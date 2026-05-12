@@ -2479,7 +2479,7 @@ async def test_fetch_page_uses_cookie_handoff_before_browser_first(
     assert curl_calls == [
         {
             "url": url,
-            "timeout": 10.0,
+            "timeout": 3.0,
             "proxy": None,
             "cookie_header": "session=ok",
         }

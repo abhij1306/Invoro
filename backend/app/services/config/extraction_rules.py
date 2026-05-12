@@ -915,9 +915,9 @@ VARIANT_OPTION_VALUE_NOISE_PATTERNS = {
     "search": (r"\b(?:please\s+)?select\b",),
 }
 VARIANT_PLACEHOLDER_VALUES = frozenset(
-    {"default title", "choose", "option", "select", "swatch"}
+    {"default title", "choose", "option", "select", "swatch", "size chart", "(size chart)"}
 )
-VARIANT_PLACEHOLDER_PREFIXES = ("please select", "open ")
+VARIANT_PLACEHOLDER_PREFIXES = ("please select", "open ", "select ")
 VARIANT_SIZE_QUANTITY_CONTROL_VALUES = frozenset({"-", "+"})
 SIZE_REJECT_TOKENS = frozenset(
     {
@@ -1374,6 +1374,8 @@ VARIANT_SIZE_VALUE_PATTERNS = tuple(
             r"^(?:(?:eu|uk|us|cm|mm)[-\s]?)?\d{1,3}(?:\.\d+)?(?:/\d{1,3}(?:\.\d+)?)?$",
             r"^m\s*\d+(?:\.\d+)?\s*/\s*w\s*\d+(?:\.\d+)?$",
             r"^\d+(?:\.\d+)?/\d+(?:\.\d+)?\s+us\s+\(\d+\s+eu\)$",
+            r"^(?:xxxs|xxs|xs|s|m|l|xl|xxl|xxxl|\d+xl)\s*\(?(?:\d{1,3}(?:\s*[-–]\s*\d{1,3})?)\)?$",
+            r"^(?:xxxs|xxs|xs|s|m|l|xl|xxl|xxxl|\d+xl)\s*/\s*(?:xxxs|xxs|xs|s|m|l|xl|xxl|xxxl|\d+xl)$",
         )
     )
 )
@@ -1452,6 +1454,7 @@ VARIANT_AXIS_ALLOWED_SINGLE_TOKENS = frozenset(
         "engraving",
         "fabric_grade",
         "finish",
+        "firmness",
         "fit",
         "flavor",
         "flavour",
@@ -1484,6 +1487,7 @@ VARIANT_AXIS_ALLOWED_SINGLE_TOKENS = frozenset(
         "storage",
         "storage_capacity",
         "support",
+        "thickness",
         "thread_size",
         "tier",
         "tilt",
@@ -1498,12 +1502,9 @@ VARIANT_AXIS_ALLOWED_SINGLE_TOKENS = frozenset(
 )
 VARIANT_AXIS_GENERIC_TOKENS = frozenset(
     {
-        "attribute", "choice", "dropdown", "option", "options",
-        "please", "shoe", "shoes", "select", "selected", "selector",
-        "styledselect",
-        "swatch",
-        "variant",
-        "variation",
+        "attribute", "choice", "description", "dropdown", "item", "name", "option",
+        "options", "please", "shoe", "shoes", "select", "selected", "selector",
+        "styledselect", "swatch", "variant", "variation",
     }
 )
 VARIANT_AXIS_TECHNICAL_PATTERNS = (

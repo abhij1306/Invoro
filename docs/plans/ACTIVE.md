@@ -1,9 +1,9 @@
 # Active Plan
 
-**Current:** Variant Extraction Refactor → `docs/plans/variant-extraction-refactor-plan.md`
-**Status:** IN PROGRESS
+**Current:** Variant Extraction Refactor (DONE) → `docs/plans/variant-extraction-refactor-plan.md`
+**Status:** DONE
 **Started:** 2026-05-12
-**Last slice completed:** None — plan created, awaiting confirmation.
+**Last slice completed:** Slice 6 — Integration verification
 
 ## Previous
 - God Module Consolidation & LOC Reduction (IN PROGRESS, paused) → `docs/plans/god-module-consolidation-plan.md`

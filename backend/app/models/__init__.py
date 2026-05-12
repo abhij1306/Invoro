@@ -1,7 +1,8 @@
 # ORM model exports.
 from app.core.database import Base
-from app.models.data_enrichment import DataEnrichmentJob, EnrichedProduct
+from app.models.user import User
 from app.models.crawl_run import CrawlLog, CrawlRecord, CrawlRun
+from app.models.data_enrichment import DataEnrichmentJob, EnrichedProduct
 from app.models.domain_memory import (
     DomainCookieMemory,
     DomainFieldFeedback,
@@ -17,7 +18,6 @@ from app.models.product_intelligence import (
     ProductIntelligenceSourceProduct,
 )
 from app.models.review import ReviewPromotion
-from app.models.user import User
 
 __all__ = [
     "Base",

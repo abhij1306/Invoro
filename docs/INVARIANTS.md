@@ -236,6 +236,8 @@ Detail extraction must also reject collection/category URLs that expose product-
   1. Try curl handoff first.
   2. On drift/block/empty output, fallback to the proven browser engine.
   3. On further failure, revert to the normal auto policy.
+- **Handoff timeout is capped at `browser_http_handoff_timeout_seconds` (default 3s), not the full HTTP timeout.**
+  Handoff is speculative — it tries to skip the browser entirely using stored cookies. If the WAF hangs or slow-rejects, the full `http_timeout_seconds` (10s) would burn before the browser even starts launching. On WAF-heavy sites this caused 20–26s total acquisition delay (handoff timeout + cold browser launch). The dedicated short timeout ensures handoff either succeeds fast or fails fast, keeping browser-first paths responsive.
 - Host protection memory is short-TTL block/backoff memory only. It may bias browser-first safety, but it must not become the durable owner of engine preference or handoff eligibility.
 - After the configured acquisition-contract stale threshold of consecutive non-blocked zero-data failures, the contract is marked stale. Stale contracts must not keep forcing browser engine or curl handoff choices.
 

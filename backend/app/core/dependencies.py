@@ -1,6 +1,8 @@
 # FastAPI dependency helpers.
 from __future__ import annotations
 
+import inspect
+
 from app.core.config import settings
 from app.core.database import get_session
 from app.core.security import decode_access_token
@@ -12,6 +14,8 @@ from fastapi import Cookie, Depends, Header, HTTPException, status
 from jose import JWTError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+_run_dispatchers: dict[bool, RunDispatcher] = {}
 
 
 async def get_db(
@@ -67,7 +71,24 @@ async def require_admin(
 
 
 def get_run_dispatcher() -> RunDispatcher:
-    """Resolve the run dispatcher based on settings. Called once at startup or per-request."""
-    if settings.celery_dispatch_enabled:
-        return CeleryRunDispatcher()
-    return LocalRunDispatcher()
+    """Resolve one shared run dispatcher per dispatch mode."""
+    celery_enabled = bool(settings.celery_dispatch_enabled)
+    dispatcher = _run_dispatchers.get(celery_enabled)
+    if dispatcher is None:
+        dispatcher = CeleryRunDispatcher() if celery_enabled else LocalRunDispatcher()
+        _run_dispatchers[celery_enabled] = dispatcher
+    return dispatcher
+
+
+async def shutdown_run_dispatchers() -> None:
+    """Best-effort cleanup for shared dispatcher instances."""
+    for dispatcher in list(_run_dispatchers.values()):
+        cleanup = getattr(dispatcher, "shutdown", None) or getattr(
+            dispatcher, "close", None
+        )
+        if not callable(cleanup):
+            continue
+        result = cleanup()
+        if inspect.isawaitable(result):
+            await result
+    _run_dispatchers.clear()

@@ -768,7 +768,10 @@ async def _try_browser_http_handoff(
             )
             if not cookie_header:
                 continue
-            handoff_timeout = _resolve_http_timeout(context)
+            handoff_timeout = min(
+                float(crawler_runtime_settings.browser_http_handoff_timeout_seconds),
+                _resolve_http_timeout(context),
+            )
             try:
                 result = await _curl_fetch(
                     context.url,

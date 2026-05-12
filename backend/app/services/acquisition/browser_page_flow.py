@@ -56,6 +56,29 @@ from app.services.platform_policy import (
 logger = logging.getLogger(__name__)
 
 
+def _generic_card_selectors_for_surface(surface: str | None) -> list[str]:
+    if not isinstance(CARD_SELECTORS, dict):
+        return []
+    normalized_surface = str(surface or "").strip().lower()
+    if normalized_surface == "jobs" or normalized_surface.startswith("job_"):
+        groups = ("jobs",)
+    elif normalized_surface == "ecommerce" or normalized_surface.startswith(
+        "ecommerce_"
+    ):
+        groups = ("ecommerce",)
+    else:
+        groups = tuple(str(key) for key in CARD_SELECTORS)
+    selectors: list[str] = []
+    seen: set[str] = set()
+    for group in groups:
+        for selector in list(CARD_SELECTORS.get(group) or []):
+            normalized = str(selector or "").strip()
+            if normalized and normalized not in seen:
+                selectors.append(normalized)
+                seen.add(normalized)
+    return selectors
+
+
 @dataclass(slots=True)
 class BrowserFinalizeInput:
     page: Any
@@ -824,16 +847,7 @@ async def settle_browser_page_impl(
         # skeleton and the product tiles mount asynchronously. The selector
         # vocabulary is the same one used by the extractor, so we only wait for
         # things we can actually parse.
-        selector_group = (
-            "jobs"
-            if str(surface or "").strip().lower().startswith("job_")
-            else "ecommerce"
-        )
-        generic_card_selectors = [
-            str(selector or "").strip()
-            for selector in list(CARD_SELECTORS.get(selector_group) or [])
-            if str(selector or "").strip()
-        ]
+        generic_card_selectors = _generic_card_selectors_for_surface(surface)
         if generic_card_selectors:
             generic_override = {
                 "platform": "generic",

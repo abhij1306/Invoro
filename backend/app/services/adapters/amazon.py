@@ -31,6 +31,9 @@ from app.services.field_value_core import (
     extract_currency_code,
     flatten_variants_for_public_output,
 )
+from app.services.extract.shared_variant_logic import (
+    normalized_variant_axis_key as _normalized_variant_axis_key,
+)
 
 
 def _clean_brand(value: str) -> str:
@@ -47,7 +50,7 @@ def _axis_key(value: object) -> str:
         return "color"
     if normalized.startswith("size"):
         return "size"
-    return re.sub(r"[^a-z0-9]+", "_", normalized).strip("_")
+    return _normalized_variant_axis_key(normalized) or re.sub(r"[^a-z0-9]+", "_", normalized).strip("_")
 
 
 def _availability(value: object) -> str | None:
@@ -565,7 +568,7 @@ class AmazonAdapter(BaseAdapter):
         axis_names = [_axis_key(dim) for dim in dim_order]
         if len(axis_names) != 1:
             return variants
-        entry_lists = [axis_entries.get(axis_name) or [] for axis_name in axis_names]
+        entry_lists = [axis_entries.get(axis_names[0]) or []]
         for combo in product(*entry_lists):
             option_values: dict[str, str] = {}
             metadata: dict[str, object] = {}

@@ -237,6 +237,7 @@ class CrawlerRuntimeSettings(BaseSettings):
     browser_proxy_bridge_first_byte_timeout_seconds: float = 15.0
     browser_proxy_domain_storage_enabled: bool = False
     browser_http_handoff_enabled: bool = True
+    browser_http_handoff_timeout_seconds: float = 3.0
     browser_http_handoff_cookie_engines: tuple[str, ...] = (
         "real_chrome",
         "patchright",

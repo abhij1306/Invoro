@@ -219,7 +219,6 @@ async def _mark_run_failed_with_retry(
     session_factory=SessionLocal,
 ) -> None:
     """Best-effort failure marking."""
-    from app.models.crawl_run import CrawlRun
     from app.services.crawl_state import CrawlStatus, update_run_status
 
     async with session_factory() as error_session:
@@ -656,6 +655,7 @@ async def crawls_logs_ws(
         await websocket.accept()
         cursor = after_id
         poll_interval_seconds = _log_stream_sleep_seconds()
+        missing_run_snapshots = 0
         try:
             while True:
                 rows, next_run = await _load_log_stream_snapshot(
@@ -668,9 +668,19 @@ async def crawls_logs_ws(
                     cursor = row.id
 
                 if next_run is None:
-                    await websocket.close(code=1008, reason=RUN_NOT_FOUND_DETAIL)
-                    return
-                run = next_run
+                    missing_run_snapshots += 1
+                    logger.warning(
+                        "Run logs snapshot did not reload run %s; retrying",
+                        run_id,
+                    )
+                    if missing_run_snapshots >= 3:
+                        await websocket.close(
+                            code=1011, reason="Run snapshot unavailable"
+                        )
+                        return
+                else:
+                    missing_run_snapshots = 0
+                    run = next_run
                 if run.status_value in TERMINAL_STATUSES and not rows:
                     await websocket.close(code=1000, reason="Run completed")
                     return

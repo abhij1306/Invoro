@@ -122,6 +122,22 @@ def browser_finalize_support(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace
     )
 
 
+def test_generic_card_selectors_use_all_groups_for_unknown_listing_surface(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        browser_page_flow,
+        "CARD_SELECTORS",
+        {"ecommerce": [".product-card"], "jobs": [".job-card", ".product-card"]},
+    )
+
+    selectors = browser_page_flow._generic_card_selectors_for_surface(
+        "automobile_listing"
+    )
+
+    assert selectors == [".product-card", ".job-card"]
+
+
 def test_select_primary_browser_html_prefers_full_rendered_when_traversal_fragment_is_capped() -> (
     None
 ):

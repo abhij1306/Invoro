@@ -22,6 +22,7 @@ from app.api.review import router as review_router
 from app.api.selectors import router as selectors_router
 from app.api.users import router as users_router
 from app.core.config import get_frontend_origins, settings
+from app.core.dependencies import shutdown_run_dispatchers
 from app.core.metrics import (
     check_browser_pool,
     check_database,
@@ -68,6 +69,7 @@ async def lifespan(_: FastAPI):
     try:
         yield
     finally:
+        await shutdown_run_dispatchers()
         await shutdown_browser_runtime()
         await close_shared_http_client()
         await close_llm_provider_clients()

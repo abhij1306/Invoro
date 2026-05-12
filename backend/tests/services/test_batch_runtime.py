@@ -169,6 +169,63 @@ async def test_process_run_tracks_failure_reason_counts(
 
 
 @pytest.mark.asyncio
+async def test_process_run_starts_with_fresh_batch_progress(
+    db_session: AsyncSession,
+    test_user,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run = await create_crawl_run(
+        db_session,
+        test_user.id,
+        {
+            "run_type": "batch",
+            "surface": "ecommerce_detail",
+            "settings": {
+                "urls": [
+                    "https://example.com/products/stale-a",
+                    "https://example.com/products/stale-b",
+                ],
+            },
+        },
+    )
+    run.update_summary(
+        url_verdicts=["success", "blocked"],
+        completed_urls=2,
+        processed_urls=2,
+        verdict_counts={"success": 1, "blocked": 1},
+        acquisition_summary={"methods": {"stale": 2}},
+    )
+    await db_session.commit()
+
+    async def _fake_process_single_url(*args, **kwargs):
+        url = str(kwargs.get("url") or "")
+        if "stale-a" in url:
+            return URLProcessingResult(
+                records=[],
+                verdict="error",
+                url_metrics={"record_count": 0, "method": "fresh"},
+            )
+        return URLProcessingResult(
+            records=[],
+            verdict="success",
+            url_metrics={"record_count": 0, "method": "fresh"},
+        )
+
+    monkeypatch.setattr(
+        "app.services._batch_runtime.process_single_url",
+        _fake_process_single_url,
+    )
+
+    await process_run(db_session, run.id)
+    await db_session.refresh(run)
+
+    assert run.result_summary["url_verdicts"] == ["error", "success"]
+    assert run.result_summary["completed_urls"] == 2
+    assert run.result_summary["verdict_counts"] == {"error": 1, "success": 1}
+    assert run.result_summary["acquisition_summary"]["methods"] == {"fresh": 2}
+
+
+@pytest.mark.asyncio
 async def test_process_run_aggregates_quality_summary_from_url_metrics(
     db_session: AsyncSession,
     test_user,

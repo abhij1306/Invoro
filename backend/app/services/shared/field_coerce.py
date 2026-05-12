@@ -602,8 +602,9 @@ def _sanitize_option_scalar(field_name: str, value: object) -> str | None:
     elif field_name == "size":
         cleaned = re.sub(r"^size\s*:\s*", "", cleaned, flags=re.I)
         cleaned = re.split(r"\bview as list\b", cleaned, maxsplit=1, flags=re.I)[0]
+        cleaned = re.sub(r"\s*\(size\s+chart\)", "", cleaned, flags=re.I)
         cleaned = clean_text(cleaned)
-        if re.search(r"\bplease\s+select\b", cleaned, flags=re.I):
+        if re.search(r"\b(?:please\s+)?select(?:\s+size)?\b", cleaned, flags=re.I):
             return None
         if cleaned.strip().lower() in _SIZE_REJECT_TOKENS_NORMALIZED:
             return None
@@ -682,9 +683,7 @@ _PUBLIC_VARIANT_AXIS_KEYS = frozenset(
 
 def _canonical_variant_axis_key(value: object) -> str:
     axis_key = re.sub(
-        r"[^a-z0-9]+",
-        "_",
-        str(value or "").strip().lower().replace("&", " "),
+        r"[^a-z0-9]+", "_", str(value or "").strip().lower().replace("&", " "),
     ).strip("_")
     return AXIS_NAME_ALIASES.get(axis_key, axis_key)
 

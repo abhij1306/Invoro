@@ -19,6 +19,7 @@ from app.services.crawl_state import (
 from app.services.crawl_utils import normalize_target_url, parse_csv_urls_async
 from app.services.config.runtime_settings import crawler_runtime_settings
 from app.services.domain_utils import normalize_domain
+from app.services.acquisition.browser_runtime import get_browser_runtime, patchright_browser_available
 from app.services.pipeline.extraction_loop import process_single_url
 from app.services.pipeline.run_progress import BatchRunProgressState
 from app.services.pipeline.runtime_helpers import (
@@ -34,6 +35,17 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
+
+
+async def _prewarm_browser_pool() -> None:
+    """Launch patchright browser process ahead of first URL so cold start doesn't block acquisition."""
+    if not patchright_browser_available():
+        return
+    try:
+        runtime = await get_browser_runtime(browser_engine="patchright")
+        await runtime._ensure()
+    except Exception:
+        logger.debug("Browser pool pre-warm failed; will launch on demand", exc_info=True)
 
 
 def _require_url_processing_result(url_result: object) -> URLProcessingResult:
@@ -220,8 +232,7 @@ async def process_run(session: AsyncSession, run_id: int) -> None:
         sleep_ms = settings_view.sleep_ms()
         url_timeout_seconds = _url_timeout_seconds(settings_view)
 
-        progress_state = BatchRunProgressState.from_run(
-            run,
+        progress_state = BatchRunProgressState(
             total_urls=total_urls,
             url_domain=normalize_domain(url_list[0]) if url_list else "",
             persisted_record_count=as_int(run.get_summary("record_count", 0)),
@@ -238,6 +249,9 @@ async def process_run(session: AsyncSession, run_id: int) -> None:
 
         verdicts: list[str] = []
         record_count = as_int(run.get_summary("record_count", 0))
+
+        # Pre-warm browser pool so cold start doesn't block first URL acquisition.
+        prewarm_task = asyncio.create_task(_prewarm_browser_pool())
 
         for idx, url in enumerate(url_list, start=1):
             await session.refresh(run)

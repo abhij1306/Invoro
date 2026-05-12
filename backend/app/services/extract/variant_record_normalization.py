@@ -44,6 +44,7 @@ from app.services.field_value_core import (
 )
 from app.services.extract.shared_variant_logic import (
     collapse_duplicate_size_aliases,
+    infer_variant_group_name_from_values,
     merge_variant_pair,
     normalized_variant_axis_key,
     variant_option_value_is_noise,
@@ -211,7 +212,53 @@ def _hydrate_variant_axes(record: dict[str, Any]) -> None:
     _infer_single_variant_axes(record)
 
 
+# Axes that are technically public but should be remapped when their values
+# clearly belong to a more specific axis (size, color).
+_REMAP_ELIGIBLE_AXES = frozenset({"state", "type", "style", "configuration"})
+_CORE_AXES = frozenset({"size", "color"})
+
+
+def _remap_generic_variant_axes(record: dict[str, Any]) -> None:
+    """Remap generic/non-semantic axes to size or color when values match."""
+    variants = record.get("variants")
+    if not isinstance(variants, list) or not variants:
+        return
+    # Collect axes that appear across all variant rows (excluding core axes).
+    generic_axis_values: dict[str, list[str]] = {}
+    for variant in variants:
+        if not isinstance(variant, dict):
+            continue
+        for axis in _REMAP_ELIGIBLE_AXES:
+            value = clean_text(variant.get(axis))
+            if value:
+                generic_axis_values.setdefault(axis, []).append(value)
+    if not generic_axis_values:
+        return
+    for axis, values in generic_axis_values.items():
+        if len(values) < 2:
+            continue
+        # Only remap if no variant already has the target axis populated.
+        inferred = infer_variant_group_name_from_values(values)
+        if not inferred or inferred not in _CORE_AXES:
+            continue
+        # Check that no variant already has the target axis set.
+        if any(
+            clean_text(variant.get(inferred))
+            for variant in variants
+            if isinstance(variant, dict)
+        ):
+            continue
+        # Remap: move values from generic axis to the inferred axis.
+        for variant in variants:
+            if not isinstance(variant, dict):
+                continue
+            value = variant.pop(axis, None)
+            if value not in (None, "", [], {}):
+                variant[inferred] = value
+
+
 def _sanitize_variant_axes(record: dict[str, Any]) -> None:
+    _remap_generic_variant_axes(record)
     drop_cross_product_variant_rows(record, color_extractor=_extract_color_value)
     _flatten_variant_rows(record)
     _clean_variant_rows(record)

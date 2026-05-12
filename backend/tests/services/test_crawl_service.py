@@ -8,6 +8,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from app.core import database as database_module
+from app.core import dependencies as dependencies_module
 from app.core.config import settings
 from app.models.crawl_run import CrawlRecord, CrawlRun
 from app.models.review import ReviewPromotion
@@ -34,6 +35,25 @@ from app.services.exceptions import CrawlerConfigurationError
 from app.services.crawl_state import get_control_request, update_run_status
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncSession
+
+
+def test_get_run_dispatcher_reuses_dispatch_mode_singletons(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    dependencies_module._run_dispatchers.clear()
+    try:
+        monkeypatch.setattr(settings, "celery_dispatch_enabled", False)
+        local_dispatcher = dependencies_module.get_run_dispatcher()
+
+        assert dependencies_module.get_run_dispatcher() is local_dispatcher
+
+        monkeypatch.setattr(settings, "celery_dispatch_enabled", True)
+        celery_dispatcher = dependencies_module.get_run_dispatcher()
+
+        assert dependencies_module.get_run_dispatcher() is celery_dispatcher
+        assert celery_dispatcher is not local_dispatcher
+    finally:
+        dependencies_module._run_dispatchers.clear()
 
 
 async def _create_running_run(
