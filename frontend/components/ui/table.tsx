@@ -94,7 +94,11 @@ export function TableCell({
   colSpan,
   ...props
 }: Readonly<
-  { children: ReactNode; className?: string; colSpan?: number } & React.TdHTMLAttributes<HTMLTableCellElement>
+  {
+    children: ReactNode;
+    className?: string;
+    colSpan?: number;
+  } & React.TdHTMLAttributes<HTMLTableCellElement>
 >) {
   return (
     <td

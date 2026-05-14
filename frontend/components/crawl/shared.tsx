@@ -1061,7 +1061,8 @@ function groupDurationMs(group: LogSiteGroup, activeNowMs?: number): number | nu
           ? (acquisition.browser_diagnostics as Record<string, unknown>)
           : null;
       const phaseTimings =
-        browserDiagnostics?.phase_timings_ms && typeof browserDiagnostics.phase_timings_ms === 'object'
+        browserDiagnostics?.phase_timings_ms &&
+        typeof browserDiagnostics.phase_timings_ms === 'object'
           ? (browserDiagnostics.phase_timings_ms as Record<string, unknown>)
           : null;
       return numberOrNull(phaseTimings?.total);
@@ -1478,7 +1479,8 @@ export const LogTerminal = memo(function LogTerminal({
             const payload = payloadSnapshot(group);
             const confidence = groupConfidence(group);
             const coverage = groupFieldCoverage(group, requestedFields);
-            const activeGroup = live && groups.length > 0 && group.key === groups[groups.length - 1].key;
+            const activeGroup =
+              live && groups.length > 0 && group.key === groups[groups.length - 1].key;
             const durationMs = groupDurationMs(group, activeGroup ? nowMs : undefined);
             const lastLog = group.logs.at(-1);
             const summaryLog =
@@ -1734,9 +1736,7 @@ export const LogTerminal = memo(function LogTerminal({
                     Copy
                   </Button>
                 </div>
-                <pre
-                  className="crawl-terminal crawl-terminal-json h-full max-h-full overflow-auto"
-                >
+                <pre className="crawl-terminal crawl-terminal-json h-full max-h-full overflow-auto">
                   {peekedGroup && peekedGroup.records[safePeekedRecordIndex]
                     ? JSON.stringify(
                         cleanRecordForDisplay(peekedGroup.records[safePeekedRecordIndex]),
