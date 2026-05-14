@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.services import crawl_fetch_runtime
+from app.services.fetch import fetch_context as crawl_fetch_runtime
 from app.services import extraction_runtime
 from app.services.acquisition.host_protection_memory import HostProtectionPolicy
 from app.services.adapters.belk import BelkAdapter
@@ -17,7 +17,7 @@ from app.services.extract.detail_price_extractor import backfill_detail_price_fr
 from app.services.extract.variant_record_normalization import normalize_variant_record
 from app.services.extraction_runtime import extract_records
 from app.services.js_state_helpers import select_variant
-from app.services.js_state_mapper import map_js_state_to_fields
+from app.services.js_state.state_normalizer import map_js_state_to_fields
 from app.services.listing_extractor import extract_listing_records
 from tests.fixtures.loader import read_optional_artifact_text
 

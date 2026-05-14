@@ -6,7 +6,7 @@ from urllib.parse import urlparse
 from selectolax.lexbor import LexborHTMLParser
 
 from app.services.adapters.base import AdapterResult, BaseAdapter
-from app.services.field_value_core import (
+from app.services.shared.field_coerce import (
     absolute_url,
     clean_text,
     finalize_record,

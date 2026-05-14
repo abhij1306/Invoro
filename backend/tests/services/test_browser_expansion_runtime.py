@@ -17,6 +17,7 @@ from app.services.acquisition import (
     browser_capture,
     browser_detail,
     browser_recovery,
+    cookie_store,
     dom_runtime,
 )
 from app.services.acquisition.browser_capture import BrowserNetworkCapture
@@ -122,7 +123,7 @@ def browser_finalize_support(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace
     )
 
 
-def test_generic_card_selectors_use_all_groups_for_unknown_listing_surface(
+def test_generic_card_selectors_use_ecommerce_group_for_unknown_listing_surface(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
@@ -135,7 +136,8 @@ def test_generic_card_selectors_use_all_groups_for_unknown_listing_surface(
         "automobile_listing"
     )
 
-    assert selectors == [".product-card", ".job-card"]
+    # Non-job surfaces route to ecommerce group only, matching listing_selector_group.
+    assert selectors == [".product-card"]
 
 
 def test_select_primary_browser_html_prefers_full_rendered_when_traversal_fragment_is_capped() -> (
@@ -2870,12 +2872,8 @@ async def test_listing_card_signal_count_uses_heuristic_card_fallback_after_sele
         return 9 if allow_heuristic else 0
 
     monkeypatch.setattr(
-        browser_runtime, "count_listing_cards", _fake_count_listing_cards
-    )
-    monkeypatch.setattr(
-        browser_runtime,
-        "CARD_SELECTORS",
-        {"ecommerce": [".product-card"], "jobs": [".job-card"]},
+        "app.services.acquisition.traversal.count_listing_cards",
+        _fake_count_listing_cards,
     )
 
     count = await browser_runtime.listing_card_signal_count(
@@ -4038,7 +4036,7 @@ async def test_page_might_have_location_interstitial_uses_live_selector_probe() 
             assert "selectors" in payload
             return True
 
-    detected = await browser_page_flow._page_might_have_location_interstitial(_Page())
+    detected = await browser_page_flow.page_might_have_location_interstitial(_Page())
 
     assert detected is True
 
@@ -4117,7 +4115,7 @@ async def test_wait_for_listing_readiness_treats_only_playwright_timeout_as_reco
         wait_for_selector_error=PlaywrightTimeoutError("listing readiness timeout"),
     )
 
-    diagnostics = await browser_runtime._wait_for_listing_readiness(
+    diagnostics = await browser_readiness.wait_for_listing_readiness_impl(
         page,
         override={
             "platform": "example",
@@ -4140,7 +4138,7 @@ async def test_wait_for_listing_readiness_propagates_browser_closure() -> None:
     )
 
     with pytest.raises(PlaywrightError, match="closed"):
-        await browser_runtime._wait_for_listing_readiness(
+        await browser_readiness.wait_for_listing_readiness_impl(
             page,
             override={
                 "platform": "example",
@@ -4374,8 +4372,8 @@ async def test_browser_fetch_skips_real_chrome_warmup_when_domain_cookies_exist(
         captured_skip_flags.append(bool(kwargs.get("skip_for_reusable_domain_state")))
 
     monkeypatch.setattr(
-        browser_runtime,
-        "_load_storage_state_for_domain",
+        cookie_store,
+        "load_storage_state_for_domain",
         _fake_load_storage_state_for_domain,
     )
     monkeypatch.setattr(

@@ -602,7 +602,7 @@ def _sanitize_option_scalar(field_name: str, value: object) -> str | None:
     elif field_name == "size":
         cleaned = re.sub(r"^size\s*:\s*", "", cleaned, flags=re.I)
         cleaned = re.split(r"\bview as list\b", cleaned, maxsplit=1, flags=re.I)[0]
-        cleaned = re.sub(r"\s*\(size\s+chart\)", "", cleaned, flags=re.I)
+        cleaned = re.sub(r"\s*\(size[\s_-]*chart\)", "", cleaned, flags=re.I)
         cleaned = clean_text(cleaned)
         if re.search(r"\b(?:please\s+)?select(?:\s+size)?\b", cleaned, flags=re.I):
             return None

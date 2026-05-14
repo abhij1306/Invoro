@@ -31,13 +31,13 @@ from app.services.config.extraction_rules import (
 from app.services.config.variant_policy import (
     DETAIL_VARIANT_SIZE_MIN_FOR_NUMERIC_PARENT_DROP,
 )
-from app.services.field_value_core import (
+from app.services.shared.field_coerce import (
     clean_text,
     enforce_flat_variant_public_contract,
     text_or_none,
 )
 from app.services.field_url_normalization import same_site
-from app.services.field_value_dom import dedupe_image_urls, upgrade_low_resolution_image_url
+from app.services.dom.selector_engine import dedupe_image_urls, upgrade_low_resolution_image_url
 from app.services.extract.shared_variant_logic import (
     normalized_variant_axis_key,
     variant_axis_allowed_single_tokens,

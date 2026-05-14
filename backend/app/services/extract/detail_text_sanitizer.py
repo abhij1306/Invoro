@@ -46,7 +46,7 @@ from app.services.config.extraction_rules import (
     TOKEN_MIN_LEN_CHUNK,
     TOKEN_MIN_LEN_DISTINCTIVE,
 )
-from app.services.field_value_core import LONG_TEXT_FIELDS, clean_text, text_or_none
+from app.services.shared.field_coerce import LONG_TEXT_FIELDS, clean_text, text_or_none
 
 document_link_label_patterns = tuple(
     re.compile(str(pattern), re.I)

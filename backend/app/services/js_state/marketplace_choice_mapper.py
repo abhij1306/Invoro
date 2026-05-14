@@ -7,7 +7,7 @@ from app.services.config.js_state_field_specs import (
     JS_STATE_PRODUCT_PAYLOAD_LIMIT,
 )
 from app.services.extract.shared_variant_logic import merge_variant_rows
-from app.services.field_value_core import text_or_none
+from app.services.shared.field_coerce import text_or_none
 from app.services.js_state_helpers import compact_dict
 
 

@@ -27,7 +27,7 @@ from app.services.config.extraction_rules import (
     LISTING_BRAND_MAX_WORDS,
 )
 from app.services.extract.listing_candidate_ranking import looks_like_utility_title
-from app.services.field_value_core import (
+from app.services.shared.field_coerce import (
     absolute_url,
     clean_text,
     coerce_field_value,

@@ -50,11 +50,12 @@ from app.services.acquisition.browser_identity import (
     build_playwright_context_spec,
     clear_browser_identity_cache,
 )
-from app.services.acquisition.cookie_store import (
-    load_storage_state_for_domain,
-    load_storage_state_for_run,
-    persist_storage_state_for_domain,
-    persist_storage_state_for_run,
+from app.services.acquisition import cookie_store
+from app.services.acquisition.browser_storage_state import (
+    DOMAIN_STORAGE_PERSIST_ATTR as _DOMAIN_STORAGE_PERSIST_ATTR,
+    RUN_STORAGE_PERSIST_ATTR as _RUN_STORAGE_PERSIST_ATTR,
+    mark_storage_state_persist_policy,
+    persist_context_storage_state,
 )
 from app.services.acquisition.browser_page_flow import (
     BrowserFinalizeInput,
@@ -77,10 +78,13 @@ from app.services.acquisition.browser_proxy_config import (
     normalized_proxy_value as _normalized_proxy_value,
 )
 from app.services.acquisition.browser_readiness import (
-    classify_browser_outcome_impl,
-    classify_low_content_reason_impl,
-    probe_browser_readiness_impl,
-    wait_for_listing_readiness_impl,
+    classify_browser_outcome,
+    classify_low_content_reason,
+    detail_readiness_hint_count,
+    listing_card_signal_count,
+    looks_like_low_content_shell,
+    probe_browser_readiness,
+    wait_for_listing_readiness,
 )
 from app.services.acquisition.browser_recovery import (
     emit_browser_behavior_activity,
@@ -91,7 +95,6 @@ from app.services.acquisition.browser_stage_runner import (
 )
 from app.services.acquisition.dom_runtime import get_page_html
 from app.services.acquisition.runtime import (
-    BlockPageClassification,
     NetworkPayloadReadResult,
     classify_blocked_page_async,
     copy_headers,
@@ -99,14 +102,12 @@ from app.services.acquisition.runtime import (
     is_blocked_html_async,
 )
 from app.services.acquisition.traversal import (
-    count_listing_cards,
     execute_listing_traversal,
     recover_listing_page_content,
     should_run_traversal,
 )
 from app.services.config.extraction_rules import (
     BROWSER_DETAIL_EXPAND_KEYWORDS,
-    BROWSER_DETAIL_READINESS_HINTS,
     DETAIL_EXPAND_KEYWORD_EXTENSIONS,
 )
 from app.services.config.browser_fingerprint_profiles import (
@@ -125,18 +126,14 @@ from app.services.config.runtime_settings import (
     crawler_runtime_settings,
     proxy_rotation_mode,
 )
-from app.services.config.selectors import CARD_SELECTORS
 from app.services.domain_utils import normalize_domain
-from app.services.field_value_core import clean_text
-from app.services.platform_policy import resolve_listing_readiness_override
+from app.services.shared.field_coerce import clean_text
 
 if TYPE_CHECKING:
     from patchright.async_api import Browser, BrowserContext, Playwright
 
 logger = logging.getLogger(__name__)
 
-_RUN_STORAGE_PERSIST_ATTR = "_crawler_persist_run_storage_state"
-_DOMAIN_STORAGE_PERSIST_ATTR = "_crawler_persist_domain_storage_state"
 _BROWSERFORGE_ACTIVE_ATTR = "_crawler_browserforge_active"
 class BrowserRuntimePool:
     def __init__(self) -> None:
@@ -150,10 +147,6 @@ _BROWSER_POOL = BrowserRuntimePool()
 _DETAIL_EXPAND_KEYWORDS: dict[str, tuple[str, ...]] = {
     str(key): tuple(str(item) for item in list(value or []))
     for key, value in dict(BROWSER_DETAIL_EXPAND_KEYWORDS or {}).items()
-}
-_DETAIL_READINESS_HINTS: dict[str, tuple[str, ...]] = {
-    str(key): tuple(str(item) for item in list(value or []))
-    for key, value in dict(BROWSER_DETAIL_READINESS_HINTS or {}).items()
 }
 _AOM_EXPAND_ROLES = {"button", "tab"}
 
@@ -533,12 +526,12 @@ class SharedBrowserRuntime:
                 )
             )
             if allow_storage_state:
-                storage_state = await _load_storage_state_for_run(
+                storage_state = await cookie_store.load_storage_state_for_run(
                     run_id,
                     browser_engine=self.browser_engine,
                 )
                 if not storage_state and allow_domain_storage_state:
-                    storage_state = await _load_storage_state_for_domain(
+                    storage_state = await cookie_store.load_storage_state_for_domain(
                         domain,
                         browser_engine=self.browser_engine,
                     )
@@ -552,7 +545,7 @@ class SharedBrowserRuntime:
         finally:
             await self._update_active_contexts(-1)
             if context is not None:
-                await _persist_context_storage_state(
+                await persist_context_storage_state(
                     context,
                     run_id=run_id,
                     domain=domain,
@@ -916,146 +909,6 @@ def _log_shutdown_task_result(task: asyncio.Task[None]) -> None:
         logger.exception("Browser runtime shutdown task failed")
 
 
-async def _persist_context_storage_state(
-    context: Any,
-    *,
-    run_id: int | None,
-    domain: str | None,
-    browser_engine: str = _CHROMIUM_BROWSER_ENGINE,
-    persist_run_storage_state: bool = True,
-    persist_domain_storage_state: bool = True,
-    timeout_seconds: float | None = None,
-) -> None:
-    normalized_domain = str(domain or "").strip()
-    if run_id is None and not normalized_domain:
-        return
-    storage_state_fn = getattr(context, "storage_state", None)
-    if storage_state_fn is None:
-        return
-    resolved_timeout_seconds = max(
-        0.1,
-        float(
-            timeout_seconds
-            if timeout_seconds is not None
-            else _browser_context_timeout_seconds()
-        ),
-    )
-    try:
-        storage_state = await asyncio.wait_for(
-            storage_state_fn(),
-            timeout=resolved_timeout_seconds,
-        )
-    except asyncio.TimeoutError:
-        logger.warning(
-            "Timed out capturing browser storage state for run_id=%s domain=%s after %.1fs",
-            run_id,
-            normalized_domain or None,
-            resolved_timeout_seconds,
-        )
-        return
-    except Exception:
-        logger.debug(
-            "Failed to capture browser storage state for run_id=%s",
-            run_id,
-            exc_info=True,
-        )
-        return
-    if run_id is not None and persist_run_storage_state:
-        try:
-            await _persist_storage_state_for_run(
-                run_id,
-                storage_state,
-                browser_engine=browser_engine,
-            )
-        except Exception:
-            logger.error(
-                "Failed to persist browser storage state for run_id=%s",
-                run_id,
-                exc_info=True,
-            )
-    if normalized_domain and persist_domain_storage_state:
-        try:
-            await _persist_storage_state_for_domain(
-                normalized_domain,
-                storage_state,
-                browser_engine=browser_engine,
-            )
-        except Exception:
-            logger.error(
-                "Failed to persist browser storage state for domain=%s",
-                normalized_domain,
-                exc_info=True,
-            )
-
-
-async def _load_storage_state_for_run(
-    run_id: int | None,
-    *,
-    browser_engine: str,
-) -> dict[str, object] | None:
-    return await load_storage_state_for_run(
-        run_id,
-        browser_engine=browser_engine,
-    )
-
-
-async def _load_storage_state_for_domain(
-    domain: str | None,
-    *,
-    browser_engine: str,
-) -> dict[str, object] | None:
-    return await load_storage_state_for_domain(
-        domain,
-        browser_engine=browser_engine,
-    )
-
-
-async def _persist_storage_state_for_run(
-    run_id: int | None,
-    storage_state,
-    *,
-    browser_engine: str,
-) -> None:
-    await persist_storage_state_for_run(
-        run_id,
-        storage_state,
-        browser_engine=browser_engine,
-    )
-
-
-async def _persist_storage_state_for_domain(
-    domain: str | None,
-    storage_state,
-    *,
-    browser_engine: str,
-) -> bool:
-    return await persist_storage_state_for_domain(
-        domain,
-        storage_state,
-        browser_engine=browser_engine,
-    )
-
-
-def _mark_storage_state_persist_policy(
-    page: Any,
-    *,
-    persist_run_storage_state: bool,
-    persist_domain_storage_state: bool,
-) -> None:
-    context = getattr(page, "context", None)
-    if callable(context):
-        try:
-            context = context()
-        except Exception:
-            return
-    if context is None:
-        return
-    with suppress(Exception):
-        setattr(context, _RUN_STORAGE_PERSIST_ATTR, persist_run_storage_state)
-    with suppress(Exception):
-        setattr(context, _DOMAIN_STORAGE_PERSIST_ATTR, persist_domain_storage_state)
-
-
 def _browser_context_timeout_seconds() -> float:
     return max(
         0.1,
@@ -1317,7 +1170,7 @@ async def browser_fetch(
                 and normalized_domain
             ):
                 skip_origin_warmup = bool(
-                    await _load_storage_state_for_domain(
+                    await cookie_store.load_storage_state_for_domain(
                         normalized_domain,
                         browser_engine=runtime_engine,
                     )
@@ -1559,7 +1412,7 @@ async def browser_fetch(
                     browser_engine=runtime_engine,
                     browser_binary=runtime_binary,
                 )
-                _mark_storage_state_persist_policy(
+                mark_storage_state_persist_policy(
                     page,
                     persist_run_storage_state=allow_storage_state
                     and not bool(finalized["blocked"]),
@@ -1754,73 +1607,6 @@ async def _settle_browser_page(
     )
 
 
-async def wait_for_listing_readiness(
-    page: Any,
-    page_url: str,
-    *,
-    override: dict[str, object] | None = None,
-) -> dict[str, object]:
-    override = override or resolve_listing_readiness_override(page_url)
-    return await _wait_for_listing_readiness(page, override=override)
-
-
-async def _wait_for_listing_readiness(
-    page: Any,
-    *,
-    override: dict[str, object] | None,
-) -> dict[str, object]:
-    return await wait_for_listing_readiness_impl(page, override=override)
-
-
-async def probe_browser_readiness(
-    page: Any,
-    *,
-    url: str,
-    surface: str,
-    listing_override: dict[str, object] | None = None,
-    html: str | None = None,
-) -> dict[str, object]:
-    return await probe_browser_readiness_impl(
-        page,
-        url=url,
-        surface=surface,
-        listing_override=listing_override,
-        html=html,
-        detail_readiness_hint_count=detail_readiness_hint_count,
-    )
-
-
-async def listing_card_signal_count(page: Any, *, surface: str) -> int:
-    selector_group = (
-        "jobs" if str(surface or "").strip().lower().startswith("job_") else "ecommerce"
-    )
-    selectors = (
-        CARD_SELECTORS.get(selector_group) if isinstance(CARD_SELECTORS, dict) else []
-    )
-    normalized_selectors = [
-        str(selector).strip()
-        for selector in list(selectors or [])
-        if str(selector).strip()
-    ]
-    if not normalized_selectors:
-        return 0
-    return await count_listing_cards(
-        page,
-        surface=surface,
-    )
-
-
-def detail_readiness_hint_count(surface: str, visible_text: str) -> int:
-    lowered_surface = str(surface or "").strip().lower()
-    if "ecommerce" in lowered_surface:
-        hints = _DETAIL_READINESS_HINTS["ecommerce"]
-    elif "job" in lowered_surface:
-        hints = _DETAIL_READINESS_HINTS["job"]
-    else:
-        hints = ()
-    return sum(1 for hint in hints if hint in visible_text)
-
-
 async def expand_detail_content_if_needed(
     page: Any,
     *,
@@ -1876,36 +1662,6 @@ def detail_expansion_keywords(
     if dynamic_keywords:
         keywords.extend(dynamic_keywords)
     return tuple(dict.fromkeys(keywords))
-
-
-def classify_browser_outcome(
-    *,
-    html: str,
-    html_bytes: int,
-    blocked: bool,
-    block_classification: BlockPageClassification | None = None,
-    traversal_result: Any = None,
-) -> str:
-    classification = block_classification or BlockPageClassification(
-        blocked=blocked,
-        outcome="challenge_page" if blocked else "ok",
-    )
-    return classify_browser_outcome_impl(
-        html=html,
-        html_bytes=html_bytes,
-        blocked=blocked,
-        block_classification=classification,
-        traversal_result=traversal_result,
-        looks_like_low_content_shell=looks_like_low_content_shell,
-    )
-
-
-def looks_like_low_content_shell(html: str, *, html_bytes: int) -> bool:
-    return classify_low_content_reason(html, html_bytes=html_bytes) is not None
-
-
-def classify_low_content_reason(html: str, *, html_bytes: int) -> str | None:
-    return classify_low_content_reason_impl(html, html_bytes=html_bytes)
 
 
 def _elapsed_ms(started_at: float) -> int:

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from app.services import js_state_mapper
-from app.services.js_state_mapper import (
+from app.services.js_state import state_normalizer as js_state_mapper
+from app.services.js_state.state_normalizer import (
     map_configured_state_payload,
     map_js_state_to_fields,
 )

@@ -4,7 +4,7 @@ from decimal import Decimal
 
 import pytest
 
-from app.services.field_value_core import (
+from app.services.shared.field_coerce import (
     _decimal_for_shared_price,
     absolute_url,
     clean_text,

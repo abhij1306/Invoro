@@ -13,7 +13,7 @@ from app.services.adapters.base import (
     selectolax_node_attr,
     selectolax_node_text,
 )
-from app.services.field_value_core import clean_text
+from app.services.shared.field_coerce import clean_text
 
 
 class ADPAdapter(BaseAdapter):

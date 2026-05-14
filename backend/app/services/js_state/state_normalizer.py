@@ -21,14 +21,14 @@ from app.services.config.js_state_field_specs import (
 from app.services.config.extraction_rules import ECOMMERCE_DESCRIPTION_BLOCK_LIMIT
 from app.services.extraction_html_helpers import extract_job_sections, html_to_text
 from app.services.field_policy import normalize_field_key
-from app.services.field_value_dom import dedupe_image_urls, extract_feature_rows
+from app.services.dom.selector_engine import dedupe_image_urls, extract_feature_rows
 from app.services.extract.shared_variant_logic import (
     merge_variant_rows,
     normalized_variant_axis_key,
     resolve_variants,
     variant_axis_name_is_semantic,
 )
-from app.services.field_value_core import (
+from app.services.shared.field_coerce import (
     clean_text,
     coerce_field_value,
     extract_urls,

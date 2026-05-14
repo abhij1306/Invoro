@@ -7,7 +7,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.services import crawl_fetch_runtime
+from app.services.fetch import fetch_context as crawl_fetch_runtime
 
 from app.models.domain_memory import DomainCookieMemory
 from app.services.acquisition import browser_identity
@@ -2222,12 +2222,12 @@ async def test_shared_browser_runtime_reuses_run_storage_state(
         persisted_states.append((int(run_id), dict(storage_state)))
 
     monkeypatch.setattr(
-        acquisition_browser_runtime,
+        cookie_store,
         "load_storage_state_for_run",
         _fake_load_storage_state_for_run,
     )
     monkeypatch.setattr(
-        acquisition_browser_runtime,
+        cookie_store,
         "persist_storage_state_for_run",
         _fake_persist_storage_state_for_run,
     )
@@ -2324,12 +2324,12 @@ async def test_shared_browser_runtime_skips_storage_state_reuse_when_disallowed(
         raise AssertionError(f"storage state should not load: {args} {kwargs}")
 
     monkeypatch.setattr(
-        acquisition_browser_runtime,
+        cookie_store,
         "load_storage_state_for_run",
         _boom,
     )
     monkeypatch.setattr(
-        acquisition_browser_runtime,
+        cookie_store,
         "load_storage_state_for_domain",
         _boom,
     )
@@ -2403,17 +2403,17 @@ async def test_shared_browser_runtime_skips_domain_storage_for_proxied_runtime_b
         domain_persist_calls.append(domain)
 
     monkeypatch.setattr(
-        acquisition_browser_runtime,
+        cookie_store,
         "load_storage_state_for_run",
         _load_run,
     )
     monkeypatch.setattr(
-        acquisition_browser_runtime,
+        cookie_store,
         "load_storage_state_for_domain",
         _load_domain,
     )
     monkeypatch.setattr(
-        acquisition_browser_runtime,
+        cookie_store,
         "persist_storage_state_for_domain",
         _persist_domain,
     )
@@ -2468,7 +2468,7 @@ async def test_shared_browser_runtime_suppresses_storage_state_persist_failures(
         raise RuntimeError("boom")
 
     monkeypatch.setattr(
-        acquisition_browser_runtime,
+        cookie_store,
         "persist_storage_state_for_run",
         _boom,
     )
@@ -2478,7 +2478,7 @@ async def test_shared_browser_runtime_suppresses_storage_state_persist_failures(
         return None
 
     monkeypatch.setattr(
-        acquisition_browser_runtime,
+        cookie_store,
         "load_storage_state_for_run",
         _no_state,
     )
@@ -2632,12 +2632,12 @@ async def test_persist_context_storage_state_normalizes_domain_before_persist(
         persisted_domains.append(domain)
 
     monkeypatch.setattr(
-        acquisition_browser_runtime,
+        cookie_store,
         "persist_storage_state_for_domain",
         _persist_domain,
     )
 
-    await acquisition_browser_runtime._persist_context_storage_state(
+    await acquisition_browser_runtime.persist_context_storage_state(
         FakeContext(),
         run_id=None,
         domain="  example.com  ",
@@ -2673,12 +2673,12 @@ async def test_persist_context_storage_state_skips_domain_persist_when_disallowe
         persisted_domains.append(domain)
 
     monkeypatch.setattr(
-        acquisition_browser_runtime,
+        cookie_store,
         "persist_storage_state_for_domain",
         _persist_domain,
     )
 
-    await acquisition_browser_runtime._persist_context_storage_state(
+    await acquisition_browser_runtime.persist_context_storage_state(
         FakeContext(),
         run_id=None,
         domain="example.com",
@@ -2715,12 +2715,12 @@ async def test_persist_context_storage_state_skips_run_persist_when_disallowed(
         persisted_run_ids.append(int(run_id or 0))
 
     monkeypatch.setattr(
-        acquisition_browser_runtime,
+        cookie_store,
         "persist_storage_state_for_run",
         _persist_run,
     )
 
-    await acquisition_browser_runtime._persist_context_storage_state(
+    await acquisition_browser_runtime.persist_context_storage_state(
         FakeContext(),
         run_id=77,
         domain=None,

@@ -24,7 +24,7 @@ from app.services.config.extraction_rules import (
 )
 from app.services.field_policy import normalize_field_key, normalize_requested_field
 
-from app.services.field_value_core import (
+from app.services.shared.field_coerce import (
     STRUCTURED_MULTI_FIELDS,
     STRUCTURED_OBJECT_FIELDS,
     STRUCTURED_OBJECT_LIST_FIELDS,

@@ -60,7 +60,7 @@ from app.services.field_policy import (
     normalize_requested_field,
 )
 from app.services.field_value_candidates import add_candidate
-from app.services.field_value_core import (
+from app.services.shared.field_coerce import (
     IMAGE_FIELDS,
     LONG_TEXT_FIELDS,
     URL_FIELDS,

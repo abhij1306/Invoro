@@ -18,7 +18,7 @@ from app.services.config.data_enrichment import (
     DATA_ENRICHMENT_TAXONOMY_CONTEXT_BLOCKS,
     DATA_ENRICHMENT_TAXONOMY_VERSION,
 )
-from app.services.field_value_core import clean_text, strip_html_tags
+from app.services.shared.field_coerce import clean_text, strip_html_tags
 
 _token_re = re.compile(r"[a-z0-9]+")
 

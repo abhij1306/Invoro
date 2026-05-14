@@ -4428,7 +4428,7 @@
       "^shop all categories$",
       "^(?:customer care|customer service|help|support|faq|about(?: us)?|returns?)$",
       "^(?:free\\s+)?(?:fast|same[- ]?day|next[- ]?day|standard|express|overnight|expedited|international)?\\s*(?:free\\s+)?shipping$",
-      "^ships?\\s+(?:in|within|same\\s*day|today)\\s*[\\w\\d\\-\\s/(),%]*$",
+      "^ships?\\s+(?:in|within|same\\s*day|today)\\s*(?:\\d+(?:\\s*[-–]\\s*\\d+)?\\s*(?:business\\s+)?(?:days?|hours?|weeks?))?$",
       "^(?:in\\s+stock|out\\s+of\\s+stock|sold\\s+out|available)$"
     ]
   },

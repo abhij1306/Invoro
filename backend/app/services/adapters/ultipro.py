@@ -5,7 +5,7 @@ from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 from app.services.adapters.base import AdapterResult, BaseAdapter
 from app.services.config.adapter_runtime_settings import adapter_runtime_settings
-from app.services.field_value_core import clean_text
+from app.services.shared.field_coerce import clean_text
 
 _DEFAULT_ORDER = "postedDateDesc"
 _SEARCH_FILTERS: tuple[dict[str, object], ...] = (

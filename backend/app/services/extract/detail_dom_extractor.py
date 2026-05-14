@@ -26,7 +26,7 @@ from app.services.config.field_mappings import (
     DOM_OPTIONAL_CUE_FIELDS,
 )
 from app.services.field_policy import exact_requested_field_key, normalize_field_key
-from app.services.field_value_core import (
+from app.services.shared.field_coerce import (
     RATING_RE,
     REVIEW_COUNT_RE,
     absolute_url,
@@ -41,7 +41,7 @@ from app.services.field_value_core import (
     surface_fields,
     text_or_none,
 )
-from app.services.field_value_dom import (
+from app.services.dom.selector_engine import (
     apply_selector_fallbacks,
     extract_feature_rows,
     extract_heading_sections,

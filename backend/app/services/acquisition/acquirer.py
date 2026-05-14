@@ -10,7 +10,7 @@ from app.services.acquisition_plan import AcquisitionPlan
 from app.services.acquisition.policy import AcquisitionPolicy
 from app.services.acquisition.policy_middleware import PolicyMiddleware
 from app.services.adapters.registry import normalize_adapter_acquisition_url
-from app.services.crawl_fetch_runtime import fetch_page
+from app.services.fetch.fetch_context import fetch_page
 from app.services.platform_policy import resolve_platform_runtime_policy
 
 logger = logging.getLogger(__name__)

@@ -103,18 +103,21 @@ Flow:
 | `acquisition/browser_capture.py` | Screenshots and network payload capture |
 | `acquisition/browser_diagnostics.py` | Browser engine labels, profile diagnostics, and failed-fetch diagnostic contracts |
 | `acquisition/browser_identity.py` | Browser fingerprint generation |
+| `acquisition/browser_interstitial.py` | Location-interstitial detection and safe dismissal |
 | `acquisition/browser_page_flow.py` | Page navigation and readiness probing |
 | `acquisition/browser_proxy_config.py` | Browser proxy URL parsing, redaction, and Playwright proxy config |
-| `acquisition/browser_readiness.py` | DOM readiness checks |
+| `acquisition/browser_readiness.py` | DOM readiness checks, listing/detail probes, outcome classification |
 | `acquisition/browser_stage_runner.py` | Bounded browser-stage execution, timeout cancellation, and page/context teardown |
+| `acquisition/browser_storage_state.py` | Browser storage-state capture and persist-policy marking |
 | `acquisition/traversal.py` | Listing pagination and load-more |
+| `acquisition/traversal_card_counting.py` | Card-count and progress-snapshot helpers used by traversal loops |
 | `acquisition/pacing.py` | Host-level rate limiting |
 | `acquisition/cookie_store.py` | Temp storage state plus domain cookie memory helpers |
-| `crawl_fetch_runtime.py` | `fetch_page()` owner: HTTP/browser decision, escalation, block detection |
+| `fetch/fetch_context.py` | `fetch_page()` owner: HTTP/browser decision, escalation, block detection |
 | `robots_policy.py` | robots.txt policy |
 | `url_safety.py` | SSRF and public-target validation |
 
-Import rule: import `fetch_page` from `crawl_fetch_runtime.py` directly.
+Import rule: import `fetch_page` from `app.services.fetch.fetch_context` directly.
 
 Canonical config owner:
 
@@ -134,9 +137,9 @@ Canonical config owner:
 | `detail_extractor.py` | Detail-page preparation and field candidate arbitration |
 | `listing_extractor.py` | Listing-page extraction |
 | `structured_sources.py` | JSON-LD, microdata, OG, Nuxt, harvested JS state |
-| `js_state_mapper.py` | JS state to field mapping |
+| `js_state/state_normalizer.py` | JS state to field mapping (canonical owner) |
 | `network_payload_mapper.py` | Network payload to field mapping |
-| `field_value_core.py` | Canonical field coercion |
+| `shared/field_coerce.py` | Canonical field coercion |
 | `field_url_normalization.py` | Tracking URL cleanup and query stripping |
 | `dom/content_extractability.py` | Visible text/link/image extractability checks used by selector extraction |
 | `dom/selector_engine.py` | DOM selector extraction, image URL ranking, and selector result assembly |

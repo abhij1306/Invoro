@@ -27,7 +27,7 @@ from app.services.config.extraction_rules import (
     CURRENCY_DECIMAL_PLACES,
     DEFAULT_DECIMAL_PLACES,
 )
-from app.services.field_value_core import (
+from app.services.shared.field_coerce import (
     extract_currency_code,
     flatten_variants_for_public_output,
 )
@@ -468,6 +468,8 @@ class AmazonAdapter(BaseAdapter):
             raw_variations=raw_variations,
         )
 
+    _MAX_DIM_PERMUTATION = 5
+
     def _best_twister_dimension_order(
         self,
         dim_order: list[str],
@@ -476,6 +478,9 @@ class AmazonAdapter(BaseAdapter):
         raw_variations: list[object],
     ) -> list[str]:
         if len(dim_order) <= 1:
+            return dim_order
+        # Cap permutation search to avoid combinatorial explosion.
+        if len(dim_order) > self._MAX_DIM_PERMUTATION:
             return dim_order
         best_order = dim_order
         best_score = self._score_twister_dimension_order(

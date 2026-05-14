@@ -35,7 +35,7 @@ from app.services.config.extraction_rules import (
     DETAIL_STRICT_PARENT_PRICE_SOURCE_SET,
     PAGE_URL_CURRENCY_HINTS_RAW,
 )
-from app.services.field_value_core import (
+from app.services.shared.field_coerce import (
     extract_currency_code,
     text_or_none,
 )

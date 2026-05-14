@@ -47,8 +47,11 @@ from app.services.auth_service import bootstrap_admin_user
 from app.services.crawl_service import recover_stale_local_runs
 from app.services.llm_provider_client import close_llm_provider_clients
 
-logger = logging.getLogger("app")
+# Configure logging at import time so startup/import-time logs use the
+# configured formatter rather than Python's default handler.
 configure_logging()
+
+logger = logging.getLogger("app")
 
 
 @asynccontextmanager
