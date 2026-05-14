@@ -98,8 +98,11 @@ class CrawlRun(UpdatedAtMixin, CompletedAtMixin, Base):
     def set_status(self, target: str | CrawlStatus) -> CrawlStatus:
         next_status = transition_status(self.status, target)
         self.status = next_status.value
-        if next_status in TERMINAL_STATUSES and self.completed_at is None:
-            self.completed_at = _utcnow()
+        if next_status in TERMINAL_STATUSES:
+            if self.completed_at is None:
+                self.completed_at = _utcnow()
+        else:
+            self.completed_at = None
         return next_status
 
     def get_setting(self, key: str, default: object = None) -> object:
@@ -164,6 +167,7 @@ class CrawlRecord(CreatedAtMixin, Base):
     raw_html_path: Mapped[str | None] = mapped_column(Text, nullable=True)
     enrichment_status: Mapped[str] = mapped_column(
         String(32),
+        default=DATA_ENRICHMENT_STATUS_UNENRICHED,
         server_default=DATA_ENRICHMENT_STATUS_UNENRICHED,
         nullable=False,
         index=True,

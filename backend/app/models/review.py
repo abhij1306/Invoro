@@ -17,7 +17,7 @@ class ReviewPromotion(UpdatedAtMixin, Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     run_id: Mapped[int] = mapped_column(
-        ForeignKey(CRAWL_RUN_FK, ondelete=CASCADE)
+        ForeignKey(CRAWL_RUN_FK, ondelete=CASCADE), index=True
     )
     domain: Mapped[str] = mapped_column(String(255), index=True)
     surface: Mapped[str] = mapped_column(String(40))

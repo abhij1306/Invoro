@@ -100,7 +100,7 @@ def _url_failure_metrics(exc: BaseException) -> dict[str, object]:
     if browser_outcome:
         metrics["browser_outcome"] = browser_outcome
     if diagnostics.get("browser_attempted") is not None:
-        metrics["browser_attempted"] = bool(diagnostics["browser_attempted"])
+        metrics["browser_attempted"] = bool(diagnostics.get("browser_attempted"))
     return metrics
 
 
@@ -403,7 +403,7 @@ async def process_run(session: AsyncSession, run_id: int) -> None:
             # early return, break, or exception.
             if not prewarm_task.done():
                 prewarm_task.cancel()
-            with suppress(BaseException):
+            with suppress(Exception):
                 await prewarm_task
     except (RuntimeError, ValueError, TypeError, SQLAlchemyError) as exc:
         logger.exception("Run-level failure for run=%s", run_id)

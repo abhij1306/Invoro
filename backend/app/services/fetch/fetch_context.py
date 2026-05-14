@@ -683,6 +683,45 @@ async def _run_browser_attempts(
                     browser_engine,
                     exc_info=True,
                 )
+                # When patchright times out on a vendor-block escalation,
+                # treat it like a blocked result for engine rotation purposes.
+                # This allows real_chrome to be tried within the same run
+                # instead of requiring a second run with host memory.
+                if (
+                    isinstance(exc, (TimeoutError, asyncio.TimeoutError))
+                    and _is_vendor_block_reason(reason)
+                    and engine_index <= len(engine_attempts)
+                ):
+                    await note_host_hard_block(
+                        context.url,
+                        method=f"browser:{browser_engine}",
+                        vendor=_extract_vendor_from_reason(reason),
+                        status_code=0,
+                        proxy_used=bool(proxy),
+                        ttl_seconds=context.host_memory_ttl_seconds,
+                    )
+                    active_host_policy = await load_host_protection_policy(
+                        context.url,
+                        ttl_seconds=context.host_memory_ttl_seconds,
+                    )
+                    context.host_policy = active_host_policy
+                    engine_attempts = _extend_browser_engine_attempts_after_block(
+                        engine_attempts=engine_attempts,
+                        attempted_engine=browser_engine,
+                        context=context,
+                        host_policy=active_host_policy,
+                    )
+                    if engine_index < len(engine_attempts):
+                        cooldown_ms = max(
+                            0,
+                            int(
+                                crawler_runtime_settings.browser_post_block_cooldown_ms
+                                or 0
+                            ),
+                        )
+                        if cooldown_ms > 0:
+                            await asyncio.sleep(cooldown_ms / 1000)
+                        continue
     if last_blocked_result is not None:
         return last_blocked_result
     if last_browser_error is not None:
