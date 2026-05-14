@@ -202,9 +202,14 @@ def _extract_vtex_state_listing_items(
         link_text = value.get("linkText") or value.get("slug")
         if not product_name or not link_text:
             continue
-        # Normalize slug: strip whitespace, lowercase, replace spaces with hyphens
+        # Normalize slug: strip whitespace, lowercase, replace spaces with hyphens,
+        # percent-encode reserved chars while preserving international characters
+        import unicodedata
+        from urllib.parse import quote as url_quote
+
         normalized_slug = re.sub(r"\s+", "-", str(link_text).strip().lower())
-        normalized_slug = re.sub(r"[^a-z0-9\-_/]", "", normalized_slug)
+        normalized_slug = unicodedata.normalize("NFC", normalized_slug)
+        normalized_slug = url_quote(normalized_slug, safe="-_/")
         if not normalized_slug:
             continue
         url = f"{base_origin}/{normalized_slug}/p"

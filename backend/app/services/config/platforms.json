@@ -848,8 +848,8 @@
       "readiness_path_patterns": [
         "^/[^/]+/p$",
         "^/[^/]+/p\\?",
-        "/product/",
-        "/products/"
+        "^/[^/]+/product(/.*)?$",
+        "^/[^/]+/products(/.*)?$"
       ],
       "readiness_selectors": [
         "[class*='productSummary' i] a[href]",

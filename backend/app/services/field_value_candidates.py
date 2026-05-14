@@ -836,12 +836,22 @@ def collect_structured_candidates(
                 "title",
                 coerce_text(payload.get("name") or payload.get("title")),
             )
+            raw_id = payload.get("@id")
+            # Ignore blank-node identifiers or non-URL @id values
+            id_fallback = (
+                raw_id
+                if isinstance(raw_id, str)
+                and raw_id
+                and not raw_id.startswith("_:")
+                and ("/" in raw_id or ":" in raw_id)
+                else None
+            )
             add_candidate(
                 candidates,
                 "url",
                 absolute_url(
                     page_url,
-                    payload.get("url") or payload.get("@id") or page_url,
+                    payload.get("url") or id_fallback or page_url,
                 ),
             )
             add_candidate(
