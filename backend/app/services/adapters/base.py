@@ -106,6 +106,13 @@ class BaseAdapter(ABC):
         *,
         source_type: str | None = None,
     ) -> AdapterResult:
+        if not isinstance(records, list):
+            logger.warning(
+                "Adapter %s returned non-list records payload: %s",
+                self.name,
+                type(records).__name__,
+            )
+            records = []
         return AdapterResult(
             records=records,
             source_type=source_type or f"{self.name}_adapter",

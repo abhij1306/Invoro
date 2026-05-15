@@ -61,6 +61,9 @@ class BelkAdapter(BaseAdapter):
 
 
 def _extract_listing_records(page_url: str, html: str) -> list[dict[str, Any]]:
+    product_limit = max(0, int(adapter_runtime_settings.belk_max_products))
+    if product_limit <= 0:
+        return []
     state_index = _state_product_index(page_url, html)
     records: list[dict[str, Any]] = []
     seen_urls: set[str] = set()
@@ -88,7 +91,7 @@ def _extract_listing_records(page_url: str, html: str) -> list[dict[str, Any]]:
             continue
         seen_urls.add(final_url)
         records.append(finalized)
-        if len(records) >= adapter_runtime_settings.belk_max_products:
+        if len(records) >= product_limit:
             return records
     for url, record in state_index.items():
         if url in seen_urls:
@@ -99,9 +102,9 @@ def _extract_listing_records(page_url: str, html: str) -> list[dict[str, Any]]:
             continue
         seen_urls.add(final_url)
         records.append(finalized)
-        if len(records) >= adapter_runtime_settings.belk_max_products:
+        if len(records) >= product_limit:
             break
-    return records[: adapter_runtime_settings.belk_max_products]
+    return records[:product_limit]
 
 
 def _extract_detail_record(page_url: str, html: str) -> dict[str, Any] | None:

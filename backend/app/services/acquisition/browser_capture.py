@@ -156,20 +156,8 @@ class BrowserNetworkCapture:
                         break
             else:
                 self._closing = True
-                try:
-                    for _ in workers:
-                        await asyncio.wait_for(
-                            self._queue.put(None),
-                            timeout=join_timeout_seconds,
-                        )
-                except asyncio.TimeoutError:
-                    logger.warning(
-                        "Browser capture sentinel enqueue timed out after %ss; "
-                        "cancelling workers",
-                        join_timeout_seconds,
-                    )
-                    for worker in workers:
-                        worker.cancel()
+                for worker in workers:
+                    worker.cancel()
             await asyncio.gather(*workers, return_exceptions=True)
             self._workers.clear()
         self._closed = True
@@ -600,7 +588,7 @@ def _network_payload_byte_budget(
     budget = max(1, browser_capture_max_network_payload_bytes())
     if resolved_endpoint.get("type") in HIGH_VALUE_NETWORK_ENDPOINT_TYPES:
         budget *= HIGH_VALUE_NETWORK_PAYLOAD_BUDGET_MULTIPLIER
-    return min(budget, browser_capture_total_network_payload_bytes())
+    return min(budget, max(1, browser_capture_total_network_payload_bytes()))
 
 
 __all__ = [

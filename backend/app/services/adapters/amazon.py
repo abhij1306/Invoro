@@ -532,7 +532,7 @@ class AmazonAdapter(BaseAdapter):
             if row_valid:
                 valid_rows += 1
             valid_cells += row_valid_cells
-        return valid_cells, valid_rows
+        return valid_rows, valid_cells
 
     def _twister_variants(
         self,
@@ -551,16 +551,16 @@ class AmazonAdapter(BaseAdapter):
                 continue
             option_values: dict[str, str] = {}
             metadata: dict[str, object] = {}
+            row_valid = True
             for axis_name, index in zip(axis_names, row, strict=False):
-                if not isinstance(index, int):
-                    continue
                 entries = axis_entries.get(axis_name) or []
-                if index < 0 or index >= len(entries):
+                if not isinstance(index, int) or index < 0 or index >= len(entries):
+                    row_valid = False
                     continue
                 self._merge_twister_entry(
                     option_values, metadata, axis_name, entries[index], page_url
                 )
-            if option_values:
+            if row_valid and option_values:
                 variants.append(
                     {"option_values": option_values, **option_values, **metadata}
                 )

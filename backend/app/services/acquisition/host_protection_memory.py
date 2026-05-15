@@ -151,7 +151,10 @@ def _recent_success_method(
     now: datetime,
     ttl_seconds: int | None = None,
 ) -> str | None:
-    if not _is_recent(row.last_success_at, now=now, ttl_seconds=ttl_seconds):
+    last_success_at = row.last_success_at
+    if last_success_at is None and _coerce_method(row.last_success_method):
+        last_success_at = row.updated_at
+    if not _is_recent(last_success_at, now=now, ttl_seconds=ttl_seconds):
         return None
     return _coerce_method(getattr(row, "last_success_method", None)) or None
 
