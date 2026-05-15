@@ -290,7 +290,17 @@ def _dedupe_product_payloads(
         key = tuple(
             sorted(
                 (field_name, str(product.get(field_name)))
-                for field_name in ("id", "product_id", "productId", "sku", "handle", "title", "name")
+                for field_name in (
+                    "id",
+                    "product_id",
+                    "productId",
+                    "pid",
+                    "sku",
+                    "handle",
+                    "title",
+                    "name",
+                    "pn",
+                )
                 if product.get(field_name) not in (None, "", [], {})
             )
         ) + (("__keys__", ",".join(sorted(str(key) for key in product))),)
@@ -328,6 +338,8 @@ def _merge_same_product_record(
     merged_variants = merge_variant_rows(
         base_record.get("variants"),
         incoming.get("variants"),
+        [] if base_record.get("variants") else [_scalar_variant_row(base_record)],
+        [] if incoming.get("variants") else [_scalar_variant_row(incoming)],
     )
     if merged_variants:
         merged["variants"] = merged_variants
@@ -346,6 +358,32 @@ def _merge_variant_fields(
         merged["variants"] = merged_variants
         merged["variant_count"] = len(merged_variants)
     return compact_dict(merged)
+
+
+def _scalar_variant_row(record: dict[str, Any]) -> dict[str, Any]:
+    axes = {
+        field_name: record.get(field_name)
+        for field_name in VARIANT_AXIS_KEYS
+        if record.get(field_name) not in (None, "", [], {})
+    }
+    if not axes:
+        return {}
+    row: dict[str, Any] = dict(axes)
+    for field_name in (
+        "sku",
+        "barcode",
+        "url",
+        "image_url",
+        "availability",
+        "stock_quantity",
+        "price",
+        "original_price",
+        "currency",
+        "product_id",
+    ):
+        if record.get(field_name) not in (None, "", [], {}):
+            row[field_name] = record[field_name]
+    return row
 
 
 def _mapped_product_identity_matches(
@@ -496,15 +534,23 @@ def _revive_nuxt_data_array(payload: Any) -> dict[str, Any] | None:
     return revived or None
 
 def _looks_like_product_payload(value: Any) -> bool:
-    if not isinstance(value, dict) or not any(
-        key in value for key in ("title", "name", "pn")
-    ):
+    if not isinstance(value, dict):
+        return False
+    has_title = any(key in value for key in ("title", "name", "pn")) or bool(
+        text_or_none(
+            ((value.get("item") or {}).get("product_description") or {}).get("title")
+        )
+        if isinstance(value.get("item"), dict)
+        else None
+    )
+    if not has_title:
         return False
     return any(
         key in value
         for key in (
             "variants",
             "availableSizes",
+            "variation_hierarchy",
             "options",
             "colors",
             "sizes",
@@ -563,6 +609,7 @@ def _product_payload_score(product: dict[str, Any]) -> tuple[int, ...]:
     strong_product_keys = {
         "variants",
         "options",
+        "variation_hierarchy",
         "colors",
         "sizes",
         "prices",
@@ -694,7 +741,11 @@ def _map_product_payload(
         )
     size = variant_attribute(active_variant, "size")
     if size in (None, "", [], {}):
-        size = _variant_axis_value("size", product.get("size"), page_url=page_url)
+        size = _variant_axis_value(
+            "size",
+            product.get("size") or product.get("sz"),
+            page_url=page_url,
+        )
 
     # Resolve brand/vendor: dict values need name extraction
     brand_raw = base.get("brand")
@@ -1127,6 +1178,9 @@ def _variant_selection_values(
     option_names: list[str],
 ) -> dict[str, str]:
     selection_values: dict[str, str] = {}
+    named_axis = _name_value_axis(variant)
+    if named_axis:
+        return named_axis
     selected_options = (
         variant.get("selectedOptions")
         if isinstance(variant.get("selectedOptions"), list)
@@ -1183,6 +1237,9 @@ def _variant_option_values(
     option_value_labels: dict[str, dict[str, str]] | None = None,
 ) -> dict[str, str]:
     option_values: dict[str, str] = {}
+    named_axis = _name_value_axis(variant, option_value_labels=option_value_labels)
+    if named_axis:
+        return named_axis
     selected_options = (
         variant.get("selectedOptions")
         if isinstance(variant.get("selectedOptions"), list)
@@ -1249,6 +1306,31 @@ def _variant_option_values(
             )
     if option_values:
         return option_values
+    traits = variant.get("traits")
+    if isinstance(traits, dict):
+        for axis_name, raw_value in traits.items():
+            axis_key = normalized_variant_axis_key(axis_name)
+            cleaned = _variant_axis_value(axis_key, raw_value, page_url="")
+            if not axis_key or not cleaned or not variant_axis_name_is_semantic(axis_name):
+                continue
+            option_values[axis_key] = _display_option_value(
+                axis_key,
+                cleaned,
+                option_value_labels=option_value_labels,
+            )
+    if option_values:
+        return option_values
+    size_chart = variant.get("sizeChart")
+    if isinstance(size_chart, dict):
+        cleaned = _variant_axis_value("size", size_chart.get("baseSize"), page_url="")
+        if cleaned:
+            option_values["size"] = _display_option_value(
+                "size",
+                cleaned,
+                option_value_labels=option_value_labels,
+            )
+    if option_values:
+        return option_values
     raw_options = _as_list(variant.get("options"))
     for index in range(1, 4):
         axis_name = (
@@ -1283,6 +1365,25 @@ def _variant_option_values(
                 )
 
     return option_values
+
+
+def _name_value_axis(
+    variant: dict[str, Any],
+    *,
+    option_value_labels: dict[str, dict[str, str]] | None = None,
+) -> dict[str, str]:
+    axis_name = text_or_none(variant.get("name") or variant.get("label"))
+    axis_key = normalized_variant_axis_key(axis_name or "")
+    cleaned = _variant_axis_value(axis_key, variant.get("value"), page_url="")
+    if not axis_key or not cleaned or not variant_axis_name_is_semantic(axis_name):
+        return {}
+    return {
+        axis_key: _display_option_value(
+            axis_key,
+            cleaned,
+            option_value_labels=option_value_labels,
+        )
+    }
 
 def _option_value_labels(product: dict[str, Any]) -> dict[str, dict[str, str]]:
     labels: dict[str, dict[str, str]] = {}

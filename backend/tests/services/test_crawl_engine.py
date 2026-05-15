@@ -3871,6 +3871,23 @@ def test_extract_ecommerce_detail_recovers_firstcry_static_js_state_price() -> N
     )
 
 
+def test_extract_ecommerce_detail_recovers_firstcry_keyed_size_variants_from_artifact() -> None:
+    html = read_optional_artifact_text("artifacts/runs/1/pages/911cb20ab9926f3d.html")
+
+    rows = extract_records(
+        html,
+        "https://www.firstcry.com/babyhug/babyhug-denim-woven-sleeveless-top-and-pant-set-with-floral-print-blue/22346676/product-detail",
+        "ecommerce_detail",
+        max_records=1,
+        requested_page_url="https://www.firstcry.com/babyhug/babyhug-denim-woven-sleeveless-top-and-pant-set-with-floral-print-blue/22346676/product-detail",
+        requested_fields=["variants"],
+    )
+
+    assert len(rows) == 1
+    sizes = {row.get("size") for row in rows[0]["variants"]}
+    assert {"2-3Y", "3-4Y", "4-5Y"} <= sizes
+
+
 def test_extract_ecommerce_detail_rejects_brand_shell_with_tracking_pixel_image() -> None:
     html = """
     <html>

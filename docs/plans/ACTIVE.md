@@ -1,11 +1,12 @@
 # Active Plan
 
-**Current:** God Module Consolidation & LOC Reduction (DONE) → `docs/plans/god-module-consolidation-plan.md`
-**Status:** DONE
-**Started:** 2026-05-13
-**Last slice completed:** Slice 13 — Ratchet architecture gates
+**Current:** Architecture Refactoring — God Functions, Frontend Split, Coupling Reduction → `docs/plans/architecture-refactoring-plan.md`
+**Status:** IN PROGRESS
+**Started:** 2026-05-15
+**Last slice completed:** None (plan created)
 
 ## Previous
+- God Module Consolidation & LOC Reduction (DONE) → `docs/plans/god-module-consolidation-plan.md`
 - Variant Extraction Refactor (DONE) → `docs/plans/variant-extraction-refactor-plan.md`
 - Architecture Audit 2 Remediation (COMPLETE) → `docs/plans/architecture-audit-2-remediation-plan.md`
 - Architecture Audit Remediation (COMPLETE) → `docs/plans/architecture-audit-plan.md`

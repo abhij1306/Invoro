@@ -88,10 +88,12 @@ VARIANT_SWATCH_BUTTON_SELECTOR = (
     "button[class*='swatch' i], button[class*='color-option' i],"
     " button[class*='color-selector' i], button[class*='size-option' i],"
     " button[class*='size-selector' i], button[class*='variant' i],"
-    " button[data-option], button[data-value], a[href], a[class*='swatch' i],"
+    " button[data-option], button[data-value], button[data-size], a[href],"
+    " a[class*='swatch' i],"
     " div[class*='swatch' i], div[role='radio'],"
     " [data-testid*='variants-selector' i]"
 )
+VARIANT_COMPONENT_SIZE_STYLE_LABELS = ("jacket", "trouser", "pant", "pants")
 VARIANT_SWATCH_BUTTON_LIMIT = 20
 VARIANT_SWATCH_PARENT_DEPTH = 6
 VARIANT_MATCHING_INPUT_LIMIT = 12
@@ -1060,7 +1062,7 @@ VARIANT_CHOICE_OPTION_SELECTOR = (
     "option, [role='radio'], [role='option'], button, a[href], "
     "input[type='radio'], input[type='checkbox']"
 )
-VARIANT_CHOICE_OPTION_LIMIT = 24
+VARIANT_CHOICE_OPTION_LIMIT = 80
 VARIANT_CHOICE_CONTAINER_OPTION_LIMIT = 24
 VARIANT_CHOICE_CONTAINER_SELECT_LIMIT = 8
 VARIANT_CHOICE_CONTAINER_GROUP_LIMIT = 12
@@ -1358,6 +1360,8 @@ VARIANT_CHOICE_GROUP_SELECTOR = ", ".join(
             ),
             "[data-testid*='variants-selector' i]",
             "[class*='selectable-container' i]",
+            "#productSizeStock",
+            "[class*='sizeOptions' i]",
         )
     )
 )

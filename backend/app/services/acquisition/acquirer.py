@@ -167,6 +167,8 @@ class PageEvidence:
 
     @property
     def challenge_shell_reason(self) -> str | None:
+        if self.browser_outcome == "usable_content" and not self.indicates_block:
+            return None
         challenge_shell = (
             self.browser_outcome in {"challenge_page", "low_content_shell"}
             or self.indicates_block

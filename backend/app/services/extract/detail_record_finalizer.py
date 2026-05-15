@@ -150,10 +150,7 @@ def _sanitize_ecommerce_detail_record(
     existing_variants = [
         row for row in list(record.get("variants") or []) if isinstance(row, dict)
     ]
-    if (
-        soup is not None
-        and not existing_variant_cluster_has_transport_signal(existing_variants)
-    ):
+    if soup is not None:
         backfill_variants_from_dom_if_missing(
             record, soup=soup, page_url=page_url, js_state_objects=js_state_objects
         )

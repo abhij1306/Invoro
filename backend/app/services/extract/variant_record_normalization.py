@@ -428,6 +428,17 @@ def _enforce_variant_currency_context(record: dict[str, Any]) -> None:
     parent_currency = _currency_code(record.get("currency"))
     if not parent_currency:
         return
+    variant_currencies = {
+        currency
+        for variant in variants
+        if isinstance(variant, dict)
+        if (currency := _currency_code(variant.get("currency")))
+    }
+    if len(variant_currencies) == 1:
+        only_variant_currency = next(iter(variant_currencies))
+        if only_variant_currency != parent_currency:
+            record["currency"] = only_variant_currency
+            parent_currency = only_variant_currency
     kept: list[dict[str, Any]] = []
     mismatched: list[dict[str, Any]] = []
     for variant in variants:
