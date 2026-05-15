@@ -669,6 +669,11 @@ def _drop_parent_shared_variant_fields(record: dict[str, Any]) -> None:
     if len(variant_rows) < 2:
         return
     for field_name in VARIANT_PARENT_SHARED_FIELDS:
+        if field_name == "currency" and any(
+            variant.get(PRICE_FIELD) not in (None, "", [], {})
+            for variant in variant_rows
+        ):
+            continue
         parent_value = text_or_none(record.get(field_name))
         if parent_value is None:
             continue
@@ -703,6 +708,11 @@ def _drop_unanimous_variant_transport_fields(
     ):
         return
     for field_name in VARIANT_TRANSPORT_FIELDS:
+        if field_name == "currency" and any(
+            variant.get(PRICE_FIELD) not in (None, "", [], {})
+            for variant in variant_rows
+        ):
+            continue
         values = [variant.get(field_name) for variant in variant_rows]
         if any(value in (None, "", [], {}) for value in values):
             continue

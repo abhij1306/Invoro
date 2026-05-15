@@ -13,6 +13,7 @@ from app.services.config.extraction_rules import (
     AVAILABILITY_OUT_OF_STOCK,
     CANDIDATE_PLACEHOLDER_VALUES,
     CATEGORY_PLACEHOLDER_VALUES,
+    DETAIL_CATEGORY_BRANCH_STOP_TOKENS,
     DETAIL_CATEGORY_LABEL_PREFIXES,
     DETAIL_CATEGORY_UI_TOKENS,
     DETAIL_BREADCRUMB_SEPARATOR_LABELS,
@@ -340,6 +341,11 @@ def _clean_detail_category_path(
     prefixes = tuple(
         str(prefix).casefold() for prefix in tuple(DETAIL_CATEGORY_LABEL_PREFIXES or ())
     )
+    branch_stop_tokens = {
+        clean_text(token).casefold()
+        for token in tuple(DETAIL_CATEGORY_BRANCH_STOP_TOKENS or ())
+        if clean_text(token)
+    }
     cleaned_parts: list[str] = []
     strip_chars = (
         "".join(map(str, DETAIL_BREADCRUMB_SEPARATOR_LABELS or ())) + " \t\n\r"
@@ -353,6 +359,8 @@ def _clean_detail_category_path(
             or any(lowered.startswith(prefix) for prefix in prefixes)
         ):
             continue
+        if lowered in branch_stop_tokens:
+            break
         cleaned_parts.append(cleaned)
     while cleaned_parts and detail_breadcrumb_is_root_label(
         cleaned_parts[0], page_url=page_url

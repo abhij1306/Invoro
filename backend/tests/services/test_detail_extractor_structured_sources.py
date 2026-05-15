@@ -725,6 +725,40 @@ def test_extract_ecommerce_detail_uses_breadcrumblist_json_ld_category() -> None
     assert rows[0]["category"] == "Women > Dresses"
 
 
+def test_extract_ecommerce_detail_category_drops_collection_branch_noise() -> None:
+    html = """
+    <html>
+      <head>
+        <script type="application/ld+json">
+        {
+          "@context": "https://schema.org",
+          "@type": "BreadcrumbList",
+          "itemListElement": [
+            {"@type": "ListItem", "position": 1, "name": "Sports"},
+            {"@type": "ListItem", "position": 2, "name": "Padel"},
+            {"@type": "ListItem", "position": 3, "name": "Collections"},
+            {"@type": "ListItem", "position": 4, "name": "Back to the court"}
+          ]
+        }
+        </script>
+        <script type="application/ld+json">
+        {"@context": "https://schema.org", "@type": "Product", "name": "Pressurised Padel Balls PB Speed Tri-Pack"}
+        </script>
+      </head>
+      <body><h1>Pressurised Padel Balls PB Speed Tri-Pack</h1></body>
+    </html>
+    """
+
+    rows = extract_records(
+        html,
+        "https://example.com/p/pressurised-padel-balls-pb-speed-tri-pack/347273/m8804642",
+        "ecommerce_detail",
+        max_records=5,
+    )
+
+    assert rows[0]["category"] == "Sports > Padel"
+
+
 def test_extract_ecommerce_detail_category_from_dom_breadcrumb() -> None:
     html = """
     <html>
