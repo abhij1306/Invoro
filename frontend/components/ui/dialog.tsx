@@ -38,11 +38,11 @@ export function ConfirmDialog({
       onOpenChange={(nextOpen) => !pending && onOpenChange(nextOpen)}
     >
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-[100] bg-[color-mix(in_srgb,var(--bg-base)_34%,black)] backdrop-blur-[3px]" />
+        <DialogPrimitive.Overlay className="fixed inset-0 z-[100] bg-[color-mix(in_srgb,var(--bg-base)_34%,black)]" />
         <DialogPrimitive.Content
           className={cn(
             'fixed top-1/2 left-1/2 z-[101] w-[min(420px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2',
-            'border-border card-gradient rounded-[var(--radius-xl)] border p-5 shadow-xl',
+            'border-border card-gradient rounded-[var(--radius-lg)] border p-5',
           )}
         >
           <div className="flex items-start justify-between gap-4">

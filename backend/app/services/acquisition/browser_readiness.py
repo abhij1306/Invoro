@@ -4,6 +4,7 @@ import asyncio
 from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import lru_cache
+import re
 from typing import Any
 
 from bs4 import BeautifulSoup, Comment
@@ -21,6 +22,39 @@ _DETAIL_READINESS_HINTS: dict[str, tuple[str, ...]] = {
     str(key): tuple(map(str, value or ()))
     for key, value in (BROWSER_DETAIL_READINESS_HINTS or {}).items()
 }
+_ECOMMERCE_READY_CARD_SELECTORS = (
+    "[data-product-id]",
+    "[itemscope][itemtype*='Product']",
+    ".product-card",
+    ".product-item",
+    ".product-tile",
+    ".product-grid-item",
+    "li.product-grid-product",
+    "li.product-base",
+    ".plp-card",
+    "[class*='productcard']",
+    "[class*='product-card']",
+    "[class*='product-item']",
+    "[class*='product-tile']",
+    "[class*='ProductPod']",
+    "[class*='item-tile']",
+    "[data-testid*='product']",
+    "[data-test*='product']",
+    "[data-component*='product']",
+    "[data-automation*='product']",
+)
+_ECOMMERCE_READY_PRICE_RE = re.compile(
+    r"(?:rs\.?|inr|₹|\$|£|€|cad|usd|brl|r\$)\s*\d|\b\d[\d,.]{2,}\s*(?:cad|usd|brl)\b",
+    re.I,
+)
+_ECOMMERCE_READY_PRODUCT_ATTR_RE = re.compile(
+    r"product(?:card|[-_ ]?card|[-_ ]?item|[-_ ]?tile|[-_ ]?grid|pod|base)",
+    re.I,
+)
+_ECOMMERCE_READY_DETAIL_PATH_RE = re.compile(
+    r"/(?:products?|p|dp|item|shop)/",
+    re.I,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -211,10 +245,71 @@ async def probe_browser_readiness_impl(
 async def listing_card_signal_count_impl(page: Any, *, surface: str) -> int:
     from app.services.acquisition.traversal import count_listing_cards
 
+    if str(surface or "").strip().lower().startswith("ecommerce"):
+        html = await get_page_html(page, flatten_shadow=False)
+        return _ecommerce_ready_card_count(analyze_html(html).soup)
     return await count_listing_cards(
         page,
         surface=surface,
     )
+
+
+def _ecommerce_ready_card_count(soup: BeautifulSoup) -> int:
+    seen: set[int] = set()
+    count = 0
+    for selector in _ECOMMERCE_READY_CARD_SELECTORS:
+        try:
+            nodes = soup.select(selector)
+        except Exception:
+            continue
+        for node in nodes:
+            node_id = id(node)
+            if node_id in seen:
+                continue
+            seen.add(node_id)
+            if _ecommerce_node_has_product_evidence(node):
+                count += 1
+    return count
+
+
+def _ecommerce_node_has_product_evidence(node: Any) -> bool:
+    attrs = getattr(node, "attrs", {}) or {}
+    text = clean_text(node.get_text(" ", strip=True) if hasattr(node, "get_text") else "")
+    signature = " ".join(
+        str(attrs.get(key) or "")
+        for key in (
+            "class",
+            "id",
+            "role",
+            "aria-label",
+            "data-testid",
+            "data-test",
+            "data-component",
+            "data-automation",
+        )
+    )
+    product_signature = bool(_ECOMMERCE_READY_PRODUCT_ATTR_RE.search(signature))
+    has_product_id = bool(
+        attrs.get("data-product-id")
+        or (hasattr(node, "select_one") and node.select_one("[data-product-id]"))
+    )
+    itemtype = str(attrs.get("itemtype") or "")
+    has_product_itemtype = "product" in itemtype.lower() or bool(
+        hasattr(node, "select_one") and node.select_one("[itemscope][itemtype*='Product']")
+    )
+    has_price = bool(_ECOMMERCE_READY_PRICE_RE.search(text))
+    has_media = bool(hasattr(node, "select_one") and node.select_one("img, picture, source"))
+    links = node.select("a[href]")[:8] if hasattr(node, "select") else []
+    hrefs = [str(link.get("href") or "").strip() for link in links]
+    has_link = any(href and not href.startswith(("#", "javascript:")) for href in hrefs)
+    has_detail_link = any(_ECOMMERCE_READY_DETAIL_PATH_RE.search(href) for href in hrefs)
+    if has_product_id or has_product_itemtype:
+        return True
+    if has_price and (has_link or has_media):
+        return True
+    if product_signature and (has_link or has_media):
+        return True
+    return bool(has_detail_link and (has_price or product_signature or has_media))
 
 
 async def count_matching_selectors(page: Any, *, selectors: list[str]) -> int:

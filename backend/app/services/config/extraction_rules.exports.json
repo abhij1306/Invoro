@@ -4599,6 +4599,7 @@
       "sale_price",
       "salePrice",
       "offers",
+      "priceRange",
       "displayPrice",
       "formattedPrice",
       "currentPrice",
@@ -4617,6 +4618,8 @@
       "lowPrice",
       "minPrice",
       "minValue",
+      "minDiscountPrice",
+      "regularPrice",
       "displayPrice",
       "formattedPrice"
     ]
@@ -4626,6 +4629,7 @@
     "items": [
       "name",
       "title",
+      "marketingName",
       "productName",
       "product_name"
     ]

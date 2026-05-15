@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { Check, Globe, Info, Plus, Shield, SlidersHorizontal, Sparkles } from 'lucide-react';
 import type { Route } from 'next';
@@ -79,15 +79,15 @@ const CAPTURE_NETWORK_OPTIONS = new Set<CaptureNetworkMode>([
   'all_small_json',
 ]);
 const RUN_SETUP_ROW_CLASS =
-  'grid gap-2 md:grid-cols-[140px_minmax(0,1fr)] md:items-center md:gap-3';
-const RUN_SETUP_CONTROL_CLASS = 'flex md:justify-self-start';
+  'grid gap-2 md:grid-cols-[110px_minmax(0,1fr)] md:items-center md:gap-3';
+const RUN_SETUP_CONTROL_CLASS = 'flex md:justify-self-end';
 const RUN_SETUP_LABEL_CLASS = 'flex min-w-0 h-[var(--control-height)] items-center gap-3';
 const RUN_SETUP_STACK_CLASS = 'flex flex-col gap-3';
 const ADVANCED_CONTROL_ROW_CLASS =
   'grid gap-1.5 md:grid-cols-[140px_minmax(0,1fr)] md:items-center md:gap-3';
 const ADVANCED_COLUMN_CLASS = 'flex flex-col gap-4';
 const ADVANCED_SUBSECTION_CLASS = 'flex flex-col gap-2.5';
-const ADVANCED_SECTION_TITLE_CLASS = 'flex items-center gap-2 type-label-mono text-secondary';
+const ADVANCED_SECTION_TITLE_CLASS = 'flex items-center gap-2 type-caption text-secondary';
 
 const DIAGNOSTICS_PRESETS: Record<DiagnosticsPreset, DomainRunProfile['diagnostics_profile']> = {
   lean: {
@@ -823,15 +823,15 @@ export function CrawlConfigScreen({
         onSubmit={(event) => void startCrawl(event)}
       >
         <Card className="section-card overflow-hidden">
-          <header className="border-border flex h-10 items-center justify-between border-b bg-[color-mix(in_srgb,var(--bg-alt)_40%,var(--bg-panel))] px-4">
-            <span className="type-label-mono text-secondary">Target URL</span>
+          <header className="border-border flex h-10 items-center justify-between border-b bg-[color-mix(in_srgb,var(--bg-alt)_40%,var(--bg-panel))] px-5">
+            <span className="type-body-sm font-medium text-secondary">Target URL</span>
             <Badge tone="accent" className="text-2xs h-5 px-1.5">
               {crawlTab === 'category' ? 'Category' : 'PDP'}
             </Badge>
           </header>
-          <div className="space-y-4 p-4">
+          <div className="space-y-5 px-5 pt-5 pb-5">
             <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2.5">
                 <TabBar
                   value={crawlTab}
                   onChange={(value) => {
@@ -884,7 +884,7 @@ export function CrawlConfigScreen({
                 size="lg"
                 type="submit"
                 disabled={!canSubmit}
-                className="min-w-[140px] justify-self-start shadow-[0_8px_24px_color-mix(in_srgb,var(--accent)_20%,transparent)] lg:justify-self-end"
+                className="min-w-[140px] justify-self-start lg:justify-self-end"
               >
                 {isSubmitting ? (
                   <>
@@ -903,7 +903,7 @@ export function CrawlConfigScreen({
             {(crawlTab === 'category' && categoryMode === 'bulk') ||
             (crawlTab === 'pdp' && pdpMode === 'batch') ? (
               <label className="grid gap-1.5">
-                <span className="type-control">URLs (one per line)</span>
+                <span className="type-control crawl-control-label">URLs (one per line)</span>
                 <div className="relative">
                   <Textarea
                     value={bulkUrls}
@@ -921,7 +921,7 @@ export function CrawlConfigScreen({
               </label>
             ) : crawlTab === 'pdp' && pdpMode === 'csv' ? (
               <label className="grid gap-1.5">
-                <span className="type-control">CSV File</span>
+                <span className="type-control crawl-control-label">CSV File</span>
                 <div className="flex items-center gap-3">
                   <input
                     key="csv-file-input"
@@ -945,7 +945,7 @@ export function CrawlConfigScreen({
               </label>
             ) : (
               <label className="grid gap-1.5">
-                <span className="type-control">Target URL</span>
+                <span className="type-control crawl-control-label">Target URL</span>
                 <Input
                   key="target-url-input"
                   value={targetUrl}
@@ -984,17 +984,17 @@ export function CrawlConfigScreen({
         <div className="h-full xl:self-stretch">
           <div className="h-full xl:sticky xl:top-[68px]">
             <Card className="section-card h-full overflow-hidden">
-              <header className="border-border flex h-10 items-center justify-between border-b bg-[color-mix(in_srgb,var(--bg-alt)_40%,var(--bg-panel))] px-4">
-                <span className="type-label-mono text-secondary">Crawl Settings</span>
+              <header className="border-border flex h-10 items-center justify-between border-b bg-[color-mix(in_srgb,var(--bg-alt)_40%,var(--bg-panel))] px-5">
+                <span className="type-body-sm font-medium text-secondary">Crawl Settings</span>
                 <Badge tone="accent" className="text-2xs h-5 px-1.5">
                   {studioMode === 'advanced' ? 'Advanced' : 'Quick'}
                 </Badge>
               </header>
-              <div className="page-stack p-4">
+              <div className="page-stack px-5 pt-5 pb-5">
                 <div className={RUN_SETUP_ROW_CLASS}>
                   <div className={RUN_SETUP_LABEL_CLASS}>
                     <Globe className="text-accent size-4 shrink-0" />
-                    <div className="type-control">Domain</div>
+                    <div className="type-control crawl-control-label">Domain</div>
                   </div>
                   <TabBar
                     value={crawlDomain}
@@ -1016,7 +1016,7 @@ export function CrawlConfigScreen({
                   <div className={RUN_SETUP_LABEL_CLASS}>
                     <SlidersHorizontal className="text-accent size-4 shrink-0" />
                     <div className="flex items-center gap-1.5">
-                      <div className="type-control">Mode</div>
+                      <div className="type-control crawl-control-label">Mode</div>
                       <Tooltip content="Advanced Mode exposes the full fetch, locality, diagnostics, and selector controls.">
                         <Info className="text-muted hover:text-secondary size-3.5 cursor-help transition-colors" />
                       </Tooltip>
@@ -1038,68 +1038,57 @@ export function CrawlConfigScreen({
                   />
                 </div>
 
-                <div className={RUN_SETUP_ROW_CLASS}>
-                  <div className={RUN_SETUP_LABEL_CLASS}>
+                <div className="flex h-[var(--control-height)] items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
                     <Sparkles className="text-accent size-4 shrink-0" />
-                    <div className="flex items-center gap-1.5">
-                      <div className="type-control">LLM Enabled</div>
-                      <Tooltip content="Per-run enrichment only. This does not overwrite saved domain defaults.">
+                    <span className="type-control crawl-control-label">LLM Processing</span>
+                    <Tooltip content="Per-run enrichment only. This does not overwrite saved domain defaults.">
+                      <Info className="text-muted hover:text-secondary size-3.5 cursor-help transition-colors" />
+                    </Tooltip>
+                  </div>
+                  <Toggle
+                    checked={smartExtraction}
+                    onChange={setSmartExtraction}
+                    ariaLabel="LLM Processing"
+                  />
+                </div>
+
+                <div className="border-border border-t pt-4">
+                  <div className="flex h-[var(--control-height)] items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <Globe className="text-accent size-4 shrink-0" />
+                      <span className="type-control crawl-control-label">Proxy List</span>
+                      <Tooltip content={'Example:\nhttp://host:port\nhttp://user:pass@host:port'}>
                         <Info className="text-muted hover:text-secondary size-3.5 cursor-help transition-colors" />
                       </Tooltip>
                     </div>
-                  </div>
-                  <div className={RUN_SETUP_CONTROL_CLASS}>
                     <Toggle
-                      checked={smartExtraction}
-                      onChange={setSmartExtraction}
-                      ariaLabel="LLM enabled"
+                      checked={proxyEnabled}
+                      onChange={setProxyEnabled}
+                      ariaLabel="Proxy List enabled"
                     />
                   </div>
                 </div>
 
-                <div className={RUN_SETUP_STACK_CLASS}>
-                  <div className={RUN_SETUP_ROW_CLASS}>
-                    <div className={RUN_SETUP_LABEL_CLASS}>
-                      <Globe className="text-accent size-4 shrink-0" />
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <div className="type-control">Proxy List</div>
-                          <Tooltip
-                            content={'Example:\nhttp://host:port\nhttp://user:pass@host:port'}
-                          >
-                            <Info className="text-muted hover:text-secondary size-3.5 cursor-help transition-colors" />
-                          </Tooltip>
-                        </div>
-                      </div>
-                    </div>
-                    <div className={RUN_SETUP_CONTROL_CLASS}>
-                      <Toggle
-                        checked={proxyEnabled}
-                        onChange={setProxyEnabled}
-                        ariaLabel="Proxy List enabled"
-                      />
-                    </div>
+                {proxyEnabled ? (
+                  <div className="ml-7 flex flex-col gap-3">
+                    <div className="type-control crawl-control-label">Example Proxy List To Enter</div>
+                    <Textarea
+                      value={proxyInput}
+                      onChange={(event) => {
+                        setProxyInput(event.target.value);
+                      }}
+                      placeholder={'http://host:port\nhttp://user:pass@host:port'}
+                      className="min-h-[104px] font-mono leading-[var(--leading-relaxed)]"
+                      aria-label="Proxy pool input"
+                    />
                   </div>
-                  {proxyEnabled ? (
-                    <div className="mt-6 ml-7 flex flex-col gap-3">
-                      <div className="type-control">Example Proxy List To Enter</div>
-                      <Textarea
-                        value={proxyInput}
-                        onChange={(event) => {
-                          setProxyInput(event.target.value);
-                        }}
-                        placeholder={'http://host:port\nhttp://user:pass@host:port'}
-                        className="min-h-[104px] font-mono leading-[var(--leading-relaxed)]"
-                        aria-label="Proxy pool input"
-                      />
-                    </div>
-                  ) : null}
-                </div>
+                ) : null}
 
                 {singleUrlMode && savedProfileLoaded ? (
                   <div className="text-secondary type-body leading-[var(--leading-relaxed)]">
                     Saved domain profile active:{' '}
-                    <span className="type-label-mono text-foreground">{savedProfileDomain}</span> ·{' '}
+                    <span className="type-label-mono text-foreground">{savedProfileDomain}</span> Â·{' '}
                     {surfaceLabel(surface)}
                   </div>
                 ) : null}
@@ -1110,8 +1099,8 @@ export function CrawlConfigScreen({
 
         {studioMode === 'advanced' ? (
           <Card className="section-card overflow-hidden xl:col-span-2">
-            <header className="border-border flex h-10 items-center justify-between border-b bg-[color-mix(in_srgb,var(--bg-alt)_40%,var(--bg-panel))] px-4">
-              <span className="type-label-mono text-secondary">Field Configuration</span>
+            <header className="border-border flex h-10 items-center justify-between border-b bg-[color-mix(in_srgb,var(--bg-alt)_40%,var(--bg-panel))] px-5">
+              <span className="type-body-sm font-medium text-secondary">Field Configuration</span>
               <div className="flex items-center gap-2">
                 <Button
                   variant="ghost"
@@ -1147,13 +1136,13 @@ export function CrawlConfigScreen({
                         (row.cssSelector.trim() || row.xpath.trim() || row.regex.trim()),
                     )
                   }
-                  className="h-7 rounded-lg px-3 text-xs shadow-[0_6px_16px_color-mix(in_srgb,var(--accent)_20%,transparent)]"
+                  className="h-7 rounded-[var(--radius-md)] px-3 text-xs"
                 >
                   {savingDomainMemory ? 'Saving...' : 'Save to Memory'}
                 </Button>
               </div>
             </header>
-            <div className="space-y-3 p-4">
+            <div className="space-y-4 px-5 pt-5 pb-5">
               {fieldConfigMessage ? (
                 <p className="text-success type-body leading-[var(--leading-relaxed)]">
                   {fieldConfigMessage}
@@ -1224,8 +1213,8 @@ export function CrawlConfigScreen({
 
         {studioMode === 'advanced' ? (
           <Card className="section-card overflow-visible xl:col-span-2">
-            <header className="border-border flex h-10 items-center justify-between border-b bg-[color-mix(in_srgb,var(--bg-alt)_40%,var(--bg-panel))] px-4">
-              <span className="type-label-mono text-secondary flex items-center gap-1.5">
+            <header className="border-border flex h-10 items-center justify-between border-b bg-[color-mix(in_srgb,var(--bg-alt)_40%,var(--bg-panel))] px-5">
+              <span className="type-body-sm font-medium text-secondary flex items-center gap-1.5">
                 <SlidersHorizontal className="size-3.5" /> Advanced Settings
               </span>
               <Tooltip content="Fine-tune fetch, limits, locality, and diagnostics for this exploratory run.">
@@ -1242,7 +1231,7 @@ export function CrawlConfigScreen({
                 </div>
                 <div className={ADVANCED_SUBSECTION_CLASS}>
                   <div className={ADVANCED_CONTROL_ROW_CLASS}>
-                    <div className="type-control">Fetch Mode</div>
+                    <div className="type-control crawl-control-label">Fetch Mode</div>
                     <Dropdown<FetchMode>
                       ariaLabel="Fetch mode"
                       value={runProfile.fetch_profile.fetch_mode}
@@ -1266,7 +1255,7 @@ export function CrawlConfigScreen({
                     />
                   </div>
                   <div className={ADVANCED_CONTROL_ROW_CLASS}>
-                    <div className="type-control">Extraction</div>
+                    <div className="type-control crawl-control-label">Extraction</div>
                     <Dropdown<ExtractionSource>
                       ariaLabel="Extraction source"
                       value={runProfile.fetch_profile.extraction_source}
@@ -1290,7 +1279,7 @@ export function CrawlConfigScreen({
                     />
                   </div>
                   <div className={ADVANCED_CONTROL_ROW_CLASS}>
-                    <div className="type-control">JS Mode</div>
+                    <div className="type-control crawl-control-label">JS Mode</div>
                     <Dropdown<JsMode>
                       ariaLabel="JavaScript mode"
                       value={runProfile.fetch_profile.js_mode}
@@ -1313,7 +1302,7 @@ export function CrawlConfigScreen({
                     />
                   </div>
                   <div className={ADVANCED_CONTROL_ROW_CLASS}>
-                    <div className="type-control">Traversal</div>
+                    <div className="type-control crawl-control-label">Traversal</div>
                     <Dropdown<TraversalDropdownValue>
                       ariaLabel="Traversal mode"
                       value={runProfile.fetch_profile.traversal_mode ?? 'off'}
@@ -1423,7 +1412,7 @@ export function CrawlConfigScreen({
                   />
                   <div className={ADVANCED_CONTROL_ROW_CLASS}>
                     <div className="flex items-center gap-2">
-                      <div className="type-control">Host Memory TTL</div>
+                      <div className="type-control crawl-control-label">Host Memory TTL</div>
                       <Tooltip
                         content={`Blank uses default ${CRAWL_DEFAULTS.HOST_MEMORY_TTL_SECONDS}s. Lower TTL forgets host block and pacing memory sooner.`}
                       >
@@ -1455,7 +1444,7 @@ export function CrawlConfigScreen({
                 </div>
                 <div className={ADVANCED_SUBSECTION_CLASS}>
                   <div className={ADVANCED_CONTROL_ROW_CLASS}>
-                    <div className="type-control">Geo Country</div>
+                    <div className="type-control crawl-control-label">Geo Country</div>
                     <Input
                       value={runProfile.locality_profile.geo_country}
                       onChange={(event) =>
@@ -1471,7 +1460,7 @@ export function CrawlConfigScreen({
                     />
                   </div>
                   <div className={ADVANCED_CONTROL_ROW_CLASS}>
-                    <div className="type-control">Language Hint</div>
+                    <div className="type-control crawl-control-label">Language Hint</div>
                     <Input
                       value={runProfile.locality_profile.language_hint ?? ''}
                       onChange={(event) =>
@@ -1487,7 +1476,7 @@ export function CrawlConfigScreen({
                     />
                   </div>
                   <div className={ADVANCED_CONTROL_ROW_CLASS}>
-                    <div className="type-control">Currency Hint</div>
+                    <div className="type-control crawl-control-label">Currency Hint</div>
                     <Input
                       value={runProfile.locality_profile.currency_hint ?? ''}
                       onChange={(event) =>
@@ -1514,7 +1503,7 @@ export function CrawlConfigScreen({
                 </div>
                 <div className={ADVANCED_SUBSECTION_CLASS}>
                   <div className={ADVANCED_CONTROL_ROW_CLASS}>
-                    <div className="type-control">Diagnostics</div>
+                    <div className="type-control crawl-control-label">Diagnostics</div>
                     <Dropdown<DiagnosticsPreset>
                       ariaLabel="Diagnostics preset"
                       value={diagnosticsPreset}
@@ -1531,7 +1520,7 @@ export function CrawlConfigScreen({
                     />
                   </div>
                   <div className={ADVANCED_CONTROL_ROW_CLASS}>
-                    <div className="type-control">Network Capture</div>
+                    <div className="type-control crawl-control-label">Network Capture</div>
                     <Dropdown<CaptureNetworkMode>
                       ariaLabel="Network capture"
                       value={runProfile.diagnostics_profile.capture_network}

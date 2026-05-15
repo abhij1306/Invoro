@@ -68,7 +68,7 @@ export function SettingSection({
               {renderedIcon}
             </div>
           ) : null}
-          <div className="type-control min-w-0">{label}</div>
+          <div className="type-control crawl-control-label min-w-0">{label}</div>
           <Tooltip content={description}>
             <Info className="text-muted hover:text-secondary size-3.5 cursor-help transition-colors" />
           </Tooltip>
@@ -120,7 +120,7 @@ export function SliderRow({
       className={cn('grid w-full gap-2.5 md:grid-cols-[140px_minmax(0,1fr)_112px] md:items-center')}
     >
       <div className="flex min-w-0 items-center gap-1.5">
-        <span className="type-control">{label}</span>
+        <span className="type-control crawl-control-label">{label}</span>
         {description ? (
           <Tooltip content={description}>
             <Info className="text-muted hover:text-secondary size-3.5 cursor-help transition-colors" />
@@ -206,7 +206,7 @@ export function AdditionalFieldInput({
 
   return (
     <label className="grid gap-1.5">
-      <span className="type-control">Additional Fields</span>
+      <span className="type-control crawl-control-label">Additional Fields</span>
       <Input
         value={value}
         onChange={(event) => handleChange(event.target.value)}
@@ -345,22 +345,18 @@ export function FieldEditorHeader() {
     <div className="hidden items-center gap-2 px-3 py-1.5 xl:grid xl:grid-cols-[24px_minmax(140px,0.8fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.8fr)_auto]">
       <div />
       <div className="flex items-center gap-1.5">
-        <span className="type-label-mono text-accent">Field</span>
-        <Info className="text-accent/60 size-3" />
+        <span className="type-caption text-muted">Field</span>
       </div>
       <div className="flex items-center gap-1.5">
-        <span className="type-label-mono text-accent">CSS</span>
-        <Info className="text-accent/60 size-3" />
+        <span className="type-caption text-muted">CSS</span>
       </div>
       <div className="flex items-center gap-1.5">
-        <span className="type-label-mono text-accent">XPath</span>
-        <Info className="text-accent/60 size-3" />
+        <span className="type-caption text-muted">XPath</span>
       </div>
       <div className="flex items-center gap-1.5">
-        <span className="type-label-mono text-accent">Regex</span>
-        <Info className="text-accent/60 size-3" />
+        <span className="type-caption text-muted">Regex</span>
       </div>
-      <span className="type-label-mono text-accent text-right">Actions</span>
+      <span className="type-caption text-muted text-right">Actions</span>
     </div>
   );
 }

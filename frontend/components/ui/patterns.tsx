@@ -141,7 +141,7 @@ export function TabBar({
   return (
     <div
       className={cn(
-        'segmented-root inline-flex h-[var(--control-height)] items-stretch rounded-[var(--radius-md)] p-0.5',
+        'segmented-root inline-flex h-[36px] items-stretch gap-1 rounded-[8px] p-[4px]',
         className,
       )}
     >
@@ -152,11 +152,11 @@ export function TabBar({
           aria-pressed={value === option.value}
           onClick={() => onChange(option.value)}
           className={cn(
-            'type-control relative z-10 inline-flex shrink-0 items-center justify-center rounded-[4px] py-0 whitespace-nowrap transition-all duration-200',
+            'type-control relative z-10 inline-flex min-w-[72px] shrink-0 items-center justify-center rounded-[5px] border px-3 py-0 whitespace-nowrap transition-[background-color,border-color,color,opacity] duration-150',
             padX,
             value === option.value
-              ? 'ui-on-accent-surface bg-accent shadow-[0_1px_2px_rgba(15,23,42,0.12)]'
-              : 'text-secondary hover:text-foreground',
+              ? 'border-border bg-panel text-foreground'
+              : 'border-transparent bg-transparent text-secondary opacity-100 hover:text-foreground',
           )}
         >
           {option.label}
@@ -198,7 +198,7 @@ export function EmptyPanel({
   description,
 }: Readonly<{ title: string; description: string }>) {
   return (
-    <div className="border-border-strong bg-subtle-panel grid min-h-32 place-items-center rounded-[var(--radius-xl)] border border-dashed px-6 py-8 text-center">
+    <div className="border-border-strong bg-subtle-panel grid min-h-32 place-items-center rounded-[var(--radius-lg)] border border-dashed px-6 py-8 text-center">
       <div className="space-y-1">
         <p className="type-subheading m-0">{title}</p>
         <p className="type-body m-0">{description}</p>
@@ -297,7 +297,7 @@ export function SkeletonRows({
 /* ─── MetricSkeleton ─────────────────────────────────────────────────────── */
 export function MetricSkeleton() {
   return (
-    <div className="border-border card-gradient shadow-card relative space-y-2 overflow-hidden rounded-[var(--radius-xl)] border p-4">
+    <div className="border-border card-gradient relative space-y-2 overflow-hidden rounded-[var(--radius-lg)] border p-4">
       <Skeleton className="h-3 w-20" />
       <Skeleton className="mt-2 h-9 w-28" />
       <Skeleton className="h-3 w-16" />
@@ -394,18 +394,6 @@ export function RunSummaryChips({
       : normalizedVerdict === 'partial'
         ? 'text-warning'
         : 'text-danger';
-  const verdictBg =
-    normalizedVerdict === 'success'
-      ? 'bg-success-bg'
-      : normalizedVerdict === 'partial'
-        ? 'bg-warning-bg'
-        : 'bg-danger-bg';
-  const verdictBar =
-    normalizedVerdict === 'success'
-      ? 'bg-success'
-      : normalizedVerdict === 'partial'
-        ? 'bg-warning'
-        : 'bg-danger';
 
   const qualityTone =
     normalizedQuality === 'high'
@@ -415,72 +403,36 @@ export function RunSummaryChips({
         : normalizedQuality === 'low'
           ? 'text-danger'
           : 'text-muted';
-  const qualityBg =
-    normalizedQuality === 'high'
-      ? 'bg-success-bg'
-      : normalizedQuality === 'medium'
-        ? 'bg-warning-bg'
-        : normalizedQuality === 'low'
-          ? 'bg-danger-bg'
-          : 'bg-status-neutral-bg';
-  const qualityBar =
-    normalizedQuality === 'high'
-      ? 'bg-success'
-      : normalizedQuality === 'medium'
-        ? 'bg-warning'
-        : normalizedQuality === 'low'
-          ? 'bg-danger'
-          : 'bg-muted';
 
   const chips = [
     {
-      label: 'TIME',
       value: duration,
       icon: Clock,
-      tone: 'text-accent',
-      bg: 'bg-accent-subtle',
-      bar: 'bg-accent',
+      tone: 'text-secondary',
     },
     {
-      label: 'VERDICT',
       value: verdict,
       icon: CheckCircle2,
       tone: verdictTone,
-      bg: verdictBg,
-      bar: verdictBar,
     },
     {
-      label: 'QUALITY',
       value: quality,
       icon: Award,
       tone: qualityTone,
-      bg: qualityBg,
-      bar: qualityBar,
     },
   ];
 
   return (
-    <div className="flex flex-wrap items-center justify-end gap-2">
+    <div className="flex flex-wrap items-center justify-end gap-1.5">
       {chips.map((chip) => {
         const Icon = chip.icon;
         return (
           <div
-            key={chip.label}
-            className={cn(
-              'inline-flex items-center gap-1.5 rounded-[var(--radius-lg)] px-2 py-1 transition-all hover:brightness-[0.98]',
-              chip.bg,
-            )}
+            key={chip.value}
+            className="border-border inline-flex items-center gap-1.5 rounded-[var(--radius-md)] border px-2.5 py-1"
           >
-            <div className={cn('h-3 w-[3px] shrink-0 rounded-full', chip.bar)} />
-            <div className="flex items-center gap-1">
-              <Icon className={cn('size-3 shrink-0 opacity-90', chip.tone)} aria-hidden="true" />
-              <div className="flex items-baseline gap-1.5">
-                <span className="type-body-sm font-medium tracking-wider uppercase">
-                  {chip.label}
-                </span>
-                <span className={cn('type-body-sm tabular-nums', chip.tone)}>{chip.value}</span>
-              </div>
-            </div>
+            <Icon className={cn('size-3.5 shrink-0', chip.tone)} aria-hidden="true" />
+            <span className={cn('type-body-sm tabular-nums', chip.tone)}>{chip.value}</span>
           </div>
         );
       })}
@@ -572,9 +524,9 @@ export function NavList<T>({
             aria-pressed={isActive}
             onClick={() => onSelect(key)}
             className={cn(
-              'w-full rounded-[var(--radius-xl)] border px-3 py-3 text-left transition-colors',
+              'w-full rounded-[var(--radius-lg)] border px-3 py-3 text-left transition-colors',
               isActive
-                ? 'border-accent shadow-card bg-[color-mix(in_srgb,var(--accent)_6%,var(--bg-panel))]'
+                ? 'border-accent bg-accent-subtle'
                 : 'border-border bg-background hover:bg-background-elevated',
             )}
           >

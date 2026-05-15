@@ -7,19 +7,20 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import type { ComponentType, ReactNode } from 'react';
 import {
-  Activity,
-  Brain,
+  BrainCircuit,
+  BriefcaseBusiness,
   ChevronLeft,
   ChevronRight,
-  Database,
-  Globe,
-  History,
-  LayoutDashboard,
-  Search,
+  Clock3,
+  DatabaseZap,
+  FileChartColumn,
+  Grid2x2,
+  SearchCheck,
   Settings2,
   Sparkles,
   ShieldCheck,
   Trash2,
+  WandSparkles,
   Zap,
 } from 'lucide-react';
 
@@ -40,14 +41,14 @@ const navGroups = [
   {
     label: 'Workspace',
     items: [
-      { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-      { href: '/crawl', label: 'Crawl Studio', icon: Globe },
-      { href: '/runs', label: 'History', icon: History },
-      { href: '/data-enrichment', label: 'Data Enrichment', icon: Sparkles },
-      { href: '/product-intelligence', label: 'Product Intelligence', icon: Brain },
-      { href: '/selectors', label: 'Selector Tool', icon: Search, exactMatch: true },
-      { href: '/selectors/manage', label: 'Domain Memory', icon: Database },
-      { href: '/jobs', label: 'Jobs', icon: Activity },
+      { href: '/dashboard', label: 'Dashboard', icon: Grid2x2 },
+      { href: '/crawl', label: 'Crawl Studio', icon: WandSparkles },
+      { href: '/runs', label: 'History', icon: Clock3 },
+      { href: '/data-enrichment', label: 'Data Enrichment', icon: FileChartColumn },
+      { href: '/product-intelligence', label: 'Product Intelligence', icon: BrainCircuit },
+      { href: '/selectors', label: 'Selector Tool', icon: SearchCheck, exactMatch: true },
+      { href: '/selectors/manage', label: 'Domain Memory', icon: DatabaseZap },
+      { href: '/jobs', label: 'Jobs', icon: BriefcaseBusiness },
     ],
   },
   {
@@ -130,7 +131,7 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
                   {Array.from({ length: 4 }, (_, index) => (
                     <div
                       key={index}
-                      className="border-border card-gradient shadow-card space-y-3 rounded-[var(--radius-xl)] border p-4"
+                      className="border-border card-gradient space-y-3 rounded-[var(--radius-lg)] border p-4"
                     >
                       <div className="skeleton h-3 w-20" />
                       <div className="skeleton h-8 w-28" />
@@ -149,7 +150,7 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
   if (authQuery.error && httpErrorStatus(authQuery.error) === 401) {
     return (
       <div className="app-shell-feedback">
-        <div className="border-border card-gradient shadow-card max-w-sm rounded-[var(--radius-xl)] border p-6 text-center">
+        <div className="border-border card-gradient max-w-sm rounded-[var(--radius-lg)] border p-6 text-center">
           <p className="text-foreground type-heading text-base leading-snug font-semibold">
             Session expired
           </p>
@@ -164,7 +165,7 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
   if (authQuery.error) {
     return (
       <div className="app-shell-feedback">
-        <div className="border-border card-gradient shadow-card max-w-sm rounded-[var(--radius-xl)] border p-6 text-center">
+        <div className="border-border card-gradient max-w-sm rounded-[var(--radius-lg)] border p-6 text-center">
           <p className="text-foreground type-heading text-base leading-snug font-semibold">
             Unable to load session
           </p>

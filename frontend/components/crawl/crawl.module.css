@@ -13,14 +13,11 @@
   border-radius: var(--radius-xl);
   background: var(--surface-card);
   font-size: var(--text-sm);
-  transition:
-    border-color var(--transition-fast),
-    box-shadow var(--transition-fast);
+  transition: border-color var(--transition-fast);
 }
 
 :global(.cs-metric:hover) {
   border-color: color-mix(in srgb, var(--accent) 24%, var(--border));
-  box-shadow: var(--shadow-sm);
 }
 
 :global(.cs-metric-value) {

@@ -32,6 +32,7 @@ import { uniqueRequestedFields } from '../../lib/crawl/fields';
 import { cleanRecordForDisplay } from '../../lib/crawl/record-utils';
 import { isInformativeValue, qualityLevelFromScore } from '../../lib/crawl/quality';
 import { scrollViewportToBottom } from '../../lib/crawl/scroll';
+import { syntaxHighlightJson } from '../../lib/ui/syntax';
 import { Button } from '../ui/primitives';
 function useLogViewport(_logCount: number, ref?: RefObject<HTMLDivElement | null>) {
   const internalRef = useRef<HTMLDivElement | null>(null);
@@ -102,7 +103,7 @@ function getLogIconStyle(level: string, message: string): { iconCls: string; bgC
   if (msg.includes('ignoring robots.txt'))
     return { iconCls: 'text-warning', bgCls: 'bg-warning-bg' };
   if (msg.includes('resolved')) return { iconCls: 'text-muted ', bgCls: 'bg-zinc-500/10' };
-  if (msg.includes('acquired')) return { iconCls: 'text-info', bgCls: 'bg-indigo-500/10' };
+  if (msg.includes('acquired')) return { iconCls: 'text-info', bgCls: 'bg-info-bg' };
   if (msg.includes('extracted')) return { iconCls: 'text-success', bgCls: 'bg-success-bg' };
   if (msg.includes('normalized') || msg.includes('normalised'))
     return { iconCls: 'text-warning', bgCls: 'bg-warning-bg' };
@@ -124,7 +125,7 @@ function getLogIconStyle(level: string, message: string): { iconCls: string; bgC
     msg.includes('playwright') ||
     msg.includes('headless')
   )
-    return { iconCls: 'text-violet-600', bgCls: 'bg-violet-500/12' };
+    return { iconCls: 'text-info', bgCls: 'bg-info-bg' };
   if (msg.includes('record')) return { iconCls: 'text-success', bgCls: 'bg-success-bg' };
   if (hasUrl) return { iconCls: 'text-info', bgCls: 'bg-info-bg' };
   if (
@@ -188,17 +189,17 @@ export const STAGE_CONFIG: Record<LogStage, LogStageConfig> = {
   },
   normalize: {
     label: 'Normalize',
-    borderClass: 'border-orange-400/30',
-    chipClass: 'bg-orange-500 text-white font-bold',
-    textOnlyClass: 'text-orange-500 font-bold',
-    panelClass: 'border-orange-400/20 bg-orange-500/10',
+    borderClass: 'border-warning/30',
+    chipClass: 'bg-warning text-white font-bold',
+    textOnlyClass: 'text-warning font-bold',
+    panelClass: 'border-warning/20 bg-warning-bg',
   },
   persistence: {
     label: 'Persist',
-    borderClass: 'border-indigo-400/30',
-    chipClass: 'bg-indigo-500 text-white font-bold',
-    textOnlyClass: 'text-indigo-500 font-bold',
-    panelClass: 'border-indigo-400/20 bg-indigo-500/10',
+    borderClass: 'border-info/30',
+    chipClass: 'bg-info text-white font-bold',
+    textOnlyClass: 'text-info font-bold',
+    panelClass: 'border-info/20 bg-info-bg',
   },
   system: {
     label: 'Run',
@@ -798,6 +799,10 @@ export const LogTerminal = memo(function LogTerminal({
   const safePeekedRecordIndex = peekedGroup
     ? Math.min(peekedRecordIndex, Math.max(peekedGroup.records.length - 1, 0))
     : 0;
+  const peekedRecordJson =
+    peekedGroup && peekedGroup.records[safePeekedRecordIndex]
+      ? JSON.stringify(cleanRecordForDisplay(peekedGroup.records[safePeekedRecordIndex]), null, 2)
+      : '';
   const safeTriageCursor = issueGroups.length ? Math.min(triageCursor, issueGroups.length - 1) : 0;
 
   useEffect(() => {
@@ -940,7 +945,7 @@ export const LogTerminal = memo(function LogTerminal({
 
       <div
         ref={ref}
-        className="crawl-activity-log max-h-[72vh] min-h-[50vh] overflow-y-auto"
+        className="crawl-activity-log max-h-[78vh] min-h-[62vh] overflow-y-auto"
         role="log"
         aria-live={live ? 'polite' : 'off'}
         aria-atomic="false"
@@ -1152,7 +1157,7 @@ export const LogTerminal = memo(function LogTerminal({
         <div className="absolute inset-0 z-40 bg-[color-mix(in_srgb,var(--bg-base)_60%,transparent)] backdrop-blur-sm">
           <div
             ref={peekPanelRef}
-            className="animate-in slide-in-from-right absolute inset-y-0 right-0 z-50 w-[32rem] max-w-full border-l duration-300"
+            className="animate-in slide-in-from-right absolute inset-y-0 right-0 z-50 w-[36rem] max-w-full border-l duration-300"
             style={{
               borderColor: 'var(--terminal-border)',
               backgroundColor: 'var(--terminal-code-bg)',
@@ -1187,7 +1192,7 @@ export const LogTerminal = memo(function LogTerminal({
                 Close
               </button>
             </div>
-            <div className="relative h-[calc(100%-60px)] overflow-hidden p-4">
+            <div className="relative h-[calc(100%-56px)] overflow-hidden p-4">
               <div className="group relative h-full">
                 <div className="absolute top-3 right-3 z-10 opacity-0 transition-all group-hover:opacity-100">
                   <Button
@@ -1209,15 +1214,19 @@ export const LogTerminal = memo(function LogTerminal({
                     Copy
                   </Button>
                 </div>
-                <pre className="crawl-terminal crawl-terminal-json h-full max-h-full overflow-auto">
-                  {peekedGroup && peekedGroup.records[safePeekedRecordIndex]
-                    ? JSON.stringify(
-                        cleanRecordForDisplay(peekedGroup.records[safePeekedRecordIndex]),
-                        null,
-                        2,
-                      )
-                    : TERMINAL_STRINGS.NO_PAYLOAD}
-                </pre>
+                {peekedRecordJson ? (
+                  <pre className="crawl-terminal crawl-terminal-json h-full max-h-full overflow-auto">
+                    <span className="sr-only">{peekedRecordJson}</span>
+                    <span
+                      aria-hidden="true"
+                      dangerouslySetInnerHTML={{ __html: syntaxHighlightJson(peekedRecordJson) }}
+                    />
+                  </pre>
+                ) : (
+                  <pre className="crawl-terminal crawl-terminal-json h-full max-h-full overflow-auto">
+                    {TERMINAL_STRINGS.NO_PAYLOAD}
+                  </pre>
+                )}
               </div>
             </div>
           </div>

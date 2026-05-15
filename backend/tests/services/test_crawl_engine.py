@@ -1935,6 +1935,62 @@ def test_extract_records_backfills_listing_price_from_network_payload_candidates
     ]
 
 
+def test_extract_records_uses_network_payload_listing_rows_when_dom_is_empty() -> None:
+    rows = extract_records(
+        "<html><body></body></html>",
+        "https://arcteryx.com/ca/en/c/mens/footwear-run/wid-kjyr4dq9",
+        "ecommerce_listing",
+        max_records=10,
+        network_payloads=[
+            {
+                "body": {
+                    "result": {
+                        "data": {
+                            "json": {
+                                "productList": [
+                                    {
+                                        "id": "X000010398",
+                                        "marketingName": "Norvan LD 4 Shoe Men's",
+                                        "shortDescription": "Adaptable, long-distance mountain running shoe",
+                                        "slug": "shop/mens/norvan-ld-4-shoe-0398",
+                                        "priceRange": {
+                                            "currency": "CAD",
+                                            "regularPrice": 220,
+                                            "minDiscountPrice": 220,
+                                            "maxDiscountPrice": 220,
+                                        },
+                                        "review": {"count": 94, "rating": 4.1277},
+                                        "hoverImage": {
+                                            "url": "https://images.arcteryx.com/details/1350x1710/F25-X000010398-Norvan-LD-4-Shoe-Black-Cloud-Hover.jpg",
+                                            "alt": "Norvan LD 4 Shoe Men's",
+                                        },
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
+        ],
+    )
+
+    assert rows == [
+        {
+            "source_url": "https://arcteryx.com/ca/en/c/mens/footwear-run/wid-kjyr4dq9",
+            "_source": "network_listing",
+            "title": "Norvan LD 4 Shoe Men's",
+            "url": "https://arcteryx.com/shop/mens/norvan-ld-4-shoe-0398",
+            "product_id": "X000010398",
+            "description": "Adaptable, long-distance mountain running shoe",
+            "image_url": "https://images.arcteryx.com/details/1350x1710/F25-X000010398-Norvan-LD-4-Shoe-Black-Cloud-Hover.jpg",
+            "rating": 4.13,
+            "review_count": 94,
+            "price": "220",
+            "currency": "CAD",
+        }
+    ]
+
+
 def test_extract_records_backfills_listing_brand_and_range_price_from_network_payload_candidates() -> None:
     rows = extract_records(
         "<html><body></body></html>",

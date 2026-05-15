@@ -1367,6 +1367,88 @@ async def test_probe_browser_readiness_does_not_fast_path_listing_on_visible_tex
 
 
 @pytest.mark.asyncio
+async def test_probe_browser_readiness_does_not_fast_path_ecommerce_category_cards() -> (
+    None
+):
+    page = _FakeExpansionPage(
+        base_html="""
+        <html><body>
+          <h1>Outdoor Footwear</h1>
+          <button class="plp-card">
+            <a href="/ca/en/c/mens/footwear-run/wid-kjyr4dq9">
+              <h4>Run footwear</h4>
+              <img src="/run.jpg" alt="Trail running category">
+            </a>
+          </button>
+          <button class="plp-card">
+            <a href="/ca/en/c/mens/footwear-hike/wid-kjyr4dq9">
+              <h4>Hike footwear</h4>
+              <img src="/hike.jpg" alt="Hike category">
+            </a>
+          </button>
+          <button class="plp-card">
+            <a href="/ca/en/c/mens/footwear-climb/wid-kjyr4dq9">
+              <h4>Climb footwear</h4>
+              <img src="/climb.jpg" alt="Climb category">
+            </a>
+          </button>
+        </body></html>
+        """,
+    )
+
+    probe = await browser_runtime.probe_browser_readiness(
+        page,
+        url="https://arcteryx.com/ca/en/c/mens/footwear",
+        surface="ecommerce_listing",
+        listing_override=None,
+    )
+
+    assert probe["listing_card_count"] == 0
+    assert probe["is_ready"] is False
+
+
+@pytest.mark.asyncio
+async def test_probe_browser_readiness_accepts_ecommerce_product_tiles() -> None:
+    page = _FakeExpansionPage(
+        base_html="""
+        <html><body>
+          <div class="qa--grid-product-tile product-tile" data-product-id="X000009613">
+            <a href="/shop/mens/vertex-speed-shoe-9613">
+              <img src="/vertex.jpg" alt="Vertex Speed Shoe Men's">
+              <span class="product-tile-name">Vertex Speed Shoe Men's</span>
+              <span class="product-tile-price">$240.00</span>
+            </a>
+          </div>
+          <div class="qa--grid-product-tile product-tile" data-product-id="X000009715">
+            <a href="/shop/mens/vertex-speed-low-shoe-9715">
+              <img src="/vertex-low.jpg" alt="Vertex Speed Low Shoe Men's">
+              <span class="product-tile-name">Vertex Speed Low Shoe Men's</span>
+              <span class="product-tile-price">$230.00</span>
+            </a>
+          </div>
+          <div class="qa--grid-product-tile product-tile" data-product-id="X000010398">
+            <a href="/shop/mens/norvan-ld-4-shoe-0398">
+              <img src="/norvan.jpg" alt="Norvan LD 4 Shoe Men's">
+              <span class="product-tile-name">Norvan LD 4 Shoe Men's</span>
+              <span class="product-tile-price">$220.00</span>
+            </a>
+          </div>
+        </body></html>
+        """,
+    )
+
+    probe = await browser_runtime.probe_browser_readiness(
+        page,
+        url="https://arcteryx.com/ca/en/c/mens/footwear",
+        surface="ecommerce_listing",
+        listing_override=None,
+    )
+
+    assert probe["listing_card_count"] == 3
+    assert probe["is_ready"] is True
+
+
+@pytest.mark.asyncio
 async def test_browser_fetch_bounds_response_capture_workers_under_burst_load(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

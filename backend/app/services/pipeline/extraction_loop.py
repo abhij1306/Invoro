@@ -756,7 +756,6 @@ async def _retry_empty_extraction_with_browser(
     )
     if not retry_decision["should_retry"]:
         return records, selector_rules
-    await _log_extraction_outcome(context, acquisition_result, records)
     await _log_pipeline_event(
         context,
         "info",
@@ -766,7 +765,10 @@ async def _retry_empty_extraction_with_browser(
         context, fetched, retry_reason="empty_extraction"
     )
     fetched.acquisition_result = browser_result
-    return await _extract_records_for_acquisition(context, fetched)
+    retry_records, retry_selector_rules = await _extract_records_for_acquisition(
+        context, fetched
+    )
+    return retry_records, retry_selector_rules
 
 
 async def _retry_low_quality_extraction_with_browser(

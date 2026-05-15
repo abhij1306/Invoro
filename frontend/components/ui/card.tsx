@@ -6,7 +6,7 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '../../lib/utils';
 
 export const cardVariants = cva(
-  'relative overflow-hidden rounded-[var(--radius-xl)] border border-border card-gradient p-5 transition-[border-color] hover:border-border-strong',
+  'relative overflow-hidden rounded-[var(--radius-lg)] border border-border card-gradient p-5 transition-[border-color] hover:border-border-strong',
   {
     variants: {
       animate: {

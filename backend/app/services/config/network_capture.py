@@ -7,7 +7,12 @@ from app.services.config.network_payload_specs import endpoint_type_path_tokens
 
 
 NETWORK_PAYLOAD_NOISE_DOMAINS: Final[tuple[str, ...]] = (
+    "cdndex.io",
+    "cookielaw.org",
+    "evergage.com",
+    "forter.com",
     "klarna.com",
+    "nr-data.net",
     "affirm.com",
     "afterpay.com",
     "olapic-cdn.com",

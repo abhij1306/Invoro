@@ -67,10 +67,7 @@ export function TableRow({
     <tr
       {...props}
       className={cn(
-        // Hairline bottom border; fades on last row via TableBody selector
-        'border-border border-b transition-colors',
-        // Hover: subtle accent-tinted bg works in both themes
-        'hover:bg-[color-mix(in_srgb,var(--accent)_5%,var(--bg-panel))]',
+        'border-border h-[var(--table-row-height)] border-b transition-colors odd:bg-panel even:bg-background-alt hover:bg-accent-subtle',
         className,
       )}
     >
@@ -91,7 +88,7 @@ export function TableHead({
     <th
       {...props}
       className={cn(
-        'text-secondary h-8 px-4 text-left align-middle [font-family:var(--font-primary-family)] text-xs font-semibold tracking-wide uppercase',
+        'text-muted h-[var(--table-header-height)] bg-background-alt px-4 text-left align-middle [font-family:var(--font-primary-family)] text-[length:var(--text-xs)] font-bold tracking-[var(--tracking-wider)] uppercase',
         className,
       )}
     >
@@ -107,7 +104,7 @@ export function TableCell({
   ...props
 }: Readonly<
   {
-    children: ReactNode;
+    children?: ReactNode;
     className?: string;
     colSpan?: number;
   } & React.TdHTMLAttributes<HTMLTableCellElement>
@@ -116,7 +113,7 @@ export function TableCell({
     <td
       {...props}
       className={cn(
-        'text-primary px-4 py-2 align-middle [font-family:var(--font-primary-family)] text-[length:var(--text-sm)] leading-normal font-normal',
+        'text-primary px-4 py-0 align-middle [font-family:var(--font-primary-family)] text-[length:var(--text-sm)] leading-normal font-normal',
         className,
       )}
       colSpan={colSpan}

@@ -165,6 +165,12 @@ def extract_records(
             selector_rules=selector_rules,
             network_payloads=network_payloads,
         )
+        network_rows = _extract_listing_rows_from_network(
+            network_payloads,
+            page_url=page_url,
+            surface=normalized_surface,
+            max_records=max_records,
+        )
         adapter_rows = _backfill_listing_rows_from_network(
             adapter_rows,
             network_payloads=network_payloads,
@@ -175,47 +181,40 @@ def extract_records(
         )
         adapter_rows = _finalize_listing_rows(adapter_rows)
         listing_rows = _finalize_listing_rows(listing_rows)
+        network_rows = _finalize_listing_rows(network_rows)
         listing_rows = _backfill_listing_rows_from_adapter(
             listing_rows,
             adapter_rows=adapter_rows,
         )
-        if adapter_rows and listing_rows:
-            candidate_rows = best_listing_candidate_set(
-                [
-                    ("adapter", adapter_rows),
-                    ("generic", listing_rows),
-                    ("generic_plus_adapter", [*listing_rows, *adapter_rows]),
-                ],
-                page_url=page_url,
-                surface=normalized_surface,
-                max_records=max_records,
-                title_is_noise=is_title_noise,
-                url_is_structural=listing_url_is_structural,
-                detail_like_url=lambda candidate_url: listing_detail_like_path(
-                    candidate_url,
-                    is_job=str(normalized_surface or "").startswith("job_"),
-                ),
+        candidate_sets: list[tuple[str, list[dict[str, Any]]]] = []
+        if adapter_rows:
+            candidate_sets.append(("adapter", adapter_rows))
+        if listing_rows:
+            candidate_sets.append(("generic", listing_rows))
+        if network_rows:
+            candidate_sets.append(("network", network_rows))
+        combined_rows = [*listing_rows, *adapter_rows, *network_rows]
+        if len(candidate_sets) >= 2 and combined_rows:
+            candidate_sets.append(("combined", combined_rows))
+        if candidate_sets:
+            candidate_rows = (
+                best_listing_candidate_set(
+                    candidate_sets,
+                    page_url=page_url,
+                    surface=normalized_surface,
+                    max_records=max_records,
+                    title_is_noise=is_title_noise,
+                    url_is_structural=listing_url_is_structural,
+                    detail_like_url=lambda candidate_url: listing_detail_like_path(
+                        candidate_url,
+                        is_job=str(normalized_surface or "").startswith("job_"),
+                    ),
+                )
+                if len(candidate_sets) > 1
+                else candidate_sets[0][1][:max_records]
             )
             gated_rows = apply_listing_integrity_gate(
                 candidate_rows,
-                page_url=page_url,
-                surface=normalized_surface,
-                artifacts=artifacts,
-            )
-            _propagate_listing_integrity_to_diagnostics(artifacts, browser_diagnostics)
-            return gated_rows
-        if listing_rows:
-            gated_rows = apply_listing_integrity_gate(
-                listing_rows,
-                page_url=page_url,
-                surface=normalized_surface,
-                artifacts=artifacts,
-            )
-            _propagate_listing_integrity_to_diagnostics(artifacts, browser_diagnostics)
-            return gated_rows
-        if adapter_rows:
-            gated_rows = apply_listing_integrity_gate(
-                adapter_rows,
                 page_url=page_url,
                 surface=normalized_surface,
                 artifacts=artifacts,
@@ -258,7 +257,6 @@ def _html_is_blocked_extraction_shell(html: str) -> bool:
             or classification.title_matches
         )
     )
-
 
 
 def _finalize_listing_rows(rows: list[dict]) -> list[dict[str, Any]]:
@@ -376,6 +374,122 @@ def _backfill_listing_rows_from_adapter(
     return rows
 
 
+def _extract_listing_rows_from_network(
+    network_payloads: list[dict[str, object]] | None,
+    *,
+    page_url: str,
+    surface: str,
+    max_records: int,
+) -> list[dict[str, Any]]:
+    if not network_payloads:
+        return []
+    rows: list[dict[str, Any]] = []
+    seen_urls: set[str] = set()
+    for payload in list(network_payloads or []):
+        body = payload.get("body") if isinstance(payload, dict) else None
+        for candidate in _iter_listing_price_candidates(body):
+            row = _network_listing_row(candidate, page_url=page_url, surface=surface)
+            url = str(row.get("url") or "").strip()
+            if not url or url in seen_urls:
+                continue
+            seen_urls.add(url)
+            rows.append(row)
+            if len(rows) >= max_records:
+                return rows
+    return rows
+
+
+def _network_listing_row(
+    candidate: dict[str, Any],
+    *,
+    page_url: str,
+    surface: str,
+) -> dict[str, Any]:
+    title = _first_candidate_text(candidate, LISTING_NETWORK_TITLE_KEYS)
+    url = _network_listing_url(candidate, page_url=page_url)
+    if not title or not url:
+        return {}
+    row: dict[str, Any] = {
+        "source_url": page_url,
+        "_source": "network_listing",
+        "title": title,
+        "url": url,
+    }
+    product_id = clean_text(
+        candidate.get("productId") or candidate.get("product_id") or candidate.get("id")
+    )
+    if product_id:
+        row["product_id"] = product_id
+    description = coerce_text(
+        candidate.get("shortDescription") or candidate.get("description")
+    )
+    if description:
+        row["description"] = description
+    image_url = _network_listing_image_url(candidate, page_url=page_url)
+    if image_url:
+        row["image_url"] = image_url
+    review = candidate.get("review")
+    if isinstance(review, dict):
+        if review.get("rating") not in (None, "", [], {}):
+            row["rating"] = review.get("rating")
+        if review.get("count") not in (None, "", [], {}):
+            row["review_count"] = review.get("count")
+    row.update(
+        _listing_candidate_backfill_entry(
+            candidate,
+            alias_lookup=surface_alias_lookup(surface, None),
+        )
+    )
+    return finalize_record(row, surface=surface)
+
+
+def _network_listing_url(candidate: dict[str, Any], *, page_url: str) -> str:
+    for key in ("url", "link", "href", "permalink"):
+        resolved = absolute_url(page_url, candidate.get(key))
+        if resolved:
+            return resolved
+    slug = clean_text(candidate.get("slug") or candidate.get("handle"))
+    if not slug:
+        return ""
+    if re.match(r"^https?://", slug, re.I):
+        return slug
+    if slug.startswith("/"):
+        return absolute_url(page_url, slug) or ""
+    parsed = urlsplit(page_url)
+    origin = (
+        f"{parsed.scheme}://{parsed.netloc}"
+        if parsed.scheme and parsed.netloc
+        else page_url
+    )
+    return absolute_url(origin, f"/{slug}") or ""
+
+
+def _network_listing_image_url(candidate: dict[str, Any], *, page_url: str) -> str:
+    for key in ("image", "image_url", "imageUrl", "thumbnail", "hoverImage"):
+        resolved = _image_url_from_value(candidate.get(key), page_url=page_url)
+        if resolved:
+            return resolved
+    colour_options = candidate.get("colourOptions") or candidate.get("colorOptions")
+    if isinstance(colour_options, list):
+        for option in colour_options:
+            if not isinstance(option, dict):
+                continue
+            for key in ("image", "thumbnail", "hoverImage"):
+                resolved = _image_url_from_value(option.get(key), page_url=page_url)
+                if resolved:
+                    return resolved
+    return ""
+
+
+def _image_url_from_value(value: object, *, page_url: str) -> str:
+    if isinstance(value, dict):
+        for key in ("url", "src", "href"):
+            resolved = absolute_url(page_url, value.get(key))
+            if resolved:
+                return resolved
+    return absolute_url(page_url, value) or ""
+
+
 def _listing_network_backfill_maps(
     network_payloads: list[dict[str, object]],
 ) -> tuple[dict[str, dict[str, str]], dict[str, dict[str, str]]]:
@@ -402,7 +516,7 @@ def _listing_network_backfill_maps(
 def _iter_listing_price_candidates(
     value: object, *, depth: int = 0
 ) -> list[dict[str, Any]]:
-    if depth > 4:
+    if depth > 6:
         return []
     rows: list[dict[str, Any]] = []
     if isinstance(value, dict):
@@ -475,6 +589,7 @@ def _listing_candidate_price(candidate: dict[str, Any]) -> str | None:
 
 def _listing_candidate_raw_price(candidate: dict[str, Any]) -> object | None:
     prices = candidate.get("prices")
+    price_range = candidate.get("priceRange")
     offers = candidate.get("offers")
     if isinstance(offers, list):
         offers = next((item for item in offers if isinstance(item, dict)), None)
@@ -498,6 +613,13 @@ def _listing_candidate_raw_price(candidate: dict[str, Any]) -> object | None:
         for key in LISTING_NETWORK_FALLBACK_PRICE_KEYS:
             if prices.get(key) not in (None, "", [], {}):
                 return prices.get(key)
+    if isinstance(price_range, dict):
+        for key in LISTING_NETWORK_PRIMARY_PRICE_KEYS:
+            if price_range.get(key) not in (None, "", [], {}):
+                return price_range.get(key)
+        for key in LISTING_NETWORK_FALLBACK_PRICE_KEYS:
+            if price_range.get(key) not in (None, "", [], {}):
+                return price_range.get(key)
     if isinstance(offers, dict):
         for key in LISTING_NETWORK_PRIMARY_PRICE_KEYS:
             if offers.get(key) not in (None, "", [], {}):
@@ -510,6 +632,7 @@ def _listing_candidate_raw_price(candidate: dict[str, Any]) -> object | None:
 
 def _listing_candidate_currency(candidate: dict[str, Any]) -> str | None:
     prices = candidate.get("prices")
+    price_range = candidate.get("priceRange")
     if isinstance(prices, dict):
         for bucket_name in LISTING_NETWORK_PRICE_BUCKETS:
             bucket = prices.get(bucket_name)
@@ -523,6 +646,11 @@ def _listing_candidate_currency(candidate: dict[str, Any]) -> str | None:
             return code
         for key in ("currencyCode", "priceCurrency"):
             code = clean_text(prices.get(key))
+            if code:
+                return code
+    if isinstance(price_range, dict):
+        for key in ("currency", "currencyCode", "priceCurrency"):
+            code = _listing_currency_code(price_range.get(key))
             if code:
                 return code
     offers = candidate.get("offers")
@@ -743,6 +871,7 @@ def _has_surface_field_overlap(items: list[object], *, surface: str) -> bool:
         if matching + remaining < required_matches:
             return False
     return matching >= required_matches
+
 
 def _payload_has_surface_field_overlap(
     payload: dict[str, object],

@@ -1544,6 +1544,77 @@ async def test_process_single_url_retries_with_browser_after_empty_non_browser_e
 
 
 @pytest.mark.asyncio
+async def test_process_single_url_does_not_auto_scroll_after_empty_browser_listing(
+    db_session: AsyncSession,
+    test_user,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run = await create_crawl_run(
+        db_session,
+        test_user.id,
+        {
+            "run_type": "crawl",
+            "url": "https://example.com/category/widgets",
+            "surface": "ecommerce_listing",
+            "settings": {"respect_robots_txt": False},
+        },
+    )
+    acquire_calls: list[tuple[dict[str, object], str | None]] = []
+
+    async def _fake_acquire(request):
+        acquire_calls.append(
+            (dict(request.acquisition_profile), request.plan.traversal_mode)
+        )
+        if request.acquisition_profile.get("prefer_browser"):
+            return AcquisitionResult(
+                request=request,
+                final_url=request.url,
+                html="<html><body>browser</body></html>",
+                method="browser",
+                status_code=200,
+                browser_diagnostics={"browser_outcome": "usable_content"},
+            )
+        return AcquisitionResult(
+            request=request,
+            final_url=request.url,
+            html="<html><body>http</body></html>",
+            method="curl_cffi",
+            status_code=200,
+        )
+
+    async def _no_selector_rules(*args, **kwargs):
+        del args, kwargs
+        return []
+
+    monkeypatch.setattr("app.services.pipeline.extraction_loop.acquire", _fake_acquire)
+    monkeypatch.setattr("app.services.pipeline.extraction_loop.run_adapter", _no_adapter)
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.load_domain_selector_rules",
+        _no_selector_rules,
+    )
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.extract_records",
+        lambda *args, **kwargs: [],
+    )
+
+    async def _persist_artifacts(**kwargs):
+        del kwargs
+        return "artifacts/widgets.html"
+
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.persist_acquisition_artifacts",
+        _persist_artifacts,
+    )
+
+    result = await process_single_url(db_session, run, run.url)
+
+    assert len(acquire_calls) == 2
+    assert acquire_calls[1][0]["prefer_browser"] is True
+    assert acquire_calls[1][1] is None
+    assert result.verdict == "listing_detection_failed"
+
+
+@pytest.mark.asyncio
 async def test_process_single_url_persists_listing_page_source_separately_from_record_url(
     db_session: AsyncSession,
     test_user,

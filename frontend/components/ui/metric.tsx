@@ -16,13 +16,13 @@ export function Metric({
   loading = false,
 }: Readonly<{ label: string; value: ReactNode; loading?: boolean }>) {
   return (
-    <div className="border-border card-gradient hover:border-border-strong relative space-y-1.5 overflow-hidden rounded-[var(--radius-xl)] border p-4 transition-[border-color]">
-      <p className="text-secondary text-sm font-medium">{label}</p>
+    <div className="border-border card-gradient hover:border-border-strong relative space-y-2 overflow-hidden rounded-[var(--radius-lg)] border px-5 py-4 transition-[border-color]">
+      <p className="type-label">{label}</p>
       {loading ? (
         <div className="skeleton h-7 w-20" aria-hidden />
       ) : (
         <div
-          className="mono-body text-foreground leading-none font-semibold tabular-nums"
+          className="mono-body text-foreground leading-none font-bold tabular-nums"
           style={{ fontSize: 'var(--text-3xl)' }}
         >
           {value}
@@ -50,14 +50,14 @@ export function StatCard({
   loading?: boolean;
 }>) {
   return (
-    <div className="border-border card-gradient hover:border-border-strong relative overflow-hidden rounded-[var(--radius-xl)] border p-4 transition-[border-color]">
+    <div className="border-border card-gradient hover:border-border-strong relative overflow-hidden rounded-[var(--radius-lg)] border px-5 py-4 transition-[border-color]">
       <div
         className="absolute inset-x-0 top-0 h-0.5"
         style={{ background: stripeColor ?? 'var(--accent)' }}
         aria-hidden
       />
       <div className="mb-2.5 flex items-center justify-between gap-2">
-        <p className="text-secondary text-sm font-medium">{label}</p>
+        <p className="type-label">{label}</p>
         {icon ? (
           <div
             className="grid size-[22px] place-items-center rounded-md"
@@ -76,7 +76,7 @@ export function StatCard({
         <div className="skeleton mt-2.5 h-9 w-28" aria-hidden />
       ) : (
         <div
-          className="mono-body text-foreground mt-2 leading-none font-semibold tabular-nums"
+          className="mono-body text-foreground mt-2 leading-none font-bold tabular-nums"
           style={{ fontSize: 'var(--text-3xl)' }}
         >
           {value}

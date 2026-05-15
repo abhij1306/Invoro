@@ -30,11 +30,11 @@ export function Title({
   return (
     <div className={cn('space-y-1', className)}>
       {kicker ? (
-        <p className="text-accent m-0 mb-1.5 font-mono text-[11px] font-semibold tracking-[0.14em] uppercase">
+        <p className="type-label m-0 mb-1.5">
           {kicker}
         </p>
       ) : null}
-      <h1 className="text-foreground type-heading m-0 text-[clamp(1.75rem,1.45rem+0.8vw,2rem)] leading-[var(--leading-tight)] font-semibold">
+      <h1 className="text-foreground type-heading-1 m-0">
         {children}
       </h1>
     </div>
@@ -235,7 +235,7 @@ export function Dropdown<T extends string>({
         disabled={disabled}
         onKeyDown={handleKeyDown}
         className={cn(
-          'focus-ring border-border-strong bg-background text-foreground hover:bg-background-alt focus:border-accent flex h-[var(--control-height)] w-full items-center gap-2 rounded-[var(--radius-md)] border px-3 text-sm leading-[1.4] font-medium transition-[background-color,border-color,box-shadow] focus:shadow-[0_0_0_3px_var(--accent-subtle)]',
+          'focus-ring border-border bg-panel text-foreground hover:border-border-strong focus:border-accent flex h-[34px] w-full items-center gap-2 rounded-[var(--radius-md)] border px-3 text-[length:var(--text-sm)] leading-[1.4] font-normal transition-[background-color,border-color]',
           align === 'center' ? 'justify-center text-center' : 'justify-between text-left',
         )}
       >
@@ -265,7 +265,7 @@ export function Dropdown<T extends string>({
               onMouseEnter={cancelClose}
               onMouseLeave={scheduleClose}
               className={cn(
-                'border-border bg-background-elevated fixed z-[300] max-h-[320px] w-max overflow-y-auto rounded-[var(--radius-lg)] border py-1 shadow-lg',
+                'border-border bg-background-elevated fixed z-[300] max-h-[320px] w-max overflow-y-auto rounded-[var(--radius-lg)] border py-1',
                 listboxPosition.side === 'bottom'
                   ? 'animate-[dropdown-in_150ms_cubic-bezier(0.16,1,0.3,1)]'
                   : 'animate-[dropdown-in-up_150ms_cubic-bezier(0.16,1,0.3,1)]',
@@ -290,7 +290,7 @@ export function Dropdown<T extends string>({
                     }}
                     onMouseDown={(e) => e.preventDefault()}
                     className={cn(
-                      'flex w-full items-center py-2 text-sm leading-[var(--leading-snug)] transition-colors',
+                      'flex w-full items-center py-2 text-[length:var(--text-sm)] leading-[var(--leading-snug)] transition-colors',
                       align === 'center' ? 'justify-center px-8' : 'justify-start px-3',
                       option.value === value
                         ? 'bg-accent-subtle text-accent font-medium'
@@ -323,13 +323,13 @@ export function Toggle({
       aria-checked={checked}
       onClick={() => onChange(!checked)}
       className={cn(
-        'focus-ring relative inline-flex h-[20px] w-[36px] shrink-0 cursor-pointer items-center rounded-full transition-[background-color,box-shadow]',
+        'focus-ring relative inline-flex h-[18px] w-[32px] shrink-0 cursor-pointer items-center rounded-full transition-[background-color]',
         checked ? 'bg-accent' : 'bg-border-strong',
       )}
     >
       <span
         className={cn(
-          'inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform',
+          'inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform',
           checked ? 'translate-x-[16px]' : 'translate-x-[2px]',
         )}
       />
@@ -428,7 +428,7 @@ export function Tooltip({
               role="tooltip"
               className={cn(
                 'pointer-events-none fixed w-max max-w-[min(420px,calc(100vw-24px))]',
-                'tooltip-surface bg-panel rounded-[var(--radius-md)] px-2 py-1.5 shadow-lg',
+                'tooltip-surface bg-panel rounded-[var(--radius-md)] px-2 py-1.5',
                 'text-foreground z-[200] text-sm leading-normal font-medium break-words',
               )}
               style={{ left: `${position.left}px`, top: `${position.top}px` }}

@@ -215,6 +215,30 @@ def test_should_capture_network_payload_skips_noise_and_large_declared_payloads(
     None
 ):
     assert not should_capture_network_payload(
+        url="https://cdn.cookielaw.org/consent/site/en.json",
+        content_type="application/json",
+        headers={},
+        captured_count=0,
+    )
+    assert not should_capture_network_payload(
+        url="https://cdn0.forter.com/site/prop.json",
+        content_type="application/json",
+        headers={},
+        captured_count=0,
+    )
+    assert not should_capture_network_payload(
+        url="https://bam.nr-data.net/1/NRBR",
+        content_type="application/json",
+        headers={},
+        captured_count=0,
+    )
+    assert not should_capture_network_payload(
+        url="https://arcteryx.us-5.evergage.com/api2/event/site",
+        content_type="application/json",
+        headers={},
+        captured_count=0,
+    )
+    assert not should_capture_network_payload(
         url="https://example.com/telemetry/events",
         content_type="application/json",
         headers={},

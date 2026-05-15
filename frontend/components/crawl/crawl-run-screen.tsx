@@ -939,7 +939,7 @@ export function CrawlRunScreen({ runId }: Readonly<CrawlRunScreenProps>) {
               Live Log Stream
               {logSocketOnline ? (
                 <span
-                  className="bg-success inline-block size-1.5 animate-pulse rounded-full shadow-[0_0_6px_var(--success)]"
+                  className="bg-success inline-block size-1.5 animate-pulse rounded-full"
                   aria-label="Connected"
                 />
               ) : (
