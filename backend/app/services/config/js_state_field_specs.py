@@ -12,16 +12,29 @@ JS_STATE_PRODUCT_VARIANT_LIST_KEYS: tuple[str, ...] = (
     "availableSizes",
     "variation_hierarchy",
 )
+JS_STATE_PRODUCT_OPTION_GROUP_KEYS: tuple[str, ...] = (
+    "options",
+    "configurable_product_options",
+    "configurableProductOptions",
+)
+JS_STATE_OPTION_GROUP_VALUE_KEYS: tuple[str, ...] = (
+    "values",
+    "options",
+)
 JS_STATE_VARIANT_AVAILABILITY_BOOL_KEYS: tuple[str, ...] = (
     "available",
     "availableForSale",
     "inStock",
+    "isInStock",
+    "enabled",
+    "in_stock",
 )
 JS_STATE_VARIANT_STOCK_QUANTITY_KEYS: tuple[str, ...] = (
     "inventory_quantity",
     "stock_quantity",
     "quantity",
     "inventoryQuantity",
+    "stock",
 )
 VARIANT_AXIS_KEYS = (
     "color",
@@ -44,7 +57,9 @@ JS_STATE_PRODUCT_FIELD_SPEC = {
     "title": Coalesce(
         "title",
         "name",
+        "nameByLanguage.en",
         "pn",
+        "copyProductTitle",
         "item.product_description.title",
         default=None,
         skip=JS_STATE_GLOM_SKIP,
@@ -52,8 +67,11 @@ JS_STATE_PRODUCT_FIELD_SPEC = {
     "brand": Coalesce(
         "brand.name",
         "brand",
+        "brandName",
         "vendor.name",
         "vendor",
+        "labelDisplayName",
+        "newBrand.name.en",
         default=None,
         skip=JS_STATE_GLOM_SKIP,
     ),
@@ -68,6 +86,7 @@ JS_STATE_PRODUCT_FIELD_SPEC = {
         "canonicalUrl",
         "canonical_url",
         "item.enrichment.buy_url",
+        "websiteUrl",
         default=None,
         skip=JS_STATE_GLOM_SKIP,
     ),
@@ -76,6 +95,8 @@ JS_STATE_PRODUCT_FIELD_SPEC = {
         "description",
         "body_html",
         "descriptionHtml",
+        "descriptionByLanguage.en",
+        "copyDescription",
         "pd",
         default=None,
         skip=JS_STATE_GLOM_SKIP,
@@ -87,6 +108,7 @@ JS_STATE_PRODUCT_FIELD_SPEC = {
         "tcin",
         "pid",
         "legacyResourceId",
+        "legacyStyleGroupId",
         default=None,
         skip=JS_STATE_GLOM_SKIP,
     ),
@@ -97,7 +119,9 @@ JS_STATE_PRODUCT_FIELD_SPEC = {
     "gender": Coalesce(
         "gender", "target_gender", "targetGender", default=None, skip=JS_STATE_GLOM_SKIP
     ),
-    "sku": Coalesce("sku", default=None, skip=JS_STATE_GLOM_SKIP),
+    "sku": Coalesce(
+        "sku.skuId", "sku", "productCode", default=None, skip=JS_STATE_GLOM_SKIP
+    ),
     "barcode": Coalesce("barcode", default=None, skip=JS_STATE_GLOM_SKIP),
     "currency": Coalesce(
         "currency",
@@ -105,6 +129,7 @@ JS_STATE_PRODUCT_FIELD_SPEC = {
         "priceCurrency",
         "prices.currency",
         "prices.currentPrice.currencyCode",
+        "productPrice.currency",
         "pricing_information.currency",
         "pricing_information.currentPrice.currencyCode",
         "prices.promo.currency.code",
@@ -128,6 +153,8 @@ JS_STATE_PRODUCT_FIELD_SPEC = {
         "currentPrice",
         "currentPrice.amount",
         "currentPrice.value",
+        "productPrice.current.value",
+        "productPrice.current.text",
         "prices.currentPrice",
         "prices.currentPrice.amount",
         "pricing_information.currentPrice",
@@ -199,8 +226,13 @@ JS_STATE_VARIANT_FIELD_SPEC = {
         "currentPrice.amount",
         "currentPrice.value",
         "currentPrice",
+        "price.current.value",
+        "price.current.text",
         "prices.currentPrice",
         "prices.currentPrice.amount",
+        "sku.propositions.0.pricings.0.sellingRetail.price",
+        "sellingRetail.price",
+        "sellingRetailPriceRange.min",
         "amount",
         "formattedPrice",
         "price",
@@ -221,6 +253,9 @@ JS_STATE_VARIANT_FIELD_SPEC = {
         "fullPrice",
         "prices.initialPrice",
         "prices.initialPrice.amount",
+        "sku.propositions.0.pricings.0.baseRetail.price",
+        "baseRetail.price",
+        "baseRetailPriceRange.min",
         default=None,
         skip=JS_STATE_GLOM_SKIP,
     ),
@@ -231,6 +266,7 @@ JS_STATE_VARIANT_FIELD_SPEC = {
         "currentPrice.currencyCode",
         "salePrice.currencyCode",
         "prices.currency",
+        "price.currency",
         "price.currencyCode",
         "price.currency_code",
         "priceV2.currencyCode",
@@ -239,6 +275,6 @@ JS_STATE_VARIANT_FIELD_SPEC = {
         default=None,
         skip=JS_STATE_GLOM_SKIP,
     ),
-    "sku": Coalesce("sku", default=None, skip=JS_STATE_GLOM_SKIP),
+    "sku": Coalesce("sku.skuId", "sku", default=None, skip=JS_STATE_GLOM_SKIP),
     "barcode": Coalesce("barcode", default=None, skip=JS_STATE_GLOM_SKIP),
 }

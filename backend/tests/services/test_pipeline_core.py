@@ -22,6 +22,7 @@ from app.services.pipeline.extraction_loop import (
     apply_llm_fallback,
     process_single_url,
 )
+from app.services.pipeline.direct_record_fallback import apply_direct_record_llm_fallback
 from app.services.pipeline.extraction_retry_decision import (
     low_quality_extraction_browser_retry_decision,
     records_missing_repair_fields,
@@ -62,6 +63,130 @@ def _fake_acquire_result(
 
 async def _no_adapter(*_args, **_kwargs):
     return None
+
+
+@pytest.mark.asyncio
+async def test_direct_record_llm_fallback_does_not_replace_deterministic_records(
+    db_session: AsyncSession,
+    test_user,
+) -> None:
+    run = await create_crawl_run(
+        db_session,
+        test_user.id,
+        {
+            "run_type": "crawl",
+            "url": "https://www.notre-shop.com/products/sneaker",
+            "surface": "ecommerce_detail",
+            "settings": {"llm_enabled": True},
+        },
+    )
+    deterministic_records = [
+        {
+            "title": "Joe Freshgoods Abzorb 1890 Sneaker",
+            "url": "https://www.notre-shop.com/products/sneaker",
+            "price": "19500",
+            "variants": [{"size": "10 M", "price": "19500"}],
+            "_source": "shopify_adapter",
+        }
+    ]
+
+    async def _unexpected_resolve_run_config(*args, **kwargs):
+        del args, kwargs
+        raise AssertionError("direct LLM must not replace deterministic records")
+
+    async def _unexpected_extract_records(*args, **kwargs):
+        del args, kwargs
+        raise AssertionError("direct LLM must not run as primary extraction")
+
+    rows = await apply_direct_record_llm_fallback(
+        db_session,
+        run=run,
+        page_url=run.url,
+        html=_detail_html(),
+        records=deterministic_records,
+        resolve_run_config_fn=_unexpected_resolve_run_config,
+        extract_records_fn=_unexpected_extract_records,
+    )
+
+    assert rows == deterministic_records
+
+
+@pytest.mark.asyncio
+async def test_direct_record_llm_fallback_does_not_create_primary_records(
+    db_session: AsyncSession,
+    test_user,
+) -> None:
+    run = await create_crawl_run(
+        db_session,
+        test_user.id,
+        {
+            "run_type": "crawl",
+            "url": "https://example.com/products/widget",
+            "surface": "ecommerce_detail",
+            "settings": {"llm_enabled": True},
+        },
+    )
+
+    async def _unexpected_resolve_run_config(*args, **kwargs):
+        del args, kwargs
+        raise AssertionError("direct LLM must not create primary records")
+
+    async def _unexpected_extract_records(*args, **kwargs):
+        del args, kwargs
+        raise AssertionError("direct LLM must not run as primary extraction")
+
+    rows = await apply_direct_record_llm_fallback(
+        db_session,
+        run=run,
+        page_url=run.url,
+        html=_detail_html(),
+        records=[],
+        resolve_run_config_fn=_unexpected_resolve_run_config,
+        extract_records_fn=_unexpected_extract_records,
+    )
+
+    assert rows == []
+
+
+@pytest.mark.asyncio
+async def test_direct_record_llm_fallback_backfills_missing_listing_fields(
+    db_session: AsyncSession,
+    test_user,
+) -> None:
+    run = await create_crawl_run(
+        db_session,
+        test_user.id,
+        {
+            "run_type": "crawl",
+            "url": "https://example.com/products",
+            "surface": "ecommerce_listing",
+            "requested_fields": ["title", "price", "image_url"],
+            "settings": {"llm_enabled": True},
+        },
+    )
+    records = [{"title": "Widget", "price": "19.99", "url": "https://example.com/p/1"}]
+
+    async def _resolve_run_config(*args, **kwargs):
+        del args, kwargs
+        return {"provider": "test"}
+
+    async def _extract_records(*args, **kwargs):
+        del args, kwargs
+        return ([{"image_url": "https://example.com/widget.jpg"}], None)
+
+    rows = await apply_direct_record_llm_fallback(
+        db_session,
+        run=run,
+        page_url=run.url,
+        html=_detail_html(),
+        records=records,
+        resolve_run_config_fn=_resolve_run_config,
+        extract_records_fn=_extract_records,
+    )
+
+    assert rows[0]["title"] == "Widget"
+    assert rows[0]["price"] == "19.99"
+    assert rows[0]["image_url"] == "https://example.com/widget.jpg"
 
 
 def test_best_adapter_result_deduplicates_unsourced_records() -> None:
@@ -2923,7 +3048,6 @@ async def test_process_single_url_raises_when_browser_retry_fails(
     assert len(acquire_calls) == 2
     assert [log.message for log in logs] == [
         "Acquired payload via curl_cffi (status=200)",
-        "Extraction yielded 0 records (generic extraction path)",
         "No records via curl_cffi; retrying browser render for https://example.com/category/widgets",
         "Browser retry failed for https://example.com/category/widgets: TimeoutError: browser retry timed out",
     ]

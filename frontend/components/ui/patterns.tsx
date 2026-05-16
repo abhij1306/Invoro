@@ -406,16 +406,19 @@ export function RunSummaryChips({
 
   const chips = [
     {
+      key: 'duration',
       value: duration,
       icon: Clock,
       tone: 'text-secondary',
     },
     {
+      key: 'verdict',
       value: verdict,
       icon: CheckCircle2,
       tone: verdictTone,
     },
     {
+      key: 'quality',
       value: quality,
       icon: Award,
       tone: qualityTone,
@@ -428,7 +431,7 @@ export function RunSummaryChips({
         const Icon = chip.icon;
         return (
           <div
-            key={chip.value}
+            key={chip.key}
             className="border-border inline-flex items-center gap-1.5 rounded-[var(--radius-md)] border px-2.5 py-1"
           >
             <Icon className={cn('size-3.5 shrink-0', chip.tone)} aria-hidden="true" />

@@ -66,6 +66,31 @@ def test_dedupe_image_urls_keeps_highest_resolution_cdn_variant() -> None:
     assert set(result) == set(expected)
 
 
+def test_dedupe_image_urls_normalizes_asos_profile_query_keys() -> None:
+    result = dedupe_image_urls(
+        [
+            "https://images.asos-media.com/products/pants/210397084-1-cleanmidblue?$n_240w$&wid=120&fit=constrain",
+            "https://images.asos-media.com/products/pants/210397084-1-cleanmidblue?$n_1920w$&wid=1926&fit=constrain",
+        ]
+    )
+
+    assert result == [
+        "https://images.asos-media.com/products/pants/210397084-1-cleanmidblue?$n_1920w$&wid=1926&fit=constrain"
+    ]
+
+
+def test_dedupe_image_urls_keeps_valid_default_path_product_images() -> None:
+    result = dedupe_image_urls(
+        [
+            "https://www.birkenstock.com/on/demandware.static/-/Sites-birkenstock-master/default/dw9d2e3a4a/images/0051791/0051791_1.jpg"
+        ]
+    )
+
+    assert result == [
+        "https://www.birkenstock.com/on/demandware.static/-/Sites-birkenstock-master/default/dw9d2e3a4a/images/0051791/0051791_1.jpg"
+    ]
+
+
 def test_dedupe_image_urls_normalizes_repeated_scheme_slashes() -> None:
     result = dedupe_image_urls(
         [

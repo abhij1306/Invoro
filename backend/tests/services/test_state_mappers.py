@@ -1564,6 +1564,118 @@ def test_map_js_state_to_fields_reads_nested_variant_price_objects() -> None:
     assert mapped["variants"][1]["price"] == "100.00"
 
 
+def test_map_js_state_to_fields_recovers_nested_choice_item_variants() -> None:
+    mapped = map_js_state_to_fields(
+        {
+            "__INITIAL_CONFIG__": {
+                "productDisplay": {
+                    "entities": {
+                        "7507996": {
+                            "legacyStyleGroupId": "10014429",
+                            "webPathAlias": "nike-air-force-1-07-basketball-sneaker-men",
+                            "copyProductTitle": "Air Force 1 '07 Basketball Sneaker",
+                            "copyDescription": "Basketball sneaker with heritage details.",
+                            "labelDisplayName": "Nike",
+                            "coreProducts": [
+                                {
+                                    "nptHierarchy": "npt.shoes.sneakers",
+                                    "coreChoices": [
+                                        {
+                                            "coreChoiceId": "4444444TRN",
+                                            "displayColorDescription": "WHITE/ BLACK",
+                                            "orderedShots": [
+                                                {
+                                                    "imageUrl": (
+                                                        "https://n.nordstrommedia.com/it/"
+                                                        "shoe.jpeg"
+                                                    )
+                                                }
+                                            ],
+                                            "items": [
+                                                {
+                                                    "npin": "22222Q92NG",
+                                                    "concatenatedDisplaySize": "7.5 M",
+                                                    "sku": {
+                                                        "skuId": "A7293017",
+                                                        "propositions": [
+                                                            {
+                                                                "salability": {
+                                                                    "status": "SELLABLE"
+                                                                },
+                                                                "availability": {
+                                                                    "isAvailable": True,
+                                                                    "shipQuantity": 1,
+                                                                },
+                                                                "pricings": [
+                                                                    {
+                                                                        "sellingRetail": {
+                                                                            "price": "69.00"
+                                                                        },
+                                                                        "baseRetail": {
+                                                                            "price": "115.00"
+                                                                        },
+                                                                    }
+                                                                ],
+                                                            }
+                                                        ],
+                                                    },
+                                                },
+                                                {
+                                                    "npin": "22222X2S9M",
+                                                    "sizeDimension1": {"label": "8"},
+                                                    "sizeDimension2": {"label": "M"},
+                                                    "sku": {
+                                                        "skuId": "A7293024",
+                                                        "propositions": [
+                                                            {
+                                                                "salability": {
+                                                                    "status": "SOLD_OUT"
+                                                                },
+                                                                "availability": {
+                                                                    "isAvailable": False,
+                                                                    "shipQuantity": 0,
+                                                                },
+                                                                "pricings": [
+                                                                    {
+                                                                        "sellingRetail": {
+                                                                            "price": "69.00"
+                                                                        }
+                                                                    }
+                                                                ],
+                                                            }
+                                                        ],
+                                                    },
+                                                },
+                                            ],
+                                        }
+                                    ],
+                                }
+                            ],
+                        }
+                    }
+                }
+            }
+        },
+        surface="ecommerce_detail",
+        page_url="https://www.nordstrom.com/s/nike-air-force-1-07-basketball-sneaker-men/7507996",
+    )
+
+    assert mapped["title"] == "Air Force 1 '07 Basketball Sneaker"
+    assert mapped["brand"] == "Nike"
+    assert mapped["variant_count"] == 2
+    assert mapped["variants"][0]["sku"] == "A7293017"
+    assert mapped["variants"][0]["size"] == "7.5 M"
+    assert mapped["variants"][0]["color"] == "WHITE/ BLACK"
+    assert mapped["variants"][0]["price"] == "69.00"
+    assert mapped["variants"][0]["original_price"] == "115.00"
+    assert mapped["variants"][0]["availability"] == "in_stock"
+    assert mapped["variants"][1]["size"] == "8"
+    assert mapped["variants"][1]["sku"] == "A7293024"
+    assert mapped["variants"][1]["price"] == "69.00"
+    assert mapped["variants"][1]["color"] == "WHITE/ BLACK"
+    assert mapped["variants"][1]["availability"] == "out_of_stock"
+
+
 def test_map_js_state_to_fields_reads_nested_variant_original_price_objects() -> None:
     mapped = map_js_state_to_fields(
         {

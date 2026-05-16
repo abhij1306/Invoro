@@ -17,6 +17,7 @@ from app.services.extract.detail_price_extractor import (
 )
 from app.services.extract.detail_record_finalizer import (
     detail_image_matches_primary_family,
+    repair_ecommerce_detail_record_quality,
     sanitize_variant_row,
 )
 from app.services.extract import detail_raw_signals
@@ -119,6 +120,181 @@ def test_extract_ecommerce_detail_rejects_url_like_structured_brand() -> None:
 
     assert len(rows) == 1
     assert "brand" not in rows[0]
+
+
+def test_extract_ecommerce_detail_backfills_currency_from_url_hint_when_price_exists() -> None:
+    html = """
+    <html>
+      <head>
+        <script type="application/ld+json">
+        {
+          "@context": "https://schema.org",
+          "@type": "Product",
+          "name": "Joe Freshgoods ABZORB 1890 Sneaker",
+          "offers": {"price": "110.00"}
+        }
+        </script>
+      </head>
+      <body><h1>Joe Freshgoods ABZORB 1890 Sneaker</h1></body>
+    </html>
+    """
+
+    rows = extract_records(
+        html,
+        "https://www.notre-shop.com/collections/new-arrivals/products/joe-freshgoods-abzorb-1890-sneaker-in-pirate-black-heron-persian-purple",
+        "ecommerce_detail",
+        max_records=5,
+    )
+
+    assert len(rows) == 1
+    assert rows[0]["price"] == "110.00"
+    assert rows[0]["currency"] == "USD"
+
+
+def test_extract_ecommerce_detail_rejects_same_url_wrong_product_title() -> None:
+    html = """
+    <html>
+      <head>
+        <script type="application/ld+json">
+        {
+          "@context": "https://schema.org",
+          "@type": "Product",
+          "name": "JLab GO Pop ANC True Wireless Earbuds",
+          "offers": {"price": "29.99", "priceCurrency": "USD"}
+        }
+        </script>
+      </head>
+      <body><h1>JLab GO Pop ANC True Wireless Earbuds</h1></body>
+    </html>
+    """
+
+    rows = extract_records(
+        html,
+        "https://www.bestbuy.com/product/apple-airpods-pro-2nd-generation-white/JJ8ZH6TPSW?intl=nosplash",
+        "ecommerce_detail",
+        max_records=5,
+    )
+
+    assert rows == []
+
+
+def test_extract_ecommerce_detail_rejects_access_denied_shell_title() -> None:
+    html = """
+    <html>
+      <head><title>Access to this page has been denied</title></head>
+      <body><h1>Access to this page has been denied</h1></body>
+    </html>
+    """
+
+    rows = extract_records(
+        html,
+        "https://www.wayfair.com/furniture/pdp/flexsteel-bryce-power-reclining-sofa-with-power-headrest-xtya1522.html",
+        "ecommerce_detail",
+        max_records=5,
+    )
+
+    assert rows == []
+
+
+def test_extract_ecommerce_detail_defaults_missing_availability_to_unknown() -> None:
+    html = """
+    <html>
+      <head>
+        <script type="application/ld+json">
+        {
+          "@context": "https://schema.org",
+          "@type": "Product",
+          "name": "Rambler 8 oz Stackable Cup",
+          "image": "https://www.yeti.com/images/rambler-stackable-cup.jpg",
+          "offers": {"price": "24.99", "priceCurrency": "USD"}
+        }
+        </script>
+      </head>
+      <body><h1>Rambler 8 oz Stackable Cup</h1></body>
+    </html>
+    """
+
+    rows = extract_records(
+        html,
+        "https://www.yeti.com/drinkware/tumblers/rambler-ceramic-stackable-8oz.html",
+        "ecommerce_detail",
+        max_records=5,
+    )
+
+    assert len(rows) == 1
+    assert rows[0]["availability"] == "unknown"
+
+
+def test_repair_ecommerce_detail_backfills_parent_image_from_variants() -> None:
+    record = {
+        "title": "American Vintage II 1972 Telecaster Thinline",
+        "price": "272800.00",
+        "currency": "INR",
+        "variants": [
+            {
+                "color": "Aged Natural",
+                "sku": "0110392834",
+                "image_url": "https://cdn.shopify.com/s/files/1/0712/3510/9086/files/0110392834_fen_ins_frt_1_rr.png?v=1742191446",
+            }
+        ],
+    }
+
+    repair_ecommerce_detail_record_quality(
+        record,
+        html="",
+        page_url="https://intl.fender.com/products/american-vintage-ii-1972-telecaster-thinline",
+    )
+
+    assert (
+        record["image_url"]
+        == "https://cdn.shopify.com/s/files/1/0712/3510/9086/files/0110392834_fen_ins_frt_1_rr.png?v=1742191446"
+    )
+
+
+def test_build_detail_record_drops_single_numeric_feature_id() -> None:
+    record = build_detail_record(
+        "<html><body><main><h1>Soft Rock Crewneck</h1></main></body></html>",
+        "https://www.sneakersnstuff.com/products/dime-soft-rock-crewneck-dime2sp2542blk",
+        "ecommerce_detail",
+        None,
+        adapter_records=[
+            {
+                "title": "Soft Rock Crewneck",
+                "price": "64.00",
+                "currency": "EUR",
+                "features": ["9906444108117"],
+            }
+        ],
+    )
+
+    assert "features" not in record
+
+
+def test_build_detail_record_drops_category_dropdown_additional_images() -> None:
+    record = build_detail_record(
+        "<html><body><main><h1>47 NY Yankees Clean Up Cap</h1></main></body></html>",
+        "https://www.endclothing.com/us/47-ny-yankees-clean-up-cap-b-rgw17gws-vn.html",
+        "ecommerce_detail",
+        None,
+        adapter_records=[
+            {
+                "title": "47 NY Yankees Clean Up Cap",
+                "price": "35.00",
+                "currency": "USD",
+                "image_url": "https://media.endclothing.com/media/catalog/product/b/r/brgw17gws-vn_1.jpg",
+                "additional_images": [
+                    "https://media.endclothing.com/media/catalog/category/Bound-Menswear-Jacket_03-02-26_Dropdown_426x262.jpg",
+                    "https://media.endclothing.com/media/catalog/product/b/r/brgw17gws-vn_2.jpg",
+                ],
+            }
+        ],
+    )
+
+    images = " ".join(record.get("additional_images", []))
+    assert "category" not in images
+    assert record["additional_images"] == [
+        "https://media.endclothing.com/media/catalog/product/b/r/brgw17gws-vn_2.jpg"
+    ]
 
 
 def test_extract_ecommerce_detail_from_microdata() -> None:
@@ -4619,7 +4795,7 @@ def test_extract_detail_corrects_host_currency_hint_integer_cent_price() -> None
     assert rows[0]["price"] == "282.00"
 
 
-def test_extract_detail_drops_decimal_price_when_currency_conflicts_with_host_hint() -> None:
+def test_extract_detail_keeps_decimal_price_when_currency_conflicts_with_host_hint() -> None:
     html = """
     <html>
       <head>
@@ -4644,8 +4820,8 @@ def test_extract_detail_drops_decimal_price_when_currency_conflicts_with_host_hi
     )
 
     assert len(rows) == 1
-    assert "currency" not in rows[0]
-    assert "price" not in rows[0]
+    assert rows[0]["currency"] == "INR"
+    assert rows[0]["price"] == "260650.21"
 
 
 def test_extract_detail_does_not_backfill_low_signal_price_after_currency_conflict() -> None:
@@ -4678,7 +4854,32 @@ def test_extract_detail_does_not_backfill_low_signal_price_after_currency_confli
     )
 
     assert len(rows) == 1
-    assert "price" not in rows[0]
+    assert rows[0]["currency"] == "INR"
+    assert rows[0]["price"] == "2153.05"
+
+
+def test_repair_ecommerce_detail_replaces_mismatched_title_when_slug_evidence_matches() -> None:
+    record = {
+        "title": "Yonder Jr. 600 mL / 20 oz Water Bottle",
+        "price": "25.00",
+        "currency": "USD",
+        "image_url": "https://yeti-webmedia.imgix.net/site_studio_drinkware_Rambler_8oz_CL_Tumbler_Seafoam_Front.png",
+        "description": "The perk-friendly stackable cup that brings the cafe to any terrain.",
+        "variants": [
+            {
+                "color": "Seafoam",
+                "url": "https://www.yeti.com/on/demandware.store/Sites-Yeti_US-Site/en_US/Product-Variation?dwvar_rambler-stackable_color=seafoam&dwvar_rambler-stackable_size=ceramic-8oz&pid=rambler-stackable",
+            }
+        ],
+    }
+
+    repair_ecommerce_detail_record_quality(
+        record,
+        html="",
+        page_url="https://www.yeti.com/drinkware/tumblers/rambler-ceramic-stackable-8oz.html",
+    )
+
+    assert record["title"] == "Rambler Ceramic Stackable 8Oz"
 
 
 def test_currency_reconcile_keeps_adapter_localized_price_over_host_hint() -> None:
@@ -6775,3 +6976,136 @@ def test_extract_ecommerce_detail_reads_scalar_size_from_two_span_label_value_ro
     assert rows[0]["price"] == "8.00"
     assert rows[0]["color"] == "209 Mocha Latte - soft mocha brown matte"
     assert rows[0]["size"] == "0.035 oz / 0.99 g"
+
+
+def test_extract_detail_recovers_nordstrom_initial_config_variants_from_artifact() -> None:
+    html = read_optional_artifact_text(
+        "artifacts/runs/1/pages/9192dbfda15a2ac3.html"
+    )
+    rows = extract_records(
+        html,
+        "https://www.nordstrom.com/s/nike-air-force-1-07-basketball-sneaker-men/7507996",
+        "ecommerce_detail",
+        max_records=1,
+        requested_fields=["variants", "price", "currency", "availability", "image_url"],
+    )
+
+    record = rows[0]
+    assert record["title"] == "Air Force 1 '07 Basketball Sneaker"
+    assert record["variant_count"] >= 20
+    assert any(
+        variant.get("size") == "7.5 M" and variant.get("sku") == "A7293017"
+        for variant in record["variants"]
+    )
+    assert all("option_values" not in variant for variant in record["variants"])
+
+
+def test_extract_detail_recovers_end_option_variants_from_artifact() -> None:
+    html = read_optional_artifact_text("artifacts/runs/1/pages/3b8d6be40db29760.html")
+    rows = extract_records(
+        html,
+        (
+            "https://www.endclothing.com/us/47-ny-yankees-clean-up-cap-b-rgw17gws-vn.html"
+            "?queryID=92cd67a81343c72b1e7ea4257417a975"
+        ),
+        "ecommerce_detail",
+        max_records=1,
+        requested_fields=["variants", "price", "currency", "availability"],
+    )
+
+    record = rows[0]
+    assert record["variant_count"] == 1
+    assert record["variants"][0]["size"] == "One Size"
+    assert record["availability"] == "in_stock"
+
+
+def test_extract_detail_recovers_asos_stock_price_and_size_variants_from_artifact() -> None:
+    html = read_optional_artifact_text("artifacts/runs/1/pages/db1fce245d2380a5.html")
+    rows = extract_records(
+        html,
+        (
+            "https://www.asos.com/us/asos-curve/"
+            "asos-design-curve-lightweight-pull-on-barrel-pants-in-darkwash/"
+            "prd/210397084#colourWayId-210397088"
+        ),
+        "ecommerce_detail",
+        max_records=1,
+        requested_fields=["variants", "price", "currency", "availability"],
+    )
+
+    record = rows[0]
+    assert record["price"] == "59.99"
+    assert record["currency"] == "USD"
+    assert record["variant_count"] == 6
+    assert {variant.get("size") for variant in record["variants"]} >= {
+        "US 14",
+        "US 24",
+    }
+    assert any(variant.get("availability") == "in_stock" for variant in record["variants"])
+
+
+def test_extract_detail_recovers_ssense_next_f_size_variants_from_artifact() -> None:
+    html = read_optional_artifact_text("artifacts/runs/1/pages/99f37e207742af7a.html")
+    rows = extract_records(
+        html,
+        "https://www.ssense.com/en-us/men/product/willy-chavarria/brown-ruff-rider-leather-jacket/19072301",
+        "ecommerce_detail",
+        max_records=1,
+        requested_fields=["variants", "price", "currency", "availability"],
+    )
+
+    record = rows[0]
+    assert record["variant_count"] == 4
+    assert {variant.get("size") for variant in record["variants"]} == {
+        "S",
+        "M",
+        "L",
+        "XL",
+    }
+    assert all(variant.get("availability") == "out_of_stock" for variant in record["variants"])
+
+
+def test_extract_detail_recovers_patagonia_boldmetrics_variants_from_artifact() -> None:
+    html = read_optional_artifact_text("artifacts/runs/1/pages/72d532d622b8051e.html")
+    rows = extract_records(
+        html,
+        "https://www.patagonia.com/product/mens-nano-puff-insulated-jacket/84213.html",
+        "ecommerce_detail",
+        max_records=1,
+        requested_fields=["variants", "price", "currency", "availability"],
+    )
+
+    record = rows[0]
+    assert record["price"] == "229.00"
+    assert record["availability"] == "in_stock"
+    assert record["variant_count"] == 7
+    assert {variant.get("size") for variant in record["variants"]} >= {"XS", "3XL"}
+
+
+def test_extract_detail_recovers_bh_primary_image_from_artifact() -> None:
+    html = read_optional_artifact_text("artifacts/runs/1/pages/6c0655481681f545.html")
+    rows = extract_records(
+        html,
+        "https://www.bhphotovideo.com/c/product/1882297-REG/cozyla_cd_8v543f0_white_us_32_4k_calendar_gen2_white.html",
+        "ecommerce_detail",
+        max_records=1,
+        requested_fields=["image_url", "title"],
+    )
+
+    assert rows[0]["image_url"].endswith(
+        "cozyla_cd_8v543f0_white_us_32_4k_calendar_gen2_white_1882297.jpg"
+    )
+
+
+def test_extract_detail_rejects_amazon_adding_to_cart_title_from_artifact() -> None:
+    html = read_optional_artifact_text("artifacts/runs/1/pages/d244c66cea62f06d.html")
+    rows = extract_records(
+        html,
+        "https://www.amazon.com/Sparkling-Prebiotic-Beverage-Vinegar-Seltzer/dp/B0F5Y3X8PP/?th=1",
+        "ecommerce_detail",
+        max_records=1,
+        requested_fields=["title", "brand", "image_url", "price"],
+    )
+
+    assert rows[0]["title"] != "Adding to Cart..."
+    assert "Prebiotic" in rows[0]["title"]

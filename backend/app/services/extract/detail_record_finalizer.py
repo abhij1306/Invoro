@@ -8,9 +8,12 @@ from functools import lru_cache
 from typing import Any
 from urllib.parse import unquote, urlparse
 
+from bs4 import BeautifulSoup
+
 from app.services.config.extraction_rules import (
     AVAILABILITY_IN_STOCK,
     AVAILABILITY_OUT_OF_STOCK,
+    AVAILABILITY_UNKNOWN,
     CANDIDATE_PLACEHOLDER_VALUES,
     CATEGORY_PLACEHOLDER_VALUES,
     DETAIL_CATEGORY_BRANCH_STOP_TOKENS,
@@ -24,6 +27,7 @@ from app.services.config.extraction_rules import (
     ORG_SUFFIXES,
     DETAIL_LOW_SIGNAL_PARENT_MIN,
     DETAIL_LOW_SIGNAL_PRICE_MAX,
+    DETAIL_NON_PRODUCT_IMAGE_URL_HINTS,
     DETAIL_PRICE_COMPARISON_TOLERANCE,
     PLACEHOLDER_IMAGE_URL_PATTERNS,
     VARIANT_OPTION_LABEL_MAX_WORDS,
@@ -33,8 +37,10 @@ from app.services.config.variant_policy import (
     DETAIL_VARIANT_SIZE_MIN_FOR_NUMERIC_PARENT_DROP,
 )
 from app.services.shared.field_coerce import (
+    absolute_url,
     clean_text,
     enforce_flat_variant_public_contract,
+    extract_urls,
     text_or_none,
 )
 from app.services.field_url_normalization import same_site
@@ -68,6 +74,7 @@ from app.services.extract.detail_price_extractor import (
     backfill_detail_price_from_html,
     detail_price_decimal,
     format_detail_price_decimal,
+    reconcile_detail_currency_with_url,
     reconcile_detail_price_magnitudes,
     reconcile_parent_price_against_variant_range,
 )
@@ -88,6 +95,11 @@ _PLACEHOLDER_IMAGE_URL_PATTERNS_LOWER = tuple(
     for pattern in tuple(PLACEHOLDER_IMAGE_URL_PATTERNS or ())
     if str(pattern).strip()
 )
+_NON_PRODUCT_IMAGE_HINTS_LOWER = tuple(
+    str(pattern).lower()
+    for pattern in tuple(DETAIL_NON_PRODUCT_IMAGE_URL_HINTS or ())
+    if str(pattern).strip()
+)
 _DETAIL_BASE_PLACEHOLDER_TITLE_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"^404$"),
     re.compile(r"^(?:error\s*)?404\b", re.I),
@@ -100,6 +112,7 @@ _DETAIL_BASE_PLACEHOLDER_TITLE_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"^page not found$", re.I),
     re.compile(r"^not found$", re.I),
     re.compile(r"^access denied$", re.I),
+    re.compile(r"^adding\s+to\s+cart\.{0,3}$", re.I),
 )
 def _compile_detail_waf_queue_title_patterns() -> tuple[re.Pattern[str], ...]:
     patterns: list[re.Pattern[str]] = []
@@ -154,7 +167,9 @@ def _sanitize_ecommerce_detail_record(
             page_url=page_url,
             js_state_objects=js_state_objects if isinstance(js_state_objects, dict) else None,
         )
+        _backfill_detail_image_from_html(record, soup=soup, identity_url=identity_url)
     _sanitize_detail_variant_payload(record, identity_url=identity_url)
+    _backfill_parent_image_from_variants(record)
     sanitize_detail_long_text_fields(
         record,
         title_hint=_detail_title_from_url(identity_url),
@@ -238,6 +253,7 @@ def _sanitize_detail_identity_scalars(
         record["sku"] = preferred_code
         if text_or_none(record.get("part_number")) in (None, ""):
             record["part_number"] = preferred_code
+    _repair_detail_title_from_requested_identity(record, identity_url=identity_url)
     placeholder_title_removed = bool(record.pop("_placeholder_title_removed", False))
     if not text_or_none(record.get("title")):
         fallback_is_safe = _detail_title_fallback_is_safe(record)
@@ -249,6 +265,48 @@ def _sanitize_detail_identity_scalars(
             record["title"] = fallback_title.title() if fallback_is_safe else fallback_title
             field_sources = record.setdefault("_field_sources", {})
             field_sources["title"] = ["url_slug"]
+
+
+def _repair_detail_title_from_requested_identity(
+    record: dict[str, Any],
+    *,
+    identity_url: str,
+) -> None:
+    title = clean_text(record.get("title"))
+    fallback_title = _detail_title_from_url(identity_url)
+    if not title or not fallback_title:
+        return
+    requested_tokens = _semantic_detail_identity_tokens(fallback_title)
+    title_tokens = _semantic_detail_identity_tokens(title)
+    if len(requested_tokens) < 3 or requested_tokens & title_tokens:
+        return
+    supporting_text = " ".join(
+        clean_text(value)
+        for value in (
+            record.get("description"),
+            record.get("image_url"),
+            record.get("sku"),
+            record.get("part_number"),
+        )
+        if clean_text(value)
+    )
+    for variant in list(record.get("variants") or []):
+        if isinstance(variant, dict):
+            supporting_text = " ".join(
+                (
+                    supporting_text,
+                    clean_text(variant.get("url")),
+                    clean_text(variant.get("image_url")),
+                    clean_text(variant.get("sku")),
+                )
+            )
+    supporting_tokens = _semantic_detail_identity_tokens(supporting_text)
+    if len(requested_tokens & supporting_tokens) < min(2, len(requested_tokens)):
+        return
+    record["title"] = fallback_title.title()
+    field_sources = record.setdefault("_field_sources", {})
+    if isinstance(field_sources, dict):
+        field_sources["title"] = ["url_slug_identity_repair"]
 
 
 def _detail_title_fallback_is_safe(record: dict[str, Any]) -> bool:
@@ -568,15 +626,58 @@ def repair_ecommerce_detail_record_quality(
         soup=soup,
         js_state_objects=js_state_objects,
     )
+    if soup is None and not text_or_none(record.get("image_url")) and str(html or "").strip():
+        parsed_soup = BeautifulSoup(str(html), "html.parser")
+        _backfill_detail_image_from_html(
+            record,
+            soup=parsed_soup,
+            identity_url=text_or_none(requested_page_url) or page_url,
+        )
+        _sanitize_detail_images(
+            record,
+            identity_url=text_or_none(requested_page_url) or page_url,
+        )
     normalize_variant_record(record, finalize_contract=False)
     backfill_detail_price_from_html(record, html=html)
+    reconcile_detail_currency_with_url(record, page_url=page_url)
     reconcile_detail_price_magnitudes(record)
     reconcile_parent_price_against_variant_range(record)
     _normalize_detail_money_precision(record)
     _repair_invalid_original_prices(record)
     _drop_invalid_detail_discounts(record)
     _repair_detail_variant_prices_and_identity(record)
+    _default_unknown_availability_for_real_product(record)
     enforce_flat_variant_public_contract(record, page_url=page_url)
+
+
+def _default_unknown_availability_for_real_product(record: dict[str, Any]) -> None:
+    if record.get("availability") not in (None, "", [], {}):
+        return
+    if not any(
+        record.get(field_name) not in (None, "", [], {})
+        for field_name in (
+            "price",
+            "original_price",
+            "image_url",
+            "variants",
+        )
+    ):
+        return
+    if detail_title_looks_like_placeholder(clean_text(record.get("title"))):
+        return
+    record["availability"] = AVAILABILITY_UNKNOWN
+
+
+def _backfill_parent_image_from_variants(record: dict[str, Any]) -> None:
+    if text_or_none(record.get("image_url")):
+        return
+    for variant in list(record.get("variants") or []):
+        if not isinstance(variant, dict):
+            continue
+        image_url = text_or_none(variant.get("image_url"))
+        if image_url:
+            record["image_url"] = image_url
+            return
 
 
 def _repair_detail_variant_prices_and_identity(record: dict[str, Any]) -> None:
@@ -966,7 +1067,7 @@ def _sanitize_detail_images(record: dict[str, Any], *, identity_url: str) -> Non
         ):
             continue
         cleaned.append(normalized_image)
-    merged = dedupe_image_urls(cleaned)
+    merged = dedupe_image_urls(cleaned) or _dedupe_cleaned_detail_images(cleaned)
     if not merged:
         record.pop("image_url", None)
         record.pop("additional_images", None)
@@ -976,6 +1077,48 @@ def _sanitize_detail_images(record: dict[str, Any], *, identity_url: str) -> Non
         record["additional_images"] = merged[1:]
     else:
         record.pop("additional_images", None)
+
+
+def _backfill_detail_image_from_html(
+    record: dict[str, Any],
+    *,
+    soup: Any,
+    identity_url: str,
+) -> None:
+    if text_or_none(record.get("image_url")):
+        return
+    candidates: list[str] = []
+    for node in soup.select(
+        "meta[property='og:image'], meta[name='twitter:image'], "
+        "link[rel='preload'][as='image'], main img, [role='main'] img"
+    ):
+        raw = node.get("content") or node.get("href") or node.get("src")
+        if not raw:
+            continue
+        urls = extract_urls(raw, identity_url)
+        candidates.extend(urls or [absolute_url(identity_url, raw)])
+    for url in _dedupe_cleaned_detail_images(candidates):
+        if _detail_image_candidate_is_usable(url, identity_url=identity_url):
+            record["image_url"] = url
+            field_sources = record.setdefault("_field_sources", {})
+            if isinstance(field_sources, dict):
+                field_sources.setdefault("image_url", []).append("html_image")
+            return
+
+
+def _dedupe_cleaned_detail_images(urls: list[str]) -> list[str]:
+    merged: list[str] = []
+    seen: set[str] = set()
+    for url in urls:
+        cleaned = text_or_none(url)
+        if not cleaned:
+            continue
+        key = cleaned.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        merged.append(cleaned)
+    return merged
 
 
 def _detail_image_candidate_is_usable(url: str, *, identity_url: str) -> bool:
@@ -989,6 +1132,8 @@ def _detail_image_candidate_is_usable(url: str, *, identity_url: str) -> bool:
     if "base64," in lowered or lowered.startswith("data:"):
         return False
     if any(pattern in lowered for pattern in _PLACEHOLDER_IMAGE_URL_PATTERNS_LOWER):
+        return False
+    if any(pattern in lowered for pattern in _NON_PRODUCT_IMAGE_HINTS_LOWER):
         return False
     if _detail_image_url_is_extensionless_transform(path):
         return False

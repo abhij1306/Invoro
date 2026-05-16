@@ -13,7 +13,9 @@ from glom import GlomError, glom  # type: ignore[import-untyped]
 from app.services.config.js_state_field_specs import (
     JS_STATE_PRODUCT_PAYLOAD_LIMIT,
     JS_STATE_LIST_ITERATION_LIMIT,
+    JS_STATE_OPTION_GROUP_VALUE_KEYS,
     JS_STATE_PRODUCT_FIELD_SPEC,
+    JS_STATE_PRODUCT_OPTION_GROUP_KEYS,
     JS_STATE_PRODUCT_VARIANT_LIST_KEYS,
     JS_STATE_VARIANT_FIELD_SPEC,
     VARIANT_AXIS_KEYS,
@@ -73,7 +75,98 @@ def _product_variant_rows(product: dict[str, Any]) -> list[dict[str, Any]]:
             if key != "variants":
                 _backfill_nested_variant_context(row, product)
             rows.append(row)
+    rows.extend(_nested_choice_item_variant_rows(product))
+    if not rows:
+        rows.extend(_option_group_variant_rows(product))
     return rows
+
+
+def _option_group_variant_rows(product: dict[str, Any]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for group_key in JS_STATE_PRODUCT_OPTION_GROUP_KEYS:
+        for group in _as_list(product.get(group_key)):
+            if not isinstance(group, dict):
+                continue
+            axis_name = text_or_none(
+                group.get("name")
+                or group.get("title")
+                or group.get("label")
+                or group.get("attribute_code")
+                or group.get("id")
+            )
+            if not axis_name:
+                continue
+            for value_key in JS_STATE_OPTION_GROUP_VALUE_KEYS:
+                values = _as_list(group.get(value_key))
+                if values:
+                    break
+            else:
+                values = []
+            for item in values:
+                if not isinstance(item, dict):
+                    continue
+                axis_value = (
+                    text_or_none(item.get("label"))
+                    or text_or_none(item.get("name"))
+                    or text_or_none(item.get("displayValue"))
+                    or text_or_none(item.get("value"))
+                    or text_or_none(item.get("index"))
+                )
+                if not axis_value:
+                    continue
+                row = dict(item)
+                row["name"] = axis_name
+                row["value"] = axis_value
+                simple_id = text_or_none(
+                    item.get("simple_id") or item.get("simpleId") or item.get("variantId")
+                )
+                if simple_id and row.get("id") in (None, "", [], {}):
+                    row["id"] = simple_id
+                rows.append(row)
+    return rows
+
+
+def _nested_choice_item_variant_rows(product: dict[str, Any]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for core_product in _as_list(product.get("coreProducts")):
+        if not isinstance(core_product, dict):
+            continue
+        for choice in _as_list(core_product.get("coreChoices")):
+            if not isinstance(choice, dict):
+                continue
+            color_family = choice.get("colorFamily")
+            color = (
+                text_or_none(choice.get("displayColorDescription"))
+                or (
+                    text_or_none(color_family.get("label"))
+                    if isinstance(color_family, dict)
+                    else None
+                )
+            )
+            image_url = _choice_primary_image(choice)
+            for item in _as_list(choice.get("items")):
+                if not isinstance(item, dict):
+                    continue
+                row = dict(item)
+                if color and row.get("color") in (None, "", [], {}):
+                    row["color"] = color
+                size = _variant_axis_raw_value(row, "size")
+                if size and row.get("size") in (None, "", [], {}):
+                    row["size"] = size
+                if image_url and row.get("image") in (None, "", [], {}):
+                    row["image"] = image_url
+                rows.append(row)
+    return rows
+
+
+def _choice_primary_image(choice: dict[str, Any]) -> str | None:
+    for shot in _as_list(choice.get("orderedShots")):
+        if not isinstance(shot, dict):
+            continue
+        image_url = text_or_none(shot.get("imageUrl"))
+        if image_url:
+            return image_url
+    return None
 
 
 def _backfill_nested_variant_context(
@@ -418,6 +511,9 @@ def _mapped_product_identity_matches(
 
 def _mapped_record_matches_page_url(record: dict[str, Any], page_url: str) -> bool:
     page_path = urlsplit(page_url).path.rstrip("/").lower()
+    product_id = text_or_none(record.get("product_id"))
+    if product_id and product_id.lower() in str(page_url or "").lower():
+        return True
     for field_name in ("url", "handle"):
         value = text_or_none(record.get(field_name))
         if value and urlsplit(value).path.rstrip("/").lower() == page_path:
@@ -539,7 +635,11 @@ def _revive_nuxt_data_array(payload: Any) -> dict[str, Any] | None:
 def _looks_like_product_payload(value: Any) -> bool:
     if not isinstance(value, dict):
         return False
-    has_title = any(key in value for key in ("title", "name", "pn")) or bool(
+    if _looks_like_stock_price_product_payload(value):
+        return True
+    has_title = any(
+        key in value for key in ("title", "name", "nameByLanguage", "pn", "copyProductTitle")
+    ) or bool(
         text_or_none(
             ((value.get("item") or {}).get("product_description") or {}).get("title")
         )
@@ -554,6 +654,7 @@ def _looks_like_product_payload(value: Any) -> bool:
             "variants",
             "availableSizes",
             "variation_hierarchy",
+            "coreProducts",
             "options",
             "colors",
             "sizes",
@@ -580,7 +681,16 @@ def _looks_like_product_payload(value: Any) -> bool:
             "description",
             "body_html",
             "onlineStoreUrl",
+            "webPathAlias",
         )
+    )
+
+
+def _looks_like_stock_price_product_payload(value: dict[str, Any]) -> bool:
+    return (
+        value.get("productId") not in (None, "", [], {})
+        and isinstance(value.get("productPrice"), dict)
+        and isinstance(value.get("variants"), list)
     )
 
 def _find_product_payloads(
@@ -613,6 +723,7 @@ def _product_payload_score(product: dict[str, Any]) -> tuple[int, ...]:
         "variants",
         "options",
         "variation_hierarchy",
+        "coreProducts",
         "colors",
         "sizes",
         "prices",
@@ -631,6 +742,7 @@ def _product_payload_score(product: dict[str, Any]) -> tuple[int, ...]:
         "product_id",
         "id",
         "pid",
+        "legacyStyleGroupId",
         "mrp",
         "Img",
         "offers",
@@ -1065,7 +1177,7 @@ def _option_names(raw_options: object) -> list[str]:
             if isinstance(option, str):
                 names.append(option)
             elif isinstance(option, dict):
-                label = option.get("name") or option.get("title")
+                label = option.get("name") or option.get("title") or option.get("label")
                 if label:
                     names.append(str(label))
     return names
@@ -1080,7 +1192,12 @@ def _normalize_variant(
 ) -> dict[str, Any] | None:
     row: dict[str, Any] = {}
     variant_id = text_or_none(
-        variant.get("id") or variant.get("variantId") or variant.get("variant_id")
+        variant.get("id")
+        or variant.get("variantId")
+        or variant.get("variant_id")
+        or variant.get("simple_id")
+        or variant.get("simpleId")
+        or variant.get("npin")
     )
     explicit_url: str | None = None
     if variant_id:
@@ -1103,14 +1220,20 @@ def _normalize_variant(
     barcode = text_or_none(base.get("barcode"))
     if barcode:
         row["barcode"] = barcode
+    raw_price = _nested_variant_price(variant, "sellingRetail")
+    if raw_price in (None, "", [], {}):
+        raw_price = base.get("price")
     price = normalize_price(
-        base.get("price"),
+        raw_price,
         interpret_integral_as_cents=interpret_integral_as_cents,
     )
     if price is not None:
         row["price"] = price
+    raw_original_price = _nested_variant_price(variant, "baseRetail")
+    if raw_original_price in (None, "", [], {}):
+        raw_original_price = base.get("original_price")
     original_price = normalize_price(
-        base.get("original_price"),
+        raw_original_price,
         interpret_integral_as_cents=interpret_integral_as_cents,
     )
     if original_price is not None:
@@ -1118,10 +1241,12 @@ def _normalize_variant(
     currency = text_or_none(base.get("currency"))
     if currency:
         row["currency"] = currency
-    availability = availability_value(variant)
+    availability = _nested_variant_availability(variant) or availability_value(variant)
     if availability:
         row["availability"] = availability
     variant_stock = stock_quantity(variant)
+    if variant_stock is None:
+        variant_stock = _nested_variant_stock_quantity(variant)
     if variant_stock is not None:
         row["stock_quantity"] = variant_stock
     image_url = next(
@@ -1153,7 +1278,7 @@ def _normalize_variant(
         if option_values.get("size"):
             row["size"] = option_values["size"]
     for field_name in ("title", "name", "color", "size"):
-        raw_value = variant.get(field_name)
+        raw_value = _variant_axis_raw_value(variant, field_name)
         value = (
             variant_axis_value(field_name, raw_value, page_url=page_url)
             if field_name in {"color", "size"}
@@ -1162,6 +1287,87 @@ def _normalize_variant(
         if value and field_name not in row:
             row["title" if field_name == "name" else field_name] = value
     return row or None
+
+
+def _variant_axis_raw_value(variant: dict[str, Any], field_name: str) -> Any:
+    if field_name != "size":
+        return variant.get(field_name)
+    return (
+        _dict_label(variant.get("size"))
+        or variant.get("size")
+        or variant.get("concatenatedDisplaySize")
+        or _dict_label(variant.get("sizeDimension1"))
+    )
+
+
+def _nested_variant_availability(variant: dict[str, Any]) -> str | None:
+    for proposition in _nested_variant_propositions(variant):
+        nested_availability = proposition.get("availability")
+        if isinstance(nested_availability, dict):
+            availability = availability_value(nested_availability)
+            if availability:
+                return availability
+        else:
+            availability = availability_value(proposition)
+            if availability:
+                return availability
+        salability = proposition.get("salability")
+        if isinstance(salability, dict):
+            status = text_or_none(salability.get("status"))
+            if status and status.strip().upper() in {"SELLABLE", "PREVIEWABLE"}:
+                return "in_stock"
+            if status and status.strip().upper() in {"SOLD_OUT", "UNSELLABLE"}:
+                return "out_of_stock"
+    return None
+
+
+def _nested_variant_stock_quantity(variant: dict[str, Any]) -> int | None:
+    for proposition in _nested_variant_propositions(variant):
+        availability = proposition.get("availability")
+        if not isinstance(availability, dict):
+            continue
+        quantities = [
+            availability.get("shipQuantity"),
+            availability.get("marketPickQuantity"),
+            availability.get("pickQuantity"),
+        ]
+        numeric_quantities: list[int] = []
+        for raw_quantity in quantities:
+            try:
+                numeric_quantities.append(int(str(raw_quantity).strip()))
+            except (TypeError, ValueError):
+                continue
+        if numeric_quantities:
+            return max(numeric_quantities)
+    return None
+
+
+def _nested_variant_price(variant: dict[str, Any], price_key: str) -> Any:
+    for proposition in _nested_variant_propositions(variant):
+        for pricing in _as_list(proposition.get("pricings")):
+            if not isinstance(pricing, dict):
+                continue
+            price = pricing.get(price_key)
+            if isinstance(price, dict) and price.get("price") not in (None, "", [], {}):
+                return price.get("price")
+    return None
+
+
+def _nested_variant_propositions(variant: dict[str, Any]) -> list[dict[str, Any]]:
+    sku = variant.get("sku")
+    if not isinstance(sku, dict):
+        return []
+    return [
+        proposition
+        for proposition in _as_list(sku.get("propositions"))
+        if isinstance(proposition, dict)
+    ]
+
+
+def _dict_label(value: Any) -> str | None:
+    if not isinstance(value, dict):
+        return None
+    return text_or_none(value.get("label")) or text_or_none(value.get("name"))
 
 
 def _variant_url(page_url: str, variant_id: str) -> str:

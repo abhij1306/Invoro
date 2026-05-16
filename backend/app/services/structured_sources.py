@@ -19,7 +19,6 @@ from app.services.config.extraction_rules import (
 from app.services.config.runtime_settings import crawler_runtime_settings
 from app.services.script_text_extractor import (
     extract_script_text_by_id,
-    find_first_script_text_matching,
     find_script_regex_matches,
     iter_script_text_nodes,
 )
@@ -290,20 +289,38 @@ def _assignment_state_patterns() -> tuple[str, ...]:
 
 def _extract_assignment_payload(html: str, state_name: str) -> Any | None:
     for pattern in _assignment_patterns(state_name):
-        raw = find_first_script_text_matching(html, pattern)
-        if raw is None:
-            continue
-        match = pattern.search(raw)
-        if match is None:
-            continue
-        fragment = _balanced_json_fragment(raw[match.end() :])
-        if not fragment:
-            continue
-        try:
-            return json.loads(fragment)
-        except json.JSONDecodeError:
-            continue
+        for raw in _script_texts_matching(html, pattern):
+            for match in pattern.finditer(raw):
+                tail = raw[match.end() :]
+                fragment = _balanced_json_fragment(tail)
+                if fragment:
+                    try:
+                        return json.loads(fragment)
+                    except json.JSONDecodeError:
+                        pass
+                stripped_tail = tail.lstrip()
+                if not stripped_tail.startswith("{"):
+                    continue
+                product_fragment = _balanced_object_property_fragment(
+                    stripped_tail, "product"
+                )
+                if product_fragment:
+                    try:
+                        return {"product": json.loads(product_fragment)}
+                    except json.JSONDecodeError:
+                        continue
     return None
+
+
+def _script_texts_matching(html: str, pattern: re.Pattern[str]) -> list[str]:
+    return [node.text for node in iter_script_text_nodes(html) if pattern.search(node.text)]
+
+
+def _balanced_object_property_fragment(text: str, property_name: str) -> str:
+    match = re.search(rf"(?:^|[{{,])\s*{re.escape(property_name)}\s*:\s*", text, re.S)
+    if match is None:
+        return ""
+    return _balanced_json_fragment(text[match.end() :])
 
 
 def _extract_generic_assignment_payloads(html: str) -> list[Any]:

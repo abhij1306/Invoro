@@ -197,4 +197,21 @@ describe('buildLogSiteGroups', () => {
     expect(groups[1].hasWarning).toBe(true);
     expect(groups[1].recordCount).toBe(1);
   });
+
+  it('attaches truncated leading site logs to the first URL-bearing log', () => {
+    const logs = [
+      makeLog(1, 'Normalized 1 record(s) for persistence'),
+      makeLog(2, 'Persisted 1 record(s) for https://example.com/p/1'),
+      makeLog(3, 'Starting crawl run for https://example.com/p/2 (2/2)'),
+      makeLog(4, 'Acquiring https://example.com/p/2'),
+    ];
+
+    const groups = buildLogSiteGroups(logs);
+
+    expect(groups).toHaveLength(2);
+    expect(groups[0].url).toBe('https://example.com/p/1');
+    expect(groups[0].stageLogs.normalize).toHaveLength(1);
+    expect(groups[0].stageLogs.persistence).toHaveLength(1);
+    expect(groups[1].url).toBe('https://example.com/p/2');
+  });
 });

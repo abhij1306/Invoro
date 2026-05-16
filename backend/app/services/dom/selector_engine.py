@@ -19,6 +19,7 @@ from app.services.config.extraction_rules import (
     AMAZON_IMAGE_LOW_RES_MAX_DIMENSION,
     AMAZON_IMAGE_LOW_RES_SUFFIX_PATTERN,
     CROSS_LINK_CONTAINER_HINTS,
+    CDN_IMAGE_QUERY_KEY_PATTERNS,
     CDN_IMAGE_QUERY_PARAMS,
     CDN_IMAGE_PATH_SUFFIX_PATTERN,
     DETAIL_CROSS_PRODUCT_CONTAINER_TOKENS,
@@ -125,6 +126,11 @@ _NON_PRIMARY_IMAGE_SECTION_HINTS = tuple(
     for token in (SEMANTIC_SECTION_NOISE.get("label_skip_tokens") or ())
 )
 _CDN_IMAGE_QUERY_PARAMS = frozenset(CDN_IMAGE_QUERY_PARAMS or ())
+_CDN_IMAGE_QUERY_KEY_REGEXES = tuple(
+    re.compile(str(pattern), re.I)
+    for pattern in tuple(CDN_IMAGE_QUERY_KEY_PATTERNS or ())
+    if str(pattern).strip()
+)
 _CDN_IMAGE_PATH_SUFFIX_RE = regex_lib.compile(
     str(CDN_IMAGE_PATH_SUFFIX_PATTERN),
     regex_lib.I,
@@ -226,7 +232,7 @@ def canonical_image_url(url: str) -> str:
     filtered_query = [
         (key, value)
         for key, value in parse_qsl(parsed.query, keep_blank_values=True)
-        if str(key or "").strip().lower() not in _CDN_IMAGE_QUERY_PARAMS
+        if not _is_cdn_image_query_key(str(key or "").strip())
     ]
     normalized_path = _CDN_IMAGE_PATH_SUFFIX_RE.sub("", parsed.path or "")
     return urlunparse(
@@ -236,6 +242,17 @@ def canonical_image_url(url: str) -> str:
             fragment="",
         )
     ).lower()
+
+
+def _is_cdn_image_query_key(key: str) -> bool:
+    normalized = str(key or "").strip().lower()
+    if not normalized:
+        return False
+    if normalized == "v":
+        return False
+    return normalized in _CDN_IMAGE_QUERY_PARAMS or any(
+        pattern.fullmatch(normalized) for pattern in _CDN_IMAGE_QUERY_KEY_REGEXES
+    )
 
 
 def _effective_image_url(url: str) -> str:
@@ -280,22 +297,27 @@ def image_candidate_score(url: str) -> tuple[int, int, int, int]:
 
     def _int_param(*names: str) -> int:
         for name in names:
+            raw_value = numeric_params.get(name)
+            if not raw_value:
+                continue
             try:
-                return int(numeric_params.get(name, "0") or "0")
+                return int(raw_value)
             except ValueError:
                 continue
         return 0
 
-    _WIDTH_NAMES = tuple(p for p in ("width", "w") if p in _CDN_IMAGE_QUERY_PARAMS)
-    _HEIGHT_NAMES = tuple(p for p in ("height", "h") if p in _CDN_IMAGE_QUERY_PARAMS)
+    _WIDTH_NAMES = tuple(p for p in ("width", "w", "wid") if p in _CDN_IMAGE_QUERY_PARAMS)
+    _HEIGHT_NAMES = tuple(p for p in ("height", "h", "hei") if p in _CDN_IMAGE_QUERY_PARAMS)
     width = _int_param(*_WIDTH_NAMES)
     height = _int_param(*_HEIGHT_NAMES)
     if not width or not height:
         for match in _IMAGE_PATH_DIMENSION_RE.finditer(normalized_url):
             first = int(match.group(1) or 0)
             second = int(match.group(2) or 0)
-            width = max(width, first)
-            height = max(height, second or first)
+            if not width:
+                width = max(width, first)
+            if not height:
+                height = max(height, second or first)
     area = width * height if width and height else max(width, height)
     return (0 if _is_proxy_image_url(url) else 1, area, width, height)
 

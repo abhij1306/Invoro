@@ -550,8 +550,6 @@ def _reconcile_container_currency(
         container["price"] = corrected_price
         container["currency"] = expected_currency
         return
-    container.pop("price", None)
-    container.pop("currency", None)
 
 
 def _html_currency_conflicts_with_strong_host_hint(

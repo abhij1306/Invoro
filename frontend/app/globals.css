@@ -759,21 +759,16 @@ select:focus-visible:not(.focus-ring) {
    FOCUS RING
    ═══════════════════════════════════════════════════════════════════════════ */
 .focus-ring {
-  outline: none;
+  outline: 2px solid transparent;
+  outline-offset: 2px;
   transition:
     outline-color var(--transition-fast),
     border-color var(--transition-base);
 }
 
 .focus-ring:focus-visible {
-  outline: 2px solid var(--accent-subtle);
-  outline-offset: 2px;
+  outline-color: var(--accent);
   border-color: var(--border-focus);
-}
-
-html:not([data-theme='dark']) .focus-ring:focus-visible {
-  outline: 2px solid var(--accent-subtle);
-  outline-offset: 2px;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

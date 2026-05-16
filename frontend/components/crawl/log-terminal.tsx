@@ -354,11 +354,68 @@ function siteDomId(groupKey: string) {
   return `site-log-${groupKey.replace(/[^a-z0-9_-]+/gi, '-')}`;
 }
 
+type LogSiteGroupDraft = Omit<
+  LogSiteGroup,
+  'records' | 'hasError' | 'hasWarning' | 'lastStage' | 'recordCount'
+>;
+
+function emptyStageLogs(): Record<LogStage, CrawlLog[]> {
+  return {
+    acquisition: [],
+    extraction: [],
+    normalize: [],
+    persistence: [],
+    system: [],
+  };
+}
+
+function createSiteGroup({
+  key,
+  url,
+  index,
+  total,
+}: {
+  key: string;
+  url: string;
+  index: number | null;
+  total: number | null;
+}): LogSiteGroupDraft {
+  return {
+    key,
+    label: siteLabel(url, index, total),
+    url,
+    index,
+    total,
+    logs: [],
+    stageLogs: emptyStageLogs(),
+  };
+}
+
+function createRunGroup(key: string): LogSiteGroupDraft {
+  return {
+    key,
+    label: TERMINAL_STRINGS.RUN_EVENTS,
+    url: '',
+    index: null,
+    total: null,
+    logs: [],
+    stageLogs: emptyStageLogs(),
+  };
+}
+
+function addLogToGroup(group: LogSiteGroupDraft, log: CrawlLog, stage: LogStage) {
+  group.logs.push(log);
+  group.stageLogs[stage].push(log);
+}
+
+function firstUrlInLog(message: string): string {
+  return sanitizeLogMessage(message).match(/https?:\/\/[^\s]+/i)?.[0] ?? '';
+}
+
 export function buildLogSiteGroups(logs: CrawlLog[], records: CrawlRecord[] = []): LogSiteGroup[] {
-  const groups: Array<
-    Omit<LogSiteGroup, 'records' | 'hasError' | 'hasWarning' | 'lastStage' | 'recordCount'>
-  > = [];
-  let currentGroup: (typeof groups)[number] | null = null;
+  const groups: LogSiteGroupDraft[] = [];
+  let currentGroup: LogSiteGroupDraft | null = null;
+  let pendingRunLogs: CrawlLog[] = [];
   let untitledCounter = 0;
 
   for (const log of logs) {
@@ -367,47 +424,55 @@ export function buildLogSiteGroups(logs: CrawlLog[], records: CrawlRecord[] = []
     }
     const start = parseStartingLog(log.message);
     if (start) {
-      currentGroup = {
+      if (pendingRunLogs.length) {
+        untitledCounter += 1;
+        const runGroup = createRunGroup(`run:${untitledCounter}`);
+        for (const pendingLog of pendingRunLogs) {
+          addLogToGroup(runGroup, pendingLog, getLogStage(pendingLog.message));
+        }
+        groups.push(runGroup);
+        pendingRunLogs = [];
+      }
+      currentGroup = createSiteGroup({
         key: `site:${start.index ?? logs.indexOf(log)}:${start.url}`,
-        label: siteLabel(start.url, start.index, start.total),
         url: start.url,
         index: start.index,
         total: start.total,
-        logs: [],
-        stageLogs: {
-          acquisition: [],
-          extraction: [],
-          normalize: [],
-          persistence: [],
-          system: [],
-        },
-      };
+      });
       groups.push(currentGroup);
+      addLogToGroup(currentGroup, log, 'system');
+      continue;
     }
 
     if (!currentGroup) {
-      untitledCounter += 1;
-      currentGroup = {
-        key: `run:${untitledCounter}`,
-        label: TERMINAL_STRINGS.RUN_EVENTS,
-        url: '',
+      const inferredUrl = firstUrlInLog(log.message);
+      if (!inferredUrl) {
+        pendingRunLogs.push(log);
+        continue;
+      }
+      currentGroup = createSiteGroup({
+        key: `site:inferred:${log.id}:${inferredUrl}`,
+        url: inferredUrl,
         index: null,
         total: null,
-        logs: [],
-        stageLogs: {
-          acquisition: [],
-          extraction: [],
-          normalize: [],
-          persistence: [],
-          system: [],
-        },
-      };
+      });
       groups.push(currentGroup);
+      for (const pendingLog of pendingRunLogs) {
+        addLogToGroup(currentGroup, pendingLog, getLogStage(pendingLog.message));
+      }
+      pendingRunLogs = [];
     }
 
-    const stage = start ? 'system' : getLogStage(log.message);
-    currentGroup.logs.push(log);
-    currentGroup.stageLogs[stage].push(log);
+    addLogToGroup(currentGroup, log, getLogStage(log.message));
+  }
+
+  if (pendingRunLogs.length) {
+    untitledCounter += 1;
+    const runGroup = createRunGroup(`run:${untitledCounter}`);
+    for (const pendingLog of pendingRunLogs) {
+      addLogToGroup(runGroup, pendingLog, getLogStage(pendingLog.message));
+    }
+    groups.push(runGroup);
   }
 
   return groups.map((group) => {
@@ -794,7 +859,7 @@ export const LogTerminal = memo(function LogTerminal({
     if (live && groups.length > 0) {
       return groups[groups.length - 1].key;
     }
-    return issueGroups[0]?.key ?? groups[0]?.key ?? null;
+    return issueGroups[0]?.key ?? null;
   }, [expandedGroupPreference, groups, issueGroups, live]);
   const safePeekedRecordIndex = peekedGroup
     ? Math.min(peekedRecordIndex, Math.max(peekedGroup.records.length - 1, 0))
@@ -954,6 +1019,7 @@ export const LogTerminal = memo(function LogTerminal({
           groups.map((group, index) => {
             const activeKey = live && groups.length > 0 ? groups[groups.length - 1].key : null;
             const expanded = expandedGroupKey === group.key || group.key === activeKey;
+            const isRunEventGroup = !group.url;
             const payload = payloadSnapshot(group);
             const confidence = groupConfidence(group);
             const coverage = groupFieldCoverage(group, requestedFields);
@@ -980,15 +1046,26 @@ export const LogTerminal = memo(function LogTerminal({
                     }
                   }}
                   className={cn(
-                    'group/row grid w-full cursor-pointer grid-cols-[32px_minmax(280px,2fr)_80px_100px_100px_auto_minmax(200px,1.2fr)_80px_60px] items-center gap-3 px-6 py-2.5 text-left transition-colors outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-inset',
+                    'group/row grid w-full cursor-pointer items-center gap-3 px-6 py-2.5 text-left transition-colors outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-inset',
+                    isRunEventGroup
+                      ? 'grid-cols-[32px_minmax(280px,1fr)_auto_minmax(260px,1.4fr)_60px]'
+                      : 'grid-cols-[32px_minmax(280px,2fr)_80px_100px_100px_auto_minmax(200px,1.2fr)_80px_60px]',
                     severityTone(group, index),
                   )}
                 >
                   <div className="type-body text-muted font-medium opacity-60">
-                    {(index + 1).toString().padStart(2, '0')}
+                    {(group.index ?? (index + 1)).toString().padStart(2, '0')}
                   </div>
                   <div className="min-w-0">
-                    {group.url ? (
+                    {isRunEventGroup ? (
+                      <span
+                        className="text-secondary block truncate text-sm font-medium"
+                        title={group.label}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {group.label}
+                      </span>
+                    ) : (
                       <a
                         href={group.url}
                         target="_blank"
@@ -999,42 +1076,40 @@ export const LogTerminal = memo(function LogTerminal({
                       >
                         {formatShortUrlLabel(group.url)}
                       </a>
-                    ) : (
-                      <span
-                        className="text-secondary block truncate text-sm font-normal"
-                        title={group.label}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {group.label}
-                      </span>
                     )}
                   </div>
-                  <div className="type-body text-secondary font-medium whitespace-nowrap">
-                    <span className="text-muted mr-1.5 font-sans text-sm font-bold tracking-wider uppercase">
-                      F:
-                    </span>
-                    {coverage.foundCount}/{coverage.totalCount || 0}
-                  </div>
-                  <div className="type-body font-medium whitespace-nowrap">
-                    <span className="text-muted mr-1.5 font-sans text-sm font-bold tracking-wider uppercase">
-                      C:
-                    </span>
-                    <span
-                      className={cn(
-                        confidence ? toneForConfidence(confidence.level) : 'text-muted',
-                      )}
-                    >
-                      {confidence ? `${Math.round(confidence.score * 100)}%` : '--'}
-                    </span>
-                  </div>
-                  <div className="type-body text-secondary font-medium whitespace-nowrap">
-                    <span className="text-muted mr-1.5 font-sans text-sm font-bold tracking-wider uppercase">
-                      T:
-                    </span>
-                    {durationMs !== null ? formatDurationMs(durationMs) : '--'}
-                  </div>
+                  {!isRunEventGroup ? (
+                    <>
+                      <div className="type-body text-secondary font-medium whitespace-nowrap">
+                        <span className="text-muted mr-1.5 font-sans text-sm font-bold tracking-wider uppercase">
+                          F:
+                        </span>
+                        {coverage.foundCount}/{coverage.totalCount || 0}
+                      </div>
+                      <div className="type-body font-medium whitespace-nowrap">
+                        <span className="text-muted mr-1.5 font-sans text-sm font-bold tracking-wider uppercase">
+                          C:
+                        </span>
+                        <span
+                          className={cn(
+                            confidence ? toneForConfidence(confidence.level) : 'text-muted',
+                          )}
+                        >
+                          {confidence ? `${Math.round(confidence.score * 100)}%` : '--'}
+                        </span>
+                      </div>
+                      <div className="type-body text-secondary font-medium whitespace-nowrap">
+                        <span className="text-muted mr-1.5 font-sans text-sm font-bold tracking-wider uppercase">
+                          T:
+                        </span>
+                        {durationMs !== null ? formatDurationMs(durationMs) : '--'}
+                      </div>
+                    </>
+                  ) : null}
                   <div className="flex items-center justify-center">
-                    {group.lastStage !== 'system' && (
+                    {isRunEventGroup ? (
+                      <div className="text-muted type-label-mono uppercase">Run</div>
+                    ) : group.lastStage !== 'system' ? (
                       <div
                         className={cn(
                           'rounded px-1.5 py-0.5 text-sm font-bold tracking-wider uppercase',
@@ -1043,7 +1118,7 @@ export const LogTerminal = memo(function LogTerminal({
                       >
                         {STAGE_CONFIG[group.lastStage].label}
                       </div>
-                    )}
+                    ) : null}
                   </div>
                   <div className="min-w-0">
                     <div
@@ -1055,25 +1130,27 @@ export const LogTerminal = memo(function LogTerminal({
                         : TERMINAL_STRINGS.PENDING}
                     </div>
                   </div>
-                  <div className="flex items-center justify-end">
-                    {payload ? (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="type-control h-7 px-2"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          setPeekedGroupKey(group.key);
-                          setPeekedRecordIndex(0);
-                        }}
-                      >
-                        Peek
-                      </Button>
-                    ) : (
-                      <span className="type-caption opacity-25">--</span>
-                    )}
-                  </div>
+                  {!isRunEventGroup ? (
+                    <div className="flex items-center justify-end">
+                      {payload ? (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="type-control h-7 px-2"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setPeekedGroupKey(group.key);
+                            setPeekedRecordIndex(0);
+                          }}
+                        >
+                          Peek
+                        </Button>
+                      ) : (
+                        <span className="type-caption opacity-25">--</span>
+                      )}
+                    </div>
+                  ) : null}
                   <div className="pr-2 text-right">
                     <div className="text-muted group-hover/row:text-secondary type-label-mono uppercase transition-colors">
                       {live && groups.length > 0 && group.key === groups[groups.length - 1].key

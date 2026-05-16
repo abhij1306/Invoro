@@ -5,6 +5,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 from app.services.config.extraction_rules import (
+    AVAILABILITY_UNKNOWN,
     DETAIL_BRAND_SHELL_DESCRIPTION_PHRASES,
     DETAIL_BRAND_SHELL_TITLE_TOKENS,
     TRACKING_PIXEL_PATTERNS,
@@ -49,7 +50,6 @@ def looks_like_site_shell_record(record: dict[str, Any], *, page_url: str) -> bo
         "sku",
         "part_number",
         "barcode",
-        "availability",
         "variants",
     )
     has_generic_detail_fields = any(
@@ -60,6 +60,9 @@ def looks_like_site_shell_record(record: dict[str, Any], *, page_url: str) -> bo
         record.get(field_name) not in (None, "", [], {})
         for field_name in strong_detail_fields
     )
+    availability = text_or_none(record.get("availability"))
+    if availability and availability != AVAILABILITY_UNKNOWN:
+        has_strong_detail_fields = True
     has_identity_fields = any(
         record.get(field_name) not in (None, "", [], {})
         for field_name in (
@@ -72,6 +75,7 @@ def looks_like_site_shell_record(record: dict[str, Any], *, page_url: str) -> bo
             "barcode",
             "description",
             "image_url",
+            "availability",
         )
     )
     confidence_score = float((record.get("_confidence") or {}).get("score") or 0.0)
@@ -114,16 +118,19 @@ def looks_like_site_shell_record(record: dict[str, Any], *, page_url: str) -> bo
         confidence_score < 0.5
         and description_looks_like_shell_copy(record.get("description"))
         and title_looks_like_brand_shell(title, page_url=page_url)
-        and not any(
-            record.get(field_name) not in (None, "", [], {})
-            for field_name in (
-                "price",
-                "original_price",
-                "currency",
-                "brand",
-                "availability",
-                "variants",
+        and not (
+            any(
+                record.get(field_name) not in (None, "", [], {})
+                for field_name in (
+                    "price",
+                    "original_price",
+                    "currency",
+                    "brand",
+                    "variants",
+                )
             )
+            or text_or_none(record.get("availability"))
+            not in (None, AVAILABILITY_UNKNOWN)
         )
     ):
         return True

@@ -37,9 +37,17 @@ for _name, _value in _STATIC_EXPORTS.items():
 
 HYDRATED_STATE_PATTERNS = tuple(
     dict.fromkeys(
-        value
-        for value in _STATIC_EXPORTS.get("HYDRATED_STATE_PATTERNS", ())
-        if str(value).strip()
+        [
+            *(
+                value
+                for value in _STATIC_EXPORTS.get("HYDRATED_STATE_PATTERNS", ())
+                if str(value).strip()
+            ),
+            "__INITIAL_CONFIG__",
+            "_boldmetrics",
+            "asos.pdp.config.product",
+            "asos.pdp.config.stockPriceResponse",
+        ]
     )
 )
 SHIPPING_DATE_FIELD = "shipping_date"
@@ -179,6 +187,9 @@ CDN_IMAGE_QUERY_PARAMS = _string_frozenset(
         "wid",
         "width",
     }
+)
+CDN_IMAGE_QUERY_KEY_PATTERNS = (
+    r"^\$n_\d+w\$$",
 )
 CDN_IMAGE_TRANSFORM_SUFFIX_PATTERN = r"[._](?:AC_)?(?:US|SR|SL|SX|SY|SS|UL)\d+_?"
 CDN_IMAGE_PATH_SUFFIX_PATTERN = (
@@ -422,6 +433,7 @@ DETAIL_VARIANT_ARTIFACT_VALUE_TOKENS = frozenset(
 )
 AVAILABILITY_IN_STOCK = "in_stock"
 AVAILABILITY_OUT_OF_STOCK = "out_of_stock"
+AVAILABILITY_UNKNOWN = "unknown"
 MATERIAL_KEYWORDS = frozenset(
     {
         "cotton",
@@ -1027,6 +1039,7 @@ IMAGE_FAMILY_NOISE_TOKENS = frozenset(
     }
 )
 WAF_QUEUE_PATTERNS = (
+    r"\baccess to this page has been denied\b",
     r"\bsorry for the wait\b",
     r"\bplease wait while we verify\b",
     r"\bwe need to verify\b",
@@ -1079,6 +1092,7 @@ FEATURE_ROW_NOISE_PATTERNS = (
     r"^(?:key\s+)?features?(?:\s*&\s*benefits?)?$",
     r"^(?:see|show)\s+more\s+(?:key\s+)?features?(?:\s*&\s*benefits?)?$",
     r"^.+?\$\d[\d,.]*\s+add\s+to\s+(?:bag|cart|basket)$",
+    r"^\d{6,}$",
 )
 DETAIL_BRACKET_PROSE_MIN_WORDS = 5
 PRICE_SOURCE_KEY_FIELDS = frozenset(
@@ -1317,7 +1331,6 @@ NON_PRODUCT_IMAGE_HINTS = tuple(
             *tuple(_STATIC_EXPORTS.get("NON_PRODUCT_IMAGE_HINTS", ())),
             "arrow",
             "blank",
-            "default",
             "loading",
             "loding",
             "placeholder",
@@ -1335,12 +1348,27 @@ NON_PRODUCT_IMAGE_HINTS = tuple(
             "_swatch.",
             "dyo-icon",
             "/static-dyo/",
+            "/media/catalog/category/",
+            "/category/",
+            "dropdown",
         ]
     )
+)
+DETAIL_NON_PRODUCT_IMAGE_URL_HINTS = (
+    "/media/catalog/category/",
+    "/category/",
+    "dropdown",
 )
 PAGE_URL_CURRENCY_HINTS_RAW = {
     **dict(_STATIC_EXPORTS.get("PAGE_URL_CURRENCY_HINTS_RAW", {})),
     "firstcry.com/": "INR",
+    "converse.com/": "USD",
+    "gymshark.com/": "USD",
+    "notre-shop.com/": "USD",
+    "onepeloton.com/": "USD",
+    "patagonia.com/": "USD",
+    "phase-eight.com/": "GBP",
+    "yeti.com/": "USD",
 }
 VARIANT_AXIS_ALIASES = {
     **dict(_STATIC_EXPORTS.get("VARIANT_AXIS_ALIASES", {})),
@@ -1531,6 +1559,7 @@ VARIANT_OPTION_TEXT_CHILD_DROP_PATTERNS = (
 _EXTRA_EXPORTS = [
     "AVAILABILITY_IN_STOCK",
     "AVAILABILITY_OUT_OF_STOCK",
+    "AVAILABILITY_UNKNOWN",
     "AVAILABILITY_URL_MAP",
     "NORMALIZER_AVAILABILITY_TOKENS",
     "BARE_HOST_URL_RE",
@@ -1559,6 +1588,7 @@ _EXTRA_EXPORTS = [
     "DETAIL_VARIANT_SIZE_SEQUENCE_MIN_COUNT",
     "DETAIL_LOW_SIGNAL_LONG_TEXT_VALUES",
     "DETAIL_LOW_SIGNAL_NUMERIC_SIZE_MAX",
+    "DETAIL_NON_PRODUCT_IMAGE_URL_HINTS",
     "DETAIL_LOW_SIGNAL_PRODUCT_TYPE_VALUES",
     "DETAIL_ARTIFACT_PRODUCT_TYPE_VALUES",
     "DETAIL_ARTIFACT_PRODUCT_TYPE_PATTERNS",
@@ -1684,6 +1714,7 @@ _EXTRA_EXPORTS = [
     "AMAZON_IMAGE_CDN_HOSTS",
     "AMAZON_IMAGE_LOW_RES_SUFFIX_PATTERN",
     "CDN_IMAGE_QUERY_PARAMS",
+    "CDN_IMAGE_QUERY_KEY_PATTERNS",
     "CDN_IMAGE_PATH_SUFFIX_PATTERN",
     "RATING_RE",
     "REVIEW_COUNT_RE",

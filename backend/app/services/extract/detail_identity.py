@@ -18,6 +18,7 @@ from app.services.config.extraction_rules import (
     DETAIL_PRODUCT_PATH_TOKENS,
     DETAIL_SEARCH_QUERY_KEYS,
     DETAIL_UTILITY_PATH_TOKENS,
+    AVAILABILITY_UNKNOWN,
     JOB_LISTING_DETAIL_ROOT_MARKERS,
     JOB_LISTING_DETAIL_PATH_MARKERS,
     LISTING_CATEGORY_PATH_SEGMENTS,
@@ -826,6 +827,47 @@ def _detail_redirect_identity_is_mismatched(
             and same_site(requested, candidate_url)
             and not _detail_url_matches_requested_identity(
                 candidate_url,
+                requested_page_url=requested,
+            )
+        ):
+            return True
+        requested_tokens = _detail_identity_tokens(_detail_title_from_url(requested))
+        candidate_tokens = _detail_identity_tokens(record.get("title"))
+        has_strong_same_url_product_evidence = any(
+            record.get(field_name) not in (None, "", [], {})
+            for field_name in (
+                "sku",
+                "product_id",
+                "part_number",
+                "barcode",
+                "description",
+                "brand",
+                "product_details",
+                "variants",
+            )
+        )
+        if not has_strong_same_url_product_evidence:
+            availability = text_or_none(record.get("availability"))
+            has_strong_same_url_product_evidence = bool(
+                availability and availability != AVAILABILITY_UNKNOWN
+            )
+        has_same_url_mismatch_evidence = any(
+            record.get(field_name) not in (None, "", [], {})
+            for field_name in (
+                "price",
+                "original_price",
+                "currency",
+                "image_url",
+            )
+        ) or len(candidate_tokens) >= 4
+        if (
+            not has_strong_same_url_product_evidence
+            and has_same_url_mismatch_evidence
+            and len(requested_tokens) >= 2
+            and len(candidate_tokens) >= 2
+            and len(requested_tokens & candidate_tokens) < min(2, len(requested_tokens))
+            and not _record_matches_requested_detail_identity(
+                record,
                 requested_page_url=requested,
             )
         ):

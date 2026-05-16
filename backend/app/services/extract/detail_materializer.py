@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import re
 from typing import Any
+from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup
 
@@ -654,27 +655,40 @@ def _detail_structured_payload_is_irrelevant_product(
         requested_codes=requested_codes,
     ):
         return True
-    if _record_matches_requested_detail_identity(
-        candidate_record,
-        requested_page_url=requested_page_url,
-    ):
-        return False
-    if candidate_url and _detail_url_matches_requested_identity(
-        candidate_url,
-        requested_page_url=requested_page_url,
-    ):
-        return False
+    if candidate_url:
+        if _detail_url_matches_requested_identity(
+            candidate_url,
+            requested_page_url=requested_page_url,
+        ):
+            return False
+        if _record_matches_requested_detail_identity(
+            candidate_record,
+            requested_page_url=requested_page_url,
+        ):
+            return False
+        if same_site(candidate_url, requested_page_url):
+            candidate_path = urlparse(candidate_url).path.rstrip("/")
+            requested_path = urlparse(requested_page_url).path.rstrip("/")
+            return bool(candidate_path and requested_path and candidate_path != requested_path)
+    else:
+        if _record_matches_requested_detail_identity(
+            candidate_record,
+            requested_page_url=requested_page_url,
+        ):
+            return False
     if not text_or_none(raw_candidate_url):
+        candidate_title = clean_text(candidate_record.get("title"))
+        if not candidate_title:
+            return False
+        requested_tokens = requested_tokens or _detail_identity_tokens(requested_title)
+        candidate_tokens = _detail_identity_tokens(candidate_title)
+        if (
+            requested_tokens
+            and candidate_tokens
+            and requested_tokens.isdisjoint(candidate_tokens)
+        ):
+            return True
         return False
-    candidate_title = clean_text(candidate_record.get("title"))
-    requested_tokens = requested_tokens or _detail_identity_tokens(requested_title)
-    candidate_tokens = _detail_identity_tokens(candidate_title)
-    if (
-        requested_tokens
-        and candidate_tokens
-        and requested_tokens.isdisjoint(candidate_tokens)
-    ):
-        return True
     candidate_codes = _detail_identity_codes_from_record_fields(candidate_record)
     if (
         requested_codes

@@ -426,11 +426,8 @@ describe('CrawlRunScreen', () => {
 
     renderRunScreen();
 
-    expect(await screen.findByText('TIME')).toBeInTheDocument();
-    expect(screen.getByText('1m 5s')).toBeInTheDocument();
-    expect(screen.getByText('VERDICT')).toBeInTheDocument();
+    expect(await screen.findByText('1m 5s')).toBeInTheDocument();
     expect(screen.getByText('success')).toBeInTheDocument();
-    expect(screen.getByText('QUALITY')).toBeInTheDocument();
     expect(screen.getByText('high')).toBeInTheDocument();
   });
 
@@ -443,8 +440,6 @@ describe('CrawlRunScreen', () => {
     renderRunScreen();
 
     expect(await screen.findByRole('button', { name: 'Excel (CSV)' })).toBeInTheDocument();
-    expect(screen.getByText('TIME')).toBeInTheDocument();
-    expect(screen.getByText('VERDICT')).toBeInTheDocument();
   });
 
   it('keeps the live workspace visible when summary counts are zero', async () => {
