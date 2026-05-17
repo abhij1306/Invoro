@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
-from app.services.extract.shared_variant_logic import (
+from app.services.extract.variant_axis import (
     normalized_variant_axis_key,
     public_variant_axis_fields,
 )

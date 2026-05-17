@@ -9,10 +9,8 @@ from urllib.parse import parse_qsl, urljoin, urlparse, urlsplit
 
 from app.services.adapters.base import AdapterResult, BaseAdapter
 from app.services.config.adapter_runtime_settings import adapter_runtime_settings
-from app.services.extract.shared_variant_logic import (
-    normalized_variant_axis_key,
-    split_variant_axes,
-)
+from app.services.extract.variant_axis import normalized_variant_axis_key
+from app.services.extract.variant_identity_merge import split_variant_axes
 from app.services.shared.field_coerce import flatten_variants_for_public_output
 from app.services.normalizers import normalize_decimal_price
 

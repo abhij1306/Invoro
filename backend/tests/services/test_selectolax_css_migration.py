@@ -9,7 +9,7 @@ from app.services.adapters.ebay import EbayAdapter
 from app.services.adapters.indeed import IndeedAdapter
 from app.services.adapters.linkedin import LinkedInAdapter
 from app.services.adapters.nike import NikeAdapter
-from app.services.extract.detail_materializer import (
+from app.services.extract.detail_record_assembly import (
     build_detail_record,
     extract_detail_records,
 )

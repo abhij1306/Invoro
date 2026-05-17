@@ -11,7 +11,7 @@ from app.services.config.extraction_rules import (
     STRUCTURED_CANDIDATE_LIST_SLICE,
     STRUCTURED_CANDIDATE_TRAVERSAL_LIMIT,
 )
-from app.services.extract.shared_variant_logic import resolve_variants
+from app.services.extract.variant_identity_merge import resolve_variants
 from app.services.field_policy import normalize_field_key, normalize_requested_field
 from app.services.shared.field_coerce import (
     STRUCTURED_MULTI_FIELDS,

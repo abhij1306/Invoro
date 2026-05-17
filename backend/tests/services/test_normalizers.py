@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from bs4 import BeautifulSoup
 
-from app.services.extract.detail_record_finalizer import (
+from app.services.extract.detail_final_cleanup import (
     repair_ecommerce_detail_record_quality,
 )
 from app.services.extract.variant_record_normalization import normalize_variant_record

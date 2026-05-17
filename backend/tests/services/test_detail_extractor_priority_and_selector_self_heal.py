@@ -6,12 +6,10 @@ import pytest
 from bs4 import BeautifulSoup
 from selectolax.lexbor import LexborHTMLParser
 
-from app.services.extract import detail_dom_extractor
-from app.services.extract.detail_materializer import (
-    prune_irrelevant_detail_structured_payload,
-    materialize_image_fields,
-    requires_dom_completion,
-)
+from app.services.extract import detail_dom_fallbacks
+from app.services.extract import detail_dom_completion
+from app.services.extract import detail_image_materialize
+from app.services.extract import detail_structured_pruning
 from app.services.config._export_data import load_export_data
 from app.services.extraction_context import prepare_extraction_context
 from app.services.pipeline.extract_records import extract_records
@@ -20,6 +18,12 @@ from app.services.selector_self_heal import (
     selector_heal_improved_record,
     reduce_html_for_selector_synthesis,
     selector_self_heal_targets,
+)
+
+requires_dom_completion = detail_dom_completion._requires_dom_completion
+materialize_image_fields = detail_image_materialize._materialize_image_fields
+prune_irrelevant_detail_structured_payload = (
+    detail_structured_pruning._prune_irrelevant_detail_structured_payload
 )
 
 
@@ -113,7 +117,7 @@ def test_prepare_extraction_context_caches_original_dom_objects() -> None:
 def test_apply_dom_fallbacks_limits_heading_section_targets_to_section_like_fields(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from app.services.extract import detail_dom_context
+    from app.services.extract import detail_dom_fallbacks
 
     captured: dict[str, set[str]] = {}
 
@@ -127,13 +131,13 @@ def test_apply_dom_fallbacks_limits_heading_section_targets_to_section_like_fiel
         return {}
 
     monkeypatch.setattr(
-        detail_dom_context,
+        detail_dom_fallbacks,
         "extract_heading_sections",
         _fake_extract_heading_sections,
     )
 
     html = "<html><body><main><h1>Widget</h1></main></body></html>"
-    detail_dom_extractor.apply_dom_fallbacks(
+    detail_dom_fallbacks.apply_dom_fallbacks(
         LexborHTMLParser(html),
         BeautifulSoup(html, "html.parser"),
         page_url="https://example.com/products/widget",
@@ -171,15 +175,15 @@ def testprune_irrelevant_detail_structured_payload_reuses_requested_identity(
         return {"sku123"}
 
     monkeypatch.setattr(
-        "app.services.extract.detail_candidate_collection._detail_title_from_url",
+        "app.services.extract.detail_structured_pruning._detail_title_from_url",
         _fake_title_from_url,
     )
     monkeypatch.setattr(
-        "app.services.extract.detail_candidate_collection._detail_identity_tokens",
+        "app.services.extract.detail_structured_pruning._detail_identity_tokens",
         _fake_identity_tokens,
     )
     monkeypatch.setattr(
-        "app.services.extract.detail_candidate_collection._detail_identity_codes_from_url",
+        "app.services.extract.detail_structured_pruning._detail_identity_codes_from_url",
         _fake_identity_codes_from_url,
     )
 

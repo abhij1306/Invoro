@@ -146,18 +146,14 @@ def _sync_browser_pool_compatibility() -> None:
 
 _sync_browser_pool_compatibility()
 
-
 async def get_browser_runtime(*args, **kwargs):
     return await _get_browser_runtime_impl(*args, **kwargs)
-
 
 async def shutdown_browser_runtime() -> None:
     await _shutdown_browser_runtime_impl()
 
-
 def shutdown_browser_runtime_sync() -> None:
     _shutdown_browser_runtime_sync_impl()
-
 
 def browser_runtime_snapshot() -> dict[str, int | bool]:
     return _browser_runtime_snapshot_impl()
@@ -180,7 +176,6 @@ def _should_run_behavior_realism(engine: str, *, browser_reason: str | None) -> 
         WARMUP_VENDOR_BLOCK_PREFIX
     )
 
-
 def detail_expansion_keywords(
     surface: str,
     *,
@@ -190,7 +185,6 @@ def detail_expansion_keywords(
         surface,
         requested_fields=requested_fields,
     )
-
 
 async def expand_all_interactive_elements(
     page: Any,
@@ -212,7 +206,6 @@ async def expand_all_interactive_elements(
         max_elapsed_ms=max_elapsed_ms,
     )
 
-
 async def expand_interactive_elements_via_accessibility(
     page: Any,
     *,
@@ -230,7 +223,6 @@ async def expand_interactive_elements_via_accessibility(
         max_elapsed_ms=max_elapsed_ms,
     )
 
-
 def accessibility_expand_candidates(
     snapshot: dict[str, object] | None,
     *,
@@ -244,7 +236,6 @@ def accessibility_expand_candidates(
         aom_expand_roles=set(DETAIL_AOM_EXPAND_ROLES),
         detail_expansion_keywords=detail_expansion_keywords,
     )
-
 
 async def expand_detail_content_if_needed(
     page: Any,
@@ -263,39 +254,6 @@ async def expand_detail_content_if_needed(
         expand_interactive_elements_via_accessibility=expand_interactive_elements_via_accessibility,
     )
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 def _build_payload_capture(*, surface: str) -> _BrowserNetworkCapture:
     return _BrowserNetworkCapture(
         surface=surface,
@@ -311,11 +269,6 @@ def _normalize_surface(surface: str | None) -> str:
 
 def _mapping_value(value: object) -> dict[str, object]:
     return dict(value) if isinstance(value, dict) else {}
-
-
-
-
-
 
 def _proxy_requires_fresh_browser_state(
     proxy_profile: dict[str, object] | None,
@@ -338,13 +291,6 @@ def _browser_proxy_mode(
     if proxied_page_factory is temporary_browser_page:
         return "launch"
     return "page"
-
-
-def _network_payload_rows(value: object) -> list[dict[str, object]]:
-    if not isinstance(value, list):
-        return []
-    return [dict(item) for item in value if isinstance(item, dict)]
-
 
 async def _resolve_runtime_provider(
     runtime_provider,

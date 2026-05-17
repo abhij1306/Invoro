@@ -6,7 +6,7 @@ from app.services.config.js_state_field_specs import (
     JS_STATE_LIST_ITERATION_LIMIT,
     JS_STATE_PRODUCT_PAYLOAD_LIMIT,
 )
-from app.services.extract.shared_variant_logic import merge_variant_rows
+from app.services.extract.variant_identity_merge import merge_variant_rows
 from app.services.shared.field_coerce import text_or_none
 from app.services.js_state.helpers import compact_dict
 

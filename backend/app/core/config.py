@@ -40,7 +40,6 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
     redis_state_enabled: bool = False
     celery_dispatch_enabled: bool = True
-    legacy_inprocess_runner_enabled: bool = False
     artifacts_dir: Path = Field(default=BASE_DIR / "artifacts")
     acquisition_cache_dir: Path = Field(
         default=BASE_DIR / "artifacts" / "acquisition_cache"

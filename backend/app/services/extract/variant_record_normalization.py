@@ -42,16 +42,16 @@ from app.services.shared.field_coerce import (
     flatten_variants_for_public_output,
     text_or_none,
 )
-from app.services.extract.shared_variant_logic import (
+from app.services.extract.variant_identity_merge import (
     collapse_duplicate_size_aliases,
-    infer_variant_group_name_from_values,
     merge_variant_pair,
-    normalized_variant_axis_key,
-    variant_option_value_is_noise,
     variant_identity,
     variant_row_richness,
     variant_semantic_identity,
 )
+from app.services.extract.variant_choice_traversal import infer_variant_group_name_from_values
+from app.services.extract.variant_axis import normalized_variant_axis_key
+from app.services.extract.variant_option_value import variant_option_value_is_noise
 from app.services.extract.variant_structural_pruning import (
     drop_color_only_rows_when_size_rows_exist,
     drop_cross_product_variant_rows,

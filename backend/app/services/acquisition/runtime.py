@@ -850,8 +850,10 @@ def has_extractable_dom_content_detail_signals(
         parsed = analysis
     elif isinstance(value, HtmlAnalysis):
         parsed = value
+    elif not isinstance(value, str):
+        return False
     else:
-        parsed = analyze_html(str(value or ""))
+        parsed = analyze_html(value)
     return _has_extractable_dom_content_detail_signals(parsed)
 
 

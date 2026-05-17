@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 from urllib.parse import parse_qsl, urlsplit
 
-from app.services.extract.shared_variant_logic import normalized_variant_axis_key
+from app.services.extract.variant_axis import normalized_variant_axis_key
 from app.services.config.js_state_field_specs import (
     JS_STATE_VARIANT_AVAILABILITY_BOOL_KEYS,
     JS_STATE_VARIANT_STOCK_QUANTITY_KEYS,

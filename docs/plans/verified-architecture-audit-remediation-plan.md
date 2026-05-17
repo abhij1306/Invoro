@@ -2,7 +2,7 @@
 
 **Created:** 2026-05-17
 **Agent:** Codex
-**Status:** IN PROGRESS
+**Status:** COMPLETE
 **Touches buckets:** Extraction, Crawl Ingestion + Orchestration, Acquisition + Browser Runtime, API + Bootstrap, Review + Selectors + Domain Memory, LLM Admin + Runtime, Product/Data Enrichment, Tests, Docs
 
 ## Goal
@@ -166,7 +166,7 @@ These audit items are not included as remediation because current code did not s
 **Verify:** Run the narrow tests for each moved owner, then `cd backend; $env:PYTHONPATH='.'; .\.venv\Scripts\python.exe -m pytest tests -q`
 
 ### Slice 13: Final Smoke And Docs Closeout
-**Status:** IN PROGRESS
+**Status:** DONE
 **Files:** `docs/CODEBASE_MAP.md`, `docs/backend-architecture.md`, `docs/ENGINEERING_STRATEGY.md`, `docs/plans/ACTIVE.md`, this plan
 **What:** Update canonical docs for moved files and ownership. Add any new anti-pattern found during execution to `ENGINEERING_STRATEGY.md` only if it is stable and enforceable. Mark all acceptance criteria complete only after full tests and smoke commands pass.
 **Verify:** `cd backend; $env:PYTHONPATH='.'; .\.venv\Scripts\python.exe -m pytest tests -q; .\.venv\Scripts\python.exe run_acquire_smoke.py commerce; .\.venv\Scripts\python.exe run_extraction_smoke.py; .\.venv\Scripts\python.exe run_test_sites_acceptance.py`

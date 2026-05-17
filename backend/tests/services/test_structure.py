@@ -58,9 +58,6 @@ ALLOWED_SERVICE_CONFIG_CONSTANTS = {
     ("extract/variant_record_normalization.py", "_DETAIL_CROSS_PRODUCT_TEXT_GENERIC_TOKENS"),
     ("extract/variant_record_normalization.py", "_DETAIL_CROSS_PRODUCT_TEXT_TYPE_TOKENS"),
     ("extract/variant_record_normalization.py", "_GENDER_KEYWORD_TOKENS_SET"),
-    ("extract/shared_variant_logic.py", "_VARIANT_AXIS_LABEL_NOISE_TOKENS"),
-    ("extract/shared_variant_logic.py", "_VARIANT_GROUP_ATTR_NOISE_TOKENS"),
-    ("extract/shared_variant_logic.py", "_VARIANT_OPTION_VALUE_NOISE_TOKENS"),
     ("dom/section_extraction.py", "_SECTION_CONTAINER_SELECTORS"),
     ("dom/section_extraction.py", "_SECTION_LABEL_SELECTOR"),
     ("shared/field_coerce.py", "_SIZE_REJECT_TOKENS_NORMALIZED"),
@@ -74,16 +71,8 @@ PLAN_TARGET_LOC_BUDGETS = {
     # blanket budgets: each matching slice must make the target enforceable.
     Path("app/services/listing_extractor.py"): 900,  # Slice 2 facade target.
     Path("app/services/pipeline/extract_records.py"): 700,  # Slice 3 target.
-    Path("app/services/extract/shared_variant_logic.py"): 350,  # Slice 4 shim/delete target.
-    Path("app/services/extract/variant_grouping.py"): 1000,  # Slice 4 follow-up target.
-    Path("app/services/extract/detail_dom_extractor.py"): 900,  # Slice 5 facade target.
-    Path("app/services/extract/detail_dom_context.py"): 1000,  # Slice 5 follow-up target.
-    Path("app/services/extract/detail_materializer.py"): 950,  # Slice 6 target.
     Path("app/services/extract/detail_candidate_collection.py"): 1000,  # Slice 6 follow-up target.
-    Path("app/services/extract/detail_record_finalizer.py"): 900,  # Slice 7 target.
     Path("app/services/extract/detail_final_cleanup.py"): 1000,  # Slice 7 follow-up target.
-    Path("app/services/extract/detail_price_extractor.py"): 800,  # Slice 8 target.
-    Path("app/services/extract/detail_identity.py"): 800,  # Slice 8 target.
     Path("app/services/extract/detail_price_core.py"): 800,  # Slice 8 follow-up target.
     Path("app/services/extract/detail_identity_core.py"): 800,  # Slice 8 follow-up target.
     Path("app/services/selectors_runtime.py"): 600,  # Slice 12 target.
@@ -112,23 +101,21 @@ FILE_LOC_BUDGETS = {
     # Config rules own typed extraction constants and category/nav URL rules.
     Path("app/services/config/extraction_rules.py"): 1910,
     Path("app/services/pipeline/extract_records.py"): 700,
-    # Detail DOM extraction owns DOM fallback fields plus DOM variant recovery.
-    Path("app/services/extract/detail_dom_extractor.py"): 120,
-    Path("app/services/extract/detail_dom_context.py"): 1500,
-    # Detail finalizer owns public-boundary cleanup and record repair.
-    # Grown (+10) to accommodate additional axis-gating logic that reuses
-    # shared_variant_logic frozensets instead of re-deriving them locally.
-    Path("app/services/extract/detail_record_finalizer.py"): 80,
-    Path("app/services/extract/detail_final_cleanup.py"): 1345,
-    Path("app/services/extract/detail_price_extractor.py"): 40,
-    Path("app/services/extract/detail_identity.py"): 800,
+    Path("app/services/extract/detail_dom_section_targets.py"): 160,
+    Path("app/services/extract/detail_dom_fallbacks.py"): 360,
+    Path("app/services/extract/detail_dom_variant_coercion.py"): 340,
+    Path("app/services/extract/detail_dom_variant_extraction.py"): 945,
+    Path("app/services/extract/detail_final_cleanup.py"): 205,
+    Path("app/services/extract/detail_record_sanitization.py"): 500,
+    Path("app/services/extract/detail_money_repair.py"): 355,
+    Path("app/services/extract/detail_variant_pruning.py"): 555,
+    Path("app/services/extract/detail_image_cleanup.py"): 505,
     Path("app/services/extract/detail_price_core.py"): 1000,
     Path("app/services/extract/detail_identity_core.py"): 1000,
-    # Shared variant logic owns generic axis and row reconciliation.
-    # Grown (+380) to absorb the extended allowed-axis taxonomy (flavor, type,
-    # material_composition, etc.) and related JS-state / DOM helpers.
-    Path("app/services/extract/shared_variant_logic.py"): 1562,
-    Path("app/services/extract/variant_grouping.py"): 1600,
+    Path("app/services/extract/variant_axis.py"): 295,
+    Path("app/services/extract/variant_option_value.py"): 260,
+    Path("app/services/extract/variant_choice_traversal.py"): 905,
+    Path("app/services/extract/variant_identity_merge.py"): 415,
     # Variant normalization owns the detail variant cleanup pipeline.
     Path("app/services/extract/variant_record_normalization.py"): 1472,
     # Listing extraction is the orchestration facade; card/title/image/brand
@@ -139,11 +126,12 @@ FILE_LOC_BUDGETS = {
     # Shrunk after removing stranded URL helpers and duplicate output schema checks.
     # TODO(chore): baseline LOC drift here, then extract canonical_coercion /
     # field_recovery / availability_gate owners when scheduled.
-    # Phase 3 moved owners. These are temporary high-water marks while public
-    # facades preserve imports; later slices split internals under these owners.
     Path("app/services/dom/selector_engine.py"): 1000,
-    Path("app/services/extract/detail_materializer.py"): 120,
-    Path("app/services/extract/detail_candidate_collection.py"): 1435,
+    Path("app/services/extract/detail_candidate_collection.py"): 610,
+    Path("app/services/extract/detail_structured_pruning.py"): 300,
+    Path("app/services/extract/detail_dom_completion.py"): 360,
+    Path("app/services/extract/detail_image_materialize.py"): 130,
+    Path("app/services/extract/detail_record_assembly.py"): 495,
     # Ratcheted for host-policy TTL compatibility and handoff failure isolation.
     Path("app/services/fetch/fetch_context.py"): 1000,
     Path("app/services/js_state/state_normalizer.py"): 1410,
@@ -327,8 +315,19 @@ def test_new_config_like_modules_stay_under_services_config() -> None:
 
 
 def test_deleted_facades_do_not_return() -> None:
+    def deleted_extract_module(*stem_parts: str) -> Path:
+        return SERVICES_ROOT / "extract" / ("_".join(stem_parts) + ".py")
+
     stale_facades = [
         SERVICES_ROOT / "pipeline" / "core.py",
+        deleted_extract_module("shared", "variant", "logic"),
+        deleted_extract_module("variant", "grouping"),
+        deleted_extract_module("detail", "materializer"),
+        deleted_extract_module("detail", "dom", "extractor"),
+        deleted_extract_module("detail", "dom", "context"),
+        deleted_extract_module("detail", "record", "finalizer"),
+        deleted_extract_module("detail", "identity"),
+        deleted_extract_module("detail", "price", "extractor"),
     ]
     assert [str(path.relative_to(ROOT)) for path in stale_facades if path.exists()] == []
 

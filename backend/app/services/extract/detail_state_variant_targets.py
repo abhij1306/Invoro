@@ -3,10 +3,8 @@ from __future__ import annotations
 from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
-from app.services.extract.shared_variant_logic import (
-    normalized_variant_axis_key,
-    variant_option_value_is_noise,
-)
+from app.services.extract.variant_axis import normalized_variant_axis_key
+from app.services.extract.variant_option_value import variant_option_value_is_noise
 from app.services.shared.field_coerce import absolute_url, object_dict, text_or_none
 
 

@@ -31,9 +31,7 @@ from app.services.shared.field_coerce import (
     extract_currency_code,
     flatten_variants_for_public_output,
 )
-from app.services.extract.shared_variant_logic import (
-    normalized_variant_axis_key as _normalized_variant_axis_key,
-)
+from app.services.extract.variant_axis import normalized_variant_axis_key as _normalized_variant_axis_key
 
 
 def _clean_brand(value: str) -> str:

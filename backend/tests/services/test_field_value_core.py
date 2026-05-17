@@ -19,7 +19,7 @@ from app.services.shared.field_coerce import (
     surface_alias_lookup,
     validate_record_for_surface,
 )
-from app.services.extract.shared_variant_logic import merge_variant_rows
+from app.services.extract.variant_identity_merge import merge_variant_rows
 from app.services.field_url_normalization import registrable_host, same_site
 from app.services.public_record_firewall import public_record_data_for_surface
 

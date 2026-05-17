@@ -18,7 +18,7 @@ from app.services.config.extraction_rules import (
     NON_PRODUCT_PROVIDER_HINTS,
     TITLE_PROMOTION_PREFIXES,
 )
-from app.services.extract.detail_identity import (
+from app.services.extract.detail_identity_core import (
     listing_detail_like_path,
     listing_url_is_structural,
 )

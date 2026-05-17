@@ -10,13 +10,11 @@ from app.services.config.extraction_rules import (
     DETAIL_BRAND_SHELL_TITLE_TOKENS,
     TRACKING_PIXEL_PATTERNS,
 )
-from app.services.extract.detail_identity import (
+from app.services.extract.detail_identity_core import (
     detail_url_is_collection_like,
     detail_url_is_utility,
 )
-from app.services.extract.detail_record_finalizer import (
-    detail_title_looks_like_placeholder,
-)
+from app.services.extract.detail_record_sanitization import detail_title_looks_like_placeholder
 from app.services.extract.detail_title_scorer import (
     title_needs_promotion,
 )

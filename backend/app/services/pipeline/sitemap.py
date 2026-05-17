@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import re
 from typing import Any
 from urllib.parse import unquote, urlsplit
@@ -7,6 +8,8 @@ from urllib.parse import unquote, urlsplit
 from defusedxml import ElementTree as ET  # type: ignore[import-untyped]
 
 from app.services.shared.field_coerce import absolute_url, clean_text, finalize_record
+
+logger = logging.getLogger(__name__)
 
 def extract_xml_sitemap_records(
     text: str,
@@ -25,6 +28,11 @@ def extract_xml_sitemap_records(
     try:
         root = ET.fromstring(raw)
     except Exception:
+        logger.exception(
+            "ET.fromstring failed while parsing sitemap from %s; bytes=%d",
+            page_url,
+            len(raw.encode("utf-8")),
+        )
         return []
     records: list[dict[str, Any]] = []
     seen_urls: set[str] = set()

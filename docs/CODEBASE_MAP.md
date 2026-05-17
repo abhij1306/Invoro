@@ -178,18 +178,33 @@ Canonical config owner:
 | `extract/content_surface_extractor.py` | DOM fallback extraction for content, article, and forum detail surfaces |
 | `extract/table_extractor.py` | Meaningful table detection, filtering, context resolution, and structured table output |
 | `extract/detail_tiers.py` | Detail tier execution order, DOM skip decision, and finalization transitions |
-| `extract/detail_dom_extractor.py` | Detail DOM context selection, DOM fallback fields, and DOM variant recovery |
+| `extract/detail_dom_section_targets.py` | Detail DOM context selection and section target field discovery |
+| `extract/detail_dom_fallbacks.py` | DOM fallback field assembly for detail records |
+| `extract/detail_dom_variant_coercion.py` | DOM variant axis and option-value coercion helpers |
+| `extract/detail_dom_variant_extraction.py` | DOM variant row extraction, expansion, and backfill |
+| `extract/detail_structured_pruning.py` | Structured detail payload relevance and variant-leaf pruning |
+| `extract/detail_dom_completion.py` | DOM completion gates and DOM variant collection decisions |
+| `extract/detail_image_materialize.py` | Detail image candidate materialization before final cleanup |
+| `extract/detail_record_assembly.py` | Detail record build/extract orchestration and detail rejection/failure reasons |
 | `extract/detail_dom_variant_options.py` | DOM variant option availability, URL, image, and selected-state helpers |
 | `extract/detail_image_dedupe.py` | Primary/additional detail image merge and dedupe helper |
 | `extract/detail_numbered_options.py` | DOM-axis hydration for raw numbered option variant rows |
 | `extract/detail_raw_signals.py` | Raw detail breadcrumb category and deterministic gender signal helpers |
-| `extract/detail_price_extractor.py` | Detail price, currency reconciliation, and visible PDP price backfill |
-| `extract/detail_record_finalizer.py` | Detail field cleanup, DOM variant backfill sequencing, variant row repair, and final quality normalization |
+| `extract/detail_identity_core.py` | Detail/listing URL identity, redirect identity, and requested-detail matching |
+| `extract/detail_price_core.py` | Detail price, currency reconciliation, visible PDP price backfill, and magnitude repair |
+| `extract/detail_final_cleanup.py` | Ecommerce detail final cleanup orchestrator |
+| `extract/detail_record_sanitization.py` | Detail placeholder, identity scalar, category, materials, and title cleanup |
+| `extract/detail_money_repair.py` | Detail price precision, discount, original-price, and variant price repair |
+| `extract/detail_variant_pruning.py` | Detail variant row sanitization and parent-record variant scalar pruning |
+| `extract/detail_image_cleanup.py` | Final detail image cleanup, family matching, and parent image backfill |
 | `extract/detail_shell_filter.py` | Site-shell and utility-page detail rejection helpers |
 | `extract/detail_state_variant_targets.py` | JS-state target maps for DOM variant URL/id enrichment |
 | `extract/detail_text_sanitizer.py` | Detail long-text pollution filters, fulfillment copy cleanup, and low-signal scalar checks |
 | `extract/detail_title_scorer.py` | Detail title promotion and shell-title scoring |
-| `extract/shared_variant_logic.py` | Canonical variant identity, merge, richness, grouping, and axis helpers |
+| `extract/variant_axis.py` | Variant axis key/display normalization and semantic axis-label gates |
+| `extract/variant_option_value.py` | Variant option-value noise, UI-noise, color, and quantity-run gates |
+| `extract/variant_choice_traversal.py` | Variant DOM choice traversal and group-name inference |
+| `extract/variant_identity_merge.py` | Variant axis splitting, identity, row richness, row merge, and size alias collapse |
 | `extract/variant_dom_cues.py` | Variant DOM cue and sibling-signal helpers |
 | `extract/variant_dom_provenance.py` | DOM variant provenance capture for validator input |
 | `extract/variant_group_validator.py` | Evidence-based DOM variant group admission and rejection logging |

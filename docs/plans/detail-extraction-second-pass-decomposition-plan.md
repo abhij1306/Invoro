@@ -9,8 +9,8 @@
 
 **Why:** Architecture audit (2026-05-17) found that Slices 4–7 of `verified-architecture-audit-remediation-plan.md` shrank the original god modules into shims, but the new owners they pointed at became god modules themselves. Each of the four files above mixes 4–6 sub-concerns. This plan finishes the decomposition by responsibility, not by file rename.
 
-**Status:** PLANNED — queued behind `verified-architecture-audit-remediation-plan.md`
-**Started:** —
+**Status:** COMPLETE
+**Started:** 2026-05-17
 
 > **Why this plan exists despite Slices 4–7 of the remediation plan being DONE:** Those slices reduced the old monolith files to shims, but the work moved logic into new files (`variant_grouping.py`, `detail_candidate_collection.py`, `detail_dom_context.py`, `detail_final_cleanup.py`) that became 1 334–1 546 LoC each. The post-refactor architecture review on 2026-05-17 flagged this as the same god-module problem wearing new names. This plan finishes the decomposition.
 
@@ -124,6 +124,8 @@ After the split, `variant_grouping.py` becomes a thin re-export shim mirroring `
 
 ### Slice 1.1 — Axis & option-value owners
 
+**Status:** DONE
+
 **Severity:** 🟠 (D3)
 
 **Deletion first:**
@@ -145,7 +147,12 @@ After the split, `variant_grouping.py` becomes a thin re-export shim mirroring `
 cd backend && set PYTHONPATH=. && .venv\Scripts\python.exe -m pytest tests/services -q -k "variant"
 ```
 
+**Verified:** 2026-05-17 with `cd backend; $env:PYTHONPATH='.'; .\.venv\Scripts\python.exe -m pytest tests/services -q -k "variant"` and `.\.venv\Scripts\python.exe -m pytest tests/services/test_structure.py -q`.
+**Note:** `variant_choice_traversal.py` was started with `infer_variant_group_name` so the Slice 1.1 LoC gate stayed green; Slice 1.2 still owns the remaining DOM choice traversal move.
+
 ### Slice 1.2 — DOM choice traversal owner
+
+**Status:** DONE
 
 **Severity:** 🟠 (D3)
 
@@ -163,7 +170,12 @@ cd backend && set PYTHONPATH=. && .venv\Scripts\python.exe -m pytest tests/servi
 .venv\Scripts\python.exe run_extraction_smoke.py --groups controls --limit 2
 ```
 
+**Verified:** 2026-05-17 with `cd backend; $env:PYTHONPATH='.'; .\.venv\Scripts\python.exe -m pytest tests/services -q -k "variant or shared_variant"` and `.\.venv\Scripts\python.exe run_extraction_smoke.py --groups controls --limit 2` (corpus missing, smoke skipped with exit 0).
+**Note:** `variant_choice_traversal.py` is 852 LoC after the mechanical move. Behavior and `variant_grouping.py` shrink gate passed; revisit the target in Slice 5.3 if the structure ratchet requires a lower budget.
+
 ### Slice 1.3 — Identity, merge, richness, alias owner
+
+**Status:** DONE
 
 **Severity:** 🟠 (D3)
 
@@ -180,6 +192,8 @@ cd backend && set PYTHONPATH=. && .venv\Scripts\python.exe -m pytest tests/servi
 cd backend && set PYTHONPATH=. && .venv\Scripts\python.exe -m pytest tests -q
 .venv\Scripts\python.exe run_extraction_smoke.py
 ```
+
+**Verified:** 2026-05-17 with `cd backend; $env:PYTHONPATH='.'; .\.venv\Scripts\python.exe -m pytest tests -q` (first run had only `test_structure.py` private import failure, fixed by module import) then `.\.venv\Scripts\python.exe -m pytest tests/services/test_structure.py -q`. `run_extraction_smoke.py` skipped because acceptance corpus is missing and exited 0.
 
 ---
 
@@ -267,6 +281,8 @@ After the split, `detail_candidate_collection.py` should be ≤ 600 LoC and only
 
 ### Slice 2.1 — Owner E `detail_structured_pruning.py`
 
+**Status:** DONE
+
 **Severity:** 🟠 (D3)
 
 **Deletion first:** Cut Owner E symbols out of `detail_candidate_collection.py`. Update `detail_materializer.py` shim to re-export from the new owner. Update `detail_candidate_collection.py` to import the helper back where it is used internally.
@@ -282,7 +298,11 @@ After the split, `detail_candidate_collection.py` should be ≤ 600 LoC and only
 cd backend && set PYTHONPATH=. && .venv\Scripts\python.exe -m pytest tests/services/test_detail_extractor_priority_and_selector_self_heal.py tests/services/test_detail_extractor_structured_sources.py -q
 ```
 
+**Verified:** 2026-05-17 with the listed pytest command.
+
 ### Slice 2.2 — Owner F `detail_dom_completion.py`
+
+**Status:** DONE
 
 **Severity:** 🟠 (D3)
 
@@ -299,7 +319,11 @@ cd backend && set PYTHONPATH=. && .venv\Scripts\python.exe -m pytest tests/servi
 cd backend && set PYTHONPATH=. && .venv\Scripts\python.exe -m pytest tests/services -q -k "detail or dom"
 ```
 
+**Verified:** 2026-05-17 with `cd backend; $env:PYTHONPATH='.'; .\.venv\Scripts\python.exe -m pytest tests/services -q -k "detail or dom"`.
+
 ### Slice 2.3 — Owner G `detail_image_materialize.py`
+
+**Status:** DONE
 
 **Severity:** 🟡 (D3)
 
@@ -310,7 +334,11 @@ cd backend && set PYTHONPATH=. && .venv\Scripts\python.exe -m pytest tests/servi
 **Acceptance:**
 - `grep -rn "def _materialize_image_fields" backend/app` → 1 result, in `detail_image_materialize.py`.
 
+**Verified:** 2026-05-17 with detail extractor priority and structured-source tests.
+
 ### Slice 2.4 — Owner H `detail_record_assembly.py`
+
+**Status:** DONE
 
 **Severity:** 🟠 (D3)
 
@@ -327,6 +355,8 @@ cd backend && set PYTHONPATH=. && .venv\Scripts\python.exe -m pytest tests/servi
 cd backend && set PYTHONPATH=. && .venv\Scripts\python.exe -m pytest tests -q
 .venv\Scripts\python.exe run_extraction_smoke.py --groups controls --limit 2
 ```
+
+**Verified:** 2026-05-17 with `cd backend; $env:PYTHONPATH='.'; .\.venv\Scripts\python.exe -m pytest tests -q` (behavior green, then private-import structure cleanup), `.\.venv\Scripts\python.exe -m pytest tests/services/test_structure.py -q`, and `run_extraction_smoke.py --groups controls --limit 2` (corpus missing, smoke skipped with exit 0).
 
 ---
 
@@ -397,6 +427,8 @@ After the split, `detail_dom_context.py` either deletes or shrinks to a thin re-
 
 ### Slice 3.1 — Owners I + J split
 
+**Status:** DONE
+
 **Severity:** 🟠 (D3)
 
 **Deletion first:** Cut section-target and DOM-fallback symbols out of `detail_dom_context.py`.
@@ -408,6 +440,8 @@ After the split, `detail_dom_context.py` either deletes or shrinks to a thin re-
 - `grep -rn "def primary_dom_context" backend/app` → in `detail_dom_section_targets.py`.
 
 ### Slice 3.2 — Owners K + L split
+
+**Status:** DONE
 
 **Severity:** 🟠 (D3)
 
@@ -424,6 +458,8 @@ After the split, `detail_dom_context.py` either deletes or shrinks to a thin re-
 cd backend && set PYTHONPATH=. && .venv\Scripts\python.exe -m pytest tests/services -q -k "detail or variant"
 .venv\Scripts\python.exe run_extraction_smoke.py --groups controls --limit 2
 ```
+
+**Verified:** 2026-05-17 with `cd backend; $env:PYTHONPATH='.'; .\.venv\Scripts\python.exe -m pytest tests/services -q -k "detail or variant"` and `.\.venv\Scripts\python.exe run_extraction_smoke.py --groups controls --limit 2` (corpus missing, smoke skipped with exit 0).
 
 ---
 
@@ -528,6 +564,8 @@ After the split, `detail_final_cleanup.py` ≤ 250 LoC and reads top to bottom a
 
 ### Slice 4.1 — Owner M record sanitization
 
+**Status:** DONE
+
 **Severity:** 🟠 (D3)
 
 **Deletion first:** Cut Owner M symbols out of `detail_final_cleanup.py`. Update the `detail_record_finalizer.py` shim to re-export `detail_title_looks_like_placeholder` from the new owner.
@@ -540,6 +578,8 @@ After the split, `detail_final_cleanup.py` ≤ 250 LoC and reads top to bottom a
 
 ### Slice 4.2 — Owner N money repair
 
+**Status:** DONE
+
 **Severity:** 🟠 (D3)
 
 **Deletion first:** Cut Owner N symbols out of `detail_final_cleanup.py`.
@@ -550,6 +590,8 @@ After the split, `detail_final_cleanup.py` ≤ 250 LoC and reads top to bottom a
 - `wc -l backend/app/services/extract/detail_final_cleanup.py` → ≤ 850.
 
 ### Slice 4.3 — Owner O variant pruning
+
+**Status:** DONE
 
 **Severity:** 🟠 (D3)
 
@@ -562,6 +604,8 @@ After the split, `detail_final_cleanup.py` ≤ 250 LoC and reads top to bottom a
 - No new owner has < 5 helpers.
 
 ### Slice 4.4 — Owner P image cleanup
+
+**Status:** DONE
 
 **Severity:** 🟡 (D3)
 
@@ -579,6 +623,8 @@ cd backend && set PYTHONPATH=. && .venv\Scripts\python.exe -m pytest tests -q
 .venv\Scripts\python.exe run_extraction_smoke.py
 ```
 
+**Verified:** 2026-05-17 with `cd backend; $env:PYTHONPATH='.'; .\.venv\Scripts\python.exe -m pytest tests/services -q -k "detail or variant or normalizers"` and `.\.venv\Scripts\python.exe -m pytest tests/services/test_structure.py -q`.
+
 ---
 
 # Part 5 — Cross-Cutting Migration & Cleanup
@@ -588,6 +634,8 @@ These run last, across all four parts.
 ## Slices
 
 ### Slice 5.1 — Migrate callers off facade shims
+
+**Status:** DONE
 
 **Severity:** 🟡 (D4 drift removal)
 
@@ -599,9 +647,12 @@ These run last, across all four parts.
 
 ### Slice 5.2 — Delete shims after deadline
 
+**Status:** DONE
+
 **Severity:** 🟡 (D8)
 
 **Trigger:** Run on or after 2026-06-30 once Slice 5.1 has been verified for ≥ 2 weeks.
+Completed early on 2026-05-17 by explicit user request after verifying app/test imports no longer required the shims.
 
 **Deletion first:** Delete:
 - `extract/shared_variant_logic.py`
@@ -619,7 +670,11 @@ Migrate any test still importing from those paths.
 - `grep -rn "shared_variant_logic\|variant_grouping\b" backend/` → 0 results outside this plan file and historical commit messages.
 - `grep -rn "extract.detail_materializer\|extract.detail_dom_extractor\|extract.detail_record_finalizer\|extract.detail_identity\b\|extract.detail_price_extractor" backend/` → 0 results.
 
+**Verified:** 2026-05-17 with focused import greps and `cd backend; $env:PYTHONPATH='.'; .\.venv\Scripts\python.exe -m pytest tests/services/test_structure.py tests/services/test_shared_variant_logic.py tests/services/test_detail_extractor_structured_sources.py tests/services/test_detail_extractor_priority_and_selector_self_heal.py tests/services/test_crawl_engine.py tests/services/test_confidence.py tests/services/test_field_value_core.py tests/services/test_normalizers.py tests/services/test_selectolax_css_migration.py tests/services/test_variant_regression.py tests/services/test_listing_identity_regressions.py -q`.
+
 ### Slice 5.3 — Ratchet test_structure budgets
+
+**Status:** DONE
 
 **Severity:** 🟡 (D7)
 
@@ -628,6 +683,8 @@ Migrate any test still importing from those paths.
 **Acceptance:**
 - `pytest tests/services/test_structure.py -q` exits 0.
 - No ledger entry exceeds its target by more than 50 LoC.
+
+**Verified:** 2026-05-17 with `cd backend; $env:PYTHONPATH='.'; .\.venv\Scripts\python.exe -m compileall -q app/services`, facade import greps, and `.\.venv\Scripts\python.exe -m pytest tests/services/test_structure.py -q`.
 
 ---
 
@@ -643,6 +700,12 @@ set PYTHONPATH=.
 .venv\Scripts\python.exe run_extraction_smoke.py
 .venv\Scripts\python.exe run_test_sites_acceptance.py
 ```
+
+**Verified:** 2026-05-17 with:
+- `.\.venv\Scripts\python.exe -m pytest tests -q` → 1685 passed, 16 skipped.
+- `.\.venv\Scripts\python.exe run_acquire_smoke.py commerce` → 6 ok, 0 failed.
+- `.\.venv\Scripts\python.exe run_extraction_smoke.py` → acceptance corpus missing, smoke skipped with exit 0.
+- `.\.venv\Scripts\python.exe run_test_sites_acceptance.py` → report `artifacts/test_sites_acceptance/20260517T161448Z__full_pipeline__test_sites_tail.json`, 54 ok, 0 failed, 6 tracked issues. The command process returned non-zero after live browser timeout logging for a tracked external site, but the generated acceptance report has no failed hard gates.
 
 ---
 

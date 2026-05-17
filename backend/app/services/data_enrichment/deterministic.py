@@ -31,7 +31,7 @@ from app.services.data_enrichment.shopify_catalog import (
     term_dict,
     top_taxonomy_candidates as shopify_top_taxonomy_candidates,
 )
-from app.services.extract.detail_price_extractor import currency_hint_from_page_url
+from app.services.extract.detail_price_core import currency_hint_from_page_url
 from app.services.normalizers import normalize_decimal_price
 from app.services.shared.field_coerce import (
     clean_text,
@@ -45,7 +45,7 @@ logger = logging.getLogger(__name__)
 token_re = re.compile(r"[a-z0-9]+")
 price_range_re = re.compile(
     r"\s*[^\d+-]*([+-]?\d[\d,]*(?:\.\d+)?)\s*(?:to|[-–])\s*"
-    r"[^\d+-]*([+-]?\d[\d,]*(?:\.\d+)?)\s*",
+    r"[^\d+-]*([+-]?\d[\d,]*(?:\.\d+)?)(?:\s*[^\d]+)?\s*",
     re.I,
 )
 

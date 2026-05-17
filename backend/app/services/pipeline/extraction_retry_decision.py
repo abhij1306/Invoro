@@ -15,11 +15,11 @@ from app.services.config.extraction_rules import (
     VARIANT_FIELDS,
 )
 from app.services.config.runtime_settings import crawler_runtime_settings
-from app.services.extract.detail_identity import (
+from app.services.extract.detail_identity_core import (
     detail_url_is_collection_like,
     detail_url_is_utility,
 )
-from app.services.extract.shared_variant_logic import variant_dom_cues_present
+from app.services.extract.variant_choice_traversal import variant_dom_cues_present
 from app.services.field_policy import (
     browser_retry_target_fields_for_surface,
     repair_target_fields_for_surface,

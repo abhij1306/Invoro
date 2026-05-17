@@ -6,23 +6,26 @@ import pytest
 from bs4 import BeautifulSoup
 
 from app.services.adapters.myntra import MyntraAdapter
-from app.services.extract.detail_materializer import (
+from app.services.extract.detail_record_assembly import (
     build_detail_record,
 )
-from app.services.extract.detail_dom_extractor import variant_option_availability
-from app.services.extract.detail_price_extractor import (
+from app.services.extract.detail_dom_variant_options import variant_option_availability
+from app.services.extract.detail_price_core import (
     detail_currency_hint_is_host_level,
     reconcile_parent_price_against_variant_range,
     reconcile_detail_currency_with_url,
 )
-from app.services.extract.detail_record_finalizer import (
+from app.services.extract.detail_image_cleanup import (
     detail_image_matches_primary_family,
+)
+from app.services.extract.detail_final_cleanup import (
     repair_ecommerce_detail_record_quality,
+)
+from app.services.extract.detail_variant_pruning import (
     sanitize_variant_row,
 )
 from app.services.extract import detail_raw_signals
-from app.services.extract import detail_dom_extractor
-from app.services.extract import detail_materializer
+from app.services.extract import detail_dom_completion
 from app.services.extract.variant_record_normalization import normalize_variant_record
 from app.services.pipeline.extract_records import extract_records
 from tests.fixtures.loader import read_optional_artifact_text
@@ -2061,9 +2064,13 @@ def test_extract_ecommerce_detail_recovers_labeled_image_color_swatches() -> Non
 
 
 def test_extract_ecommerce_detail_guarded_dom_cartesian_keeps_axis_rows(monkeypatch: pytest.MonkeyPatch) -> None:
-    from app.services.extract import detail_dom_context
+    from app.services.extract import detail_dom_variant_extraction
 
-    monkeypatch.setattr(detail_dom_context, "DOM_VARIANT_CARTESIAN_COMBO_LIMIT", 4)
+    monkeypatch.setattr(
+        detail_dom_variant_extraction,
+        "DOM_VARIANT_CARTESIAN_COMBO_LIMIT",
+        4,
+    )
     html = """
     <html>
       <body>
@@ -2766,7 +2773,7 @@ def test_should_collect_dom_variants_keeps_priced_shopify_rows_over_unpriced_dom
     }
 
     assert (
-        detail_materializer._should_collect_dom_variants(candidates, dom_variants)
+        detail_dom_completion._should_collect_dom_variants(candidates, dom_variants)
         is False
     )
 

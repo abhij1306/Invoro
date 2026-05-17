@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 import re
 from typing import Any
-from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup
 
@@ -26,8 +25,6 @@ from app.services.config.extraction_rules import (
     DETAIL_LONG_TEXT_SOURCE_RANKS,
     DETAIL_LONG_TEXT_THIN_DESCRIPTION_WORDS,
     DETAIL_LONG_TEXT_TRUNCATED_TAIL_TOKENS,
-    DETAIL_PAYLOAD_LIST_LIMIT,
-    DETAIL_PAYLOAD_MAX_DEPTH,
     DETAIL_TITLE_SOURCE_RANKS,
     SOURCE_PRIORITY,
 )
@@ -42,7 +39,6 @@ from app.services.shared.field_coerce import (
     STRUCTURED_OBJECT_LIST_FIELDS,
     clean_text,
     coerce_field_value,
-    extract_urls,
     finalize_record,
     is_title_noise,
     object_dict as _object_dict,
@@ -64,9 +60,11 @@ from app.services.dom.selector_engine import (
 )
 from app.services.js_state.state_normalizer import map_js_state_to_fields
 from app.services.network_payload_mapper import map_network_payloads_to_fields
-from app.services.extract.detail_dom_extractor import (
-    apply_dom_fallbacks,
+from app.services.extract.detail_dom_fallbacks import apply_dom_fallbacks
+from app.services.extract.detail_dom_variant_extraction import (
     extract_variants_from_dom as _extract_variants_from_dom,
+)
+from app.services.extract.detail_dom_section_targets import (
     primary_dom_context,
     record_has_rich_existing_variants,
 )
@@ -77,39 +75,34 @@ from app.services.extract.detail_shell_filter import (
     detail_url_has_multiple_product_segments as _detail_url_has_multiple_product_segments,
     looks_like_site_shell_record as _looks_like_site_shell_record,
 )
-from app.services.extract.detail_identity import (
-    detail_identity_codes_from_record_fields as _detail_identity_codes_from_record_fields,
+from app.services.extract.detail_identity_core import (
     detail_identity_codes_from_url as _detail_identity_codes_from_url,
-    detail_query_identity_codes_from_url as _detail_query_identity_codes_from_url,
     detail_identity_tokens as _detail_identity_tokens,
     detail_redirect_identity_is_mismatched as _detail_redirect_identity_is_mismatched,
     detail_title_from_url as _detail_title_from_url,
     detail_url_candidate_is_low_signal as _detail_url_candidate_is_low_signal,
     detail_url_is_collection_like as _detail_url_is_collection_like,
     detail_url_is_utility as _detail_url_is_utility,
-    detail_url_matches_requested_identity as _detail_url_matches_requested_identity,
     preferred_detail_identity_url as _preferred_detail_identity_url,
     prune_irrelevant_detail_dom_nodes,
     record_matches_requested_detail_identity as _record_matches_requested_detail_identity,
 )
-from app.services.extract.detail_record_finalizer import (
-    repair_ecommerce_detail_record_quality,
-)
+from app.services.extract.detail_final_cleanup import repair_ecommerce_detail_record_quality
 from app.services.extract.table_extractor import extract_tables
 from app.services.extract.detail_image_dedupe import dedupe_primary_and_additional_images
+from app.services.extract import detail_dom_completion as _detail_dom_completion
+from app.services.extract import detail_image_materialize as _detail_image_materialize
+from app.services.extract import detail_structured_pruning as _detail_structured_pruning
 from app.services.extract.detail_text_sanitizer import detail_candidate_is_valid
-from app.services.extract.detail_price_extractor import (
+from app.services.extract.detail_price_core import (
     drop_low_signal_zero_detail_price,
     reconcile_detail_currency_with_url as _reconcile_detail_currency_with_url,
 )
-from app.services.field_url_normalization import same_site
 from app.services.extract.detail_title_scorer import (
     promote_detail_title,
     title_needs_promotion,
 )
-from app.services.extract.shared_variant_logic import (
-    variant_dom_cues_present,
-)
+from app.services.extract.variant_choice_traversal import variant_dom_cues_present
 from app.services.field_policy import exact_requested_field_key
 from app.services.extract.detail_tiers import (
     DetailTierExecutor,
@@ -121,12 +114,28 @@ from app.services.extract.detail_tiers import (
 
 logger = logging.getLogger(__name__)
 
-try:
-    DETAIL_PAYLOAD_MAX_DEPTH_INT = int(DETAIL_PAYLOAD_MAX_DEPTH)
-except (TypeError, ValueError):
-    DETAIL_PAYLOAD_MAX_DEPTH_INT = 10
-
 _EARLY_PRICE_REPAIR_REQUIRED_FIELDS = (TITLE_FIELD, IMAGE_URL_FIELD, URL_FIELD)
+(
+    _detail_structured_payload_is_irrelevant_product,
+    _prune_irrelevant_detail_structured_payload,
+    _structured_payload_is_breadcrumb_list,
+) = (
+    _detail_structured_pruning._detail_structured_payload_is_irrelevant_product,
+    _detail_structured_pruning._prune_irrelevant_detail_structured_payload,
+    _detail_structured_pruning._structured_payload_is_breadcrumb_list,
+)
+(
+    _detail_description_value_looks_thin,
+    _detail_long_text_value_looks_truncated,
+    _requires_dom_completion,
+    _should_collect_dom_variants,
+) = (
+    _detail_dom_completion._detail_description_value_looks_thin,
+    _detail_dom_completion._detail_long_text_value_looks_truncated,
+    _detail_dom_completion._requires_dom_completion,
+    _detail_dom_completion._should_collect_dom_variants,
+)
+_materialize_image_fields = _detail_image_materialize._materialize_image_fields
 
 try:
     DETAIL_LONG_TEXT_THIN_DESCRIPTION_WORDS_INT = int(
@@ -134,6 +143,14 @@ try:
     )
 except (TypeError, ValueError):
     DETAIL_LONG_TEXT_THIN_DESCRIPTION_WORDS_INT = 50
+
+
+def _sync_structured_pruning_patchpoints() -> None:
+    _detail_structured_pruning._detail_title_from_url = _detail_title_from_url
+    _detail_structured_pruning._detail_identity_tokens = _detail_identity_tokens
+    _detail_structured_pruning._detail_identity_codes_from_url = (
+        _detail_identity_codes_from_url
+    )
 
 
 def _coerce_float(value: object, default: float = 0.0) -> float:
@@ -229,6 +246,7 @@ def _collect_structured_payload_candidates(
     selector_trace_candidates: dict[str, list[dict[str, object]]],
     source: str,
 ) -> None:
+    _sync_structured_pruning_patchpoints()
     identity_url = requested_page_url or page_url
     if identity_url:
         requested_title = _detail_title_from_url(identity_url)
@@ -284,17 +302,6 @@ def _collect_structured_payload_candidates(
             bucket = field_sources.setdefault(field_name, [])
             if candidate_source not in bucket:
                 bucket.append(candidate_source)
-
-
-def _structured_payload_is_breadcrumb_list(payload: object) -> bool:
-    if not isinstance(payload, dict):
-        return False
-    raw_type = payload.get("@type")
-    type_values = raw_type if isinstance(raw_type, list) else [raw_type]
-    return any(
-        str(value or "").strip().lower() in {"breadcrumblist", "breadcrumb_list"}
-        for value in type_values
-    )
 
 
 def _primary_source_for_record(selected_field_sources: dict[str, str]) -> str:
@@ -544,882 +551,3 @@ def _materialize_record(
         "threshold": _coerce_float(selector_self_heal.get("threshold")),
     }
     return finalize_record(record, surface=surface)
-
-
-def _prune_irrelevant_detail_structured_payload(
-    payload: object,
-    *,
-    page_url: str,
-    requested_page_url: str,
-    depth: int = 0,
-    requested_title: str | None = None,
-    requested_tokens: set[str] | None = None,
-    requested_codes: set[str] | None = None,
-) -> object | None:
-    if depth == 0:
-        requested_title = requested_title or _detail_title_from_url(requested_page_url)
-        requested_tokens = requested_tokens or _detail_identity_tokens(requested_title)
-        requested_codes = requested_codes or _detail_identity_codes_from_url(
-            requested_page_url
-        )
-    if depth >= DETAIL_PAYLOAD_MAX_DEPTH_INT:
-        return None
-    if isinstance(payload, list):
-        cleaned_items = [
-            _prune_irrelevant_detail_structured_payload(
-                item,
-                page_url=page_url,
-                requested_page_url=requested_page_url,
-                depth=depth + 1,
-                requested_title=requested_title,
-                requested_tokens=requested_tokens,
-                requested_codes=requested_codes,
-            )
-            for item in payload[: int(DETAIL_PAYLOAD_LIST_LIMIT or 50)]
-        ]
-        return [item for item in cleaned_items if item not in (None, "", [], {})]
-    if not isinstance(payload, dict):
-        return payload
-    if _detail_structured_payload_is_irrelevant_product(
-        payload,
-        page_url=page_url,
-        requested_page_url=requested_page_url,
-        requested_title=requested_title,
-        requested_tokens=requested_tokens,
-        requested_codes=requested_codes,
-    ):
-        return None
-    cleaned: dict[str, object] = {}
-    for key, value in payload.items():
-        cleaned_value = _prune_irrelevant_detail_structured_payload(
-            value,
-            page_url=page_url,
-            requested_page_url=requested_page_url,
-            depth=depth + 1,
-            requested_title=requested_title,
-            requested_tokens=requested_tokens,
-            requested_codes=requested_codes,
-        )
-        if cleaned_value in (None, "", [], {}):
-            continue
-        cleaned[str(key)] = cleaned_value
-    return cleaned or None
-
-
-def _detail_structured_payload_is_irrelevant_product(
-    payload: dict[str, object],
-    *,
-    page_url: str,
-    requested_page_url: str,
-    requested_title: str | None = None,
-    requested_tokens: set[str] | None = None,
-    requested_codes: set[str] | None = None,
-) -> bool:
-    raw_type = payload.get("@type")
-    normalized_type = (
-        " ".join(raw_type) if isinstance(raw_type, list) else str(raw_type or "")
-    )
-    lowered_type = normalized_type.lower()
-    payload_keys = {str(key).lower() for key in payload}
-    looks_product_like = (
-        "product" in lowered_type
-        or bool(
-            {"sku", "mpn", "productid", "offers", "price", "image", "url"}
-            & payload_keys
-        )
-        or (
-            {"name", "description"} <= payload_keys
-            and bool({"offers", "price", "image", "url"} & payload_keys)
-        )
-    )
-    if not looks_product_like:
-        return False
-    raw_candidate_url = payload.get("url") or payload.get("@id")
-    candidate_urls = extract_urls(raw_candidate_url, page_url)
-    candidate_url = _preferred_structured_payload_url(
-        candidate_urls,
-        requested_page_url=requested_page_url,
-    )
-    candidate_record = {
-        "title": payload.get("name") or payload.get("title"),
-        "description": payload.get("description"),
-        "url": candidate_url,
-        "sku": payload.get("sku")
-        or payload.get("productId")
-        or payload.get("productID"),
-        "part_number": payload.get("mpn"),
-    }
-    if _structured_variant_leaf_conflicts_with_base_request(
-        candidate_urls=candidate_urls,
-        candidate_record=candidate_record,
-        requested_page_url=requested_page_url,
-        requested_codes=requested_codes,
-    ):
-        return True
-    if candidate_url:
-        if _detail_url_matches_requested_identity(
-            candidate_url,
-            requested_page_url=requested_page_url,
-        ):
-            return False
-        if _record_matches_requested_detail_identity(
-            candidate_record,
-            requested_page_url=requested_page_url,
-        ):
-            return False
-        if same_site(candidate_url, requested_page_url):
-            candidate_path = urlparse(candidate_url).path.rstrip("/")
-            requested_path = urlparse(requested_page_url).path.rstrip("/")
-            return bool(candidate_path and requested_path and candidate_path != requested_path)
-    else:
-        if _record_matches_requested_detail_identity(
-            candidate_record,
-            requested_page_url=requested_page_url,
-        ):
-            return False
-    if not text_or_none(raw_candidate_url):
-        candidate_title = clean_text(candidate_record.get("title"))
-        if not candidate_title:
-            return False
-        requested_tokens = requested_tokens or _detail_identity_tokens(requested_title)
-        candidate_tokens = _detail_identity_tokens(candidate_title)
-        if (
-            requested_tokens
-            and candidate_tokens
-            and requested_tokens.isdisjoint(candidate_tokens)
-        ):
-            return True
-        return False
-    candidate_codes = _detail_identity_codes_from_record_fields(candidate_record)
-    if (
-        requested_codes
-        and candidate_codes
-        and requested_codes.isdisjoint(candidate_codes)
-    ):
-        return True
-    return False
-
-
-def _preferred_structured_payload_url(
-    candidate_urls: list[str],
-    *,
-    requested_page_url: str,
-) -> str:
-    if not candidate_urls:
-        return ""
-    requested_query_codes = _detail_query_identity_codes_from_url(requested_page_url)
-    if requested_query_codes:
-        for candidate_url in candidate_urls:
-            if _detail_query_identity_codes_from_url(candidate_url) & requested_query_codes:
-                return candidate_url
-    for candidate_url in candidate_urls:
-        if _detail_url_matches_requested_identity(
-            candidate_url,
-            requested_page_url=requested_page_url,
-        ):
-            return candidate_url
-    for candidate_url in candidate_urls:
-        if (
-            same_site(requested_page_url, candidate_url)
-            and not _detail_url_is_utility(candidate_url)
-        ):
-            return candidate_url
-    return candidate_urls[0]
-
-
-def _structured_variant_leaf_conflicts_with_base_request(
-    *,
-    candidate_urls: list[str],
-    candidate_record: dict[str, object],
-    requested_page_url: str,
-    requested_codes: set[str] | None,
-) -> bool:
-    if len(candidate_urls) < 2:
-        return False
-    if _detail_query_identity_codes_from_url(requested_page_url):
-        return False
-    has_base_like_url = any(
-        _detail_url_matches_requested_identity(
-            candidate_url,
-            requested_page_url=requested_page_url,
-        )
-        and not _detail_query_identity_codes_from_url(candidate_url)
-        for candidate_url in candidate_urls
-    )
-    has_variant_specific_url = any(
-        _detail_query_identity_codes_from_url(candidate_url)
-        for candidate_url in candidate_urls
-    )
-    if not has_base_like_url or not has_variant_specific_url:
-        return False
-    return True
-
-
-def _variant_signal_strength(variants: object) -> tuple[int, int, int, int]:
-    if not isinstance(variants, list):
-        return (0, 0, 0, 0)
-    rows = [row for row in variants if isinstance(row, dict)]
-    axis_coverage = _variant_axis_coverage(rows)
-    return (
-        sum(
-            1
-            for row in rows
-            if text_or_none(row.get("price"))
-        ),
-        sum(
-            1
-            for row in rows
-            if (
-                any(text_or_none(row.get(axis_name)) for axis_name in VARIANT_AXIS_FIELD_NAMES)
-                or (
-                    isinstance(row.get("option_values"), dict)
-                    and any(text_or_none(value) for value in row["option_values"].values())
-                )
-            )
-        ),
-        len(axis_coverage),
-        len(rows),
-    )
-
-
-def _variant_axis_coverage(variants: object) -> set[str]:
-    if not isinstance(variants, list):
-        return set()
-    coverage: set[str] = set()
-    for row in variants:
-        if not isinstance(row, dict):
-            continue
-        option_values = row.get("option_values")
-        if isinstance(option_values, dict):
-            for axis_name, axis_value in option_values.items():
-                if text_or_none(axis_value):
-                    coverage.add(str(axis_name).strip().lower())
-        for axis_name in VARIANT_AXIS_FIELD_NAMES:
-            if text_or_none(row.get(axis_name)):
-                coverage.add(axis_name)
-    return coverage
-
-
-def _should_collect_dom_variants(
-    candidates: dict[str, list[object]],
-    dom_variants: dict[str, object],
-) -> bool:
-    if not _dom_variants_are_validated(dom_variants):
-        return False
-    if not any(candidates.get(field_name) for field_name in VARIANT_DOM_FIELD_NAMES):
-        return True
-    existing_variants = finalize_candidate_value(
-        "variants", list(candidates.get("variants") or [])
-    )
-    existing_strength = _variant_signal_strength(existing_variants)
-    if dom_variants:
-        existing_axes = _variant_axis_coverage(existing_variants)
-        dom_axes = _variant_axis_coverage(dom_variants.get("variants"))
-        if dom_axes - existing_axes and existing_strength[0] == 0 and existing_strength[1] == 0:
-            return True
-    if existing_strength[3] == 0:
-        return True
-    if existing_strength[0] == 0 and existing_strength[1] == 0:
-        return True
-    dom_strength = _variant_signal_strength(dom_variants.get("variants"))
-    return dom_strength > existing_strength
-
-
-def _dom_variants_are_validated(dom_variants: dict[str, object]) -> bool:
-    rows = dom_variants.get("variants") if isinstance(dom_variants, dict) else None
-    return isinstance(rows, list) and bool(rows) and all(
-        isinstance(row, dict) and row.get("_validated") is True for row in rows
-    )
-
-
-def _materialize_image_fields(
-    *,
-    surface: str,
-    candidates: dict[str, list[object]],
-    candidate_sources: dict[str, list[str]],
-    page_url: str,
-    soup: BeautifulSoup | None = None,
-    raw_soup: BeautifulSoup | None = None,
-) -> tuple[list[str], str | None]:
-    values: list[str] = []
-    primary_source: str | None = None
-    ordered_candidates = [
-        *_ordered_candidates_for_field(
-            surface, "image_url", candidates, candidate_sources
-        ),
-        *_ordered_candidates_for_field(
-            surface, "additional_images", candidates, candidate_sources
-        ),
-    ]
-    for source, raw_value in ordered_candidates:
-        if primary_source is None and source:
-            primary_source = source
-        items = raw_value if isinstance(raw_value, list) else [raw_value]
-        for item in items:
-            image = text_or_none(item)
-            if image:
-                values.append(image)
-    images = dedupe_image_urls(values)
-    if (
-        str(surface or "").strip().lower() == "ecommerce_detail"
-        and raw_soup is not None
-        and len(images) <= int(DETAIL_IMAGE_RAW_SOUP_FALLBACK_MAX_WINNING_IMAGES)
-    ):
-        soup_img_count = len(soup.find_all("img")) if soup is not None else 0
-        if len(raw_soup.find_all("img")) > soup_img_count:
-            images = dedupe_image_urls(
-                [*images, *extract_page_images(raw_soup, page_url, surface=surface)]
-            )
-            primary_source = primary_source or "dom_selector"
-    return images, primary_source
-
-
-def _missing_requested_fields(
-    record: dict[str, Any],
-    requested_fields: list[str] | None,
-) -> set[str]:
-    missing: set[str] = set()
-    for field_name in list(requested_fields or []):
-        normalized = exact_requested_field_key(str(field_name or ""))
-        if normalized and record.get(normalized) in (None, "", [], {}):
-            missing.add(normalized)
-    return missing
-
-
-def _detail_long_text_value_looks_truncated(value: object) -> bool:
-    text = clean_text(value).rstrip()
-    if not text:
-        return False
-    if text.endswith(("...", "…")):
-        return True
-    if text[-1] in ".!?":
-        return False
-    tokens = re.findall(r"[A-Za-z0-9']+", text.casefold())
-    return bool(tokens) and tokens[-1] in DETAIL_LONG_TEXT_TRUNCATED_TAIL_TOKENS
-
-
-def _detail_description_value_looks_thin(value: object) -> bool:
-    text = clean_text(value)
-    if not text:
-        return False
-    tokens = (
-        re.findall(r"[A-Za-z0-9']+", text)
-        if text.isascii()
-        else re.findall(r"\w+", text, flags=re.UNICODE)
-    )
-    return bool(tokens) and len(tokens) <= DETAIL_LONG_TEXT_THIN_DESCRIPTION_WORDS_INT
-
-
-def _requires_dom_long_text_completion(
-    record: dict[str, Any],
-    *,
-    extractable_fields: set[str],
-) -> bool:
-    if not (extractable_fields & DETAIL_LONG_TEXT_RANK_FIELDS):
-        return False
-    field_sources = _object_dict(record.get("_field_sources"))
-    weak_source_rank = DETAIL_LONG_TEXT_SOURCE_RANKS.get("opengraph", 20)
-    for field_name in extractable_fields & DETAIL_LONG_TEXT_RANK_FIELDS:
-        value = clean_text(record.get(field_name))
-        if not value:
-            continue
-        source_ranks = [
-            DETAIL_LONG_TEXT_SOURCE_RANKS.get(str(source or ""), 20)
-            for source in _object_list(field_sources.get(field_name))
-        ]
-        best_rank = min(source_ranks) if source_ranks else 20
-        if (
-            field_name == "description"
-            and _detail_description_value_looks_thin(value)
-        ):
-            return True
-        if best_rank >= weak_source_rank or _detail_long_text_value_looks_truncated(
-            value
-        ):
-            return True
-    return False
-
-
-def _requires_dom_completion(
-    *,
-    record: dict[str, Any],
-    surface: str,
-    requested_fields: list[str] | None,
-    selector_rules: list[dict[str, object]] | None,
-    soup: BeautifulSoup,
-    breadcrumb_soup: BeautifulSoup | None = None,
-) -> bool:
-    normalized_surface = str(surface or "").strip().lower()
-    raw_soup = breadcrumb_soup or soup
-    requested_missing_fields = _missing_requested_fields(record, requested_fields)
-    if normalized_surface == "ecommerce_detail":
-        breadcrumb_category = breadcrumb_category_from_dom(
-            raw_soup,
-            current_title=text_or_none(record.get("title")),
-        )
-        record_category = _normalized_category_path(record.get("category"))
-        dom_category = _normalized_category_path(breadcrumb_category)
-        if dom_category and record_category != dom_category:
-            return True
-    if (
-        normalized_surface == "ecommerce_detail"
-        and not record_has_rich_existing_variants(record)
-        and (
-            variant_dom_cues_present(soup) or variant_dom_cues_present(raw_soup)
-        )
-    ):
-        return True
-    if (
-        normalized_surface == "ecommerce_detail"
-        and record.get("image_url") in (None, "", [], {})
-        and (
-            raw_soup.select_one(DETAIL_PRODUCT_IMAGE_CUE_SELECTOR) is not None
-            or raw_soup.select_one("img") is not None
-        )
-    ):
-        return True
-    if (
-        normalized_surface == "ecommerce_detail"
-        and not requested_fields
-        and not selector_rules
-        and record_has_rich_existing_variants(record)
-        and all(
-            record.get(field_name) not in (None, "", [], {})
-            for field_name in _EARLY_PRICE_REPAIR_REQUIRED_FIELDS
-        )
-    ):
-        return False
-    high_value_fields = set(DOM_HIGH_VALUE_FIELDS.get(normalized_surface) or ())
-    optional_probe_fields = set(DOM_OPTIONAL_CUE_FIELDS.get(normalized_surface) or ())
-    probe_fields = sorted(
-        {
-            *high_value_fields,
-            *optional_probe_fields,
-            *requested_missing_fields,
-        }
-    )
-    extractability = requested_content_extractability(
-        soup,
-        surface=surface,
-        requested_fields=requested_fields,
-        selector_rules=selector_rules,
-        probe_fields=probe_fields or None,
-    )
-    extractable_fields = {
-        str(field_name).strip()
-        for field_name in _object_list(extractability.get("extractable_fields"))
-        if str(field_name).strip()
-    }
-    advertised_high_value_fields = extractable_fields & high_value_fields
-    missing_high_value_fields = {
-        field_name
-        for field_name in advertised_high_value_fields
-        if record.get(field_name) in (None, "", [], {})
-    }
-    missing_high_value_fields.update(
-        {
-            field_name
-            for field_name in high_value_fields
-            if field_name in requested_missing_fields
-        }
-    )
-    if extractable_fields & requested_missing_fields:
-        return True
-    if missing_high_value_fields or requested_missing_fields & high_value_fields:
-        return True
-    if normalized_surface == "ecommerce_detail" and _requires_dom_long_text_completion(
-        record,
-        extractable_fields=extractable_fields,
-    ):
-        return True
-    optional_cue_fields = {
-        field_name
-        for field_name in set(DOM_OPTIONAL_CUE_FIELDS.get(normalized_surface) or ())
-        if record.get(field_name) in (None, "", [], {})
-    }
-    dom_pattern_fields = {
-        str(field_name).strip()
-        for field_name in _object_list(extractability.get("dom_pattern_fields"))
-        if str(field_name).strip()
-    }
-    if optional_cue_fields & dom_pattern_fields:
-        return True
-    selector_backed_fields = {
-        str(field_name).strip()
-        for field_name in _object_list(extractability.get("selector_backed_fields"))
-        if str(field_name).strip()
-    }
-    return bool(requested_missing_fields & selector_backed_fields)
-
-
-def _normalized_category_path(value: object) -> str:
-    text = clean_text(value).casefold()
-    return " > ".join(
-        part for part in re.split(r"\s*(?:>|/|›|»|→|\|)\s*", text) if part
-    )
-
-
-def _finalize_early_detail_record(
-    record: dict[str, Any],
-    *,
-    html: str,
-    page_url: str,
-    surface: str,
-    requested_fields: list[str] | None,
-    requested_page_url: str | None,
-    soup: BeautifulSoup,
-    js_state_objects: dict[str, Any],
-) -> dict[str, Any]:
-    _attach_detail_tables(record, soup)
-    if str(surface or "").strip().lower() == "ecommerce_detail":
-        _reconcile_detail_currency_with_url(record, page_url=page_url)
-        repair_ecommerce_detail_record_quality(
-            record,
-            html=html,
-            page_url=page_url,
-            requested_page_url=requested_page_url,
-            soup=soup,
-            js_state_objects=js_state_objects,
-        )
-        drop_low_signal_zero_detail_price(record)
-        record = finalize_record(record, surface=surface)
-    record["_confidence"] = score_record_confidence(
-        record,
-        surface=surface,
-        requested_fields=requested_fields,
-    )
-    record["_extraction_tiers"]["early_exit"] = "js_state"
-    return record
-
-
-def _promote_dom_detail_title(
-    record: dict[str, Any],
-    *,
-    js_state_record: dict[str, Any],
-    page_url: str,
-) -> None:
-    if not title_needs_promotion(
-        text_or_none(record.get("title")) or "",
-        page_url=page_url,
-    ):
-        return
-    preferred_title = text_or_none(js_state_record.get("title"))
-    if preferred_title:
-        record["title"] = preferred_title
-    return
-
-
-def _fill_missing_dom_detail_title(record: dict[str, Any], *, page_url: str) -> None:
-    if text_or_none(record.get("title")):
-        return
-    fallback_title = _detail_title_from_url(page_url)
-    if not fallback_title:
-        return
-    record["title"] = fallback_title
-    title_sources = record.setdefault("_field_sources", {}).setdefault("title", [])
-    if "url_slug" not in title_sources:
-        title_sources.append("url_slug")
-
-
-def _finalize_dom_detail_record(
-    record: dict[str, Any],
-    *,
-    html: str,
-    page_url: str,
-    surface: str,
-    requested_fields: list[str] | None,
-    requested_page_url: str | None,
-    soup: BeautifulSoup,
-    js_state_objects: dict[str, Any],
-) -> dict[str, Any]:
-    _attach_detail_tables(record, soup)
-    if str(surface or "").strip().lower() == "ecommerce_detail":
-        _reconcile_detail_currency_with_url(record, page_url=page_url)
-        repair_ecommerce_detail_record_quality(
-            record,
-            html=html,
-            page_url=page_url,
-            requested_page_url=requested_page_url,
-            soup=soup,
-            js_state_objects=js_state_objects,
-        )
-        drop_low_signal_zero_detail_price(record)
-        record = finalize_record(record, surface=surface)
-    record["_confidence"] = score_record_confidence(
-        record,
-        surface=surface,
-        requested_fields=requested_fields,
-    )
-    record["_extraction_tiers"]["early_exit"] = None
-    return record
-
-
-def _attach_detail_tables(record: dict[str, Any], soup: BeautifulSoup | None) -> None:
-    if record.get("tables") not in (None, "", [], {}) or soup is None:
-        return
-    tables = extract_tables(soup)
-    if tables:
-        record["tables"] = tables
-
-
-def _prepare_detail_extraction(
-    html: str,
-    page_url: str,
-    surface: str,
-    requested_fields: list[str] | None,
-    *,
-    requested_page_url: str | None,
-    extraction_runtime_snapshot: dict[str, object] | None,
-) -> PreparedDetailExtraction:
-    context = prepare_extraction_context(html)
-    dom_parser, soup = primary_dom_context(context, page_url=page_url)
-    raw_soup = context.original_soup
-    if str(surface or "").strip().lower() == "ecommerce_detail":
-        soup = BeautifulSoup(str(soup), "html.parser")
-        prune_irrelevant_detail_dom_nodes(
-            soup,
-            page_url=page_url,
-            requested_page_url=text_or_none(requested_page_url) or page_url,
-        )
-    candidates: dict[str, list[object]] = {}
-    candidate_sources: dict[str, list[str]] = {}
-    field_sources: dict[str, list[str]] = {}
-    selector_trace_candidates: dict[str, list[dict[str, object]]] = {}
-    state = DetailTierState(
-        page_url=page_url,
-        requested_page_url=requested_page_url,
-        surface=surface,
-        requested_fields=requested_fields,
-        fields=surface_fields(surface, requested_fields),
-        candidates=candidates,
-        candidate_sources=candidate_sources,
-        field_sources=field_sources,
-        selector_trace_candidates=selector_trace_candidates,
-        extraction_runtime_snapshot=extraction_runtime_snapshot,
-        completed_tiers=[],
-        raw_soup=raw_soup,
-        soup=soup,
-    )
-    js_state_objects = harvest_js_state_objects(None, context.cleaned_html)
-    js_state_record = map_js_state_to_fields(
-        js_state_objects,
-        surface=surface,
-        page_url=page_url,
-    )
-    if surface == "ecommerce_detail" and is_title_noise(js_state_record.get("title")):
-        js_state_record = dict(js_state_record)
-        js_state_record.pop("title", None)
-    return PreparedDetailExtraction(
-        context=context,
-        dom_parser=dom_parser,
-        soup=soup,
-        raw_soup=raw_soup,
-        state=state,
-        js_state_objects=js_state_objects,
-        js_state_record=js_state_record,
-        selector_self_heal=_selector_self_heal_config(extraction_runtime_snapshot),
-    )
-
-
-def _apply_prepared_dom_fallbacks(
-    prepared: PreparedDetailExtraction,
-    *,
-    selector_rules: list[dict[str, object]] | None,
-) -> None:
-    apply_dom_fallbacks(
-        prepared.dom_parser,
-        prepared.soup,
-        page_url=prepared.state.page_url,
-        surface=prepared.state.surface,
-        requested_fields=prepared.state.requested_fields,
-        candidates=prepared.state.candidates,
-        candidate_sources=prepared.state.candidate_sources,
-        field_sources=prepared.state.field_sources,
-        selector_trace_candidates=prepared.state.selector_trace_candidates,
-        selector_rules=selector_rules,
-        add_sourced_candidate=_add_sourced_candidate,
-        breadcrumb_soup=prepared.raw_soup,
-    )
-
-
-def _extract_prepared_dom_variants(
-    soup: BeautifulSoup,
-    *,
-    page_url: str,
-    prepared: PreparedDetailExtraction,
-) -> dict[str, object]:
-    return _extract_variants_from_dom(
-        soup,
-        page_url=page_url,
-        js_state_objects=prepared.js_state_objects,
-    )
-
-
-def build_detail_record(
-    html: str,
-    page_url: str,
-    surface: str,
-    requested_fields: list[str] | None,
-    *,
-    requested_page_url: str | None = None,
-    adapter_records: list[dict[str, Any]] | None = None,
-    network_payloads: list[dict[str, object]] | None = None,
-    selector_rules: list[dict[str, object]] | None = None,
-    extraction_runtime_snapshot: dict[str, object] | None = None,
-) -> dict[str, Any]:
-    prepared = _prepare_detail_extraction(
-        html,
-        page_url,
-        surface,
-        requested_fields,
-        requested_page_url=requested_page_url,
-        extraction_runtime_snapshot=extraction_runtime_snapshot,
-    )
-    alias_lookup = surface_alias_lookup(surface, requested_fields)
-    tier_executor = DetailTierExecutor(
-        DetailTierRuntime(
-            materialize_record=_materialize_record,
-            collect_record_candidates=_collect_record_candidates,
-            map_network_payloads_to_fields=map_network_payloads_to_fields,
-            collect_structured_source_payloads=collect_structured_source_payloads,
-            collect_structured_payload_candidates=_collect_structured_payload_candidates,
-            apply_dom_fallbacks=_apply_prepared_dom_fallbacks,
-            extract_variants_from_dom=(
-                lambda soup, *, page_url: _extract_prepared_dom_variants(
-                    soup,
-                    page_url=page_url,
-                    prepared=prepared,
-                )
-            ),
-            should_collect_dom_variants=_should_collect_dom_variants,
-            add_sourced_candidate=_add_sourced_candidate,
-            coerce_float=_coerce_float,
-            requires_dom_completion=_requires_dom_completion,
-            promote_dom_detail_title=_promote_dom_detail_title,
-            fill_missing_dom_detail_title=_fill_missing_dom_detail_title,
-            finalize_early_detail_record=_finalize_early_detail_record,
-            finalize_dom_detail_record=_finalize_dom_detail_record,
-        )
-    )
-    return tier_executor.build_record(
-        prepared,
-        DetailTierInputs(
-            adapter_records=adapter_records,
-            network_payloads=network_payloads,
-            alias_lookup=alias_lookup,
-            selector_rules=selector_rules,
-            html=html,
-            page_url=page_url,
-            surface=surface,
-            requested_fields=requested_fields,
-        ),
-    )
-
-
-def detail_record_rejection_reason(
-    record: dict[str, Any],
-    *,
-    page_url: str,
-    requested_page_url: str | None = None,
-) -> str | None:
-    if _detail_redirect_identity_is_mismatched(
-        record,
-        page_url=page_url,
-        requested_page_url=requested_page_url,
-    ):
-        return "detail_identity_mismatch"
-    if _looks_like_site_shell_record(record, page_url=page_url):
-        if (
-            _detail_url_has_multiple_product_segments(page_url)
-            or _detail_url_is_collection_like(page_url)
-            or _detail_url_is_utility(page_url)
-        ):
-            return "non_detail_seed"
-        return "detail_shell"
-    return None
-
-
-def infer_detail_failure_reason(
-    html: str,
-    page_url: str,
-    surface: str,
-    requested_fields: list[str] | None,
-    *,
-    requested_page_url: str | None = None,
-    adapter_records: list[dict[str, Any]] | None = None,
-    network_payloads: list[dict[str, object]] | None = None,
-    selector_rules: list[dict[str, object]] | None = None,
-    extraction_runtime_snapshot: dict[str, object] | None = None,
-) -> str | None:
-    if "detail" not in str(surface or "").strip().lower():
-        return None
-    record = build_detail_record(
-        html,
-        page_url,
-        surface,
-        requested_fields,
-        requested_page_url=requested_page_url,
-        adapter_records=adapter_records,
-        network_payloads=network_payloads,
-        selector_rules=selector_rules,
-        extraction_runtime_snapshot=extraction_runtime_snapshot,
-    )
-    return detail_record_rejection_reason(
-        record,
-        page_url=page_url,
-        requested_page_url=requested_page_url,
-    )
-
-
-def extract_detail_records(
-    html: str,
-    page_url: str,
-    surface: str,
-    requested_fields: list[str] | None = None,
-    *,
-    requested_page_url: str | None = None,
-    adapter_records: list[dict[str, Any]] | None = None,
-    network_payloads: list[dict[str, object]] | None = None,
-    selector_rules: list[dict[str, object]] | None = None,
-    extraction_runtime_snapshot: dict[str, object] | None = None,
-) -> list[dict[str, Any]]:
-    record = build_detail_record(
-        html,
-        page_url,
-        surface,
-        requested_fields,
-        requested_page_url=requested_page_url,
-        adapter_records=adapter_records,
-        network_payloads=network_payloads,
-        selector_rules=selector_rules,
-        extraction_runtime_snapshot=extraction_runtime_snapshot,
-    )
-    if surface == "ecommerce_detail" and _looks_like_site_shell_record(
-        record,
-        page_url=page_url,
-    ):
-        return []
-    if surface == "ecommerce_detail" and _detail_redirect_identity_is_mismatched(
-        record,
-        page_url=page_url,
-        requested_page_url=requested_page_url,
-    ):
-        return []
-    if (
-        surface == "ecommerce_detail"
-        and record.get("_irrelevant_detail_structured_product")
-        and len(
-            _detail_identity_tokens(
-                _detail_title_from_url(requested_page_url or page_url)
-            )
-        )
-        >= 2
-        and not _record_matches_requested_detail_identity(
-            record,
-            requested_page_url=requested_page_url or page_url,
-        )
-    ):
-        return []
-    if record_score(record) <= 0:
-        return []
-    return [record]

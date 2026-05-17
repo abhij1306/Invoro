@@ -9,7 +9,7 @@ from app.services.config.variant_migration_rules import (
     VARIANT_STRONG_OPTION_SELECTOR,
     VARIANT_WEAK_OPTION_SELECTOR,
 )
-from app.services.extract.shared_variant_logic import normalized_variant_axis_key
+from app.services.extract.variant_axis import normalized_variant_axis_key
 from app.services.extract.variant_group_validator import VariantCandidateGroup
 from app.services.shared.field_coerce import absolute_url, clean_text, text_or_none
 

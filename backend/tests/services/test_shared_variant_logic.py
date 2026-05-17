@@ -6,19 +6,31 @@ import pytest
 
 from bs4 import BeautifulSoup
 
-from app.services.extract.detail_materializer import build_detail_record
-from app.services.extract.shared_variant_logic import (
-    variant_choice_container_for_input,
-    variant_choice_container_is_overbroad,
+from app.services.extract.detail_record_assembly import build_detail_record
+from app.services.extract import variant_choice_traversal
+from app.services.extract.variant_choice_traversal import (
     iter_variant_choice_groups,
     iter_variant_select_groups,
-    normalized_variant_axis_key,
     resolve_variant_group_name,
-    resolve_variants,
+)
+from app.services.extract.variant_axis import (
+    normalized_variant_axis_key,
     variant_axis_name_is_semantic,
+)
+from app.services.extract.variant_identity_merge import (
+    resolve_variants,
+)
+from app.services.extract.variant_option_value import (
     variant_option_value_is_noise,
 )
-from app.services.extract.detail_dom_extractor import extract_variants_from_dom
+from app.services.extract.detail_dom_variant_extraction import extract_variants_from_dom
+
+variant_choice_container_for_input = (
+    variant_choice_traversal._variant_choice_container_for_input
+)
+variant_choice_container_is_overbroad = (
+    variant_choice_traversal._variant_choice_container_is_overbroad
+)
 
 
 def _next_f_script(fragment: str) -> str:

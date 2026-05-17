@@ -17,7 +17,7 @@ from app.services.crawl.profile import (
     resolve_url_acquisition_recipe,
 )
 from app.services.db_utils import mapping_or_empty
-from app.services.extract.detail_materializer import (
+from app.services.extract.detail_record_assembly import (
     detail_record_rejection_reason,
     infer_detail_failure_reason,
 )

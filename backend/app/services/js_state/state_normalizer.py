@@ -24,7 +24,7 @@ from app.services.config.extraction_rules import ECOMMERCE_DESCRIPTION_BLOCK_LIM
 from app.services.extraction_html_helpers import extract_job_sections, html_to_text
 from app.services.field_policy import normalize_field_key
 from app.services.dom.selector_engine import dedupe_image_urls, extract_feature_rows
-from app.services.extract.shared_variant_logic import (
+from app.services.extract.variant_identity_merge import (
     merge_variant_rows,
     resolve_variants,
 )

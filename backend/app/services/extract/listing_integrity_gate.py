@@ -21,7 +21,7 @@ from app.services.config.extraction_rules import (
     LISTING_PRODUCT_DETAIL_ID_RE,
 )
 from app.services.config.runtime_settings import crawler_runtime_settings
-from app.services.extract.detail_identity import (
+from app.services.extract.detail_identity_core import (
     listing_detail_like_path,
     listing_url_is_structural,
 )

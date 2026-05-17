@@ -12,8 +12,8 @@ from app.services.config.extraction_rules import (
     VARIANT_TITLE_STOPWORDS,
 )
 from app.services.config.variant_policy import PUBLIC_VARIANT_AXIS_FIELDS
-from app.services.extract.shared_variant_logic import (
-    normalized_variant_axis_key,
+from app.services.extract.variant_axis import normalized_variant_axis_key
+from app.services.extract.variant_identity_merge import (
     variant_row_richness,
     variant_semantic_identity,
 )

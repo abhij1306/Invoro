@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from app.services.config.js_state_field_specs import VARIANT_AXIS_KEYS
-from app.services.extract.shared_variant_logic import (
+from app.services.extract.variant_axis import (
     normalized_variant_axis_key,
     variant_axis_name_is_semantic,
 )

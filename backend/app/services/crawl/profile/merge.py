@@ -144,9 +144,6 @@ def merge_saved_run_profile(
     fetch_root_aliases = {
         "advanced_mode": "traversal_mode",
         "sleep_ms": "request_delay_ms",
-        "request_delay_ms": "request_delay_ms",
-        "max_pages": "max_pages",
-        "max_scrolls": "max_scrolls",
     }
     merged["fetch_profile"] = _merge_profile_section(
         merged,

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.services.extract.shared_variant_logic import merge_variant_rows
+from app.services.extract.variant_identity_merge import merge_variant_rows
 from app.services.shared.field_coerce import (
     LONG_TEXT_FIELDS,
     STRUCTURED_MULTI_FIELDS,

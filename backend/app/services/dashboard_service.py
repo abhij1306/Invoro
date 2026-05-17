@@ -220,7 +220,7 @@ async def _reset_crawl_runtime_state() -> dict:
     await reset_robots_policy_cache()
 
     artifacts_removed = _reset_directory(settings.artifacts_dir)
-    legacy_artifacts_dir = PROJECT_ROOT / "backend" / "backend" / "artifacts"
+    legacy_artifacts_dir = PROJECT_ROOT / "artifacts"
     if legacy_artifacts_dir.resolve() != Path(settings.artifacts_dir).resolve():
         artifacts_removed += _reset_directory(legacy_artifacts_dir, create_if_missing=False)
     cookies_removed = _reset_directory(settings.cookie_store_dir)

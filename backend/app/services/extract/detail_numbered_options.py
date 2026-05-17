@@ -4,11 +4,13 @@ import re
 from decimal import Decimal
 from typing import Any
 
-from app.services.extract.detail_price_extractor import format_detail_price_decimal
-from app.services.extract.shared_variant_logic import (
+from app.services.extract.detail_price_core import format_detail_price_decimal
+from app.services.extract.variant_choice_traversal import (
     iter_variant_choice_groups,
-    normalized_variant_axis_key,
     resolve_variant_group_name,
+)
+from app.services.extract.variant_axis import (
+    normalized_variant_axis_key,
     variant_axis_allowed_single_tokens,
 )
 from app.services.shared.field_coerce import clean_text, text_or_none
