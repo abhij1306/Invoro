@@ -16,6 +16,7 @@ from app.schemas.product_intelligence import (
     ProductIntelligenceJobResponse,
     ProductIntelligenceReviewRequest,
 )
+from app.services.crawl.access_service import AccessDeniedError
 from app.services.product_intelligence.service import (
     build_job_payload,
     create_product_intelligence_job,
@@ -46,10 +47,14 @@ async def product_intelligence_discover(
             user=user,
             payload=payload.model_dump(),
         )
+    except (LookupError, AccessDeniedError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-    except LookupError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
     return ProductIntelligenceDiscoveryResponse.model_validate(response)
 
 
@@ -66,10 +71,14 @@ async def product_intelligence_create_job(
             user=user,
             payload=payload.model_dump(),
         )
+    except (LookupError, AccessDeniedError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-    except LookupError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
     background_tasks.add_task(run_product_intelligence_job, job.id)
     return ProductIntelligenceJobResponse.model_validate(job, from_attributes=True)
 

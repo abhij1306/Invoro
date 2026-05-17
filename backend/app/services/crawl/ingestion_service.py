@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 
+from app.models.crawl_run import CrawlRun
 from app.services.crawl.crud import create_crawl_run
 from app.services.crawl.service import dispatch_run
 from app.services.crawl.utils import parse_csv_urls
@@ -73,7 +74,7 @@ def build_csv_crawl_payload(
 
 async def create_crawl_run_from_payload(
     session: AsyncSession, user_id: int, payload: dict
-):
+) -> CrawlRun:
     data = prepare_crawl_create_payload(payload)
     run = await create_crawl_run(session, user_id, data)
     return await dispatch_run(session, run)
@@ -87,7 +88,7 @@ async def create_crawl_run_from_csv(
     surface: str,
     additional_fields: str = "",
     settings_json: str = "{}",
-):
+) -> tuple[CrawlRun, int]:
     data, url_count = build_csv_crawl_payload(
         csv_content=csv_content,
         surface=surface,

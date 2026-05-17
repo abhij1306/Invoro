@@ -43,7 +43,7 @@ async def _prewarm_browser_pool() -> None:
         return
     try:
         runtime = await get_browser_runtime(browser_engine="patchright")
-        await runtime._ensure()
+        await runtime.ensure()
     except Exception:
         logger.debug("Browser pool pre-warm failed; will launch on demand", exc_info=True)
 
@@ -88,8 +88,10 @@ def _url_timeout_seconds(settings_view) -> float:
     # significantly longer than a single-page fetch+extract cycle.
     traversal_mode = settings_view.traversal_mode()
     if traversal_mode:
-        max_pages = int(settings_view.max_pages() or 1)
-        max_scrolls = int(settings_view.max_scrolls() or 1)
+        raw_max_pages = settings_view.max_pages()
+        raw_max_scrolls = settings_view.max_scrolls()
+        max_pages = int(raw_max_pages) if raw_max_pages is not None else 1
+        max_scrolls = int(raw_max_scrolls) if raw_max_scrolls is not None else 1
         traversal_pages = max(max_pages, max_scrolls)
         # Allow ~30s per traversal page on top of the base timeout, capped at max.
         traversal_budget = traversal_pages * 30.0

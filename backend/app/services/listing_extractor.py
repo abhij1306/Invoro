@@ -4,8 +4,7 @@ import logging
 from typing import Any
 from urllib.parse import urlsplit
 from bs4 import BeautifulSoup
-from selectolax.lexbor import SelectolaxError
-from selectolax.lexbor import LexborHTMLParser
+from selectolax.lexbor import LexborHTMLParser, SelectolaxError
 
 from app.services.config.extraction_rules import (
     EXTRACTION_RULES,
@@ -57,12 +56,8 @@ from app.services.extract.listing_card_fragments import (
     listing_node_text,
     select_listing_fragment_nodes,
 )
-from app.services.extract.listing_record_finalizer import finalize_listing_price_fields
 from app.services.extract.listing_visual import visual_listing_records
-from app.services.extract.content_listing_handler import (
-    has_table_row_intent,
-    table_row_records,
-)
+from app.services.extract.content_listing_handler import has_table_row_intent, table_row_records
 from app.services.extract.detail_price_extractor import currency_hint_from_page_url
 from app.services.field_policy import normalize_requested_field
 from app.services.shared.field_coerce import (
@@ -72,7 +67,6 @@ from app.services.shared.field_coerce import (
     absolute_url,
     clean_text,
     coerce_field_value,
-    coerce_text,
     extract_currency_code,
     extract_price_text,
     finalize_record,
@@ -84,7 +78,6 @@ from app.services.shared.field_coerce import (
 from app.services.field_url_normalization import same_site
 from app.services.extract.field_candidates import (
     add_candidate,
-    collect_structured_candidates,
     finalize_candidate_value,
 )
 from app.services.dom.selector_engine import apply_selector_fallbacks
@@ -1054,6 +1047,7 @@ def _dom_listing_stage(
 ) -> list[dict[str, Any]]:
     records: list[dict[str, Any]] = []
     skipped_urls: set[str] = set(seed_urls or ())
+    records_by_url: dict[str, dict[str, Any]] = {}
     for card in _listing_card_html_fragments(
         parser,
         is_job=is_job_surface,
@@ -1069,8 +1063,18 @@ def _dom_listing_stage(
         if record is None:
             continue
         url = str(record.get("url") or "")
-        if not url or url in skipped_urls:
+        if not url:
             continue
+        existing = records_by_url.get(url)
+        if existing is not None:
+            for key, value in record.items():
+                if key not in existing or existing.get(key) in (None, "", [], {}):
+                    existing[key] = value
+            continue
+        if url in skipped_urls:
+            continue
+        skipped_urls.add(url)
+        records_by_url[url] = record
         records.append(record)
     return records
 

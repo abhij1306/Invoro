@@ -71,6 +71,7 @@ class ExportRecord(BaseModel):
 
     def model_post_init(self, __context: Any) -> None:
         record_url = self.data.get("url")
+        # Missing record URLs are intentional: skip URL parsing for partial records.
         if record_url in (None, ""):
             return
         parsed = urlparse(str(record_url))

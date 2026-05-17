@@ -2,14 +2,23 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from sqlalchemy import select
-from sqlalchemy.exc import ProgrammingError
+from sqlalchemy import inspect, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.domain_memory import DomainRunProfile
 from app.services.domain_utils import normalize_domain
 
 from .normalization import normalize_domain_run_profile
+
+
+async def _has_domain_run_profiles_table(session: AsyncSession) -> bool:
+    return bool(
+        await session.run_sync(
+            lambda sync_session: inspect(sync_session.connection()).has_table(
+                "domain_run_profiles"
+            )
+        )
+    )
 
 
 async def load_domain_run_profile(
@@ -20,21 +29,17 @@ async def load_domain_run_profile(
 ) -> DomainRunProfile | None:
     normalized_domain = normalize_domain(domain or "")
     normalized_surface = str(surface or "").strip().lower()
-    try:
-        result = await session.execute(
-            select(DomainRunProfile)
-            .where(
-                DomainRunProfile.domain == normalized_domain,
-                DomainRunProfile.surface == normalized_surface,
-            )
-            .order_by(DomainRunProfile.updated_at.desc(), DomainRunProfile.id.desc())
-            .limit(1)
-        )
-    except ProgrammingError as exc:
-        if "domain_run_profiles" not in str(exc).lower():
-            raise
-        await session.rollback()
+    if not await _has_domain_run_profiles_table(session):
         return None
+    result = await session.execute(
+        select(DomainRunProfile)
+        .where(
+            DomainRunProfile.domain == normalized_domain,
+            DomainRunProfile.surface == normalized_surface,
+        )
+        .order_by(DomainRunProfile.updated_at.desc(), DomainRunProfile.id.desc())
+        .limit(1)
+    )
     return result.scalar_one_or_none()
 
 
@@ -51,20 +56,16 @@ async def list_domain_run_profiles(
         statement = statement.where(DomainRunProfile.domain == normalized_domain)
     if normalized_surface:
         statement = statement.where(DomainRunProfile.surface == normalized_surface)
-    try:
-        result = await session.execute(
-            statement.order_by(
-                DomainRunProfile.domain.asc(),
-                DomainRunProfile.surface.asc(),
-                DomainRunProfile.updated_at.desc(),
-                DomainRunProfile.id.desc(),
-            )
-        )
-    except ProgrammingError as exc:
-        if "domain_run_profiles" not in str(exc).lower():
-            raise
-        await session.rollback()
+    if not await _has_domain_run_profiles_table(session):
         return []
+    result = await session.execute(
+        statement.order_by(
+            DomainRunProfile.domain.asc(),
+            DomainRunProfile.surface.asc(),
+            DomainRunProfile.updated_at.desc(),
+            DomainRunProfile.id.desc(),
+        )
+    )
     return list(result.scalars().all())
 
 

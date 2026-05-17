@@ -96,7 +96,7 @@ def safe_truncate_for_prompt(
             for item in value[:max_list_items]
         ]
         if len(value) > max_list_items:
-            truncated.append(f"... ({len(value) - max_list_items} more items)")
+            return {"items": truncated, "_truncated": len(value) - max_list_items}
         return truncated
     if isinstance(value, dict):
         return {

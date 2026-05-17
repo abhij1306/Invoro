@@ -10,7 +10,6 @@ from app.services.publish import VERDICT_BLOCKED, VERDICT_EMPTY, VERDICT_LISTING
 
 from .normalization import (
     _BROWSER_ENGINE_VALUES,
-    _clean_str,
     _coerce_optional_choice,
     normalize_acquisition_contract,
     normalize_domain_run_profile,
@@ -89,8 +88,10 @@ def build_success_acquisition_contract(
         and not required_network_payloads
     )
     handoff_engine = preferred_engine if handoff_eligible else "auto"
-    requested_set = set(requested_fields or [])
+    requested = list(requested_fields or [])
+    requested_set = set(requested)
     covered_fields = [field for field in list(found_fields or []) if field in requested_set]
+    covered_set = set(covered_fields)
     return normalize_acquisition_contract(
         {
             "preferred_browser_engine": preferred_engine,
@@ -105,12 +106,12 @@ def build_success_acquisition_contract(
                 "browser_engine": normalized_engine,
                 "record_count": int(record_count or 0),
                 "field_coverage": {
-                    "requested": list(requested_fields or []),
+                    "requested": requested,
                     "found": covered_fields,
                     "missing": [
                         field
-                        for field in list(requested_fields or [])
-                        if field not in set(covered_fields)
+                        for field in requested
+                        if field not in covered_set
                     ],
                 },
                 "source_run_id": int(source_run_id or 0),
@@ -157,7 +158,7 @@ async def note_acquisition_contract_failure(
     domain: str,
     surface: str,
     threshold: int,
-    ) -> dict[str, object] | None:
+) -> dict[str, object] | None:
     existing = await load_domain_run_profile(
         session,
         domain=domain,
@@ -177,12 +178,18 @@ async def note_acquisition_contract_failure(
         "stale": failure_count >= max(1, int(threshold or 1)),
     }
     profile["acquisition_contract"] = contract
+    raw_source_run_id = profile.get("source_run_id")
+    source_run_id = (
+        int(raw_source_run_id)
+        if raw_source_run_id not in (None, "", [], {})
+        else int(existing.source_run_id or 1)
+    )
     return await save_domain_run_profile(
         session,
         domain=domain,
         surface=surface,
         profile=profile,
-        source_run_id=int(profile.get("source_run_id") or 0) or 1,
+        source_run_id=source_run_id,
         existing_record=existing,
     )
 

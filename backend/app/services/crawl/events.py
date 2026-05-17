@@ -27,7 +27,7 @@ _LEVEL_ORDER = {
 _URL_PROGRESS_PATTERN = re.compile(r"^Processing URL \d+/\d+: ")
 _REDIS_KEY_PREFIX = "crawl:events"
 _DETACHED_LOG_WRITE_CONCURRENCY = 8
-_detached_log_write_semaphore: asyncio.Semaphore | None = None
+_detached_log_write_semaphore = asyncio.Semaphore(_DETACHED_LOG_WRITE_CONCURRENCY)
 
 
 def get_counter_ttl_seconds() -> int:
@@ -35,11 +35,6 @@ def get_counter_ttl_seconds() -> int:
 
 
 def get_detached_log_write_semaphore() -> asyncio.Semaphore:
-    global _detached_log_write_semaphore
-    if _detached_log_write_semaphore is None:
-        _detached_log_write_semaphore = asyncio.Semaphore(
-            _DETACHED_LOG_WRITE_CONCURRENCY
-        )
     return _detached_log_write_semaphore
 
 
@@ -95,7 +90,7 @@ def _normalize_level(level: str) -> str:
     return normalized if normalized in _LEVEL_ORDER else "info"
 
 
-def _format_message(message: str, correlation_id: str | None) -> str:
+def _format_message(message: str) -> str:
     text = str(message or "")
     if text.startswith("[corr:"):
         text = text.split("]", 1)[1] if "]" in text else text
@@ -174,7 +169,7 @@ async def prepare_log_event(
     run_id: int, level: str, message: str
 ) -> tuple[str, str, bool]:
     normalized_level = _normalize_level(level)
-    formatted_message = _format_message(message, None)
+    formatted_message = _format_message(message)
     logger.log(
         _LEVEL_ORDER.get(normalized_level, logging.INFO),
         "run_id=%s %s",

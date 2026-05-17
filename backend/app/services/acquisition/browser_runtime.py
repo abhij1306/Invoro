@@ -356,10 +356,14 @@ class SharedBrowserRuntime:
             async with self._counter_lock:
                 self._total_contexts_created = 0
 
+    async def ensure(self) -> None:
+        """Public browser warm-up API."""
+        await self._ensure()
+
     async def _recycle_after_driver_disconnect(self) -> None:
         async with self._lock:
             await self._close_locked()
-        await self._ensure()
+        await self.ensure()
 
     async def _open_context_page(
         self,

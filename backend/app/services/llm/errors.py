@@ -34,6 +34,7 @@ _DETERMINISTIC_CLIENT_ERROR_CODES = frozenset({
 
 def classify_error(raw: str) -> LLMErrorCategory:
     lowered = raw.lower()
+    has_error_prefix = lowered.startswith(ERROR_PREFIX.lower())
     if "circuit_open" in lowered or "circuit breaker" in lowered:
         return LLMErrorCategory.CIRCUIT_OPEN
     if "429" in raw or "rate" in lowered:
@@ -47,12 +48,11 @@ def classify_error(raw: str) -> LLMErrorCategory:
         or "forbidden" in lowered
     ):
         return LLMErrorCategory.AUTH_FAILURE
-    if raw.startswith(ERROR_PREFIX) and any(
+    if has_error_prefix and any(
         re.search(r"\b" + re.escape(code) + r"\b", raw)
         for code in _DETERMINISTIC_CLIENT_ERROR_CODES
     ):
         return LLMErrorCategory.CLIENT_ERROR
-    if raw.startswith(ERROR_PREFIX):
+    if has_error_prefix:
         return LLMErrorCategory.PROVIDER_ERROR
     return LLMErrorCategory.NONE
-

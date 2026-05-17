@@ -15,6 +15,7 @@ from app.schemas.crawl import (
     serialize_crawl_record_responses,
 )
 from app.services.crawl.access_service import (
+    AccessDeniedError,
     RUN_NOT_FOUND_DETAIL,
     require_accessible_run,
 )
@@ -133,7 +134,7 @@ async def record_provenance(
             record_id=record_id,
             user=current_user,
         )
-    except LookupError as exc:
+    except (LookupError, AccessDeniedError) as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=RUN_NOT_FOUND_DETAIL) from exc

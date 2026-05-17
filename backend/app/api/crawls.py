@@ -75,7 +75,6 @@ from fastapi import (
 from jose import JWTError
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-from starlette.websockets import WebSocketState
 
 router = APIRouter(prefix="/api/crawls", tags=["crawls"])
 
@@ -185,9 +184,7 @@ async def _mutate_run_status(
 async def _close_websocket_safely(
     websocket: WebSocket, *, code: int, reason: str
 ) -> None:
-    """Close before accept() would otherwise fail to deliver code/reason on some ASGI stacks."""
-    if websocket.application_state == WebSocketState.CONNECTING:
-        await websocket.accept()
+    """Reject unauthenticated websocket handshakes without accepting the client."""
     await websocket.close(code=code, reason=reason)
 
 

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
-
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.crawl_settings import normalize_crawl_settings
@@ -13,9 +11,11 @@ from .normalization import (
 )
 from .repository import load_domain_run_profile
 
+_CACHED_DEFAULT_RUN_SETTINGS = normalize_crawl_settings({})
+
 
 def _default_run_settings() -> dict[str, object]:
-    return normalize_crawl_settings({})
+    return dict(_CACHED_DEFAULT_RUN_SETTINGS)
 
 
 def _should_apply_explicit_override(

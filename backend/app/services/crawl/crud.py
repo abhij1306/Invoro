@@ -101,7 +101,7 @@ async def create_crawl_run(
         settings=settings,
         requested_fields=requested_fields,
         result_summary={
-            "url_count": max(1, len(urls) or 1),
+            "url_count": max(1, len(urls)),
             "progress": 0,
             "current_stage": STAGE_ACQUIRE,
             "correlation_id": get_correlation_id() or generate_correlation_id(),
@@ -112,6 +112,8 @@ async def create_crawl_run(
     await session.commit()
     await session.refresh(run)
     return run
+
+
 async def list_runs(
     session: AsyncSession,
     page: int,

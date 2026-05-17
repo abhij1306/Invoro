@@ -163,6 +163,7 @@ _PAYLOAD_ADAPTERS: dict[str, TypeAdapter[Any]] = {
     ),
     "data_enrichment_semantic": TypeAdapter(_DataEnrichmentSemanticPayload),
 }
+SUPPORTED_TASK_TYPES = tuple(_PAYLOAD_ADAPTERS.keys())
 
 
 def parse_payload(raw_text: str, *, response_type: str) -> dict | list | None:

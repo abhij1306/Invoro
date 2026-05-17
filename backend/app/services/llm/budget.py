@@ -14,12 +14,18 @@ async def reserve_run_llm_call(
     scope = str(budget_scope or "").strip()
     if not scope and run_id is None:
         return True
+    run_id_int: int | None = None
+    if run_id is not None:
+        try:
+            run_id_int = int(run_id)
+        except (TypeError, ValueError):
+            return True
     max_calls = int(llm_runtime_settings.llm_max_calls_per_run)
     if max_calls < 1:
         return False
 
     async def _reserve(redis) -> bool:
-        key_suffix = scope or str(int(run_id))
+        key_suffix = scope or str(run_id_int)
         key = f"{_LLM_RUN_CALL_BUDGET_KEY_PREFIX}:{key_suffix}"
         count = int(await redis.incr(key))
         if count == 1:

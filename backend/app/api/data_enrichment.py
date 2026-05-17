@@ -12,6 +12,7 @@ from app.schemas.data_enrichment import (
     DataEnrichmentJobDetailResponse,
     DataEnrichmentJobResponse,
 )
+from app.services.crawl.access_service import AccessDeniedError
 from app.services.data_enrichment.service import (
     build_data_enrichment_job_payload,
     create_data_enrichment_job,
@@ -36,10 +37,14 @@ async def data_enrichment_create_job(
             user=user,
             payload=payload.model_dump(),
         )
+    except (LookupError, AccessDeniedError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-    except LookupError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
     background_tasks.add_task(run_data_enrichment_job, job.id)
     return DataEnrichmentJobResponse.model_validate(job, from_attributes=True)
 

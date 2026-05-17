@@ -11,6 +11,7 @@ from app.services.config.field_mappings import PROMPT_REGISTRY
 from app.services.config.llm_runtime import SUPPORTED_LLM_PROVIDERS
 from app.services.config.data_enrichment import DATA_ENRICHMENT_PROMPT_REGISTRY
 from app.services.config.product_intelligence import PRODUCT_INTELLIGENCE_PROMPT_REGISTRY
+from app.services.llm.payloads import SUPPORTED_TASK_TYPES
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -121,18 +122,7 @@ async def snapshot_active_configs(
     task_types: list[str] | None = None,
 ) -> dict[str, dict]:
     snapshot: dict[str, dict] = {}
-    for task_type in task_types or [
-        "general",
-        "direct_record_extraction",
-        "xpath_discovery",
-        "missing_field_extraction",
-        "field_cleanup_review",
-        "page_classification",
-        "schema_inference",
-        "product_intelligence_enrichment",
-        "product_intelligence_brand_inference",
-        "data_enrichment_semantic",
-    ]:
+    for task_type in task_types or ("general", *SUPPORTED_TASK_TYPES):
         config = await resolve_active_config(session, task_type)
         if config is not None:
             snapshot[task_type] = serialize_config_snapshot(config)

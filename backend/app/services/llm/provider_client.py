@@ -38,32 +38,36 @@ async def close_llm_provider_clients() -> None:
     global _nvidia_client, _nvidia_client_timeout
     global _aws_client, _aws_client_timeout
     async with _groq_client_lock:
-        async with _anthropic_client_lock:
-            async with _nvidia_client_lock:
-                async with _aws_client_lock:
-                    for client_name, client in (
-                        ("groq", _groq_client),
-                        ("anthropic", _anthropic_client),
-                        ("nvidia", _nvidia_client),
-                        ("aws", _aws_client),
-                    ):
-                        if client is not None and not client.is_closed:
-                            try:
-                                await client.aclose()
-                            except Exception:
-                                logger.warning(
-                                    "Failed to close shared %s LLM client",
-                                    client_name,
-                                    exc_info=True,
-                                )
-                    _groq_client = None
-                    _groq_client_timeout = None
-                    _anthropic_client = None
-                    _anthropic_client_timeout = None
-                    _nvidia_client = None
-                    _nvidia_client_timeout = None
-                    _aws_client = None
-                    _aws_client_timeout = None
+        await _close_provider_client("groq", _groq_client)
+        _groq_client = None
+        _groq_client_timeout = None
+    async with _anthropic_client_lock:
+        await _close_provider_client("anthropic", _anthropic_client)
+        _anthropic_client = None
+        _anthropic_client_timeout = None
+    async with _nvidia_client_lock:
+        await _close_provider_client("nvidia", _nvidia_client)
+        _nvidia_client = None
+        _nvidia_client_timeout = None
+    async with _aws_client_lock:
+        await _close_provider_client("aws", _aws_client)
+        _aws_client = None
+        _aws_client_timeout = None
+
+
+async def _close_provider_client(
+    client_name: str, client: httpx.AsyncClient | None
+) -> None:
+    if client is None or client.is_closed:
+        return
+    try:
+        await client.aclose()
+    except Exception:
+        logger.warning(
+            "Failed to close shared %s LLM client",
+            client_name,
+            exc_info=True,
+        )
 
 
 async def _refresh_shared_client(

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 from app.services.extract.shared_variant_logic import (
     normalized_variant_axis_key,
@@ -19,6 +20,18 @@ _OFFER_TITLE_SIZE_RE = re.compile(
     r"(?:^|[,\s])(\d+(?:\.\d+)?\s*-?\s*(?:lb|lbs|oz|kg|g|ml|l|ct|count|pack|pk|bag|bags))\b",
     re.I,
 )
+
+
+def _variant_url_from_id(page_url: str, variant_id: str) -> str:
+    parsed = urlparse(page_url)
+    query = [
+        (key, value)
+        for key, value in parse_qsl(parsed.query, keep_blank_values=True)
+        if key != "variant"
+    ]
+    query.append(("variant", variant_id))
+    composed = urlunparse(parsed._replace(query=urlencode(query, doseq=True)))
+    return composed if parsed.scheme and parsed.netloc else absolute_url(page_url, composed) or ""
 
 
 def _structured_variant_rows(
@@ -331,7 +344,7 @@ def _structured_variants_from_product_payload(
             row["image_url"] = image_url
         variant_url = coerce_field_value("url", item.get("url"), page_url)
         if variant_url in (None, "", [], {}) and variant_id:
-            variant_url = absolute_url(page_url, f"{page_url}?variant={variant_id}")
+            variant_url = _variant_url_from_id(page_url, variant_id)
         if variant_url not in (None, "", [], {}):
             row["url"] = variant_url
         for axis_key, axis_value in option_values.items():

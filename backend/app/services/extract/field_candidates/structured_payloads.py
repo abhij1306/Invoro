@@ -53,6 +53,8 @@ def _gender_from_text(value: object) -> str | None:
     for canonical, terms in DETAIL_GENDER_TERMS.items():
         if any(f" {str(term).lower().replace('-', ' ')} " in padded for term in terms):
             matches.append(str(canonical))
+    # DETAIL_GENDER_TERMS may match duplicate terms for one canonical gender.
+    # Multiple distinct canonicals are ambiguous and intentionally return None.
     return matches[0] if len(set(matches)) == 1 else None
 
 

@@ -5,7 +5,7 @@ import time
 from dataclasses import dataclass
 
 from app.core.redis import redis_fail_open, redis_is_enabled
-from app.services.config.llm_runtime import llm_runtime_settings
+from app.services.config.llm_runtime import LLMRuntimeSettings, llm_runtime_settings
 from app.services.llm.errors import ERROR_PREFIX, LLMErrorCategory, classify_error
 
 __all__ = [
@@ -126,16 +126,13 @@ def _shared_circuit_stats_ttl_seconds() -> int:
 
 
 def _resolved_failure_threshold() -> int | None:
-    default_threshold = type(llm_runtime_settings).model_fields[
-        "circuit_failure_threshold"
-    ].default
     raw_threshold = getattr(
         llm_runtime_settings,
         "circuit_failure_threshold",
-        default_threshold,
+        LLMRuntimeSettings().circuit_failure_threshold,
     )
     if raw_threshold is None:
-        raw_threshold = default_threshold
+        raw_threshold = LLMRuntimeSettings().circuit_failure_threshold
     try:
         return max(1, int(raw_threshold))
     except (TypeError, ValueError):

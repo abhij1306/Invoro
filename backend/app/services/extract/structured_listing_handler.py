@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from typing import Any
+from typing import Any, Iterator
 from urllib.parse import urlsplit
 
 from app.services.config.extraction_rules import LISTING_NAVIGATION_TITLE_HINTS
@@ -126,7 +126,8 @@ def _structured_listing_items(
             " ".join(raw_type) if isinstance(raw_type, list) else str(raw_type or "")
         ).lower()
         if "itemlist" in normalized_type:
-            for item in candidate.get("itemListElement") or []:
+            item_list = candidate.get("itemListElement")
+            for item in item_list or []:
                 entry = item.get("item") if isinstance(item, dict) else None
                 if isinstance(entry, dict):
                     items.append(entry)
@@ -170,7 +171,7 @@ def _normalized_payload_type(payload: dict[str, Any]) -> str:
     ).lower()
 
 
-def _typed_listing_payloads(payloads: list[dict[str, Any]]):
+def _typed_listing_payloads(payloads: list[dict[str, Any]]) -> Iterator[dict[str, Any]]:
     for payload in payloads:
         for candidate in _listing_payload_candidates(payload):
             if not isinstance(candidate, dict):
@@ -218,9 +219,8 @@ def allow_embedded_json_listing_payloads(
         normalized_type = _normalized_payload_type(payload)
         if "itemlist" in normalized_type:
             return True
-        if isinstance(payload.get("itemListElement"), list) and payload.get(
-            "itemListElement"
-        ):
+        item_list = payload.get("itemListElement")
+        if isinstance(item_list, list) and item_list:
             return True
         if _looks_like_untyped_listing_payload(payload):
             listing_like += 1
@@ -230,9 +230,8 @@ def allow_embedded_json_listing_payloads(
         normalized_main_entity_type = _normalized_payload_type(main_entity)
         if "itemlist" in normalized_main_entity_type:
             return True
-        if isinstance(main_entity.get("itemListElement"), list) and main_entity.get(
-            "itemListElement"
-        ):
+        main_item_list = main_entity.get("itemListElement")
+        if isinstance(main_item_list, list) and main_item_list:
             return True
     threshold = max(2, int(listing_min_items))
     return listing_like >= threshold

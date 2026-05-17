@@ -85,7 +85,7 @@ def extract_listing_rows_from_network(
         return []
     rows: list[dict[str, Any]] = []
     seen_urls: set[str] = set()
-    for payload in list(network_payloads or []):
+    for payload in list(network_payloads):
         body = payload.get("body") if isinstance(payload, dict) else None
         for candidate in _iter_listing_price_candidates(body):
             row = _network_listing_row(candidate, page_url=page_url, surface=surface)
@@ -196,7 +196,7 @@ def _listing_network_backfill_maps(
     by_id: dict[str, dict[str, str]] = {}
     by_title: dict[str, dict[str, str]] = {}
     alias_lookup = surface_alias_lookup("ecommerce_listing", None)
-    for payload in list(network_payloads or []):
+    for payload in list(network_payloads):
         body = payload.get("body")
         for candidate in _iter_listing_price_candidates(body):
             entry = _listing_candidate_backfill_entry(
@@ -372,6 +372,11 @@ def _listing_currency_code(value: object) -> str | None:
 
 
 def listing_identity_from_url(url: str) -> str:
+    """Extract listing identity from URL.
+
+    Matches retailer SKU paths like /products/A123456-789/ -> a123456-789.
+    Falls back to the terminal path segment for feeds without that SKU shape.
+    """
     if not url:
         return ""
     path = urlsplit(url).path
