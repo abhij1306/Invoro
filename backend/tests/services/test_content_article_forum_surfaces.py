@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from bs4 import BeautifulSoup
 
+from app.services.extract.content_listing_handler import validate_table_rows_quality
 from app.services.extract.table_extractor import extract_tables
 from app.services.extraction_runtime import extract_records
 from app.services.normalizers import normalize_value
@@ -54,6 +55,26 @@ def test_content_listing_table_rows_keep_open_fields() -> None:
     )
     assert data["country"] == "France"
     assert "country" not in rejected
+
+
+def test_content_listing_table_row_quality_rejects_empty_chrome_rows() -> None:
+    assert (
+        validate_table_rows_quality(
+            [
+                {
+                    "_source": "content_table_rows",
+                    "_extraction_mode": "table_rows",
+                    "title": "OK",
+                },
+                {
+                    "_source": "content_table_rows",
+                    "_extraction_mode": "table_rows",
+                    "title": "",
+                },
+            ]
+        )
+        is False
+    )
 
 
 def test_content_listing_table_row_urls_stay_aligned_when_tr_is_skipped() -> None:
@@ -161,7 +182,10 @@ def test_ecommerce_detail_prefers_product_json_ld_over_faq_question_title() -> N
     )
 
     assert len(rows) == 1
-    assert rows[0]["title"] == "Yamaha R-N800A Network Receiver with Phono and Built-in DAC - Black"
+    assert (
+        rows[0]["title"]
+        == "Yamaha R-N800A Network Receiver with Phono and Built-in DAC - Black"
+    )
     assert rows[0]["sku"] == "0ZK-01A6-00390"
 
 
@@ -194,7 +218,6 @@ def test_detail_spec_tables_use_field_value_shape() -> None:
     assert tables[0]["context"] == "Model"
     assert tables[0]["rows"][0] == {"field": "Brand", "value": "Yamaha"}
     assert tables[1]["rows"][0] == {"field": "Digital Optical Audio", "value": "Yes"}
-    assert tables[1]["rows"][0] == {"field": "Digital Optical Audio", "value": "Yes"}
 
 
 def test_article_listing_requires_article_signal() -> None:
@@ -211,7 +234,10 @@ def test_article_listing_requires_article_signal() -> None:
     )
 
     assert {row["title"] for row in rows} >= {"Launch Notes", "Crawler Patterns"}
-    assert all(row.get("publication_date") or row.get("summary") or row.get("author") for row in rows)
+    assert all(
+        row.get("publication_date") or row.get("summary") or row.get("author")
+        for row in rows
+    )
 
 
 def test_forum_detail_extracts_body_and_counts() -> None:
@@ -231,5 +257,4 @@ def test_forum_detail_extracts_body_and_counts() -> None:
     assert rows[0]["title"] == "How do I tune crawls?"
     assert "explicit surfaces" in rows[0]["content"]
     assert rows[0]["reply_count"] == 12
-    assert rows[0]["view_count"] == 140
     assert rows[0]["view_count"] == 140

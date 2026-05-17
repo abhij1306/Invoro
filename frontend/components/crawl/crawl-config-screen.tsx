@@ -53,6 +53,7 @@ type JsMode = DomainRunProfile['fetch_profile']['js_mode'];
 type TraversalMode = NonNullable<DomainRunProfile['fetch_profile']['traversal_mode']>;
 type TraversalDropdownValue = TraversalMode | 'off';
 type CaptureNetworkMode = DomainRunProfile['diagnostics_profile']['capture_network'];
+type BrowserEngine = DomainRunProfile['acquisition_contract']['preferred_browser_engine'];
 type DiagnosticsPreset = 'lean' | 'standard' | 'deep_debug';
 
 const FETCH_MODE_OPTIONS = new Set<FetchMode>([
@@ -79,6 +80,7 @@ const CAPTURE_NETWORK_OPTIONS = new Set<CaptureNetworkMode>([
   'matched_only',
   'all_small_json',
 ]);
+const BROWSER_ENGINE_OPTIONS = new Set<BrowserEngine>(['auto', 'patchright', 'real_chrome']);
 const RUN_SETUP_ROW_CLASS =
   'grid gap-2 md:grid-cols-[110px_minmax(0,1fr)] md:items-center md:gap-3';
 const RUN_SETUP_CONTROL_CLASS = 'flex md:justify-self-end';
@@ -326,7 +328,8 @@ export function CrawlConfigScreen({
   const lastProfileKeyRef = useRef('');
   const lastDomainMemoryKeyRef = useRef('');
 
-  const activeMode = crawlTab === 'category' ? categoryMode : pdpMode;
+  const effectivePdpMode = crawlDomain === 'forum_thread' ? 'single' : pdpMode;
+  const activeMode = crawlTab === 'category' ? categoryMode : effectivePdpMode;
   const surface = deriveSurface(crawlDomain, crawlTab);
   const domainTabs = DOMAIN_TABS[crawlDomain];
   const activeTabLabel =
@@ -371,6 +374,11 @@ export function CrawlConfigScreen({
     }
     setCrawlTab(domainTabs[0]?.value ?? 'category');
   }, [crawlDomain, crawlTab, domainTabs]);
+
+  useEffect(() => {
+    if (crawlDomain !== 'forum_thread') return;
+    setPdpMode((current) => (current === 'single' ? current : 'single'));
+  }, [crawlDomain]);
 
   useEffect(() => {
     const routeMode = crawlTab === 'category' ? requestedCategoryMode : requestedPdpMode;
@@ -522,7 +530,7 @@ export function CrawlConfigScreen({
     () => ({
       module: crawlTab,
       domain: crawlDomain,
-      mode: crawlTab === 'category' ? categoryMode : pdpMode,
+      mode: crawlTab === 'category' ? categoryMode : effectivePdpMode,
       target_url: targetUrl,
       bulk_urls: bulkUrls,
       csv_file: csvFile,
@@ -546,7 +554,7 @@ export function CrawlConfigScreen({
       crawlTab,
       csvFile,
       maxRecords,
-      pdpMode,
+      effectivePdpMode,
       proxyEnabled,
       proxyInput,
       respectRobotsTxt,
@@ -859,14 +867,14 @@ export function CrawlConfigScreen({
       >
         <Card className="section-card overflow-hidden p-0">
           <header className="border-border flex h-10 items-center justify-between border-b bg-[color-mix(in_srgb,var(--bg-alt)_40%,var(--bg-panel))] px-6">
-            <span className="type-body-sm font-medium text-secondary">Target URL</span>
-            <Badge tone="accent" className="text-xs h-5 px-1.5 font-medium">
+            <span className="type-body-sm text-secondary font-medium">Target URL</span>
+            <Badge tone="accent" className="h-5 px-1.5 text-xs font-medium">
               {activeTabLabel}
             </Badge>
           </header>
           <div className="space-y-5 px-6 pt-6 pb-6">
             <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
-              <div className="flex flex-wrap items-center gap-2.5 ml-[-4px]">
+              <div className="ml-[-4px] flex flex-wrap items-center gap-2.5">
                 {showSurfaceTabs ? (
                   <TabBar
                     value={crawlTab}
@@ -880,39 +888,39 @@ export function CrawlConfigScreen({
                   />
                 ) : null}
                 {showModePicker ? (
-                  <div className="flex flex-wrap items-center gap-2.5 ml-[-4px]">
+                  <div className="ml-[-4px] flex flex-wrap items-center gap-2.5">
                     {crawlTab === 'category' ? (
-                    <TabBar
-                      value={categoryMode}
-                      compact
-                      onChange={(value) => {
-                        const parsed = parseRequestedCategoryMode(value);
-                        if (parsed) {
-                          setCategoryMode(parsed);
-                        }
-                      }}
-                      options={[
-                        { value: 'single', label: 'Single' },
-                        { value: 'sitemap', label: 'Sitemap' },
-                        { value: 'bulk', label: 'Bulk' },
-                      ]}
-                    />
+                      <TabBar
+                        value={categoryMode}
+                        compact
+                        onChange={(value) => {
+                          const parsed = parseRequestedCategoryMode(value);
+                          if (parsed) {
+                            setCategoryMode(parsed);
+                          }
+                        }}
+                        options={[
+                          { value: 'single', label: 'Single' },
+                          { value: 'sitemap', label: 'Sitemap' },
+                          { value: 'bulk', label: 'Bulk' },
+                        ]}
+                      />
                     ) : (
-                    <TabBar
-                      value={pdpMode}
-                      compact
-                      onChange={(value) => {
-                        const parsed = parseRequestedPdpMode(value);
-                        if (parsed) {
-                          setPdpMode(parsed);
-                        }
-                      }}
-                      options={[
-                        { value: 'single', label: 'Single' },
-                        { value: 'batch', label: 'Batch' },
-                        { value: 'csv', label: 'CSV Upload' },
-                      ]}
-                    />
+                      <TabBar
+                        value={pdpMode}
+                        compact
+                        onChange={(value) => {
+                          const parsed = parseRequestedPdpMode(value);
+                          if (parsed) {
+                            setPdpMode(parsed);
+                          }
+                        }}
+                        options={[
+                          { value: 'single', label: 'Single' },
+                          { value: 'batch', label: 'Batch' },
+                          { value: 'csv', label: 'CSV Upload' },
+                        ]}
+                      />
                     )}
                   </div>
                 ) : null}
@@ -1023,8 +1031,8 @@ export function CrawlConfigScreen({
           <div className="h-full xl:sticky xl:top-[68px]">
             <Card className="section-card h-full overflow-hidden p-0">
               <header className="border-border flex h-10 items-center justify-between border-b bg-[color-mix(in_srgb,var(--bg-alt)_40%,var(--bg-panel))] px-6">
-                <span className="type-body-sm font-medium text-secondary">Crawl Settings</span>
-                <Badge tone="accent" className="text-xs h-5 px-1.5 font-medium">
+                <span className="type-body-sm text-secondary font-medium">Crawl Settings</span>
+                <Badge tone="accent" className="h-5 px-1.5 text-xs font-medium">
                   {studioMode === 'advanced' ? 'Advanced' : 'Quick'}
                 </Badge>
               </header>
@@ -1107,7 +1115,9 @@ export function CrawlConfigScreen({
 
                 {proxyEnabled ? (
                   <div className="ml-7 flex flex-col gap-3">
-                    <div className="type-control crawl-control-label">Example Proxy List To Enter</div>
+                    <div className="type-control crawl-control-label">
+                      Example Proxy List To Enter
+                    </div>
                     <Textarea
                       value={proxyInput}
                       onChange={(event) => {
@@ -1133,9 +1143,9 @@ export function CrawlConfigScreen({
         </div>
 
         {studioMode === 'advanced' ? (
-          <Card className="section-card overflow-hidden xl:col-span-2 p-0">
+          <Card className="section-card overflow-hidden p-0 xl:col-span-2">
             <header className="border-border flex h-10 items-center justify-between border-b bg-[color-mix(in_srgb,var(--bg-alt)_40%,var(--bg-panel))] px-6">
-              <span className="type-body-sm font-medium text-secondary">Field Configuration</span>
+              <span className="type-body-sm text-secondary font-medium">Field Configuration</span>
               <div className="flex items-center gap-2">
                 <Button
                   variant="ghost"
@@ -1247,9 +1257,9 @@ export function CrawlConfigScreen({
         ) : null}
 
         {studioMode === 'advanced' ? (
-          <Card className="section-card overflow-visible xl:col-span-2 p-0">
+          <Card className="section-card overflow-visible p-0 xl:col-span-2">
             <header className="border-border flex h-10 items-center justify-between border-b bg-[color-mix(in_srgb,var(--bg-alt)_40%,var(--bg-panel))] px-6">
-              <span className="type-body-sm font-medium text-secondary flex items-center gap-1.5">
+              <span className="type-body-sm text-secondary flex items-center gap-1.5 font-medium">
                 <SlidersHorizontal className="size-3.5" /> Advanced Settings
               </span>
               <Tooltip content="Fine-tune fetch, limits, locality, and diagnostics for this exploratory run.">
@@ -1286,6 +1296,29 @@ export function CrawlConfigScreen({
                         { value: 'http_only', label: 'HTTP Only' },
                         { value: 'browser_only', label: 'Browser Only' },
                         { value: 'http_then_browser', label: 'HTTP Then Browser' },
+                      ]}
+                    />
+                  </div>
+                  <div className={ADVANCED_CONTROL_ROW_CLASS}>
+                    <div className="type-control crawl-control-label">Browser Engine</div>
+                    <Dropdown<BrowserEngine>
+                      ariaLabel="Browser engine"
+                      value={runProfile.acquisition_contract.preferred_browser_engine}
+                      onChange={(next) => {
+                        if (BROWSER_ENGINE_OPTIONS.has(next)) {
+                          markProfileDirty((current) => ({
+                            ...current,
+                            acquisition_contract: {
+                              ...current.acquisition_contract,
+                              preferred_browser_engine: next,
+                            },
+                          }));
+                        }
+                      }}
+                      options={[
+                        { value: 'auto', label: 'Auto' },
+                        { value: 'patchright', label: 'Patchright' },
+                        { value: 'real_chrome', label: 'Real Chrome' },
                       ]}
                     />
                   </div>
@@ -1739,6 +1772,7 @@ export function buildDispatch(
     },
     locality_profile: { ...runProfile.locality_profile },
     diagnostics_profile: { ...runProfile.diagnostics_profile },
+    acquisition_contract: { ...runProfile.acquisition_contract },
     extraction_contract: buildExtractionContract(fieldRows),
   };
 

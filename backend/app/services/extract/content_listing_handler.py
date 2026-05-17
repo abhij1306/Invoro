@@ -10,6 +10,21 @@ from app.services.extract.table_extractor import (
 )
 from app.services.shared.field_coerce import absolute_url, clean_text, finalize_record
 
+_TABLE_ROW_INTERNAL_FIELDS = frozenset({"_source", "_extraction_mode"})
+
+
+def validate_table_rows_quality(listing_rows: list[dict[str, Any]]) -> bool:
+    meaningful_rows = 0
+    for row in listing_rows:
+        meaningful_values = [
+            clean_text(value)
+            for key, value in row.items()
+            if key not in _TABLE_ROW_INTERNAL_FIELDS and clean_text(value)
+        ]
+        if any(len(value) >= 3 for value in meaningful_values):
+            meaningful_rows += 1
+    return meaningful_rows > 0 and meaningful_rows == len(listing_rows)
+
 
 def table_row_records(html: str, page_url: str, *, max_records: int) -> list[dict[str, Any]]:
     soup = BeautifulSoup(html or "", "html.parser")

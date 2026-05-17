@@ -86,7 +86,8 @@ FILE_LOC_BUDGETS = {
     # Variant normalization owns the detail variant cleanup pipeline.
     Path("app/services/extract/variant_record_normalization.py"): 1472,
     # Listing extraction remains coherent but large enough to warrant an explicit budget.
-    Path("app/services/listing_extractor.py"): 1295,
+    # Ratcheted for content table-row fallback paths while this owner awaits a split.
+    Path("app/services/listing_extractor.py"): 1396,
     # Field candidate collection is a current large owner; later extraction
     # slices should split structured candidate assembly and lower this budget.
     Path("app/services/field_value_candidates.py"): 1125,
@@ -98,7 +99,8 @@ FILE_LOC_BUDGETS = {
     # facades preserve imports; later slices split internals under these owners.
     Path("app/services/dom/selector_engine.py"): 1695,
     Path("app/services/extract/detail_materializer.py"): 1435,
-    Path("app/services/fetch/fetch_context.py"): 1386,
+    # Ratcheted for host-policy TTL compatibility and handoff failure isolation.
+    Path("app/services/fetch/fetch_context.py"): 1410,
     Path("app/services/js_state/state_normalizer.py"): 1410,
     # Grown (+187) for listing-integrity escalation retry wiring (task 10.1).
     Path("app/services/pipeline/extraction_loop.py"): 1575,
