@@ -43,7 +43,7 @@ def _object_int(value: object, default: int = 0) -> int:
     if isinstance(value, (int, float)):
         return int(value)
     try:
-        return int(str(value or default))
+        return int(str(default if value is None else value))
     except (TypeError, ValueError):
         return default
 
@@ -132,6 +132,8 @@ def _detail_expansion_extractability(
     soup: BeautifulSoup | None = None,
     surface: str,
     requested_fields: list[str] | None,
+    requested_content_extractability_impl=requested_content_extractability,
+    beautiful_soup_factory=BeautifulSoup,
 ) -> dict[str, object]:
     if soup is None and not str(html or "").strip():
         return {
@@ -141,8 +143,8 @@ def _detail_expansion_extractability(
             "section_fields": [],
         }
     if soup is None:
-        soup = BeautifulSoup(str(html or ""), HTML_PARSER)
-    return requested_content_extractability(
+        soup = beautiful_soup_factory(str(html or ""), HTML_PARSER)
+    return requested_content_extractability_impl(
         soup,
         surface=surface,
         requested_fields=requested_fields,

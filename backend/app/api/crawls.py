@@ -266,7 +266,7 @@ async def crawls_list(
     )
 
 
-@router.get("/{run_id}", responses=RUN_NOT_FOUND_RESPONSE)
+@router.get("/{run_id:int}", responses=RUN_NOT_FOUND_RESPONSE)
 async def crawls_detail(
     run_id: int,
     session: Annotated[AsyncSession, Depends(get_db)],
@@ -282,7 +282,7 @@ async def crawls_detail(
 
 
 @router.delete(
-    "/{run_id}", status_code=status.HTTP_204_NO_CONTENT, responses=RUN_CONFLICT_RESPONSE
+    "/{run_id:int}", status_code=status.HTTP_204_NO_CONTENT, responses=RUN_CONFLICT_RESPONSE
 )
 async def crawls_delete(
     run_id: int,
@@ -304,7 +304,7 @@ async def crawls_delete(
         )
 
 
-@router.post("/{run_id}/pause", responses=RUN_CONFLICT_RESPONSE)
+@router.post("/{run_id:int}/pause", responses=RUN_CONFLICT_RESPONSE)
 async def crawls_pause(
     run_id: int,
     session: Annotated[AsyncSession, Depends(get_db)],
@@ -318,7 +318,7 @@ async def crawls_pause(
     )
 
 
-@router.post("/{run_id}/llm-commit", responses=RUN_NOT_FOUND_RESPONSE)
+@router.post("/{run_id:int}/llm-commit", responses=RUN_NOT_FOUND_RESPONSE)
 async def crawls_llm_commit(
     run_id: int,
     payload: FieldCommitRequest,
@@ -336,7 +336,7 @@ async def crawls_llm_commit(
     )
 
 
-@router.post("/{run_id}/commit-fields", responses=RUN_NOT_FOUND_RESPONSE)
+@router.post("/{run_id:int}/commit-fields", responses=RUN_NOT_FOUND_RESPONSE)
 async def crawls_commit_fields(
     run_id: int,
     payload: FieldCommitRequest,
@@ -354,7 +354,7 @@ async def crawls_commit_fields(
     )
 
 
-@router.post("/{run_id}/resume", responses=RUN_CONFLICT_RESPONSE)
+@router.post("/{run_id:int}/resume", responses=RUN_CONFLICT_RESPONSE)
 async def crawls_resume(
     run_id: int,
     session: Annotated[AsyncSession, Depends(get_db)],
@@ -405,7 +405,7 @@ async def crawls_cancel(
     return await crawls_kill(run_id, session, user)
 
 
-@router.get("/{run_id}/logs", responses=RUN_NOT_FOUND_RESPONSE)
+@router.get("/{run_id:int}/logs", responses=RUN_NOT_FOUND_RESPONSE)
 async def crawls_logs(
     run_id: int,
     session: Annotated[AsyncSession, Depends(get_db)],

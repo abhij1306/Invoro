@@ -23,7 +23,7 @@ def test_absolute_url_repairs_relative_and_bare_host_values() -> None:
     assert absolute_url("https://example.com", "") == ""
 
 
-def testensure_scheme_preserves_relative_and_existing_scheme() -> None:
+def test_ensure_scheme_preserves_relative_and_existing_scheme() -> None:
     assert ensure_scheme("example.com") == "https://example.com"
     assert ensure_scheme("/path") == "/path"
     assert ensure_scheme("javascript:void(0)") == "javascript:void(0)"

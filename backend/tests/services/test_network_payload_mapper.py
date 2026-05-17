@@ -383,7 +383,7 @@ def test_map_network_payloads_to_fields_keeps_richer_product_fields_alongside_av
 # ------------------------------------------------------------------
 
 
-def testlooks_like_product_api_detects_product_payload() -> None:
+def test_looks_like_product_api_detects_product_payload() -> None:
     assert looks_like_product_api({
         "price": "29.99",
         "sku": "ABC-123",
@@ -392,14 +392,14 @@ def testlooks_like_product_api_detects_product_payload() -> None:
     })
 
 
-def testlooks_like_product_api_rejects_insufficient_keys() -> None:
+def test_looks_like_product_api_rejects_insufficient_keys() -> None:
     assert not looks_like_product_api({
         "price": "29.99",
         "sku": "ABC-123",
     })
 
 
-def testlooks_like_job_api_detects_job_payload() -> None:
+def test_looks_like_job_api_detects_job_payload() -> None:
     assert looks_like_job_api({
         "title": "Engineer",
         "description": "Build things",
@@ -408,19 +408,19 @@ def testlooks_like_job_api_detects_job_payload() -> None:
     })
 
 
-def testlooks_like_job_api_rejects_insufficient_keys() -> None:
+def test_looks_like_job_api_rejects_insufficient_keys() -> None:
     assert not looks_like_job_api({
         "title": "Engineer",
         "description": "Build things",
     })
 
 
-def testlooks_like_product_api_rejects_non_dict() -> None:
+def test_looks_like_product_api_rejects_non_dict() -> None:
     assert not looks_like_product_api("not a dict")
     assert not looks_like_product_api([1, 2, 3])
 
 
-def testlooks_like_job_api_rejects_non_dict() -> None:
+def test_looks_like_job_api_rejects_non_dict() -> None:
     assert not looks_like_job_api(None)
     assert not looks_like_job_api("not a dict")
     assert not looks_like_job_api([1, 2, 3])

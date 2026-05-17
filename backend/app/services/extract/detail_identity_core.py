@@ -135,8 +135,7 @@ def prune_irrelevant_detail_dom_nodes(
                 if not isinstance(item, dict):
                     continue
                 if not any(k in item for k in ("name", "offers", "sku", "mpn")):
-                    match_found = True
-                    break
+                    continue
                 if not script_product_name:
                     raw_name = item.get("name")
                     if isinstance(raw_name, str):
@@ -144,8 +143,7 @@ def prune_irrelevant_detail_dom_nodes(
 
                 raw_url = item.get("url") or item.get("@id")
                 if not raw_url:
-                    match_found = True
-                    break
+                    continue
 
                 abs_url = absolute_url(page_url, raw_url)
                 if _detail_url_matches_requested_identity(

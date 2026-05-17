@@ -189,7 +189,7 @@ async def test_direct_record_llm_fallback_backfills_missing_listing_fields(
     assert rows[0]["image_url"] == "https://example.com/widget.jpg"
 
 
-def testbest_adapter_result_deduplicates_unsourced_records() -> None:
+def test_best_adapter_result_deduplicates_unsourced_records() -> None:
     result = best_adapter_result(
         [
             AdapterResult(
@@ -1145,7 +1145,7 @@ def test_url_processing_config_syncs_compatibility_fields_from_acquisition_plan(
     assert config.persist_logs is False
 
 
-def testresolved_url_processing_config_handles_none_plan_limits() -> None:
+def test_resolved_url_processing_config_handles_none_plan_limits() -> None:
     config = URLProcessingConfig.from_acquisition_plan(
         AcquisitionPlan(
             surface="ecommerce_detail",
@@ -1175,7 +1175,7 @@ def testresolved_url_processing_config_handles_none_plan_limits() -> None:
     assert resolved.sleep_ms == 7
 
 
-def testresolved_url_processing_config_preserves_explicit_zero_sleep_ms() -> None:
+def test_resolved_url_processing_config_preserves_explicit_zero_sleep_ms() -> None:
     config = URLProcessingConfig.from_acquisition_plan(
         AcquisitionPlan(
             surface="ecommerce_listing",

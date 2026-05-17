@@ -501,7 +501,7 @@ def _extract_brand_signal_from_card(card, title: str) -> str | None:
     title_text = clean_text(title).casefold()
     for selector in LISTING_BRAND_SELECTORS:
         try:
-            matches = card.css(str(selector))
+            matches = listing_node_css(card, str(selector))
         except SelectolaxError:
             continue
         for node in matches:

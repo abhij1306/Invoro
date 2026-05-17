@@ -395,7 +395,7 @@ async def test_data_enrichment_llm_disabled_makes_no_call(
     assert job.status == DATA_ENRICHMENT_STATUS_ENRICHED
 
 
-def test_data_enrichmentllm_prompt_context_excludes_raw_artifacts() -> None:
+def test_data_enrichment_llm_prompt_context_excludes_raw_artifacts() -> None:
     product = EnrichedProduct(
         job_id=1,
         source_url="https://example.com/products/dress",

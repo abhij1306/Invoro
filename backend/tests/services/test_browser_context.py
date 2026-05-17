@@ -14,6 +14,7 @@ from app.services.acquisition import browser_identity
 from app.services.acquisition import browser_proxy_bridge
 from app.services.acquisition import cookie_store
 from app.services.acquisition import host_protection_memory
+from app.services.acquisition import browser_pool as acquisition_browser_pool
 from app.services.acquisition.browser_readiness import analyze_html
 from app.services.acquisition.browser_proxy_config import build_browser_proxy_config
 from app.services.acquisition import browser_runtime as acquisition_browser_runtime
@@ -3144,7 +3145,7 @@ async def test_get_browser_runtime_evicts_idle_proxied_runtime_when_pool_is_full
             closed.append((self.launch_proxy, self.browser_engine))
 
     monkeypatch.setattr(
-        acquisition_browser_runtime,
+        acquisition_browser_pool,
         "SharedBrowserRuntime",
         FakeRuntime,
     )
@@ -3221,7 +3222,7 @@ async def test_get_browser_runtime_evicts_idle_direct_runtime_when_pool_is_full(
             closed.append((self.launch_proxy, self.browser_engine))
 
     monkeypatch.setattr(
-        acquisition_browser_runtime,
+        acquisition_browser_pool,
         "SharedBrowserRuntime",
         FakeRuntime,
     )

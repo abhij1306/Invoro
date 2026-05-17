@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+from typing import TYPE_CHECKING
 
 from app.services.acquisition.dom_runtime import wait_for_dom_mutation_settle
 from app.services.acquisition.traversal_helpers import (
@@ -10,6 +11,7 @@ from app.services.acquisition.traversal_helpers import (
 )
 from app.services.config.extraction_rules import TRAVERSAL_LISTING_RECOVERY_ACTIONS
 from app.services.config.runtime_settings import crawler_runtime_settings
+from app.services.config.selectors import COOKIE_CONSENT_SELECTORS
 
 try:
     from patchright.async_api import Error as PlaywrightError
@@ -18,6 +20,9 @@ except ImportError:  # pragma: no cover
         pass
 
 logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from app.services.acquisition.traversal import TraversalResult
 
 
 async def _wait_for_dom_mutation_settle(page, **kwargs):
@@ -47,6 +52,8 @@ async def recover_listing_page_content(
         diagnostics["actions_taken"] = actions_taken
         diagnostics["status"] = "disabled"
         return diagnostics
+
+    from app.services.acquisition.traversal import TraversalResult
 
     helper_result = TraversalResult(requested_mode="recovery")
     wait_ms = max(0, int(crawler_runtime_settings.listing_recovery_post_action_wait_ms))
@@ -345,8 +352,6 @@ async def dismiss_overlays_if_needed(
         dismissed_any = int(muted_count or 0) > 0
     except Exception:
         logger.debug("Traversal overlay dismissal JS failed", exc_info=True)
-    # Dismiss cookie consent banners
-    from app.services.config.selectors import COOKIE_CONSENT_SELECTORS
     consent_selectors = (
         list(COOKIE_CONSENT_SELECTORS)
         if isinstance(COOKIE_CONSENT_SELECTORS, (list, tuple))
@@ -392,7 +397,7 @@ async def _restore_overlays(page) -> None:
                     try {
                         const origPE = node.getAttribute('data-crawlwise-orig-pointer-events');
                         const origZI = node.getAttribute('data-crawlwise-orig-z-index');
-                        if (origPE !== undefined) {
+                        if (origPE !== null) {
                             if (origPE === '') {
                                 node.style.removeProperty('pointer-events');
                             } else {
@@ -400,7 +405,7 @@ async def _restore_overlays(page) -> None:
                             }
                             node.removeAttribute('data-crawlwise-orig-pointer-events');
                         }
-                        if (origZI !== undefined) {
+                        if (origZI !== null) {
                             if (origZI === '') {
                                 node.style.removeProperty('z-index');
                             } else {

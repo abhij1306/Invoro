@@ -106,7 +106,7 @@ def attach_browser_attempt_diagnostics(
 ) -> None:
     if not diagnostics:
         return
-    merged = dict(result.browser_diagnostics or {})
+    merged = dict(getattr(result, "browser_diagnostics", None) or {})
     merged.update(dict(diagnostics))
     result.browser_diagnostics = merged
 

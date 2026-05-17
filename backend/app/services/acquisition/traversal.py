@@ -234,9 +234,7 @@ async def execute_listing_traversal(
         _set_stop_reason(result, "unsupported_mode", surface=surface, traversal_mode=normalized_mode)
 
     if not result.html_fragments:
-        result.html_fragments = [
-            (await get_page_html(page, flatten_shadow=False), True)
-        ]
+        await _append_html_fragment(page, result, surface=surface)
     return result
 
 

@@ -259,7 +259,12 @@ def reconcile_detail_currency_with_url(
     before_currency = text_or_none(record.get("currency"))
 
     adapter_price = "adapter" in record_field_sources(record, "price")
-    if not (strong_host_hint and adapter_price and before_currency != expected_currency):
+    if not (
+        strong_host_hint
+        and adapter_price
+        and before_currency is not None
+        and before_currency != expected_currency
+    ):
         _reconcile_container_currency(
             record,
             expected_currency=expected_currency,
@@ -287,7 +292,12 @@ def reconcile_detail_currency_with_url(
         for index, variant in enumerate(variants):
             if isinstance(variant, dict):
                 before_currency = text_or_none(variant.get("currency"))
-                if not (strong_host_hint and adapter_variants and before_currency != expected_currency):
+                if not (
+                    strong_host_hint
+                    and adapter_variants
+                    and before_currency is not None
+                    and before_currency != expected_currency
+                ):
                     _reconcile_container_currency(
                         variant,
                         expected_currency=expected_currency,

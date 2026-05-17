@@ -31,11 +31,30 @@ extract_heading_sections = _impl.extract_heading_sections
 # at load time so the implementation sees the same defaults.
 _impl.DOM_VARIANT_GROUP_LIMIT = DOM_VARIANT_GROUP_LIMIT
 _impl.DOM_VARIANT_CARTESIAN_COMBO_LIMIT = DOM_VARIANT_CARTESIAN_COMBO_LIMIT
+_DEFAULT_DOM_VARIANT_GROUP_LIMIT = DOM_VARIANT_GROUP_LIMIT
+_DEFAULT_DOM_VARIANT_CARTESIAN_COMBO_LIMIT = DOM_VARIANT_CARTESIAN_COMBO_LIMIT
 
 
-apply_dom_fallbacks = _impl.apply_dom_fallbacks
-extract_variants_from_dom = _impl.extract_variants_from_dom
-backfill_variants_from_dom_if_missing = _impl.backfill_variants_from_dom_if_missing
+def _sync_limit_patchpoints() -> None:
+    if DOM_VARIANT_GROUP_LIMIT != _DEFAULT_DOM_VARIANT_GROUP_LIMIT:
+        _impl.DOM_VARIANT_GROUP_LIMIT = DOM_VARIANT_GROUP_LIMIT
+    if DOM_VARIANT_CARTESIAN_COMBO_LIMIT != _DEFAULT_DOM_VARIANT_CARTESIAN_COMBO_LIMIT:
+        _impl.DOM_VARIANT_CARTESIAN_COMBO_LIMIT = DOM_VARIANT_CARTESIAN_COMBO_LIMIT
+
+
+def apply_dom_fallbacks(*args, **kwargs):
+    _sync_limit_patchpoints()
+    return _impl.apply_dom_fallbacks(*args, **kwargs)
+
+
+def extract_variants_from_dom(*args, **kwargs):
+    _sync_limit_patchpoints()
+    return _impl.extract_variants_from_dom(*args, **kwargs)
+
+
+def backfill_variants_from_dom_if_missing(*args, **kwargs):
+    _sync_limit_patchpoints()
+    return _impl.backfill_variants_from_dom_if_missing(*args, **kwargs)
 
 
 __all__ = [

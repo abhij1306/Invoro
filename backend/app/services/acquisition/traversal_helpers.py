@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from typing import TYPE_CHECKING
 from urllib.parse import urlsplit
 
 from selectolax.lexbor import LexborHTMLParser
@@ -26,6 +27,9 @@ from app.services.platform_policy import (
 )
 
 logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from app.services.acquisition.traversal import TraversalResult
 
 
 async def _wait_for_dom_mutation_settle(page, **kwargs):

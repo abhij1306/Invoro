@@ -24,7 +24,7 @@ def extract_xml_sitemap_records(
         return []
     try:
         root = ET.fromstring(raw)
-    except ET.ParseError:
+    except Exception:
         return []
     records: list[dict[str, Any]] = []
     seen_urls: set[str] = set()

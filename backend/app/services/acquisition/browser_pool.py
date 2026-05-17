@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-import concurrent.futures
 import logging
-import threading
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -26,6 +24,7 @@ from app.services.acquisition.browser_identity import (
     build_playwright_context_spec,
     clear_browser_identity_cache,
 )
+from app.services.acquisition.browser_page_helpers import object_int as _int_or_zero
 from app.services.acquisition.browser_proxy_bridge import (
     Socks5AuthBridge,
     parse_socks5_upstream_proxy,
@@ -760,19 +759,6 @@ def shutdown_browser_runtime_sync() -> None:
     except RuntimeError:
         asyncio.run(shutdown_browser_runtime())
         return
-    try:
-        loop_thread_id = getattr(loop, "_thread_id")
-    except Exception:
-        loop_thread_id = None
-    if loop_thread_id is not None and loop_thread_id != threading.get_ident():
-        future = asyncio.run_coroutine_threadsafe(shutdown_browser_runtime(), loop)
-        try:
-            future.result(timeout=_browser_shutdown_timeout_seconds())
-        except concurrent.futures.TimeoutError:
-            logger.warning("Timed out waiting for browser runtime shutdown to complete")
-        except Exception:
-            logger.exception("Browser runtime shutdown task failed")
-        return
     # When called from the event loop thread, waiting synchronously would deadlock
     # the loop, so shutdown remains best-effort and logs completion asynchronously.
     task = loop.create_task(shutdown_browser_runtime())
@@ -841,18 +827,6 @@ def _browser_close_timeout_seconds() -> float:
         float(crawler_runtime_settings.browser_close_timeout_ms) / 1000,
     )
 
-def _browser_shutdown_timeout_seconds() -> float:
-    try:
-        return max(
-            0.1, float(crawler_runtime_settings.browser_shutdown_timeout_seconds)
-        )
-    except (TypeError, ValueError):
-        logger.warning(
-            "Invalid browser_shutdown_timeout_seconds=%r; using 10.0s",
-            crawler_runtime_settings.browser_shutdown_timeout_seconds,
-        )
-        return 10.0
-
 async def _close_browser_context_safely(context: Any) -> None:
     try:
         await asyncio.wait_for(
@@ -882,18 +856,3 @@ def _snapshot_count(snapshot: dict[str, object], *keys: str) -> int:
         if value is not None:
             return _int_or_zero(value)
     return 0
-
-def _int_or_zero(value: object) -> int:
-    if isinstance(value, bool):
-        return int(value)
-    if isinstance(value, int):
-        return value
-    if isinstance(value, float):
-        return int(value)
-    normalized = str(value or "").strip()
-    if not normalized:
-        return 0
-    try:
-        return int(normalized)
-    except (TypeError, ValueError):
-        return 0

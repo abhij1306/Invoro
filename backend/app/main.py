@@ -7,6 +7,7 @@ import re
 from collections import OrderedDict, deque
 from contextlib import asynccontextmanager
 from time import monotonic
+from types import MappingProxyType
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -152,7 +153,24 @@ def _client_rate_limit_key(request: Request) -> str:
 sanitize_header_value = _sanitize_header_value
 sanitize_header_name = _sanitize_header_name
 client_rate_limit_key = _client_rate_limit_key
-RATE_LIMIT_BUCKETS = _RATE_LIMIT_BUCKETS
+RATE_LIMIT_BUCKETS = MappingProxyType(_RATE_LIMIT_BUCKETS)
+
+
+def rate_limit_buckets_snapshot() -> OrderedDict[str, deque[float]]:
+    return OrderedDict((key, deque(value)) for key, value in _RATE_LIMIT_BUCKETS.items())
+
+
+def clear_rate_limit_buckets_for_testing() -> None:
+    _RATE_LIMIT_BUCKETS.clear()
+
+
+def restore_rate_limit_buckets_for_testing(
+    buckets: OrderedDict[str, deque[float]],
+) -> None:
+    _RATE_LIMIT_BUCKETS.clear()
+    _RATE_LIMIT_BUCKETS.update(
+        OrderedDict((key, deque(value)) for key, value in buckets.items())
+    )
 
 
 def _is_trusted_proxy(proxy_ip: str) -> bool:
@@ -249,12 +267,8 @@ async def metrics() -> Response:
     return Response(content=payload, media_type=content_type)
 
 
-# NOTE: crawl_domain_router and crawls_router both use the "/api/crawls"
-# prefix. Order matters: crawl_domain_router must be registered BEFORE
-# crawls_router because the latter defines the catch-all "/{run_id}" path.
-# FastAPI matches routes in registration order; reversing this would cause
-# crawls_router to claim "/api/crawls/domain-run-profile" and shadow the
-# specific crawl_domain endpoints with a 422 response.
+# crawl_domain_router and crawls_router share "/api/crawls". Dynamic run routes
+# use the int path converter, so non-run domain-memory routes are not shadowed.
 for router in [
     auth_router,
     users_router,

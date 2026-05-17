@@ -259,7 +259,8 @@ async def _run_job(session: AsyncSession, job: DataEnrichmentJob) -> None:
     await session.commit()
 
 
-run_job = _run_job
+async def run_job(session: AsyncSession, job: DataEnrichmentJob) -> None:
+    await _run_job(session, job)
 
 
 async def _enrich_product(
@@ -389,6 +390,7 @@ def _apply_llm_payload(
             product.color_family = color_family
             applied.append("color_family")
     if product.size_normalized is None:
+        category_match = _category_match_for_product_path(product.category_path)
         size_normalized, size_system = normalize_sizes(
             {
                 "size": payload.get("size_normalized"),
@@ -396,7 +398,7 @@ def _apply_llm_payload(
                 "category": product.category_path,
             },
             terms=terms,
-            category_match=match_category_path({"category": product.category_path}),
+            category_match=category_match,
         )
         if size_normalized:
             product.size_normalized = size_normalized
@@ -461,11 +463,26 @@ def _apply_llm_payload(
         payload.get("audience"),
         allowed_values=audience_allowed_values,
     )
-    product.audience = audience_values
     if audience_values:
+        product.audience = audience_values
         applied.append("audience")
     product.taxonomy_version = DATA_ENRICHMENT_TAXONOMY_VERSION
     return applied
+
+
+def _category_match_for_product_path(category_path: str | None) -> dict[str, object] | None:
+    if not category_path:
+        return None
+    taxonomy_reference = taxonomy_reference_for_category_path(
+        category_path,
+        load_taxonomy_index(),
+    )
+    if not taxonomy_reference:
+        return None
+    return {
+        "category_path": str(taxonomy_reference.get("category_path") or category_path),
+        "taxonomy_reference": taxonomy_reference,
+    }
 
 
 async def _upsert_enriched_product(
@@ -703,4 +720,5 @@ def _as_int(value: object) -> int | None:
     return parsed if parsed > 0 else None
 
 
-llm_prompt_context = _llm_prompt_context
+def llm_prompt_context(*args, **kwargs):
+    return _llm_prompt_context(*args, **kwargs)

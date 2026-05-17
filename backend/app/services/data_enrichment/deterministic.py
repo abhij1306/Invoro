@@ -43,7 +43,11 @@ from app.services.shared.field_coerce import (
 
 logger = logging.getLogger(__name__)
 token_re = re.compile(r"[a-z0-9]+")
-price_range_re = re.compile(r"(.+?)(?:\s+(?:to)\s+|\s*[-–]\s*)(.+)", re.I)
+price_range_re = re.compile(
+    r"\s*[^\d+-]*([+-]?\d[\d,]*(?:\.\d+)?)\s*(?:to|[-–])\s*"
+    r"[^\d+-]*([+-]?\d[\d,]*(?:\.\d+)?)\s*",
+    re.I,
+)
 
 
 def build_deterministic_enrichment(

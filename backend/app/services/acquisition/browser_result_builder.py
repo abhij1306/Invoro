@@ -63,6 +63,12 @@ class BrowserAcquisitionResultBuilder:
         capture_browser_screenshot,
         emit_browser_event,
         elapsed_ms,
+        build_browser_diagnostics_impl,
+        build_browser_artifacts_impl,
+        capture_rendered_listing_fragments_impl,
+        capture_listing_visual_elements_impl,
+        ready_probe_supports_fast_finalize_impl,
+        logger_impl,
     ) -> None:
         self.payload = payload
         self.blocked_html_checker = blocked_html_checker
@@ -72,6 +78,12 @@ class BrowserAcquisitionResultBuilder:
         self.capture_browser_screenshot = capture_browser_screenshot
         self.emit_browser_event = emit_browser_event
         self.elapsed_ms = elapsed_ms
+        self.build_browser_diagnostics = build_browser_diagnostics_impl
+        self.build_browser_artifacts = build_browser_artifacts_impl
+        self.capture_rendered_listing_fragments = capture_rendered_listing_fragments_impl
+        self.capture_listing_visual_elements = capture_listing_visual_elements_impl
+        self.ready_probe_supports_fast_finalize = ready_probe_supports_fast_finalize_impl
+        self.logger = logger_impl
 
     async def build(self) -> dict[str, object]:
         payload = self.payload
@@ -94,7 +106,7 @@ class BrowserAcquisitionResultBuilder:
             payload_capture_started_at
         )
         html_bytes = len(payload.html.encode("utf-8"))
-        fast_finalize = _ready_probe_supports_fast_finalize(
+        fast_finalize = self.ready_probe_supports_fast_finalize(
             payload.readiness_probes,
             surface=payload.surface,
             status_code=status_code,
@@ -165,7 +177,7 @@ class BrowserAcquisitionResultBuilder:
             "rendered_listing_fragments": len(rendered_listing_fragments),
             "listing_visual_elements": len(listing_visual_elements),
         }
-        diagnostics = build_browser_diagnostics(
+        diagnostics = self.build_browser_diagnostics(
             browser_reason=payload.browser_reason,
             browser_outcome=browser_outcome,
             navigation_strategy=payload.navigation_strategy,
@@ -197,7 +209,7 @@ class BrowserAcquisitionResultBuilder:
             "listing_visual_elements"
         ]
         diagnostics["extractable_listing_evidence"] = listing_evidence_counts
-        artifacts = build_browser_artifacts(
+        artifacts = self.build_browser_artifacts(
             screenshot_path=screenshot_path,
             traversal_result=payload.traversal_result,
             html=payload.html,
@@ -288,7 +300,7 @@ class BrowserAcquisitionResultBuilder:
             payload.html,
             html_bytes=html_bytes,
         )
-        logger.warning(
+        self.logger.warning(
             "Browser acquisition outcome=%s url=%s html_bytes=%s low_content_reason=%s probes=%s",
             browser_outcome,
             payload.url,
@@ -318,7 +330,7 @@ class BrowserAcquisitionResultBuilder:
                 rendered_listing_fragments,
                 rendered_listing_fragment_capture,
             ) = await self._capture_timed_listing_artifact(
-                capture_rendered_listing_fragments(
+                self.capture_rendered_listing_fragments(
                     payload.page,
                     surface=payload.surface,
                     limit=int(crawler_runtime_settings.rendered_listing_card_capture_limit),
@@ -337,7 +349,7 @@ class BrowserAcquisitionResultBuilder:
                 listing_visual_elements,
                 listing_visual_capture,
             ) = await self._capture_timed_listing_artifact(
-                _capture_listing_visual_elements(
+                self.capture_listing_visual_elements(
                     payload.page,
                     surface=payload.surface,
                 ),
@@ -373,6 +385,7 @@ class BrowserAcquisitionResultBuilder:
             stage=stage,
             url=payload.url,
             item_kind=item_kind,
+            logger_impl=self.logger,
         )
         payload.phase_timings_ms[stage] = self.elapsed_ms(started_at)
         return artifacts, capture_diagnostics
@@ -383,6 +396,7 @@ async def _capture_listing_artifact_with_timeout(
     stage: str,
     url: str,
     item_kind: str = "mapping",
+    logger_impl=logger,
 ) -> tuple[list[object], dict[str, object]]:
     timeout_seconds = max(
         0.1,
@@ -393,7 +407,7 @@ async def _capture_listing_artifact_with_timeout(
     except asyncio.CancelledError:
         raise
     except asyncio.TimeoutError:
-        logger.warning(
+        logger_impl.warning(
             "Timed out during %s for %s after %.1fs",
             stage,
             url,
@@ -401,11 +415,11 @@ async def _capture_listing_artifact_with_timeout(
         )
         return [], {"status": "timeout"}
     except PlaywrightTimeoutError:
-        logger.warning("Playwright timed out during %s for %s", stage, url)
+        logger_impl.warning("Playwright timed out during %s for %s", stage, url)
         return [], {"status": "playwright_timeout"}
     except PlaywrightError as exc:
         status = "closed" if is_response_closed_error(exc) else "playwright_error"
-        logger.debug(
+        logger_impl.debug(
             "Listing artifact capture Playwright error stage=%s url=%s status=%s",
             stage,
             url,
@@ -414,7 +428,7 @@ async def _capture_listing_artifact_with_timeout(
         )
         return [], {"status": status}
     except Exception:
-        logger.exception(
+        logger_impl.exception(
             "Listing artifact capture unexpected error stage=%s url=%s",
             stage,
             url,
@@ -580,6 +594,12 @@ async def finalize_browser_fetch(
     capture_browser_screenshot,
     emit_browser_event,
     elapsed_ms,
+    build_browser_diagnostics_impl=build_browser_diagnostics,
+    build_browser_artifacts_impl=build_browser_artifacts,
+    capture_rendered_listing_fragments_impl=capture_rendered_listing_fragments,
+    capture_listing_visual_elements_impl=_capture_listing_visual_elements,
+    ready_probe_supports_fast_finalize_impl=_ready_probe_supports_fast_finalize,
+    logger_impl=logger,
 ) -> dict[str, object]:
     builder = BrowserAcquisitionResultBuilder(
         payload,
@@ -590,5 +610,11 @@ async def finalize_browser_fetch(
         capture_browser_screenshot=capture_browser_screenshot,
         emit_browser_event=emit_browser_event,
         elapsed_ms=elapsed_ms,
+        build_browser_diagnostics_impl=build_browser_diagnostics_impl,
+        build_browser_artifacts_impl=build_browser_artifacts_impl,
+        capture_rendered_listing_fragments_impl=capture_rendered_listing_fragments_impl,
+        capture_listing_visual_elements_impl=capture_listing_visual_elements_impl,
+        ready_probe_supports_fast_finalize_impl=ready_probe_supports_fast_finalize_impl,
+        logger_impl=logger_impl,
     )
     return await builder.build()

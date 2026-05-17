@@ -278,8 +278,11 @@ async def _extract_records_from_preserved_browser_html(
     rendered_html = str(artifacts.get("full_rendered_html") or "").strip()
     if not rendered_html or rendered_html == str(acquisition_result.html or "").strip():
         return []
+    from app.services.pipeline import extraction_loop as _extraction_loop
+
+    extract_impl = getattr(_extraction_loop, "extract_records", extract_records)
     fallback_records = await asyncio.to_thread(
-        getattr(__import__("app.services.pipeline.extraction_loop", fromlist=["extract_records"]), "extract_records", extract_records),
+        extract_impl,
         rendered_html,
         acquisition_result.final_url,
         context.surface,

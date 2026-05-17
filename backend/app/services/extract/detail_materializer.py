@@ -25,18 +25,18 @@ def _sync_test_patchpoints() -> None:
     _impl._detail_identity_codes_from_url = _detail_identity_codes_from_url
 
 
+_sync_test_patchpoints()
+
+
 def _prune_irrelevant_detail_structured_payload(*args, **kwargs):
-    _sync_test_patchpoints()
     return _impl._prune_irrelevant_detail_structured_payload(*args, **kwargs)
 
 
 def build_detail_record(*args, **kwargs):
-    _sync_test_patchpoints()
     return _impl.build_detail_record(*args, **kwargs)
 
 
 def extract_detail_records(*args, **kwargs):
-    _sync_test_patchpoints()
     return _impl.extract_detail_records(*args, **kwargs)
 
 
@@ -65,8 +65,4 @@ __all__ = [
     "extract_detail_records",
     "infer_detail_failure_reason",
     "repair_ecommerce_detail_record_quality",
-    "_materialize_image_fields",
-    "_prune_irrelevant_detail_structured_payload",
-    "_requires_dom_completion",
-    "_should_collect_dom_variants",
 ]

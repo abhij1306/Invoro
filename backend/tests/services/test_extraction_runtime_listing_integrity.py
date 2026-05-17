@@ -1,4 +1,4 @@
-"""Unit tests for propagate_listing_integrity_to_diagnostics in extraction_runtime.
+"""Unit tests for app.services.pipeline.listing_integrity.propagate_listing_integrity_to_diagnostics.
 
 Validates task 8.1 requirements:
 - Thread IntegrityDecision onto browser_diagnostics under key listing_integrity

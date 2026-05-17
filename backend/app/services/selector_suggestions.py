@@ -69,7 +69,7 @@ def listing_card_suggestions(
     html: str,
     field_name: str,
 ) -> list[dict[str, object]]:
-    card_selectors = list(CARD_SELECTORS.get("ecommerce") or [])
+    card_selectors = CARD_SELECTORS.get("ecommerce") or []
     first_card = None
     for card_sel in card_selectors:
         cards = soup.select(str(card_sel))

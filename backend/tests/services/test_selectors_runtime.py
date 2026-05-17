@@ -155,6 +155,6 @@ async def test_list_selector_records_without_surface_returns_all_domain_surfaces
     }
 
 
-def testcoerce_int_preserves_zero() -> None:
+def test_coerce_int_preserves_zero() -> None:
     assert coerce_int(0, default=9) == 0
     assert coerce_int(" 0 ", default=9) == 0

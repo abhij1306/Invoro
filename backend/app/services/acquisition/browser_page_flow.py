@@ -8,7 +8,6 @@ from patchright.async_api import Error as PlaywrightError
 from patchright.async_api import TimeoutError as PlaywrightTimeoutError
 
 from app.services.acquisition.browser_readiness import HtmlAnalysis, analyze_html
-from app.services.acquisition import browser_page_helpers as _browser_page_helpers
 from app.services.acquisition.browser_page_helpers import (
     capture_listing_visual_elements,
     detail_expansion_can_skip,
@@ -48,10 +47,11 @@ build_browser_artifacts = _browser_result_builder.build_browser_artifacts
 
 
 def _detail_expansion_extractability(*args, **kwargs):
-    _browser_page_helpers.requested_content_extractability = (
-        requested_content_extractability
+    kwargs.setdefault(
+        "requested_content_extractability_impl",
+        requested_content_extractability,
     )
-    _browser_page_helpers.BeautifulSoup = BeautifulSoup
+    kwargs.setdefault("beautiful_soup_factory", BeautifulSoup)
     return detail_expansion_extractability(*args, **kwargs)
 
 
@@ -689,7 +689,7 @@ _ready_probe_supports_fast_finalize = (
 
 
 async def _capture_listing_artifact_with_timeout(*args, **kwargs):
-    _browser_result_builder.logger = logger
+    kwargs.setdefault("logger_impl", logger)
     return await _browser_result_builder._capture_listing_artifact_with_timeout(
         *args,
         **kwargs,
@@ -697,16 +697,21 @@ async def _capture_listing_artifact_with_timeout(*args, **kwargs):
 
 
 async def finalize_browser_fetch(*args, **kwargs):
-    _browser_result_builder.capture_rendered_listing_fragments = (
-        capture_rendered_listing_fragments
+    kwargs.setdefault("build_browser_diagnostics_impl", build_browser_diagnostics)
+    kwargs.setdefault("build_browser_artifacts_impl", build_browser_artifacts)
+    kwargs.setdefault(
+        "capture_rendered_listing_fragments_impl",
+        capture_rendered_listing_fragments,
     )
-    _browser_result_builder._capture_listing_visual_elements = (
-        _capture_listing_visual_elements
+    kwargs.setdefault(
+        "capture_listing_visual_elements_impl",
+        _capture_listing_visual_elements,
     )
-    _browser_result_builder.logger = logger
-    _browser_result_builder._ready_probe_supports_fast_finalize = (
-        _ready_probe_supports_fast_finalize
+    kwargs.setdefault(
+        "ready_probe_supports_fast_finalize_impl",
+        _ready_probe_supports_fast_finalize,
     )
+    kwargs.setdefault("logger_impl", logger)
     return await _browser_result_builder.finalize_browser_fetch(*args, **kwargs)
 
 

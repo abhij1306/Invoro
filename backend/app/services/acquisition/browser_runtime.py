@@ -16,12 +16,14 @@ from app.services.acquisition.browser_capture import (
     should_capture_network_payload,
 )
 from app.services.acquisition.browser_detail import (
-    accessibility_expand_candidates,
-    expand_all_interactive_elements,
+    DETAIL_AOM_EXPAND_ROLES,
+    DETAIL_EXPAND_SELECTORS,
+    accessibility_expand_candidates_impl,
     expand_detail_content_if_needed_impl,
-    expand_interactive_elements_via_accessibility,
+    expand_all_interactive_elements_impl,
+    expand_interactive_elements_via_accessibility_impl,
     interactive_candidate_snapshot,
-    detail_expansion_keywords,
+    detail_expansion_keywords as _detail_expansion_keywords_impl,
 )
 from app.services.acquisition.browser_diagnostics import (
     CHROMIUM_BROWSER_ENGINE as _CHROMIUM_BROWSER_ENGINE,
@@ -130,7 +132,8 @@ logger = logging.getLogger(__name__)
 
 def _sync_browser_pool_compatibility() -> None:
     _browser_pool.SharedBrowserRuntime = SharedBrowserRuntime
-    _browser_pool._BROWSER_POOL = _BROWSER_POOL
+    if _browser_pool._BROWSER_POOL is not _BROWSER_POOL:
+        _browser_pool._BROWSER_POOL = _BROWSER_POOL
     _browser_pool.build_playwright_context_spec = build_playwright_context_spec
     _browser_pool._resolve_browser_binary = _resolve_browser_binary
     _browser_pool.persist_context_storage_state = persist_context_storage_state
@@ -141,23 +144,22 @@ def _sync_browser_pool_compatibility() -> None:
     )
 
 
+_sync_browser_pool_compatibility()
+
+
 async def get_browser_runtime(*args, **kwargs):
-    _sync_browser_pool_compatibility()
     return await _get_browser_runtime_impl(*args, **kwargs)
 
 
 async def shutdown_browser_runtime() -> None:
-    _sync_browser_pool_compatibility()
     await _shutdown_browser_runtime_impl()
 
 
 def shutdown_browser_runtime_sync() -> None:
-    _sync_browser_pool_compatibility()
     _shutdown_browser_runtime_sync_impl()
 
 
 def browser_runtime_snapshot() -> dict[str, int | bool]:
-    _sync_browser_pool_compatibility()
     return _browser_runtime_snapshot_impl()
 
 
@@ -176,6 +178,71 @@ def _should_run_behavior_realism(engine: str, *, browser_reason: str | None) -> 
         return False
     return reason in BEHAVIOR_REALISM_ELIGIBLE_BROWSER_REASONS or reason.startswith(
         WARMUP_VENDOR_BLOCK_PREFIX
+    )
+
+
+def detail_expansion_keywords(
+    surface: str,
+    *,
+    requested_fields: list[str] | None = None,
+) -> tuple[str, ...]:
+    return _detail_expansion_keywords_impl(
+        surface,
+        requested_fields=requested_fields,
+    )
+
+
+async def expand_all_interactive_elements(
+    page: Any,
+    *,
+    surface: str = "",
+    requested_fields: list[str] | None = None,
+    checkpoint: Any = None,
+    max_elapsed_ms: int | None = None,
+) -> dict[str, object]:
+    del checkpoint
+    return await expand_all_interactive_elements_impl(
+        page,
+        surface=surface,
+        requested_fields=requested_fields,
+        detail_expand_selectors=DETAIL_EXPAND_SELECTORS,
+        detail_expansion_keywords=detail_expansion_keywords,
+        interactive_candidate_snapshot=interactive_candidate_snapshot,
+        elapsed_ms=_elapsed_ms,
+        max_elapsed_ms=max_elapsed_ms,
+    )
+
+
+async def expand_interactive_elements_via_accessibility(
+    page: Any,
+    *,
+    surface: str = "",
+    requested_fields: list[str] | None = None,
+    max_elapsed_ms: int | None = None,
+) -> dict[str, object]:
+    return await expand_interactive_elements_via_accessibility_impl(
+        page,
+        surface=surface,
+        requested_fields=requested_fields,
+        accessibility_expand_candidates=accessibility_expand_candidates,
+        detail_expansion_keywords=detail_expansion_keywords,
+        elapsed_ms=_elapsed_ms,
+        max_elapsed_ms=max_elapsed_ms,
+    )
+
+
+def accessibility_expand_candidates(
+    snapshot: dict[str, object] | None,
+    *,
+    surface: str,
+    requested_fields: list[str] | None = None,
+) -> list[tuple[str, str]]:
+    return accessibility_expand_candidates_impl(
+        snapshot,
+        surface=surface,
+        requested_fields=requested_fields,
+        aom_expand_roles=set(DETAIL_AOM_EXPAND_ROLES),
+        detail_expansion_keywords=detail_expansion_keywords,
     )
 
 
@@ -945,7 +1012,10 @@ __all__ = [
     "capture_browser_screenshot",
     "classify_network_endpoint",
     "classify_browser_outcome",
+    "detail_expansion_keywords",
     "expand_all_interactive_elements",
+    "expand_detail_content_if_needed",
+    "expand_interactive_elements_via_accessibility",
     "interactive_candidate_snapshot",
     "get_browser_runtime",
     "looks_like_low_content_shell",

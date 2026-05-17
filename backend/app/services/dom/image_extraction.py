@@ -265,13 +265,16 @@ def extract_page_images(
     for index, node in enumerate(root.find_all(["img", "source"])):
         if is_non_primary_image_context(node):
             continue
-        if exclude_linked_detail_images and callable(other_detail_link_checker):
+        if exclude_linked_detail_images:
             link = node.find_parent("a", href=True)
-            if link is not None and other_detail_link_checker(
-                absolute_url(page_url, link.get("href")),
-                page_url,
-                surface=surface,
-                link_node=link,
+            if link is not None and (
+                not callable(other_detail_link_checker)
+                or other_detail_link_checker(
+                    absolute_url(page_url, link.get("href")),
+                    page_url,
+                    surface=surface,
+                    link_node=link,
+                )
             ):
                 continue
         for candidate in candidate_image_urls_from_node(node, page_url):

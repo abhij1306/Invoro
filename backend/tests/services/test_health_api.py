@@ -1,12 +1,16 @@
 from __future__ import annotations
 
-from collections import OrderedDict, deque
-
 import pytest
 from httpx import ASGITransport, AsyncClient
 from starlette.requests import Request
 
-from app.main import RATE_LIMIT_BUCKETS, client_rate_limit_key, app
+from app.main import (
+    clear_rate_limit_buckets_for_testing,
+    client_rate_limit_key,
+    rate_limit_buckets_snapshot,
+    restore_rate_limit_buckets_for_testing,
+    app,
+)
 from app.services.config.runtime_settings import crawler_runtime_settings
 
 
@@ -53,10 +57,8 @@ async def test_ready_health_endpoint_reports_dependency_failure(monkeypatch) -> 
 
 @pytest.mark.asyncio
 async def test_http_rate_limit_rejects_excess_requests(monkeypatch) -> None:
-    previous_buckets = OrderedDict(
-        (key, deque(value)) for key, value in RATE_LIMIT_BUCKETS.items()
-    )
-    RATE_LIMIT_BUCKETS.clear()
+    previous_buckets = rate_limit_buckets_snapshot()
+    clear_rate_limit_buckets_for_testing()
     try:
         monkeypatch.setattr(crawler_runtime_settings, "api_rate_limit_enabled", True)
         monkeypatch.setattr(crawler_runtime_settings, "api_rate_limit_max_requests", 1)
@@ -78,16 +80,13 @@ async def test_http_rate_limit_rejects_excess_requests(monkeypatch) -> None:
         assert "retry-after" in second.headers
         assert int(second.headers["retry-after"]) > 0
     finally:
-        RATE_LIMIT_BUCKETS.clear()
-        RATE_LIMIT_BUCKETS.update(previous_buckets)
+        restore_rate_limit_buckets_for_testing(previous_buckets)
 
 
 @pytest.mark.asyncio
 async def test_health_and_metrics_skip_http_rate_limit(monkeypatch) -> None:
-    previous_buckets = OrderedDict(
-        (key, deque(value)) for key, value in RATE_LIMIT_BUCKETS.items()
-    )
-    RATE_LIMIT_BUCKETS.clear()
+    previous_buckets = rate_limit_buckets_snapshot()
+    clear_rate_limit_buckets_for_testing()
     try:
         monkeypatch.setattr(crawler_runtime_settings, "api_rate_limit_enabled", True)
         monkeypatch.setattr(crawler_runtime_settings, "api_rate_limit_max_requests", 1)
@@ -104,11 +103,10 @@ async def test_health_and_metrics_skip_http_rate_limit(monkeypatch) -> None:
             assert (await client.get("/health/live")).status_code == 200
             assert (await client.get("/api/metrics")).status_code == 200
     finally:
-        RATE_LIMIT_BUCKETS.clear()
-        RATE_LIMIT_BUCKETS.update(previous_buckets)
+        restore_rate_limit_buckets_for_testing(previous_buckets)
 
 
-def testclient_rate_limit_key_ignores_forwarded_for_from_untrusted_peer(
+def test_client_rate_limit_key_ignores_forwarded_for_from_untrusted_peer(
     monkeypatch,
 ) -> None:
     monkeypatch.setattr(crawler_runtime_settings, "api_rate_limit_trusted_proxies", ())
@@ -125,7 +123,7 @@ def testclient_rate_limit_key_ignores_forwarded_for_from_untrusted_peer(
     assert client_rate_limit_key(request) == "198.51.100.2"
 
 
-def testclient_rate_limit_key_honors_forwarded_for_from_trusted_peer(
+def test_client_rate_limit_key_honors_forwarded_for_from_trusted_peer(
     monkeypatch,
 ) -> None:
     monkeypatch.setattr(

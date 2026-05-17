@@ -1046,11 +1046,6 @@ def _sanitize_detail_images(record: dict[str, Any], *, identity_url: str) -> Non
     images = [upgrade_low_resolution_image_url(image) for image in raw_images if image]
     if not images:
         return
-    primary_image = (
-        "https://" + images[0][7:]
-        if images[0].lower().startswith("http://")
-        else images[0]
-    )
     cleaned: list[str] = []
     for image in images:
         normalized_image = (
@@ -1060,14 +1055,24 @@ def _sanitize_detail_images(record: dict[str, Any], *, identity_url: str) -> Non
             normalized_image, identity_url=identity_url
         ):
             continue
+        cleaned.append(normalized_image)
+    if not cleaned:
+        record.pop("image_url", None)
+        record.pop("additional_images", None)
+        return
+    primary_image = cleaned[0]
+    family_cleaned: list[str] = []
+    for normalized_image in cleaned:
         if not detail_image_matches_primary_family(
             normalized_image,
             primary_image=primary_image,
             title=record.get("title"),
         ):
             continue
-        cleaned.append(normalized_image)
-    merged = dedupe_image_urls(cleaned) or _dedupe_cleaned_detail_images(cleaned)
+        family_cleaned.append(normalized_image)
+    merged = dedupe_image_urls(family_cleaned) or _dedupe_cleaned_detail_images(
+        family_cleaned
+    )
     if not merged:
         record.pop("image_url", None)
         record.pop("additional_images", None)

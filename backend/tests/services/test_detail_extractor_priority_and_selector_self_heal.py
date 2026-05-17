@@ -171,15 +171,15 @@ def testprune_irrelevant_detail_structured_payload_reuses_requested_identity(
         return {"sku123"}
 
     monkeypatch.setattr(
-        "app.services.extract.detail_materializer._detail_title_from_url",
+        "app.services.extract.detail_candidate_collection._detail_title_from_url",
         _fake_title_from_url,
     )
     monkeypatch.setattr(
-        "app.services.extract.detail_materializer._detail_identity_tokens",
+        "app.services.extract.detail_candidate_collection._detail_identity_tokens",
         _fake_identity_tokens,
     )
     monkeypatch.setattr(
-        "app.services.extract.detail_materializer._detail_identity_codes_from_url",
+        "app.services.extract.detail_candidate_collection._detail_identity_codes_from_url",
         _fake_identity_codes_from_url,
     )
 

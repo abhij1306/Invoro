@@ -104,8 +104,12 @@ __all__ = [
     "STAGE_EXTRACT",
     "STAGE_NORMALIZE",
     "STAGE_PERSIST",
+    "URLProcessingContext",
+    "best_adapter_result",
+    "empty_extraction_browser_retry_decision",
     "mark_run_failed",
     "process_single_url",
+    "resolved_url_processing_config",
 ]
 
 acquire = _acquire

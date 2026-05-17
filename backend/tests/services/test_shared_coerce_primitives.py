@@ -18,7 +18,7 @@ def test_safe_int_covers_normal_null_and_malformed_values() -> None:
     assert safe_int("bad", default=None) is None
 
 
-def testcoerce_int_rejects_bool_and_malformed_values() -> None:
+def test_coerce_int_rejects_bool_and_malformed_values() -> None:
     assert coerce_int(" 12 ") == 12
     assert coerce_int(8) == 8
     assert coerce_int(False, default=9) == 9

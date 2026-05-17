@@ -98,6 +98,22 @@ def _merge_acquisition_contract(
     return normalize_acquisition_contract(merged)
 
 
+def _section_with_saved_root_aliases(
+    saved: dict[str, object],
+    section_key: str,
+    *,
+    root_keys: set[str],
+    root_aliases: dict[str, str],
+) -> dict[str, object]:
+    section = dict(saved.get(section_key) or {})
+    for root_key in root_keys:
+        if root_key not in saved:
+            continue
+        target_key = root_aliases.get(root_key, root_key)
+        section.setdefault(target_key, saved[root_key])
+    return section
+
+
 def merge_saved_run_profile(
     explicit_settings: object,
     saved_profile: object,
@@ -113,29 +129,36 @@ def merge_saved_run_profile(
     if not saved:
         return merged
     default_settings = _default_run_settings()
+    fetch_root_keys = {
+        "fetch_mode",
+        "extraction_source",
+        "js_mode",
+        "include_iframes",
+        "traversal_mode",
+        "advanced_mode",
+        "request_delay_ms",
+        "sleep_ms",
+        "max_pages",
+        "max_scrolls",
+    }
+    fetch_root_aliases = {
+        "advanced_mode": "traversal_mode",
+        "sleep_ms": "request_delay_ms",
+        "request_delay_ms": "request_delay_ms",
+        "max_pages": "max_pages",
+        "max_scrolls": "max_scrolls",
+    }
     merged["fetch_profile"] = _merge_profile_section(
         merged,
         "fetch_profile",
-        dict(saved.get("fetch_profile") or {}),
-        root_override_keys={
-            "fetch_mode",
-            "extraction_source",
-            "js_mode",
-            "include_iframes",
-            "traversal_mode",
-            "advanced_mode",
-            "request_delay_ms",
-            "sleep_ms",
-            "max_pages",
-            "max_scrolls",
-        },
-        root_override_aliases={
-            "advanced_mode": "traversal_mode",
-            "sleep_ms": "request_delay_ms",
-            "request_delay_ms": "request_delay_ms",
-            "max_pages": "max_pages",
-            "max_scrolls": "max_scrolls",
-        },
+        _section_with_saved_root_aliases(
+            saved,
+            "fetch_profile",
+            root_keys=fetch_root_keys,
+            root_aliases=fetch_root_aliases,
+        ),
+        root_override_keys=fetch_root_keys,
+        root_override_aliases=fetch_root_aliases,
         default_settings=default_settings,
         ignore_default_equivalent_values=ignore_default_equivalent_values,
     )

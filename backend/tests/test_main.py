@@ -82,15 +82,15 @@ async def test_correlation_middleware_falls_back_for_invalid_configured_header_n
     assert response.headers["X-Request-ID"] == "req-123"
 
 
-def testsanitize_header_value_removes_crlf_characters() -> None:
+def test_sanitize_header_value_removes_crlf_characters() -> None:
     assert sanitize_header_value("abc\r\ndef\nxyz") == "abcdefxyz"
 
 
-def testsanitize_header_value_preserves_safe_content() -> None:
+def test_sanitize_header_value_preserves_safe_content() -> None:
     assert sanitize_header_value("req-123_ABC") == "req-123_ABC"
 
 
-def testsanitize_header_name_rejects_invalid_tokens() -> None:
+def test_sanitize_header_name_rejects_invalid_tokens() -> None:
     assert sanitize_header_name("X-Request-ID:Bad") == "X-Request-ID"
 
 

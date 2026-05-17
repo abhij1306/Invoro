@@ -70,8 +70,6 @@ __all__ = [
     "variant_row_richness",
     "variant_semantic_identity",
     "variant_size_value_patterns",
-    "_variant_choice_container_for_input",
-    "_variant_choice_container_is_overbroad",
     "variant_choice_container_for_input",
     "variant_choice_container_is_overbroad",
 ]

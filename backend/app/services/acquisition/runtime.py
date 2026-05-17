@@ -841,8 +841,26 @@ def _marker_map_from_config(
     }
 
 
-has_extractable_dom_content_detail_signals = _has_extractable_dom_content_detail_signals
-has_extractable_listing_signals = _has_extractable_listing_signals
+def has_extractable_dom_content_detail_signals(
+    value: HtmlAnalysis | str,
+    *,
+    analysis: HtmlAnalysis | None = None,
+) -> bool:
+    if analysis is not None:
+        parsed = analysis
+    elif isinstance(value, HtmlAnalysis):
+        parsed = value
+    else:
+        parsed = analyze_html(str(value or ""))
+    return _has_extractable_dom_content_detail_signals(parsed)
+
+
+def has_extractable_listing_signals(
+    html: str,
+    *,
+    analysis: HtmlAnalysis | None = None,
+) -> bool:
+    return _has_extractable_listing_signals(html, analysis=analysis)
 
 
 __all__ = [

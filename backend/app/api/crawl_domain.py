@@ -48,14 +48,14 @@ RUN_NOT_FOUND_RESPONSE = {
 
 
 def _domain_run_profile_payload(value: object) -> DomainRunProfilePayload:
-    payload = (
-        dict(value)
-        if isinstance(value, Mapping)
-        else value.model_dump()
-        if isinstance(value, BaseModel)
-        else value
+    if isinstance(value, Mapping):
+        return DomainRunProfilePayload.model_validate(dict(value))
+    if isinstance(value, BaseModel):
+        return DomainRunProfilePayload.model_validate(value.model_dump())
+    raise ValueError(
+        "profile payload must be a mapping or Pydantic model; "
+        f"got {type(value).__name__}"
     )
-    return DomainRunProfilePayload.model_validate(payload)
 
 
 def _raise_http_from_value_error(*, status_code: int, exc: ValueError) -> NoReturn:
@@ -187,7 +187,7 @@ async def crawls_domain_memory_field_feedback(
     return [DomainFieldFeedbackRecordResponse.model_validate(row) for row in rows]
 
 
-@router.get("/{run_id}/domain-recipe", responses=RUN_NOT_FOUND_RESPONSE)
+@router.get("/{run_id:int}/domain-recipe", responses=RUN_NOT_FOUND_RESPONSE)
 async def crawls_domain_recipe(
     run_id: int,
     session: Annotated[AsyncSession, Depends(get_db)],
@@ -198,7 +198,7 @@ async def crawls_domain_recipe(
     return DomainRecipeResponse.model_validate(payload)
 
 
-@router.post("/{run_id}/domain-recipe/promote-selectors", responses=RUN_NOT_FOUND_RESPONSE)
+@router.post("/{run_id:int}/domain-recipe/promote-selectors", responses=RUN_NOT_FOUND_RESPONSE)
 async def crawls_promote_domain_recipe_selectors(
     run_id: int,
     payload: DomainRecipePromoteSelectorsRequest,
@@ -213,7 +213,7 @@ async def crawls_promote_domain_recipe_selectors(
     )
 
 
-@router.post("/{run_id}/domain-recipe/save-run-profile", responses=RUN_NOT_FOUND_RESPONSE)
+@router.post("/{run_id:int}/domain-recipe/save-run-profile", responses=RUN_NOT_FOUND_RESPONSE)
 async def crawls_save_domain_run_profile(
     run_id: int,
     payload: DomainRecipeSaveRunProfileRequest,
@@ -228,7 +228,7 @@ async def crawls_save_domain_run_profile(
     )
 
 
-@router.post("/{run_id}/domain-recipe/field-action", responses=RUN_NOT_FOUND_RESPONSE)
+@router.post("/{run_id:int}/domain-recipe/field-action", responses=RUN_NOT_FOUND_RESPONSE)
 async def crawls_domain_recipe_field_action(
     run_id: int,
     payload: DomainRecipeFieldActionRequest,
