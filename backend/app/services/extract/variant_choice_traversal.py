@@ -29,42 +29,28 @@ from app.services.config.extraction_rules import (
     VARIANT_SWATCH_BUTTON_SELECTOR,
     VARIANT_SWATCH_PARENT_DEPTH,
 )
-from app.services.extract import variant_axis as _variant_axis
-from app.services.extract import variant_option_value as _variant_option_value
 from app.services.extract.variant_dom_cues import (
     select_variant_nodes as _select_variant_nodes,
     variant_context_noise_tokens as _variant_context_noise_tokens,
     variant_node_in_noise_context,
 )
+from app.services.extract.variant_axis import (
+    normalized_variant_axis_key,
+    resolve_machine_variant_group_name as _resolve_machine_variant_group_name,
+    resolve_visible_variant_group_name as _resolve_visible_variant_group_name,
+    semantic_group_label_from_text as _semantic_group_label_from_text,
+    variant_axis_allowed_single_tokens as _variant_axis_allowed_single_tokens,
+)
+from app.services.extract.variant_option_value import (
+    is_sequential_integer_run as _is_sequential_integer_run,
+    select_option_texts_from_node as _select_option_texts,
+    select_option_values_are_noise as _select_option_values_are_noise,
+    value_looks_like_color as _value_looks_like_color,
+)
 from app.services.shared.field_coerce import clean_text, text_or_none
 
 _ALNUM_SPLIT_PATTERN = r"[^a-z0-9]+"
 
-(
-    _resolve_machine_variant_group_name,
-    _resolve_visible_variant_group_name,
-    _semantic_group_label_from_text,
-    normalized_variant_axis_key,
-    variant_axis_allowed_single_tokens,
-) = (
-    _variant_axis._resolve_machine_variant_group_name,
-    _variant_axis._resolve_visible_variant_group_name,
-    _variant_axis._semantic_group_label_from_text,
-    _variant_axis.normalized_variant_axis_key,
-    _variant_axis.variant_axis_allowed_single_tokens,
-)
-_variant_axis_allowed_single_tokens = variant_axis_allowed_single_tokens
-(
-    _is_sequential_integer_run,
-    _select_option_texts,
-    _select_option_values_are_noise,
-    _value_looks_like_color,
-) = (
-    _variant_option_value._is_sequential_integer_run,
-    _variant_option_value._select_option_texts_from_node,
-    _variant_option_value._select_option_values_are_noise,
-    _variant_option_value._value_looks_like_color,
-)
 _variant_group_attr_noise_tokens = frozenset(
     str(token).strip().lower()
     for token in tuple(VARIANT_GROUP_ATTR_NOISE_TOKENS or ())

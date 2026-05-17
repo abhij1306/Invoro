@@ -45,7 +45,7 @@ logger = logging.getLogger(__name__)
 token_re = re.compile(r"[a-z0-9]+")
 price_range_re = re.compile(
     r"\s*[^\d+-]*([+-]?\d[\d,]*(?:\.\d+)?)\s*(?:to|[-–])\s*"
-    r"[^\d+-]*([+-]?\d[\d,]*(?:\.\d+)?)(?:\s*[^\d]+)?\s*",
+    r"[^\d+-]*([+-]?\d[\d,]*(?:\.\d+)?)(?:\s*(?:[$€£¥]|usd|eur|gbp|cad|aud|inr|each|ea|per|unit|piece|pc|pcs))?\s*",
     re.I,
 )
 
@@ -136,9 +136,10 @@ def normalize_price(
     )
     range_match = price_range_re.fullmatch(clean_text(raw_price))
     if range_match:
-        price_min = decimal_text(range_match.group(1))
-        price_max = decimal_text(range_match.group(2))
-        if price_min is None or price_max is None:
+        try:
+            price_min = Decimal(range_match.group(1).replace(",", ""))
+            price_max = Decimal(range_match.group(2).replace(",", ""))
+        except (InvalidOperation, ValueError):
             return None
         return without_empty(
             {

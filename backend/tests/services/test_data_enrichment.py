@@ -26,6 +26,7 @@ from app.services.data_enrichment.service import (
     get_data_enrichment_job,
     list_data_enrichment_jobs,
 )
+from app.services.data_enrichment.deterministic import normalize_price
 
 
 @pytest.mark.asyncio
@@ -434,6 +435,18 @@ def test_data_enrichment_llm_prompt_context_excludes_raw_artifacts() -> None:
         "Teens & young adults",
         "Other",
     ]
+
+
+def test_normalize_price_range_rejects_trailing_noise() -> None:
+    assert normalize_price(
+        {"price": "$10 - $20 each"},
+        source_url="https://example.com/products/widget",
+    ) == {"price_min": 10.0, "price_max": 20.0, "currency": "USD"}
+    noisy = normalize_price(
+        {"price": "$10 - $20 random words"},
+        source_url="https://example.com/products/widget",
+    )
+    assert noisy == {"amount": 10.0, "currency": "USD"}
 
 
 def test_data_enrichment_variant_dict_values_do_not_pollute_sizes_or_availability() -> None:

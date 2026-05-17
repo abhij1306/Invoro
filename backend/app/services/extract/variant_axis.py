@@ -202,6 +202,11 @@ def _semantic_group_label_from_text(value: object) -> str:
     return ""
 
 
+resolve_machine_variant_group_name = _resolve_machine_variant_group_name
+resolve_visible_variant_group_name = _resolve_visible_variant_group_name
+semantic_group_label_from_text = _semantic_group_label_from_text
+
+
 def variant_axis_name_is_semantic(value: object) -> bool:
     cleaned = clean_text(value)
     lowered = cleaned.lower()

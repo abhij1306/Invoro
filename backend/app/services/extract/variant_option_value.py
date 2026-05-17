@@ -205,3 +205,9 @@ def _value_looks_like_color(value: object) -> bool:
     if not tokens:
         return False
     return any(token in _variant_color_hint_words for token in tokens)
+
+
+is_sequential_integer_run = _is_sequential_integer_run
+select_option_texts_from_node = _select_option_texts_from_node
+select_option_values_are_noise = _select_option_values_are_noise
+value_looks_like_color = _value_looks_like_color

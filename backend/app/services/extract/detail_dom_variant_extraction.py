@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import logging
 import re
 from itertools import product
@@ -8,6 +9,7 @@ from collections.abc import Callable
 from typing import Any
 
 from bs4 import BeautifulSoup
+from bs4.element import Tag
 from selectolax.lexbor import LexborHTMLParser
 
 from app.services.config.extraction_rules import (
@@ -170,7 +172,11 @@ def _visible_node_text(
         cached = cache.get(cache_key)
         if cached is not None:
             return cached
-    parsed = BeautifulSoup(str(node), "html.parser")
+    parsed = (
+        copy.deepcopy(node)
+        if isinstance(node, (BeautifulSoup, Tag))
+        else BeautifulSoup(str(node), "html.parser")
+    )
     for hidden in parsed.select(
         ".sr-only, .visually-hidden, [aria-hidden='true'], svg, title, use"
     ):

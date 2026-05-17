@@ -6,7 +6,7 @@ import shutil
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from app.core.config import PROJECT_ROOT, settings
+from app.core.config import BASE_DIR, PROJECT_ROOT, settings
 from app.models.data_enrichment import (
     DataEnrichmentJob,
     EnrichedProduct,
@@ -220,8 +220,12 @@ async def _reset_crawl_runtime_state() -> dict:
     await reset_robots_policy_cache()
 
     artifacts_removed = _reset_directory(settings.artifacts_dir)
-    legacy_artifacts_dir = PROJECT_ROOT / "artifacts"
-    if legacy_artifacts_dir.resolve() != Path(settings.artifacts_dir).resolve():
+    legacy_artifacts_dir = BASE_DIR / "artifacts"
+    artifacts_dir = Path(settings.artifacts_dir).resolve()
+    if (
+        artifacts_dir.is_relative_to(PROJECT_ROOT.resolve())
+        and legacy_artifacts_dir.resolve() != artifacts_dir
+    ):
         artifacts_removed += _reset_directory(legacy_artifacts_dir, create_if_missing=False)
     cookies_removed = _reset_directory(settings.cookie_store_dir)
     return {

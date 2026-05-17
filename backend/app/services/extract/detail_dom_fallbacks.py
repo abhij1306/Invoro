@@ -226,7 +226,6 @@ def apply_dom_fallbacks(
                 gender,
                 source="dom_text",
             )
-    normalized_surface = str(surface or "")
     body_text = ""
     body_text_needed = (
         ("size" in fields and not candidates.get("size"))

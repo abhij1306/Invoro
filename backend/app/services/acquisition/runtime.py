@@ -842,7 +842,7 @@ def _marker_map_from_config(
 
 
 def has_extractable_dom_content_detail_signals(
-    value: HtmlAnalysis | str,
+    value: HtmlAnalysis | str | object,
     *,
     analysis: HtmlAnalysis | None = None,
 ) -> bool:
@@ -850,10 +850,8 @@ def has_extractable_dom_content_detail_signals(
         parsed = analysis
     elif isinstance(value, HtmlAnalysis):
         parsed = value
-    elif not isinstance(value, str):
-        return False
     else:
-        parsed = analyze_html(value)
+        parsed = analyze_html(str(value or ""))
     return _has_extractable_dom_content_detail_signals(parsed)
 
 

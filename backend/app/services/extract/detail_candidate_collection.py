@@ -145,14 +145,6 @@ except (TypeError, ValueError):
     DETAIL_LONG_TEXT_THIN_DESCRIPTION_WORDS_INT = 50
 
 
-def _sync_structured_pruning_patchpoints() -> None:
-    _detail_structured_pruning._detail_title_from_url = _detail_title_from_url
-    _detail_structured_pruning._detail_identity_tokens = _detail_identity_tokens
-    _detail_structured_pruning._detail_identity_codes_from_url = (
-        _detail_identity_codes_from_url
-    )
-
-
 def _coerce_float(value: object, default: float = 0.0) -> float:
     if isinstance(value, (int, float)):
         return float(value)
@@ -246,7 +238,6 @@ def _collect_structured_payload_candidates(
     selector_trace_candidates: dict[str, list[dict[str, object]]],
     source: str,
 ) -> None:
-    _sync_structured_pruning_patchpoints()
     identity_url = requested_page_url or page_url
     if identity_url:
         requested_title = _detail_title_from_url(identity_url)
@@ -261,6 +252,7 @@ def _collect_structured_payload_candidates(
                 requested_title=requested_title,
                 requested_tokens=requested_tokens,
                 requested_codes=requested_codes,
+                detail_identity_tokens=_detail_identity_tokens,
             )
         )
         payload = _prune_irrelevant_detail_structured_payload(
@@ -270,6 +262,9 @@ def _collect_structured_payload_candidates(
             requested_title=requested_title,
             requested_tokens=requested_tokens,
             requested_codes=requested_codes,
+            detail_title_from_url=_detail_title_from_url,
+            detail_identity_tokens=_detail_identity_tokens,
+            detail_identity_codes_from_url=_detail_identity_codes_from_url,
         )
         if had_irrelevant_product_payload and payload in (None, "", [], {}):
             candidates.setdefault("_irrelevant_detail_structured_product", []).append(

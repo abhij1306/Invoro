@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from bs4 import BeautifulSoup
@@ -14,6 +15,7 @@ from app.services.shared.field_coerce import text_or_none
 _SOURCE_PRIORITY_RANK = {
     source_name: index for index, source_name in enumerate(SOURCE_PRIORITY)
 }
+logger = logging.getLogger(__name__)
 
 
 def _ordered_candidates_for_field(
@@ -62,10 +64,20 @@ def _materialize_image_fields(
             if image:
                 values.append(image)
     images = dedupe_image_urls(values)
+    try:
+        parsed_max_winning_images = int(
+            DETAIL_IMAGE_RAW_SOUP_FALLBACK_MAX_WINNING_IMAGES
+        )
+    except (TypeError, ValueError):
+        logger.error(
+            "Invalid DETAIL_IMAGE_RAW_SOUP_FALLBACK_MAX_WINNING_IMAGES=%r; using 1",
+            DETAIL_IMAGE_RAW_SOUP_FALLBACK_MAX_WINNING_IMAGES,
+        )
+        parsed_max_winning_images = 1
     if (
         str(surface or "").strip().lower() == "ecommerce_detail"
         and raw_soup is not None
-        and len(images) <= int(DETAIL_IMAGE_RAW_SOUP_FALLBACK_MAX_WINNING_IMAGES)
+        and len(images) <= parsed_max_winning_images
     ):
         soup_img_count = len(soup.find_all("img")) if soup is not None else 0
         if len(raw_soup.find_all("img")) > soup_img_count:

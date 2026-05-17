@@ -23,15 +23,10 @@ from app.services.config.extraction_rules import (
     DETAIL_BREADCRUMB_TITLE_DUPLICATE_RATIO,
     IMAGE_FAMILY_NOISE_TOKENS,
     IMAGE_PATH_TOKENS,
-    MATERIAL_KEYWORDS,
-    ORG_SUFFIXES,
     DETAIL_LOW_SIGNAL_PARENT_MIN,
     DETAIL_LOW_SIGNAL_PRICE_MAX,
-    DETAIL_NON_PRODUCT_IMAGE_URL_HINTS,
     DETAIL_PRICE_COMPARISON_TOLERANCE,
-    PLACEHOLDER_IMAGE_URL_PATTERNS,
     VARIANT_OPTION_LABEL_MAX_WORDS,
-    WAF_QUEUE_PATTERNS,
 )
 from app.services.config.variant_policy import (
     DETAIL_VARIANT_SIZE_MIN_FOR_NUMERIC_PARENT_DROP,
@@ -89,67 +84,6 @@ from app.services.extract.detail_text_sanitizer import (
 )
 
 logger = logging.getLogger(__name__)
-
-_UUID_LIKE_PATTERN = re.compile(r"(?i)^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$")
-_MERCH_CODE_PATTERN = re.compile(r"\b[A-Z0-9]{2,}(?:-[A-Z0-9]{2,})+\b", re.I)
-_PLACEHOLDER_IMAGE_URL_PATTERNS_LOWER = tuple(
-    str(pattern).lower()
-    for pattern in tuple(PLACEHOLDER_IMAGE_URL_PATTERNS or ())
-    if str(pattern).strip()
-)
-_NON_PRODUCT_IMAGE_HINTS_LOWER = tuple(
-    str(pattern).lower()
-    for pattern in tuple(DETAIL_NON_PRODUCT_IMAGE_URL_HINTS or ())
-    if str(pattern).strip()
-)
-_DETAIL_BASE_PLACEHOLDER_TITLE_PATTERNS: tuple[re.Pattern[str], ...] = (
-    re.compile(r"^404$"),
-    re.compile(r"^(?:error\s*)?404\b", re.I),
-    re.compile(r"^error\s+page$", re.I),
-    re.compile(r"^your\s+ai-generated\s+outfit$", re.I),
-    re.compile(r"^oops,?\s+something\s+went\s+wrong\.?$", re.I),
-    re.compile(
-        r"^oops!? the page you(?:'|’)re looking for can(?:'|’)t be found\.?$", re.I
-    ),
-    re.compile(r"^page not found$", re.I),
-    re.compile(r"^not found$", re.I),
-    re.compile(r"^access denied$", re.I),
-    re.compile(r"^adding\s+to\s+cart\.{0,3}$", re.I),
-)
-def _compile_detail_waf_queue_title_patterns() -> tuple[re.Pattern[str], ...]:
-    patterns: list[re.Pattern[str]] = []
-    for pattern in tuple(WAF_QUEUE_PATTERNS or ()):
-        if not str(pattern).strip():
-            continue
-        try:
-            patterns.append(re.compile(str(pattern), re.I))
-        except re.error:
-            logger.warning("Skipping invalid WAF queue title pattern: %r", pattern)
-    return tuple(patterns)
-
-
-_DETAIL_WAF_QUEUE_TITLE_PATTERNS = _compile_detail_waf_queue_title_patterns()
-_material_keyword_tokens = frozenset(
-    str(token).strip().lower()
-    for token in tuple(MATERIAL_KEYWORDS or ())
-    if str(token).strip()
-)
-_DETAIL_PLACEHOLDER_TITLE_PATTERNS: tuple[re.Pattern[str], ...] = (
-    *_DETAIL_BASE_PLACEHOLDER_TITLE_PATTERNS,
-    *_DETAIL_WAF_QUEUE_TITLE_PATTERNS,
-)
-_ORG_SUFFIX_PATTERN = (
-    re.compile(
-        r"\b(?:"
-        + "|".join(re.escape(token) for token in sorted(ORG_SUFFIXES))
-        + r")\b",
-        re.I,
-    )
-    if ORG_SUFFIXES
-    else None
-)
-
-
 
 def _sanitize_detail_variant_payload(
     record: dict[str, Any], *, identity_url: str
@@ -413,7 +347,7 @@ def _option_value_repeats_product_title(value: str, *, title_hint: str) -> bool:
     return title_key in value_key
 
 
-@lru_cache(maxsize=None)
+@lru_cache(maxsize=4096)
 def _whole_value_pattern(value: str) -> re.Pattern[str]:
     return re.compile(rf"(?<![a-z0-9]){re.escape(value)}(?![a-z0-9])")
 

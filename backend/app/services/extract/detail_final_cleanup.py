@@ -58,12 +58,12 @@ def repair_ecommerce_detail_record_quality(
     )
     if soup is None and not text_or_none(record.get("image_url")) and str(html or "").strip():
         parsed_soup = BeautifulSoup(str(html), "html.parser")
-        _image_cleanup._backfill_detail_image_from_html(
+        _image_cleanup.backfill_detail_image_from_html(
             record,
             soup=parsed_soup,
             identity_url=text_or_none(requested_page_url) or page_url,
         )
-        _image_cleanup._sanitize_detail_images(
+        _image_cleanup.sanitize_detail_images(
             record,
             identity_url=text_or_none(requested_page_url) or page_url,
         )
@@ -72,10 +72,10 @@ def repair_ecommerce_detail_record_quality(
     reconcile_detail_currency_with_url(record, page_url=page_url)
     reconcile_detail_price_magnitudes(record)
     reconcile_parent_price_against_variant_range(record)
-    _money_repair._normalize_detail_money_precision(record)
-    _money_repair._repair_invalid_original_prices(record)
-    _money_repair._drop_invalid_detail_discounts(record)
-    _money_repair._repair_detail_variant_prices_and_identity(record)
+    _money_repair.normalize_detail_money_precision(record)
+    _money_repair.repair_invalid_original_prices(record)
+    _money_repair.drop_invalid_detail_discounts(record)
+    _money_repair.repair_detail_variant_prices_and_identity(record)
     _default_unknown_availability_for_real_product(record)
     enforce_flat_variant_public_contract(record, page_url=page_url)
 
@@ -89,11 +89,11 @@ def _sanitize_ecommerce_detail_record(
     js_state_objects: object | None = None,
 ) -> None:
     identity_url = text_or_none(requested_page_url) or page_url
-    _record_sanitization._sanitize_detail_placeholder_scalars(
+    _record_sanitization.sanitize_detail_placeholder_scalars(
         record,
         identity_url=identity_url,
     )
-    _record_sanitization._sanitize_detail_identity_scalars(
+    _record_sanitization.sanitize_detail_identity_scalars(
         record,
         identity_url=identity_url,
     )
@@ -105,7 +105,7 @@ def _sanitize_ecommerce_detail_record(
             page_url=page_url,
             js_state_objects=js_state_objects if isinstance(js_state_objects, dict) else None,
         )
-        _image_cleanup._backfill_detail_image_from_html(
+        _image_cleanup.backfill_detail_image_from_html(
             record,
             soup=soup,
             identity_url=identity_url,
@@ -118,8 +118,8 @@ def _sanitize_ecommerce_detail_record(
         record,
         title_hint=_record_sanitization._detail_title_from_url(identity_url),
     )
-    _image_cleanup._sanitize_detail_images(record, identity_url=identity_url)
-    _image_cleanup._backfill_parent_image_from_variants(record)
+    _image_cleanup.sanitize_detail_images(record, identity_url=identity_url)
+    _image_cleanup.backfill_parent_image_from_variants(record)
     _reconcile_detail_availability_from_variants(record)
 
 
@@ -143,11 +143,16 @@ def _default_unknown_availability_for_real_product(record: dict[str, Any]) -> No
 
 def _reconcile_detail_availability_from_variants(record: dict[str, Any]) -> None:
     variants = [row for row in record.get("variants") or [] if isinstance(row, dict)]
-    if not variants or record.get("availability") not in (None, "", [], {}):
+    if not variants:
         return
     values = {text_or_none(row.get("availability")) for row in variants}
     values.discard(None)
-    if values and values <= {AVAILABILITY_OUT_OF_STOCK, AVAILABILITY_UNKNOWN}:
-        record["availability"] = AVAILABILITY_OUT_OF_STOCK
-    elif AVAILABILITY_IN_STOCK in values:
+    parent_availability = text_or_none(record.get("availability"))
+    if AVAILABILITY_IN_STOCK in values:
         record["availability"] = AVAILABILITY_IN_STOCK
+    elif (
+        parent_availability in (None, "", AVAILABILITY_UNKNOWN)
+        and values
+        and values <= {AVAILABILITY_OUT_OF_STOCK, AVAILABILITY_UNKNOWN}
+    ):
+        record["availability"] = AVAILABILITY_OUT_OF_STOCK

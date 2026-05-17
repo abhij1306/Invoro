@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+from difflib import SequenceMatcher
 from decimal import Decimal
 from functools import lru_cache
 from typing import Any
@@ -23,15 +24,10 @@ from app.services.config.extraction_rules import (
     DETAIL_BREADCRUMB_TITLE_DUPLICATE_RATIO,
     IMAGE_FAMILY_NOISE_TOKENS,
     IMAGE_PATH_TOKENS,
-    MATERIAL_KEYWORDS,
-    ORG_SUFFIXES,
     DETAIL_LOW_SIGNAL_PARENT_MIN,
     DETAIL_LOW_SIGNAL_PRICE_MAX,
-    DETAIL_NON_PRODUCT_IMAGE_URL_HINTS,
     DETAIL_PRICE_COMPARISON_TOLERANCE,
-    PLACEHOLDER_IMAGE_URL_PATTERNS,
     VARIANT_OPTION_LABEL_MAX_WORDS,
-    WAF_QUEUE_PATTERNS,
 )
 from app.services.config.variant_policy import (
     DETAIL_VARIANT_SIZE_MIN_FOR_NUMERIC_PARENT_DROP,
@@ -87,69 +83,15 @@ from app.services.extract.detail_text_sanitizer import (
     detail_title_value_is_low_signal,
     sanitize_detail_long_text_fields,
 )
+from app.services.config.detail_extraction_constants import (
+    DETAIL_PLACEHOLDER_TITLE_PATTERNS as _DETAIL_PLACEHOLDER_TITLE_PATTERNS,
+    MATERIAL_KEYWORD_TOKENS as _material_keyword_tokens,
+    MERCH_CODE_PATTERN as _MERCH_CODE_PATTERN,
+    ORG_SUFFIX_PATTERN as _ORG_SUFFIX_PATTERN,
+    UUID_LIKE_PATTERN as _UUID_LIKE_PATTERN,
+)
 
 logger = logging.getLogger(__name__)
-
-_UUID_LIKE_PATTERN = re.compile(r"(?i)^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$")
-_MERCH_CODE_PATTERN = re.compile(r"\b[A-Z0-9]{2,}(?:-[A-Z0-9]{2,})+\b", re.I)
-_PLACEHOLDER_IMAGE_URL_PATTERNS_LOWER = tuple(
-    str(pattern).lower()
-    for pattern in tuple(PLACEHOLDER_IMAGE_URL_PATTERNS or ())
-    if str(pattern).strip()
-)
-_NON_PRODUCT_IMAGE_HINTS_LOWER = tuple(
-    str(pattern).lower()
-    for pattern in tuple(DETAIL_NON_PRODUCT_IMAGE_URL_HINTS or ())
-    if str(pattern).strip()
-)
-_DETAIL_BASE_PLACEHOLDER_TITLE_PATTERNS: tuple[re.Pattern[str], ...] = (
-    re.compile(r"^404$"),
-    re.compile(r"^(?:error\s*)?404\b", re.I),
-    re.compile(r"^error\s+page$", re.I),
-    re.compile(r"^your\s+ai-generated\s+outfit$", re.I),
-    re.compile(r"^oops,?\s+something\s+went\s+wrong\.?$", re.I),
-    re.compile(
-        r"^oops!? the page you(?:'|’)re looking for can(?:'|’)t be found\.?$", re.I
-    ),
-    re.compile(r"^page not found$", re.I),
-    re.compile(r"^not found$", re.I),
-    re.compile(r"^access denied$", re.I),
-    re.compile(r"^adding\s+to\s+cart\.{0,3}$", re.I),
-)
-def _compile_detail_waf_queue_title_patterns() -> tuple[re.Pattern[str], ...]:
-    patterns: list[re.Pattern[str]] = []
-    for pattern in tuple(WAF_QUEUE_PATTERNS or ()):
-        if not str(pattern).strip():
-            continue
-        try:
-            patterns.append(re.compile(str(pattern), re.I))
-        except re.error:
-            logger.warning("Skipping invalid WAF queue title pattern: %r", pattern)
-    return tuple(patterns)
-
-
-_DETAIL_WAF_QUEUE_TITLE_PATTERNS = _compile_detail_waf_queue_title_patterns()
-_material_keyword_tokens = frozenset(
-    str(token).strip().lower()
-    for token in tuple(MATERIAL_KEYWORDS or ())
-    if str(token).strip()
-)
-_DETAIL_PLACEHOLDER_TITLE_PATTERNS: tuple[re.Pattern[str], ...] = (
-    *_DETAIL_BASE_PLACEHOLDER_TITLE_PATTERNS,
-    *_DETAIL_WAF_QUEUE_TITLE_PATTERNS,
-)
-_ORG_SUFFIX_PATTERN = (
-    re.compile(
-        r"\b(?:"
-        + "|".join(re.escape(token) for token in sorted(ORG_SUFFIXES))
-        + r")\b",
-        re.I,
-    )
-    if ORG_SUFFIXES
-    else None
-)
-
-
 
 def _sanitize_detail_placeholder_scalars(
     record: dict[str, Any], *, identity_url: str = ""
@@ -201,6 +143,12 @@ def _sanitize_detail_placeholder_scalars(
             record.pop("product_attributes", None)
 
 
+def sanitize_detail_placeholder_scalars(
+    record: dict[str, Any], *, identity_url: str = ""
+) -> None:
+    _sanitize_detail_placeholder_scalars(record, identity_url=identity_url)
+
+
 def _feature_text_is_json_object(value: str) -> bool:
     text = clean_text(value)
     if not (text.startswith("{") and text.endswith("}")):
@@ -238,6 +186,14 @@ def _sanitize_detail_identity_scalars(
             record["title"] = fallback_title.title() if fallback_is_safe else fallback_title
             field_sources = record.setdefault("_field_sources", {})
             field_sources["title"] = ["url_slug"]
+
+
+def sanitize_detail_identity_scalars(
+    record: dict[str, Any],
+    *,
+    identity_url: str,
+) -> None:
+    _sanitize_detail_identity_scalars(record, identity_url=identity_url)
 
 
 def _repair_detail_title_from_requested_identity(
@@ -417,8 +373,6 @@ def _category_part_matches_identity(part: object, identity: str) -> bool:
         return True
     if min(len(part_key), len(identity_key)) < 8:
         return False
-    from difflib import SequenceMatcher
-
     return SequenceMatcher(None, part_key, identity_key).ratio() >= float(
         DETAIL_BREADCRUMB_TITLE_DUPLICATE_RATIO
     )

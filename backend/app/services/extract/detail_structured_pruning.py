@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from urllib.parse import urlparse
 
 from app.services.config.extraction_rules import (
@@ -45,11 +46,19 @@ def _prune_irrelevant_detail_structured_payload(
     requested_title: str | None = None,
     requested_tokens: set[str] | None = None,
     requested_codes: set[str] | None = None,
+    detail_title_from_url: Callable[[str], str] | None = None,
+    detail_identity_tokens: Callable[[object], set[str]] | None = None,
+    detail_identity_codes_from_url: Callable[[str], set[str]] | None = None,
 ) -> object | None:
+    detail_title_from_url = detail_title_from_url or _detail_title_from_url
+    detail_identity_tokens = detail_identity_tokens or _detail_identity_tokens
+    detail_identity_codes_from_url = (
+        detail_identity_codes_from_url or _detail_identity_codes_from_url
+    )
     if depth == 0:
-        requested_title = requested_title or _detail_title_from_url(requested_page_url)
-        requested_tokens = requested_tokens or _detail_identity_tokens(requested_title)
-        requested_codes = requested_codes or _detail_identity_codes_from_url(
+        requested_title = requested_title or detail_title_from_url(requested_page_url)
+        requested_tokens = requested_tokens or detail_identity_tokens(requested_title)
+        requested_codes = requested_codes or detail_identity_codes_from_url(
             requested_page_url
         )
     if depth >= DETAIL_PAYLOAD_MAX_DEPTH_INT:
@@ -64,6 +73,9 @@ def _prune_irrelevant_detail_structured_payload(
                 requested_title=requested_title,
                 requested_tokens=requested_tokens,
                 requested_codes=requested_codes,
+                detail_title_from_url=detail_title_from_url,
+                detail_identity_tokens=detail_identity_tokens,
+                detail_identity_codes_from_url=detail_identity_codes_from_url,
             )
             for item in payload[: int(DETAIL_PAYLOAD_LIST_LIMIT or 50)]
         ]
@@ -77,6 +89,7 @@ def _prune_irrelevant_detail_structured_payload(
         requested_title=requested_title,
         requested_tokens=requested_tokens,
         requested_codes=requested_codes,
+        detail_identity_tokens=detail_identity_tokens,
     ):
         return None
     cleaned: dict[str, object] = {}
@@ -89,6 +102,9 @@ def _prune_irrelevant_detail_structured_payload(
             requested_title=requested_title,
             requested_tokens=requested_tokens,
             requested_codes=requested_codes,
+            detail_title_from_url=detail_title_from_url,
+            detail_identity_tokens=detail_identity_tokens,
+            detail_identity_codes_from_url=detail_identity_codes_from_url,
         )
         if cleaned_value in (None, "", [], {}):
             continue
@@ -104,7 +120,9 @@ def _detail_structured_payload_is_irrelevant_product(
     requested_title: str | None = None,
     requested_tokens: set[str] | None = None,
     requested_codes: set[str] | None = None,
+    detail_identity_tokens: Callable[[object], set[str]] | None = None,
 ) -> bool:
+    detail_identity_tokens = detail_identity_tokens or _detail_identity_tokens
     raw_type = payload.get("@type")
     normalized_type = (
         " ".join(raw_type) if isinstance(raw_type, list) else str(raw_type or "")
@@ -171,8 +189,8 @@ def _detail_structured_payload_is_irrelevant_product(
         candidate_title = clean_text(candidate_record.get("title"))
         if not candidate_title:
             return False
-        requested_tokens = requested_tokens or _detail_identity_tokens(requested_title)
-        candidate_tokens = _detail_identity_tokens(candidate_title)
+        requested_tokens = requested_tokens or detail_identity_tokens(requested_title)
+        candidate_tokens = detail_identity_tokens(candidate_title)
         if (
             requested_tokens
             and candidate_tokens
