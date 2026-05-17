@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from app.services.network_payload_mapper import (
-    _looks_like_job_api,
-    _looks_like_product_api,
-    _infer_surface_from_body,
+    looks_like_job_api,
+    looks_like_product_api,
+    infer_surface_from_body,
     map_network_payloads_to_fields,
 )
 
@@ -383,8 +383,8 @@ def test_map_network_payloads_to_fields_keeps_richer_product_fields_alongside_av
 # ------------------------------------------------------------------
 
 
-def test_looks_like_product_api_detects_product_payload() -> None:
-    assert _looks_like_product_api({
+def testlooks_like_product_api_detects_product_payload() -> None:
+    assert looks_like_product_api({
         "price": "29.99",
         "sku": "ABC-123",
         "name": "Widget",
@@ -392,15 +392,15 @@ def test_looks_like_product_api_detects_product_payload() -> None:
     })
 
 
-def test_looks_like_product_api_rejects_insufficient_keys() -> None:
-    assert not _looks_like_product_api({
+def testlooks_like_product_api_rejects_insufficient_keys() -> None:
+    assert not looks_like_product_api({
         "price": "29.99",
         "sku": "ABC-123",
     })
 
 
-def test_looks_like_job_api_detects_job_payload() -> None:
-    assert _looks_like_job_api({
+def testlooks_like_job_api_detects_job_payload() -> None:
+    assert looks_like_job_api({
         "title": "Engineer",
         "description": "Build things",
         "location": "Remote",
@@ -408,22 +408,22 @@ def test_looks_like_job_api_detects_job_payload() -> None:
     })
 
 
-def test_looks_like_job_api_rejects_insufficient_keys() -> None:
-    assert not _looks_like_job_api({
+def testlooks_like_job_api_rejects_insufficient_keys() -> None:
+    assert not looks_like_job_api({
         "title": "Engineer",
         "description": "Build things",
     })
 
 
-def test_looks_like_product_api_rejects_non_dict() -> None:
-    assert not _looks_like_product_api("not a dict")
-    assert not _looks_like_product_api([1, 2, 3])
+def testlooks_like_product_api_rejects_non_dict() -> None:
+    assert not looks_like_product_api("not a dict")
+    assert not looks_like_product_api([1, 2, 3])
 
 
-def test_looks_like_job_api_rejects_non_dict() -> None:
-    assert not _looks_like_job_api(None)
-    assert not _looks_like_job_api("not a dict")
-    assert not _looks_like_job_api([1, 2, 3])
+def testlooks_like_job_api_rejects_non_dict() -> None:
+    assert not looks_like_job_api(None)
+    assert not looks_like_job_api("not a dict")
+    assert not looks_like_job_api([1, 2, 3])
 
 
 def test_infer_surface_prefers_product_when_ambiguous() -> None:
@@ -434,7 +434,7 @@ def test_infer_surface_prefers_product_when_ambiguous() -> None:
         "description": "A product",
         "company": "MegaCorp",
     }
-    assert _infer_surface_from_body(body) == "ecommerce_detail"
+    assert infer_surface_from_body(body) == "ecommerce_detail"
 
 
 def test_infer_surface_returns_job_when_job_signature_stronger() -> None:
@@ -446,11 +446,11 @@ def test_infer_surface_returns_job_when_job_signature_stronger() -> None:
         "apply_url": "https://acme.com/apply",
         "salary": "100k",
     }
-    assert _infer_surface_from_body(body) == "job_detail"
+    assert infer_surface_from_body(body) == "job_detail"
 
 
 def test_infer_surface_returns_none_for_unrecognised_payload() -> None:
-    assert _infer_surface_from_body({"foo": 1, "bar": 2}) is None
+    assert infer_surface_from_body({"foo": 1, "bar": 2}) is None
 
 
 def test_ghost_route_captures_unconfigured_product_payload() -> None:

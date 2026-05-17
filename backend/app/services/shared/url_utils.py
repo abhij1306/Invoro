@@ -148,3 +148,7 @@ def _looks_like_malformed_relative_url_candidate(value: str) -> bool:
 def _is_template_url(url: str) -> bool:
     lowered = str(url or "").lower()
     return any(token in lowered for token in unresolved_template_url_tokens_lower)
+
+
+ensure_scheme = _ensure_scheme
+is_placeholder_image_url = _is_placeholder_image_url

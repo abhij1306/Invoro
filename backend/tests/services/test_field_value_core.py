@@ -5,7 +5,7 @@ from decimal import Decimal
 import pytest
 
 from app.services.shared.field_coerce import (
-    _decimal_for_shared_price,
+    decimal_for_shared_price,
     absolute_url,
     clean_text,
     coerce_field_value,
@@ -113,10 +113,10 @@ def test_direct_record_to_surface_fields_rejects_unknown_requested_fields() -> N
     assert shaped == {"title": "Widget Prime"}
 
 
-def test_decimal_for_shared_price_supports_european_decimal_format() -> None:
-    assert _decimal_for_shared_price("1.234,56") == Decimal("1234.56")
-    assert _decimal_for_shared_price("234,56") == Decimal("234.56")
-    assert _decimal_for_shared_price("1.234.567,89") == Decimal("1234567.89")
+def testdecimal_for_shared_price_supports_european_decimal_format() -> None:
+    assert decimal_for_shared_price("1.234,56") == Decimal("1234.56")
+    assert decimal_for_shared_price("234,56") == Decimal("234.56")
+    assert decimal_for_shared_price("1.234.567,89") == Decimal("1234567.89")
 
 
 def test_persistence_schema_firewall_drops_unknown_and_internal_fields() -> None:

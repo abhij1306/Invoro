@@ -22,9 +22,9 @@ from app.services.config.product_intelligence import (
 from app.services.llm.config_service import get_prompt_task
 from app.services.product_intelligence.discovery import (
     SearchResult,
-    _google_native_blocked,
-    _google_native_session,
-    _parse_google_native_results,
+    google_native_blocked,
+    google_native_session,
+    parse_google_native_results,
     build_search_queries,
     classify_source_type,
     discover_candidates,
@@ -39,9 +39,9 @@ from app.services.product_intelligence.matching import (
 from app.services.llm.circuit_breaker import LLMErrorCategory
 from app.services.llm.types import LLMTaskResult
 from app.services.product_intelligence.service import (
-    _backfill_candidate_brand,
-    _poll_candidate_and_score,
-    _resolve_source_snapshot,
+    backfill_candidate_brand,
+    poll_candidate_and_score,
+    resolve_source_snapshot,
     create_product_intelligence_job,
     discover_product_intelligence_candidates,
 )
@@ -303,7 +303,7 @@ def test_product_intelligence_settings_rejects_legacy_duckduckgo_provider() -> N
         ProductIntelligenceSettings(_env_file=None, default_search_provider="duckduckgo")
 
 
-def test_parse_google_native_results_extracts_redirect_targets() -> None:
+def testparse_google_native_results_extracts_redirect_targets() -> None:
     html = """
     <html><body>
       <a href="/url?q=https%3A%2F%2Fshop.example.com%2Fp%2Fwidget&sa=U"><h3>Widget</h3></a>
@@ -311,13 +311,13 @@ def test_parse_google_native_results_extracts_redirect_targets() -> None:
     </body></html>
     """
 
-    results = _parse_google_native_results(html, limit=5)
+    results = parse_google_native_results(html, limit=5)
 
     assert results[0].url == "https://shop.example.com/p/widget"
     assert results[0].payload["provider"] == "google_native"
 
 
-def test_parse_google_native_results_skips_anchors_without_h3() -> None:
+def testparse_google_native_results_skips_anchors_without_h3() -> None:
     """Non-organic anchors (shopping carousel, PAA, ads, knowledge panels)
     have anchor text but no inner h3; they must be ignored."""
     html = """
@@ -332,13 +332,13 @@ def test_parse_google_native_results_skips_anchors_without_h3() -> None:
     </body></html>
     """
 
-    results = _parse_google_native_results(html, limit=5)
+    results = parse_google_native_results(html, limit=5)
 
     assert len(results) == 1
     assert results[0].url == "https://shop.example.com/p/widget"
 
 
-def test_parse_google_native_results_prefers_h3_over_anchor_text() -> None:
+def testparse_google_native_results_prefers_h3_over_anchor_text() -> None:
     html = """
     <html><body>
       <div class="result">
@@ -350,12 +350,12 @@ def test_parse_google_native_results_prefers_h3_over_anchor_text() -> None:
     </body></html>
     """
 
-    results = _parse_google_native_results(html, limit=5)
+    results = parse_google_native_results(html, limit=5)
 
     assert results[0].payload["title"] == "Widget Pro Edition"
 
 
-def test_parse_google_native_results_extracts_thumbnail_from_result_container() -> None:
+def testparse_google_native_results_extracts_thumbnail_from_result_container() -> None:
     html = """
     <html><body>
       <div class="result-block">
@@ -367,7 +367,7 @@ def test_parse_google_native_results_extracts_thumbnail_from_result_container() 
     </body></html>
     """
 
-    results = _parse_google_native_results(html, limit=5)
+    results = parse_google_native_results(html, limit=5)
 
     assert results[0].payload["thumbnail"] == "https://example.com/thumb.jpg"
 
@@ -380,7 +380,7 @@ def test_google_native_block_detection_flags_google_unusual_traffic_page() -> No
     </body></html>
     """
 
-    assert _google_native_blocked("https://www.google.com/sorry/index", html) is True
+    assert google_native_blocked("https://www.google.com/sorry/index", html) is True
 
 
 def test_google_native_thumbnail_flows_into_snapshot_image_url() -> None:
@@ -410,7 +410,7 @@ def test_google_native_intelligence_keeps_provider_label() -> None:
 
 
 @pytest.mark.asyncio
-async def test_google_native_session_reuses_single_page_across_queries(monkeypatch) -> None:
+async def testgoogle_native_session_reuses_single_page_across_queries(monkeypatch) -> None:
     actions: list[str] = []
     current_url = GOOGLE_NATIVE_HOME_URL
     html_by_url: dict[str, str] = {}
@@ -467,7 +467,7 @@ async def test_google_native_session_reuses_single_page_across_queries(monkeypat
         _fake_html,
     )
 
-    async with _google_native_session() as run_query:
+    async with google_native_session() as run_query:
         html_by_url[_fake_search_url("blue shoe", 3)] = """
         <a href="/url?q=https%3A%2F%2Fshop.example.com%2Fp%2Fwidget"><h3>Widget</h3></a>
         """
@@ -491,7 +491,7 @@ async def test_google_native_session_reuses_single_page_across_queries(monkeypat
 
 
 @pytest.mark.asyncio
-async def test_google_native_session_stops_after_google_sorry_page(monkeypatch) -> None:
+async def testgoogle_native_session_stops_after_google_sorry_page(monkeypatch) -> None:
     actions: list[str] = []
     current_url = GOOGLE_NATIVE_HOME_URL
     html_by_url: dict[str, str] = {}
@@ -551,7 +551,7 @@ async def test_google_native_session_stops_after_google_sorry_page(monkeypatch) 
     </body></html>
     """
 
-    async with _google_native_session() as run_query:
+    async with google_native_session() as run_query:
         first = await run_query("blue shoe", 3)
         second = await run_query("red shoe", 3)
 
@@ -586,7 +586,7 @@ def test_product_intelligence_brand_inference_prompt_registered() -> None:
 
 
 @pytest.mark.asyncio
-async def test_resolve_source_snapshot_skips_llm_when_brand_present(monkeypatch) -> None:
+async def testresolve_source_snapshot_skips_llm_when_brand_present(monkeypatch) -> None:
     calls: list[str] = []
 
     async def fake_run_prompt_task(*args, **kwargs):
@@ -598,7 +598,7 @@ async def test_resolve_source_snapshot_skips_llm_when_brand_present(monkeypatch)
         fake_run_prompt_task,
     )
 
-    snapshot = await _resolve_source_snapshot(
+    snapshot = await resolve_source_snapshot(
         session=None,  # never used because LLM path is gated off
         raw={"brand": "Levis", "title": "Men 511 Slim Fit Jeans", "url": "https://www.belk.com/p/1.html"},
         llm_enabled=True,
@@ -610,7 +610,7 @@ async def test_resolve_source_snapshot_skips_llm_when_brand_present(monkeypatch)
 
 
 @pytest.mark.asyncio
-async def test_resolve_source_snapshot_skips_llm_when_disabled(monkeypatch) -> None:
+async def testresolve_source_snapshot_skips_llm_when_disabled(monkeypatch) -> None:
     async def fake_run_prompt_task(*args, **kwargs):
         raise AssertionError("LLM must not be called when llm_enabled is False")
 
@@ -619,7 +619,7 @@ async def test_resolve_source_snapshot_skips_llm_when_disabled(monkeypatch) -> N
         fake_run_prompt_task,
     )
 
-    snapshot = await _resolve_source_snapshot(
+    snapshot = await resolve_source_snapshot(
         session=None,
         raw={"title": "Wundermost Bodysuit", "url": "https://shop.example.com/products/wundermost.html"},
         llm_enabled=False,
@@ -630,7 +630,7 @@ async def test_resolve_source_snapshot_skips_llm_when_disabled(monkeypatch) -> N
 
 
 @pytest.mark.asyncio
-async def test_resolve_source_snapshot_uses_llm_brand_when_confident(monkeypatch) -> None:
+async def testresolve_source_snapshot_uses_llm_brand_when_confident(monkeypatch) -> None:
     captured: dict[str, object] = {}
 
     async def fake_run_prompt_task(session, *, task_type, run_id, domain, variables):
@@ -648,7 +648,7 @@ async def test_resolve_source_snapshot_uses_llm_brand_when_confident(monkeypatch
         fake_run_prompt_task,
     )
 
-    snapshot = await _resolve_source_snapshot(
+    snapshot = await resolve_source_snapshot(
         session=None,
         raw={
             "title": "Wundermost Bodysuit",
@@ -666,7 +666,7 @@ async def test_resolve_source_snapshot_uses_llm_brand_when_confident(monkeypatch
 
 
 @pytest.mark.asyncio
-async def test_resolve_source_snapshot_drops_low_confidence_llm_brand(monkeypatch) -> None:
+async def testresolve_source_snapshot_drops_low_confidence_llm_brand(monkeypatch) -> None:
     async def fake_run_prompt_task(session, *, task_type, run_id, domain, variables):
         return LLMTaskResult(
             payload={"brand": "MaybeBrand", "confidence": 0.2, "rationale": "weak signal"},
@@ -679,7 +679,7 @@ async def test_resolve_source_snapshot_drops_low_confidence_llm_brand(monkeypatc
         fake_run_prompt_task,
     )
 
-    snapshot = await _resolve_source_snapshot(
+    snapshot = await resolve_source_snapshot(
         session=None,
         raw={"title": "Random Title", "url": "https://retailer.example.com/p/123.html"},
         llm_enabled=True,
@@ -690,7 +690,7 @@ async def test_resolve_source_snapshot_drops_low_confidence_llm_brand(monkeypatc
 
 
 @pytest.mark.asyncio
-async def test_resolve_source_snapshot_swallows_llm_error(monkeypatch) -> None:
+async def testresolve_source_snapshot_swallows_llm_error(monkeypatch) -> None:
     async def fake_run_prompt_task(session, *, task_type, run_id, domain, variables):
         return LLMTaskResult(
             payload=None,
@@ -703,7 +703,7 @@ async def test_resolve_source_snapshot_swallows_llm_error(monkeypatch) -> None:
         fake_run_prompt_task,
     )
 
-    snapshot = await _resolve_source_snapshot(
+    snapshot = await resolve_source_snapshot(
         session=None,
         raw={"title": "Random Title", "url": "https://retailer.example.com/p/123.html"},
         llm_enabled=True,
@@ -714,7 +714,7 @@ async def test_resolve_source_snapshot_swallows_llm_error(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_resolve_source_snapshot_skips_llm_when_no_inputs(monkeypatch) -> None:
+async def testresolve_source_snapshot_skips_llm_when_no_inputs(monkeypatch) -> None:
     async def fake_run_prompt_task(*args, **kwargs):
         raise AssertionError("LLM must not be called without title or url")
 
@@ -723,7 +723,7 @@ async def test_resolve_source_snapshot_skips_llm_when_no_inputs(monkeypatch) -> 
         fake_run_prompt_task,
     )
 
-    snapshot = await _resolve_source_snapshot(
+    snapshot = await resolve_source_snapshot(
         session=None,
         raw={},
         llm_enabled=True,
@@ -751,7 +751,7 @@ def _build_candidate_intelligence(*, brand: str = "", title: str = "Wundermost B
 
 
 @pytest.mark.asyncio
-async def test_backfill_candidate_brand_skips_when_disabled(monkeypatch) -> None:
+async def testbackfill_candidate_brand_skips_when_disabled(monkeypatch) -> None:
     async def fake_run_prompt_task(*args, **kwargs):
         raise AssertionError("LLM must not be called when llm_enabled is False")
 
@@ -761,7 +761,7 @@ async def test_backfill_candidate_brand_skips_when_disabled(monkeypatch) -> None
     )
 
     intelligence = _build_candidate_intelligence()
-    result = await _backfill_candidate_brand(
+    result = await backfill_candidate_brand(
         session=None,
         source={"title": "Lululemon Wundermost Bodysuit", "brand": "Lululemon"},
         intelligence=intelligence,
@@ -773,7 +773,7 @@ async def test_backfill_candidate_brand_skips_when_disabled(monkeypatch) -> None
 
 
 @pytest.mark.asyncio
-async def test_backfill_candidate_brand_skips_when_brand_present(monkeypatch) -> None:
+async def testbackfill_candidate_brand_skips_when_brand_present(monkeypatch) -> None:
     async def fake_run_prompt_task(*args, **kwargs):
         raise AssertionError("LLM must not be called when candidate brand is set")
 
@@ -783,7 +783,7 @@ async def test_backfill_candidate_brand_skips_when_brand_present(monkeypatch) ->
     )
 
     intelligence = _build_candidate_intelligence(brand="Lululemon")
-    result = await _backfill_candidate_brand(
+    result = await backfill_candidate_brand(
         session=None,
         source={"title": "Lululemon Wundermost Bodysuit", "brand": "Lululemon"},
         intelligence=intelligence,
@@ -795,7 +795,7 @@ async def test_backfill_candidate_brand_skips_when_brand_present(monkeypatch) ->
 
 
 @pytest.mark.asyncio
-async def test_backfill_candidate_brand_applies_llm_brand_and_rescores(monkeypatch) -> None:
+async def testbackfill_candidate_brand_applies_llm_brand_and_rescores(monkeypatch) -> None:
     async def fake_run_prompt_task(session, *, task_type, run_id, domain, variables):
         return LLMTaskResult(
             payload={"brand": "Lululemon", "confidence": 0.91, "rationale": "DTC URL match"},
@@ -814,7 +814,7 @@ async def test_backfill_candidate_brand_applies_llm_brand_and_rescores(monkeypat
         "brand": "Lululemon",
         "normalized_brand": "lululemon",
     }
-    result = await _backfill_candidate_brand(
+    result = await backfill_candidate_brand(
         session=None,
         source=source,
         intelligence=intelligence,
@@ -830,7 +830,7 @@ async def test_backfill_candidate_brand_applies_llm_brand_and_rescores(monkeypat
 
 
 @pytest.mark.asyncio
-async def test_backfill_candidate_brand_drops_low_confidence(monkeypatch) -> None:
+async def testbackfill_candidate_brand_drops_low_confidence(monkeypatch) -> None:
     async def fake_run_prompt_task(session, *, task_type, run_id, domain, variables):
         return LLMTaskResult(
             payload={"brand": "Maybe", "confidence": 0.1, "rationale": "weak"},
@@ -844,7 +844,7 @@ async def test_backfill_candidate_brand_drops_low_confidence(monkeypatch) -> Non
     )
 
     intelligence = _build_candidate_intelligence()
-    result = await _backfill_candidate_brand(
+    result = await backfill_candidate_brand(
         session=None,
         source={"title": "Wundermost Bodysuit", "brand": ""},
         intelligence=intelligence,
@@ -856,7 +856,7 @@ async def test_backfill_candidate_brand_drops_low_confidence(monkeypatch) -> Non
 
 
 @pytest.mark.asyncio
-async def test_backfill_candidate_brand_handles_llm_error(monkeypatch) -> None:
+async def testbackfill_candidate_brand_handles_llm_error(monkeypatch) -> None:
     async def fake_run_prompt_task(session, *, task_type, run_id, domain, variables):
         return LLMTaskResult(
             payload=None,
@@ -870,7 +870,7 @@ async def test_backfill_candidate_brand_handles_llm_error(monkeypatch) -> None:
     )
 
     intelligence = _build_candidate_intelligence()
-    result = await _backfill_candidate_brand(
+    result = await backfill_candidate_brand(
         session=None,
         source={"title": "Anything", "brand": ""},
         intelligence=intelligence,
@@ -1525,6 +1525,6 @@ async def test_product_intelligence_candidate_poll_marks_timeout(
     await db_session.flush()
 
     monkeypatch.setattr(product_intelligence_settings, "candidate_poll_seconds", 0.0)
-    await _poll_candidate_and_score(db_session, job, candidate)
+    await poll_candidate_and_score(db_session, job, candidate)
 
     assert candidate.status == PRODUCT_INTELLIGENCE_CANDIDATE_STATUS_CRAWL_TIMEOUT

@@ -575,3 +575,8 @@ def _dedupe_keep_order(values: list[str]) -> list[str]:
             seen.add(value)
             result.append(value)
     return result
+
+
+google_native_blocked = _google_native_blocked
+google_native_session = _google_native_session
+parse_google_native_results = _parse_google_native_results

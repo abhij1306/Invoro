@@ -1068,3 +1068,6 @@ def finalize_record(
     cleaned = clean_record(record)
     cleaned = strip_record_tracking_params(cleaned, surface=surface)
     return normalize_record_fields(cleaned) if normalize_fields else cleaned
+
+
+decimal_for_shared_price = _decimal_for_shared_price

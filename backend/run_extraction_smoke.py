@@ -21,7 +21,7 @@ from app.services.acquisition.acquirer import AcquisitionRequest, acquire
 from app.services.acquisition.runtime import is_blocked_html
 from app.services.acquisition_plan import AcquisitionPlan
 from app.services.adapters.registry import run_adapter
-from app.services.extraction_runtime import extract_records
+from app.services.pipeline.extract_records import extract_records
 from app.services.platform_policy import detect_platform_family
 
 from harness_support import infer_surface

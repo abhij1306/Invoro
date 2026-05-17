@@ -8,16 +8,16 @@ from selectolax.lexbor import LexborHTMLParser
 
 from app.services.extract import detail_dom_extractor
 from app.services.extract.detail_materializer import (
-    _prune_irrelevant_detail_structured_payload,
-    _materialize_image_fields,
-    _requires_dom_completion,
+    prune_irrelevant_detail_structured_payload,
+    materialize_image_fields,
+    requires_dom_completion,
 )
 from app.services.config._export_data import load_export_data
 from app.services.extraction_context import prepare_extraction_context
-from app.services.extraction_runtime import extract_records
+from app.services.pipeline.extract_records import extract_records
 from app.services.selector_self_heal import (
-    _validated_xpath_rules,
-    _selector_heal_improved_record,
+    validated_xpath_rules,
+    selector_heal_improved_record,
     reduce_html_for_selector_synthesis,
     selector_self_heal_targets,
 )
@@ -52,7 +52,7 @@ def test_extract_records_prefers_higher_priority_adapter_value_even_when_dom_val
     assert record["_source"] == "adapter"
 
 
-def test_requires_dom_completion_uses_raw_variant_cues_after_pruning() -> None:
+def testrequires_dom_completion_uses_raw_variant_cues_after_pruning() -> None:
     soup = BeautifulSoup("<main><h1>Widget</h1></main>", "html.parser")
     raw_soup = BeautifulSoup(
         """
@@ -65,7 +65,7 @@ def test_requires_dom_completion_uses_raw_variant_cues_after_pruning() -> None:
         "html.parser",
     )
 
-    assert _requires_dom_completion(
+    assert requires_dom_completion(
         record={"title": "Widget", "image_url": "https://example.com/widget.jpg"},
         surface="ecommerce_detail",
         requested_fields=None,
@@ -75,7 +75,7 @@ def test_requires_dom_completion_uses_raw_variant_cues_after_pruning() -> None:
     )
 
 
-def test_requires_dom_completion_ignores_logo_only_image_cue() -> None:
+def testrequires_dom_completion_ignores_logo_only_image_cue() -> None:
     """When image_url is missing and any img exists in DOM, DOM completion is
     attempted.  Logo filtering is handled downstream by the image extraction
     pipeline, not at the DOM completion gate."""
@@ -91,7 +91,7 @@ def test_requires_dom_completion_ignores_logo_only_image_cue() -> None:
 
     # DOM completion is correctly triggered — the extractor will discard
     # non-product images downstream via dedupe_image_urls / tracking filters.
-    assert _requires_dom_completion(
+    assert requires_dom_completion(
         record={"title": "Widget"},
         surface="ecommerce_detail",
         requested_fields=None,
@@ -113,6 +113,8 @@ def test_prepare_extraction_context_caches_original_dom_objects() -> None:
 def test_apply_dom_fallbacks_limits_heading_section_targets_to_section_like_fields(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    from app.services.extract import detail_dom_context
+
     captured: dict[str, set[str]] = {}
 
     def _fake_extract_heading_sections(
@@ -125,7 +127,7 @@ def test_apply_dom_fallbacks_limits_heading_section_targets_to_section_like_fiel
         return {}
 
     monkeypatch.setattr(
-        detail_dom_extractor,
+        detail_dom_context,
         "extract_heading_sections",
         _fake_extract_heading_sections,
     )
@@ -151,7 +153,7 @@ def test_apply_dom_fallbacks_limits_heading_section_targets_to_section_like_fiel
     assert "brand" not in captured["allowed_fields"]
 
 
-def test_prune_irrelevant_detail_structured_payload_reuses_requested_identity(
+def testprune_irrelevant_detail_structured_payload_reuses_requested_identity(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     calls = {"title": 0, "tokens": 0, "codes": 0}
@@ -199,7 +201,7 @@ def test_prune_irrelevant_detail_structured_payload_reuses_requested_identity(
         ]
     }
 
-    pruned = _prune_irrelevant_detail_structured_payload(
+    pruned = prune_irrelevant_detail_structured_payload(
         payload,
         page_url="https://example.com/products/widget",
         requested_page_url="https://example.com/products/widget",
@@ -209,7 +211,7 @@ def test_prune_irrelevant_detail_structured_payload_reuses_requested_identity(
     assert calls == {"title": 1, "tokens": 1, "codes": 1}
 
 
-def test_materialize_image_fields_merges_raw_soup_gallery_when_structured_is_single() -> None:
+def testmaterialize_image_fields_merges_raw_soup_gallery_when_structured_is_single() -> None:
     raw_soup = BeautifulSoup(
         """
         <main>
@@ -222,7 +224,7 @@ def test_materialize_image_fields_merges_raw_soup_gallery_when_structured_is_sin
         "html.parser",
     )
 
-    images, source = _materialize_image_fields(
+    images, source = materialize_image_fields(
         surface="ecommerce_detail",
         candidates={"image_url": ["https://example.com/images/widget-cover.jpg"]},
         candidate_sources={"image_url": ["json_ld"]},
@@ -599,7 +601,7 @@ def test_selector_self_heal_requires_field_level_improvement_before_persisting()
     None
 ):
     assert (
-        _selector_heal_improved_record(
+        selector_heal_improved_record(
             before_record={"title": "Widget Prime", "price": ""},
             after_record={"title": "Widget Prime", "price": "19.99"},
             target_fields=["price"],
@@ -607,7 +609,7 @@ def test_selector_self_heal_requires_field_level_improvement_before_persisting()
         is True
     )
     assert (
-        _selector_heal_improved_record(
+        selector_heal_improved_record(
             before_record={"title": "Widget Prime", "price": ""},
             after_record={"title": "Widget Prime", "price": ""},
             target_fields=["price"],
@@ -617,7 +619,7 @@ def test_selector_self_heal_requires_field_level_improvement_before_persisting()
 
 
 def test_selector_self_heal_converts_css_candidates_before_persisting_xpath() -> None:
-    rules = _validated_xpath_rules(
+    rules = validated_xpath_rules(
         html="""
         <html>
           <body>

@@ -300,3 +300,6 @@ def _record_has_support_signal(
 ) -> bool:
     """Return True if *record* has at least one non-empty support signal field."""
     return any(record.get(field) not in (None, "", [], {}) for field in support_fields)
+
+
+ensure_frozenset = _ensure_frozenset

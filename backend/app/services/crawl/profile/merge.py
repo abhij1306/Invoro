@@ -34,8 +34,8 @@ def _merge_profile_section(
     key: str,
     saved_section: dict[str, object],
     *,
-    legacy_keys: set[str],
-    legacy_aliases: dict[str, str],
+    root_override_keys: set[str],
+    root_override_aliases: dict[str, str],
     default_settings: dict[str, object],
     ignore_default_equivalent_values: bool,
 ) -> dict[str, object]:
@@ -61,17 +61,17 @@ def _merge_profile_section(
             ignore_default_equivalent_values=ignore_default_equivalent_values,
         ):
             merged[field_name] = explicit_value
-    for legacy_key in legacy_keys:
-        if legacy_key not in explicit_settings:
+    for root_override_key in root_override_keys:
+        if root_override_key not in explicit_settings:
             continue
         if not _should_apply_explicit_override(
-            explicit_settings[legacy_key],
-            default_value=default_settings.get(legacy_key),
+            explicit_settings[root_override_key],
+            default_value=default_settings.get(root_override_key),
             ignore_default_equivalent_values=ignore_default_equivalent_values,
         ):
             continue
-        target_key = legacy_aliases.get(legacy_key, legacy_key)
-        merged[target_key] = explicit_settings[legacy_key]
+        target_key = root_override_aliases.get(root_override_key, root_override_key)
+        merged[target_key] = explicit_settings[root_override_key]
     return merged or explicit_section
 
 
@@ -117,7 +117,7 @@ def merge_saved_run_profile(
         merged,
         "fetch_profile",
         dict(saved.get("fetch_profile") or {}),
-        legacy_keys={
+        root_override_keys={
             "fetch_mode",
             "extraction_source",
             "js_mode",
@@ -129,7 +129,7 @@ def merge_saved_run_profile(
             "max_pages",
             "max_scrolls",
         },
-        legacy_aliases={
+        root_override_aliases={
             "advanced_mode": "traversal_mode",
             "sleep_ms": "request_delay_ms",
             "request_delay_ms": "request_delay_ms",
@@ -143,8 +143,8 @@ def merge_saved_run_profile(
         merged,
         "locality_profile",
         dict(saved.get("locality_profile") or {}),
-        legacy_keys={"geo_country", "language_hint", "currency_hint"},
-        legacy_aliases={},
+        root_override_keys={"geo_country", "language_hint", "currency_hint"},
+        root_override_aliases={},
         default_settings=default_settings,
         ignore_default_equivalent_values=ignore_default_equivalent_values,
     )
@@ -152,14 +152,14 @@ def merge_saved_run_profile(
         merged,
         "diagnostics_profile",
         dict(saved.get("diagnostics_profile") or {}),
-        legacy_keys={
+        root_override_keys={
             "capture_html",
             "capture_screenshot",
             "capture_network",
             "capture_response_headers",
             "capture_browser_diagnostics",
         },
-        legacy_aliases={},
+        root_override_aliases={},
         default_settings=default_settings,
         ignore_default_equivalent_values=ignore_default_equivalent_values,
     )

@@ -30,7 +30,7 @@ from app.services.acquisition.browser_fetch_support import build_browser_fetch_r
 from app.services.acquisition.traversal import TraversalResult
 from app.services.config.runtime_settings import crawler_runtime_settings
 from app.services.config.selectors import CARD_SELECTORS
-from app.services.extraction_runtime import extract_records
+from app.services.pipeline.extract_records import extract_records
 
 
 def _network_capture_summary() -> SimpleNamespace:

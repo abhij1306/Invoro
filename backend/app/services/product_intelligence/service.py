@@ -1089,3 +1089,8 @@ def _string_list(value: object) -> list[str]:
         else:
             return []
     return [str(item or "").strip().lower() for item in value if str(item or "").strip()]
+
+
+backfill_candidate_brand = _backfill_candidate_brand
+poll_candidate_and_score = _poll_candidate_and_score
+resolve_source_snapshot = _resolve_source_snapshot

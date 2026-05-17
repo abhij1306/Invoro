@@ -39,8 +39,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/crawl_db"
     redis_url: str = "redis://localhost:6379/0"
     redis_state_enabled: bool = False
-    celery_dispatch_enabled: bool = False
-    legacy_inprocess_runner_enabled: bool = True
+    celery_dispatch_enabled: bool = True
     artifacts_dir: Path = Field(default=BASE_DIR / "artifacts")
     acquisition_cache_dir: Path = Field(
         default=BASE_DIR / "artifacts" / "acquisition_cache"

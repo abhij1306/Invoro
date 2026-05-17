@@ -4,7 +4,7 @@ These guard two real failures observed in the DB crawl history:
 - Tire Rack category pages (run #8 and #10) yielded `listing_detection_failed`
   because every 2-segment product URL was rejected by `listing_url_is_structural`.
 - Dell listing (run #19) persisted 33 navigation/landing anchors as products
-  because `_unsupported_non_detail_ecommerce_merchandise_hint` accepted paths
+  because `unsupported_non_detail_ecommerce_merchandise_hint` accepted paths
   like `/en-us/lp/dt/energy-efficient-data-center`.
 """
 from __future__ import annotations
@@ -53,11 +53,11 @@ def test_product_slug_in_utility_prefix_path_is_not_structural() -> None:
 def test_dell_landing_page_not_rescued_as_merchandise() -> None:
     """`/en-us/lp/dt/<slug>` is a Dell landing page, not a product."""
     from app.services.extract.listing_candidate_ranking import (
-        _unsupported_non_detail_ecommerce_merchandise_hint,
+        unsupported_non_detail_ecommerce_merchandise_hint,
     )
 
     assert (
-        _unsupported_non_detail_ecommerce_merchandise_hint(
+        unsupported_non_detail_ecommerce_merchandise_hint(
             title="Sustainable Data Center",
             url="https://www.dell.com/en-us/lp/dt/energy-efficient-data-center",
         )
@@ -68,11 +68,11 @@ def test_dell_landing_page_not_rescued_as_merchandise() -> None:
 def test_dell_industry_landing_page_not_rescued_as_merchandise() -> None:
     """Industry landing pages under Dell `/lp/dt/` must stay navigation."""
     from app.services.extract.listing_candidate_ranking import (
-        _unsupported_non_detail_ecommerce_merchandise_hint,
+        unsupported_non_detail_ecommerce_merchandise_hint,
     )
 
     assert (
-        _unsupported_non_detail_ecommerce_merchandise_hint(
+        unsupported_non_detail_ecommerce_merchandise_hint(
             title="State & Local Government",
             url="https://www.dell.com/en-us/lp/dt/industry-state-and-local-government",
         )
@@ -83,11 +83,11 @@ def test_dell_industry_landing_page_not_rescued_as_merchandise() -> None:
 def test_short_slug_product_can_still_be_rescued() -> None:
     """The existing 2-token rescue path for `/browse/widget-prime` is preserved."""
     from app.services.extract.listing_candidate_ranking import (
-        _unsupported_non_detail_ecommerce_merchandise_hint,
+        unsupported_non_detail_ecommerce_merchandise_hint,
     )
 
     assert (
-        _unsupported_non_detail_ecommerce_merchandise_hint(
+        unsupported_non_detail_ecommerce_merchandise_hint(
             title="Widget Prime Ultra",
             url="https://example.com/browse/widget-prime",
         )

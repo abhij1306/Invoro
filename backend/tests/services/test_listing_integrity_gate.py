@@ -15,7 +15,7 @@ from unittest.mock import patch
 
 from app.services.extract.listing_integrity_gate import (
     IntegrityDecision,
-    _ensure_frozenset,
+    ensure_frozenset,
     evaluate_listing_integrity,
 )
 
@@ -38,8 +38,8 @@ def _category_record(idx: int) -> dict:
     }
 
 
-def test_ensure_frozenset_uses_mapping_values() -> None:
-    assert _ensure_frozenset({"primary": "price", "secondary": "image_url"}) == frozenset(
+def testensure_frozenset_uses_mapping_values() -> None:
+    assert ensure_frozenset({"primary": "price", "secondary": "image_url"}) == frozenset(
         {"price", "image_url"}
     )
 

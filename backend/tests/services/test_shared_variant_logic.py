@@ -8,8 +8,8 @@ from bs4 import BeautifulSoup
 
 from app.services.extract.detail_materializer import build_detail_record
 from app.services.extract.shared_variant_logic import (
-    _variant_choice_container_for_input,
-    _variant_choice_container_is_overbroad,
+    variant_choice_container_for_input,
+    variant_choice_container_is_overbroad,
     iter_variant_choice_groups,
     iter_variant_select_groups,
     normalized_variant_axis_key,
@@ -818,7 +818,7 @@ def test_dom_variant_extraction_filters_fulfillment_noise_from_color_group() -> 
     assert all(set(row) <= {"color", "_validated"} for row in record["variants"])
 
 
-def test_variant_choice_container_is_overbroad_avoids_css_select_scans() -> None:
+def testvariant_choice_container_is_overbroad_avoids_css_select_scans() -> None:
     class FakeNode:
         name = "div"
 
@@ -830,10 +830,10 @@ def test_variant_choice_container_is_overbroad_avoids_css_select_scans() -> None
         def select(self, *_args, **_kwargs):  # type: ignore[no-untyped-def]
             raise AssertionError("slow CSS select path should not run")
 
-    assert _variant_choice_container_is_overbroad(FakeNode()) is True
+    assert variant_choice_container_is_overbroad(FakeNode()) is True
 
 
-def test_variant_choice_container_for_input_avoids_css_select_scans() -> None:
+def testvariant_choice_container_for_input_avoids_css_select_scans() -> None:
     class FakeInput:
         name = "input"
 
@@ -880,4 +880,4 @@ def test_variant_choice_container_for_input_avoids_css_select_scans() -> None:
     parent = FakeParent()
     node = parent.children[0]
 
-    assert _variant_choice_container_for_input(node, axis_name="size") is parent
+    assert variant_choice_container_for_input(node, axis_name="size") is parent

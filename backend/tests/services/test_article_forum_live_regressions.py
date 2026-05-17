@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from app.services.acquisition.runtime import classify_blocked_page
-from app.services.extraction_runtime import extract_records
+from app.services.pipeline.extract_records import extract_records
 
 
 def test_content_detail_preserves_main_inside_sidebar_named_layout() -> None:

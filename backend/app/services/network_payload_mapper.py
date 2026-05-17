@@ -641,3 +641,8 @@ def _detail_url_matches_page(candidate_url: object, page_url: str) -> bool:
     if not any(len(token) >= 4 or any(char.isdigit() for char in token) for token in overlap):
         return False
     return len(overlap) >= min(2, len(candidate_tokens))
+
+
+looks_like_product_api = _looks_like_product_api
+looks_like_job_api = _looks_like_job_api
+infer_surface_from_body = _infer_surface_from_body

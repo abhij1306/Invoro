@@ -13,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 
 from app.api.auth import router as auth_router
+from app.api.crawl_domain import router as crawl_domain_router
 from app.api.crawls import router as crawls_router
 from app.api.data_enrichment import router as data_enrichment_router
 from app.api.dashboard import router as dashboard_router
@@ -148,6 +149,12 @@ def _client_rate_limit_key(request: Request) -> str:
     return "unknown"
 
 
+sanitize_header_value = _sanitize_header_value
+sanitize_header_name = _sanitize_header_name
+client_rate_limit_key = _client_rate_limit_key
+RATE_LIMIT_BUCKETS = _RATE_LIMIT_BUCKETS
+
+
 def _is_trusted_proxy(proxy_ip: str) -> bool:
     trusted_proxies = {
         str(value).strip()
@@ -242,10 +249,17 @@ async def metrics() -> Response:
     return Response(content=payload, media_type=content_type)
 
 
+# NOTE: crawl_domain_router and crawls_router both use the "/api/crawls"
+# prefix. Order matters: crawl_domain_router must be registered BEFORE
+# crawls_router because the latter defines the catch-all "/{run_id}" path.
+# FastAPI matches routes in registration order; reversing this would cause
+# crawls_router to claim "/api/crawls/domain-run-profile" and shadow the
+# specific crawl_domain endpoints with a 422 response.
 for router in [
     auth_router,
     users_router,
     dashboard_router,
+    crawl_domain_router,
     crawls_router,
     data_enrichment_router,
     records_router,

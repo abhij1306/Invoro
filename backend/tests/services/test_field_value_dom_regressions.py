@@ -10,7 +10,7 @@ from bs4.element import Tag
 
 from app.services.shared.field_coerce import coerce_field_value
 from app.services.dom.selector_engine import (
-    _is_garbage_image_candidate,
+    is_garbage_image_candidate,
     dedupe_image_urls,
     extract_feature_rows,
     upgrade_low_resolution_image_url,
@@ -28,26 +28,26 @@ def _img(src: str) -> Tag | None:
 def test_unresolved_template_image_url_is_garbage() -> None:
     node = _img("https://cdn.example.com/shop/p/foo/URL_TO_THE_PRODUCT_IMAGE")
     assert node is not None
-    assert _is_garbage_image_candidate(node, node.get("src")) is True
+    assert is_garbage_image_candidate(node, node.get("src")) is True
 
 
 def test_handlebars_template_image_url_is_garbage() -> None:
     node = _img("https://cdn.example.com/{{image}}.jpg")
     assert node is not None
-    assert _is_garbage_image_candidate(node, node.get("src")) is True
+    assert is_garbage_image_candidate(node, node.get("src")) is True
 
 
 def test_bracket_placeholder_image_url_is_garbage() -> None:
     node = _img("https://cdn.example.com/[[image]]/hero.jpg")
     assert node is not None
-    assert _is_garbage_image_candidate(node, node.get("src")) is True
+    assert is_garbage_image_candidate(node, node.get("src")) is True
 
 
 def test_resolved_image_url_is_not_garbage() -> None:
     node = _img("https://cdn.example.com/product/hero-image.jpg")
     assert node is not None
     # Not garbage on its own (URL has no template tokens).
-    assert _is_garbage_image_candidate(node, node.get("src")) is False
+    assert is_garbage_image_candidate(node, node.get("src")) is False
 
 
 def test_dedupe_image_urls_keeps_highest_resolution_cdn_variant() -> None:

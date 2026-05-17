@@ -290,6 +290,21 @@ def select_listing_fragment_nodes(
     return [node for _score, _order, node in rows]
 
 
+def listing_card_html_fragments(
+    dom_parser: LexborHTMLParser,
+    *,
+    is_job: bool,
+    fallback_fragment_limit: int,
+    limit: int | None = None,
+) -> list[object]:
+    fragment_limit = max(int(fallback_fragment_limit), int(limit or 0))
+    return select_listing_fragment_nodes(
+        dom_parser,
+        surface="job_listing" if is_job else "ecommerce_listing",
+        limit=max(1, fragment_limit),
+    )
+
+
 def collect_listing_fragment_html(
     parser: LexborHTMLParser,
     *,

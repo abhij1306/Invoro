@@ -841,6 +841,10 @@ def _marker_map_from_config(
     }
 
 
+has_extractable_dom_content_detail_signals = _has_extractable_dom_content_detail_signals
+has_extractable_listing_signals = _has_extractable_listing_signals
+
+
 __all__ = [
     "BlockPageClassification",
     "NetworkPayloadReadResult",
@@ -857,6 +861,8 @@ __all__ = [
     "is_blocked_html_async",
     "is_non_retryable_http_status",
     "is_retryable_http_status",
+    "has_extractable_dom_content_detail_signals",
+    "has_extractable_listing_signals",
     "should_escalate_to_browser",
     "should_escalate_to_browser_async",
 ]

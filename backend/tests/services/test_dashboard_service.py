@@ -97,7 +97,6 @@ async def test_split_reset_crawl_data_and_domain_memory_preserve_the_other_scope
 
     monkeypatch.setattr(dashboard_service.settings, "artifacts_dir", artifacts_dir)
     monkeypatch.setattr(dashboard_service.settings, "cookie_store_dir", cookies_dir)
-    monkeypatch.setattr(dashboard_service, "_legacy_artifact_paths", lambda: [])
 
     run = await create_crawl_run(
         db_session,

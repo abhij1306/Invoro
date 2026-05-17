@@ -5,11 +5,9 @@ from uuid import uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
 from app.models.crawl_run import CrawlRun
 from app.services.config.runtime_settings import CELERY_TASK_ID_KEY
 from app.services.crawl.state import CrawlStatus
-from app.services.dispatch.local_dispatcher import track_local_run_task
 from app.tasks import process_run_task
 
 logger = logging.getLogger(__name__)
@@ -42,7 +40,7 @@ async def _load_run_with_normalized_status(
 
 
 class CeleryRunDispatcher:
-    """Dispatches crawl runs via Celery. Falls back to local if configured."""
+    """Dispatch crawl runs via Celery only."""
 
     async def dispatch(self, session: AsyncSession, run: CrawlRun) -> CrawlRun:
         loaded_run, current = await _load_run_with_normalized_status(
@@ -56,15 +54,8 @@ class CeleryRunDispatcher:
         try:
             process_run_task.apply_async(args=[loaded_run.id], task_id=task_id)
         except Exception as exc:
-            if not settings.legacy_inprocess_runner_enabled:
-                await _clear_task_id(session, loaded_run)
-                raise
-            logger.warning(
-                "Celery enqueue failed for run %s; falling back to in-process execution: %s",
-                loaded_run.id,
-                exc,
-            )
             await _clear_task_id(session, loaded_run)
-            track_local_run_task(int(loaded_run.id))
+            logger.exception("Celery enqueue failed for run %s", loaded_run.id)
+            raise exc
         await session.refresh(loaded_run)
         return loaded_run

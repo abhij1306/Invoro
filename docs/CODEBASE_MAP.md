@@ -19,7 +19,8 @@ If a file is not listed, assume it is a helper under a listed owner.
 
 | File | Purpose |
 |---|---|
-| `crawls.py` | Run creation, CSV ingestion, run control, logs, domain recipe/profile/feedback/cookie-memory routes |
+| `crawls.py` | Run creation, CSV ingestion, run listing/detail/control, commit fields, and logs |
+| `crawl_domain.py` | Crawl domain recipe/profile/feedback/cookie-memory routes |
 | `records.py` | Record listing, exports, provenance |
 | `review.py` | Review payloads and approved mapping save |
 | `selectors.py` | Selector CRUD, suggest, test, preview |
@@ -75,10 +76,14 @@ If a file is not listed, assume it is a helper under a listed owner.
 | `crawl/profile/*` | Reusable domain run-profile normalization, merge, persistence, and acquisition-contract learning |
 | `crawl/events.py` | WebSocket log emission |
 | `product_intelligence/*` | Product web discovery, candidate crawl orchestration, deterministic match scoring |
-| `data_enrichment/*` | On-demand enrichment job setup for ecommerce detail records |
+| `data_enrichment/service.py` | On-demand enrichment job orchestration and persistence for ecommerce detail records |
+| `data_enrichment/deterministic.py` | Deterministic enrichment normalization, taxonomy matching, and product attribute diagnostics |
+| `data_enrichment/shopify_catalog.py` | Shopify taxonomy and attribute repository loading/matching |
 | `crawl/batch_runtime.py` | URL loop, progress, pause, kill checks |
 | `tasks.py` | Celery task entry |
-| `pipeline/extraction_loop.py` | Per-URL orchestration: acquire -> extract -> normalize -> persist |
+| `pipeline/extraction_loop.py` | Per-URL stage orchestration: acquire -> extract -> normalize -> persist |
+| `pipeline/record_extraction_stage.py` | Adapter population, selector-rule loading, extraction invocation, acquisition-contract memory |
+| `pipeline/extraction_retry_stage.py` | Browser retry families, detail rejection guard, listing-integrity escalation |
 | `pipeline/url_processing_context.py` | Per-URL acquisition config and run-context resolution |
 | `pipeline/persistence.py` | `CrawlRecord` writes, dedupe, summaries |
 | `pipeline/runtime_helpers.py` | Typed stage helpers, browser diagnostics merge, failure-state persistence |
@@ -99,22 +104,29 @@ Flow:
 | `acquisition/policy.py` | Public acquisition plan/policy interfaces |
 | `acquisition/runtime.py` | Shared HTTP client pool |
 | `acquisition/http_client.py` | Thin shared-client wrapper |
-| `acquisition/browser_runtime.py` | Shared Playwright runtime and limits |
+| `acquisition/browser_runtime.py` | Browser fetch orchestration and runtime-policy wiring |
+| `acquisition/browser_pool.py` | Shared Playwright pool, context lifecycle, browser binary/proxy launch |
 | `acquisition/browser_fetch_support.py` | Browser fetch result, diagnostics, and page event assembly helpers |
 | `acquisition/browser_capture.py` | Screenshots and network payload capture |
 | `acquisition/browser_diagnostics.py` | Browser engine labels, profile diagnostics, and failed-fetch diagnostic contracts |
 | `acquisition/browser_identity.py` | Browser fingerprint generation |
 | `acquisition/browser_interstitial.py` | Location-interstitial detection and safe dismissal |
-| `acquisition/browser_page_flow.py` | Page navigation and readiness probing |
+| `acquisition/browser_page_flow.py` | Page navigation, readiness probing, serialization policy |
+| `acquisition/browser_result_builder.py` | Browser acquisition diagnostics, artifacts, screenshots, final result shaping |
+| `acquisition/browser_page_helpers.py` | Browser page HTML selection, detail extractability probes, listing visual capture |
 | `acquisition/browser_proxy_config.py` | Browser proxy URL parsing, redaction, and Playwright proxy config |
 | `acquisition/browser_readiness.py` | DOM readiness checks, listing/detail probes, outcome classification |
 | `acquisition/browser_stage_runner.py` | Bounded browser-stage execution, timeout cancellation, and page/context teardown |
 | `acquisition/browser_storage_state.py` | Browser storage-state capture and persist-policy marking |
-| `acquisition/traversal.py` | Listing pagination and load-more |
+| `acquisition/traversal.py` | Listing traversal mode orchestration |
+| `acquisition/traversal_helpers.py` | Traversal fragments, timing waits, pagination-control detection |
+| `acquisition/traversal_recovery.py` | Listing recovery actions, overlay dismissal, resilient clicks |
 | `acquisition/traversal_card_counting.py` | Card-count and progress-snapshot helpers used by traversal loops |
 | `acquisition/pacing.py` | Host-level rate limiting |
 | `acquisition/cookie_store.py` | Temp storage state plus domain cookie memory helpers |
 | `fetch/fetch_context.py` | `fetch_page()` owner: HTTP/browser decision, escalation, block detection |
+| `fetch/browser_policy.py` | Proxy shaping, browser escalation policy, engine attempt selection, and diagnostics merge helpers |
+| `fetch/retry_policy.py` | HTTP retry status, attempt count, backoff, and jitter policy |
 | `robots_policy.py` | robots.txt policy |
 | `url_safety.py` | SSRF and public-target validation |
 
@@ -150,6 +162,8 @@ Canonical config owner:
 | `field_url_normalization.py` | Tracking URL cleanup and query stripping |
 | `dom/content_extractability.py` | Visible text/link/image extractability checks used by selector extraction |
 | `dom/selector_engine.py` | DOM selector extraction, image URL ranking, and selector result assembly |
+| `dom/image_extraction.py` | DOM image URL scoring, dedupe, low-resolution upgrade, and page image extraction |
+| `dom/section_extraction.py` | DOM label/value pairs, semantic heading sections, materials sections, and feature rows |
 | `public_record_firewall.py` | Final public persisted-data schema/value firewall |
 | `field_value_*.py` | Per-field normalization helpers |
 | `field_policy.py` | Field eligibility by surface |
@@ -222,6 +236,7 @@ Verdict set:
 |---|---|
 | `review/__init__.py` | Review payloads and approved field mapping persistence |
 | `selectors_runtime.py` | Selector CRUD and runtime lookup |
+| `selector_suggestions.py` | Selector suggestion assembly from domain memory, deterministic DOM patterns, listing cards, and LLM candidates |
 | `selector_self_heal.py` | Selector synthesis and validation |
 | `domain_memory_service.py` | Domain memory load/save |
 

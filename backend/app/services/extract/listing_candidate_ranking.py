@@ -675,3 +675,8 @@ def _unsupported_detail_like_ecommerce_merchandise_hint(*, title: str, url: str)
     return bool(title_tokens & set(terminal_tokens))
 
 
+unsupported_non_detail_ecommerce_merchandise_hint = (
+    _unsupported_non_detail_ecommerce_merchandise_hint
+)
+
+

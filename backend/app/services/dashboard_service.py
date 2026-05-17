@@ -221,13 +221,8 @@ async def _reset_crawl_runtime_state() -> dict:
 
     artifacts_removed = _reset_directory(settings.artifacts_dir)
     cookies_removed = _reset_directory(settings.cookie_store_dir)
-    legacy_artifacts_removed = sum(
-        _reset_directory(path, create_if_missing=False)
-        for path in _legacy_artifact_paths()
-    )
     return {
         "artifacts_removed": artifacts_removed,
-        "legacy_artifacts_removed": legacy_artifacts_removed,
         "cookies_removed": cookies_removed,
         "knowledge_base_reset": False,
     }
@@ -408,21 +403,6 @@ def _reset_directory(path, *, create_if_missing: bool = True) -> int:
     if create_if_missing:
         path.mkdir(parents=True, exist_ok=True)
     return removed
-
-
-def _legacy_artifact_paths() -> list[Path]:
-    candidates = [
-        PROJECT_ROOT / "backend" / "backend" / "artifacts",
-    ]
-    normalized_current = Path(settings.artifacts_dir).resolve()
-    results: list[Path] = []
-    for candidate in candidates:
-        resolved = candidate.resolve()
-        if resolved == normalized_current:
-            continue
-        if resolved not in results:
-            results.append(resolved)
-    return results
 
 
 async def build_operational_metrics(session: AsyncSession) -> dict:

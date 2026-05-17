@@ -20,7 +20,7 @@ from app.services.config.selectors import (
 )
 from app.services.config.runtime_settings import crawler_runtime_settings
 from app.services.db_utils import mapping_or_empty
-from app.services.extraction_runtime import extract_records
+from app.services.pipeline.extract_records import extract_records
 from app.services.domain_memory_service import (
     load_domain_memory,
     save_domain_memory,
@@ -454,3 +454,7 @@ def _safe_float(value: object, *, default: float) -> float:
 
 def _list_or_empty(value: object) -> list[object]:
     return list(value) if isinstance(value, list) else []
+
+
+validated_xpath_rules = _validated_xpath_rules
+selector_heal_improved_record = _selector_heal_improved_record

@@ -5,8 +5,8 @@ from fastapi.responses import Response
 
 from app.core.telemetry import install_asyncio_exception_filter
 from app.main import (
-    _sanitize_header_name,
-    _sanitize_header_value,
+    sanitize_header_name,
+    sanitize_header_value,
     correlation_middleware,
 )
 
@@ -82,16 +82,16 @@ async def test_correlation_middleware_falls_back_for_invalid_configured_header_n
     assert response.headers["X-Request-ID"] == "req-123"
 
 
-def test_sanitize_header_value_removes_crlf_characters() -> None:
-    assert _sanitize_header_value("abc\r\ndef\nxyz") == "abcdefxyz"
+def testsanitize_header_value_removes_crlf_characters() -> None:
+    assert sanitize_header_value("abc\r\ndef\nxyz") == "abcdefxyz"
 
 
-def test_sanitize_header_value_preserves_safe_content() -> None:
-    assert _sanitize_header_value("req-123_ABC") == "req-123_ABC"
+def testsanitize_header_value_preserves_safe_content() -> None:
+    assert sanitize_header_value("req-123_ABC") == "req-123_ABC"
 
 
-def test_sanitize_header_name_rejects_invalid_tokens() -> None:
-    assert _sanitize_header_name("X-Request-ID:Bad") == "X-Request-ID"
+def testsanitize_header_name_rejects_invalid_tokens() -> None:
+    assert sanitize_header_name("X-Request-ID:Bad") == "X-Request-ID"
 
 
 def test_install_asyncio_exception_filter_suppresses_known_pipe_reset() -> None:

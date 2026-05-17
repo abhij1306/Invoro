@@ -9,10 +9,13 @@ import app.models  # noqa: F401
 
 ROOT = Path(__file__).resolve().parents[2]
 SERVICES_ROOT = ROOT / "app" / "services"
+APP_ROOT = ROOT / "app"
+API_ROOT = APP_ROOT / "api"
+TESTS_ROOT = ROOT / "tests"
 EXTRACTION_MODULES = [
-    SERVICES_ROOT / "extraction_runtime.py",
     SERVICES_ROOT / "extraction_context.py",
     SERVICES_ROOT / "listing_extractor.py",
+    SERVICES_ROOT / "pipeline" / "extract_records.py",
     SERVICES_ROOT / "structured_sources.py",
     SERVICES_ROOT / "extract" / "field_candidates" / "structured_payloads.py",
     SERVICES_ROOT / "extract" / "field_candidates" / "structured_values.py",
@@ -26,6 +29,17 @@ FIELD_POLICY_CONSUMERS = [
     SERVICES_ROOT / "review" / "__init__.py",
 ]
 ALLOWED_PRIVATE_SERVICE_IMPORTS = set()
+ALLOWED_PRIVATE_TEST_IMPORTS: set[str] = set()
+ALLOWED_ROOT_EXTRACTION_MODULES = {
+    # Slice 2 keeps this as the public listing orchestration facade.
+    Path("app/services/listing_extractor.py"),
+    # Canonical shared structured-source owner, explicitly out of this plan.
+    Path("app/services/structured_sources.py"),
+    # Shared extraction context types.
+    Path("app/services/extraction_context.py"),
+    # Generic script text extraction owner used by structured source parsing.
+    Path("app/services/script_text_extractor.py"),
+}
 CONFIG_CONSTANT_NAME_MARKERS = (
     "SELECTOR",
     "TOKEN",
@@ -47,74 +61,113 @@ ALLOWED_SERVICE_CONFIG_CONSTANTS = {
     ("extract/shared_variant_logic.py", "_VARIANT_AXIS_LABEL_NOISE_TOKENS"),
     ("extract/shared_variant_logic.py", "_VARIANT_GROUP_ATTR_NOISE_TOKENS"),
     ("extract/shared_variant_logic.py", "_VARIANT_OPTION_VALUE_NOISE_TOKENS"),
-    ("dom/selector_engine.py", "_SECTION_CONTAINER_SELECTORS"),
-    ("dom/selector_engine.py", "_SECTION_LABEL_SELECTOR"),
+    ("dom/section_extraction.py", "_SECTION_CONTAINER_SELECTORS"),
+    ("dom/section_extraction.py", "_SECTION_LABEL_SELECTOR"),
     ("shared/field_coerce.py", "_SIZE_REJECT_TOKENS_NORMALIZED"),
     ("normalizers/__init__.py", "_AVAILABILITY_TOKENS"),
     ("platform_policy.py", "_GENERIC_COMMERCE_TOKENS"),
     ("platform_policy.py", "_GENERIC_JOB_TOKENS"),
-    ("selectors_runtime.py", "_SELECTOR_NOISE_FROZEN"),
 }
 DEFAULT_LOC_BUDGET = 1000
+PLAN_TARGET_LOC_BUDGETS = {
+    # Verified Architecture Audit Remediation staged targets. These are not
+    # blanket budgets: each matching slice must make the target enforceable.
+    Path("app/services/listing_extractor.py"): 900,  # Slice 2 facade target.
+    Path("app/services/pipeline/extract_records.py"): 700,  # Slice 3 target.
+    Path("app/services/extract/shared_variant_logic.py"): 350,  # Slice 4 shim/delete target.
+    Path("app/services/extract/variant_grouping.py"): 1000,  # Slice 4 follow-up target.
+    Path("app/services/extract/detail_dom_extractor.py"): 900,  # Slice 5 facade target.
+    Path("app/services/extract/detail_dom_context.py"): 1000,  # Slice 5 follow-up target.
+    Path("app/services/extract/detail_materializer.py"): 950,  # Slice 6 target.
+    Path("app/services/extract/detail_candidate_collection.py"): 1000,  # Slice 6 follow-up target.
+    Path("app/services/extract/detail_record_finalizer.py"): 900,  # Slice 7 target.
+    Path("app/services/extract/detail_final_cleanup.py"): 1000,  # Slice 7 follow-up target.
+    Path("app/services/extract/detail_price_extractor.py"): 800,  # Slice 8 target.
+    Path("app/services/extract/detail_identity.py"): 800,  # Slice 8 target.
+    Path("app/services/extract/detail_price_core.py"): 800,  # Slice 8 follow-up target.
+    Path("app/services/extract/detail_identity_core.py"): 800,  # Slice 8 follow-up target.
+    Path("app/services/selectors_runtime.py"): 600,  # Slice 12 target.
+    Path("app/services/pipeline/extraction_loop.py"): 1000,  # Slice 12 target.
+    Path("app/services/dom/selector_engine.py"): 1000,  # Slice 12 target.
+    Path("app/services/acquisition/browser_runtime.py"): 1000,  # Slice 12 target.
+    Path("app/services/acquisition/traversal.py"): 1000,  # Slice 12 target.
+    Path("app/services/acquisition/browser_page_flow.py"): 1000,  # Slice 12 target.
+    Path("app/services/fetch/fetch_context.py"): 1000,  # Slice 12 target.
+    Path("app/services/data_enrichment/service.py"): 725,  # Slice 12 target.
+    Path("app/api/crawls.py"): 500,  # Slice 12 target.
+}
 # Keep explicit budgets for coherent large owners. Budgets are set to roughly the
 # current LOC plus 10% so growth requires a conscious update instead of a blanket
 # threshold increase.
 FILE_LOC_BUDGETS = {
     # Browser identity owns UA/timezone/device/runtime surface shaping.
     Path("app/services/acquisition/browser_identity.py"): 1690,
-    # Browser runtime owns pooled browser lifecycle and context management.
-    # Ratcheted after storage-state and readiness wrappers moved out.
-    Path("app/services/acquisition/browser_runtime.py"): 1800,
-    # Page flow owns navigation, readiness, artifact capture, and final browser shaping.
-    # Ratcheted after interstitial helpers moved to browser_interstitial.py.
-    Path("app/services/acquisition/browser_page_flow.py"): 1660,
-    # Traversal owns readiness-aware pagination and bounded expansion loops.
-    # Ratcheted after card-counting/progress-snapshot helpers moved out.
-    Path("app/services/acquisition/traversal.py"): 1710,
+    # Browser runtime owns fetch orchestration; pooled lifecycle lives in browser_pool.py.
+    Path("app/services/acquisition/browser_runtime.py"): 1000,
+    # Page flow owns navigation/readiness; final result shaping lives in browser_result_builder.py.
+    Path("app/services/acquisition/browser_page_flow.py"): 1000,
+    # Traversal owns mode orchestration; helper/recovery mechanics live beside it.
+    Path("app/services/acquisition/traversal.py"): 1000,
     # Config owners.
     # Config rules own typed extraction constants and category/nav URL rules.
     Path("app/services/config/extraction_rules.py"): 1910,
-    Path("app/services/extraction_runtime.py"): 870,
+    Path("app/services/pipeline/extract_records.py"): 700,
     # Detail DOM extraction owns DOM fallback fields plus DOM variant recovery.
-    Path("app/services/extract/detail_dom_extractor.py"): 1480,
+    Path("app/services/extract/detail_dom_extractor.py"): 120,
+    Path("app/services/extract/detail_dom_context.py"): 1500,
     # Detail finalizer owns public-boundary cleanup and record repair.
     # Grown (+10) to accommodate additional axis-gating logic that reuses
     # shared_variant_logic frozensets instead of re-deriving them locally.
-    Path("app/services/extract/detail_record_finalizer.py"): 1345,
+    Path("app/services/extract/detail_record_finalizer.py"): 80,
+    Path("app/services/extract/detail_final_cleanup.py"): 1345,
+    Path("app/services/extract/detail_price_extractor.py"): 40,
+    Path("app/services/extract/detail_identity.py"): 800,
+    Path("app/services/extract/detail_price_core.py"): 1000,
+    Path("app/services/extract/detail_identity_core.py"): 1000,
     # Shared variant logic owns generic axis and row reconciliation.
     # Grown (+380) to absorb the extended allowed-axis taxonomy (flavor, type,
     # material_composition, etc.) and related JS-state / DOM helpers.
     Path("app/services/extract/shared_variant_logic.py"): 1562,
+    Path("app/services/extract/variant_grouping.py"): 1600,
     # Variant normalization owns the detail variant cleanup pipeline.
     Path("app/services/extract/variant_record_normalization.py"): 1472,
-    # Listing extraction remains coherent but large enough to warrant an explicit budget.
-    # Ratcheted for content table-row fallback paths while this owner awaits a split.
-    Path("app/services/listing_extractor.py"): 1260,
+    # Listing extraction is the orchestration facade; card/title/image/brand
+    # signal ownership lives in extract/listing_signals.py.
+    Path("app/services/listing_extractor.py"): 900,
+    Path("app/services/extract/listing_signals.py"): 650,
     # Canonical field coercion remains centralized here instead of scattering value policy.
     # Shrunk after removing stranded URL helpers and duplicate output schema checks.
     # TODO(chore): baseline LOC drift here, then extract canonical_coercion /
     # field_recovery / availability_gate owners when scheduled.
     # Phase 3 moved owners. These are temporary high-water marks while public
     # facades preserve imports; later slices split internals under these owners.
-    Path("app/services/dom/selector_engine.py"): 1695,
-    Path("app/services/extract/detail_materializer.py"): 1435,
+    Path("app/services/dom/selector_engine.py"): 1000,
+    Path("app/services/extract/detail_materializer.py"): 120,
+    Path("app/services/extract/detail_candidate_collection.py"): 1435,
     # Ratcheted for host-policy TTL compatibility and handoff failure isolation.
-    Path("app/services/fetch/fetch_context.py"): 1410,
+    Path("app/services/fetch/fetch_context.py"): 1000,
     Path("app/services/js_state/state_normalizer.py"): 1410,
-    # Grown (+187) for listing-integrity escalation retry wiring (task 10.1).
-    Path("app/services/pipeline/extraction_loop.py"): 1575,
+    # Extraction loop owns stage orchestration; retry and record extraction stages are split out.
+    Path("app/services/pipeline/extraction_loop.py"): 1000,
     # Run progress owns batch-level summary/merge/quality aggregation, evicted
     # from the ORM layer so business logic does not live in models/crawl.py.
     Path("app/services/pipeline/run_progress.py"): 365,
     Path("app/services/shared/field_coerce.py"): 1080,
-    # Enrichment owns deterministic product normalization and job application.
-    Path("app/services/data_enrichment/service.py"): 1400,
+    Path("app/services/selectors_runtime.py"): 600,
+    Path("app/services/selector_suggestions.py"): 250,
+    # Enrichment service owns job orchestration and delegates deterministic normalization.
+    Path("app/services/data_enrichment/service.py"): 725,
+    Path("app/services/data_enrichment/deterministic.py"): 725,
     # LLM task runtime now only orchestrates task execution. Prompt rendering,
     # payload validation, provider calls, budget/cache, and cost logging have
     # separate owners.
     Path("app/services/llm/tasks.py"): 455,
     # Product Intelligence service owns job + discovery orchestration with brand and enrichment LLM helpers.
     Path("app/services/product_intelligence/service.py"): 1105,
+}
+API_FILE_LOC_BUDGETS = {
+    Path("app/api/crawls.py"): 500,
+    Path("app/api/crawl_domain.py"): 250,
 }
 
 
@@ -168,6 +221,21 @@ def _private_service_imports(path: Path) -> set[str]:
     return imports
 
 
+def _private_app_imports(path: Path) -> set[str]:
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    imports: set[str] = set()
+    rel = path.relative_to(ROOT).as_posix()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ImportFrom) or not node.module:
+            continue
+        if not node.module.startswith("app."):
+            continue
+        for alias in node.names:
+            if alias.name.startswith("_"):
+                imports.add(f"{rel} -> {node.module}:{alias.name}")
+    return imports
+
+
 def test_service_files_stay_under_loc_budget() -> None:
     oversized: list[str] = []
     for path in SERVICES_ROOT.rglob("*.py"):
@@ -177,6 +245,43 @@ def test_service_files_stay_under_loc_budget() -> None:
         if line_count > budget:
             oversized.append(f"{rel} has {line_count} LOC (budget {budget})")
     assert oversized == []
+
+
+def test_api_files_stay_under_loc_budget() -> None:
+    oversized: list[str] = []
+    for path in API_ROOT.rglob("*.py"):
+        rel = path.relative_to(ROOT)
+        budget = API_FILE_LOC_BUDGETS.get(rel)
+        if budget is None:
+            continue
+        line_count = len(path.read_text(encoding="utf-8").splitlines())
+        if line_count > budget:
+            oversized.append(f"{rel} has {line_count} LOC (budget {budget})")
+    assert oversized == []
+
+
+def test_audit_plan_targets_are_tracked_by_current_budgets() -> None:
+    missing = set(PLAN_TARGET_LOC_BUDGETS) - set(FILE_LOC_BUDGETS)
+    missing = {
+        path
+        for path in missing
+        if (ROOT / path).exists()
+        and len((ROOT / path).read_text(encoding="utf-8").splitlines())
+        > DEFAULT_LOC_BUDGET
+    }
+    missing -= {Path("app/api/crawls.py")}
+    assert missing == set()
+
+
+def test_root_extraction_services_are_explicitly_owned() -> None:
+    root_extraction_modules = {
+        path.relative_to(ROOT)
+        for path in SERVICES_ROOT.glob("*.py")
+        if path.name.endswith("_extractor.py")
+        or path.name
+        in {"extraction_context.py", "structured_sources.py"}
+    }
+    assert root_extraction_modules == ALLOWED_ROOT_EXTRACTION_MODULES
 
 
 def test_extraction_modules_do_not_import_llm_runtime_layers() -> None:
@@ -228,6 +333,31 @@ def test_deleted_facades_do_not_return() -> None:
     assert [str(path.relative_to(ROOT)) for path in stale_facades if path.exists()] == []
 
 
+def test_legacy_dispatcher_fallback_flag_is_removed() -> None:
+    offenders: list[str] = []
+    for path in APP_ROOT.rglob("*.py"):
+        if "legacy_inprocess_runner_enabled" in path.read_text(encoding="utf-8"):
+            offenders.append(str(path.relative_to(ROOT)))
+    assert offenders == []
+
+
+def test_retired_legacy_shims_do_not_return() -> None:
+    forbidden = (
+        "_LEGACY_PROMPTS_DIR",
+        "_legacy_artifact_paths",
+        "legacy_artifacts_removed",
+        "legacy_keys",
+        "legacy_aliases",
+    )
+    offenders: list[str] = []
+    for path in APP_ROOT.rglob("*.py"):
+        text = path.read_text(encoding="utf-8")
+        for token in forbidden:
+            if token in text:
+                offenders.append(f"{path.relative_to(ROOT)}:{token}")
+    assert offenders == []
+
+
 def test_model_bootstrap_registers_domain_memory_tables() -> None:
     expected = {
         "domain_memory",
@@ -274,3 +404,10 @@ def test_private_service_imports_do_not_drift() -> None:
     for path in SERVICES_ROOT.rglob("*.py"):
         offenders.update(_private_service_imports(path))
     assert offenders == ALLOWED_PRIVATE_SERVICE_IMPORTS
+
+
+def test_private_test_imports_do_not_drift() -> None:
+    offenders: set[str] = set()
+    for path in TESTS_ROOT.rglob("*.py"):
+        offenders.update(_private_app_imports(path))
+    assert offenders == ALLOWED_PRIVATE_TEST_IMPORTS

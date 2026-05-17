@@ -4,7 +4,7 @@ from bs4 import BeautifulSoup
 
 from app.services.extract.content_listing_handler import validate_table_rows_quality
 from app.services.extract.table_extractor import extract_tables
-from app.services.extraction_runtime import extract_records
+from app.services.pipeline.extract_records import extract_records
 from app.services.normalizers import normalize_value
 from app.services.public_record_firewall import public_record_data_for_surface
 

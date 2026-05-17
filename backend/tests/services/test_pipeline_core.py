@@ -15,10 +15,10 @@ from app.services.acquisition.acquirer import (
 from app.services.adapters.base import AdapterResult
 from app.services.crawl.crud import create_crawl_run, get_run_logs, get_run_records
 from app.services.pipeline.extraction_loop import (
-    _URLProcessingContext,
-    _best_adapter_result,
-    _empty_extraction_browser_retry_decision,
-    _resolved_url_processing_config,
+    URLProcessingContext,
+    best_adapter_result,
+    empty_extraction_browser_retry_decision,
+    resolved_url_processing_config,
     apply_llm_fallback,
     process_single_url,
 )
@@ -189,8 +189,8 @@ async def test_direct_record_llm_fallback_backfills_missing_listing_fields(
     assert rows[0]["image_url"] == "https://example.com/widget.jpg"
 
 
-def test_best_adapter_result_deduplicates_unsourced_records() -> None:
-    result = _best_adapter_result(
+def testbest_adapter_result_deduplicates_unsourced_records() -> None:
+    result = best_adapter_result(
         [
             AdapterResult(
                 records=[{"title": "Widget", "price": "$10"}],
@@ -232,7 +232,7 @@ def test_empty_extraction_retry_skips_static_detail_price_html() -> None:
         status_code=200,
     )
 
-    decision = _empty_extraction_browser_retry_decision(
+    decision = empty_extraction_browser_retry_decision(
         acquisition_result,
         [],
         surface="ecommerce_detail",
@@ -260,7 +260,7 @@ def test_empty_detail_extraction_retry_skips_collection_seed() -> None:
         status_code=200,
     )
 
-    decision = _empty_extraction_browser_retry_decision(
+    decision = empty_extraction_browser_retry_decision(
         acquisition_result,
         [],
         surface="ecommerce_detail",
@@ -367,7 +367,7 @@ async def test_missing_repair_fields_uses_default_ecommerce_targets(
             "settings": {},
         },
     )
-    context = _URLProcessingContext(
+    context = URLProcessingContext(
         session=db_session,
         run=run,
         url=run.url,
@@ -1145,7 +1145,7 @@ def test_url_processing_config_syncs_compatibility_fields_from_acquisition_plan(
     assert config.persist_logs is False
 
 
-def test_resolved_url_processing_config_handles_none_plan_limits() -> None:
+def testresolved_url_processing_config_handles_none_plan_limits() -> None:
     config = URLProcessingConfig.from_acquisition_plan(
         AcquisitionPlan(
             surface="ecommerce_detail",
@@ -1156,7 +1156,7 @@ def test_resolved_url_processing_config_handles_none_plan_limits() -> None:
         )
     )
 
-    resolved = _resolved_url_processing_config(
+    resolved = resolved_url_processing_config(
         config,
         surface="ecommerce_detail",
         proxy_list=[],
@@ -1175,7 +1175,7 @@ def test_resolved_url_processing_config_handles_none_plan_limits() -> None:
     assert resolved.sleep_ms == 7
 
 
-def test_resolved_url_processing_config_preserves_explicit_zero_sleep_ms() -> None:
+def testresolved_url_processing_config_preserves_explicit_zero_sleep_ms() -> None:
     config = URLProcessingConfig.from_acquisition_plan(
         AcquisitionPlan(
             surface="ecommerce_listing",
@@ -1183,7 +1183,7 @@ def test_resolved_url_processing_config_preserves_explicit_zero_sleep_ms() -> No
         )
     )
 
-    resolved = _resolved_url_processing_config(
+    resolved = resolved_url_processing_config(
         config,
         surface="ecommerce_listing",
         proxy_list=[],

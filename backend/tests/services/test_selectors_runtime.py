@@ -4,7 +4,7 @@ import pytest
 
 from app.services.domain_memory_service import load_domain_memory, save_domain_memory
 from app.services.selectors_runtime import (
-    _coerce_int,
+    coerce_int,
     create_selector_record,
     fetch_selector_document,
     list_selector_records,
@@ -155,6 +155,6 @@ async def test_list_selector_records_without_surface_returns_all_domain_surfaces
     }
 
 
-def test_coerce_int_preserves_zero() -> None:
-    assert _coerce_int(0, default=9) == 0
-    assert _coerce_int(" 0 ", default=9) == 0
+def testcoerce_int_preserves_zero() -> None:
+    assert coerce_int(0, default=9) == 0
+    assert coerce_int(" 0 ", default=9) == 0

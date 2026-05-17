@@ -1,42 +1,30 @@
 from __future__ import annotations
 
 import asyncio
-import inspect
-import json
 import logging
 import time
 
 from app.models.crawl_run import CrawlRun
-from app.models.crawl_settings import CrawlRunSettings
-from app.services.acquisition.acquirer import AcquisitionRequest
 from app.services.acquisition.acquirer import AcquisitionResult
-from app.services.acquisition.acquirer import PageEvidence
 from app.services.acquisition.acquirer import acquire as _acquire
-from app.services.acquisition.policy import AcquisitionPolicy
 from app.services.acquisition.host_protection_memory import note_host_hard_block
-from app.services.acquisition_plan import AcquisitionPlan
-from app.services.adapters.base import AdapterResult
-from app.services.adapters.registry import run_adapter, try_blocked_adapter_recovery
-from app.services.acquisition.browser_runtime import (
-    build_failed_browser_diagnostics,
-    real_chrome_browser_available,
+from app.services.adapters.registry import run_adapter
+from app.services.acquisition.browser_runtime import real_chrome_browser_available
+from app.services.config.runtime_settings import crawler_runtime_settings
+from app.services.domain_memory_service import load_domain_selector_rules
+from app.services.pipeline.extract_records import extract_records
+from app.services.extract.detail_materializer import (
+    detail_record_rejection_reason,
+    infer_detail_failure_reason,
 )
-from app.services.domain_memory_service import (
-    compose_runtime_selector_rules,
-    load_domain_selector_rules,
+from app.services.platform_policy import detect_platform_family
+from app.services.pipeline.extraction_retry_stage import (
+    remaining_url_budget_seconds as _remaining_url_budget_seconds,
 )
 from app.services.db_utils import mapping_or_empty
 from app.services.domain_utils import normalize_domain
 from app.services.crawl.profile import (
     apply_acquisition_contract_to_profile,
-    record_acquisition_contract_outcome,
-    resolve_url_acquisition_recipe,
-)
-from app.services.field_policy import repair_target_fields_for_surface
-from app.services.config.runtime_settings import crawler_runtime_settings
-from app.services.extract.detail_materializer import (
-    detail_record_rejection_reason,
-    infer_detail_failure_reason,
 )
 from app.services.shared.field_coerce import validate_record_for_surface
 from app.services.llm.config_service import resolve_run_config
@@ -47,12 +35,10 @@ from app.services.pipeline.direct_record_fallback import (
     apply_direct_record_llm_fallback as apply_direct_record_llm_fallback_impl,
     apply_llm_fallback,
 )
-from app.services.platform_policy import detect_platform_family
 from app.services.publish import (
     VERDICT_BLOCKED,
     VERDICT_EMPTY,
     VERDICT_LISTING_FAILED,
-    build_acquisition_profile,
     build_url_metrics,
     compute_verdict,
     finalize_url_metrics,
@@ -63,7 +49,6 @@ from app.services.robots_policy import (
     check_url_crawlability,
 )
 from app.services.selector_self_heal import apply_selector_self_heal
-from app.services.extraction_runtime import extract_records
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .extraction_retry_decision import (
@@ -71,10 +56,22 @@ from .extraction_retry_decision import (
     empty_extraction_browser_retry_decision as _empty_extraction_browser_retry_decision,
     low_quality_extraction_browser_retry_decision as _low_quality_extraction_browser_retry_decision,
 )
-from .listing_escalation_decision import (
-    listing_integrity_escalation_decision as _listing_integrity_escalation_decision,
+from .extraction_retry_stage import (
+    _apply_detail_rejection_guard,
+    _build_acquisition_request,
+    _log_extraction_outcome,
+    _retry_detail_challenge_shell_with_real_chrome,
+    _retry_empty_extraction_with_browser,
+    _retry_listing_integrity_with_stronger_tier,
+    _retry_low_quality_extraction_with_browser,
+    _retry_patchright_detail_shell_with_real_chrome,
 )
 from .persistence import persist_acquisition_artifacts, persist_extracted_records
+from .record_extraction_stage import (
+    _best_adapter_result,
+    _extract_records_for_acquisition,
+    _update_acquisition_contract_memory,
+)
 from .runtime_helpers import (
     STAGE_ACQUIRE,
     STAGE_EXTRACT,
@@ -256,49 +253,6 @@ async def _run_robots_gate(
     return None
 
 
-async def _build_acquisition_request(
-    context: _URLProcessingContext,
-) -> AcquisitionRequest:
-    current_settings_view = context.run.settings_view
-    resolved_recipe = await resolve_url_acquisition_recipe(
-        context.session,
-        url=context.url,
-        surface=context.surface,
-        explicit_settings=current_settings_view.as_dict(),
-    )
-    resolved_settings_view = CrawlRunSettings.from_value(resolved_recipe)
-    plan = resolved_settings_view.acquisition_plan(
-        surface=context.surface,
-        max_records=context.config.max_records,
-        adapter_recovery_enabled=context.config.resolved_acquisition_plan(
-            surface=context.surface
-        ).adapter_recovery_enabled,
-    )
-    if context.config.proxy_list != current_settings_view.proxy_list():
-        plan = plan.with_updates(proxy_list=tuple(context.config.proxy_list))
-    if context.config.traversal_mode != current_settings_view.traversal_mode():
-        plan = plan.with_updates(traversal_mode=context.config.traversal_mode)
-    if context.config.max_pages != current_settings_view.max_pages():
-        plan = plan.with_updates(max_pages=context.config.max_pages)
-    if context.config.max_scrolls != current_settings_view.max_scrolls():
-        plan = plan.with_updates(max_scrolls=context.config.max_scrolls)
-    if context.config.sleep_ms != current_settings_view.sleep_ms():
-        plan = plan.with_updates(sleep_ms=context.config.sleep_ms)
-    acquisition_profile = apply_acquisition_contract_to_profile(
-        build_acquisition_profile(resolved_settings_view),
-        resolved_settings_view.acquisition_contract(),
-    )
-    acquisition_policy = AcquisitionPolicy.from_profile(acquisition_profile)
-    return AcquisitionRequest(
-        run_id=context.run.id,
-        url=context.url,
-        plan=plan,
-        requested_fields=list(context.requested_fields),
-        requested_field_selectors={},
-        acquisition_profile=acquisition_policy.to_profile(),
-        policy=acquisition_policy,
-        on_event=_pipeline_acquisition_event_logger(context),
-    )
 
 
 def _pipeline_acquisition_event_logger(
@@ -450,236 +404,12 @@ async def _run_extraction_stage(
     return _ExtractedURLStage(fetched=fetched, records=records)
 
 
-async def _retry_detail_challenge_shell_with_real_chrome(
-    context: _URLProcessingContext,
-    fetched: _FetchedURLStage,
-    *,
-    rejection_reason: str | None,
-) -> _ExtractedURLStage | None:
-    if rejection_reason != "challenge_shell":
-        return None
-    if str(context.surface or "").strip().lower() != "ecommerce_detail":
-        return None
-    acquisition_result = fetched.acquisition_result
-    diagnostics = mapping_or_empty(
-        getattr(acquisition_result, "browser_diagnostics", {})
-    )
-    browser_engine = str(diagnostics.get("browser_engine") or "").strip().lower()
-    if (
-        getattr(acquisition_result, "method", "") != "browser"
-        or browser_engine != "patchright"
-    ):
-        return None
-    if not real_chrome_browser_available():
-        return None
-
-    remaining_budget_seconds = _remaining_url_budget_seconds(context)
-    min_remaining_seconds = _post_extraction_browser_retry_min_remaining_seconds()
-    if remaining_budget_seconds < min_remaining_seconds:
-        await _log_pipeline_event(
-            context,
-            "info",
-            "Skipping challenge_shell Chrome retry for "
-            f"{context.url}: remaining URL budget {remaining_budget_seconds:.1f}s"
-            f" < required {min_remaining_seconds:.1f}s",
-        )
-        return None
-
-    await note_host_hard_block(
-        acquisition_result.final_url or context.url,
-        method="browser:patchright",
-        vendor=None,
-        status_code=getattr(acquisition_result, "status_code", None),
-        proxy_used=False,
-    )
-    await _log_pipeline_event(
-        context,
-        "info",
-        f"Patchright detail rejected as challenge_shell; retrying real Chrome for {context.url}",
-    )
-
-    retry_result = await _acquire_browser_retry_result(
-        context,
-        fetched,
-        retry_reason="post_extraction_challenge_shell",
-        forced_browser_engine="real_chrome",
-    )
-    _merge_browser_diagnostics(
-        retry_result,
-        {"retry_reason": "post_extraction_challenge_shell"},
-    )
-    fetched.acquisition_result = retry_result
-    retry_records, retry_selector_rules = await _extract_records_for_acquisition(
-        context,
-        fetched,
-    )
-    retry_records, retry_selector_rules = await _apply_extraction_post_processing(
-        context,
-        acquisition_result=retry_result,
-        records=retry_records,
-        selector_rules=retry_selector_rules,
-    )
-    retry_records, retry_rejection_reason = _apply_detail_rejection_guard(
-        context,
-        fetched,
-        records=retry_records,
-        selector_rules=retry_selector_rules,
-    )
-    if retry_rejection_reason:
-        await _log_pipeline_event(
-            context,
-            "warning",
-            f"Rejected detail extraction for {context.url}: {retry_rejection_reason}",
-        )
-    else:
-        await _log_extraction_outcome(context, retry_result, retry_records)
-    return _ExtractedURLStage(fetched=fetched, records=retry_records)
 
 
-async def _retry_patchright_detail_shell_with_real_chrome(
-    context: _URLProcessingContext,
-    fetched: _FetchedURLStage,
-    *,
-    rejection_reason: str | None,
-) -> _ExtractedURLStage | None:
-    if rejection_reason != "detail_shell":
-        return None
-    if str(context.surface or "").strip().lower() != "ecommerce_detail":
-        return None
-    if not bool(
-        crawler_runtime_settings.post_extraction_detail_shell_real_chrome_retry_enabled
-    ):
-        await _log_pipeline_event(
-            context,
-            "info",
-            f"Skipping detail_shell Chrome retry for {context.url}: disabled by runtime setting",
-        )
-        return None
-    acquisition_result = fetched.acquisition_result
-    diagnostics = mapping_or_empty(
-        getattr(acquisition_result, "browser_diagnostics", {})
-    )
-    browser_engine = str(diagnostics.get("browser_engine") or "").strip().lower()
-    browser_outcome = str(diagnostics.get("browser_outcome") or "").strip().lower()
-    if (
-        getattr(acquisition_result, "method", "") != "browser"
-        or browser_engine != "patchright"
-        or browser_outcome != "usable_content"
-    ):
-        return None
-    if not real_chrome_browser_available():
-        return None
-
-    remaining_budget_seconds = _remaining_url_budget_seconds(context)
-    min_remaining_seconds = _post_extraction_browser_retry_min_remaining_seconds()
-    if remaining_budget_seconds < min_remaining_seconds:
-        await _log_pipeline_event(
-            context,
-            "info",
-            "Skipping detail_shell Chrome retry for "
-            f"{context.url}: remaining URL budget {remaining_budget_seconds:.1f}s"
-            f" < required {min_remaining_seconds:.1f}s",
-        )
-        return None
-    await _log_pipeline_event(
-        context,
-        "info",
-        f"Patchright detail rejected as detail_shell; retrying real Chrome for {context.url}",
-    )
-
-    retry_result = await _acquire_browser_retry_result(
-        context,
-        fetched,
-        retry_reason="post_extraction_detail_shell",
-        forced_browser_engine="real_chrome",
-    )
-    _merge_browser_diagnostics(
-        retry_result,
-        {"retry_reason": "post_extraction_detail_shell"},
-    )
-    fetched.acquisition_result = retry_result
-    retry_records, retry_selector_rules = await _extract_records_for_acquisition(
-        context,
-        fetched,
-    )
-    retry_records, retry_selector_rules = await _apply_extraction_post_processing(
-        context,
-        acquisition_result=retry_result,
-        records=retry_records,
-        selector_rules=retry_selector_rules,
-    )
-    retry_records, retry_rejection_reason = _apply_detail_rejection_guard(
-        context,
-        fetched,
-        records=retry_records,
-        selector_rules=retry_selector_rules,
-    )
-    if retry_rejection_reason:
-        await _log_pipeline_event(
-            context,
-            "warning",
-            f"Rejected detail extraction for {context.url}: {retry_rejection_reason}",
-        )
-    else:
-        await _log_extraction_outcome(context, retry_result, retry_records)
-    return _ExtractedURLStage(fetched=fetched, records=retry_records)
 
 
-def _challenge_shell_reason(acquisition_result: AcquisitionResult) -> str | None:
-    return PageEvidence.from_acquisition_result(
-        acquisition_result
-    ).challenge_shell_reason
 
 
-def _apply_detail_rejection_guard(
-    context: _URLProcessingContext,
-    fetched: _FetchedURLStage,
-    *,
-    records: list[dict[str, object]],
-    selector_rules: list[dict[str, object]],
-) -> tuple[list[dict[str, object]], str | None]:
-    if "detail" not in context.surface:
-        return records, None
-    acquisition_result = fetched.acquisition_result
-    rejection_reason = _challenge_shell_reason(acquisition_result)
-    if rejection_reason is None:
-        for record in records:
-            if not isinstance(record, dict):
-                continue
-            rejection_reason = detail_record_rejection_reason(
-                dict(record),
-                page_url=acquisition_result.final_url,
-                requested_page_url=context.url,
-            )
-            if rejection_reason:
-                break
-    if rejection_reason is None and not records:
-        rejection_reason = infer_detail_failure_reason(
-            acquisition_result.html,
-            acquisition_result.final_url,
-            context.surface,
-            list(context.requested_fields),
-            requested_page_url=context.url,
-            adapter_records=acquisition_result.adapter_records,
-            network_payloads=acquisition_result.network_payloads,
-            selector_rules=selector_rules,
-            extraction_runtime_snapshot=context.run.settings_view.extraction_runtime_snapshot(),
-        )
-    if not rejection_reason:
-        return records, None
-    _merge_browser_diagnostics(
-        acquisition_result,
-        {"failure_reason": rejection_reason},
-    )
-    if rejection_reason == "challenge_shell":
-        acquisition_result.blocked = True
-        fetched.url_metrics = build_url_metrics(
-            acquisition_result,
-            requested_fields=list(context.requested_fields),
-        )
-        fetched.url_metrics["blocked"] = True
-    fetched.url_metrics["failure_reason"] = rejection_reason
-    return [], rejection_reason
 
 
 async def _run_normalization_stage(
@@ -716,381 +446,26 @@ async def _run_normalization_stage(
     return _ExtractedURLStage(fetched=extracted.fetched, records=normalized_records)
 
 
-async def _log_extraction_outcome(
-    context: _URLProcessingContext,
-    acquisition_result,
-    records: list[dict[str, object]],
-) -> None:
-    adapter_name = str(getattr(acquisition_result, "adapter_name", "") or "").strip()
-    extraction_label = (
-        f"{adapter_name} adapter" if adapter_name else "generic extraction path"
-    )
-    if records:
-        await _log_pipeline_event(
-            context,
-            "info",
-            f"Extracted {len(records)} records using {extraction_label}",
-        )
-        return
-    await _log_pipeline_event(
-        context,
-        "warning",
-        f"Extraction yielded 0 records ({extraction_label})",
-    )
 
 
-async def _retry_empty_extraction_with_browser(
-    context: _URLProcessingContext,
-    fetched: _FetchedURLStage,
-    *,
-    records: list[dict[str, object]],
-    selector_rules: list[dict[str, object]],
-) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
-    acquisition_result = fetched.acquisition_result
-    retry_decision = _empty_extraction_browser_retry_decision(
-        acquisition_result,
-        records,
-        surface=context.surface,
-        requested_fields=list(context.requested_fields),
-        selector_rules=selector_rules,
-    )
-    if not retry_decision["should_retry"]:
-        return records, selector_rules
-    await _log_pipeline_event(
-        context,
-        "info",
-        f"No records via {acquisition_result.method}; retrying browser render for {context.url}",
-    )
-    browser_result = await _acquire_browser_retry_result(
-        context, fetched, retry_reason="empty_extraction"
-    )
-    fetched.acquisition_result = browser_result
-    retry_records, retry_selector_rules = await _extract_records_for_acquisition(
-        context, fetched
-    )
-    return retry_records, retry_selector_rules
 
 
-async def _retry_low_quality_extraction_with_browser(
-    context: _URLProcessingContext,
-    fetched: _FetchedURLStage,
-    *,
-    records: list[dict[str, object]],
-    selector_rules: list[dict[str, object]],
-) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
-    acquisition_result = fetched.acquisition_result
-    if "detail" not in context.surface:
-        return records, selector_rules
-    if getattr(acquisition_result, "method", "") == "browser":
-        return records, selector_rules
-    if not records or _effective_blocked(acquisition_result):
-        return records, selector_rules
-    retry_decision = _low_quality_extraction_browser_retry_decision(
-        acquisition_result,
-        records,
-        surface=context.surface,
-        requested_fields=list(context.requested_fields),
-    )
-    if not retry_decision["should_retry"]:
-        return records, selector_rules
-    raw_missing_fields = retry_decision.get("missing_fields")
-    missing_field_values = (
-        raw_missing_fields if isinstance(raw_missing_fields, list) else []
-    )
-    missing_fields = [
-        str(field_name)
-        for field_name in missing_field_values
-        if str(field_name).strip()
-    ]
-    if not missing_fields:
-        return records, selector_rules
-    remaining_budget_seconds = _remaining_url_budget_seconds(context)
-    min_remaining_seconds = _browser_retry_min_remaining_seconds()
-    if remaining_budget_seconds < min_remaining_seconds:
-        await _log_pipeline_event(
-            context,
-            "info",
-            "Skipping low-quality browser retry for "
-            f"{context.url}: remaining URL budget {remaining_budget_seconds:.1f}s"
-            f" < required {min_remaining_seconds:.1f}s",
-        )
-        return records, selector_rules
-    await _log_pipeline_event(
-        context,
-        "info",
-        "Detail record missing high-value fields "
-        f"{', '.join(missing_fields)} via {acquisition_result.method}; retrying browser render for {context.url}",
-    )
-    browser_result = await _acquire_browser_retry_result(
-        context,
-        fetched,
-        retry_reason="low_quality_extraction",
-    )
-    fetched.acquisition_result = browser_result
-    return await _extract_records_for_acquisition(context, fetched)
 
 
-async def _retry_listing_integrity_with_stronger_tier(
-    context: _URLProcessingContext,
-    fetched: _FetchedURLStage,
-    *,
-    records: list[dict[str, object]],
-    selector_rules: list[dict[str, object]],
-) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
-    """Retry at a stronger acquisition tier when the Listing_Integrity_Gate
-    flags a promo_only_cluster. Applies only to listing surfaces.
-
-    Mirrors the contract shape of _retry_low_quality_extraction_with_browser.
-    """
-    if "listing" not in context.surface:
-        return records, selector_rules
-
-    acquisition_result = fetched.acquisition_result
-
-    # Retrieve the gate decision from artifacts (attached by listing_extractor
-    # via _attach_gate_decision_to_artifacts during extract_listing_records).
-    artifacts = mapping_or_empty(
-        getattr(acquisition_result, "artifacts", {})
-    )
-    gate_payload = artifacts.get("listing_integrity")
-    if not isinstance(gate_payload, dict):
-        return records, selector_rules
-
-    # Build a lightweight gate_decision-like object for the escalation decision.
-    raw_outcome = gate_payload.get("outcome", "")
-    outcome = raw_outcome if isinstance(raw_outcome, str) else ""
-    raw_metrics = gate_payload.get("metrics")
-    gate_decision = _ListingIntegritySnapshot(
-        outcome=outcome,
-        reason=str(gate_payload.get("reason", "")),
-        metrics=raw_metrics if isinstance(raw_metrics, dict) else {},
-    )
-
-    # Build policy snapshot from the current acquisition request profile.
-    policy_snapshot = _build_escalation_policy_snapshot(acquisition_result)
-
-    escalation = _listing_integrity_escalation_decision(
-        acquisition_result,
-        gate_decision=gate_decision,
-        surface=context.surface,
-        retry_state=context,
-        policy_snapshot=policy_snapshot,
-    )
-
-    if not escalation.get("should_retry"):
-        reason = escalation.get("reason", "unknown")
-        # Only log when the escalation was actually considered but skipped
-        # for a non-trivial reason. "gate_ok" means the integrity gate passed
-        # and no escalation was ever needed — no value in logging that.
-        if reason != "gate_ok":
-            await _log_pipeline_event(
-                context,
-                "info",
-                f"listing_escalation_skipped: {reason} for {context.url}",
-            )
-        _merge_browser_diagnostics(
-            acquisition_result,
-            {
-                "listing_escalation_skipped": {
-                    "reason": reason,
-                    "prior_tier": escalation.get("prior_tier"),
-                    "next_tier": escalation.get("next_tier"),
-                    "gate_reason": escalation.get("gate_reason", ""),
-                    "candidate_summary": escalation.get("candidate_summary", {}),
-                },
-            },
-        )
-        # When final gate outcome is promo_only_cluster and records are empty,
-        # set failure_reason on the URL result.
-        if gate_decision.outcome == "promo_only_cluster" and not records:
-            fetched.url_metrics["failure_reason"] = "promo_only_cluster"
-            fetched.url_metrics["listing_integrity"] = gate_payload
-        return records, selector_rules
-
-    # --- Budget guard (reuse existing pattern) ---
-    remaining_budget_seconds = _remaining_url_budget_seconds(context)
-    min_remaining_seconds = _browser_retry_min_remaining_seconds()
-    if remaining_budget_seconds < min_remaining_seconds:
-        await _log_pipeline_event(
-            context,
-            "info",
-            f"listing_escalation_skipped: budget_exhausted for {context.url}"
-            f" (remaining {remaining_budget_seconds:.1f}s < required {min_remaining_seconds:.1f}s)",
-        )
-        _merge_browser_diagnostics(
-            acquisition_result,
-            {
-                "listing_escalation_skipped": {
-                    "reason": "budget_exhausted",
-                    "prior_tier": escalation.get("prior_tier"),
-                    "next_tier": escalation.get("next_tier"),
-                    "gate_reason": escalation.get("gate_reason", ""),
-                    "candidate_summary": escalation.get("candidate_summary", {}),
-                },
-            },
-        )
-        if gate_decision.outcome == "promo_only_cluster" and not records:
-            fetched.url_metrics["failure_reason"] = "promo_only_cluster"
-            fetched.url_metrics["listing_integrity"] = gate_payload
-        return records, selector_rules
-
-    # --- Increment retry count AFTER successful acquisition (at-most-one enforcement) ---
-
-    next_tier = str(escalation.get("next_tier") or "")
-    forced_engine = next_tier.replace("browser:", "") if next_tier.startswith("browser:") else None
-
-    await _log_pipeline_event(
-        context,
-        "info",
-        f"listing_escalation_triggered: {escalation.get('prior_tier')} → {next_tier} for {context.url}"
-        f" (gate_reason={escalation.get('gate_reason')})",
-    )
-    _merge_browser_diagnostics(
-        acquisition_result,
-        {
-            "listing_escalation_triggered": {
-                "prior_tier": escalation.get("prior_tier"),
-                "next_tier": next_tier,
-                "gate_reason": escalation.get("gate_reason", ""),
-                "candidate_summary": escalation.get("candidate_summary", {}),
-            },
-        },
-    )
-
-    # --- Acquire at the stronger tier ---
-    retry_result = await _acquire_browser_retry_result(
-        context,
-        fetched,
-        retry_reason="listing_integrity_promo_cluster",
-        forced_browser_engine=forced_engine,
-    )
-    fetched.acquisition_result = retry_result
-    context.listing_integrity_retry_count += 1
-
-    # --- Re-run extraction (Ranker + Gate re-evaluate on new observation) ---
-    retry_records, retry_selector_rules = await _extract_records_for_acquisition(
-        context,
-        fetched,
-    )
-
-    # Check the new gate decision after re-extraction.
-    retry_artifacts = mapping_or_empty(
-        getattr(retry_result, "artifacts", {})
-    )
-    retry_gate_payload = retry_artifacts.get("listing_integrity")
-    if (
-        isinstance(retry_gate_payload, dict)
-        and retry_gate_payload.get("outcome") == "promo_only_cluster"
-        and not retry_records
-    ):
-        fetched.url_metrics["failure_reason"] = "promo_only_cluster"
-        fetched.url_metrics["listing_integrity"] = retry_gate_payload
-
-    return retry_records, retry_selector_rules
 
 
-class _ListingIntegritySnapshot:
-    """Lightweight stand-in for IntegrityDecision used by the escalation decision."""
-
-    __slots__ = ("outcome", "reason", "metrics")
-
-    def __init__(self, outcome: str, reason: str, metrics: dict[str, object]):
-        self.outcome = outcome
-        self.reason = reason
-        self.metrics = metrics
 
 
-def _build_escalation_policy_snapshot(acquisition_result) -> object:
-    """Build a policy snapshot object for the escalation decision.
-
-    Exposes challenge_state, escalation_disabled, and host_hard_block
-    derived from the acquisition result and runtime settings.
-    """
-    diagnostics = mapping_or_empty(
-        getattr(acquisition_result, "browser_diagnostics", {})
-    )
-    challenge_state = bool(diagnostics.get("challenge_detected"))
-    host_hard_block = bool(diagnostics.get("host_hard_block"))
-    # escalation_disabled is read from runtime settings inside the decision
-    # function itself; expose False here so the policy snapshot doesn't
-    # duplicate that check.
-    return _EscalationPolicySnapshot(
-        challenge_state=challenge_state,
-        escalation_disabled=False,
-        host_hard_block=host_hard_block,
-    )
 
 
-class _EscalationPolicySnapshot:
-    """Minimal policy snapshot for listing_integrity_escalation_decision."""
-
-    __slots__ = ("challenge_state", "escalation_disabled", "host_hard_block")
-
-    def __init__(
-        self,
-        challenge_state: bool,
-        escalation_disabled: bool,
-        host_hard_block: bool,
-    ):
-        self.challenge_state = challenge_state
-        self.escalation_disabled = escalation_disabled
-        self.host_hard_block = host_hard_block
 
 
-def _remaining_url_budget_seconds(context: _URLProcessingContext) -> float:
-    return max(
-        0.0,
-        float(context.url_timeout_seconds)
-        - max(0.0, time.monotonic() - float(context.started_at_monotonic)),
-    )
 
 
-def _browser_retry_min_remaining_seconds() -> float:
-    return max(
-        float(crawler_runtime_settings.low_quality_browser_retry_min_remaining_seconds),
-        float(crawler_runtime_settings.browser_render_timeout_seconds),
-    )
 
 
-def _post_extraction_browser_retry_min_remaining_seconds() -> float:
-    return _browser_retry_min_remaining_seconds()
 
 
-async def _acquire_browser_retry_result(
-    context: _URLProcessingContext,
-    fetched: _FetchedURLStage,
-    *,
-    retry_reason: str,
-    forced_browser_engine: str | None = None,
-):
-    acquisition_result = fetched.acquisition_result
-    profile_updates: dict[str, object] = {
-        "prefer_browser": True,
-        "retry_reason": retry_reason,
-    }
-    if forced_browser_engine:
-        profile_updates["forced_browser_engine"] = forced_browser_engine
-    retry_request = (await _build_acquisition_request(context)).with_profile_updates(
-        **profile_updates
-    )
-    try:
-        return await acquire(retry_request)
-    except (RuntimeError, ValueError, TypeError, OSError) as exc:
-        _merge_browser_diagnostics(
-            acquisition_result,
-            build_failed_browser_diagnostics(
-                browser_reason=f"{retry_reason.replace('_', '-')} retry", exc=exc
-            ),
-        )
-        fetched.url_metrics = build_url_metrics(
-            acquisition_result, requested_fields=list(context.requested_fields)
-        )
-        await _log_pipeline_event(
-            context,
-            "warning",
-            f"Browser retry failed for {context.url}: {type(exc).__name__}: {exc}",
-        )
-        raise
 
 
 async def _apply_extraction_post_processing(
@@ -1151,304 +526,24 @@ async def _apply_extraction_post_processing(
     return records, selector_rules
 
 
-async def _extract_records_for_acquisition(
-    context: _URLProcessingContext,
-    fetched: _FetchedURLStage,
-) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
-    acquisition_result = fetched.acquisition_result
-    if not _browser_result_is_extractable(acquisition_result):
-        return [], []
-    await _populate_adapter_records(context, acquisition_result)
-    _assign_platform_family(acquisition_result)
-
-    fetched.url_metrics = build_url_metrics(
-        acquisition_result,
-        requested_fields=list(context.requested_fields),
-    )
-    selector_rules = await _load_selector_rules(context, acquisition_result.final_url)
-    records = await _run_record_extraction(
-        context,
-        acquisition_result=acquisition_result,
-        selector_rules=selector_rules,
-    )
-    if (
-        not records
-        and "listing" in context.surface
-        and getattr(acquisition_result, "method", "") == "browser"
-    ):
-        fallback_records = await _extract_records_from_preserved_browser_html(
-            context,
-            fetched,
-            selector_rules=selector_rules,
-        )
-        if fallback_records:
-            records = fallback_records
-    return records, selector_rules
 
 
-async def _populate_adapter_records(
-    context: _URLProcessingContext,
-    acquisition_result: AcquisitionResult,
-) -> None:
-    acquisition_result.adapter_records = []
-    acquisition_result.adapter_name = None
-    acquisition_result.adapter_source_type = None
-
-    adapter_results = []
-    adapter_proxy = next(
-        (
-            str(proxy).strip()
-            for proxy in context.config.proxy_list or []
-            if str(proxy).strip()
-        ),
-        None,
-    )
-    for html in [
-        str(acquisition_result.html or ""),
-        *_adapter_browser_artifact_htmls(acquisition_result),
-    ]:
-        adapter_kwargs = (
-            {"proxy": adapter_proxy}
-            if adapter_proxy
-            and "proxy" in inspect.signature(run_adapter).parameters
-            else {}
-        )
-        adapter_result = await run_adapter(
-            acquisition_result.final_url,
-            html,
-            context.surface,
-            **adapter_kwargs,
-        )
-        if adapter_result is not None and list(adapter_result.records or []):
-            adapter_results.append(adapter_result)
-    adapter_result = _best_adapter_result(adapter_results)
-    if (
-        adapter_result is None or not list(adapter_result.records or [])
-    ) and _effective_blocked(acquisition_result):
-        adapter_result = await try_blocked_adapter_recovery(
-            acquisition_result.final_url,
-            AcquisitionPlan(
-                surface=context.surface,
-                proxy_list=tuple(context.config.proxy_list or []),
-                traversal_mode=context.config.traversal_mode,
-                max_pages=context.config.max_pages,
-                max_scrolls=context.config.max_scrolls,
-                max_records=context.config.max_records,
-                sleep_ms=context.config.sleep_ms,
-                adapter_recovery_enabled=True,
-            ),
-            proxy_list=list(context.config.proxy_list or []),
-        )
-    if adapter_result is not None and list(adapter_result.records or []):
-        acquisition_result.adapter_records = list(adapter_result.records or [])
-        acquisition_result.adapter_name = adapter_result.adapter_name or None
-        acquisition_result.adapter_source_type = adapter_result.source_type or None
 
 
-def _best_adapter_result(adapter_results: list[AdapterResult]) -> AdapterResult | None:
-    if not adapter_results:
-        return None
-    best = max(
-        adapter_results,
-        key=lambda result: _adapter_result_score(
-            list(getattr(result, "records", []) or [])
-        ),
-    )
-    merged_records: dict[str, dict[str, object]] = {}
-    unsourced_records: list[dict[str, object]] = []
-    seen_unsourced: set[str] = set()
-    for result in sorted(
-        adapter_results,
-        key=lambda item: _adapter_result_score(list(item.records or [])),
-        reverse=True,
-    ):
-        for record in list(result.records or []):
-            if not isinstance(record, dict):
-                continue
-            url = str(record.get("url") or "").strip()
-            if not url:
-                fingerprint = json.dumps(record, sort_keys=True, default=str)
-                if fingerprint in seen_unsourced:
-                    continue
-                seen_unsourced.add(fingerprint)
-                unsourced_records.append(dict(record))
-                continue
-            existing = merged_records.setdefault(url, {})
-            for key, value in record.items():
-                if value in (None, "", [], {}):
-                    continue
-                if existing.get(key) in (None, "", [], {}):
-                    existing[key] = value
-    return AdapterResult(
-        records=[*merged_records.values(), *unsourced_records],
-        source_type=best.source_type,
-        adapter_name=best.adapter_name,
-    )
 
 
-def _adapter_result_score(records: list[object]) -> tuple[int, int]:
-    populated = 0
-    for record in records:
-        if not isinstance(record, dict):
-            continue
-        populated += sum(
-            value not in (None, "", [], {})
-            for key, value in record.items()
-            if not str(key).startswith("_")
-        )
-    return len(records), populated
 
 
-def _adapter_browser_artifact_htmls(
-    acquisition_result: AcquisitionResult,
-) -> list[str]:
-    artifacts = mapping_or_empty(getattr(acquisition_result, "artifacts", {}))
-    seen = {str(getattr(acquisition_result, "html", "") or "").strip()}
-    htmls: list[str] = []
-    for value in (
-        artifacts.get("full_rendered_html"),
-        _rendered_listing_fragments_html(artifacts.get("rendered_listing_fragments")),
-    ):
-        html = str(value or "").strip()
-        if not html or html in seen:
-            continue
-        seen.add(html)
-        htmls.append(html)
-    return htmls
 
 
-def _rendered_listing_fragments_html(value: object) -> str:
-    if not isinstance(value, list):
-        return ""
-    fragments = [
-        fragment for fragment in (str(item or "").strip() for item in value) if fragment
-    ]
-    if not fragments:
-        return ""
-    joined = "\n".join(fragments)
-    return f"<html><body>{joined}</body></html>"
 
 
-def _assign_platform_family(acquisition_result: AcquisitionResult) -> None:
-    platform_family = detect_platform_family(
-        acquisition_result.final_url,
-        acquisition_result.html,
-    )
-    if not platform_family and acquisition_result.adapter_name:
-        platform_family = acquisition_result.adapter_name
-    acquisition_result.platform_family = platform_family or None
 
 
-async def _run_record_extraction(
-    context: _URLProcessingContext,
-    *,
-    acquisition_result: AcquisitionResult,
-    selector_rules: list[dict[str, object]],
-) -> list[dict[str, object]]:
-    return await asyncio.to_thread(
-        extract_records,
-        acquisition_result.html,
-        acquisition_result.final_url,
-        context.surface,
-        max_records=context.config.max_records,
-        requested_page_url=context.url,
-        requested_fields=list(context.requested_fields),
-        adapter_records=acquisition_result.adapter_records,
-        network_payloads=acquisition_result.network_payloads,
-        artifacts=acquisition_result.artifacts,
-        selector_rules=selector_rules,
-        extraction_runtime_snapshot=context.run.settings_view.extraction_runtime_snapshot(),
-        content_type=acquisition_result.content_type,
-        browser_diagnostics=getattr(acquisition_result, "browser_diagnostics", None),
-    )
 
 
-async def _extract_records_from_preserved_browser_html(
-    context: _URLProcessingContext,
-    fetched: _FetchedURLStage,
-    *,
-    selector_rules: list[dict[str, object]],
-) -> list[dict[str, object]]:
-    acquisition_result = fetched.acquisition_result
-    browser_diagnostics = mapping_or_empty(
-        getattr(acquisition_result, "browser_diagnostics", {})
-    )
-    if not bool(browser_diagnostics.get("traversal_activated")):
-        return []
-    artifacts = mapping_or_empty(getattr(acquisition_result, "artifacts", {}))
-    rendered_html = str(artifacts.get("full_rendered_html") or "").strip()
-    if not rendered_html or rendered_html == str(acquisition_result.html or "").strip():
-        return []
-    fallback_records = await asyncio.to_thread(
-        extract_records,
-        rendered_html,
-        acquisition_result.final_url,
-        context.surface,
-        max_records=context.config.max_records,
-        requested_page_url=context.url,
-        requested_fields=list(context.requested_fields),
-        adapter_records=acquisition_result.adapter_records,
-        network_payloads=acquisition_result.network_payloads,
-        artifacts=acquisition_result.artifacts,
-        selector_rules=selector_rules,
-        extraction_runtime_snapshot=context.run.settings_view.extraction_runtime_snapshot(),
-        content_type=acquisition_result.content_type,
-    )
-    if not fallback_records:
-        await _log_pipeline_event(
-            context,
-            "warning",
-            "Traversal yielded no extractable listing records; fallback extraction on full rendered HTML also returned 0 records",
-        )
-        _merge_browser_diagnostics(
-            acquisition_result,
-            {
-                "traversal_fallback_used": True,
-                "traversal_fallback_recovered": False,
-                "traversal_fallback_record_count": 0,
-            },
-        )
-        fetched.url_metrics = build_url_metrics(
-            acquisition_result,
-            requested_fields=list(context.requested_fields),
-        )
-        return []
-    artifacts["traversal_composed_html"] = str(acquisition_result.html or "")
-    acquisition_result.artifacts = artifacts
-    acquisition_result.html = rendered_html
-    await _log_pipeline_event(
-        context,
-        "info",
-        f"Traversal yielded 0 extractable records; recovered {len(fallback_records)} record(s) from full rendered HTML",
-    )
-    _merge_browser_diagnostics(
-        acquisition_result,
-        {
-            "traversal_fallback_used": True,
-            "traversal_fallback_recovered": True,
-            "traversal_fallback_record_count": len(fallback_records),
-        },
-    )
-    fetched.url_metrics = build_url_metrics(
-        acquisition_result,
-        requested_fields=list(context.requested_fields),
-    )
-    return fallback_records
 
 
-async def _load_selector_rules(
-    context: _URLProcessingContext,
-    page_url: str,
-) -> list[dict[str, object]]:
-    saved_rules = await load_domain_selector_rules(
-        context.session,
-        domain=normalize_domain(page_url),
-        surface=context.surface,
-    )
-    return compose_runtime_selector_rules(
-        saved_rules,
-        context.run.settings_view.extraction_contract(),
-    )
 
 
 async def _run_persistence_stage(
@@ -1513,36 +608,9 @@ async def _run_persistence_stage(
     )
 
 
-async def _update_acquisition_contract_memory(
-    context: _URLProcessingContext,
-    *,
-    acquisition_result,
-    records: list[dict[str, object]],
-    persisted_count: int,
-    verdict: str,
-) -> None:
-    domain = normalize_domain(
-        getattr(acquisition_result, "final_url", "") or context.url
-    )
-    if not domain:
-        return
-    diagnostics = mapping_or_empty(
-        getattr(acquisition_result, "browser_diagnostics", {})
-    )
-    await record_acquisition_contract_outcome(
-        context.session,
-        domain=domain,
-        surface=context.surface,
-        source_run_id=int(context.run.id),
-        method=getattr(acquisition_result, "method", None),
-        browser_engine=str(diagnostics.get("browser_engine") or "").strip().lower(),
-        browser_diagnostics=dict(diagnostics),
-        requested_fields=repair_target_fields_for_surface(
-            context.surface,
-            list(context.requested_fields),
-        ),
-        records=records,
-        persisted_count=persisted_count,
-        verdict=verdict,
-        blocked=_effective_blocked(acquisition_result),
-    )
+
+
+URLProcessingContext = _URLProcessingContext
+best_adapter_result = _best_adapter_result
+empty_extraction_browser_retry_decision = _empty_extraction_browser_retry_decision
+resolved_url_processing_config = _resolved_url_processing_config

@@ -48,13 +48,14 @@ Routers registered in `backend/app/main.py`:
 Important route groups:
 
 - `api/crawls.py`: create runs, CSV ingestion, logs, websocket updates, pause/resume/kill, commit fields, commit LLM suggestions
+- `api/crawl_domain.py`: domain recipe, domain run-profile, field feedback, and cookie-memory routes under `/api/crawls`
 - `api/records.py`: records list plus JSON/CSV/artifacts/discoverist exports and provenance
 - `api/review.py`: review payload, artifact HTML, save review mapping
 - `api/selectors.py`: selector CRUD, cross-surface listing by domain, suggestion, test, preview HTML
 - `api/llm.py`: provider catalog, config CRUD, connection test, cost log
 - `api/data_enrichment.py`: on-demand ecommerce detail enrichment jobs and enriched product row lookup
 
-Domain-recipe routes now live under `api/crawls.py`:
+Domain-recipe routes live under `api/crawl_domain.py`:
 
 - `GET /api/crawls/domain-run-profile` — lookup saved run-profile defaults by normalized `(domain, surface)` for single-URL Crawl Studio auto-load
 - `GET /api/crawls/{run_id}/domain-recipe` — completed-run payload containing requested-field coverage, grouped winning selector candidates, acquisition evidence, per-field learning state, affordance hints, saved selectors, and the saved domain run profile
@@ -159,9 +160,13 @@ Primary files:
 - `pipeline/core.py`
 - `pipeline/direct_record_fallback.py`
 - `pipeline/extraction_retry_decision.py`
+- `pipeline/record_extraction_stage.py`
+- `pipeline/extraction_retry_stage.py`
 - `pipeline/types.py`
 - `pipeline/runtime_helpers.py`
 - `data_enrichment/service.py`
+- `data_enrichment/deterministic.py`
+- `data_enrichment/shopify_catalog.py`
 
 Responsibilities:
 
@@ -172,6 +177,7 @@ Responsibilities:
 - load, merge, persist, and learn reusable domain run-profile acquisition settings
 - persist records and summary state
 - create on-demand enrichment jobs from persisted ecommerce detail records
+- normalize deterministic enrichment fields and match Shopify taxonomy/attributes
 - emit logs and progress
 
 Current live behavior:
@@ -183,7 +189,7 @@ Current live behavior:
 - acceptance harness runs now support curated manifest-driven site sets with bucketed expectations, explicit acceptance surfaces remain authoritative instead of being silently re-inferred from URLs, and curated commerce rows can reuse artifact-backed run ids before falling back to live execution
 - acceptance reports now distinguish transport verdicts from output quality through `quality_verdict`, `observed_failure_mode`, and `quality_checks`, so runs that technically succeed but return shell pages, promo pages, chrome-heavy listings, or broken variant semantics no longer look healthy
 - reusable domain execution defaults are persisted separately from selector memory in `DomainRunProfile`; fetch/locality/diagnostics defaults still merge into single-URL run creation, while acquisition contracts are re-resolved per URL at runtime for every run type
-- `pipeline/core.py` stays the per-URL orchestrator; direct-record LLM fallback, empty-extraction browser retry decisions, browser diagnostics merge, typed result objects, and public failure-state persistence live in dedicated pipeline helper modules
+- `pipeline/extraction_loop.py` stays the per-URL stage orchestrator; record extraction, acquisition-contract memory, retry families, direct-record LLM fallback, browser diagnostics merge, typed result objects, and public failure-state persistence live in dedicated pipeline helper modules
 - Data Enrichment is separate from the crawl pipeline: it reads persisted ecommerce detail `CrawlRecord` rows, writes `EnrichedProduct` rows, and only updates source-record enrichment status metadata.
 
 ### 6.3 Acquisition and browser runtime
@@ -195,11 +201,17 @@ Primary files:
 - `acquisition/runtime.py`
 - `acquisition/browser_capture.py`
 - `acquisition/browser_runtime.py`
+- `acquisition/browser_pool.py`
+- `acquisition/browser_page_flow.py`
+- `acquisition/browser_result_builder.py`
+- `acquisition/browser_page_helpers.py`
 - `acquisition/http_client.py` (thin adapter over `runtime.get_shared_http_client`)
 - `acquisition/browser_identity.py`
 - `acquisition/cookie_store.py`
 - `acquisition/pacing.py`
 - `acquisition/traversal.py`
+- `acquisition/traversal_helpers.py`
+- `acquisition/traversal_recovery.py`
 - `crawl_fetch_runtime.py`
 - `config/runtime_settings.py`
 - `config/browser_init_scripts.py`
@@ -396,6 +408,7 @@ Primary files:
 
 - `review/__init__.py`
 - `selectors_runtime.py`
+- `selector_suggestions.py`
 - `selector_self_heal.py`
 - `domain_memory_service.py`
 
@@ -405,7 +418,7 @@ Responsibilities:
 - save approved field mappings
 - expose review artifact HTML
 - store and manage selectors in domain memory
-- suggest/test selectors
+- suggest/test selectors; suggestion assembly lives in `selector_suggestions.py`
 - synthesize and validate selectors during self-heal flows
 
 Current storage/runtime model:

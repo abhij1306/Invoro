@@ -16,9 +16,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 _PROMPTS_DIR = Path(__file__).resolve().parents[1] / "data" / "prompts"
-_LEGACY_PROMPTS_DIR = (
-    Path(__file__).resolve().parents[1] / "data" / "knowledge_base" / "prompts"
-)
 _LLM_PROVIDER_DEFINITIONS = (
     {
         "provider": "groq",
@@ -74,16 +71,15 @@ def load_prompt_file(relative_path: str) -> str:
     text = str(relative_path or "").strip()
     if not text:
         return ""
-    for prompts_dir in (_PROMPTS_DIR, _LEGACY_PROMPTS_DIR):
-        candidate = prompts_dir / text
-        prompts_dir_resolved = prompts_dir.resolve(strict=False)
-        candidate_resolved = candidate.resolve(strict=False)
-        try:
-            candidate_resolved.relative_to(prompts_dir_resolved)
-        except ValueError:
-            continue
-        if candidate.is_file():
-            return candidate.read_text(encoding="utf-8")
+    candidate = _PROMPTS_DIR / text
+    prompts_dir_resolved = _PROMPTS_DIR.resolve(strict=False)
+    candidate_resolved = candidate.resolve(strict=False)
+    try:
+        candidate_resolved.relative_to(prompts_dir_resolved)
+    except ValueError:
+        return ""
+    if candidate.is_file():
+        return candidate.read_text(encoding="utf-8")
     return ""
 
 

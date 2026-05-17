@@ -4,61 +4,23 @@ import asyncio
 from functools import partial
 from inspect import signature
 import logging
-import secrets
 from dataclasses import dataclass, field
-from urllib.parse import quote, unquote, urlparse, urlunparse
+from urllib.parse import urlparse
 from typing import Any
 import httpx
 
-from app.services.acquisition.browser_runtime import (
-    SharedBrowserRuntime,
-    build_failed_browser_diagnostics,
-    browser_fetch,
-    browser_runtime_snapshot,
-    classify_network_endpoint,
-    expand_all_interactive_elements,
-    get_browser_runtime,
-    read_network_payload_body,
-    real_chrome_browser_available,
-    should_capture_network_payload,
-    shutdown_browser_runtime,
-    temporary_browser_page,
-)
+from app.services.acquisition.browser_runtime import SharedBrowserRuntime, build_failed_browser_diagnostics, browser_fetch, browser_runtime_snapshot, classify_network_endpoint, expand_all_interactive_elements, get_browser_runtime, read_network_payload_body, real_chrome_browser_available, should_capture_network_payload, shutdown_browser_runtime, temporary_browser_page
 from app.services.acquisition.browser_proxy_config import display_proxy, proxy_scheme
-from app.services.acquisition.host_protection_memory import (
-    HostProtectionPolicy,
-    load_host_protection_policy,
-    note_host_hard_block,
-    note_host_usable_fetch,
-)
-from app.services.acquisition.cookie_store import clear_cookie_store_cache
-from app.services.acquisition.cookie_store import export_cookie_header_for_domain
-from app.services.acquisition.http_client import (
-    close_shared_http_client as close_adapter_shared_http_client,
-)
-from app.services.acquisition.pacing import (
-    apply_protected_host_backoff,
-    reset_pacing_state,
-    wait_for_host_slot,
-)
-from app.services.acquisition.runtime import (
-    PageFetchResult,
-    classify_block_from_headers,
-    close_shared_http_client,
-    curl_fetch,
-    get_shared_http_client,
-    http_fetch,
-    is_blocked_html,
-    is_blocked_html_async,
-    is_non_retryable_http_status,
-    should_escalate_to_browser,
-)
+from app.services.acquisition.host_protection_memory import HostProtectionPolicy, load_host_protection_policy, note_host_hard_block, note_host_usable_fetch
+from app.services.acquisition.cookie_store import clear_cookie_store_cache, export_cookie_header_for_domain
+from app.services.acquisition.http_client import close_shared_http_client as close_adapter_shared_http_client
+from app.services.acquisition.pacing import apply_protected_host_backoff, reset_pacing_state, wait_for_host_slot
+from app.services.acquisition.runtime import PageFetchResult, close_shared_http_client, curl_fetch, get_shared_http_client, http_fetch, is_blocked_html, is_blocked_html_async, is_non_retryable_http_status, should_escalate_to_browser
 from app.services.acquisition.traversal import should_run_traversal
-from app.services.config.runtime_settings import (
-    crawler_runtime_settings,
-    proxy_rotation_mode,
-)
+from app.services.config.runtime_settings import crawler_runtime_settings, proxy_rotation_mode
 from app.services.platform_policy import resolve_platform_runtime_policy
+from app.services.fetch.browser_policy import browser_engine_attempts as _browser_engine_attempts_impl, browser_escalation_allowed as _browser_escalation_allowed, browser_escalation_lane as _browser_escalation_lane, browser_escalation_proxies as _browser_escalation_proxies, browser_first_decision as _browser_first_decision, browser_first_reason as _browser_first_reason, attach_browser_attempt_diagnostics as _attach_browser_attempt_diagnostics, attach_exception_browser_diagnostics as _attach_exception_browser_diagnostics, durable_vendor_block_engine_attempts as _durable_vendor_block_engine_attempts, extract_vendor_from_reason as _extract_vendor_from_reason, hard_browser_requirement as _hard_browser_requirement, host_policy_snapshot as _host_policy_snapshot, is_vendor_block_reason as _is_vendor_block_reason, normalize_fetch_mode as _normalize_fetch_mode, normalize_proxy_profile as _normalize_proxy_profile, resolve_browser_reason as _resolve_browser_reason, resolve_proxy_attempts as _resolve_proxy_attempts, vendor_confirmed_block as _vendor_confirmed_block
+from app.services.fetch.retry_policy import http_max_attempts as _http_max_attempts, retry_delay_ms as _retry_delay_ms, retryable_status_for_http_fetch as _retryable_status_for_http_fetch, sleep_retry_delay as _sleep_retry_delay
 
 logger = logging.getLogger(__name__)
 
@@ -75,15 +37,6 @@ async def _load_host_protection_policy_compat(
         ttl_seconds,
     )
     return await load_host_protection_policy(url)
-
-
-def _attach_exception_browser_diagnostics(
-    exc: Exception | None,
-    diagnostics: dict[str, object] | None,
-) -> None:
-    if exc is None or not diagnostics:
-        return
-    setattr(exc, "browser_diagnostics", dict(diagnostics))
 
 
 async def _emit_fetch_event(on_event: Any | None, level: str, message: str) -> None:
@@ -180,13 +133,6 @@ _browser_fetch = partial(
 _should_capture_network_payload = should_capture_network_payload
 _classify_network_endpoint = classify_network_endpoint
 _read_network_payload_body = read_network_payload_body
-
-
-def _vendor_confirmed_block(result: PageFetchResult) -> str | None:
-    if not result.blocked:
-        return None
-    return classify_block_from_headers(result.headers)
-
 
 async def reset_fetch_runtime_state() -> None:
     await shutdown_browser_runtime()
@@ -360,121 +306,6 @@ async def fetch_page(
     raise RuntimeError(f"Failed to fetch {url}")
 
 
-def _resolve_proxy_attempts(
-    proxy_list: list[str] | None,
-    run_id: int | None = None,
-    proxy_profile: dict[str, object] | None = None,
-) -> list[str | None]:
-    seen: set[str] = set()
-    proxies: list[str] = []
-    session_rewrite_enabled = _proxy_session_rewrite_enabled(proxy_profile)
-    for proxy in list(proxy_list or []):
-        value = str(proxy or "").strip()
-        if not value:
-            continue
-        if session_rewrite_enabled:
-            value = _attach_proxy_run_session(value, run_id=run_id)
-        if value in seen:
-            continue
-        seen.add(value)
-        proxies.append(value)
-    return [*proxies] if proxies else [None]
-
-
-def _attach_proxy_run_session(proxy_url: str, *, run_id: int | None) -> str:
-    if run_id is None:
-        return proxy_url
-    raw_proxy = str(proxy_url or "").strip()
-    if not raw_proxy:
-        return raw_proxy
-    parsed = urlparse(raw_proxy)
-    username = str(parsed.username or "").strip()
-    if not username:
-        return raw_proxy
-    decoded_username = unquote(username)
-    if "-session-" in decoded_username:
-        import re
-
-        session_username = re.sub(
-            r"-session-[^:]+",
-            f"-session-r{run_id}",
-            decoded_username,
-        )
-    else:
-        session_username = f"{decoded_username}-session-r{run_id}"
-    auth = quote(session_username, safe="")
-    if parsed.password is not None:
-        auth = f"{auth}:{quote(unquote(str(parsed.password)), safe='')}"
-    host = str(parsed.hostname or "").strip()
-    if not host:
-        return raw_proxy
-    if ":" in host and not host.startswith("["):
-        host = f"[{host}]"
-    netloc = auth + "@"
-    netloc += f"{host}:{parsed.port}" if parsed.port is not None else host
-    return urlunparse(parsed._replace(netloc=netloc))
-
-
-def _normalize_proxy_profile(value: dict[str, object] | None) -> dict[str, object]:
-    return dict(value) if isinstance(value, dict) else {}
-
-
-def _proxy_session_rewrite_enabled(proxy_profile: dict[str, object] | None) -> bool:
-    if not isinstance(proxy_profile, dict):
-        return False
-    for key in tuple(crawler_runtime_settings.proxy_session_rewrite_enabled_keys or ()):
-        if bool(proxy_profile.get(str(key))):
-            return True
-    return False
-
-
-def _normalize_fetch_mode(value: object) -> str:
-    normalized = str(value or "").strip().lower()
-    if normalized in {"auto", "http_only", "browser_only", "http_then_browser"}:
-        return normalized
-    return "auto"
-
-
-def _hard_browser_requirement(
-    *,
-    context: _FetchRuntimeContext,
-    runtime_policy: dict[str, object] | None = None,
-) -> bool:
-    active_policy = runtime_policy or context.runtime_policy
-    return bool(active_policy.get("requires_browser")) or context.traversal_required
-
-
-def _browser_first_decision(
-    *,
-    context: _FetchRuntimeContext,
-    prefer_browser: bool,
-    host_preference_enabled: bool,
-) -> bool:
-    if context.fetch_mode == "browser_only":
-        return True
-    if context.fetch_mode == "http_then_browser":
-        return False
-    if context.fetch_mode == "http_only":
-        return _hard_browser_requirement(context=context)
-    return (
-        prefer_browser
-        or host_preference_enabled
-        or _hard_browser_requirement(context=context)
-    )
-
-
-def _browser_escalation_allowed(
-    *,
-    context: _FetchRuntimeContext,
-    runtime_policy: dict[str, object] | None = None,
-) -> bool:
-    if context.fetch_mode in {"browser_only", "http_then_browser"}:
-        return True
-    if context.fetch_mode == "http_only":
-        return _hard_browser_requirement(context=context, runtime_policy=runtime_policy)
-    return True
-
-
 def _acquisition_strategy_message(
     *,
     context: _FetchRuntimeContext,
@@ -495,22 +326,35 @@ def _acquisition_strategy_message(
     )
 
 
-def _browser_first_reason(
-    *,
-    context: _FetchRuntimeContext,
-    prefer_browser: bool,
-    host_preference_enabled: bool,
-) -> str:
-    if context.fetch_mode == "browser_only":
-        return "fetch_mode:browser_only"
-    if prefer_browser:
-        return "prefer_browser"
-    if host_preference_enabled:
-        return "host-preference"
-    if _hard_browser_requirement(context=context):
-        return "hard_requirement"
-    return "auto"
+def _attach_proxy_run_session(proxy_url: str, *, run_id: int | None) -> str:
+    from app.services.fetch.browser_policy import attach_proxy_run_session
+    return attach_proxy_run_session(proxy_url, run_id=run_id)
 
+
+def _browser_engine_attempts(
+    *, context: _FetchRuntimeContext, host_policy: HostProtectionPolicy,
+) -> list[str]:
+    return _browser_engine_attempts_impl(
+        context=context,
+        host_policy=host_policy,
+        real_chrome_available=real_chrome_browser_available(),
+    )
+
+
+def _extend_browser_engine_attempts_after_block(
+    *, engine_attempts: list[str], attempted_engine: str,
+    context: _FetchRuntimeContext, host_policy: HostProtectionPolicy,
+) -> list[str]:
+    refreshed_attempts = _browser_engine_attempts(
+        context=context,
+        host_policy=host_policy,
+    )
+    appended = list(engine_attempts)
+    for engine in refreshed_attempts:
+        if engine == attempted_engine or engine in appended:
+            continue
+        appended.append(engine)
+    return appended
 
 async def _run_browser_attempts(
     context: _FetchRuntimeContext,
@@ -1101,261 +945,6 @@ async def _handle_http_result(
         result=result,
     )
     return result, bool(vendor)
-
-
-def _retryable_status_for_http_fetch(status_code: int) -> bool:
-    code = int(status_code or 0)
-    retryable_codes: set[int] = set()
-    for value in list(crawler_runtime_settings.http_retry_status_codes or []):
-        try:
-            retryable_codes.add(int(value))
-        except (TypeError, ValueError):
-            logger.warning("Ignoring invalid http retry status code: %r", value)
-    return code in retryable_codes
-
-
-def _http_max_attempts() -> int:
-    try:
-        retries = int(crawler_runtime_settings.http_max_retries or 0)
-    except (TypeError, ValueError):
-        logger.warning(
-            "Invalid http_max_retries=%r; using no retries",
-            crawler_runtime_settings.http_max_retries,
-        )
-        retries = 0
-    return max(1, retries + 1)
-
-
-def _retry_delay_ms(attempt: int) -> int:
-    try:
-        raw_base_ms = int(crawler_runtime_settings.http_retry_backoff_base_ms or 0)
-    except (TypeError, ValueError):
-        logger.warning(
-            "Invalid http_retry_backoff_base_ms %r, defaulting to 0",
-            crawler_runtime_settings.http_retry_backoff_base_ms,
-        )
-        raw_base_ms = 0
-    try:
-        raw_max_ms = int(crawler_runtime_settings.http_retry_backoff_max_ms or 0)
-    except (TypeError, ValueError):
-        logger.warning(
-            "Invalid http_retry_backoff_max_ms %r, defaulting to 0",
-            crawler_runtime_settings.http_retry_backoff_max_ms,
-        )
-        raw_max_ms = 0
-    base_ms = max(0, raw_base_ms)
-    max_ms = max(base_ms, raw_max_ms)
-    delay_ms = min(max_ms, base_ms * (2 ** max(0, attempt - 1)))
-    if delay_ms <= 0:
-        return 0
-    jitter_ms = secrets.randbelow(max(1, delay_ms // 4) + 1)
-    return delay_ms + jitter_ms
-
-
-async def _sleep_retry_delay(*, delay_ms: int) -> None:
-    if delay_ms <= 0:
-        return
-    await asyncio.sleep(delay_ms / 1000)
-
-
-def _attach_browser_attempt_diagnostics(
-    result: PageFetchResult,
-    *,
-    diagnostics: dict[str, object] | None,
-) -> None:
-    if not diagnostics:
-        return
-    merged = dict(result.browser_diagnostics or {})
-    merged.update(dict(diagnostics))
-    result.browser_diagnostics = merged
-
-
-def _resolve_browser_reason(
-    *,
-    browser_reason: str | None,
-    requires_browser: bool,
-    traversal_required: bool,
-    host_preference_enabled: bool,
-) -> str:
-    if str(browser_reason or "").strip():
-        return str(browser_reason).strip().lower()
-    if requires_browser:
-        return "platform-required"
-    if traversal_required:
-        return "traversal-required"
-    if host_preference_enabled:
-        return "host-preference"
-    return "http-escalation"
-
-
-def _host_policy_snapshot(policy: HostProtectionPolicy) -> dict[str, object]:
-    return {
-        "prefer_browser": bool(policy.prefer_browser),
-        "last_block_vendor": policy.last_block_vendor,
-        "hard_block_count": int(policy.hard_block_count),
-        "request_blocked": bool(policy.request_blocked),
-        "chromium_blocked": bool(policy.chromium_blocked),
-        "patchright_blocked": bool(policy.patchright_blocked),
-        "real_chrome_blocked": bool(policy.real_chrome_blocked),
-        "patchright_success": bool(policy.patchright_success),
-        "real_chrome_success": bool(policy.real_chrome_success),
-        "last_block_method": policy.last_block_method,
-    }
-
-
-def _default_browser_engine_attempts() -> list[str]:
-    return ["patchright"]
-
-
-_VENDOR_BLOCK_REASON_PREFIX = "vendor-block:"
-
-
-def _is_vendor_block_reason(reason: str) -> bool:
-    return str(reason or "").strip().lower().startswith(_VENDOR_BLOCK_REASON_PREFIX)
-
-
-def _extract_vendor_from_reason(reason: str) -> str | None:
-    normalized = str(reason or "").strip().lower()
-    if not normalized.startswith(_VENDOR_BLOCK_REASON_PREFIX):
-        return None
-    vendor = normalized[len(_VENDOR_BLOCK_REASON_PREFIX) :].strip()
-    return vendor or None
-
-
-def _append_engine_once(engine_attempts: list[str], engine: str) -> list[str]:
-    if engine not in engine_attempts:
-        return [*engine_attempts, engine]
-    return list(engine_attempts)
-
-
-def _prefer_engine_first(engine_attempts: list[str], engine: str) -> list[str]:
-    remaining = [candidate for candidate in engine_attempts if candidate != engine]
-    return [engine, *remaining]
-
-
-def _browser_escalation_lane(
-    *,
-    context: _FetchRuntimeContext,
-    reason: str,
-    host_policy: HostProtectionPolicy,
-    proxy: str | None,
-) -> str:
-    if context.fetch_mode == "browser_only":
-        base = "browser_only"
-    elif context.fetch_mode == "http_then_browser":
-        base = "http_then_browser"
-    elif reason.startswith("vendor-block:"):
-        base = "vendor_block"
-    elif host_policy.prefer_browser:
-        base = "host_memory"
-    else:
-        base = "http_escalation"
-    if proxy:
-        return f"{base}_proxy"
-    return base
-
-
-# "chromium" is a legacy alias that resolves identically to "patchright" at the
-# browser_runtime layer (_resolve_browser_binary maps both to patchright).
-# Only two operationally distinct engines exist: patchright (default) and real_chrome.
-_SUPPORTED_FORCED_ENGINES = {"patchright", "real_chrome"}
-
-
-def _browser_engine_attempts(
-    *,
-    context: _FetchRuntimeContext,
-    host_policy: HostProtectionPolicy,
-) -> list[str]:
-    forced_engine = str(context.forced_browser_engine or "").strip().lower()
-    if forced_engine:
-        if forced_engine in _SUPPORTED_FORCED_ENGINES:
-            return [forced_engine]
-        logger.warning(
-            "Unsupported forced_browser_engine=%r for %s; ignoring and using default engine selection",
-            forced_engine,
-            context.url,
-        )
-    engines = _default_browser_engine_attempts()
-    if (
-        not bool(crawler_runtime_settings.browser_real_chrome_enabled)
-        or not real_chrome_browser_available()
-    ):
-        return engines
-    if host_policy.patchright_blocked and host_policy.prefer_browser:
-        return _prefer_engine_first(
-            _append_engine_once(engines, "real_chrome"),
-            "real_chrome",
-        )
-    if host_policy.real_chrome_success and host_policy.prefer_browser:
-        return _prefer_engine_first(
-            _append_engine_once(engines, "real_chrome"),
-            "real_chrome",
-        )
-    if (
-        host_policy.request_blocked
-        or host_policy.prefer_browser
-        or host_policy.last_block_vendor
-    ):
-        return _append_engine_once(engines, "real_chrome")
-    return engines
-
-
-def _extend_browser_engine_attempts_after_block(
-    *,
-    engine_attempts: list[str],
-    attempted_engine: str,
-    context: _FetchRuntimeContext,
-    host_policy: HostProtectionPolicy,
-) -> list[str]:
-    refreshed_attempts = _browser_engine_attempts(
-        context=context,
-        host_policy=host_policy,
-    )
-    appended = list(engine_attempts)
-    for engine in refreshed_attempts:
-        if engine == attempted_engine or engine in appended:
-            continue
-        appended.append(engine)
-    return appended
-
-
-def _durable_vendor_block_engine_attempts(
-    *,
-    engine_attempts: list[str],
-    host_policy: HostProtectionPolicy,
-    forced_engine: str | None,
-) -> list[str]:
-    if (
-        forced_engine
-        or not host_policy.prefer_browser
-        or not host_policy.last_block_vendor
-    ):
-        return list(engine_attempts)
-    prioritized = list(engine_attempts)
-    last_block_method = str(host_policy.last_block_method or "").strip().lower()
-    blocked_engine = (
-        last_block_method.split(":", 1)[1]
-        if last_block_method.startswith("browser:")
-        else None
-    )
-    if blocked_engine and blocked_engine in prioritized and len(prioritized) > 1:
-        prioritized = [
-            candidate for candidate in prioritized if candidate != blocked_engine
-        ] + [blocked_engine]
-    return prioritized[:1]
-
-
-def _browser_escalation_proxies(
-    *,
-    context: _FetchRuntimeContext,
-    current_proxy: str | None,
-    vendor_blocked: bool,
-) -> list[str | None]:
-    attempts = list(context.proxies)
-    if not vendor_blocked:
-        return attempts
-    remaining = [candidate for candidate in attempts if candidate != current_proxy]
-    return remaining or attempts
 
 
 async def _update_host_result_memory(

@@ -24,7 +24,7 @@ from app.services.extract import detail_raw_signals
 from app.services.extract import detail_dom_extractor
 from app.services.extract import detail_materializer
 from app.services.extract.variant_record_normalization import normalize_variant_record
-from app.services.extraction_runtime import extract_records
+from app.services.pipeline.extract_records import extract_records
 from tests.fixtures.loader import read_optional_artifact_text
 
 
@@ -2061,7 +2061,9 @@ def test_extract_ecommerce_detail_recovers_labeled_image_color_swatches() -> Non
 
 
 def test_extract_ecommerce_detail_guarded_dom_cartesian_keeps_axis_rows(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(detail_dom_extractor, "DOM_VARIANT_CARTESIAN_COMBO_LIMIT", 4)
+    from app.services.extract import detail_dom_context
+
+    monkeypatch.setattr(detail_dom_context, "DOM_VARIANT_CARTESIAN_COMBO_LIMIT", 4)
     html = """
     <html>
       <body>

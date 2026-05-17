@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from app.services.fetch import fetch_context as crawl_fetch_runtime
-from app.services import extraction_runtime
+from app.services.pipeline import raw_json as extraction_runtime
 from app.services.acquisition.host_protection_memory import HostProtectionPolicy
 from app.services.adapters.belk import BelkAdapter
 from app.services.extract import detail_materializer as detail_extractor
@@ -15,7 +15,7 @@ from app.services.extract.detail_identity import (
 )
 from app.services.extract.detail_price_extractor import backfill_detail_price_from_html
 from app.services.extract.variant_record_normalization import normalize_variant_record
-from app.services.extraction_runtime import extract_records
+from app.services.pipeline.extract_records import extract_records
 from app.services.js_state.helpers import select_variant
 from app.services.js_state.state_normalizer import map_js_state_to_fields
 from app.services.listing_extractor import extract_listing_records

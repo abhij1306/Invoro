@@ -18,9 +18,9 @@ from app.services.config.data_enrichment import (
     DATA_ENRICHMENT_TAXONOMY_VERSION,
 )
 from app.services.data_enrichment.service import (
-    _build_deterministic_enrichment,
-    _llm_prompt_context,
-    _run_job,
+    run_job,
+    build_deterministic_enrichment,
+    llm_prompt_context,
     build_data_enrichment_job_payload,
     create_data_enrichment_job,
     get_data_enrichment_job,
@@ -239,7 +239,7 @@ async def test_data_enrichment_deterministic_job_populates_enriched_fields(
         payload={"source_record_ids": [record.id], "options": {"llm_enabled": False}},
     )
 
-    await _run_job(db_session, job)
+    await run_job(db_session, job)
     product = (
         await db_session.scalars(
             select(EnrichedProduct).where(EnrichedProduct.job_id == job.id)
@@ -302,7 +302,7 @@ async def test_data_enrichment_category_low_confidence_stays_null(
         payload={"source_record_ids": [record.id]},
     )
 
-    await _run_job(db_session, job)
+    await run_job(db_session, job)
     product = (
         await db_session.scalars(
             select(EnrichedProduct).where(EnrichedProduct.job_id == job.id)
@@ -336,7 +336,7 @@ async def test_data_enrichment_reenrichment_clears_taxonomy_version_before_rerun
         user=test_user,
         payload={"source_record_ids": [record.id]},
     )
-    await _run_job(db_session, first_job)
+    await run_job(db_session, first_job)
     product = (
         await db_session.scalars(
             select(EnrichedProduct).where(EnrichedProduct.source_record_id == record.id)
@@ -390,12 +390,12 @@ async def test_data_enrichment_llm_disabled_makes_no_call(
         payload={"source_record_ids": [record.id], "options": {"llm_enabled": False}},
     )
 
-    await _run_job(db_session, job)
+    await run_job(db_session, job)
 
     assert job.status == DATA_ENRICHMENT_STATUS_ENRICHED
 
 
-def test_data_enrichment_llm_prompt_context_excludes_raw_artifacts() -> None:
+def test_data_enrichmentllm_prompt_context_excludes_raw_artifacts() -> None:
     product = EnrichedProduct(
         job_id=1,
         source_url="https://example.com/products/dress",
@@ -412,7 +412,7 @@ def test_data_enrichment_llm_prompt_context_excludes_raw_artifacts() -> None:
         taxonomy_version=DATA_ENRICHMENT_TAXONOMY_VERSION,
     )
 
-    context = _llm_prompt_context(
+    context = llm_prompt_context(
         {
             "title": "Linen Dress",
             "description": "<section>Clean description</section>",
@@ -437,7 +437,7 @@ def test_data_enrichment_llm_prompt_context_excludes_raw_artifacts() -> None:
 
 
 def test_data_enrichment_variant_dict_values_do_not_pollute_sizes_or_availability() -> None:
-    enrichment = _build_deterministic_enrichment(
+    enrichment = build_deterministic_enrichment(
         {
             "title": "Cotton Shirt",
             "category": "Shirts",
@@ -459,7 +459,7 @@ def test_data_enrichment_variant_dict_values_do_not_pollute_sizes_or_availabilit
 
 
 def test_data_enrichment_variant_fit_does_not_become_size() -> None:
-    enrichment = _build_deterministic_enrichment(
+    enrichment = build_deterministic_enrichment(
         {
             "title": "Cotton Trouser",
             "category": "Pants",
@@ -478,7 +478,7 @@ def test_data_enrichment_variant_fit_does_not_become_size() -> None:
 
 
 def test_data_enrichment_category_uses_primary_category_before_title_noise() -> None:
-    enrichment = _build_deterministic_enrichment(
+    enrichment = build_deterministic_enrichment(
         {
             "title": "KitchenAid 13-cup food processor",
             "brand": "KitchenAid",
@@ -495,7 +495,7 @@ def test_data_enrichment_category_uses_primary_category_before_title_noise() -> 
 
 
 def test_data_enrichment_uses_apparel_context_for_pant_set_taxonomy() -> None:
-    enrichment = _build_deterministic_enrichment(
+    enrichment = build_deterministic_enrichment(
         {
             "title": "Fashion Nova Pant Set",
             "category": "Women Pant Sets",
@@ -510,7 +510,7 @@ def test_data_enrichment_uses_apparel_context_for_pant_set_taxonomy() -> None:
 
 
 def test_data_enrichment_maps_apparel_breadcrumb_matching_sets_to_outfit_sets() -> None:
-    enrichment = _build_deterministic_enrichment(
+    enrichment = build_deterministic_enrichment(
         {
             "title": "Just Vibes Strapless Pant Set - Yellow",
             "category": "Women > Matching Sets",
@@ -524,7 +524,7 @@ def test_data_enrichment_maps_apparel_breadcrumb_matching_sets_to_outfit_sets() 
 
 
 def test_data_enrichment_exact_shopify_path_match_wins() -> None:
-    enrichment = _build_deterministic_enrichment(
+    enrichment = build_deterministic_enrichment(
         {
             "title": "Navy Linen Midi Dress",
             "category": "Apparel & Accessories > Clothing > Dresses",
@@ -537,7 +537,7 @@ def test_data_enrichment_exact_shopify_path_match_wins() -> None:
 
 
 def test_data_enrichment_scored_match_maps_category_phrase_to_shopify_path() -> None:
-    enrichment = _build_deterministic_enrichment(
+    enrichment = build_deterministic_enrichment(
         {
             "title": "Navy Linen Midi Dress",
             "category": "Cocktail Dresses",
@@ -550,7 +550,7 @@ def test_data_enrichment_scored_match_maps_category_phrase_to_shopify_path() -> 
 
 
 def test_data_enrichment_seo_keywords_filter_stopwords_from_all_sources() -> None:
-    enrichment = _build_deterministic_enrichment(
+    enrichment = build_deterministic_enrichment(
         {
             "title": "Navy Linen Dress",
             "brand": "Acme",
@@ -567,7 +567,7 @@ def test_data_enrichment_seo_keywords_filter_stopwords_from_all_sources() -> Non
 
 
 def test_data_enrichment_does_not_normalize_non_apparel_numeric_size() -> None:
-    enrichment = _build_deterministic_enrichment(
+    enrichment = build_deterministic_enrichment(
         {
             "title": "ColourPop 24 pan eyeshadow palette",
             "category": "Beauty > Makeup > Eyeshadow",
@@ -581,7 +581,7 @@ def test_data_enrichment_does_not_normalize_non_apparel_numeric_size() -> None:
 
 
 def test_data_enrichment_materials_ignore_care_instruction_noise() -> None:
-    enrichment = _build_deterministic_enrichment(
+    enrichment = build_deterministic_enrichment(
         {
             "title": "Linen Shirt",
             "category": "Shirts",
@@ -595,7 +595,7 @@ def test_data_enrichment_materials_ignore_care_instruction_noise() -> None:
 
 
 def test_data_enrichment_price_infers_firstcry_currency() -> None:
-    enrichment = _build_deterministic_enrichment(
+    enrichment = build_deterministic_enrichment(
         {
             "title": "Black Seascape Stretch Bracelet",
             "price": "868.21",
@@ -608,7 +608,7 @@ def test_data_enrichment_price_infers_firstcry_currency() -> None:
 
 
 def test_data_enrichment_seo_keywords_include_title_bigrams() -> None:
-    enrichment = _build_deterministic_enrichment(
+    enrichment = build_deterministic_enrichment(
         {
             "title": "Black Seascape Stretch Bracelet",
             "price": "868.21",
@@ -674,7 +674,7 @@ async def test_data_enrichment_rolls_back_after_sqlalchemy_product_failure(
         fake_enrich_product,
     )
 
-    await _run_job(db_session, job)
+    await run_job(db_session, job)
     products = list(
         (
             await db_session.scalars(
@@ -750,7 +750,7 @@ async def test_data_enrichment_llm_enabled_backfills_missing_fields_in_one_call(
         payload={"source_record_ids": [record.id], "options": {"llm_enabled": True}},
     )
 
-    await _run_job(db_session, job)
+    await run_job(db_session, job)
     product = (
         await db_session.scalars(
             select(EnrichedProduct).where(EnrichedProduct.job_id == job.id)
@@ -830,7 +830,7 @@ async def test_data_enrichment_llm_does_not_overwrite_deterministic_fields(
         payload={"source_record_ids": [record.id], "options": {"llm_enabled": True}},
     )
 
-    await _run_job(db_session, job)
+    await run_job(db_session, job)
     product = (
         await db_session.scalars(
             select(EnrichedProduct).where(EnrichedProduct.job_id == job.id)
@@ -891,7 +891,7 @@ async def test_data_enrichment_llm_audience_only_applies_for_categories_with_tar
         payload={"source_record_ids": [record.id], "options": {"llm_enabled": True}},
     )
 
-    await _run_job(db_session, job)
+    await run_job(db_session, job)
     product = (
         await db_session.scalars(
             select(EnrichedProduct).where(EnrichedProduct.job_id == job.id)
@@ -944,7 +944,7 @@ async def test_data_enrichment_llm_audience_uses_shopify_target_audience_values_
         payload={"source_record_ids": [record.id], "options": {"llm_enabled": True}},
     )
 
-    await _run_job(db_session, job)
+    await run_job(db_session, job)
     product = (
         await db_session.scalars(
             select(EnrichedProduct).where(EnrichedProduct.job_id == job.id)
@@ -994,7 +994,7 @@ async def test_data_enrichment_llm_rejects_non_shopify_category_path(
         payload={"source_record_ids": [record.id], "options": {"llm_enabled": True}},
     )
 
-    await _run_job(db_session, job)
+    await run_job(db_session, job)
     product = (
         await db_session.scalars(
             select(EnrichedProduct).where(EnrichedProduct.job_id == job.id)
@@ -1040,7 +1040,7 @@ async def test_data_enrichment_llm_ignores_non_dict_payload(
         payload={"source_record_ids": [record.id], "options": {"llm_enabled": True}},
     )
 
-    await _run_job(db_session, job)
+    await run_job(db_session, job)
     product = (
         await db_session.scalars(
             select(EnrichedProduct).where(EnrichedProduct.job_id == job.id)

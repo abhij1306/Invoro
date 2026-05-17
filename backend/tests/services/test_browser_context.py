@@ -18,8 +18,8 @@ from app.services.acquisition.browser_readiness import analyze_html
 from app.services.acquisition.browser_proxy_config import build_browser_proxy_config
 from app.services.acquisition import browser_runtime as acquisition_browser_runtime
 from app.services.acquisition.runtime import (
-    _has_extractable_dom_content_detail_signals,
-    _has_extractable_listing_signals,
+    has_extractable_dom_content_detail_signals,
+    has_extractable_listing_signals,
 )
 from app.services.config.runtime_settings import crawler_runtime_settings
 from app.services.domain_utils import is_special_use_domain, normalize_domain
@@ -89,7 +89,7 @@ def test_content_detail_signals_accept_meaningful_body_without_paragraph() -> No
         """
     )
 
-    assert _has_extractable_dom_content_detail_signals(analysis) is True
+    assert has_extractable_dom_content_detail_signals(analysis) is True
 
 
 def test_content_detail_signals_reject_empty_and_heading_only_body() -> None:
@@ -100,8 +100,8 @@ def test_content_detail_signals_reject_empty_and_heading_only_body() -> None:
         "<html><body><main><h1>Thread</h1><div>Thread</div></main></body></html>"
     )
 
-    assert _has_extractable_dom_content_detail_signals(empty_analysis) is False
-    assert _has_extractable_dom_content_detail_signals(heading_only_analysis) is False
+    assert has_extractable_dom_content_detail_signals(empty_analysis) is False
+    assert has_extractable_dom_content_detail_signals(heading_only_analysis) is False
 
 
 def test_content_detail_signals_accept_common_content_descendant() -> None:
@@ -114,7 +114,7 @@ def test_content_detail_signals_accept_common_content_descendant() -> None:
         """
     )
 
-    assert _has_extractable_dom_content_detail_signals(analysis) is True
+    assert has_extractable_dom_content_detail_signals(analysis) is True
 
 
 def test_listing_signals_detect_item_list_and_ignore_non_list_type() -> None:
@@ -129,8 +129,8 @@ def test_listing_signals_detect_item_list_and_ignore_non_list_type() -> None:
     </script></body></html>
     """
 
-    assert _has_extractable_listing_signals(item_list_html) is True
-    assert _has_extractable_listing_signals(non_list_html) is False
+    assert has_extractable_listing_signals(item_list_html) is True
+    assert has_extractable_listing_signals(non_list_html) is False
 
 
 def test_listing_signals_respect_typed_item_threshold(monkeypatch) -> None:
@@ -143,9 +143,9 @@ def test_listing_signals_respect_typed_item_threshold(monkeypatch) -> None:
         )
         return f"<html><body>{payloads}</body></html>"
 
-    assert _has_extractable_listing_signals(typed_products(2)) is False
-    assert _has_extractable_listing_signals(typed_products(3)) is True
-    assert _has_extractable_listing_signals(typed_products(4)) is True
+    assert has_extractable_listing_signals(typed_products(2)) is False
+    assert has_extractable_listing_signals(typed_products(3)) is True
+    assert has_extractable_listing_signals(typed_products(4)) is True
 
 
 def test_listing_signals_detect_list_item_type() -> None:
@@ -155,7 +155,7 @@ def test_listing_signals_detect_list_item_type() -> None:
     </script></body></html>
     """
 
-    assert _has_extractable_listing_signals(html) is True
+    assert has_extractable_listing_signals(html) is True
 
 
 def test_build_playwright_context_options_uses_generated_identity(

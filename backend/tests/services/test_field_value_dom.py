@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 from bs4 import BeautifulSoup
 
-from app.services.dom import selector_engine
+from app.services.dom import section_extraction, selector_engine
 from app.services.dom.selector_engine import (
     extract_heading_sections,
     extract_page_images,
@@ -518,15 +518,15 @@ def test_requested_content_extractability_probe_fields_limit_heading_section_sca
         "html.parser",
     )
     scanned_labels: list[str] = []
-    original = selector_engine._extract_section_content
+    original = section_extraction.extract_section_content
 
     def _tracking_extract_section_content(node, root):
-        scanned_labels.append(selector_engine._section_label_text(node))
+        scanned_labels.append(section_extraction.section_label_text(node))
         return original(node, root)
 
     monkeypatch.setattr(
-        selector_engine,
-        "_extract_section_content",
+        section_extraction,
+        "extract_section_content",
         _tracking_extract_section_content,
     )
 
