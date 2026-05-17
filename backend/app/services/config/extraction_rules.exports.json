@@ -2666,7 +2666,7 @@
         ]
       },
       "buy_box_pack_size_pattern": "Pack Size\\s+(?P<value>.+?)\\s+SKU(?:\\s|$)",
-      "buy_box_price_pattern": "Price\\s+(?P<value>[$€£₹]\\s*[\\d,.]+)",
+      "buy_box_price_pattern": "Price\\s+(?P<value>[$€£₹¥]\\s*[\\d,.]+)",
       "buy_box_required_tokens": {
         "__type__": "list",
         "items": [
@@ -3795,7 +3795,7 @@
     ]
   },
   "LISTING_BUY_BOX_PACK_SIZE_PATTERN": "Pack Size\\s+(?P<value>.+?)\\s+SKU(?:\\s|$)",
-  "LISTING_BUY_BOX_PRICE_PATTERN": "Price\\s+(?P<value>[$€£₹]\\s*[\\d,.]+)",
+  "LISTING_BUY_BOX_PRICE_PATTERN": "Price\\s+(?P<value>[$€£₹¥]\\s*[\\d,.]+)",
   "LISTING_BUY_BOX_REQUIRED_TOKENS": {
     "__type__": "tuple",
     "items": [

@@ -1157,7 +1157,7 @@ def _finalize_dom_detail_record(
 def _attach_detail_tables(record: dict[str, Any], soup: BeautifulSoup | None) -> None:
     if record.get("tables") not in (None, "", [], {}) or soup is None:
         return
-    tables = extract_tables(BeautifulSoup(str(soup), "html.parser"))
+    tables = extract_tables(soup)
     if tables:
         record["tables"] = tables
 

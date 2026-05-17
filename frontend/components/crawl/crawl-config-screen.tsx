@@ -1116,7 +1116,7 @@ export function CrawlConfigScreen({
                 {proxyEnabled ? (
                   <div className="ml-7 flex flex-col gap-3">
                     <div className="type-control crawl-control-label">
-                      Example Proxy List To Enter
+                      Proxy URLs
                     </div>
                     <Textarea
                       value={proxyInput}

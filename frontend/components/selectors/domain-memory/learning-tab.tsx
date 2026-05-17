@@ -3,6 +3,8 @@ import { DataRegionEmpty, DetailRow, SurfaceSection } from '../../ui/patterns';
 import type { DomainWorkspace } from './types';
 import { formatTimestamp, surfaceLabel } from './utils';
 
+const MAX_LEARNING_DISPLAY = 8;
+
 type LearningTabProps = { selectedWorkspace: DomainWorkspace };
 
 export function LearningTab({ selectedWorkspace }: LearningTabProps) {
@@ -13,7 +15,7 @@ export function LearningTab({ selectedWorkspace }: LearningTabProps) {
       bodyClassName="space-y-2"
     >
       {selectedWorkspace.learning.length ? (
-        selectedWorkspace.learning.slice(0, 8).map((row) => (
+        selectedWorkspace.learning.slice(0, MAX_LEARNING_DISPLAY).map((row) => (
           <DetailRow key={row.id}>
             <div className="flex flex-wrap items-center gap-2">
               <Badge tone={row.action === 'reject' ? 'warning' : 'success'}>{row.action}</Badge>

@@ -1,6 +1,7 @@
 # FastAPI application factory and route registration.
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 from collections import OrderedDict, deque
@@ -51,6 +52,7 @@ from app.services.llm_provider_client import close_llm_provider_clients
 
 logger = logging.getLogger("app")
 _RATE_LIMIT_BUCKETS: OrderedDict[str, deque[float]] = OrderedDict()
+_RATE_LIMIT_LOCK = asyncio.Lock()
 
 
 @asynccontextmanager
@@ -114,7 +116,7 @@ async def rate_limit_middleware(request: Request, call_next) -> Response:
     if _rate_limit_exempt_path(request.url.path):
         return await call_next(request)
 
-    allowed, retry_after = _consume_rate_limit(_client_rate_limit_key(request))
+    allowed, retry_after = await _consume_rate_limit(_client_rate_limit_key(request))
     if not allowed:
         return JSONResponse(
             {"detail": "Rate limit exceeded"},
@@ -155,31 +157,32 @@ def _is_trusted_proxy(proxy_ip: str) -> bool:
     return proxy_ip in trusted_proxies
 
 
-def _consume_rate_limit(identifier: str) -> tuple[bool, int]:
+async def _consume_rate_limit(identifier: str) -> tuple[bool, int]:
     now = monotonic()
     window_seconds = float(crawler_runtime_settings.api_rate_limit_window_seconds)
     max_requests = int(crawler_runtime_settings.api_rate_limit_max_requests)
-    bucket = _RATE_LIMIT_BUCKETS.get(identifier)
-    if bucket is None:
-        bucket = deque()
-        _RATE_LIMIT_BUCKETS[identifier] = bucket
-    else:
-        _RATE_LIMIT_BUCKETS.move_to_end(identifier)
+    async with _RATE_LIMIT_LOCK:
+        bucket = _RATE_LIMIT_BUCKETS.get(identifier)
+        if bucket is None:
+            bucket = deque()
+            _RATE_LIMIT_BUCKETS[identifier] = bucket
+        else:
+            _RATE_LIMIT_BUCKETS.move_to_end(identifier)
 
-    cutoff = now - window_seconds
-    while bucket and bucket[0] <= cutoff:
-        bucket.popleft()
+        cutoff = now - window_seconds
+        while bucket and bucket[0] <= cutoff:
+            bucket.popleft()
 
-    if len(bucket) >= max_requests:
-        retry_after = max(1, int(bucket[0] + window_seconds - now))
-        return False, retry_after
+        if len(bucket) >= max_requests:
+            retry_after = max(1, int(bucket[0] + window_seconds - now))
+            return False, retry_after
 
-    bucket.append(now)
-    while len(_RATE_LIMIT_BUCKETS) > int(
-        crawler_runtime_settings.api_rate_limit_max_clients
-    ):
-        _RATE_LIMIT_BUCKETS.popitem(last=False)
-    return True, 0
+        bucket.append(now)
+        while len(_RATE_LIMIT_BUCKETS) > int(
+            crawler_runtime_settings.api_rate_limit_max_clients
+        ):
+            _RATE_LIMIT_BUCKETS.popitem(last=False)
+        return True, 0
 
 
 @app.middleware("http")

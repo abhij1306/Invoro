@@ -1,7 +1,7 @@
 'use client';
 
 import { X } from 'lucide-react';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 import { Button, Dropdown, Field, Input, Textarea } from '../../components/ui/primitives';
 import type { ProductIntelligenceOptions } from '../../lib/api/types';
@@ -33,14 +33,20 @@ export function SettingsDrawer({
   maxCandidatesPerProductLimit: number;
   defaultOptions: ProductIntelligenceOptions;
 }>) {
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
   useEffect(() => {
     if (!open) return;
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key === 'Escape') onCloseRef.current();
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [open, onClose]);
+  }, [open]);
   if (!open) return null;
   return (
     <>
@@ -69,6 +75,11 @@ export function SettingsDrawer({
               value={options.max_source_products}
               onChange={(event) =>
                 onOptionsChange({
+                  max_source_products: event.target.value as unknown as number,
+                })
+              }
+              onBlur={(event) =>
+                onOptionsChange({
                   max_source_products: clampInt(
                     event.target.value,
                     1,
@@ -86,6 +97,11 @@ export function SettingsDrawer({
               max={maxCandidatesPerProductLimit}
               value={options.max_candidates_per_product}
               onChange={(event) =>
+                onOptionsChange({
+                  max_candidates_per_product: event.target.value as unknown as number,
+                })
+              }
+              onBlur={(event) =>
                 onOptionsChange({
                   max_candidates_per_product: clampInt(
                     event.target.value,

@@ -24,7 +24,7 @@ def extract(soup: BeautifulSoup, *, page_url: str, surface: str) -> dict[str, An
     working = BeautifulSoup(str(soup), "html.parser")
     _sanitize_dom(working)
     container = _main_container(working, normalized)
-    tables = extract_tables(working, container)
+    tables = extract_tables(working, container, remove_from_dom=True)
     if normalized == "article_detail":
         record = _article_detail(working, container, page_url)
     elif normalized == "forum_detail":

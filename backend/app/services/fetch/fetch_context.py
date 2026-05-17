@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from functools import partial
+from inspect import signature
 import logging
 import secrets
 from dataclasses import dataclass, field
@@ -67,14 +68,13 @@ async def _load_host_protection_policy_compat(
     *,
     ttl_seconds: int | None,
 ) -> HostProtectionPolicy:
-    try:
+    if "ttl_seconds" in signature(load_host_protection_policy).parameters:
         return await load_host_protection_policy(url, ttl_seconds=ttl_seconds)
-    except TypeError:
-        logger.warning(
-            "load_host_protection_policy lacks ttl_seconds; dropping host_memory_ttl_seconds=%s",
-            ttl_seconds,
-        )
-        return await load_host_protection_policy(url)
+    logger.warning(
+        "load_host_protection_policy lacks ttl_seconds; dropping host_memory_ttl_seconds=%s",
+        ttl_seconds,
+    )
+    return await load_host_protection_policy(url)
 
 
 def _attach_exception_browser_diagnostics(

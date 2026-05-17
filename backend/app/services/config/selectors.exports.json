@@ -117,7 +117,6 @@
         "value": {
           "__type__": "list",
           "items": [
-            "article",
             ".post-card",
             ".post-item",
             ".blog-entry",

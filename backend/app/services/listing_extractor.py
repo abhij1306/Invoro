@@ -1213,6 +1213,7 @@ def extract_listing_records(
         table_records = table_row_records(html, page_url, max_records=max_records)
         if table_records:
             return table_records
+        # Table intent prevents falling back to unrelated DOM cards when table parsing finds no records.
         table_row_intent = has_table_row_intent(html)
     else:
         table_row_intent = False
@@ -1387,6 +1388,7 @@ def extract_listing_records(
         ),
     )
     if table_row_intent and not best_records:
+        # Preserve empty table-listing results instead of substituting non-table card records.
         return []
     return apply_listing_integrity_gate(
         best_records,

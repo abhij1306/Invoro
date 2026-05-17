@@ -4,6 +4,7 @@
 import { Button } from '../components/ui/button';
 
 export default function Error({
+  error: _error,
   reset,
 }: Readonly<{
   error: Error & { digest?: string };

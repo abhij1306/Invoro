@@ -27,6 +27,8 @@ def validate_table_rows_quality(listing_rows: list[dict[str, Any]]) -> bool:
 
 
 def table_row_records(html: str, page_url: str, *, max_records: int) -> list[dict[str, Any]]:
+    if max_records <= 0:
+        return []
     soup = BeautifulSoup(html or "", "html.parser")
     table = _largest_meaningful_table(soup)
     if table is None:
@@ -75,7 +77,8 @@ def _table_has_row_intent(table: Tag) -> bool:
     if not meaningful_listing_table(table):
         return False
     rows = table.find_all("tr")
-    if len(rows) < 3:
+    data_rows = rows[1:]
+    if len(data_rows) < 3:
         return False
     return True
 

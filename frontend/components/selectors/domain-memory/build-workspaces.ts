@@ -70,7 +70,7 @@ export function buildDomainWorkspaces({
   for (const summary of selectorSummaries) {
     if (surfaceFilter !== 'all' && summary.surface !== surfaceFilter) continue;
     const searchable = [summary.domain, summary.surface].join(' ').toLowerCase();
-    if (query && !searchable.includes(query) && !summary.domain.toLowerCase().includes(query)) {
+    if (query && !searchable.includes(query)) {
       continue;
     }
     ensureSurfaceWorkspace(summary.domain, summary.surface).selectorCount = summary.selector_count;
@@ -87,7 +87,7 @@ export function buildDomainWorkspaces({
     ]
       .join(' ')
       .toLowerCase();
-    if (query && !searchable.includes(query) && !record.domain.toLowerCase().includes(query)) {
+    if (query && !searchable.includes(query)) {
       continue;
     }
     const workspace = ensureSurfaceWorkspace(record.domain, record.surface);
@@ -124,7 +124,7 @@ export function buildDomainWorkspaces({
     if (!domain || isSpecialUseDomain(domain)) continue;
     if (surfaceFilter !== 'all' && run.surface !== surfaceFilter) continue;
     const searchable = [domain, run.surface, run.url, run.status].join(' ').toLowerCase();
-    if (query && !searchable.includes(query) && !domain.toLowerCase().includes(query)) continue;
+    if (query && !searchable.includes(query)) continue;
     ensureDomainRuns(domain, run.surface).push(run);
     ensureSurfaceWorkspace(domain, run.surface).completedRuns.push(run);
   }

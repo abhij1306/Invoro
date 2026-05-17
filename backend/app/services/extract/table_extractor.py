@@ -9,7 +9,13 @@ from app.services.field_policy import normalize_field_key
 from app.services.shared.field_coerce import clean_text
 
 
-def extract_tables(soup: BeautifulSoup | Tag | None, content_container: Tag | None = None) -> list[dict[str, Any]]:
+def extract_tables(
+    soup: BeautifulSoup | Tag | None,
+    content_container: Tag | None = None,
+    *,
+    remove_from_dom: bool = False,
+) -> list[dict[str, Any]]:
+    """Extract table records, optionally removing extracted tables from the source DOM."""
     if soup is None:
         return []
     root = content_container or soup
@@ -32,7 +38,8 @@ def extract_tables(soup: BeautifulSoup | Tag | None, content_container: Tag | No
                 "rows": rows,
             }
         )
-        table.decompose()
+        if remove_from_dom:
+            table.decompose()
     return tables
 
 
