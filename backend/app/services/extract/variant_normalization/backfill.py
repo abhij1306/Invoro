@@ -1,23 +1,29 @@
 from __future__ import annotations
 
-from app.services.extract.variant_normalization.common import (
-    Any,
-    clean_text,
-    currency_codes_upper as _CURRENCY_CODES_UPPER,
+from typing import Any
+
+import logging
+
+from app.services.config.extraction_rules import CURRENCY_CODES
+from app.services.extract.variant_structural_pruning import (
     drop_parent_sku_alias_variant_rows,
-    extract_currency_code,
-    logger,
     prune_low_signal_numeric_only_variants,
+)
+from app.services.shared.field_coerce import (
+    clean_text,
+    extract_currency_code,
     text_or_none,
+)
+
+logger = logging.getLogger(__name__)
+currency_codes_upper = frozenset(
+    str(code).upper() for code in tuple(CURRENCY_CODES or ()) if str(code).strip()
 )
 
 __all__ = (
     "_backfill_variant_context",
     "_backfill_parent_scalar_axes_from_variants",
     "_enforce_variant_currency_context",
-    "_currency_code",
-    "_backfill_variant_prices_from_record",
-    "_backfill_variant_shared_fields_from_record",
 )
 
 
@@ -109,7 +115,7 @@ def _currency_code(value: object) -> str:
     text = text_or_none(value)
     if text:
         upper = text.upper()
-        if upper in _CURRENCY_CODES_UPPER:
+        if upper in currency_codes_upper:
             return upper
     return ""
 

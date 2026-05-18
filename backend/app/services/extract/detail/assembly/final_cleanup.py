@@ -16,11 +16,10 @@ from app.services.config.extraction_rules import (
     AVAILABILITY_OUT_OF_STOCK,
     AVAILABILITY_UNKNOWN,
 )
-from app.services.shared.field_coerce import (
-    clean_text,
+from app.services.extract.variant_normalization.contract import (
     enforce_flat_variant_public_contract,
-    text_or_none,
 )
+from app.services.shared.field_coerce import text_or_none
 from app.services.extract.detail.images import cleanup as _image_cleanup
 from app.services.extract.detail.price import money_repair as _money_repair
 from app.services.extract.detail.assembly import (
@@ -100,7 +99,6 @@ def repair_ecommerce_detail_record_quality(
     _money_repair.repair_invalid_original_prices(record)
     _money_repair.drop_invalid_detail_discounts(record)
     _money_repair.repair_detail_variant_prices_and_identity(record)
-    _default_unknown_availability_for_real_product(record)
     enforce_flat_variant_public_contract(record, page_url=page_url)
 
 
@@ -147,24 +145,6 @@ def _sanitize_ecommerce_detail_record(
     _image_cleanup.sanitize_detail_images(record, identity_url=identity_url)
     _image_cleanup.backfill_parent_image_from_variants(record)
     _reconcile_detail_availability_from_variants(record)
-
-
-def _default_unknown_availability_for_real_product(record: dict[str, Any]) -> None:
-    if record.get("availability") not in (None, "", [], {}):
-        return
-    if not any(
-        record.get(field_name) not in (None, "", [], {})
-        for field_name in (
-            "price",
-            "original_price",
-            "image_url",
-            "variants",
-        )
-    ):
-        return
-    if detail_title_looks_like_placeholder(clean_text(record.get("title"))):
-        return
-    record["availability"] = AVAILABILITY_UNKNOWN
 
 
 def _reconcile_detail_availability_from_variants(record: dict[str, Any]) -> None:

@@ -1,25 +1,31 @@
 from __future__ import annotations
 
-from app.services.extract.variant_normalization.common import (
-    Any,
-    clean_text,
-    gender_possessive_re as _GENDER_POSSESSIVE_RE,
-    standard_size_values as _STANDARD_SIZE_VALUES,
-    text_or_none,
-    unquote,
-    urlparse,
-    variant_sku_size_suffix_patterns as _VARIANT_SKU_SIZE_SUFFIX_PATTERNS,
+import re
+from typing import Any
+from urllib.parse import unquote, urlparse
+
+from app.services.config.extraction_rules import (
+    GENDER_POSSESSIVE_PATTERN,
+    STANDARD_SIZE_VALUES,
+    VARIANT_SKU_SIZE_SUFFIX_PATTERNS,
 )
 from app.services.extract.variant_normalization import size_color_extraction
+from app.services.shared.field_coerce import clean_text, text_or_none
 
-__all__ = (
-    "_hydrate_variant_axes",
-    "_infer_variant_sizes_from_titles",
-    "_infer_variant_sizes_from_skus",
-    "_infer_single_variant_axes",
-    "_variant_size_from_title_or_url",
-    "_variant_size_from_sku",
-    "_url_terminal_text",
+__all__ = ("_hydrate_variant_axes",)
+
+gender_possessive_re = (
+    re.compile(str(GENDER_POSSESSIVE_PATTERN), re.I)
+    if GENDER_POSSESSIVE_PATTERN
+    else None
+)
+standard_size_values = frozenset(
+    str(value).lower() for value in tuple(STANDARD_SIZE_VALUES or ())
+)
+variant_sku_size_suffix_patterns = tuple(
+    re.compile(str(pattern), re.I)
+    for pattern in tuple(VARIANT_SKU_SIZE_SUFFIX_PATTERNS or ())
+    if str(pattern).strip()
 )
 
 
@@ -120,9 +126,9 @@ def _variant_size_from_title_or_url(
         extracted = size_color_extraction._extract_size_value(text)
         if (
             extracted
-            and extracted.lower() in _STANDARD_SIZE_VALUES
-            and _GENDER_POSSESSIVE_RE is not None
-            and _GENDER_POSSESSIVE_RE.search(text)
+            and extracted.lower() in standard_size_values
+            and gender_possessive_re is not None
+            and gender_possessive_re.search(text)
         ):
             continue
         if extracted:
@@ -134,7 +140,7 @@ def _variant_size_from_sku(value: object) -> str:
     sku = clean_text(value)
     if not sku:
         return ""
-    for pattern in _VARIANT_SKU_SIZE_SUFFIX_PATTERNS:
+    for pattern in variant_sku_size_suffix_patterns:
         match = pattern.search(sku)
         if match is None:
             continue

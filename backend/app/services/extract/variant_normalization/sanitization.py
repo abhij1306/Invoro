@@ -1,44 +1,69 @@
 from __future__ import annotations
 
-from app.services.extract.variant_normalization.common import (
-    Any,
-    FLAT_VARIANT_KEYS,
-    clean_text,
-    drop_cross_product_variant_rows,
-    drop_invalid_variant_urls,
-    drop_parent_shared_variant_axes,
-    flatten_variants_for_public_output,
-    infer_variant_group_name_from_values,
-    public_variant_axis_fields_normalized as _PUBLIC_VARIANT_AXIS_FIELDS,
-    re,
-    scalar_field_max_option_tokens as _SCALAR_FIELD_MAX_OPTION_TOKENS,
-    scalar_field_pollution_values as _SCALAR_FIELD_POLLUTION_VALUES,
-    shade_code_color_min_tokens as _SHADE_CODE_COLOR_MIN_TOKENS,
-    variant_has_axis_value as _variant_has_axis_value,
-    variant_separate_dimension_size_rules as _VARIANT_SEPARATE_DIMENSION_SIZE_RULES,
-    variant_title_stopwords as _VARIANT_TITLE_STOPWORDS,
+import re
+from typing import Any
+
+from app.services.config.extraction_rules import (
+    SCALAR_FIELD_MAX_OPTION_TOKENS,
+    SCALAR_FIELD_POLLUTION_VALUES,
+    SHADE_CODE_COLOR_MIN_TOKENS,
+    VARIANT_SEPARATE_DIMENSION_SIZE_RULES,
+    VARIANT_TITLE_STOPWORDS,
 )
+from app.services.config.variant_policy import FLAT_VARIANT_KEYS, PUBLIC_VARIANT_AXIS_FIELDS
+from app.services.extract.variant_choice_traversal import (
+    infer_variant_group_name_from_values,
+)
+from app.services.extract.variant_structural_pruning import (
+    drop_cross_product_variant_rows,
+    drop_parent_shared_variant_axes,
+)
+from app.services.extract.variant_normalization.contract import (
+    flatten_variants_for_public_output,
+)
+from app.services.extract.variant_value_guards import drop_invalid_variant_urls
+from app.services.shared.field_coerce import clean_text
 from app.services.extract.variant_normalization import backfill
 from app.services.extract.variant_normalization import deduplication
 from app.services.extract.variant_normalization import size_color_extraction
 
 __all__ = (
-    "_remap_generic_variant_axes",
     "_sanitize_variant_axes",
-    "_flatten_variant_rows",
-    "_variant_title_tokens",
-    "_clean_variant_rows",
-    "_enforce_variant_axis_contract",
-    "_should_restore_original_variant_url",
     "_drop_polluted_parent_scalar_axes",
-    "_promote_misfiled_color_size",
-    "_drop_shade_code_size_duplicate",
-    "_normalize_separate_dimension_size_rows",
-    "_separate_dimension_style_label",
 )
 
 _REMAP_ELIGIBLE_AXES = frozenset({"state", "type", "style", "configuration"})
 _CORE_AXES = frozenset({"size", "color"})
+try:
+    scalar_field_max_option_tokens = max(1, int(SCALAR_FIELD_MAX_OPTION_TOKENS))
+except (TypeError, ValueError):
+    scalar_field_max_option_tokens = 6
+try:
+    shade_code_color_min_tokens = max(2, int(SHADE_CODE_COLOR_MIN_TOKENS))
+except (TypeError, ValueError):
+    shade_code_color_min_tokens = 2
+public_variant_axis_fields = tuple(
+    str(field_name).strip().lower()
+    for field_name in tuple(PUBLIC_VARIANT_AXIS_FIELDS or ())
+    if str(field_name).strip()
+)
+scalar_field_pollution_values = frozenset(
+    clean_text(value).casefold()
+    for value in tuple(SCALAR_FIELD_POLLUTION_VALUES or ())
+    if clean_text(value)
+)
+variant_separate_dimension_size_rules = tuple(
+    (re.compile(str(rule.get("pattern")), re.I), clean_text(rule.get("style")))
+    for rule in tuple(VARIANT_SEPARATE_DIMENSION_SIZE_RULES or ())
+    if isinstance(rule, dict)
+    and str(rule.get("pattern") or "").strip()
+    and clean_text(rule.get("style"))
+)
+variant_title_stopwords = frozenset(
+    clean_text(token).lower()
+    for token in tuple(VARIANT_TITLE_STOPWORDS or ())
+    if clean_text(token)
+)
 
 
 def _remap_generic_variant_axes(record: dict[str, Any]) -> None:
@@ -114,7 +139,7 @@ def _variant_title_tokens(value: object) -> set[str]:
     return {
         token
         for token in re.findall(r"[a-z0-9]+", clean_text(value).casefold())
-        if len(token) >= 3 and token not in _VARIANT_TITLE_STOPWORDS
+        if len(token) >= 3 and token not in variant_title_stopwords
     }
 
 
@@ -128,7 +153,7 @@ def _clean_variant_rows(record: dict[str, Any]) -> None:
             continue
         cleaned_variant = dict(variant)
         drop_row = False
-        for field_name in _PUBLIC_VARIANT_AXIS_FIELDS:
+        for field_name in public_variant_axis_fields:
             raw_axis_value = cleaned_variant.get(field_name)
             if size_color_extraction._variant_size_axis_value_is_quantity_control(
                 field_name,
@@ -156,7 +181,7 @@ def _clean_variant_rows(record: dict[str, Any]) -> None:
             cleaned_variant["url"] = variant.get("url")
         if any(
             cleaned_variant.get(field_name) not in (None, "", [], {})
-            for field_name in (*FLAT_VARIANT_KEYS, *_PUBLIC_VARIANT_AXIS_FIELDS)
+            for field_name in (*FLAT_VARIANT_KEYS, *public_variant_axis_fields)
         ):
             cleaned_variants.append(cleaned_variant)
     if cleaned_variants:
@@ -184,6 +209,10 @@ def _enforce_variant_axis_contract(record: dict[str, Any]) -> None:
     record.pop("variant_count", None)
 
 
+def _variant_has_axis_value(variant: dict[str, Any]) -> bool:
+    return any(clean_text(variant.get(axis)) for axis in public_variant_axis_fields)
+
+
 def _should_restore_original_variant_url(
     *,
     original_variant: dict[str, Any],
@@ -197,7 +226,7 @@ def _should_restore_original_variant_url(
         for field_name in FLAT_VARIANT_KEYS
         if (
             field_name != "url"
-            and field_name not in _PUBLIC_VARIANT_AXIS_FIELDS
+            and field_name not in public_variant_axis_fields
             and cleaned_variant.get(field_name) not in (None, "", [], {})
         )
     ]
@@ -210,7 +239,7 @@ def _drop_polluted_parent_scalar_axes(record: dict[str, Any]) -> None:
         isinstance(variant, dict) for variant in variants
     ):
         return
-    max_tokens = _SCALAR_FIELD_MAX_OPTION_TOKENS
+    max_tokens = scalar_field_max_option_tokens
     for field_name in ("color", "size"):
         value = clean_text(record.get(field_name))
         if not value:
@@ -218,7 +247,7 @@ def _drop_polluted_parent_scalar_axes(record: dict[str, Any]) -> None:
         lowered = value.casefold()
         tokens = [token for token in re.split(r"[\s,|/]+", lowered) if token]
         numeric_tokens = sum(1 for token in tokens if re.search(r"\d", token))
-        if lowered in _SCALAR_FIELD_POLLUTION_VALUES or (
+        if lowered in scalar_field_pollution_values or (
             field_name == "size"
             and len(tokens) > max_tokens + 2
             and numeric_tokens >= 2
@@ -252,7 +281,7 @@ def _drop_shade_code_size_duplicate(variant: dict[str, Any]) -> None:
     if not size_value.isdigit():
         return
     color_tokens = color_value.split()
-    if len(color_tokens) < _SHADE_CODE_COLOR_MIN_TOKENS:
+    if len(color_tokens) < shade_code_color_min_tokens:
         return
     if color_tokens[0].casefold() != size_value:
         return
@@ -273,7 +302,7 @@ def _normalize_separate_dimension_size_rows(record: dict[str, Any]) -> None:
         return
     separate_family_hits = [
         sum(1 for value in size_values if pattern.fullmatch(value))
-        for pattern, _label in _VARIANT_SEPARATE_DIMENSION_SIZE_RULES
+        for pattern, _label in variant_separate_dimension_size_rules
     ]
     if sum(1 for count in separate_family_hits if count >= 2) < 2:
         return
@@ -295,7 +324,7 @@ def _normalize_separate_dimension_size_rows(record: dict[str, Any]) -> None:
 
 
 def _separate_dimension_style_label(size_value: str) -> str:
-    for pattern, label in _VARIANT_SEPARATE_DIMENSION_SIZE_RULES:
+    for pattern, label in variant_separate_dimension_size_rules:
         if pattern.fullmatch(size_value):
             return label
     return ""

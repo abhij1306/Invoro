@@ -35,10 +35,12 @@ from app.services.config.extraction_rules import (
 from app.services.config.variant_policy import (
     DETAIL_VARIANT_SIZE_MIN_FOR_NUMERIC_PARENT_DROP,
 )
+from app.services.extract.variant_normalization.contract import (
+    enforce_flat_variant_public_contract,
+)
 from app.services.shared.field_coerce import (
     absolute_url,
     clean_text,
-    enforce_flat_variant_public_contract,
     extract_urls,
     text_or_none,
 )

@@ -23,9 +23,11 @@ from app.services.config.variant_migration_rules import (
     VARIANT_STRONG_OPTION_SELECTOR,
     VARIANT_WEAK_OPTION_SELECTOR,
 )
+from app.services.extract.variant_normalization.contract import (
+    flatten_variants_for_public_output,
+)
 from app.services.shared.field_coerce import (
     clean_text,
-    flatten_variants_for_public_output,
     object_dict as _object_dict,
     object_list as _object_list,
     text_or_none,

@@ -11,7 +11,6 @@ __all__ = (
     "detail_description_value_looks_thin",
     "requires_dom_long_text_completion",
     "requires_dom_completion",
-    "normalized_category_path",
 )
 
 import re
@@ -38,9 +37,6 @@ from app.services.config.extraction_rules import (
 from app.services.dom.selector_engine import requested_content_extractability
 from app.services.extract.detail.assembly.dom_section_targets import (
     record_has_rich_existing_variants,
-)
-from app.services.extract.detail.assembly.raw_signals import (
-    breadcrumb_category_from_dom,
 )
 from app.services.extract.field_candidates import finalize_candidate_value
 from app.services.extract.variant_choice_traversal import variant_dom_cues_present
@@ -221,15 +217,6 @@ def _requires_dom_completion(
     normalized_surface = str(surface or "").strip().lower()
     raw_soup = breadcrumb_soup or soup
     requested_missing_fields = _missing_requested_fields(record, requested_fields)
-    if normalized_surface == "ecommerce_detail":
-        breadcrumb_category = breadcrumb_category_from_dom(
-            raw_soup,
-            current_title=text_or_none(record.get("title")),
-        )
-        record_category = _normalized_category_path(record.get("category"))
-        dom_category = _normalized_category_path(breadcrumb_category)
-        if record_category and dom_category and record_category != dom_category:
-            return True
     if (
         normalized_surface == "ecommerce_detail"
         and not record_has_rich_existing_variants(record)
@@ -316,20 +303,6 @@ def _requires_dom_completion(
     return bool(requested_missing_fields & selector_backed_fields)
 
 
-def _normalized_category_path(value: object) -> str:
-    if isinstance(value, (list, tuple)):
-        return " > ".join(
-            part
-            for item in value
-            for part in _normalized_category_path(item).split(" > ")
-            if part
-        )
-    text = clean_text(value).casefold()
-    return " > ".join(
-        part for part in re.split(r"\s*(?:>|/|›|»|→|\|)\s*", text) if part
-    )
-
-
 early_price_repair_required_fields = _EARLY_PRICE_REPAIR_REQUIRED_FIELDS
 variant_signal_strength = _variant_signal_strength
 variant_axis_coverage = _variant_axis_coverage
@@ -340,4 +313,3 @@ detail_long_text_value_looks_truncated = _detail_long_text_value_looks_truncated
 detail_description_value_looks_thin = _detail_description_value_looks_thin
 requires_dom_long_text_completion = _requires_dom_long_text_completion
 requires_dom_completion = _requires_dom_completion
-normalized_category_path = _normalized_category_path

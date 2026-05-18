@@ -93,9 +93,7 @@ from app.services.acquisition import cookie_store
 from app.services.config.browser_fingerprint_profiles import REAL_CHROME_IGNORE_DEFAULT_ARGS
 from app.services.acquisition.browser_identity import build_playwright_context_spec
 from app.services.acquisition.browser_pool import (
-    block_unneeded_route as _block_unneeded_route,
     browser_pool_state as _BROWSER_POOL,
-    real_chrome_candidate_paths as _real_chrome_candidate_paths,
     resolve_browser_binary as _resolve_browser_binary,
 )
 from app.services.acquisition.browser_storage_state import persist_context_storage_state
@@ -465,6 +463,31 @@ async def browser_fetch(
                     on_event=on_event,
                     emit_browser_event=_emit_browser_event,
                 )
+                response = await recover_browser_challenge(
+                    page,
+                    url=url,
+                    response=response,
+                    browser_engine=runtime_engine,
+                    timeout_seconds=_remaining(),
+                    phase_timings_ms=phase_timings_ms,
+                    challenge_wait_max_seconds=float(
+                        crawler_runtime_settings.challenge_wait_max_seconds or 0
+                    ),
+                    challenge_poll_interval_ms=int(
+                        crawler_runtime_settings.challenge_poll_interval_ms
+                    ),
+                    navigation_timeout_ms=int(
+                        crawler_runtime_settings.browser_navigation_domcontentloaded_timeout_ms
+                    ),
+                    elapsed_ms=_elapsed_ms,
+                    classify_blocked_page=classify_blocked_page_async,
+                    get_page_html=get_page_html,
+                    looks_like_low_content_shell=looks_like_low_content_shell,
+                )
+                navigation_strategy = str(
+                    getattr(response, "browser_navigation_strategy", None)
+                    or navigation_strategy
+                )
                 interstitial_diagnostics = await dismiss_browser_interstitial(
                     page,
                     phase_timings_ms=phase_timings_ms,
@@ -822,6 +845,7 @@ async def _maybe_warm_origin_before_navigation(
             elapsed_ms=_elapsed_ms,
             classify_blocked_page=classify_blocked_page_async,
             get_page_html=get_page_html,
+            looks_like_low_content_shell=looks_like_low_content_shell,
         )
         phase_timings_ms["origin_warmup_behavior"] = 0
         await warm_page.wait_for_timeout(min(warm_pause_ms, warm_budget_ms))

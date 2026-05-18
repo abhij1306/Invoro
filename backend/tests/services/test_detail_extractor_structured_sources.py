@@ -199,7 +199,7 @@ def test_extract_ecommerce_detail_rejects_access_denied_shell_title() -> None:
     assert rows == []
 
 
-def test_extract_ecommerce_detail_defaults_missing_availability_to_unknown() -> None:
+def test_extract_ecommerce_detail_leaves_missing_availability_unset() -> None:
     html = """
     <html>
       <head>
@@ -225,7 +225,7 @@ def test_extract_ecommerce_detail_defaults_missing_availability_to_unknown() -> 
     )
 
     assert len(rows) == 1
-    assert rows[0]["availability"] == "unknown"
+    assert "availability" not in rows[0]
 
 
 def test_repair_ecommerce_detail_backfills_parent_image_from_variants() -> None:

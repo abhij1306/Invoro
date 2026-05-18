@@ -1321,9 +1321,8 @@ async def test_amazon_adapter_extracts_detail_completeness_fields() -> None:
         "24GB GDDR6X memory Triple-fan cooling "
         "ASIN: B08J5F3G18 Item model number: 24G-P5-3987-KR UPC: 843368067763"
     )
-    assert record["additional_images"] == [
-        "https://m.media-amazon.com/images/I/71tLsSyLUZL._SX900_.jpg"
-    ]
+    assert record["image_url"] == "https://m.media-amazon.com/images/I/71tLsSyLUZL.jpg"
+    assert record["additional_images"] is None
 
 
 @pytest.mark.asyncio

@@ -53,8 +53,6 @@ ALLOWED_SERVICE_CONFIG_CONSTANTS = {
     ("acquisition/cookie_store.py", "_CHALLENGE_LOCAL_STORAGE_NAME_TOKENS"),
     ("acquisition/cookie_store.py", "_CHALLENGE_LOCAL_STORAGE_VALUE_TOKENS"),
     ("acquisition/browser_readiness.py", "_ECOMMERCE_READY_CARD_SELECTORS"),
-    ("extract/variant_normalization/common.py", "_ADULT_SIZE_CONTEXT_TOKENS"),
-    ("extract/variant_normalization/common.py", "_GENDER_KEYWORD_TOKENS_SET"),
     ("dom/section_extraction.py", "_SECTION_CONTAINER_SELECTORS"),
     ("dom/section_extraction.py", "_SECTION_LABEL_SELECTOR"),
     ("shared/field_coerce.py", "_SIZE_REJECT_TOKENS_NORMALIZED"),

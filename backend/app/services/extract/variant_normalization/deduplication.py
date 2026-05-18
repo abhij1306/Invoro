@@ -1,29 +1,27 @@
 from __future__ import annotations
 
-from app.services.extract.variant_normalization.common import (
-    Any,
-    FLAT_VARIANT_KEYS,
-    clean_text,
+from typing import Any
+
+from app.services.config.variant_policy import FLAT_VARIANT_KEYS
+from app.services.extract.variant_identity_merge import (
     collapse_duplicate_size_aliases,
-    drop_color_only_rows_when_size_rows_exist,
-    drop_subset_variants_when_richer_alternative_exists,
     merge_variant_pair,
-    prune_axisless_rows_when_axisful_rows_exist,
     variant_identity,
     variant_row_richness,
     variant_semantic_identity,
 )
+from app.services.extract.variant_structural_pruning import (
+    drop_color_only_rows_when_size_rows_exist,
+    drop_subset_variants_when_richer_alternative_exists,
+    prune_axisless_rows_when_axisful_rows_exist,
+)
+from app.services.shared.field_coerce import clean_text
 from app.services.extract.variant_normalization import size_color_extraction
 
 __all__ = (
     "_dedupe_and_prune_variant_rows",
     "_prune_unrecognized_size_rows_when_real_sizes_exist",
-    "_variant_row_has_labeled_size_dimension",
     "_prune_child_size_rows_from_adult_products",
-    "_dedupe_variant_rows",
-    "_variant_primary_key",
-    "_variant_field_fingerprint",
-    "_richer_variant_pair",
 )
 
 
