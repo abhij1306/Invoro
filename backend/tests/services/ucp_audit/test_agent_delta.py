@@ -8,6 +8,7 @@ from app.services.ucp_audit.agent_delta import (
     build_agent_view_delta,
     extract_agent_view,
     extract_human_view,
+    extract_main_crawl_human_view,
 )
 
 
@@ -35,11 +36,12 @@ async def test_agent_mode_uses_http_only_and_human_mode_uses_browser(
         return DummyAcquisition(html=html)
 
     def fake_extract_human(html: str, url: str) -> dict[str, object]:
+        del html, url
         return {"name": "Human Product", "price": "10"}
 
     monkeypatch.setattr("app.services.ucp_audit.agent_delta.acquire_url", fake_acquire_url)
     monkeypatch.setattr(
-        "app.services.ucp_audit.agent_delta.extract_human_view",
+        "app.services.ucp_audit.agent_delta.extract_main_crawl_human_view",
         fake_extract_human,
     )
 
@@ -54,6 +56,58 @@ async def test_agent_mode_uses_http_only_and_human_mode_uses_browser(
     assert result.missing_in_agent_view == ["price"]
 
 
+def test_main_crawl_human_view_includes_variant_axes_from_extraction_pipeline() -> None:
+    html = """
+    <html><body>
+      <script type="application/json" id="__NEXT_DATA__">
+      {
+        "props": {
+          "pageProps": {
+            "product": {
+              "id": 9002,
+              "title": "Men's Wool Runner",
+              "handle": "mens-wool-runners-tuke-river",
+              "vendor": "Allbirds",
+              "options": [{"name": "Size"}],
+              "variants": [
+                {
+                  "id": 17874798215237,
+                  "sku": "WR2MTRV090",
+                  "option1": "9",
+                  "available": false
+                },
+                {
+                  "id": 17874798248005,
+                  "sku": "WR2MTRV100",
+                  "option1": "10",
+                  "available": false
+                }
+              ]
+            }
+          }
+        }
+      }
+      </script>
+    </body></html>
+    """
+    acquisition = DummyAcquisition(
+        html=html,
+        final_url="https://www.allbirds.com/products/mens-wool-runners-tuke-river",
+    )
+
+    result = extract_main_crawl_human_view(
+        acquisition,
+        "https://www.allbirds.com/products/mens-wool-runners-tuke-river",
+    )
+
+    assert result["color_options"] == ["Tuke River"]
+    assert result["size_options"] == ["9", "10"]
+    assert [(variant["size"], variant["color"]) for variant in result["variants"]] == [
+        ("9", "Tuke River"),
+        ("10", "Tuke River"),
+    ]
+
+
 def test_fidelity_score_uses_field_overlap() -> None:
     from app.services.ucp_audit.agent_delta import compute_fidelity_score
 
@@ -62,7 +116,7 @@ def test_fidelity_score_uses_field_overlap() -> None:
     assert compute_fidelity_score({}, {}) == 1.0
 
 
-def test_agent_view_extracts_structured_values_not_booleans() -> None:
+def test_agent_view_extracts_product_group_variants() -> None:
     html = """
     <script type="application/ld+json">
     {
@@ -168,3 +222,26 @@ def test_human_view_stops_color_options_before_addons() -> None:
 
     assert result["price"] == "9"
     assert result["color_options"] == ["Homecoming"]
+
+
+def test_human_view_filters_product_prose_from_color_options() -> None:
+    html = """
+    <html><body>
+      <main>
+        <section>
+          <h1>Men's Wool Runner</h1>
+          <p>$49</p>
+          <p>Color</p>
+          <button>Tuke River</button>
+          <p>("limited", edition, cozy)</p>
+          <p>Best used for walking</p>
+          <p>Select Size</p>
+          <button>8</button>
+        </section>
+      </main>
+    </body></html>
+    """
+
+    result = extract_human_view(html, "https://example.com/products/mens-wool-runner")
+
+    assert result["color_options"] == ["Tuke River"]

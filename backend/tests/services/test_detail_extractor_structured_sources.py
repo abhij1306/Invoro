@@ -3029,6 +3029,46 @@ def test_extract_ecommerce_detail_recovers_anchor_only_color_swatches() -> None:
     ]
 
 
+def test_extract_ecommerce_detail_recovers_unlabeled_color_swatch_urls() -> None:
+    html = """
+    <html>
+      <body>
+        <h1>Men's Wool Runner</h1>
+        <div class="color-selector" role="radiogroup" aria-label="Color">
+          <a href="/products/mens-wool-runners-natural-grey"></a>
+          <a href="/products/mens-wool-runners-tuke-river" aria-current="true"></a>
+          <a href="/products/mens-wool-runners-true-black"></a>
+        </div>
+      </body>
+    </html>
+    """
+
+    rows = extract_records(
+        html,
+        "https://www.allbirds.com/products/mens-wool-runners-tuke-river",
+        "ecommerce_detail",
+        max_records=5,
+    )
+
+    assert len(rows) == 1
+    record = rows[0]
+    assert record["variant_count"] == 3
+    assert [(variant["color"], variant["url"]) for variant in record["variants"]] == [
+        (
+            "Natural Grey",
+            "https://www.allbirds.com/products/mens-wool-runners-natural-grey",
+        ),
+        (
+            "Tuke River",
+            "https://www.allbirds.com/products/mens-wool-runners-tuke-river",
+        ),
+        (
+            "True Black",
+            "https://www.allbirds.com/products/mens-wool-runners-true-black",
+        ),
+    ]
+
+
 def test_extract_ecommerce_detail_recovers_variant_urls_from_js_state_option_mapping() -> None:
     html = """
     <html>
@@ -6913,6 +6953,34 @@ def test_normalize_variant_record_infers_single_variant_color_from_title_slug() 
             "url": "https://www.allbirds.com/products/mens-wool-runners-natural-black",
             "color": "Natural Black",
         }
+    ]
+
+
+def test_normalize_variant_record_infers_shared_color_slug_for_size_variants() -> None:
+    record = {
+        "title": "Men's Wool Runner",
+        "url": "https://www.allbirds.com/products/mens-wool-runners-tuke-river",
+        "variants": [
+            {
+                "sku": "WR2MTRV090",
+                "url": "https://www.allbirds.com/products/mens-wool-runners-tuke-river?variant=17874798215237",
+                "size": "9",
+                "availability": "out_of_stock",
+            },
+            {
+                "sku": "WR2MTRV100",
+                "url": "https://www.allbirds.com/products/mens-wool-runners-tuke-river?variant=17874798248005",
+                "size": "10",
+                "availability": "out_of_stock",
+            },
+        ],
+    }
+
+    normalize_variant_record(record)
+
+    assert [(variant["size"], variant["color"]) for variant in record["variants"]] == [
+        ("9", "Tuke River"),
+        ("10", "Tuke River"),
     ]
 
 

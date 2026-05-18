@@ -1,16 +1,28 @@
 from __future__ import annotations
 
 from dataclasses import asdict
-from typing import Any
+from typing import Any, Iterable, Literal
 
 from app.services.ucp_audit.types import UCPComplianceReport
 
 _MARKDOWN_SPECIAL_CHARS = "\\`*_{}[]()#+-.!"
+_MARKDOWN_SELECTIVE_SAFE_CHARS = frozenset({".", "-"})
 
 
-def escape_markdown(value: object) -> str:
+def escape_markdown(
+    value: object,
+    *,
+    mode: Literal["full", "selective"] = "full",
+    safe_chars: Iterable[str] | None = None,
+) -> str:
     text = str(value)
-    return "".join(f"\\{char}" if char in _MARKDOWN_SPECIAL_CHARS else char for char in text)
+    safe = set(safe_chars or ())
+    if mode == "selective":
+        safe.update(_MARKDOWN_SELECTIVE_SAFE_CHARS)
+    return "".join(
+        f"\\{char}" if char in _MARKDOWN_SPECIAL_CHARS and char not in safe else char
+        for char in text
+    )
 
 
 def build_report_payload(report: UCPComplianceReport) -> dict[str, Any]:
@@ -27,10 +39,10 @@ def build_report_payload(report: UCPComplianceReport) -> dict[str, Any]:
 
 def build_markdown_report(report: UCPComplianceReport) -> str:
     lines = [
-        f"# UCP Compliance Audit: {escape_markdown(report.domain)}",
+        f"# UCP Compliance Audit: {escape_markdown(report.domain, mode='selective')}",
         "",
         "## Executive Summary",
-        f"- Audit ID: {escape_markdown(report.audit_id)}",
+        f"- Audit ID: {escape_markdown(report.audit_id, mode='selective')}",
         f"- Overall score: {escape_markdown(report.overall_score)}",
         f"- D-UCP1 gate applied: {escape_markdown(report.d_ucp1_gate_applied)}",
         "",

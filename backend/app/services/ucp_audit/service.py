@@ -8,6 +8,7 @@ from types import SimpleNamespace
 from urllib.parse import urljoin, urlparse, urlunparse
 from uuid import uuid4
 
+import httpx
 from bs4 import BeautifulSoup
 from defusedxml import ElementTree as ET
 from sqlalchemy import select
@@ -18,6 +19,7 @@ from app.models.ucp_audit import UCPAuditJob, UCPAuditPageResult, UCPAuditReport
 from app.models.user import User
 from app.services.config import ucp_audit as config
 from app.services.domain_utils import normalize_domain
+from app.services.exceptions import AcquisitionError
 from app.services.network_resolution import build_async_http_client
 from app.services.ucp_audit.agent_delta import build_agent_view_delta
 from app.services.ucp_audit.catalog_checks import (
@@ -355,8 +357,8 @@ async def _fetch_audit_page(url: str):
             status_code=response.status_code,
             content_type=response.headers.get("content-type", ""),
         )
-    except Exception:
-        logger.debug("UCP audit fetch failed for %s", url, exc_info=True)
+    except (httpx.HTTPError, OSError, TimeoutError, asyncio.TimeoutError) as exc:
+        logger.debug("UCP audit fetch failed for %s: %s", url, exc, exc_info=True)
         return None
 
 
@@ -479,18 +481,37 @@ def _product_schema_dimension(
             ],
         )
     score = _average_score([item.completeness_score for item in schema_scores])
-    missing_jsonld = sum(1 for item in schema_scores if not item.product_jsonld_found)
-    missing_required = sum(len(item.missing_required) for item in schema_scores)
-    missing_recommended = sum(len(item.missing_recommended) for item in schema_scores)
-    missing_additional_property = sum(
-        1 for item in schema_scores if not item.ucp_fields_present
+    missing_jsonld_scores = [
+        item for item in schema_scores if not item.product_jsonld_found
+    ]
+    missing_required_scores = [item for item in schema_scores if item.missing_required]
+    missing_recommended_scores = [item for item in schema_scores if item.missing_recommended]
+    missing_additional_property_scores = [
+        item for item in schema_scores if not item.ucp_fields_present
+    ]
+    missing_jsonld = len(missing_jsonld_scores)
+    missing_required = sum(len(item.missing_required) for item in missing_required_scores)
+    missing_recommended = sum(
+        len(item.missing_recommended) for item in missing_recommended_scores
     )
+    missing_additional_property = len(missing_additional_property_scores)
     findings = [
         UCPFinding(
             code=config.FINDING_PRODUCT_JSONLD_MISSING,
             dimension_id=config.D_UCP2_ID,
             severity=config.UCP_FINDING_WARNING,
             affected_count=missing_jsonld,
+            count_kind="urls",
+            affected_urls=[item.url for item in missing_jsonld_scores if item.url],
+            evidence=[
+                {
+                    "url": item.url,
+                    "has_product_jsonld": False,
+                    "missing_required": item.missing_required,
+                    "missing_recommended": item.missing_recommended,
+                }
+                for item in missing_jsonld_scores
+            ],
         )
         if missing_jsonld
         else None,
@@ -499,6 +520,12 @@ def _product_schema_dimension(
             dimension_id=config.D_UCP2_ID,
             severity=config.UCP_FINDING_WARNING,
             affected_count=missing_required,
+            count_kind="field_instances",
+            affected_urls=[item.url for item in missing_required_scores if item.url],
+            evidence=[
+                {"url": item.url, "missing_required": item.missing_required}
+                for item in missing_required_scores
+            ],
         )
         if missing_required
         else None,
@@ -507,6 +534,12 @@ def _product_schema_dimension(
             dimension_id=config.D_UCP2_ID,
             severity=config.UCP_FINDING_WARNING,
             affected_count=missing_recommended,
+            count_kind="field_instances",
+            affected_urls=[item.url for item in missing_recommended_scores if item.url],
+            evidence=[
+                {"url": item.url, "missing_recommended": item.missing_recommended}
+                for item in missing_recommended_scores
+            ],
         )
         if missing_recommended
         else None,
@@ -515,6 +548,17 @@ def _product_schema_dimension(
             dimension_id=config.D_UCP2_ID,
             severity=config.UCP_FINDING_WARNING,
             affected_count=missing_additional_property,
+            count_kind="urls",
+            affected_urls=[
+                item.url for item in missing_additional_property_scores if item.url
+            ],
+            evidence=[
+                {
+                    "url": item.url,
+                    "has_additional_property": bool(item.ucp_fields_present),
+                }
+                for item in missing_additional_property_scores
+            ],
         )
         if missing_additional_property
         else None,
@@ -533,6 +577,8 @@ def _metafield_dimension(schema_scores: list[UCPSchemaScore]) -> UCPDimensionSco
             dimension_id=config.D_UCP3_ID,
             severity=config.UCP_FINDING_BLOCKING,
             affected_count=len(report.critical_gaps),
+            count_kind="attribute_gaps",
+            evidence=[{"critical_gaps": report.critical_gaps}],
         )
     ] if report.critical_gaps else []
     return _dimension(config.D_UCP3_ID, score, findings)
@@ -551,6 +597,13 @@ def _taxonomy_dimension(schema_scores: list[UCPSchemaScore]) -> UCPDimensionScor
             affected_count=(
                 len(report.duplicate_clusters) + len(report.shallow_categories)
             ),
+            count_kind="taxonomy_gaps",
+            evidence=[
+                {
+                    "duplicate_clusters": report.duplicate_clusters,
+                    "shallow_categories": report.shallow_categories,
+                }
+            ],
         )
     ] if report.duplicate_clusters or report.shallow_categories else []
     return _dimension(config.D_UCP4_ID, score, findings)
@@ -646,8 +699,14 @@ async def _agent_delta_dimension(
         delta = await build_agent_view_delta(
             _best_agent_delta_url(sampled_pages, schema_scores)
         )
-    except Exception:
-        logger.debug("UCP agent-view delta failed", exc_info=True)
+    except (
+        AcquisitionError,
+        httpx.HTTPError,
+        OSError,
+        TimeoutError,
+        asyncio.TimeoutError,
+    ) as exc:
+        logger.debug("UCP agent-view delta failed: %s", exc, exc_info=True)
         return (
             _dimension(
                 config.D_UCP7_ID,

@@ -85,7 +85,7 @@ const navItemCount = navGroups.reduce((total, group) => total + group.items.leng
 const resetDialogCopy = {
   title: 'Reset workspace data',
   description:
-    'Delete crawl runs, records, logs, artifacts, runtime cookie files, learned domain memory, saved cookie memory, field feedback, host protection memory, and Product Intelligence data.',
+    'Delete crawl runs, records, logs, artifacts, runtime cookie files, learned domain memory, saved cookie memory, field feedback, host protection memory, Product Intelligence data, Data Enrichment data, and UCP Audit reports.',
   confirmLabel: 'Reset Workspace Data',
 } as const;
 

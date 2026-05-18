@@ -74,6 +74,8 @@ def _product_variant_rows(product: dict[str, Any]) -> list[dict[str, Any]]:
             row = dict(item)
             if key != "variants":
                 _backfill_nested_variant_context(row, product)
+            else:
+                _backfill_single_axis_variant_context(row, product)
             rows.append(row)
     rows.extend(_nested_choice_item_variant_rows(product))
     if not rows:
@@ -196,6 +198,32 @@ def _backfill_nested_variant_context(
             if value not in (None, "", [], {}):
                 variant[target_key] = value
                 break
+
+
+def _backfill_single_axis_variant_context(
+    variant: dict[str, Any],
+    product: dict[str, Any],
+) -> None:
+    from app.services.extract.variant_axis import normalized_variant_axis_key
+
+    if variant.get("color") not in (None, "", [], {}):
+        return
+    option_names = {
+        normalized_variant_axis_key(name)
+        for name in _option_names(product.get("options"))
+    }
+    if "color" in option_names:
+        return
+    if "size" not in option_names and _variant_axis_raw_value(variant, "size") in (
+        None,
+        "",
+        [],
+        {},
+    ):
+        return
+    color = text_or_none(product.get("color") or product.get("colour"))
+    if color:
+        variant["color"] = color
 
 def map_js_state_to_fields(
     js_state_objects: dict[str, Any],

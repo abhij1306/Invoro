@@ -32,6 +32,7 @@ variant_sku_size_suffix_patterns = tuple(
 def _hydrate_variant_axes(record: dict[str, Any]) -> None:
     _infer_variant_sizes_from_titles(record)
     _infer_variant_sizes_from_skus(record)
+    _infer_shared_variant_color_from_record_identity(record)
     _infer_single_variant_axes(record)
 
 
@@ -104,6 +105,30 @@ def _infer_single_variant_axes(record: dict[str, Any]) -> None:
             variant["color"] = color_value
 
 
+def _infer_shared_variant_color_from_record_identity(record: dict[str, Any]) -> None:
+    variants = record.get("variants")
+    if not isinstance(variants, list) or len(variants) < 2:
+        return
+    variant_rows = [variant for variant in variants if isinstance(variant, dict)]
+    if len(variant_rows) < 2:
+        return
+    if any(clean_text(variant.get("color")) for variant in variant_rows):
+        return
+    if not any(clean_text(variant.get("size")) for variant in variant_rows):
+        return
+    color_value = _record_url_suffix_after_title(record)
+    if not color_value:
+        color_value = size_color_extraction._variant_color_from_title_or_url(
+            {},
+            record=record,
+        )
+    if not color_value:
+        return
+    for variant in variant_rows:
+        if variant.get("color") in (None, "", [], {}):
+            variant["color"] = color_value
+
+
 def _variant_size_from_title_or_url(
     variant: dict[str, Any],
     *,
@@ -159,3 +184,43 @@ def _url_terminal_text(value: object) -> str:
     if not parts:
         return ""
     return clean_text(unquote(parts[-1]).replace("-", " ").replace("_", " "))
+
+
+def _record_url_suffix_after_title(record: dict[str, Any]) -> str:
+    title = clean_text(record.get("title") or record.get("name"))
+    terminal = _url_terminal_text(record.get("url"))
+    if not title or not terminal:
+        return ""
+    title_tokens = _identity_tokens(title)
+    terminal_tokens = _identity_tokens(terminal)
+    if len(terminal_tokens) <= len(title_tokens):
+        return ""
+    if terminal_tokens[: len(title_tokens)] != title_tokens:
+        return ""
+    suffix_tokens = terminal_tokens[len(title_tokens) :]
+    if not suffix_tokens or len(suffix_tokens) > 4:
+        return ""
+    return _title_preserving_acronyms(" ".join(suffix_tokens))
+
+
+def _identity_tokens(value: str) -> list[str]:
+    return [
+        _identity_token_root(token)
+        for token in re.findall(r"[a-z0-9]+", clean_text(value).casefold())
+        if token and token != "s"
+    ]
+
+
+def _identity_token_root(value: str) -> str:
+    if value in {"mens", "womens", "kids"}:
+        return value[:-1]
+    if len(value) > 4 and value.endswith("s"):
+        return value[:-1]
+    return value
+
+
+def _title_preserving_acronyms(value: str) -> str:
+    return " ".join(
+        token.upper() if token.isupper() else token.capitalize()
+        for token in clean_text(value).split()
+    )

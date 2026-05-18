@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
 import logging
@@ -153,9 +154,22 @@ def _backfill_variant_prices_from_record(record: dict[str, Any]) -> None:
         return value not in (None, "", [], {})
 
     def _comparable_scalar(value: object) -> object:
+        if isinstance(value, bool):
+            return text_or_none(value)
         if isinstance(value, (int, float)):
-            return value
-        return text_or_none(value)
+            try:
+                parsed = Decimal(str(value))
+            except InvalidOperation:
+                return text_or_none(value)
+            return parsed if parsed.is_finite() else text_or_none(value)
+        text = text_or_none(value)
+        if text is None:
+            return None
+        try:
+            parsed = Decimal(text)
+        except InvalidOperation:
+            return text
+        return parsed if parsed.is_finite() else text
 
     def _has_distinct_variant_value(field_name: str) -> bool:
         """Distinct means a non-empty variant value differs from the parent fallback."""

@@ -83,7 +83,7 @@ def _variant_score(total: int, collapsed: int, sku: int, availability: int) -> i
     if total <= 0:
         return 100
     metrics = (collapsed, sku, availability)
-    metric_count = len(metrics)
+    metric_count = sum(1 for metric in metrics if metric > 0)
     if metric_count <= 0:
         return 100
     return max(0, int(100 - ((sum(metrics) / (total * metric_count)) * 100)))
@@ -126,6 +126,7 @@ def build_policy_readability_report(
             config.FINDING_POLICY_SHIPPING_MISSING,
             config.D_UCP6_ID,
             config.UCP_FINDING_WARNING,
+            count_kind="domain_check",
         )
         if not has_shipping
         else None,
@@ -133,6 +134,7 @@ def build_policy_readability_report(
             config.FINDING_POLICY_RETURN_PERIOD_MISSING,
             config.D_UCP6_ID,
             config.UCP_FINDING_WARNING,
+            count_kind="domain_check",
         )
         if not has_period
         else None,
@@ -140,6 +142,7 @@ def build_policy_readability_report(
             config.FINDING_POLICY_CURRENCY_INVALID,
             config.D_UCP6_ID,
             config.UCP_FINDING_WARNING,
+            count_kind="domain_check",
         )
         if not currency_valid
         else None,
@@ -147,6 +150,7 @@ def build_policy_readability_report(
             config.FINDING_POLICY_PAGE_INACCESSIBLE,
             config.D_UCP6_ID,
             config.UCP_FINDING_WARNING,
+            count_kind="domain_check",
         )
         if not page_accessible
         else None,

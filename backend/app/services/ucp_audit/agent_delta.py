@@ -8,6 +8,7 @@ from app.services.acquisition.acquirer import AcquisitionRequest, acquire
 from app.services.acquisition.policy import AcquisitionPolicy
 from app.services.acquisition_plan import AcquisitionPlan
 from app.services.config import ucp_audit as config
+from app.services.pipeline.extract_records import extract_records
 from app.services.ucp_audit.product_schema import score_product_schema
 from app.services.ucp_audit.types import AgentViewDelta
 
@@ -16,7 +17,7 @@ async def build_agent_view_delta(url: str) -> AgentViewDelta:
     structured = await acquire_url(url, mode=config.UCP_HTTP_ONLY_MODE)
     rendered = await acquire_url(url, mode=config.UCP_BROWSER_ONLY_MODE)
     agent = extract_agent_view(str(getattr(structured, "html", "") or ""), url)
-    human = extract_human_view(str(getattr(rendered, "html", "") or ""), url)
+    human = extract_main_crawl_human_view(rendered, url)
     agent_keys = set(agent)
     human_keys = set(human)
     return AgentViewDelta(
@@ -75,8 +76,53 @@ def extract_agent_view(html: str, url: str) -> dict[str, Any]:
     return {key: value for key, value in values.items() if value not in (None, "")}
 
 
-def extract_human_view(html: str, url: str) -> dict[str, Any]:
-    del url
+def extract_main_crawl_human_view(acquisition_result: Any, url: str) -> dict[str, Any]:
+    final_url = str(getattr(acquisition_result, "final_url", "") or url)
+    records = extract_records(
+        str(getattr(acquisition_result, "html", "") or ""),
+        final_url,
+        config.UCP_AUDIT_SURFACE,
+        max_records=config.AGENT_DELTA_HUMAN_MAX_RECORDS,
+        requested_page_url=url,
+        requested_fields=list(config.AGENT_DELTA_HUMAN_REQUESTED_FIELDS),
+        adapter_records=list(getattr(acquisition_result, "adapter_records", []) or []),
+        network_payloads=list(getattr(acquisition_result, "network_payloads", []) or []),
+        artifacts=dict(getattr(acquisition_result, "artifacts", {}) or {}),
+        browser_diagnostics=dict(
+            getattr(acquisition_result, "browser_diagnostics", {}) or {}
+        ),
+        content_type=str(getattr(acquisition_result, "content_type", "") or ""),
+    )
+    record = records[0] if records and isinstance(records[0], dict) else {}
+    return _human_view_from_record(record)
+
+
+def _human_view_from_record(record: dict[str, Any]) -> dict[str, Any]:
+    variants = [item for item in record.get("variants") or [] if isinstance(item, dict)]
+    values: dict[str, Any] = {
+        "name": _first_text(record.get("title") or record.get("name")),
+        "price": _first_text(record.get("price")),
+        "currency": _first_text(record.get("currency")),
+        "availability": _first_text(record.get("availability")),
+        "color_options": _variant_axis_values(variants, "color"),
+        "size_options": _variant_axis_values(variants, "size"),
+    }
+    if variants:
+        values["variants"] = variants
+        values["variant_count"] = len(variants)
+    return {key: value for key, value in values.items() if value not in (None, "", [], {})}
+
+
+def _variant_axis_values(variants: list[dict[str, Any]], axis: str) -> list[str]:
+    values: list[str] = []
+    for variant in variants:
+        value = _first_text(variant.get(axis))
+        if value and value not in values:
+            values.append(value)
+    return values
+
+
+def extract_human_view(html: str, _url: str) -> dict[str, Any]:
     soup = BeautifulSoup(str(html or ""), "html.parser")
     for node in soup(["script", "style", "noscript"]):
         node.decompose()
@@ -94,27 +140,15 @@ def extract_human_view(html: str, url: str) -> dict[str, Any]:
         "effective_price": _effective_price(price, sale_messaging),
         "color_options": _option_lines_after(
             scoped_lines,
-            "Color",
-            stop_labels=(
-                "Select Size",
-                "Size Guide",
-                "Quantity",
-                "Free Shipping",
-                "Don't Forget to Add",
-                "Add to Cart",
-                "Features",
-            ),
+            config.AGENT_DELTA_COLOR_LABEL,
+            stop_labels=config.AGENT_DELTA_COLOR_STOP_LABELS,
+            max_words=config.AGENT_DELTA_COLOR_OPTION_MAX_WORDS,
         ),
         "size_options": _option_lines_after(
             scoped_lines,
-            "Select Size",
-            stop_labels=(
-                "Size Guide",
-                "Quantity",
-                "ADD TO CART",
-                "Add to cart",
-                "Or, Try On In Store.",
-            ),
+            config.AGENT_DELTA_SIZE_LABEL,
+            stop_labels=config.AGENT_DELTA_SIZE_STOP_LABELS,
+            max_words=config.AGENT_DELTA_SIZE_OPTION_MAX_WORDS,
         ),
     }
     return {key: value for key, value in values.items() if value not in (None, "", [], {})}
@@ -252,6 +286,7 @@ def _option_lines_after(
     label: str,
     *,
     stop_labels: tuple[str, ...],
+    max_words: int,
 ) -> list[str]:
     result: list[str] = []
     active = False
@@ -266,30 +301,27 @@ def _option_lines_after(
             break
         if _is_noise_option_line(normalized):
             continue
-        if len(normalized) <= 24 and normalized not in result:
+        if _is_plausible_option_line(normalized, max_words=max_words) and normalized not in result:
             result.append(normalized)
-    return result[:12]
+    return result[: config.AGENT_DELTA_OPTION_MAX_COUNT]
 
 
 def _is_noise_option_line(value: str) -> bool:
     normalized = _option_fold(value)
     if "$" in value:
         return True
-    return normalized in {
-        "quantity",
-        "decrease quantity",
-        "increase quantity",
-        "add to cart",
-        "add to bag",
-        "sold out",
-        "or, try on in store.",
-        "price",
-        "add",
-        "shop now",
-        "powered by rebuy",
-        "features",
-        "how to apply magic press",
-    }
+    return normalized in config.AGENT_DELTA_OPTION_NOISE_LINES
+
+
+def _is_plausible_option_line(value: str, *, max_words: int) -> bool:
+    import re
+
+    if len(value) > config.AGENT_DELTA_OPTION_MAX_CHARS:
+        return False
+    if any(char in value for char in config.AGENT_DELTA_OPTION_INVALID_CHARS):
+        return False
+    words = re.findall(r"[A-Za-z0-9]+", value)
+    return len(words) <= max_words
 
 
 def _is_option_stop_line(value: str, stop_labels: tuple[str, ...]) -> bool:

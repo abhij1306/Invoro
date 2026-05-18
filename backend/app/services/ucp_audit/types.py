@@ -52,6 +52,9 @@ class UCPFinding:
     severity: str
     message: str = ""
     affected_count: int = 0
+    count_kind: str = "items"
+    affected_urls: list[str] = field(default_factory=list)
+    evidence: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass(slots=True)

@@ -205,11 +205,9 @@ def _apply_regex_filter(pattern: str | None, values: list[str]) -> list[str]:
     try:
         timeout = float(raw_timeout)
     except (TypeError, ValueError):
-        logger.warning(
-            "Invalid selector regex timeout; disabling timeout",
-            extra={"pattern": pattern[:200], "timeout": raw_timeout},
-        )
-        timeout = None
+        raise ValueError(
+            "Invalid selector_regex_timeout_seconds configuration"
+        ) from None
     filtered: list[str] = []
     for value in values:
         try:

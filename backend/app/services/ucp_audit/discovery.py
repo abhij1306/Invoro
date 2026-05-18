@@ -1,12 +1,18 @@
 from __future__ import annotations
 
+import asyncio
 import json
+import logging
 from types import SimpleNamespace
 from urllib.parse import urlparse, urlunparse
+
+import httpx
 
 from app.services.config import ucp_audit as config
 from app.services.network_resolution import build_async_http_client
 from app.services.ucp_audit.types import UCPManifestResult
+
+logger = logging.getLogger(__name__)
 
 
 async def discover_ucp_manifest(domain: str) -> UCPManifestResult:
@@ -20,6 +26,15 @@ async def discover_ucp_manifest(domain: str) -> UCPManifestResult:
             manifest_valid=False,
             raw_manifest=None,
             errors=[f"{config.UCP_MANIFEST_PATH} fetch failed"],
+        )
+    if getattr(result, "error", ""):
+        return UCPManifestResult(
+            manifest_found=False,
+            capabilities_declared=[],
+            missing_required_capabilities=list(config.UCP_REQUIRED_CAPABILITIES),
+            manifest_valid=False,
+            raw_manifest=None,
+            errors=[str(result.error)],
         )
     if int(getattr(result, "status_code", 0) or 0) == 404:
         return UCPManifestResult(
@@ -77,8 +92,16 @@ async def _fetch_manifest_page(url: str):
             status_code=response.status_code,
             content_type=response.headers.get("content-type", ""),
         )
-    except Exception:
-        return None
+    except (httpx.HTTPError, OSError, TimeoutError, asyncio.TimeoutError) as exc:
+        logger.debug("UCP manifest fetch failed for %s", url, exc_info=True)
+        return SimpleNamespace(
+            url=url,
+            final_url=url,
+            html="",
+            status_code=0,
+            content_type="",
+            error=str(exc),
+        )
 
 
 def _manifest_url(value: str) -> str:

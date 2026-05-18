@@ -36,6 +36,7 @@ import {
 import { api } from '../../lib/api';
 import { cn } from '../../lib/utils';
 import type { UcpAuditJob, UcpAuditReport } from '../../lib/api/types';
+import { syntaxHighlightJson } from '../../lib/ui/syntax';
 
 const DIMENSION_META: Record<string, { label: string; subtitle: string; desc: string }> = {
   'D-UCP1': {
@@ -232,6 +233,9 @@ type NormalizedFinding = {
   action: string;
   impact: 'critical' | 'high' | 'medium';
   affected: number;
+  countKind: string;
+  affectedUrls: string[];
+  evidence: Array<Record<string, unknown>>;
 };
 
 type AgentViewSample = {
@@ -256,12 +260,12 @@ export function UcpScoreSummary({
   return (
     <section className="border-border bg-panel overflow-hidden rounded-[var(--radius-lg)] border shadow-sm">
       <div className="grid gap-0 lg:grid-cols-[300px_1fr]">
-        
+
         {/* Overall Score Bento Card */}
         <div className="border-divider bg-background/30 flex flex-col items-center justify-center border-b p-6 lg:border-b-0 lg:border-r relative">
-          <div className="absolute top-3 left-4 flex items-center gap-1.5">
+          <div className="absolute top-3 inset-x-0 flex items-center justify-center gap-1.5">
             <Sparkles className="size-3 text-accent animate-pulse" />
-            <span className="text-[10px] font-bold font-mono tracking-widest text-muted">COMPLIANCE INDEX</span>
+            <span className="text-[10px] font-normal font-sans tracking-widest text-muted uppercase">COMPLIANCE INDEX</span>
           </div>
 
           <div className="my-2 relative flex items-center justify-center">
@@ -273,10 +277,25 @@ export function UcpScoreSummary({
             <ScoreRing score={report ? score : 0} size={156} stroke={10} label="Overall Index" />
           </div>
 
-          <div className="mt-4 grid w-full grid-cols-3 gap-2 text-center">
-            <MiniStat label="Gaps" value={blocking} tone="danger" />
-            <MiniStat label="Advisories" value={warnings} tone="warning" />
-            <MiniStat label="Status" value={job?.status ?? '--'} tone={statusTone(job?.status)} />
+          <div className="mt-4 flex flex-col gap-2.5 w-full px-2">
+            <div className="flex items-center justify-between border-b border-border/40 pb-1.5">
+              <span className="text-[9px] font-normal font-mono tracking-wider text-muted uppercase">CRITICAL GAPS</span>
+              <span className="font-mono font-normal text-danger bg-danger/10 px-1.5 py-0.5 rounded leading-none text-xs">
+                {blocking}
+              </span>
+            </div>
+            <div className="flex items-center justify-between border-b border-border/40 pb-1.5">
+              <span className="text-[9px] font-normal font-mono tracking-wider text-muted uppercase">ADVISORIES</span>
+              <span className="font-mono font-normal text-warning bg-warning/10 px-1.5 py-0.5 rounded leading-none text-xs">
+                {warnings}
+              </span>
+            </div>
+            <div className="flex items-center justify-between pt-0.5">
+              <span className="text-[9px] font-normal font-mono tracking-wider text-muted uppercase">RUN STATUS</span>
+              <span className={cn("font-mono font-normal px-2 py-0.5 rounded text-[10px] leading-none uppercase border border-border/60 bg-background-alt shadow-sm", toneClass(statusTone(job?.status)))}>
+                {job?.status ?? 'pending'}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -290,8 +309,8 @@ export function UcpScoreSummary({
               </div>
             </div>
           ) : null}
-          
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {report?.dimension_scores.map((dimension) => (
               <DimensionScoreCard
                 key={dimension.dimension_id}
@@ -299,13 +318,13 @@ export function UcpScoreSummary({
                 blocked={gateApplied && dimension.dimension_id !== 'D-UCP1'}
               />
             )) ?? (
-              <div className="col-span-full py-8">
-                <DataRegionEmpty 
-                  title="Awaiting Analytics Execution" 
-                  description="Supply a target domain and launch a compliance audit to run semantic scoring." 
-                />
-              </div>
-            )}
+                <div className="col-span-full py-8">
+                  <DataRegionEmpty
+                    title="Awaiting Analytics Execution"
+                    description="Supply a target domain and launch a compliance audit to run semantic scoring."
+                  />
+                </div>
+              )}
           </div>
         </div>
       </div>
@@ -329,19 +348,19 @@ export function UcpDimensionTable({
     <TableSurface contentClassName="min-h-[280px]">
       <header className="border-divider flex items-center justify-between gap-3 border-b px-4 py-3 bg-background/25">
         <div>
-          <h2 className="text-xs font-bold font-mono tracking-widest text-muted uppercase">DETAILED DIMENSION METRICS</h2>
+          <h2 className="text-xs font-bold font-sans tracking-widest text-muted uppercase">DETAILED DIMENSION METRICS</h2>
           <p className="type-caption text-muted mt-0.5">Determined capabilities of the target store against automated crawlers.</p>
         </div>
         {report ? (
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-bold font-mono text-muted uppercase">CAPABILITY STICKER:</span>
-            <Badge tone={badgeTone(scoreTone(report.overall_score))}>{report.overall_score}/100 INDEX</Badge>
+            <span className="text-[10px] font-normal font-mono text-muted uppercase">CAPABILITY STICKER:</span>
+            <Badge tone={badgeTone(scoreTone(report.overall_score))} className="font-normal">{report.overall_score}/100 INDEX</Badge>
           </div>
         ) : null}
       </header>
-      
+
       {report ? (
-        <div className="divide-divider divide-y">
+        <div className="divide-divider divide-y bg-background/5">
           {report.dimension_scores.map((dimension) => {
             const meta = DIMENSION_META[dimension.dimension_id] ?? {
               label: dimension.dimension_id,
@@ -351,57 +370,53 @@ export function UcpDimensionTable({
             const findings = dimension.findings.map((finding, index) =>
               normalizeFinding(finding, index),
             );
-            const isCompliant = findings.length === 0;
 
             return (
-              <article 
-                key={dimension.dimension_id} 
-                className="grid gap-4 px-4 py-4 lg:grid-cols-[200px_1fr] hover:bg-background/20 transition-colors"
+              <article
+                key={dimension.dimension_id}
+                className="grid gap-6 px-6 py-6 lg:grid-cols-[300px_1fr] hover:bg-background/10 transition-colors"
               >
-                <div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-mono text-[10px] font-bold text-muted bg-background/80 px-1.5 py-0.5 border border-border rounded-[3px]">
+                <div className="pr-4 border-b pb-4 lg:border-b-0 lg:pb-0 lg:border-r lg:border-divider/40 flex flex-col justify-start">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="font-mono text-[10px] font-normal text-muted bg-background px-2 py-0.5 border border-border/80 rounded">
                       {dimension.dimension_id}
                     </span>
-                    <Badge tone={badgeTone(dimension.status)} className="scale-90">
+                    <Badge tone={badgeTone(dimension.status)} className="scale-90 font-mono font-normal text-[9px]">
                       {dimension.status}
                     </Badge>
                   </div>
-                  <div className="mt-2 font-semibold text-foreground text-sm">{meta.label}</div>
-                  <p className="text-[11px] text-muted mt-1 leading-snug">{meta.desc}</p>
+                  <h3 className="mt-1 font-normal text-foreground text-[14px] leading-snug">{meta.label}</h3>
+                  <p className="text-[11.5px] text-muted mt-2 leading-relaxed whitespace-normal pr-2">{meta.desc}</p>
                 </div>
 
-                <div className="min-w-0 flex flex-col justify-center">
-                  <div className="mb-2.5 flex flex-wrap items-center gap-2">
+                <div className="min-w-0 flex flex-col justify-center lg:pl-4">
+                  <div className="mb-3.5 flex flex-wrap items-center gap-2">
                     <ScoreBadge score={dimension.score} />
-                    <span className="type-caption text-secondary font-medium">{meta.subtitle}</span>
+                    <span className="type-caption text-secondary font-normal text-[11px] uppercase tracking-wider">{meta.subtitle}</span>
                   </div>
 
                   {findings.length ? (
-                    <ul className="grid gap-2">
+                    <ul className="grid gap-2.5 max-w-[760px] w-full min-w-0">
                       {findings.map((finding) => (
-                        <li 
-                          key={finding.id} 
-                          className="border-border bg-background/25 hover:bg-background/45 rounded-[var(--radius-md)] border px-3 py-2 flex items-start gap-2.5 transition-colors"
+                        <li
+                          key={finding.id}
+                          className="border-border/50 bg-background/20 hover:bg-background/40 rounded-[var(--radius-md)] border p-4.5 flex items-start gap-3 transition-colors shadow-sm w-full min-w-0"
                         >
                           <AlertTriangle className={cn(
-                            "size-3.5 shrink-0 mt-0.5",
+                            "size-4 shrink-0 mt-0.5",
                             finding.severity === 'blocking' ? "text-danger" : "text-warning"
                           )} />
-                          <div>
-                            <div className="text-xs font-semibold text-foreground leading-normal">{finding.description}</div>
-                            <div className="text-[10px] text-muted mt-1 font-mono flex items-center gap-1">
-                              <span>System code:</span>
-                              <span className="text-foreground bg-background px-1 py-0.5 rounded border border-border">{finding.code}</span>
-                            </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-[13px] font-normal text-foreground leading-relaxed">{finding.description}</div>
+                            <FindingEvidence finding={finding} />
                           </div>
                         </li>
                       ))}
                     </ul>
                   ) : (
-                    <div className="flex items-center gap-2 border border-success/20 bg-success/5 rounded-[var(--radius-md)] px-3 py-2 text-xs text-success">
-                      <Check className="size-3.5 shrink-0" />
-                      <span>Compliant capability. Ready for agent integrations.</span>
+                    <div className="flex items-center gap-2.5 border border-success/20 bg-success/5 rounded-[var(--radius-md)] p-3.5 text-xs text-success max-w-[760px] w-full">
+                      <Check className="size-4 shrink-0 text-success" />
+                      <span className="font-semibold text-[12.5px]">Compliant capability. Ready for autonomous agent integrations.</span>
                     </div>
                   )}
                 </div>
@@ -452,14 +467,14 @@ export function UcpAgentViewPanel({ report }: Readonly<{ report: UcpAuditReport 
     <TableSurface>
       <header className="border-divider flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3 bg-background/25">
         <div>
-          <h2 className="text-xs font-bold font-mono tracking-widest text-muted uppercase">AGENT VIEW VS. HUMAN VIEW (D-UCP7)</h2>
+          <h2 className="text-xs font-bold font-sans tracking-widest text-muted uppercase">AGENT VIEW VS. HUMAN VIEW (D-UCP7)</h2>
           <p className="type-caption text-muted mt-0.5">
             Compares crawler parsed JSON-LD metadata fields against rendered visible browser facts.
           </p>
         </div>
         {d7 ? (
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-bold font-mono text-muted uppercase">D-UCP7 SCORE:</span>
+            <span className="text-[10px] font-normal font-mono text-muted uppercase">D-UCP7 SCORE:</span>
             <ScoreBadge score={d7.score} />
           </div>
         ) : null}
@@ -476,13 +491,25 @@ export function UcpAgentViewPanel({ report }: Readonly<{ report: UcpAuditReport 
                 onClick={() => setActiveIndex(index)}
                 className={cn(
                   'rounded-[var(--radius-md)] px-3 py-2 text-left transition-all border cursor-pointer flex items-center justify-between gap-3 min-w-[200px]',
-                  index === activeIndex 
-                    ? 'bg-panel border-border shadow-sm text-foreground' 
+                  index === activeIndex
+                    ? 'bg-panel border-border shadow-sm text-foreground'
                     : 'text-muted border-transparent hover:bg-panel/50 hover:text-foreground'
                 )}
               >
-                <div className="min-w-0">
-                  <span className="block text-[11px] font-mono truncate">{pathLabel(sample.url)}</span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="block text-[11px] font-mono truncate">{pathLabel(sample.url)}</span>
+                    <a
+                      href={sample.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-muted hover:text-accent p-0.5 rounded transition-colors shrink-0 inline-flex items-center justify-center"
+                      onClick={(e) => e.stopPropagation()}
+                      title="Open page in new tab"
+                    >
+                      <ExternalLink className="size-3 shrink-0" />
+                    </a>
+                  </div>
                   <span className="mt-0.5 block text-[10px] text-muted">{Math.round(sample.fidelity_score * 100)}% structural fidelity</span>
                 </div>
                 <div className="shrink-0">
@@ -516,19 +543,19 @@ export function UcpAgentViewPanel({ report }: Readonly<{ report: UcpAuditReport 
           {/* Tokens breakdown footer */}
           <div className="border-divider border-t px-4 py-4 bg-background/15 grid gap-4 md:grid-cols-2">
             <div className="border border-danger/10 bg-danger/5 rounded-[var(--radius-lg)] p-3">
-              <h3 className="text-xs font-bold text-danger flex items-center gap-1.5 mb-2 uppercase font-mono">
+              <h3 className="text-xs font-normal text-danger flex items-center gap-1.5 mb-2 uppercase font-sans">
                 <AlertTriangle className="size-3.5" />
-                Missing structured keys
+                Missing from agent metadata
               </h3>
               <TokenList items={activeSample.missing_in_agent_view} tone="danger" empty="Perfect alignment. Zero missing visible fields." />
             </div>
-            
+
             <div className="border border-accent/10 bg-accent-subtle/5 rounded-[var(--radius-lg)] p-3">
-              <h3 className="text-xs font-bold text-accent flex items-center gap-1.5 mb-2 uppercase font-mono">
+              <h3 className="text-xs font-normal text-accent flex items-center gap-1.5 mb-2 uppercase font-sans">
                 <Info className="size-3.5" />
-                Metadata-only signals
+                Agent-only metadata fields
               </h3>
-              <TokenList items={activeSample.agent_only_signals} tone="accent" empty="No custom backend-only attributes declared." />
+              <TokenList items={activeSample.agent_only_signals} tone="accent" empty="No backend-only attributes declared." />
             </div>
           </div>
         </div>
@@ -540,22 +567,22 @@ export function UcpAgentViewPanel({ report }: Readonly<{ report: UcpAuditReport 
               <h3 className="text-sm font-semibold">Fidelity delta details pending</h3>
             </div>
             <p className="type-body-sm text-muted">
-              Enable the <strong className="text-foreground">Agent Delta</strong> scanner option and trigger an audit to map HTTP-extracted JSON data directly against browser-rendered parameters.
+              Enable the <span className="text-foreground font-normal">Agent Delta</span> scanner option and trigger an audit to map HTTP-extracted JSON data directly against browser-rendered parameters.
             </p>
           </div>
-          
+
           <div className="border-border bg-background/25 rounded-[var(--radius-md)] border p-4">
             <div className="mb-3 flex items-center gap-2">
               <Eye className="text-muted size-4" />
-              <h3 className="text-sm font-semibold">Active D-UCP7 Diagnostics</h3>
+              <h3 className="text-sm font-normal">Active D-UCP7 Diagnostics</h3>
             </div>
             {d7Findings.length ? (
               <ul className="grid gap-2">
                 {d7Findings.map((finding) => (
                   <li key={finding.id} className="text-xs flex gap-2 items-start">
-                    <span className="text-danger font-bold shrink-0">•</span>
+                    <span className="text-danger font-normal shrink-0">•</span>
                     <div>
-                      <span className="text-foreground font-medium">{finding.description}</span>
+                      <span className="text-foreground font-normal">{finding.description}</span>
                       <p className="text-[10px] text-muted mt-0.5">Required Action: {finding.fix}</p>
                     </div>
                   </li>
@@ -573,17 +600,17 @@ export function UcpAgentViewPanel({ report }: Readonly<{ report: UcpAuditReport 
 
 export function UcpFixSequence({ report }: Readonly<{ report: UcpAuditReport | null }>) {
   const findings = useNormalizedFindings(report);
-  const storageKey = `ucp-fix-sequence-${report?.job_id ?? 'none'}`;
-  
+  const storageKey = report?.job_id ? `ucp-fix-sequence-${report.job_id}` : null;
+
   const [done, setDone] = useState<Record<string, boolean>>(() => {
-    if (typeof window === 'undefined') return {};
+    if (!storageKey || typeof window === 'undefined') return {};
     try {
       return JSON.parse(window.localStorage.getItem(storageKey) ?? '{}') as Record<string, boolean>;
     } catch {
       return {};
     }
   });
-  
+
   const ordered = [...findings].sort((a, b) => impactRank(a.impact) - impactRank(b.impact));
   const doneCount = ordered.filter(f => done[f.id]).length;
   const progressPercent = ordered.length ? Math.round((doneCount / ordered.length) * 100) : 0;
@@ -591,7 +618,9 @@ export function UcpFixSequence({ report }: Readonly<{ report: UcpAuditReport | n
   function toggle(id: string) {
     const next = { ...done, [id]: !done[id] };
     setDone(next);
-    window.localStorage.setItem(storageKey, JSON.stringify(next));
+    if (storageKey && typeof window !== 'undefined') {
+      window.localStorage.setItem(storageKey, JSON.stringify(next));
+    }
   }
 
   function exportPlan() {
@@ -599,14 +628,18 @@ export function UcpFixSequence({ report }: Readonly<{ report: UcpAuditReport | n
       const checked = done[finding.id] ? 'x' : ' ';
       return `- [${checked}] ${index + 1}. [${finding.dimension}] ${finding.action} (${finding.effort}, Impact: ${finding.impact})\n   ↳ Fix guidance: ${finding.fix}`;
     });
-    
-    const content = `# UCP Architecture Action Plan\n\nTarget Domain: ${report?.domain ?? 'Audit Store'}\nOverall Compliance: ${report?.overall_score ?? 0}/100\nCompleted Items: ${doneCount}/${ordered.length} (${progressPercent}%)\n\n## Action Items\n\n${lines.join('\n\n')}\n`;
-    
+
+    const content = `# UCP Architecture Action Plan\n\nTarget Domain: ${(report?.report_json?.domain as string) ?? 'Audit Store'}\nOverall Compliance: ${report?.overall_score ?? 0}/100\nCompleted Items: ${doneCount}/${ordered.length} (${progressPercent}%)\n\n## Action Items\n\n${lines.join('\n\n')}\n`;
+
     const blob = new Blob([content], { type: 'text/markdown' });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
+    const domain = typeof report?.report_json?.domain === 'string' ? report.report_json.domain : '';
+    const fallback = new Date().toISOString().replace(/[:.]/g, '-');
+    const rawFilenameBase = report?.job_id ? String(report.job_id) : domain || fallback;
+    const filenameBase = rawFilenameBase.replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || fallback;
     anchor.href = url;
-    anchor.download = `ucp-repair-roadmap-${report?.job_id ?? 'run'}.md`;
+    anchor.download = `ucp-repair-roadmap-${filenameBase}.md`;
     anchor.click();
     URL.revokeObjectURL(url);
   }
@@ -615,14 +648,14 @@ export function UcpFixSequence({ report }: Readonly<{ report: UcpAuditReport | n
     <TableSurface>
       <header className="border-divider flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3 bg-background/25">
         <div>
-          <h2 className="text-xs font-bold font-mono tracking-widest text-muted uppercase">REPAIR ACTION ROADMAP</h2>
+          <h2 className="text-xs font-bold font-sans tracking-widest text-muted uppercase">REPAIR ACTION ROADMAP</h2>
           <p className="type-caption text-muted mt-0.5">Step-by-step checklist ordered by impact. Share this with development teams.</p>
         </div>
-        <Button 
-          type="button" 
-          variant="secondary" 
-          size="sm" 
-          onClick={exportPlan} 
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          onClick={exportPlan}
           disabled={!ordered.length}
           className="h-8 border-border bg-panel text-foreground cursor-pointer flex gap-1.5 items-center"
         >
@@ -637,16 +670,16 @@ export function UcpFixSequence({ report }: Readonly<{ report: UcpAuditReport | n
           <div className="px-4 py-3 bg-background/10 flex items-center justify-between gap-4 flex-wrap">
             <div className="flex items-center gap-2">
               <CheckSquare className="size-4 text-success" />
-              <span className="text-xs font-bold text-foreground font-mono">ROADMAP PROGRESS:</span>
-              <span className="text-xs font-mono bg-background border border-border px-1.5 py-0.5 rounded text-success font-semibold">
+              <span className="text-xs font-normal text-foreground font-mono">ROADMAP PROGRESS:</span>
+              <span className="text-xs font-mono bg-background border border-border px-1.5 py-0.5 rounded text-success font-normal">
                 {doneCount} of {ordered.length} fixed ({progressPercent}%)
               </span>
             </div>
-            
+
             <div className="w-full md:w-48 bg-border h-2 rounded-full overflow-hidden shrink-0">
-              <div 
-                className="bg-success h-full transition-all duration-500 rounded-full" 
-                style={{ width: `${progressPercent}%` }} 
+              <div
+                className="bg-success h-full transition-all duration-500 rounded-full"
+                style={{ width: `${progressPercent}%` }}
               />
             </div>
           </div>
@@ -655,8 +688,8 @@ export function UcpFixSequence({ report }: Readonly<{ report: UcpAuditReport | n
             {ordered.map((finding, index) => {
               const isChecked = done[finding.id];
               return (
-                <li 
-                  key={finding.id} 
+                <li
+                  key={finding.id}
                   className={cn(
                     "grid gap-3 px-4 py-3.5 sm:grid-cols-[auto_1fr_auto] sm:items-start transition-all",
                     isChecked ? "bg-background/10 opacity-70" : "hover:bg-background/20"
@@ -673,7 +706,7 @@ export function UcpFixSequence({ report }: Readonly<{ report: UcpAuditReport | n
                   >
                     {isChecked ? <Check className="size-3.5" /> : null}
                   </button>
-                  
+
                   <div className="min-w-0">
                     <div className={cn(
                       "text-xs font-semibold flex items-center gap-2 flex-wrap text-foreground",
@@ -689,7 +722,7 @@ export function UcpFixSequence({ report }: Readonly<{ report: UcpAuditReport | n
                       {finding.fix}
                     </p>
                   </div>
-                  
+
                   <div className="flex items-center gap-1.5 shrink-0 self-center">
                     <Badge tone={finding.impact === 'critical' ? 'danger' : finding.impact === 'high' ? 'warning' : 'neutral'}>
                       {finding.impact}
@@ -722,9 +755,9 @@ export function UcpHistoryList({
   return (
     <TableSurface>
       <header className="border-divider border-b px-4 py-3 bg-background/25">
-        <h2 className="text-xs font-bold font-mono tracking-widest text-muted uppercase">AUDIT HISTORY ARCHIVE</h2>
+        <h2 className="text-xs font-bold font-sans tracking-widest text-muted uppercase">AUDIT HISTORY ARCHIVE</h2>
       </header>
-      
+
       {jobs.length ? (
         <div className="divide-divider divide-y max-h-[460px] overflow-y-auto">
           {jobs.map((job) => {
@@ -747,7 +780,7 @@ export function UcpHistoryList({
                 )}
 
                 <div className="min-w-0 flex flex-col justify-between">
-                  <div className="text-xs font-bold text-foreground truncate font-mono">{job.domain}</div>
+                  <div className="text-xs font-normal text-foreground truncate font-mono">{job.domain}</div>
                   <div className="text-[10px] text-muted mt-1.5 flex items-center gap-1 font-mono">
                     <span>#{job.id}</span>
                     <span>•</span>
@@ -764,7 +797,7 @@ export function UcpHistoryList({
                   <Badge tone={badgeTone(job.status)} className="scale-90">
                     {job.status}
                   </Badge>
-                  
+
                   {job.status === 'complete' && (
                     <Badge tone={badgeTone(scoreTone(score))} className="scale-90 font-mono">
                       {score}
@@ -798,17 +831,11 @@ function FindingsTable({
   empty: string;
   report: UcpAuditReport | null;
 }>) {
-  const [query, setQuery] = useState('');
-  const filtered = findings.filter((finding) => {
-    const haystack = `${finding.dimension} ${finding.code} ${finding.description} ${finding.fix}`.toLowerCase();
-    return haystack.includes(query.trim().toLowerCase());
-  });
-
   return (
     <TableSurface>
       <header className="border-divider flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3 bg-background/25">
         <div>
-          <h2 className="text-xs font-bold font-mono tracking-widest text-muted uppercase">{title}</h2>
+          <h2 className="text-xs font-bold font-sans tracking-widest text-muted uppercase">{title}</h2>
           <p className="type-caption text-muted mt-0.5">{description}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -832,68 +859,53 @@ function FindingsTable({
       </header>
 
       {findings.length ? (
-        <>
-          <div className="border-divider flex items-center gap-2 border-b px-4 py-2.5 bg-background/10">
-            <Search className="text-muted size-3.5" />
-            <Input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search active findings or corrective actions"
-              className="max-w-md h-8 text-xs font-mono"
-            />
-            <span className="type-caption text-muted ml-auto font-mono text-[10px]">
-              Showing {filtered.length} of {findings.length} rows
-            </span>
-          </div>
-
-          <div className="overflow-x-auto">
-            <Table className="min-w-[980px]">
-              <TableHeader>
-                <TableRow className="bg-background/10 hover:bg-background/10">
-                  <TableHead className="w-[100px] text-xs font-bold font-mono">Severity</TableHead>
-                  <TableHead className="w-[100px] text-xs font-bold font-mono">Dimension</TableHead>
-                  <TableHead className="text-xs font-bold font-mono">Structural Gap</TableHead>
-                  <TableHead className="w-[90px] text-xs font-bold font-mono text-center">Affected</TableHead>
-                  <TableHead className="w-[100px] text-xs font-bold font-mono">Difficulty</TableHead>
-                  <TableHead className="text-xs font-bold font-mono">Corrective Action Guidance</TableHead>
+        <div className="overflow-x-auto">
+          <Table className="min-w-[980px]">
+            <TableHeader>
+              <TableRow className="bg-background/10 hover:bg-background/10 border-b border-divider/60">
+                <TableHead className="w-[110px] text-xs font-bold font-mono py-3.5">Severity</TableHead>
+                <TableHead className="w-[110px] text-xs font-bold font-mono py-3.5">Dimension</TableHead>
+                <TableHead className="text-xs font-bold font-mono py-3.5">Structural Gap</TableHead>
+                <TableHead className="w-[140px] text-xs font-bold font-mono py-3.5 text-left">Affected</TableHead>
+                <TableHead className="w-[120px] text-xs font-bold font-mono py-3.5">Difficulty</TableHead>
+                <TableHead className="text-xs font-bold font-mono py-3.5">Corrective Action Guidance</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {findings.map((finding) => (
+                <TableRow key={finding.id} className="hover:bg-background/15 border-b border-divider/60">
+                  <TableCell className="py-4 align-top">
+                    <Badge tone={badgeTone(finding.severity)} className="scale-90 font-mono font-normal">
+                      {finding.severity}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="py-4 align-top">
+                    <span className="font-mono text-[10px] font-normal text-muted bg-background border border-border px-1.5 py-0.5 rounded">
+                      {finding.dimension}
+                    </span>
+                  </TableCell>
+                  <TableCell className="py-4 align-top">
+                    <div className="max-w-[400px] whitespace-normal font-normal text-[13px] leading-relaxed text-foreground/95">
+                      {finding.description}
+                    </div>
+                    <FindingEvidence finding={finding} />
+                  </TableCell>
+                  <TableCell className="py-4 align-top text-left font-mono text-xs font-normal whitespace-nowrap text-secondary/90">
+                    {affectedLabel(finding)}
+                  </TableCell>
+                  <TableCell className="py-4 align-top">
+                    <Badge tone="neutral" className="text-[10px] font-mono leading-none">{finding.effort}</Badge>
+                  </TableCell>
+                  <TableCell className="py-4 align-top">
+                    <div className="max-w-[420px] whitespace-normal font-normal text-[13px] leading-relaxed text-muted-foreground">
+                      {finding.fix}
+                    </div>
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.map((finding) => (
-                  <TableRow key={finding.id} className="hover:bg-background/15 border-b border-divider/60">
-                    <TableCell>
-                      <Badge tone={badgeTone(finding.severity)} className="scale-90">
-                        {finding.severity}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <span className="font-mono text-[10px] font-bold text-muted bg-background border border-border px-1.5 py-0.5 rounded">
-                        {finding.dimension}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <div className="max-w-[340px] whitespace-normal font-semibold text-xs leading-normal text-foreground">
-                        {finding.description}
-                      </div>
-                      <div className="text-[10px] text-muted mt-1 font-mono tracking-wide">{finding.code}</div>
-                    </TableCell>
-                    <TableCell className="text-center font-mono text-xs font-medium">
-                      {finding.affected ? `${finding.affected} URLs` : '--'}
-                    </TableCell>
-                    <TableCell>
-                      <Badge tone="neutral" className="text-[10px] font-mono leading-none">{finding.effort}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="max-w-[340px] whitespace-normal text-xs text-secondary leading-relaxed">
-                        {finding.fix}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       ) : (
         <div className="py-8">
           <DataRegionEmpty title={empty} description="Checks complete. This section compiles when a completed compliance report is parsed." />
@@ -918,7 +930,7 @@ function DimensionScoreCard({
   return (
     <div
       className={cn(
-        'border-border bg-background/25 relative min-h-[160px] rounded-[var(--radius-md)] border p-3 flex flex-col justify-between transition-all duration-300 hover:scale-[1.02] hover:shadow-md hover:border-accent/60',
+        'border-border bg-background/25 relative min-h-[180px] rounded-[var(--radius-md)] border p-5 flex flex-col justify-between transition-all duration-300 hover:scale-[1.02] hover:shadow-md hover:border-accent/60',
         blocked && 'opacity-35 select-none pointer-events-none',
       )}
     >
@@ -931,24 +943,24 @@ function DimensionScoreCard({
       ) : null}
 
       <div className="flex items-start justify-between gap-3">
-        <ScoreRing score={dimension.score} size={64} stroke={7} label={dimension.dimension_id} compact />
+        <ScoreRing score={dimension.score} size={70} stroke={8} label={dimension.dimension_id} compact />
         {dimension.findings.length ? (
-          <Badge tone="danger" className="animate-pulse">
+          <Badge tone="danger" className="animate-pulse font-mono font-normal text-[9px]">
             {dimension.findings.length} gaps
           </Badge>
         ) : (
-          <Badge tone="success" className="scale-90">READY</Badge>
+          <Badge tone="success" className="scale-90 font-mono font-normal text-[9px]">READY</Badge>
         )}
       </div>
 
-      <div className="mt-2.5">
-        <div className="text-xs font-bold text-foreground leading-snug">{meta.label}</div>
-        <p className="text-[10px] text-muted leading-tight mt-1 truncate" title={meta.subtitle}>{meta.subtitle}</p>
-        <div className="mt-2.5 flex items-center justify-between">
-          <Badge tone={badgeTone(dimension.status)} className="scale-85 origin-left">
+      <div className="mt-3.5">
+        <div className="text-[13px] font-normal text-foreground leading-snug">{meta.label}</div>
+        <p className="text-[11px] text-muted leading-normal mt-1.5 whitespace-normal">{meta.subtitle}</p>
+        <div className="mt-3.5 flex items-center justify-between">
+          <Badge tone={badgeTone(dimension.status)} className="scale-90 font-mono font-normal">
             {dimension.status}
           </Badge>
-          <span className="text-[9px] font-mono text-muted uppercase font-bold tracking-wide">{dimension.dimension_id}</span>
+          <span className="text-[9px] font-mono text-muted uppercase font-normal tracking-wide">{dimension.dimension_id}</span>
         </div>
       </div>
     </div>
@@ -991,14 +1003,16 @@ function ScoreRing({
           style={{ transition: 'stroke-dashoffset 800ms ease-out' }}
         />
       </svg>
-      
+
       <div className="absolute text-center select-none">
-        <div className={cn('font-mono font-bold tabular-nums text-foreground tracking-tighter leading-none', compact ? 'text-sm' : 'text-3xl')}>
+        <div className={cn('font-mono font-bold tabular-nums text-foreground tracking-tighter leading-none', compact ? 'text-sm font-semibold' : 'text-3xl')}>
           {score}
         </div>
-        <div className="text-[9px] font-mono font-bold tracking-wider text-muted mt-0.5 uppercase leading-none">
-          {compact ? label : '/100'}
-        </div>
+        {!compact && (
+          <div className="text-[9px] font-mono font-bold tracking-wider text-muted mt-0.5 uppercase leading-none">
+            /100
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1011,6 +1025,7 @@ function ViewColumn({
   values,
   missing,
   highlightKeys = [],
+  isJson = false,
 }: Readonly<{
   title: string;
   subtitle: string;
@@ -1018,10 +1033,11 @@ function ViewColumn({
   values: Record<string, unknown>;
   missing: string[];
   highlightKeys?: string[];
+  isJson?: boolean;
 }>) {
   const rows = Object.entries(values);
   return (
-    <section className="p-4 flex flex-col bg-background/5">
+    <section className="p-4 flex flex-col bg-background/5 min-w-0">
       <div className="mb-4 flex items-center gap-2">
         <div className={cn(
           "size-7 rounded-lg flex items-center justify-center border",
@@ -1039,53 +1055,77 @@ function ViewColumn({
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col gap-1.5 font-mono text-[11px] max-h-[360px] overflow-y-auto bg-slate-950/80 p-3 rounded-lg border border-border">
-        {rows.map(([key, value]) => {
-          const highlighted = highlightKeys.includes(key);
-          return (
-            <div
-              key={key}
-              className={cn(
-                'grid gap-2 px-2 py-1 rounded transition-colors',
-                highlighted 
-                  ? 'bg-danger/10 text-danger border-l-2 border-danger font-semibold' 
-                  : 'bg-background/10 hover:bg-background/20 text-secondary'
-              )}
-            >
-              <div className="flex items-center justify-between gap-4">
-                <span className="text-muted shrink-0">{key}:</span>
-                <span 
-                  className={cn("truncate font-medium", highlighted ? "text-danger" : "text-foreground")}
-                  title={stringValue(value)}
+      <div className="flex-1 font-mono text-[11px] max-h-[360px] overflow-auto bg-zinc-950 p-3 rounded-lg border border-zinc-800 text-zinc-100 w-full min-w-0" style={{ fontSynthesis: 'none' }}>
+        {isJson ? (
+          Object.keys(values).length > 0 ? (
+            <pre
+              className="font-mono text-[11px] leading-relaxed whitespace-pre-wrap break-all"
+              dangerouslySetInnerHTML={{ __html: syntaxHighlightJson(JSON.stringify(values, null, 2)) }}
+            />
+          ) : (
+            <div className="text-center py-6 text-zinc-500 font-sans text-xs flex flex-col items-center justify-center gap-1.5">
+              <Info className="size-5 text-zinc-600" />
+              <span>No JSON data available for this sample.</span>
+            </div>
+          )
+        ) : (
+          <div className="flex flex-col gap-1.5 w-full">
+            {rows.map(([key, value]) => {
+              const highlighted = highlightKeys.includes(key);
+              const rawVal = stringValue(value) || '""';
+              return (
+                <div
+                  key={key}
+                  className={cn(
+                    'px-2 py-1 rounded transition-colors w-full min-w-0',
+                    highlighted
+                      ? 'bg-red-950/40 text-red-200 border-l-2 border-red-500 font-light'
+                      : 'bg-zinc-900/50 hover:bg-zinc-800/50 text-zinc-300'
+                  )}
                 >
-                  {stringValue(value) || '""'}
-                </span>
+                  <div className="flex items-center justify-between gap-4 w-full min-w-0">
+                    <span className={cn("shrink-0 font-light max-w-[45%] truncate", highlighted ? "text-red-300 font-normal" : "text-zinc-400")}>
+                      {key}:
+                    </span>
+                    <span
+                      className={cn(
+                        "truncate font-light max-w-[55%] select-all cursor-help border-b border-dashed pb-0.5 transition-colors",
+                        highlighted
+                          ? "text-red-100 border-red-700/40 hover:border-red-500"
+                          : "text-zinc-100 border-zinc-700/50 hover:border-zinc-500"
+                      )}
+                      title={rawVal}
+                    >
+                      {rawVal}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+
+            {missing.map((key) => (
+              <div
+                key={key}
+                className="bg-red-950/40 text-red-200 border-l-2 border-red-500 font-light px-2 py-1.5 rounded animate-pulse w-full min-w-0"
+              >
+                <div className="flex items-center justify-between gap-4 w-full min-w-0">
+                  <span className="flex items-center gap-1 shrink-0 font-normal text-red-300 max-w-[45%] truncate">
+                    <X className="size-3 text-red-400 shrink-0" />
+                    {key}:
+                  </span>
+                  <span className="text-[10px] italic font-normal text-red-400 shrink-0">Missing from agent metadata</span>
+                </div>
               </div>
-            </div>
-          );
-        })}
+            ))}
 
-        {missing.map((key) => (
-          <div 
-            key={key} 
-            className="bg-danger/10 text-danger border-l-2 border-danger font-semibold grid gap-2 px-2 py-1.5 rounded"
-          >
-            <div className="flex items-center justify-between gap-4">
-              <span className="flex items-center gap-1 shrink-0 font-bold">
-                <X className="size-3 text-danger" />
-                {key}:
-              </span>
-              <span className="text-[10px] italic font-normal text-danger/80">Missing from metadata</span>
-            </div>
+            {!rows.length && !missing.length ? (
+              <div className="text-center py-6 text-zinc-500 font-sans text-xs flex flex-col items-center justify-center gap-1.5">
+                <Info className="size-5 text-zinc-600" />
+                <span>No data fields mapped for this page sample.</span>
+              </div>
+            ) : null}
           </div>
-        ))}
-
-        {!rows.length && !missing.length ? (
-          <div className="text-center py-6 text-muted font-sans text-xs flex flex-col items-center justify-center gap-1.5">
-            <Info className="size-5 text-muted/50" />
-            <span>No data fields mapped for this page sample.</span>
-          </div>
-        ) : null}
+        )}
       </div>
     </section>
   );
@@ -1109,11 +1149,12 @@ function TokenList({
         <span
           key={item}
           className={cn(
-            'rounded-[4px] px-2 py-0.5 font-mono text-[10px] font-bold border',
-            tone === 'danger' 
-              ? 'bg-danger/5 border-danger/20 text-danger' 
+            'rounded-[4px] px-2 py-0.5 font-mono text-[10px] font-light border',
+            tone === 'danger'
+              ? 'bg-danger/5 border-danger/20 text-danger'
               : 'bg-accent-subtle/10 border-accent/20 text-accent',
           )}
+          style={{ fontSynthesis: 'none' }}
         >
           {item}
         </span>
@@ -1169,7 +1210,88 @@ function normalizeFinding(finding: Record<string, unknown>, index: number): Norm
     action: copy.action,
     impact: copy.impact,
     affected: Number(finding.affected_count ?? 0),
+    countKind: String(finding.count_kind ?? 'items'),
+    affectedUrls: Array.isArray(finding.affected_urls)
+      ? finding.affected_urls.map((item) => String(item)).filter(Boolean)
+      : [],
+    evidence: Array.isArray(finding.evidence)
+      ? finding.evidence.filter(
+        (item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object',
+      )
+      : [],
   };
+}
+
+function affectedLabel(finding: NormalizedFinding) {
+  if (finding.countKind === 'domain_check') return 'Domain-level';
+  if (!finding.affected) return '--';
+  if (finding.countKind === 'field_instances') return `${finding.affected} field gaps`;
+  if (finding.countKind === 'attribute_gaps') return `${finding.affected} attribute gaps`;
+  if (finding.countKind === 'taxonomy_gaps') return `${finding.affected} taxonomy gaps`;
+  if (finding.countKind === 'urls') return `${finding.affected} URLs`;
+  return `${finding.affected} items`;
+}
+
+function FindingEvidence({ finding }: Readonly<{ finding: NormalizedFinding }>) {
+  const rows = finding.evidence.length
+    ? finding.evidence
+    : finding.affectedUrls.map((url) => ({ url }));
+  if (!rows.length) return null;
+  return (
+    <details className="mt-2 text-[10px] font-normal text-muted group">
+      <summary className="cursor-pointer font-mono text-[10px] text-secondary hover:text-accent select-none list-none [&::-webkit-details-marker]:hidden flex items-center gap-1.5 py-0.5">
+        <span className="text-[7px] text-muted-foreground/60 transition-transform duration-200 group-open:rotate-90">▶</span>
+        <span>View evidence</span>
+      </summary>
+      <div className="mt-2 grid gap-2 pl-3 border-l border-border/40">
+        {rows.slice(0, 8).map((row, index) => (
+          <div key={`${String(row.url ?? index)}-${index}`} className="rounded border border-border/50 bg-background/20 p-2 shadow-sm">
+            {'url' in row ? (
+              <div className="break-all font-mono text-[10px] text-foreground font-normal pb-1 border-b border-border/30 mb-1 flex items-center justify-between gap-2">
+                <a
+                  href={String(row.url)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-accent transition-colors flex items-center gap-1.5 min-w-0"
+                  title="Open live URL"
+                >
+                  <span className="truncate">{String(row.url)}</span>
+                  <ExternalLink className="size-3 shrink-0 text-muted" />
+                </a>
+              </div>
+            ) : null}
+            <EvidenceFields row={row} />
+          </div>
+        ))}
+      </div>
+    </details>
+  );
+}
+
+function EvidenceFields({ row }: Readonly<{ row: Record<string, unknown> }>) {
+  const fieldRows = Object.entries(row).filter(([key]) => key !== 'url');
+  if (!fieldRows.length) return null;
+  return (
+    <div className="mt-1 flex flex-col gap-1 w-full min-w-0">
+      {fieldRows.map(([key, value]) => (
+        <div key={key} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] min-w-0 w-full">
+          <span className="font-mono text-muted/80 font-normal shrink-0 uppercase tracking-wider text-[8.5px]">
+            {key}:
+          </span>
+          <span className="font-mono text-secondary break-all font-normal">
+            {formatEvidenceValue(value)}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function formatEvidenceValue(value: unknown) {
+  if (Array.isArray(value)) return value.map((item) => String(item)).join(', ');
+  if (typeof value === 'boolean') return value ? 'yes' : 'no';
+  if (value && typeof value === 'object') return JSON.stringify(value);
+  return String(value ?? '');
 }
 
 function getAgentSamples(report: UcpAuditReport | null): AgentViewSample[] {

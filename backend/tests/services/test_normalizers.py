@@ -180,6 +180,22 @@ def test_normalize_availability_schema_url() -> None:
     )
 
 
+def test_variant_price_backfill_handles_numeric_string_equivalence() -> None:
+    record: dict[str, object] = {
+        "price": "10.00",
+        "currency": "USD",
+        "variants": [
+            {"sku": "TEN", "price": 10.0},
+            {"sku": "UNKNOWN"},
+        ],
+    }
+
+    backfill._backfill_variant_context(record)
+
+    assert record["variants"][0]["price"] == 10.0
+    assert record["variants"][1]["price"] == "10.00"
+
+
 def test_variant_price_backfill_treats_numeric_zero_as_distinct() -> None:
     record: dict[str, object] = {
         "price": "10.00",
