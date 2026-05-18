@@ -54,10 +54,8 @@ ALLOWED_SERVICE_CONFIG_CONSTANTS = {
     ("acquisition/cookie_store.py", "_CHALLENGE_LOCAL_STORAGE_NAME_TOKENS"),
     ("acquisition/cookie_store.py", "_CHALLENGE_LOCAL_STORAGE_VALUE_TOKENS"),
     ("acquisition/browser_readiness.py", "_ECOMMERCE_READY_CARD_SELECTORS"),
-    ("extract/variant_record_normalization.py", "_ADULT_SIZE_CONTEXT_TOKENS"),
-    ("extract/variant_record_normalization.py", "_DETAIL_CROSS_PRODUCT_TEXT_GENERIC_TOKENS"),
-    ("extract/variant_record_normalization.py", "_DETAIL_CROSS_PRODUCT_TEXT_TYPE_TOKENS"),
-    ("extract/variant_record_normalization.py", "_GENDER_KEYWORD_TOKENS_SET"),
+    ("extract/variant_normalization/common.py", "_ADULT_SIZE_CONTEXT_TOKENS"),
+    ("extract/variant_normalization/common.py", "_GENDER_KEYWORD_TOKENS_SET"),
     ("dom/section_extraction.py", "_SECTION_CONTAINER_SELECTORS"),
     ("dom/section_extraction.py", "_SECTION_LABEL_SELECTOR"),
     ("shared/field_coerce.py", "_SIZE_REJECT_TOKENS_NORMALIZED"),
@@ -112,12 +110,18 @@ FILE_LOC_BUDGETS = {
     Path("app/services/extract/detail_image_cleanup.py"): 505,
     Path("app/services/extract/detail_price_core.py"): 1000,
     Path("app/services/extract/detail_identity_core.py"): 1000,
+    # Extract decomposition plan Slice 2 follow-up: split stage owners must stay
+    # small after variant_record_normalization.py was removed.
+    Path("app/services/extract/variant_normalization/contract.py"): 400,
+    Path("app/services/extract/variant_normalization/hydration.py"): 400,
+    Path("app/services/extract/variant_normalization/sanitization.py"): 400,
+    Path("app/services/extract/variant_normalization/deduplication.py"): 400,
+    Path("app/services/extract/variant_normalization/backfill.py"): 400,
+    Path("app/services/extract/variant_normalization/size_color_extraction.py"): 400,
     Path("app/services/extract/variant_axis.py"): 295,
     Path("app/services/extract/variant_option_value.py"): 260,
     Path("app/services/extract/variant_choice_traversal.py"): 905,
     Path("app/services/extract/variant_identity_merge.py"): 415,
-    # Variant normalization owns the detail variant cleanup pipeline.
-    Path("app/services/extract/variant_record_normalization.py"): 1472,
     # Listing extraction is the orchestration facade; card/title/image/brand
     # signal ownership lives in extract/listing_signals.py.
     Path("app/services/listing_extractor.py"): 900,
@@ -192,6 +196,25 @@ def _module_level_names(path: Path) -> set[str]:
             if isinstance(target, ast.Name):
                 names.add(target.id)
     return names
+
+
+def _module_all_names(path: Path) -> tuple[str, ...] | None:
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    for node in tree.body:
+        if not isinstance(node, ast.Assign):
+            continue
+        if not any(
+            isinstance(target, ast.Name) and target.id == "__all__"
+            for target in node.targets
+        ):
+            continue
+        value = ast.literal_eval(node.value)
+        if not isinstance(value, (tuple, list)):
+            return None
+        if not all(isinstance(name, str) and name for name in value):
+            return None
+        return tuple(value)
+    return None
 
 
 def _private_service_imports(path: Path) -> set[str]:
@@ -272,6 +295,11 @@ def test_root_extraction_services_are_explicitly_owned() -> None:
     assert root_extraction_modules == ALLOWED_ROOT_EXTRACTION_MODULES
 
 
+def test_xpath_service_lives_under_dom_bucket() -> None:
+    assert not (SERVICES_ROOT / "xpath_service.py").exists()
+    assert (SERVICES_ROOT / "dom" / "xpath_service.py").exists()
+
+
 def test_extraction_modules_do_not_import_llm_runtime_layers() -> None:
     offenders: list[str] = []
     for path in EXTRACTION_MODULES:
@@ -330,6 +358,27 @@ def test_deleted_facades_do_not_return() -> None:
         deleted_extract_module("detail", "price", "extractor"),
     ]
     assert [str(path.relative_to(ROOT)) for path in stale_facades if path.exists()] == []
+
+
+def test_extract_modules_declare_public_surface() -> None:
+    missing: set[str] = set()
+    for path in (SERVICES_ROOT / "extract").rglob("*.py"):
+        rel = path.relative_to(ROOT).as_posix()
+        if path.name == "__init__.py" or path.name.startswith("_"):
+            continue
+        if "field_candidates" in path.relative_to(SERVICES_ROOT).parts:
+            continue
+        if not _module_all_names(path):
+            missing.add(rel)
+    assert missing == set()
+
+
+def test_flat_detail_modules_are_removed_after_decomposition() -> None:
+    flat_detail_modules = sorted(
+        path.relative_to(ROOT).as_posix()
+        for path in (SERVICES_ROOT / "extract").glob("detail_*.py")
+    )
+    assert flat_detail_modules == []
 
 
 def test_legacy_dispatcher_fallback_flag_is_removed() -> None:

@@ -77,7 +77,7 @@ from app.services.shared.field_coerce import (
     surface_fields,
 )
 from app.services.shared.coerce_primitives import safe_int as _safe_int
-from app.services.xpath_service import validate_xpath_syntax
+from app.services.dom.xpath_service import validate_xpath_syntax
 
 logger = logging.getLogger(__name__)
 

@@ -2,7 +2,7 @@
 
 **Created:** 2026-05-17
 **Agent:** Claude
-**Status:** IN PROGRESS
+**Status:** DONE
 **Touches buckets:** Extraction (variant normalization, detail pipeline), Tests (structure ratchet + import targets), Docs (CODEBASE_MAP)
 
 ## Goal
@@ -26,14 +26,14 @@ Audit byte-size figures roughly match; the prior plan tracks LOC budgets in `tes
 
 ## Acceptance Criteria
 
-- [ ] `extract/variant_record_normalization.py` becomes a thin facade that imports a public `normalize_variant_record` from `extract/variant_normalization/`. The 6 cross-module callers compile unchanged.
-- [ ] Variant payload limit logic accepts `max_rows: int` as a parameter. The settings read happens at the public entry point, not inside the contract enforcement function.
-- [ ] All 26 `detail_*` modules live under `extract/detail/<concern>/` grouped by identity, price, images, variants, text, assembly. All call sites updated.
-- [ ] Every `extract/` and `extract/detail/` module declares `__all__`.
-- [ ] `xpath_service.py` either lives under `dom/` with `CODEBASE_MAP.md` updated, or stays at root with an explicit anchor entry added. No silent ambiguity remains.
-- [ ] `cd backend; $env:PYTHONPATH='.'; .\.venv\Scripts\python.exe -m pytest tests/services/test_structure.py -q` exits 0.
-- [ ] `cd backend; $env:PYTHONPATH='.'; .\.venv\Scripts\python.exe -m pytest tests -q` exits 0.
-- [ ] `run_acquire_smoke.py commerce`, `run_extraction_smoke.py`, and `run_test_sites_acceptance.py` pass before the plan is closed.
+- [x] `extract/variant_record_normalization.py` becomes a thin facade that imports a public `normalize_variant_record` from `extract/variant_normalization/`. The 6 cross-module callers compile unchanged.
+- [x] Variant payload limit logic accepts `max_rows: int` as a parameter. The settings read happens at the public entry point, not inside the contract enforcement function.
+- [x] All 26 `detail_*` modules live under `extract/detail/<concern>/` grouped by identity, price, images, variants, text, assembly. All call sites updated.
+- [x] Every `extract/` and `extract/detail/` module declares `__all__`.
+- [x] `xpath_service.py` either lives under `dom/` with `CODEBASE_MAP.md` updated, or stays at root with an explicit anchor entry added. No silent ambiguity remains.
+- [x] `cd backend; $env:PYTHONPATH='.'; .\.venv\Scripts\python.exe -m pytest tests/services/test_structure.py -q` exits 0.
+- [x] `cd backend; $env:PYTHONPATH='.'; .\.venv\Scripts\python.exe -m pytest tests -q` exits 0.
+- [x] `run_acquire_smoke.py commerce`, `run_extraction_smoke.py`, and `run_test_sites_acceptance.py` pass before the plan is closed.
 
 ## Do Not Touch
 
@@ -48,7 +48,7 @@ Audit byte-size figures roughly match; the prior plan tracks LOC budgets in `tes
 ## Slices
 
 ### Slice 1: Ratchet Structure Tests For This Plan
-**Status:** TODO
+**Status:** DONE
 **Files:** `backend/tests/services/test_structure.py`
 **What:** Stage debt ledgers for the targets this plan resolves. Add a per-slice marker comment so the next agent sees why each target exists. New entries:
 - LOC budget for the new `extract/variant_normalization/contract.py`, `hydration.py`, `sanitization.py`, `deduplication.py`, `backfill.py`, `size_color_extraction.py` modules (each well under 400).
@@ -59,7 +59,7 @@ Audit byte-size figures roughly match; the prior plan tracks LOC budgets in `tes
 **Verify:** `cd backend; $env:PYTHONPATH='.'; .\.venv\Scripts\python.exe -m pytest tests/services/test_structure.py -q`
 
 ### Slice 2: Split Variant Record Normalization By Stage
-**Status:** TODO
+**Status:** DONE
 **Files:**
 - New package `backend/app/services/extract/variant_normalization/` with `__init__.py`, `hydration.py`, `sanitization.py`, `deduplication.py`, `backfill.py`, `size_color_extraction.py`, `contract.py`.
 - `backend/app/services/extract/variant_record_normalization.py` (reduced to a thin re-export shim with a deletion-date note, or deleted if all 6 callers are migrated in this slice).
@@ -86,7 +86,7 @@ The package public `__init__.py` resolves `crawler_runtime_settings.detail_max_v
 **Verify:** `cd backend; $env:PYTHONPATH='.'; .\.venv\Scripts\python.exe -m pytest tests/services/test_variant_regression.py tests/services/test_normalizers.py tests/services/test_detail_extractor_structured_sources.py tests/services/test_crawl_engine.py tests/services/test_structure.py -q`
 
 ### Slice 3: Inject `max_rows` Into Contract Enforcement
-**Status:** TODO
+**Status:** DONE
 **Files:** `backend/app/services/extract/variant_normalization/contract.py`, `backend/app/services/extract/variant_normalization/__init__.py`, any tests asserting variant truncation behavior.
 **What:** `contract.enforce_payload_limits(record, *, max_rows: int)` accepts `max_rows` as a parameter. `contract.py` does not import `crawler_runtime_settings`. `variant_normalization/__init__.py:normalize_variant_record` resolves the limit:
 ```python
@@ -111,7 +111,7 @@ Add a focused test that calls `contract.enforce_payload_limits` directly with an
 **Verify:** `cd backend; $env:PYTHONPATH='.'; .\.venv\Scripts\python.exe -m pytest tests/services/test_variant_regression.py tests/services/test_normalizers.py -q`
 
 ### Slice 4: Group `detail_*` Files Into `extract/detail/` Sub-Package
-**Status:** TODO
+**Status:** DONE
 **Files:** All 26 `extract/detail_*.py` modules, every importer of `app.services.extract.detail_*` across `app/`, `tests/`, harness scripts, and docs cross-references.
 
 **Target layout:**
@@ -174,7 +174,7 @@ extract/detail/
 - final: `cd backend; $env:PYTHONPATH='.'; .\.venv\Scripts\python.exe -m pytest tests -q`
 
 ### Slice 5: Declare `__all__` On Every `extract/` And `extract/detail/` Module
-**Status:** TODO
+**Status:** DONE
 **Files:** Every `.py` file under `app/services/extract/` (after Slice 4 layout is in place), `backend/tests/services/test_structure.py`.
 **What:** For each module, set `__all__` to the list of names imported by code outside that module. Names only used inside the module stay underscore-prefixed and out of `__all__`. Promote cross-module private helpers to public names where the audit identified them:
 - 8 helpers in `variant_structural_pruning.py` consumed by `variant_normalization/sanitization.py`: `drop_color_only_rows_when_size_rows_exist`, `drop_cross_product_variant_rows`, `drop_parent_shared_variant_axes`, `drop_parent_sku_alias_variant_rows`, `drop_subset_variants_when_richer_alternative_exists`, `prune_axisless_rows_when_axisful_rows_exist`, `prune_low_signal_numeric_only_variants` — already public-named, just add to `__all__`.
@@ -185,7 +185,7 @@ extract/detail/
 `cd backend; $env:PYTHONPATH='.'; .\.venv\Scripts\python.exe -m pytest tests/services/test_structure.py tests -q`
 
 ### Slice 6: Resolve `xpath_service.py` Anchor
-**Status:** TODO
+**Status:** DONE — moved to `app/services/dom/xpath_service.py`
 **Files:** `backend/app/services/xpath_service.py`, `backend/app/services/dom/xpath_service.py` (target), all importers, `docs/CODEBASE_MAP.md`, `backend/tests/services/test_structure.py`.
 **What:** Move `xpath_service.py` to `app/services/dom/xpath_service.py`. Update all import paths (`app.services.xpath_service` → `app.services.dom.xpath_service`). Add the move to `docs/CODEBASE_MAP.md` under the `dom/` section. Add a structure assertion that `xpath_service.py` is not present at services root.
 **Deletion first:** Delete the root `xpath_service.py` after imports are updated. No shim.
@@ -193,23 +193,23 @@ extract/detail/
 **Verify:** `cd backend; $env:PYTHONPATH='.'; .\.venv\Scripts\python.exe -m pytest tests -q -k "xpath or selector or self_heal"; .\.venv\Scripts\python.exe -m pytest tests/services/test_structure.py -q`
 
 ### Slice 7: Smoke And Docs Closeout
-**Status:** TODO
+**Status:** DONE
 **Files:** `docs/CODEBASE_MAP.md`, `docs/backend-architecture.md` (only if extraction ownership headings change), `docs/plans/ACTIVE.md`, this plan file.
 **What:** Update `CODEBASE_MAP.md` for the new `extract/detail/` layout and `extract/variant_normalization/` package. Confirm every acceptance criterion is checked. Run smoke commands. Mark plan `DONE` and update `ACTIVE.md`.
 **Verify:** `cd backend; $env:PYTHONPATH='.'; .\.venv\Scripts\python.exe -m pytest tests -q; .\.venv\Scripts\python.exe run_acquire_smoke.py commerce; .\.venv\Scripts\python.exe run_extraction_smoke.py; .\.venv\Scripts\python.exe run_test_sites_acceptance.py`
 
 ### Slice 8: Remove `variant_record_normalization.py` Compat Shim (conditional)
-**Status:** TODO
+**Status:** DONE — old facade deleted after all importers moved
 **Files:** `backend/app/services/extract/variant_record_normalization.py`, any remaining importers.
 **What:** Only runs if Slice 2 left a compat shim for the duration of mid-slice migrations. Final deletion of the shim after all importers are confirmed migrated. Skip if Slice 2 already deleted the file.
 **Verify:** `cd backend; $env:PYTHONPATH='.'; .\.venv\Scripts\python.exe -m pytest tests -q`
 
 ## Doc Updates Required
 
-- [ ] `docs/CODEBASE_MAP.md` — new entries for `extract/variant_normalization/*` and `extract/detail/<concern>/*`. Update existing `extract/variant_record_normalization.py` row to point at the new package. Add `xpath_service.py` row under `dom/` if Slice 6 moved it.
-- [ ] `docs/backend-architecture.md` — update only if extraction subsystem ownership headings change at the section level. Routine file moves do not require an update.
-- [ ] `docs/INVARIANTS.md` — no update expected. Refactors are behavior-preserving.
-- [ ] `docs/ENGINEERING_STRATEGY.md` — only if execution surfaces a stable, repeatable anti-pattern that the existing AP-12 through AP-15 entries do not cover.
+- [x] `docs/CODEBASE_MAP.md` — new entries for `extract/variant_normalization/*` and `extract/detail/<concern>/*`. Update existing `extract/variant_record_normalization.py` row to point at the new package. Add `xpath_service.py` row under `dom/` if Slice 6 moved it.
+- [x] `docs/backend-architecture.md` — update only if extraction subsystem ownership headings change at the section level. Routine file moves do not require an update.
+- [x] `docs/INVARIANTS.md` — no update expected. Refactors are behavior-preserving.
+- [x] `docs/ENGINEERING_STRATEGY.md` — only if execution surfaces a stable, repeatable anti-pattern that the existing AP-12 through AP-15 entries do not cover.
 
 ## Notes
 
@@ -217,3 +217,11 @@ extract/detail/
 - Slices 1, 5, and 6 are low-risk and can be done in any order after Slice 4. Slices 2 → 3 → 4 must run in that order because Slice 3 depends on the package created in Slice 2 and Slice 5's `__all__` enforcement is cleaner against the post-Slice-4 layout.
 - Audit Issues 2, 3, and 7's `selector_self_heal.py` portion are excluded from this plan and reasons are recorded in the "Do Not Touch" section above. Do not re-add them mid-execution without an updated audit and explicit user direction.
 - Behavior preservation gate: every slice must keep `normalize_variant_record(record, *, finalize_contract=True)` byte-for-byte equivalent in output for the existing regression fixtures.
+
+
+## Closeout Verification
+
+- `pytest tests -q` — 1690 passed, 16 skipped.
+- `run_acquire_smoke.py commerce` — 6/6 passed.
+- `run_extraction_smoke.py` — skipped by runner because acceptance corpus is missing, exit 0.
+- `run_test_sites_acceptance.py` — 54/54 passed.

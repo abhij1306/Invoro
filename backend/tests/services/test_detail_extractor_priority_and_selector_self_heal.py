@@ -6,10 +6,10 @@ import pytest
 from bs4 import BeautifulSoup
 from selectolax.lexbor import LexborHTMLParser
 
-from app.services.extract import detail_dom_fallbacks
-from app.services.extract import detail_dom_completion
-from app.services.extract import detail_image_materialize
-from app.services.extract import detail_structured_pruning
+from app.services.extract.detail.assembly import dom_fallbacks as detail_dom_fallbacks
+from app.services.extract.detail.assembly import dom_completion as detail_dom_completion
+from app.services.extract.detail.images import materialize as detail_image_materialize
+from app.services.extract.detail.identity import structured_pruning as detail_structured_pruning
 from app.services.config._export_data import load_export_data
 from app.services.extraction_context import prepare_extraction_context
 from app.services.pipeline.extract_records import extract_records
@@ -117,7 +117,7 @@ def test_prepare_extraction_context_caches_original_dom_objects() -> None:
 def test_apply_dom_fallbacks_limits_heading_section_targets_to_section_like_fields(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from app.services.extract import detail_dom_fallbacks
+    from app.services.extract.detail.assembly import dom_fallbacks as detail_dom_fallbacks
 
     captured: dict[str, set[str]] = {}
 
@@ -175,15 +175,15 @@ def testprune_irrelevant_detail_structured_payload_reuses_requested_identity(
         return {"sku123"}
 
     monkeypatch.setattr(
-        "app.services.extract.detail_structured_pruning._detail_title_from_url",
+        "app.services.extract.detail.identity.structured_pruning._detail_title_from_url",
         _fake_title_from_url,
     )
     monkeypatch.setattr(
-        "app.services.extract.detail_structured_pruning._detail_identity_tokens",
+        "app.services.extract.detail.identity.structured_pruning._detail_identity_tokens",
         _fake_identity_tokens,
     )
     monkeypatch.setattr(
-        "app.services.extract.detail_structured_pruning._detail_identity_codes_from_url",
+        "app.services.extract.detail.identity.structured_pruning._detail_identity_codes_from_url",
         _fake_identity_codes_from_url,
     )
 

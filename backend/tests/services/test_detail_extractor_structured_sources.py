@@ -6,27 +6,27 @@ import pytest
 from bs4 import BeautifulSoup
 
 from app.services.adapters.myntra import MyntraAdapter
-from app.services.extract.detail_record_assembly import (
+from app.services.extract.detail.assembly.record_assembly import (
     build_detail_record,
 )
-from app.services.extract.detail_dom_variant_options import variant_option_availability
-from app.services.extract.detail_price_core import (
+from app.services.extract.detail.variants.dom_options import variant_option_availability
+from app.services.extract.detail.price.core import (
     detail_currency_hint_is_host_level,
     reconcile_parent_price_against_variant_range,
     reconcile_detail_currency_with_url,
 )
-from app.services.extract.detail_image_cleanup import (
+from app.services.extract.detail.images.cleanup import (
     detail_image_matches_primary_family,
 )
-from app.services.extract.detail_final_cleanup import (
+from app.services.extract.detail.assembly.final_cleanup import (
     repair_ecommerce_detail_record_quality,
 )
-from app.services.extract.detail_variant_pruning import (
+from app.services.extract.detail.variants.pruning import (
     sanitize_variant_row,
 )
-from app.services.extract import detail_raw_signals
-from app.services.extract import detail_dom_completion
-from app.services.extract.variant_record_normalization import normalize_variant_record
+from app.services.extract.detail.assembly import raw_signals as detail_raw_signals
+from app.services.extract.detail.assembly import dom_completion as detail_dom_completion
+from app.services.extract.variant_normalization import normalize_variant_record
 from app.services.pipeline.extract_records import extract_records
 from tests.fixtures.loader import read_optional_artifact_text
 
@@ -2064,7 +2064,7 @@ def test_extract_ecommerce_detail_recovers_labeled_image_color_swatches() -> Non
 
 
 def test_extract_ecommerce_detail_guarded_dom_cartesian_keeps_axis_rows(monkeypatch: pytest.MonkeyPatch) -> None:
-    from app.services.extract import detail_dom_variant_extraction
+    from app.services.extract.detail.variants import dom_extraction as detail_dom_variant_extraction
 
     monkeypatch.setattr(
         detail_dom_variant_extraction,

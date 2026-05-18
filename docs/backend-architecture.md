@@ -301,7 +301,7 @@ Primary files:
 
 - `crawl_engine.py`
 - `detail_extractor.py`
-- `extract/detail_tiers.py`
+- `extract/detail/assembly/tiers.py`
 - `listing_extractor.py`
 - `extract/structured_listing_handler.py`
 - `extract/article_card_parser.py`
@@ -314,7 +314,7 @@ Primary files:
 - `field_value_*`
 - `field_url_normalization.py`
 - `public_record_firewall.py`
-- `extract/variant_record_normalization.py`
+- `extract/variant_normalization/`
 - `extract/*`
 - `adapters/*`
 
@@ -340,12 +340,12 @@ Important implemented features:
 - ecommerce detail title selection now ranks structured sources ahead of raw DOM headings, rejects noisy DOM `<h1>/<title>` values such as promo or generic-results text, and only promotes fallback titles when the replacement source is materially stronger
 - ecommerce detail extraction now drops low-signal site-shell records when the surviving title still resolves to site-brand chrome and no real product anchors survive, preventing stale SPA/detail misses from being persisted as false product successes
 - ecommerce-detail extraction now threads the originally requested PDP URL through materialization so same-site utility redirects can either preserve the requested product identity when the product metadata still matches or drop the row entirely when the utility page is carrying mismatched stale product data
-- detail tier execution lives in `extract/detail_tiers.py`; `detail_extractor.py` prepares state and owns candidate arbitration, while the tier executor owns authoritative -> structured -> JS state -> DOM sequencing, DOM skip decisions, and early/DOM finalization transitions
+- detail tier execution lives in `extract/detail/assembly/tiers.py`; `detail_extractor.py` prepares state and owns candidate arbitration, while the tier executor owns authoritative -> structured -> JS state -> DOM sequencing, DOM skip decisions, and early/DOM finalization transitions
 - detail extraction now has a DOM variant fallback for `ecommerce_detail` pages when structured data and JS state leave variant axes empty
 - listing candidate quality lives in `extract/listing_candidate_ranking.py`; listing extraction now delegates candidate admission, support-signal checks, utility rejection, dedupe, and set ranking to that owner
 - structured listing JSON-LD handling lives in `extract/structured_listing_handler.py`, article/content card text parsing lives in `extract/article_card_parser.py`, network listing row/backfill mapping lives in `extract/network_listing_mapper.py`, and structured field-candidate responsibilities live in `extract/field_candidates/*`; `listing_extractor.py` and `extraction_runtime.py` keep orchestration
 - extraction config is split by concept: `field_mappings.py` owns schemas/aliases/field-name primitives, `js_state_field_specs.py` owns glom specs, `variant_policy.py` owns variant axes and flat transport fields, and `public_record_policy.py` owns public persisted/exported record policy
-- variant record normalization has its own owner in `extract/variant_record_normalization.py`; `detail_extractor.py` extracts candidates and delegates final variant axis/value cleanup
+- variant record normalization has its own owner in `extract/variant_normalization/`; `detail_extractor.py` extracts candidates and delegates final variant axis/value cleanup
 - DOM variant recovery now recognizes radio/checkbox-based size and color groups, associates labels via `for`/parent label structure, and carries stock-derived availability (`0 Left`, `17 Left`, etc.) into `variants` and `selected_variant`
 - JS-state ecommerce-detail mapping now scores candidate product payloads so richer nested PDP nodes beat shallow landing/navigation shells, and generic direct-axis variant keys such as `condition`, `grade`, `storage`, and `memory` are normalized without adapter-specific branches
 - DOM listing extraction no longer accepts the first non-empty candidate set; it now ranks structured, DOM, and browser-captured rendered-card candidates by record quality and keeps visual elements as a last-resort fallback only

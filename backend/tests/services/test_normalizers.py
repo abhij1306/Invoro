@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from bs4 import BeautifulSoup
 
-from app.services.extract.detail_final_cleanup import (
+from app.services.extract.detail.assembly.final_cleanup import (
     repair_ecommerce_detail_record_quality,
 )
-from app.services.extract.variant_record_normalization import normalize_variant_record
+from app.services.extract.variant_normalization import normalize_variant_record
+from app.services.extract.variant_normalization.contract import enforce_payload_limits
 from app.services.shared.field_coerce import coerce_field_value
 from app.services.dom.selector_engine import extract_node_value
 from app.services.normalizers import normalize_decimal_price, normalize_value
@@ -58,6 +59,25 @@ def test_normalize_decimal_price_rejects_negative_values() -> None:
     assert normalize_decimal_price("-1") is None
     assert normalize_decimal_price("-9.99") is None
     assert normalize_decimal_price("$-1") is None
+
+
+def test_variant_payload_limit_accepts_explicit_max_rows() -> None:
+    record = {
+        "variants": [
+            {"size": "S", "url": "https://example.test/s"},
+            {"size": "M", "url": "https://example.test/m"},
+            {"size": "L", "url": "https://example.test/l"},
+        ],
+        "variant_count": 3,
+    }
+
+    enforce_payload_limits(record, max_rows=2)
+
+    assert record["variants"] == [
+        {"size": "S", "url": "https://example.test/s"},
+        {"size": "M", "url": "https://example.test/m"},
+    ]
+    assert record["variant_count"] == 2
     assert normalize_decimal_price("-$1") is None
     assert normalize_decimal_price("-USD100") is None
 

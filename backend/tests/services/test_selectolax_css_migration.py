@@ -9,13 +9,13 @@ from app.services.adapters.ebay import EbayAdapter
 from app.services.adapters.indeed import IndeedAdapter
 from app.services.adapters.linkedin import LinkedInAdapter
 from app.services.adapters.nike import NikeAdapter
-from app.services.extract.detail_record_assembly import (
+from app.services.extract.detail.assembly.record_assembly import (
     build_detail_record,
     extract_detail_records,
 )
 from app.services.extraction_html_helpers import extract_job_sections
 from app.services.listing_extractor import extract_listing_records
-from app.services.xpath_service import extract_selector_value
+from app.services.dom.xpath_service import extract_selector_value
 from tests.fixtures.loader import read_optional_artifact_text
 
 
