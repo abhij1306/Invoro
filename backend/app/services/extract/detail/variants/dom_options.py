@@ -20,11 +20,12 @@ def node_state_matches(node: Any, *tokens: str) -> bool:
         return False
     class_attr = node.get("class")
     probe = (
-        " ".join(str(value) for value in class_attr)
+        [str(value) for value in class_attr]
         if isinstance(class_attr, list)
-        else str(class_attr or "")
-    ).lower()
-    return any(token in probe for token in tokens)
+        else re.split(r"\s+", str(class_attr or ""))
+    )
+    class_names = {clean_text(value).lower() for value in probe if clean_text(value)}
+    return any(token.lower() in class_names for token in tokens)
 
 
 def node_attr_is_truthy(node: Any, *attr_names: str) -> bool:
@@ -155,8 +156,7 @@ def merge_variant_option_state(
         )
         == "checked"
     )
-    if selected:
-        entry["selected"] = True
+    entry["selected"] = bool(selected)
     availability, stock_quantity = variant_option_availability(
         node=node, label_node=label_node
     )
@@ -186,7 +186,7 @@ def variant_option_image_url(
     node: Any,
     label_node: Any | None,
     page_url: str,
-) -> str:
+) -> str | None:
     for candidate in (node, label_node):
         if candidate is None or not hasattr(candidate, "find"):
             continue
@@ -196,4 +196,4 @@ def variant_option_image_url(
         raw_url = image.get("src") or image.get("data-src")
         if text_or_none(raw_url):
             return absolute_url(page_url, raw_url)
-    return ""
+    return None

@@ -1,6 +1,15 @@
 from __future__ import annotations
 
-from app.services.extract.variant_normalization.common import *
+from app.services.extract.variant_normalization.common import (
+    Any,
+    clean_text,
+    gender_possessive_re as _GENDER_POSSESSIVE_RE,
+    standard_size_values as _STANDARD_SIZE_VALUES,
+    text_or_none,
+    unquote,
+    urlparse,
+    variant_sku_size_suffix_patterns as _VARIANT_SKU_SIZE_SUFFIX_PATTERNS,
+)
 from app.services.extract.variant_normalization import size_color_extraction
 
 __all__ = (
@@ -12,6 +21,7 @@ __all__ = (
     "_variant_size_from_sku",
     "_url_terminal_text",
 )
+
 
 def _hydrate_variant_axes(record: dict[str, Any]) -> None:
     _infer_variant_sizes_from_titles(record)

@@ -27,7 +27,9 @@ def test_normalize_additional_images_preserves_url_lists_with_commas() -> None:
     ]
 
 
-def test_normalize_decimal_price_rejects_ambiguous_integer_text_without_price_context() -> None:
+def test_normalize_decimal_price_rejects_ambiguous_integer_text_without_price_context() -> (
+    None
+):
     assert normalize_decimal_price("126") is None
 
 
@@ -37,11 +39,15 @@ def test_normalize_decimal_price_accepts_currency_context_for_integer_text() -> 
     assert normalize_decimal_price("INR 499") == "499"
 
 
-def test_normalize_decimal_price_accepts_price_keyword_context_for_integer_text() -> None:
+def test_normalize_decimal_price_accepts_price_keyword_context_for_integer_text() -> (
+    None
+):
     assert normalize_decimal_price("price 126") == "126"
 
 
-def test_normalize_decimal_price_preserves_decimal_strings_without_currency_symbol() -> None:
+def test_normalize_decimal_price_preserves_decimal_strings_without_currency_symbol() -> (
+    None
+):
     assert normalize_decimal_price("59.99") == "59.99"
 
 
@@ -59,6 +65,8 @@ def test_normalize_decimal_price_rejects_negative_values() -> None:
     assert normalize_decimal_price("-1") is None
     assert normalize_decimal_price("-9.99") is None
     assert normalize_decimal_price("$-1") is None
+    assert normalize_decimal_price("-$1") is None
+    assert normalize_decimal_price("-USD100") is None
 
 
 def test_variant_payload_limit_accepts_explicit_max_rows() -> None:
@@ -78,11 +86,11 @@ def test_variant_payload_limit_accepts_explicit_max_rows() -> None:
         {"size": "M", "url": "https://example.test/m"},
     ]
     assert record["variant_count"] == 2
-    assert normalize_decimal_price("-$1") is None
-    assert normalize_decimal_price("-USD100") is None
 
 
-def test_repair_ecommerce_detail_reconciles_parent_price_against_unanimous_variants() -> None:
+def test_repair_ecommerce_detail_reconciles_parent_price_against_unanimous_variants() -> (
+    None
+):
     # Regression: gemini audit DQ-7 (Selfridges) — parent price 190 with both
     # variants reporting 310 is a stale/unrelated DOM scrape. The reconciler
     # should adopt the unanimous variant price as the parent.
@@ -103,7 +111,9 @@ def test_repair_ecommerce_detail_reconciles_parent_price_against_unanimous_varia
     assert record["price"] == "310.00"
 
 
-def test_repair_ecommerce_detail_skips_variant_range_reconcile_when_magnitudes_differ() -> None:
+def test_repair_ecommerce_detail_skips_variant_range_reconcile_when_magnitudes_differ() -> (
+    None
+):
     # Guard: when parent and variant prices differ by >~2x, the mismatch is
     # more likely a cents/units magnitude issue handled by the dedicated
     # magnitude reconciler. The variant-range reconciler must not overwrite
@@ -137,10 +147,7 @@ def test_coerce_field_value_category_rejects_url_path_strings() -> None:
         )
         is None
     )
-    assert (
-        coerce_field_value("category", "https://example.com/c/shoes", "")
-        is None
-    )
+    assert coerce_field_value("category", "https://example.com/c/shoes", "") is None
     # But a real breadcrumb path must still pass through.
     assert (
         coerce_field_value("category", "Shoes > Icons > Old Skool", "")
@@ -240,7 +247,9 @@ def test_normalize_variant_record_drops_subset_rows_using_indexed_axis_lookup() 
     assert record["variant_count"] == 2
 
 
-def test_normalize_variant_record_drops_parent_sku_alias_rows_using_indexed_lookup() -> None:
+def test_normalize_variant_record_drops_parent_sku_alias_rows_using_indexed_lookup() -> (
+    None
+):
     record = {
         "variants": [
             {"sku": "BOMBAS-BLACK", "size": "M"},
@@ -258,7 +267,9 @@ def test_normalize_variant_record_drops_parent_sku_alias_rows_using_indexed_look
     assert record["variant_count"] == 2
 
 
-def test_normalize_variant_record_drops_axisless_rows_and_rejects_foreign_currency() -> None:
+def test_normalize_variant_record_drops_axisless_rows_and_rejects_foreign_currency() -> (
+    None
+):
     record = {
         "currency": "GBP",
         "variants": [
@@ -309,7 +320,9 @@ def test_normalize_variant_record_drops_polluted_parent_scalar_axes() -> None:
     assert record["variant_count"] == 2
 
 
-def test_repair_ecommerce_detail_backfills_dom_variants_before_sanitizing_noise() -> None:
+def test_repair_ecommerce_detail_backfills_dom_variants_before_sanitizing_noise() -> (
+    None
+):
     html = """
     <main>
       <h1>Trail Shoe</h1>
@@ -395,7 +408,9 @@ def test_normalize_variant_record_strips_learn_more_from_real_size() -> None:
     ]
 
 
-def test_normalize_variant_record_drops_quantity_size_controls_preserves_real_rows() -> None:
+def test_normalize_variant_record_drops_quantity_size_controls_preserves_real_rows() -> (
+    None
+):
     record = {
         "variants": [
             {"size": "-", "color": "Black"},
@@ -410,7 +425,9 @@ def test_normalize_variant_record_drops_quantity_size_controls_preserves_real_ro
     assert record["variant_count"] == 1
 
 
-def test_normalize_variant_record_preserves_real_short_axes_after_ui_noise_prune() -> None:
+def test_normalize_variant_record_preserves_real_short_axes_after_ui_noise_prune() -> (
+    None
+):
     record = {
         "variants": [
             {"url": "https://example.com/products/shirt?variant=1", "size": "M"},
@@ -536,7 +553,9 @@ def test_normalize_variant_record_drops_backmarket_condition_tabs() -> None:
     assert record["variant_count"] == 2
 
 
-def test_normalize_variant_record_preserves_separate_suit_sizes_with_dimension_labels() -> None:
+def test_normalize_variant_record_preserves_separate_suit_sizes_with_dimension_labels() -> (
+    None
+):
     record = {
         "title": "Italian Seersucker Sutton Suit",
         "variants": [
@@ -558,7 +577,9 @@ def test_normalize_variant_record_preserves_separate_suit_sizes_with_dimension_l
     assert record["variant_count"] == 4
 
 
-def test_normalize_variant_record_keeps_independent_color_rows_without_selected_parent_color() -> None:
+def test_normalize_variant_record_keeps_independent_color_rows_without_selected_parent_color() -> (
+    None
+):
     record = {
         "title": "Canvas Sneaker",
         "variants": [
@@ -579,7 +600,9 @@ def test_normalize_variant_record_keeps_independent_color_rows_without_selected_
     ]
 
 
-def test_normalize_variant_record_drops_foreign_product_titles_misfiled_as_colors() -> None:
+def test_normalize_variant_record_drops_foreign_product_titles_misfiled_as_colors() -> (
+    None
+):
     record = {
         "title": "40th Anniversary Graphic Womens Short Sleeve Shirt",
         "variants": [
@@ -594,8 +617,9 @@ def test_normalize_variant_record_drops_foreign_product_titles_misfiled_as_color
     assert record["variants"] == [{"color": "Black/Red"}]
 
 
-
-def test_normalize_variant_record_prunes_global_axes_and_collapses_permutations() -> None:
+def test_normalize_variant_record_prunes_global_axes_and_collapses_permutations() -> (
+    None
+):
     variants = []
     for size in ("8 US", "9 US"):
         for site in ("Kith.com", "Kith.eu"):
@@ -661,8 +685,9 @@ def test_normalize_variant_record_preserves_identity_less_selected_variant() -> 
     normalize_variant_record(record)
 
 
-
-def test_normalize_variant_record_merges_semantic_duplicate_rows_and_size_aliases() -> None:
+def test_normalize_variant_record_merges_semantic_duplicate_rows_and_size_aliases() -> (
+    None
+):
     record = {
         "variant_axes": {"size": ["3", "4", "8", "8 US"]},
         "variants": [
@@ -729,7 +754,9 @@ def test_normalize_variant_record_merges_semantic_duplicate_rows_and_size_aliase
     assert record["variant_count"] == 3
 
 
-def test_detail_record_quality_repairs_invalid_original_prices_and_selected_variant_availability() -> None:
+def test_detail_record_quality_repairs_invalid_original_prices_and_selected_variant_availability() -> (
+    None
+):
     record = {
         "sku": "M20324",
         "url": "https://www.adidas.com/us/stan-smith-shoes/M20324.html",
@@ -815,7 +842,9 @@ def test_normalize_variant_record_does_not_invent_color_size_cross_product() -> 
         for variant in record["variants"]
     )
     assert record.get("variant_count") == 4
-    sizes = {variant.get("size") for variant in record["variants"] if variant.get("size")}
+    sizes = {
+        variant.get("size") for variant in record["variants"] if variant.get("size")
+    }
     assert sizes == {"4", "4.5"}
     color_only_values = {
         variant.get("color")

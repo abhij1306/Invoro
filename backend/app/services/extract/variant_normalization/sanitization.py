@@ -1,6 +1,23 @@
 from __future__ import annotations
 
-from app.services.extract.variant_normalization.common import *
+from app.services.extract.variant_normalization.common import (
+    Any,
+    FLAT_VARIANT_KEYS,
+    clean_text,
+    drop_cross_product_variant_rows,
+    drop_invalid_variant_urls,
+    drop_parent_shared_variant_axes,
+    flatten_variants_for_public_output,
+    infer_variant_group_name_from_values,
+    public_variant_axis_fields_normalized as _PUBLIC_VARIANT_AXIS_FIELDS,
+    re,
+    scalar_field_max_option_tokens as _SCALAR_FIELD_MAX_OPTION_TOKENS,
+    scalar_field_pollution_values as _SCALAR_FIELD_POLLUTION_VALUES,
+    shade_code_color_min_tokens as _SHADE_CODE_COLOR_MIN_TOKENS,
+    variant_has_axis_value as _variant_has_axis_value,
+    variant_separate_dimension_size_rules as _VARIANT_SEPARATE_DIMENSION_SIZE_RULES,
+    variant_title_stopwords as _VARIANT_TITLE_STOPWORDS,
+)
 from app.services.extract.variant_normalization import backfill
 from app.services.extract.variant_normalization import deduplication
 from app.services.extract.variant_normalization import size_color_extraction
@@ -14,12 +31,10 @@ __all__ = (
     "_enforce_variant_axis_contract",
     "_should_restore_original_variant_url",
     "_drop_polluted_parent_scalar_axes",
-    "_value_is_axis_header_noise",
     "_promote_misfiled_color_size",
     "_drop_shade_code_size_duplicate",
     "_normalize_separate_dimension_size_rows",
     "_separate_dimension_style_label",
-    "_variant_axis_value_is_header",
 )
 
 _REMAP_ELIGIBLE_AXES = frozenset({"state", "type", "style", "configuration"})
@@ -251,7 +266,9 @@ def _normalize_separate_dimension_size_rows(record: dict[str, Any]) -> None:
     rows = [variant for variant in variants if isinstance(variant, dict)]
     if not rows or any(clean_text(row.get("color")) for row in rows):
         return
-    size_values = [clean_text(row.get("size")) for row in rows if clean_text(row.get("size"))]
+    size_values = [
+        clean_text(row.get("size")) for row in rows if clean_text(row.get("size"))
+    ]
     if len(size_values) < 2:
         return
     separate_family_hits = [

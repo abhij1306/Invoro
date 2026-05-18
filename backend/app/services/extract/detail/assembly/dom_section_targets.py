@@ -16,7 +16,10 @@ from app.services.config.extraction_rules import (
     DETAIL_LONG_TEXT_RANK_FIELDS,
     DETAIL_PRIMARY_DOM_CONTEXT_SELECTOR,
 )
-from app.services.config.field_mappings import DOM_HIGH_VALUE_FIELDS, DOM_OPTIONAL_CUE_FIELDS
+from app.services.config.field_mappings import (
+    DOM_HIGH_VALUE_FIELDS,
+    DOM_OPTIONAL_CUE_FIELDS,
+)
 from app.services.field_policy import exact_requested_field_key, normalize_field_key
 from app.services.shared.field_coerce import (
     object_list as _object_list,
@@ -37,6 +40,7 @@ _VARIANT_TRANSPORT_FIELDS = (
     "stock_quantity",
 )
 
+
 def _dom_section_target_fields(
     surface: str,
     requested_fields: list[str] | None,
@@ -53,9 +57,9 @@ def _dom_section_target_fields(
     }
     canonical_fields = set(surface_fields(surface, None))
     for raw_field_name in list(requested_fields or []):
-        normalized_field = exact_requested_field_key(raw_field_name) or normalize_field_key(
+        normalized_field = exact_requested_field_key(
             raw_field_name
-        )
+        ) or normalize_field_key(raw_field_name)
         if normalized_field and normalized_field not in canonical_fields:
             targets.add(normalized_field)
     return targets
@@ -73,6 +77,7 @@ def record_has_rich_existing_variants(record: dict[str, Any]) -> bool:
         for row in variants
     )
 
+
 def primary_dom_context(
     context: Any,
     *,
@@ -80,16 +85,21 @@ def primary_dom_context(
 ) -> tuple[LexborHTMLParser, BeautifulSoup]:
     cleaned_parser = context.dom_parser
     cleaned_soup = context.soup
-    if cleaned_parser.css_first(
-        DETAIL_PRIMARY_DOM_CONTEXT_SELECTOR
-    ) or cleaned_soup.select_one(DETAIL_PRIMARY_DOM_CONTEXT_SELECTOR):
+
+    def _has_primary_context(
+        parser: LexborHTMLParser,
+        soup: BeautifulSoup,
+    ) -> bool:
+        return bool(
+            parser.css_first(DETAIL_PRIMARY_DOM_CONTEXT_SELECTOR)
+            and soup.select_one(DETAIL_PRIMARY_DOM_CONTEXT_SELECTOR)
+        )
+
+    if _has_primary_context(cleaned_parser, cleaned_soup):
         return cleaned_parser, cleaned_soup
     original_parser = context.original_dom_parser
     original_soup = context.original_soup
-    if not (
-        original_parser.css_first(DETAIL_PRIMARY_DOM_CONTEXT_SELECTOR)
-        or original_soup.select_one(DETAIL_PRIMARY_DOM_CONTEXT_SELECTOR)
-    ):
+    if not _has_primary_context(original_parser, original_soup):
         return cleaned_parser, cleaned_soup
     logger.debug(
         "Using original DOM after cleaned DOM lost primary content for %s", page_url

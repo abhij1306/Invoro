@@ -48,7 +48,9 @@ from app.services.extract.variant_identity_merge import (
     variant_row_richness,
     variant_semantic_identity,
 )
-from app.services.extract.variant_choice_traversal import infer_variant_group_name_from_values
+from app.services.extract.variant_choice_traversal import (
+    infer_variant_group_name_from_values,
+)
 from app.services.extract.variant_axis import normalized_variant_axis_key
 from app.services.extract.variant_option_value import variant_option_value_is_noise
 from app.services.extract.variant_structural_pruning import (
@@ -191,6 +193,36 @@ _SCALAR_FIELD_POLLUTION_VALUES = frozenset(
     if clean_text(value)
 )
 
+scalar_field_max_option_tokens = _SCALAR_FIELD_MAX_OPTION_TOKENS
+shade_code_color_min_tokens = _SHADE_CODE_COLOR_MIN_TOKENS
+variant_size_value_extract_patterns = _VARIANT_SIZE_VALUE_EXTRACT_PATTERNS
+variant_size_value_patterns = _VARIANT_SIZE_VALUE_PATTERNS
+variant_color_hint_words = _VARIANT_COLOR_HINT_WORDS
+currency_codes_upper = _CURRENCY_CODES_UPPER
+variant_option_value_suffix_noise_patterns_normalized = (
+    _VARIANT_OPTION_VALUE_SUFFIX_NOISE_PATTERNS
+)
+variant_placeholder_values_set = _VARIANT_PLACEHOLDER_VALUES_SET
+variant_placeholder_prefixes_lower = _VARIANT_PLACEHOLDER_PREFIXES_LOWER
+variant_size_quantity_control_values = _VARIANT_SIZE_QUANTITY_CONTROL_VALUES
+variant_option_label_max_words = _VARIANT_OPTION_LABEL_MAX_WORDS
+gender_artifact_pattern = _GENDER_ARTIFACT_PATTERN
+gender_artifact_re = _GENDER_ARTIFACT_RE
+gender_possessive_re = _GENDER_POSSESSIVE_RE
+standard_size_values = _STANDARD_SIZE_VALUES
+common_word_size_values = _COMMON_WORD_SIZE_VALUES
+variant_title_stopwords = _VARIANT_TITLE_STOPWORDS
+gender_keyword_tokens_set = _GENDER_KEYWORD_TOKENS_SET
+adult_size_context_tokens = _ADULT_SIZE_CONTEXT_TOKENS
+variant_child_size_patterns = _VARIANT_CHILD_SIZE_PATTERNS
+variant_sku_size_suffix_patterns = _VARIANT_SKU_SIZE_SUFFIX_PATTERNS
+variant_condition_header_prefixes = _VARIANT_CONDITION_HEADER_PREFIXES
+variant_separate_dimension_size_rules = _VARIANT_SEPARATE_DIMENSION_SIZE_RULES
+legacy_variant_keys = _LEGACY_VARIANT_KEYS
+option_field_pattern = _OPTION_FIELD_PATTERN
+public_variant_axis_fields_normalized = _PUBLIC_VARIANT_AXIS_FIELDS
+scalar_field_pollution_values = _SCALAR_FIELD_POLLUTION_VALUES
+
 __all__ = (
     "annotations",
     "logging",
@@ -246,37 +278,39 @@ __all__ = (
     "drop_invalid_variant_urls",
     "variant_axis_value_exceeds_word_limit",
     "logger",
-    "_SCALAR_FIELD_MAX_OPTION_TOKENS",
-    "_SHADE_CODE_COLOR_MIN_TOKENS",
-    "_VARIANT_SIZE_VALUE_EXTRACT_PATTERNS",
-    "_VARIANT_SIZE_VALUE_PATTERNS",
-    "_VARIANT_COLOR_HINT_WORDS",
-    "_CURRENCY_CODES_UPPER",
-    "_VARIANT_OPTION_VALUE_SUFFIX_NOISE_PATTERNS",
-    "_VARIANT_PLACEHOLDER_VALUES_SET",
-    "_VARIANT_PLACEHOLDER_PREFIXES_LOWER",
-    "_VARIANT_SIZE_QUANTITY_CONTROL_VALUES",
-    "_VARIANT_OPTION_LABEL_MAX_WORDS",
-    "_OPTION_FIELD_PATTERN",
-    "_GENDER_ARTIFACT_PATTERN",
-    "_GENDER_ARTIFACT_RE",
-    "_GENDER_POSSESSIVE_RE",
-    "_STANDARD_SIZE_VALUES",
-    "_COMMON_WORD_SIZE_VALUES",
-    "_VARIANT_TITLE_STOPWORDS",
-    "_GENDER_KEYWORD_TOKENS_SET",
-    "_ADULT_SIZE_CONTEXT_TOKENS",
-    "_VARIANT_CHILD_SIZE_PATTERNS",
-    "_VARIANT_SKU_SIZE_SUFFIX_PATTERNS",
-    "_VARIANT_CONDITION_HEADER_PREFIXES",
-    "_VARIANT_SEPARATE_DIMENSION_SIZE_RULES",
-    "_LEGACY_VARIANT_KEYS",
-    "_PUBLIC_VARIANT_AXIS_FIELDS",
-    "_SCALAR_FIELD_POLLUTION_VALUES",
-    "_variant_has_axis_value",
-    "_variant_title_tokens",
-    "_url_terminal_text",
+    "scalar_field_max_option_tokens",
+    "shade_code_color_min_tokens",
+    "variant_size_value_extract_patterns",
+    "variant_size_value_patterns",
+    "variant_color_hint_words",
+    "currency_codes_upper",
+    "variant_option_value_suffix_noise_patterns_normalized",
+    "variant_placeholder_values_set",
+    "variant_placeholder_prefixes_lower",
+    "variant_size_quantity_control_values",
+    "variant_option_label_max_words",
+    "gender_artifact_pattern",
+    "gender_artifact_re",
+    "gender_possessive_re",
+    "standard_size_values",
+    "common_word_size_values",
+    "variant_title_stopwords",
+    "gender_keyword_tokens_set",
+    "adult_size_context_tokens",
+    "variant_child_size_patterns",
+    "variant_sku_size_suffix_patterns",
+    "variant_condition_header_prefixes",
+    "variant_separate_dimension_size_rules",
+    "legacy_variant_keys",
+    "option_field_pattern",
+    "public_variant_axis_fields_normalized",
+    "scalar_field_pollution_values",
+    "variant_has_axis_value",
+    "variant_title_tokens",
+    "url_terminal_text",
 )
+
+
 def _variant_has_axis_value(variant: dict[str, Any]) -> bool:
     return any(clean_text(variant.get(axis)) for axis in _PUBLIC_VARIANT_AXIS_FIELDS)
 
@@ -285,7 +319,11 @@ def _variant_title_tokens(value: object) -> set[str]:
     text = clean_text(value).lower()
     if not text:
         return set()
-    return {token for token in re.findall(r"[a-z0-9]+", text) if token not in _VARIANT_TITLE_STOPWORDS}
+    return {
+        token
+        for token in re.findall(r"[a-z0-9]+", text)
+        if token not in _VARIANT_TITLE_STOPWORDS
+    }
 
 
 def _url_terminal_text(value: object) -> str:
@@ -296,3 +334,8 @@ def _url_terminal_text(value: object) -> str:
     path = parsed.path if parsed.scheme or parsed.netloc else text
     terminal = path.rstrip("/").rsplit("/", 1)[-1]
     return clean_text(unquote(terminal).replace("-", " ").replace("_", " "))
+
+
+variant_has_axis_value = _variant_has_axis_value
+variant_title_tokens = _variant_title_tokens
+url_terminal_text = _url_terminal_text

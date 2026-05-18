@@ -1,6 +1,15 @@
 from __future__ import annotations
 
-from app.services.extract.variant_normalization.common import *
+from app.services.extract.variant_normalization.common import (
+    Any,
+    clean_text,
+    currency_codes_upper as _CURRENCY_CODES_UPPER,
+    drop_parent_sku_alias_variant_rows,
+    extract_currency_code,
+    logger,
+    prune_low_signal_numeric_only_variants,
+    text_or_none,
+)
 
 __all__ = (
     "_backfill_variant_context",
@@ -10,6 +19,7 @@ __all__ = (
     "_backfill_variant_prices_from_record",
     "_backfill_variant_shared_fields_from_record",
 )
+
 
 def _backfill_variant_context(record: dict[str, Any]) -> None:
     _backfill_variant_prices_from_record(record)

@@ -12,12 +12,16 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any, Callable
 
+from bs4 import BeautifulSoup
+from selectolax.lexbor import LexborHTMLParser
+
 from app.services.config.extraction_rules import (
     DETAIL_BREADCRUMB_JSONLD_TYPES,
     DETAIL_IRRELEVANT_JSON_LD_TYPES,
     DETAIL_SURFACE_KEYWORD,
     ECOMMERCE_DETAIL_SURFACE,
 )
+from app.services.extraction_context import ExtractionContext
 
 
 @dataclass(slots=True)
@@ -33,8 +37,8 @@ class DetailTierState:
     selector_trace_candidates: dict[str, list[dict[str, object]]]
     extraction_runtime_snapshot: dict[str, object] | None
     completed_tiers: list[str]
-    raw_soup: Any = None
-    soup: Any = None
+    raw_soup: BeautifulSoup | None = None
+    soup: BeautifulSoup | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,7 +46,9 @@ class DetailTierRuntime:
     materialize_record: Callable[..., dict[str, Any]]
     collect_record_candidates: Callable[..., None]
     map_network_payloads_to_fields: Callable[..., list[dict[str, Any]]]
-    collect_structured_source_payloads: Callable[..., Iterable[tuple[str, Iterable[object]]]]
+    collect_structured_source_payloads: Callable[
+        ..., Iterable[tuple[str, Iterable[object]]]
+    ]
     collect_structured_payload_candidates: Callable[..., None]
     apply_dom_fallbacks: Callable[..., None]
     extract_variants_from_dom: Callable[..., dict[str, object]]
@@ -70,10 +76,10 @@ class DetailTierInputs:
 
 @dataclass(slots=True)
 class PreparedDetailExtraction:
-    context: Any
-    dom_parser: Any
-    soup: Any
-    raw_soup: Any
+    context: ExtractionContext
+    dom_parser: LexborHTMLParser
+    soup: BeautifulSoup | None
+    raw_soup: BeautifulSoup | None
     state: DetailTierState
     js_state_record: dict[str, Any]
     js_state_objects: dict[str, Any]

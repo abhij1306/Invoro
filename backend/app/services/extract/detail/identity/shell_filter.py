@@ -22,7 +22,9 @@ from app.services.extract.detail.identity.core import (
     detail_url_is_collection_like,
     detail_url_is_utility,
 )
-from app.services.extract.detail.assembly.record_sanitization import detail_title_looks_like_placeholder
+from app.services.extract.detail.assembly.record_sanitization import (
+    detail_title_looks_like_placeholder,
+)
 from app.services.extract.detail.assembly.title_scorer import (
     title_needs_promotion,
 )
@@ -84,7 +86,16 @@ def looks_like_site_shell_record(record: dict[str, Any], *, page_url: str) -> bo
             "availability",
         )
     )
-    confidence_score = float((record.get("_confidence") or {}).get("score") or 0.0)
+    confidence_payload = record.get("_confidence")
+    confidence_value = (
+        confidence_payload.get("score")
+        if isinstance(confidence_payload, dict)
+        else None
+    )
+    try:
+        confidence_score = float(confidence_value)
+    except (TypeError, ValueError):
+        confidence_score = 0.0
     description_text = clean_text(record.get("description"))
     has_rich_pdp_corroboration = bool(
         record.get("price") not in (None, "", [], {})

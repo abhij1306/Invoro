@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-__all__ = (
-    "dedupe_primary_and_additional_images",
-)
+__all__ = ("dedupe_primary_and_additional_images",)
 
 from typing import Any
 
@@ -13,8 +11,10 @@ from app.services.dom.selector_engine import dedupe_image_urls
 def dedupe_primary_and_additional_images(record: dict[str, Any]) -> None:
     raw_additional_images = record.get("additional_images")
     additional_images = (
-        list(raw_additional_images)
-        if isinstance(raw_additional_images, (list, tuple, set))
+        sorted(raw_additional_images)
+        if isinstance(raw_additional_images, set)
+        else list(raw_additional_images)
+        if isinstance(raw_additional_images, (list, tuple))
         else (
             [raw_additional_images]
             if raw_additional_images not in (None, "", [], {})

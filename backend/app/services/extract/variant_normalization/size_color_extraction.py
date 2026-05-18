@@ -1,6 +1,30 @@
 from __future__ import annotations
 
-from app.services.extract.variant_normalization.common import *
+from app.services.extract.variant_normalization.common import (
+    Any,
+    adult_size_context_tokens as _ADULT_SIZE_CONTEXT_TOKENS,
+    clean_text,
+    common_word_size_values as _COMMON_WORD_SIZE_VALUES,
+    gender_artifact_pattern as _GENDER_ARTIFACT_PATTERN,
+    gender_keyword_tokens_set as _GENDER_KEYWORD_TOKENS_SET,
+    normalized_variant_axis_key,
+    re,
+    standard_size_values as _STANDARD_SIZE_VALUES,
+    url_terminal_text as _url_terminal_text,
+    variant_child_size_patterns as _VARIANT_CHILD_SIZE_PATTERNS,
+    variant_color_hint_words as _VARIANT_COLOR_HINT_WORDS,
+    variant_condition_header_prefixes as _VARIANT_CONDITION_HEADER_PREFIXES,
+    variant_axis_value_exceeds_word_limit,
+    variant_option_label_max_words as _VARIANT_OPTION_LABEL_MAX_WORDS,
+    variant_option_value_suffix_noise_patterns_normalized as _VARIANT_OPTION_VALUE_SUFFIX_NOISE_PATTERNS,
+    variant_option_value_is_noise,
+    variant_placeholder_prefixes_lower as _VARIANT_PLACEHOLDER_PREFIXES_LOWER,
+    variant_placeholder_values_set as _VARIANT_PLACEHOLDER_VALUES_SET,
+    variant_size_quantity_control_values as _VARIANT_SIZE_QUANTITY_CONTROL_VALUES,
+    variant_size_value_extract_patterns as _VARIANT_SIZE_VALUE_EXTRACT_PATTERNS,
+    variant_size_value_patterns as _VARIANT_SIZE_VALUE_PATTERNS,
+    variant_title_tokens as _variant_title_tokens,
+)
 
 __all__ = (
     "_normalize_variant_axis_value",
@@ -19,6 +43,7 @@ __all__ = (
     "_extract_trailing_color_phrase",
     "_title_preserving_acronyms",
 )
+
 
 def _normalize_variant_axis_value(field_name: str, value: object) -> str:
     cleaned = _strip_variant_option_suffix_noise(value)
@@ -135,7 +160,8 @@ def _size_value_is_recognized(value: object) -> bool:
 def _size_value_is_child_specific(value: object) -> bool:
     cleaned = clean_text(value)
     return bool(
-        cleaned and any(pattern.fullmatch(cleaned) for pattern in _VARIANT_CHILD_SIZE_PATTERNS)
+        cleaned
+        and any(pattern.fullmatch(cleaned) for pattern in _VARIANT_CHILD_SIZE_PATTERNS)
     )
 
 
@@ -230,8 +256,7 @@ def _value_is_axis_header_noise(field_name: str, value: str) -> bool:
     if axis_name not in {"condition", "state"}:
         return False
     return any(
-        prefix
-        and re.fullmatch(rf"{re.escape(prefix)}\s*\(\d+\)", lowered) is not None
+        prefix and re.fullmatch(rf"{re.escape(prefix)}\s*\(\d+\)", lowered) is not None
         for prefix in _VARIANT_CONDITION_HEADER_PREFIXES
     )
 

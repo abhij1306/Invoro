@@ -23,7 +23,9 @@ from app.services.shared.field_coerce import (
 )
 from app.services.extract.detail.images import cleanup as _image_cleanup
 from app.services.extract.detail.price import money_repair as _money_repair
-from app.services.extract.detail.assembly import record_sanitization as _record_sanitization
+from app.services.extract.detail.assembly import (
+    record_sanitization as _record_sanitization,
+)
 from app.services.extract.detail.variants import pruning as _variant_pruning
 from app.services.extract.detail.variants.dom_extraction import (
     backfill_variants_from_dom_if_missing,
@@ -47,6 +49,17 @@ detail_title_looks_like_placeholder = (
 sanitize_variant_row = _variant_pruning.sanitize_variant_row
 
 
+def sanitize_variant_payload(record: dict[str, Any], *, identity_url: str) -> None:
+    _variant_pruning._sanitize_detail_variant_payload(
+        record,
+        identity_url=identity_url,
+    )
+
+
+def detail_title_from_url(identity_url: str) -> str | None:
+    return _record_sanitization._detail_title_from_url(identity_url)
+
+
 def repair_ecommerce_detail_record_quality(
     record: dict[str, Any],
     *,
@@ -63,7 +76,11 @@ def repair_ecommerce_detail_record_quality(
         soup=soup,
         js_state_objects=js_state_objects,
     )
-    if soup is None and not text_or_none(record.get("image_url")) and str(html or "").strip():
+    if (
+        soup is None
+        and not text_or_none(record.get("image_url"))
+        and str(html or "").strip()
+    ):
         parsed_soup = BeautifulSoup(str(html), "html.parser")
         _image_cleanup.backfill_detail_image_from_html(
             record,
@@ -110,20 +127,22 @@ def _sanitize_ecommerce_detail_record(
             record,
             soup=soup,
             page_url=page_url,
-            js_state_objects=js_state_objects if isinstance(js_state_objects, dict) else None,
+            js_state_objects=js_state_objects
+            if isinstance(js_state_objects, dict)
+            else None,
         )
         _image_cleanup.backfill_detail_image_from_html(
             record,
             soup=soup,
             identity_url=identity_url,
         )
-    _variant_pruning._sanitize_detail_variant_payload(
+    sanitize_variant_payload(
         record,
         identity_url=identity_url,
     )
     sanitize_detail_long_text_fields(
         record,
-        title_hint=_record_sanitization._detail_title_from_url(identity_url),
+        title_hint=detail_title_from_url(identity_url),
     )
     _image_cleanup.sanitize_detail_images(record, identity_url=identity_url)
     _image_cleanup.backfill_parent_image_from_variants(record)

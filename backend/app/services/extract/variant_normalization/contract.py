@@ -1,13 +1,19 @@
 from __future__ import annotations
 
-from app.services.extract.variant_normalization.common import *
 from app.services.extract.variant_normalization import deduplication
+from app.services.extract.variant_normalization.common import (
+    Any,
+    enforce_flat_variant_public_contract,
+    legacy_variant_keys as _LEGACY_VARIANT_KEYS,
+    option_field_pattern as _OPTION_FIELD_PATTERN,
+    variant_has_axis_value as _variant_has_axis_value,
+)
 
 __all__ = (
     "finalize",
     "enforce_payload_limits",
-    "_enforce_flat_variant_contract",
 )
+
 
 def finalize(record: dict[str, Any], *, max_rows: int) -> None:
     enforce_payload_limits(record, max_rows=max_rows)

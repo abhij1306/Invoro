@@ -1,6 +1,18 @@
 from __future__ import annotations
 
-from app.services.extract.variant_normalization.common import *
+from app.services.extract.variant_normalization.common import (
+    Any,
+    FLAT_VARIANT_KEYS,
+    clean_text,
+    collapse_duplicate_size_aliases,
+    drop_color_only_rows_when_size_rows_exist,
+    drop_subset_variants_when_richer_alternative_exists,
+    merge_variant_pair,
+    prune_axisless_rows_when_axisful_rows_exist,
+    variant_identity,
+    variant_row_richness,
+    variant_semantic_identity,
+)
 from app.services.extract.variant_normalization import size_color_extraction
 
 __all__ = (
@@ -13,6 +25,7 @@ __all__ = (
     "_variant_field_fingerprint",
     "_richer_variant_pair",
 )
+
 
 def _dedupe_and_prune_variant_rows(record: dict[str, Any]) -> None:
     collapse_duplicate_size_aliases(record)
@@ -79,7 +92,8 @@ def _prune_child_size_rows_from_adult_products(record: dict[str, Any]) -> None:
     child_rows = [
         variant
         for variant in variants
-        if isinstance(variant, dict) and size_color_extraction._size_value_is_child_specific(variant.get("size"))
+        if isinstance(variant, dict)
+        and size_color_extraction._size_value_is_child_specific(variant.get("size"))
     ]
     if len(adult_rows) < 2 or not child_rows:
         return

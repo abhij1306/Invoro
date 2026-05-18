@@ -21,8 +21,7 @@ EXTRACTION_MODULES = [
     SERVICES_ROOT / "extract" / "field_candidates" / "structured_values.py",
     SERVICES_ROOT / "extract" / "field_candidates" / "variant_rows.py",
 ]
-GENERIC_EXTRACTION_MODULES = [
-]
+GENERIC_EXTRACTION_MODULES = []
 FIELD_POLICY_CONSUMERS = [
     SERVICES_ROOT / "crawl" / "crud.py",
     SERVICES_ROOT / "schema_service.py",
@@ -69,10 +68,16 @@ PLAN_TARGET_LOC_BUDGETS = {
     # blanket budgets: each matching slice must make the target enforceable.
     Path("app/services/listing_extractor.py"): 900,  # Slice 2 facade target.
     Path("app/services/pipeline/extract_records.py"): 700,  # Slice 3 target.
-    Path("app/services/extract/detail_candidate_collection.py"): 1000,  # Slice 6 follow-up target.
-    Path("app/services/extract/detail_final_cleanup.py"): 1000,  # Slice 7 follow-up target.
+    Path(
+        "app/services/extract/detail_candidate_collection.py"
+    ): 1000,  # Slice 6 follow-up target.
+    Path(
+        "app/services/extract/detail_final_cleanup.py"
+    ): 1000,  # Slice 7 follow-up target.
     Path("app/services/extract/detail_price_core.py"): 800,  # Slice 8 follow-up target.
-    Path("app/services/extract/detail_identity_core.py"): 800,  # Slice 8 follow-up target.
+    Path(
+        "app/services/extract/detail_identity_core.py"
+    ): 800,  # Slice 8 follow-up target.
     Path("app/services/selectors_runtime.py"): 600,  # Slice 12 target.
     Path("app/services/pipeline/extraction_loop.py"): 1000,  # Slice 12 target.
     Path("app/services/dom/selector_engine.py"): 1000,  # Slice 12 target.
@@ -208,7 +213,10 @@ def _module_all_names(path: Path) -> tuple[str, ...] | None:
             for target in node.targets
         ):
             continue
-        value = ast.literal_eval(node.value)
+        try:
+            value = ast.literal_eval(node.value)
+        except (TypeError, ValueError, SyntaxError):
+            return None
         if not isinstance(value, (tuple, list)):
             return None
         if not all(isinstance(name, str) and name for name in value):
@@ -289,8 +297,7 @@ def test_root_extraction_services_are_explicitly_owned() -> None:
         path.relative_to(ROOT)
         for path in SERVICES_ROOT.glob("*.py")
         if path.name.endswith("_extractor.py")
-        or path.name
-        in {"extraction_context.py", "structured_sources.py"}
+        or path.name in {"extraction_context.py", "structured_sources.py"}
     }
     assert root_extraction_modules == ALLOWED_ROOT_EXTRACTION_MODULES
 
@@ -357,7 +364,9 @@ def test_deleted_facades_do_not_return() -> None:
         deleted_extract_module("detail", "identity"),
         deleted_extract_module("detail", "price", "extractor"),
     ]
-    assert [str(path.relative_to(ROOT)) for path in stale_facades if path.exists()] == []
+    assert [
+        str(path.relative_to(ROOT)) for path in stale_facades if path.exists()
+    ] == []
 
 
 def test_extract_modules_declare_public_surface() -> None:

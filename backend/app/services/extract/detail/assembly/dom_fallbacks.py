@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-__all__ = (
-    "apply_dom_fallbacks",
-)
+__all__ = ("apply_dom_fallbacks",)
 
 import re
 from collections.abc import Callable
@@ -43,6 +41,7 @@ from app.services.shared.field_coerce import (
 
 _dom_section_target_fields = _section_targets._dom_section_target_fields
 
+
 def apply_dom_fallbacks(
     dom_parser: LexborHTMLParser,
     soup: BeautifulSoup,
@@ -82,7 +81,7 @@ def apply_dom_fallbacks(
     # whose primary structured evidence pointed to a different product.
     h1_in_soup = soup.select_one("h1") if soup is not None else None
     h1 = dom_parser.css_first("h1") if h1_in_soup is not None else None
-    page_title = dom_parser.css_first("title")
+    page_title = dom_parser.css_first("title") if h1_in_soup is not None else None
     h1_title = text_or_none(h1.text(separator=" ", strip=True) if h1 else "")
     page_title_text = text_or_none(
         page_title.text(separator=" ", strip=True) if page_title else ""

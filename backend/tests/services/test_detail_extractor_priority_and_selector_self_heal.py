@@ -6,10 +6,11 @@ import pytest
 from bs4 import BeautifulSoup
 from selectolax.lexbor import LexborHTMLParser
 
-from app.services.extract.detail.assembly import dom_fallbacks as detail_dom_fallbacks
 from app.services.extract.detail.assembly import dom_completion as detail_dom_completion
 from app.services.extract.detail.images import materialize as detail_image_materialize
-from app.services.extract.detail.identity import structured_pruning as detail_structured_pruning
+from app.services.extract.detail.identity import (
+    structured_pruning as detail_structured_pruning,
+)
 from app.services.config._export_data import load_export_data
 from app.services.extraction_context import prepare_extraction_context
 from app.services.pipeline.extract_records import extract_records
@@ -80,9 +81,7 @@ def testrequires_dom_completion_uses_raw_variant_cues_after_pruning() -> None:
 
 
 def testrequires_dom_completion_ignores_logo_only_image_cue() -> None:
-    """When image_url is missing and any img exists in DOM, DOM completion is
-    attempted.  Logo filtering is handled downstream by the image extraction
-    pipeline, not at the DOM completion gate."""
+    """Generic page images should not force detail DOM completion."""
     soup = BeautifulSoup("<main><h1>Widget</h1></main>", "html.parser")
     raw_soup = BeautifulSoup(
         """
@@ -93,9 +92,7 @@ def testrequires_dom_completion_ignores_logo_only_image_cue() -> None:
         "html.parser",
     )
 
-    # DOM completion is correctly triggered — the extractor will discard
-    # non-product images downstream via dedupe_image_urls / tracking filters.
-    assert requires_dom_completion(
+    assert not requires_dom_completion(
         record={"title": "Widget"},
         surface="ecommerce_detail",
         requested_fields=None,
@@ -117,7 +114,9 @@ def test_prepare_extraction_context_caches_original_dom_objects() -> None:
 def test_apply_dom_fallbacks_limits_heading_section_targets_to_section_like_fields(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from app.services.extract.detail.assembly import dom_fallbacks as detail_dom_fallbacks
+    from app.services.extract.detail.assembly import (
+        dom_fallbacks as detail_dom_fallbacks,
+    )
 
     captured: dict[str, set[str]] = {}
 
@@ -215,7 +214,9 @@ def testprune_irrelevant_detail_structured_payload_reuses_requested_identity(
     assert calls == {"title": 1, "tokens": 1, "codes": 1}
 
 
-def testmaterialize_image_fields_merges_raw_soup_gallery_when_structured_is_single() -> None:
+def testmaterialize_image_fields_merges_raw_soup_gallery_when_structured_is_single() -> (
+    None
+):
     raw_soup = BeautifulSoup(
         """
         <main>

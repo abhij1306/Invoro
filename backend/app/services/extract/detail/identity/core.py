@@ -284,24 +284,22 @@ def listing_url_is_structural(url: str, page_url: str) -> bool:
         if candidate_segments and page_segments:
             # Strip leading locale segments from each URL independently.
             c_idx = 0
-            while (
-                c_idx < len(candidate_segments)
-                and _LISTING_LOCALE_PATH_SEGMENT_RE.fullmatch(
-                    candidate_segments[c_idx]
-                )
-            ):
+            while c_idx < len(
+                candidate_segments
+            ) and _LISTING_LOCALE_PATH_SEGMENT_RE.fullmatch(candidate_segments[c_idx]):
                 c_idx += 1
             p_idx = 0
-            while (
-                p_idx < len(page_segments)
-                and _LISTING_LOCALE_PATH_SEGMENT_RE.fullmatch(
-                    page_segments[p_idx]
-                )
-            ):
+            while p_idx < len(
+                page_segments
+            ) and _LISTING_LOCALE_PATH_SEGMENT_RE.fullmatch(page_segments[p_idx]):
                 p_idx += 1
             # At least one URL must have had locale segments stripped, and
             # both must have remaining path content after stripping.
-            if (c_idx > 0 or p_idx > 0) and c_idx < len(candidate_segments) and p_idx < len(page_segments):
+            if (
+                (c_idx > 0 or p_idx > 0)
+                and c_idx < len(candidate_segments)
+                and p_idx < len(page_segments)
+            ):
                 candidate_remainder = "/" + "/".join(candidate_segments[c_idx:])
                 page_remainder = "/" + "/".join(page_segments[p_idx:])
                 for prefix in LISTING_CATEGORY_PATH_PREFIXES:
@@ -374,7 +372,10 @@ def listing_detail_like_path(url: str, *, is_job: bool) -> bool:
             and not any(re.search(r"\d", segment) for segment in tail_segments[-2:])
         ):
             return False
-    if any(_detail_marker_matches(lowered, marker) for marker in LISTING_DETAIL_PATH_MARKERS):
+    if any(
+        _detail_marker_matches(lowered, marker)
+        for marker in LISTING_DETAIL_PATH_MARKERS
+    ):
         return True
     hints = detail_path_hints("ecommerce_detail")
     return any(_detail_marker_matches(lowered, marker) for marker in hints)
@@ -870,15 +871,18 @@ def _detail_redirect_identity_is_mismatched(
             has_strong_same_url_product_evidence = bool(
                 availability and availability != AVAILABILITY_UNKNOWN
             )
-        has_same_url_mismatch_evidence = any(
-            record.get(field_name) not in (None, "", [], {})
-            for field_name in (
-                "price",
-                "original_price",
-                "currency",
-                "image_url",
+        has_same_url_mismatch_evidence = (
+            any(
+                record.get(field_name) not in (None, "", [], {})
+                for field_name in (
+                    "price",
+                    "original_price",
+                    "currency",
+                    "image_url",
+                )
             )
-        ) or len(candidate_tokens) >= 4
+            or len(candidate_tokens) >= 4
+        )
         if (
             not has_strong_same_url_product_evidence
             and has_same_url_mismatch_evidence
@@ -891,22 +895,6 @@ def _detail_redirect_identity_is_mismatched(
             )
         ):
             return True
-        has_product_like_signal = any(
-            record.get(field_name) not in (None, "", [], {})
-            for field_name in (
-                "image_url",
-                "additional_images",
-                "price",
-                "brand",
-                "description",
-                "availability",
-                "category",
-                "product_details",
-                "variants",
-            )
-        )
-        if has_product_like_signal:
-            return False
         return False
 
     requested_codes = _detail_identity_codes_from_url(requested)

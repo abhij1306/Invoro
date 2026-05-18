@@ -10,17 +10,10 @@ import json
 import logging
 import re
 from difflib import SequenceMatcher
-from decimal import Decimal
-from functools import lru_cache
 from typing import Any
-from urllib.parse import unquote, urlparse
 
-from bs4 import BeautifulSoup
 
 from app.services.config.extraction_rules import (
-    AVAILABILITY_IN_STOCK,
-    AVAILABILITY_OUT_OF_STOCK,
-    AVAILABILITY_UNKNOWN,
     CANDIDATE_PLACEHOLDER_VALUES,
     CATEGORY_PLACEHOLDER_VALUES,
     DETAIL_CATEGORY_BRANCH_STOP_TOKENS,
@@ -28,66 +21,22 @@ from app.services.config.extraction_rules import (
     DETAIL_CATEGORY_UI_TOKENS,
     DETAIL_BREADCRUMB_SEPARATOR_LABELS,
     DETAIL_BREADCRUMB_TITLE_DUPLICATE_RATIO,
-    IMAGE_FAMILY_NOISE_TOKENS,
-    IMAGE_PATH_TOKENS,
-    DETAIL_LOW_SIGNAL_PARENT_MIN,
-    DETAIL_LOW_SIGNAL_PRICE_MAX,
-    DETAIL_PRICE_COMPARISON_TOLERANCE,
-    VARIANT_OPTION_LABEL_MAX_WORDS,
-)
-from app.services.config.variant_policy import (
-    DETAIL_VARIANT_SIZE_MIN_FOR_NUMERIC_PARENT_DROP,
 )
 from app.services.shared.field_coerce import (
-    absolute_url,
     clean_text,
-    enforce_flat_variant_public_contract,
-    extract_urls,
     text_or_none,
 )
-from app.services.field_url_normalization import same_site
-from app.services.dom.selector_engine import dedupe_image_urls, upgrade_low_resolution_image_url
-from app.services.extract.variant_axis import (
-    normalized_variant_axis_key,
-    variant_axis_allowed_single_tokens,
-    variant_axis_name_is_semantic,
-)
-from app.services.extract.variant_option_value import (
-    variant_option_value_matches_noise_token,
-    variant_option_value_is_noise as _variant_option_value_is_noise,
-)
 from app.services.extract.detail.identity.core import (
-    detail_identity_codes_match,
-    detail_identity_codes_from_record_fields as _detail_identity_codes_from_record_fields,
     detail_identity_codes_from_url as _detail_identity_codes_from_url,
-    detail_identity_tokens as _detail_identity_tokens,
     detail_title_from_url as _detail_title_from_url,
-    detail_url_looks_like_product as _detail_url_looks_like_product,
-    detail_url_matches_requested_identity as _detail_url_matches_requested_identity,
-    record_matches_requested_detail_identity as _record_matches_requested_detail_identity,
     semantic_detail_identity_tokens as _semantic_detail_identity_tokens,
 )
-from app.services.extract.detail.variants.dom_extraction import (
-    backfill_variants_from_dom_if_missing,
+from app.services.extract.detail.assembly.raw_signals import (
+    detail_breadcrumb_is_root_label,
 )
-from app.services.extract.detail.variants.numbered_options import (
-    hydrate_numbered_variant_options_from_dom,
-)
-from app.services.extract.detail.assembly.raw_signals import detail_breadcrumb_is_root_label
-from app.services.extract.detail.price.core import (
-    backfill_detail_price_from_html,
-    detail_price_decimal,
-    format_detail_price_decimal,
-    reconcile_detail_currency_with_url,
-    reconcile_detail_price_magnitudes,
-    reconcile_parent_price_against_variant_range,
-)
-from app.services.extract.variant_normalization import normalize_variant_record
 from app.services.extract.detail.text.sanitizer import (
     detail_product_type_is_low_signal,
-    detail_scalar_size_is_low_signal,
     detail_title_value_is_low_signal,
-    sanitize_detail_long_text_fields,
 )
 from app.services.config.detail_extraction_constants import (
     DETAIL_PLACEHOLDER_TITLE_PATTERNS as _DETAIL_PLACEHOLDER_TITLE_PATTERNS,
@@ -98,6 +47,7 @@ from app.services.config.detail_extraction_constants import (
 )
 
 logger = logging.getLogger(__name__)
+
 
 def _sanitize_detail_placeholder_scalars(
     record: dict[str, Any], *, identity_url: str = ""
@@ -185,11 +135,17 @@ def _sanitize_detail_identity_scalars(
     if not text_or_none(record.get("title")):
         fallback_is_safe = _detail_title_fallback_is_safe(record)
         description_backed = bool(text_or_none(record.get("description")))
-        if placeholder_title_removed and not fallback_is_safe and not description_backed:
+        if (
+            placeholder_title_removed
+            and not fallback_is_safe
+            and not description_backed
+        ):
             return
         fallback_title = _detail_title_from_url(identity_url)
         if fallback_title:
-            record["title"] = fallback_title.title() if fallback_is_safe else fallback_title
+            record["title"] = (
+                fallback_title.title() if fallback_is_safe else fallback_title
+            )
             field_sources = record.setdefault("_field_sources", {})
             field_sources["title"] = ["url_slug"]
 

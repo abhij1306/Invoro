@@ -1,17 +1,17 @@
 from __future__ import annotations
 
 __all__ = (
-    "_EARLY_PRICE_REPAIR_REQUIRED_FIELDS",
-    "_variant_signal_strength",
-    "_variant_axis_coverage",
-    "_should_collect_dom_variants",
-    "_dom_variants_are_validated",
-    "_missing_requested_fields",
-    "_detail_long_text_value_looks_truncated",
-    "_detail_description_value_looks_thin",
-    "_requires_dom_long_text_completion",
-    "_requires_dom_completion",
-    "_normalized_category_path",
+    "early_price_repair_required_fields",
+    "variant_signal_strength",
+    "variant_axis_coverage",
+    "should_collect_dom_variants",
+    "dom_variants_are_validated",
+    "missing_requested_fields",
+    "detail_long_text_value_looks_truncated",
+    "detail_description_value_looks_thin",
+    "requires_dom_long_text_completion",
+    "requires_dom_completion",
+    "normalized_category_path",
 )
 
 import re
@@ -36,8 +36,12 @@ from app.services.config.extraction_rules import (
     DETAIL_PRODUCT_IMAGE_CUE_SELECTOR,
 )
 from app.services.dom.selector_engine import requested_content_extractability
-from app.services.extract.detail.assembly.dom_section_targets import record_has_rich_existing_variants
-from app.services.extract.detail.assembly.raw_signals import breadcrumb_category_from_dom
+from app.services.extract.detail.assembly.dom_section_targets import (
+    record_has_rich_existing_variants,
+)
+from app.services.extract.detail.assembly.raw_signals import (
+    breadcrumb_category_from_dom,
+)
 from app.services.extract.field_candidates import finalize_candidate_value
 from app.services.extract.variant_choice_traversal import variant_dom_cues_present
 from app.services.field_policy import exact_requested_field_key
@@ -57,25 +61,27 @@ try:
 except (TypeError, ValueError):
     DETAIL_LONG_TEXT_THIN_DESCRIPTION_WORDS_INT = 50
 
+
 def _variant_signal_strength(variants: object) -> tuple[int, int, int, int]:
     if not isinstance(variants, list):
         return (0, 0, 0, 0)
     rows = [row for row in variants if isinstance(row, dict)]
     axis_coverage = _variant_axis_coverage(rows)
     return (
-        sum(
-            1
-            for row in rows
-            if text_or_none(row.get("price"))
-        ),
+        sum(1 for row in rows if text_or_none(row.get("price"))),
         sum(
             1
             for row in rows
             if (
-                any(text_or_none(row.get(axis_name)) for axis_name in VARIANT_AXIS_FIELD_NAMES)
+                any(
+                    text_or_none(row.get(axis_name))
+                    for axis_name in VARIANT_AXIS_FIELD_NAMES
+                )
                 or (
                     isinstance(row.get("option_values"), dict)
-                    and any(text_or_none(value) for value in row["option_values"].values())
+                    and any(
+                        text_or_none(value) for value in row["option_values"].values()
+                    )
                 )
             )
         ),
@@ -117,7 +123,11 @@ def _should_collect_dom_variants(
     if dom_variants:
         existing_axes = _variant_axis_coverage(existing_variants)
         dom_axes = _variant_axis_coverage(dom_variants.get("variants"))
-        if dom_axes - existing_axes and existing_strength[0] == 0 and existing_strength[1] == 0:
+        if (
+            dom_axes - existing_axes
+            and existing_strength[0] == 0
+            and existing_strength[1] == 0
+        ):
             return True
     if existing_strength[3] == 0:
         return True
@@ -129,8 +139,10 @@ def _should_collect_dom_variants(
 
 def _dom_variants_are_validated(dom_variants: dict[str, object]) -> bool:
     rows = dom_variants.get("variants") if isinstance(dom_variants, dict) else None
-    return isinstance(rows, list) and bool(rows) and all(
-        isinstance(row, dict) and row.get("_validated") is True for row in rows
+    return (
+        isinstance(rows, list)
+        and bool(rows)
+        and all(isinstance(row, dict) and row.get("_validated") is True for row in rows)
     )
 
 
@@ -188,10 +200,7 @@ def _requires_dom_long_text_completion(
             for source in _object_list(field_sources.get(field_name))
         ]
         best_rank = min(source_ranks) if source_ranks else 20
-        if (
-            field_name == "description"
-            and _detail_description_value_looks_thin(value)
-        ):
+        if field_name == "description" and _detail_description_value_looks_thin(value):
             return True
         if best_rank >= weak_source_rank or _detail_long_text_value_looks_truncated(
             value
@@ -219,23 +228,18 @@ def _requires_dom_completion(
         )
         record_category = _normalized_category_path(record.get("category"))
         dom_category = _normalized_category_path(breadcrumb_category)
-        if dom_category and record_category != dom_category:
+        if record_category and dom_category and record_category != dom_category:
             return True
     if (
         normalized_surface == "ecommerce_detail"
         and not record_has_rich_existing_variants(record)
-        and (
-            variant_dom_cues_present(soup) or variant_dom_cues_present(raw_soup)
-        )
+        and (variant_dom_cues_present(soup) or variant_dom_cues_present(raw_soup))
     ):
         return True
     if (
         normalized_surface == "ecommerce_detail"
         and record.get("image_url") in (None, "", [], {})
-        and (
-            raw_soup.select_one(DETAIL_PRODUCT_IMAGE_CUE_SELECTOR) is not None
-            or raw_soup.select_one("img") is not None
-        )
+        and raw_soup.select_one(DETAIL_PRODUCT_IMAGE_CUE_SELECTOR) is not None
     ):
         return True
     if (
@@ -313,7 +317,27 @@ def _requires_dom_completion(
 
 
 def _normalized_category_path(value: object) -> str:
+    if isinstance(value, (list, tuple)):
+        return " > ".join(
+            part
+            for item in value
+            for part in _normalized_category_path(item).split(" > ")
+            if part
+        )
     text = clean_text(value).casefold()
     return " > ".join(
         part for part in re.split(r"\s*(?:>|/|›|»|→|\|)\s*", text) if part
     )
+
+
+early_price_repair_required_fields = _EARLY_PRICE_REPAIR_REQUIRED_FIELDS
+variant_signal_strength = _variant_signal_strength
+variant_axis_coverage = _variant_axis_coverage
+should_collect_dom_variants = _should_collect_dom_variants
+dom_variants_are_validated = _dom_variants_are_validated
+missing_requested_fields = _missing_requested_fields
+detail_long_text_value_looks_truncated = _detail_long_text_value_looks_truncated
+detail_description_value_looks_thin = _detail_description_value_looks_thin
+requires_dom_long_text_completion = _requires_dom_long_text_completion
+requires_dom_completion = _requires_dom_completion
+normalized_category_path = _normalized_category_path

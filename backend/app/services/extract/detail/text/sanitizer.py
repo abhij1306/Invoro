@@ -89,6 +89,7 @@ from app.services.config.extraction_rules import (
     TOKEN_MIN_LEN_CHUNK,
     TOKEN_MIN_LEN_DISTINCTIVE,
 )
+from app.services.config.detail_extraction_constants import MAX_STRUCTURED_TEXT_LENGTH
 from app.services.shared.field_coerce import LONG_TEXT_FIELDS, clean_text, text_or_none
 
 document_link_label_patterns = tuple(
@@ -454,7 +455,9 @@ def sanitize_detail_long_text_fields(
 def _repair_description_feature_duplicate(record: dict[str, Any]) -> None:
     description = clean_text(record.get("description"))
     raw_features_value = record.get("features")
-    raw_features: list[Any] = raw_features_value if isinstance(raw_features_value, list) else []
+    raw_features: list[Any] = (
+        raw_features_value if isinstance(raw_features_value, list) else []
+    )
     features = []
     for row in raw_features:
         cleaned = clean_text(row)
@@ -605,6 +608,8 @@ _LEADING_ATTRIBUTE_BLOB_RE = re.compile(
 
 
 def _text_is_structured_object_repr(text: str) -> bool:
+    if len(text) > MAX_STRUCTURED_TEXT_LENGTH:
+        return False
     cleaned = text.strip()
     if not (cleaned.startswith("{") and cleaned.endswith("}")):
         return False

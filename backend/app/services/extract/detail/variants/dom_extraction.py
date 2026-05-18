@@ -8,64 +8,27 @@ __all__ = (
     "backfill_variants_from_dom_if_missing",
 )
 
-import copy
 import logging
-import re
 from itertools import product
-from urllib.parse import urlsplit
-from collections.abc import Callable
 from typing import Any
 
 from bs4 import BeautifulSoup
-from bs4.element import Tag
-from selectolax.lexbor import LexborHTMLParser
 
 from app.services.config.extraction_rules import (
     DOM_VARIANT_CARTESIAN_COMBO_LIMIT,
     DOM_VARIANT_GROUP_LIMIT,
-    DETAIL_DOM_SCALAR_SIZE_PATTERN,
-    DETAIL_LONG_TEXT_RANK_FIELDS,
-    DETAIL_PRIMARY_DOM_CONTEXT_SELECTOR,
     VARIANT_CHOICE_OPTION_LIMIT,
-    VARIANT_COMPONENT_SIZE_STYLE_LABELS,
 )
 from app.services.config.variant_migration_rules import (
     VARIANT_STRONG_OPTION_SELECTOR,
     VARIANT_WEAK_OPTION_SELECTOR,
 )
-from app.services.config.field_mappings import (
-    DOM_HIGH_VALUE_FIELDS,
-    DOM_OPTIONAL_CUE_FIELDS,
-)
-from app.services.field_policy import exact_requested_field_key, normalize_field_key
 from app.services.shared.field_coerce import (
-    RATING_RE,
-    REVIEW_COUNT_RE,
-    absolute_url,
     clean_text,
-    coerce_field_value,
-    extract_currency_code,
     flatten_variants_for_public_output,
-    is_title_noise,
     object_dict as _object_dict,
     object_list as _object_list,
-    surface_alias_lookup,
-    surface_fields,
     text_or_none,
-)
-from app.services.dom.selector_engine import (
-    apply_selector_fallbacks,
-    extract_feature_rows,
-    extract_heading_sections,
-    extract_page_images,
-)
-from app.services.extract.detail.assembly.raw_signals import (
-    breadcrumb_category_from_dom,
-    gender_from_detail_context,
-)
-from app.services.extract.content_surface_extractor import (
-    CONTENT_DETAIL_SURFACES,
-    extract as extract_content_surface,
 )
 from app.services.extract.detail.variants.state_targets import (
     state_variant_targets as _state_variant_targets,
@@ -73,7 +36,6 @@ from app.services.extract.detail.variants.state_targets import (
 from app.services.extract.detail.variants.dom_options import (
     merge_variant_option_state,
     node_attr_is_truthy,
-    variant_option_availability,
     variant_option_url,
 )
 from app.services.extract.variant_group_validator import (
@@ -98,20 +60,16 @@ from app.services.extract.variant_identity_merge import (
     split_variant_axes,
 )
 from app.services.extract.variant_axis import (
-    normalized_variant_axis_display_name,
     normalized_variant_axis_key,
     option_scalar_fields,
     public_variant_axis_fields,
-    variant_axis_name_is_semantic,
 )
 from app.services.extract.variant_option_value import (
     variant_option_value_is_noise,
-    variant_option_value_suffix_noise_patterns,
-    variant_size_value_patterns,
 )
-from app.services.extract.detail.price.inline_scalar import collect_inline_scalar_rows
-from app.services.extract.detail.assembly import dom_fallbacks as _detail_dom_fallbacks
-from app.services.extract.detail.assembly import dom_section_targets as _detail_dom_section_targets
+from app.services.extract.detail.assembly import (
+    dom_section_targets as _detail_dom_section_targets,
+)
 from app.services.extract.detail.variants import dom_coercion as _variant_coercion
 
 existing_variant_cluster_has_transport_signal = (
@@ -122,6 +80,21 @@ record_has_rich_existing_variants = (
     _detail_dom_section_targets.record_has_rich_existing_variants
 )
 
+logger = logging.getLogger(__name__)
+
+
+def _safe_int_config(value: object, default: int, name: str) -> int:
+    try:
+        return max(1, int(value))
+    except (TypeError, ValueError) as exc:
+        logger.warning(
+            f"Invalid {name}; using {default}",
+            extra={"value": value},
+            exc_info=exc,
+        )
+        return default
+
+
 _VARIANT_TRANSPORT_FIELDS = (
     "sku",
     "price",
@@ -131,7 +104,6 @@ _VARIANT_TRANSPORT_FIELDS = (
     "availability",
     "stock_quantity",
 )
-
 
 
 _coerce_variant_option_value = _variant_coercion._coerce_variant_option_value
@@ -147,6 +119,7 @@ _resolve_dom_variant_group_name = _variant_coercion._resolve_dom_variant_group_n
 _strip_variant_option_value_suffix_noise = (
     _variant_coercion._strip_variant_option_value_suffix_noise
 )
+
 
 def _variant_input_label(container: Any, input_node: Any) -> Any | None:
     input_id = (
@@ -180,11 +153,7 @@ def _visible_node_text(
         cached = cache.get(cache_key)
         if cached is not None:
             return cached
-    parsed = (
-        copy.deepcopy(node)
-        if isinstance(node, (BeautifulSoup, Tag))
-        else BeautifulSoup(str(node), "html.parser")
-    )
+    parsed = BeautifulSoup(str(node), "html.parser")
     for hidden in parsed.select(
         ".sr-only, .visually-hidden, [aria-hidden='true'], svg, title, use"
     ):
@@ -202,8 +171,7 @@ def _collect_variant_choice_entries(
     axis_name = normalized_variant_axis_key(raw_group_name)
     coercion_axis = (
         axis_name
-        if axis_name in option_scalar_fields
-        or axis_name in public_variant_axis_fields
+        if axis_name in option_scalar_fields or axis_name in public_variant_axis_fields
         else "style"
     )
     entries_by_value: dict[str, dict[str, object]] = {}
@@ -327,7 +295,6 @@ def _descendant_image_alt_text(node: Any) -> str:
     if image is None or not hasattr(image, "get"):
         return ""
     return clean_text(image.get("alt"))
-
 
 
 def extract_variants_from_dom(
@@ -516,15 +483,11 @@ def extract_variants_from_dom(
             ) in (None, "", [], {}):
                 existing["image_url"] = group_entry.get("image_url")
             merged_entries[value] = existing
-    try:
-        group_limit = max(1, int(DOM_VARIANT_GROUP_LIMIT))
-    except (TypeError, ValueError) as exc:
-        logger.warning(
-            "Invalid DOM_VARIANT_GROUP_LIMIT; using 1",
-            extra={"value": DOM_VARIANT_GROUP_LIMIT},
-            exc_info=exc,
-        )
-        group_limit = 1
+    group_limit = _safe_int_config(
+        DOM_VARIANT_GROUP_LIMIT,
+        1,
+        "DOM_VARIANT_GROUP_LIMIT",
+    )
     for group in merged_groups.values():
         values = [
             clean_text(value)
@@ -601,15 +564,11 @@ def extract_variants_from_dom(
     variants: list[dict[str, object]] = []
     axis_names = [axis_key for axis_key, _label, _values in axis_order]
     axis_value_lists = [values for _axis_key, _label, values in axis_order]
-    try:
-        combo_limit = int(DOM_VARIANT_CARTESIAN_COMBO_LIMIT)
-    except (TypeError, ValueError) as exc:
-        logger.warning(
-            "Invalid DOM_VARIANT_CARTESIAN_COMBO_LIMIT; using 1000",
-            extra={"value": DOM_VARIANT_CARTESIAN_COMBO_LIMIT},
-            exc_info=exc,
-        )
-        combo_limit = 1000
+    combo_limit = _safe_int_config(
+        DOM_VARIANT_CARTESIAN_COMBO_LIMIT,
+        1000,
+        "DOM_VARIANT_CARTESIAN_COMBO_LIMIT",
+    )
     if _dom_variant_combo_count(axis_value_lists) > combo_limit:
         variants = _axis_only_dom_variants(axis_order, axis_option_metadata)
     else:
@@ -773,7 +732,9 @@ def backfill_variants_from_dom_if_missing(
     if (
         record_has_rich_existing_variants(record)
         or existing_variant_cluster_has_transport_signal(existing_variants)
-    ) and not _dom_variants_add_missing_existing_axis(existing_variants, dom_variant_rows):
+    ) and not _dom_variants_add_missing_existing_axis(
+        existing_variants, dom_variant_rows
+    ):
         return
     if dom_variant_rows:
         expanded_rows = _expand_existing_variants_with_dom_axes(
@@ -863,20 +824,19 @@ def _expand_existing_variants_with_dom_axes(
     if not existing_axes or not missing_dom_axes:
         return []
     if not all(
-        any(text_or_none(row.get(field_name)) for field_name in _VARIANT_TRANSPORT_FIELDS)
+        any(
+            text_or_none(row.get(field_name))
+            for field_name in _VARIANT_TRANSPORT_FIELDS
+        )
         for row in existing_variants
         if isinstance(row, dict)
     ):
         return []
-    try:
-        combo_limit = int(DOM_VARIANT_CARTESIAN_COMBO_LIMIT)
-    except (TypeError, ValueError) as exc:
-        logger.warning(
-            "Invalid DOM_VARIANT_CARTESIAN_COMBO_LIMIT; using 1000",
-            extra={"value": DOM_VARIANT_CARTESIAN_COMBO_LIMIT},
-            exc_info=exc,
-        )
-        combo_limit = 1000
+    combo_limit = _safe_int_config(
+        DOM_VARIANT_CARTESIAN_COMBO_LIMIT,
+        1000,
+        "DOM_VARIANT_CARTESIAN_COMBO_LIMIT",
+    )
     if len(existing_variants) * len(dom_variant_rows) > combo_limit:
         return []
 
