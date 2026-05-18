@@ -3883,7 +3883,7 @@ def test_should_run_behavior_realism_skips_vendor_block_for_real_chrome() -> Non
             "real_chrome",
             browser_reason="vendor-block:akamai",
         )
-        is False
+        is True
     )
 
 

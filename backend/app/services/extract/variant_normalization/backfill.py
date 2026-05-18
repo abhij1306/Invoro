@@ -104,6 +104,23 @@ def _enforce_variant_currency_context(record: dict[str, Any]) -> None:
         record["variants"] = kept
         record["variant_count"] = len(kept)
         return
+    if mismatched:
+        restored_variants = [
+            {
+                key: value
+                for key, value in variant.items()
+                if key
+                not in {
+                    "currency_mismatch",
+                    "parent_currency",
+                    "variant_currency",
+                }
+            }
+            for variant in mismatched
+        ]
+        record["variants"] = restored_variants
+        record["variant_count"] = len(restored_variants)
+        return
     record.pop("variants", None)
     record.pop("variant_count", None)
 

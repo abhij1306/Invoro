@@ -11,6 +11,7 @@ from app.services.config.extraction_rules import (
     VARIANT_TITLE_STOPWORDS,
 )
 from app.services.config.variant_policy import FLAT_VARIANT_KEYS, PUBLIC_VARIANT_AXIS_FIELDS
+from app.services.extract.variant_axis import normalized_variant_axis_key
 from app.services.extract.variant_choice_traversal import (
     infer_variant_group_name_from_values,
 )
@@ -154,7 +155,12 @@ def _clean_variant_rows(record: dict[str, Any]) -> None:
         cleaned_variant = dict(variant)
         drop_row = False
         for field_name in public_variant_axis_fields:
-            raw_axis_value = cleaned_variant.get(field_name)
+            raw_axis_key = _variant_axis_source_key(cleaned_variant, field_name)
+            raw_axis_value = (
+                cleaned_variant.get(raw_axis_key)
+                if raw_axis_key is not None
+                else None
+            )
             if size_color_extraction._variant_size_axis_value_is_quantity_control(
                 field_name,
                 raw_axis_value,
@@ -167,8 +173,12 @@ def _clean_variant_rows(record: dict[str, Any]) -> None:
             )
             if cleaned_value:
                 cleaned_variant[field_name] = cleaned_value
+                if raw_axis_key is not None and raw_axis_key != field_name:
+                    cleaned_variant.pop(raw_axis_key, None)
             else:
                 cleaned_variant.pop(field_name, None)
+                if raw_axis_key is not None and raw_axis_key != field_name:
+                    cleaned_variant.pop(raw_axis_key, None)
         if drop_row:
             continue
         _promote_misfiled_color_size(cleaned_variant)
@@ -211,6 +221,18 @@ def _enforce_variant_axis_contract(record: dict[str, Any]) -> None:
 
 def _variant_has_axis_value(variant: dict[str, Any]) -> bool:
     return any(clean_text(variant.get(axis)) for axis in public_variant_axis_fields)
+
+
+def _variant_axis_source_key(
+    variant: dict[str, Any],
+    field_name: str,
+) -> str | None:
+    if field_name in variant:
+        return field_name
+    for key in variant:
+        if normalized_variant_axis_key(key) == field_name:
+            return str(key)
+    return None
 
 
 def _should_restore_original_variant_url(

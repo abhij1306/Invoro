@@ -86,6 +86,24 @@ PLAN_TARGET_LOC_BUDGETS = {
     Path("app/services/data_enrichment/service.py"): 725,  # Slice 12 target.
     Path("app/api/crawls.py"): 500,  # Slice 12 target.
 }
+
+
+def test_detail_package_keeps_public_reexports() -> None:
+    from app.services.extract import detail
+
+    assert callable(detail.backfill_detail_price_from_html)
+    assert callable(detail.repair_ecommerce_detail_record_quality)
+    assert callable(detail.currency_hint_from_page_url)
+    assert callable(detail.drop_low_signal_zero_detail_price)
+
+
+def test_variant_normalization_common_keeps_compatibility_reexports() -> None:
+    from app.services.extract.variant_normalization import common
+    from app.services.extract.variant_normalization.contract import (
+        flatten_variants_for_public_output,
+    )
+
+    assert common.flatten_variants_for_public_output is flatten_variants_for_public_output
 # Keep explicit budgets for coherent large owners. Budgets are set to roughly the
 # current LOC plus 10% so growth requires a conscious update instead of a blanket
 # threshold increase.

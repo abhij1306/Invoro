@@ -102,6 +102,35 @@ def testrequires_dom_completion_ignores_logo_only_image_cue() -> None:
     )
 
 
+def test_requires_dom_completion_when_structured_category_conflicts_with_dom_breadcrumb() -> None:
+    soup = BeautifulSoup(
+        """
+        <html><body>
+          <nav aria-label="Breadcrumb">
+            <a>Home</a><a>Women</a><a>Bags</a>
+          </nav>
+          <main><h1>Widget Bag</h1><img src="/bag.jpg"><span>$10</span></main>
+        </body></html>
+        """,
+        "html.parser",
+    )
+
+    assert requires_dom_completion(
+        record={
+            "title": "Widget Bag",
+            "category": "Women > Shoes",
+            "price": "10",
+            "image_url": "https://example.com/bag.jpg",
+            "url": "https://example.com/products/widget-bag",
+        },
+        surface="ecommerce_detail",
+        requested_fields=[],
+        selector_rules=[],
+        soup=soup,
+        breadcrumb_soup=soup,
+    )
+
+
 def test_prepare_extraction_context_caches_original_dom_objects() -> None:
     context = prepare_extraction_context(
         "<html><body><main><h1>Widget</h1></main></body></html>"

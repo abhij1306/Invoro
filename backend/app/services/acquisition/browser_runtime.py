@@ -161,8 +161,6 @@ def _should_run_behavior_realism(engine: str, *, browser_reason: str | None) -> 
     if not bool(crawler_runtime_settings.browser_behavior_realism_enabled):
         return False
     normalized_engine = _normalize_browser_engine(engine)
-    if normalized_engine == _REAL_CHROME_BROWSER_ENGINE:
-        return False
     if normalized_engine != _REAL_CHROME_BROWSER_ENGINE and bool(
         crawler_runtime_settings.browser_behavior_real_chrome_only
     ):

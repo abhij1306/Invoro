@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from typing import Any
 
+import re
+
+from app.services.config.extraction_rules import VARIANT_SEPARATE_DIMENSION_SIZE_RULES
 from app.services.config.variant_policy import FLAT_VARIANT_KEYS
 from app.services.extract.variant_identity_merge import (
     collapse_duplicate_size_aliases,
@@ -22,6 +25,14 @@ __all__ = (
     "_dedupe_and_prune_variant_rows",
     "_prune_unrecognized_size_rows_when_real_sizes_exist",
     "_prune_child_size_rows_from_adult_products",
+)
+
+variant_separate_dimension_size_rules = tuple(
+    (re.compile(str(rule.get("pattern")), re.I), clean_text(rule.get("style")))
+    for rule in tuple(VARIANT_SEPARATE_DIMENSION_SIZE_RULES or ())
+    if isinstance(rule, dict)
+    and str(rule.get("pattern") or "").strip()
+    and clean_text(rule.get("style"))
 )
 
 
@@ -66,12 +77,21 @@ def _prune_unrecognized_size_rows_when_real_sizes_exist(record: dict[str, Any]) 
 
 
 def _variant_row_has_labeled_size_dimension(variant: dict[str, Any]) -> bool:
-    if not clean_text(variant.get("size")):
+    size_value = clean_text(variant.get("size"))
+    if not size_value:
         return False
     option_values = variant.get("option_values")
     if not isinstance(option_values, dict):
         return False
-    return bool(clean_text(option_values.get("style")))
+    style_value = clean_text(option_values.get("style"))
+    return bool(
+        style_value
+        and any(
+            label.casefold() == style_value.casefold()
+            and pattern.fullmatch(size_value)
+            for pattern, label in variant_separate_dimension_size_rules
+        )
+    )
 
 
 def _prune_child_size_rows_from_adult_products(record: dict[str, Any]) -> None:

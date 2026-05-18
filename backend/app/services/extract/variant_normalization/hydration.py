@@ -20,10 +20,10 @@ gender_possessive_re = (
     else None
 )
 standard_size_values = frozenset(
-    str(value).lower() for value in tuple(STANDARD_SIZE_VALUES or ())
+    str(value).casefold() for value in tuple(STANDARD_SIZE_VALUES or ())
 )
 variant_sku_size_suffix_patterns = tuple(
-    re.compile(str(pattern), re.I)
+    pattern if isinstance(pattern, re.Pattern) else re.compile(str(pattern), re.I)
     for pattern in tuple(VARIANT_SKU_SIZE_SUFFIX_PATTERNS or ())
     if str(pattern).strip()
 )
@@ -126,7 +126,7 @@ def _variant_size_from_title_or_url(
         extracted = size_color_extraction._extract_size_value(text)
         if (
             extracted
-            and extracted.lower() in standard_size_values
+            and extracted.casefold() in standard_size_values
             and gender_possessive_re is not None
             and gender_possessive_re.search(text)
         ):
