@@ -4,6 +4,7 @@ SURFACE_DETAIL_PATH_HINTS: dict[str, tuple[str, ...]] = {
     "ecommerce": (
         "/dp/", "/p/", "/pd/", "/spd/",
         "/proddetail/",
+        "/productpage",
         "/product", "/products/", "/item/",
         "/produit/", "/produits/",
         "/produkt/", "/produkte/",

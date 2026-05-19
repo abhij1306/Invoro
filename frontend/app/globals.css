@@ -53,18 +53,18 @@
 
   /* ── Fonts
      Primary : Source Sans 3 (Google Fonts — SAP Fiori open-source typeface)
-     Mono    : JetBrains Mono */
+     Mono    : Inconsolata */
   --font-primary-family:
     var(--font-primary-source, 'Source Sans 3'), 'Source Sans 3', system-ui, -apple-system,
     'Helvetica Neue', Arial, sans-serif;
   --font-mono-family:
-    var(--font-jetbrains-mono, 'JetBrains Mono'), 'JetBrains Mono', ui-monospace, Consolas,
+    var(--font-inconsolata, 'Inconsolata'), 'Inconsolata', ui-monospace, Consolas,
     monospace;
   --font-serif: Georgia, serif;
 
   /* ── Mono size tokens */
-  --font-mono-size: 13px;
-  --font-mono-size-sm: 11px;
+  --font-mono-size: 14.5px;
+  --font-mono-size-sm: 12px;
   --font-mono-line-height: 1.4;
 
   /* ── Surfaces — SAP Fiori Belize / Horizon Morning grey-blue page base */
@@ -720,8 +720,8 @@ select:focus-visible:not(.focus-ring) {
 /* Subheading — card titles, drawer headers, group names */
 .type-subheading {
   font-family: var(--font-primary-family);
-  font-size: var(--text-xs);
-  font-weight: var(--weight-bold);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
   line-height: var(--leading-snug);
   letter-spacing: var(--tracking-tight);
   text-transform: none;
@@ -808,15 +808,6 @@ select:focus-visible:not(.focus-ring) {
   font-variant-numeric: tabular-nums;
 }
 
-.field-label {
-  font-family: var(--font-primary-family);
-  font-size: 10px;
-  font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-tight);
-  text-transform: none;
-  color: var(--text-muted);
-}
-
 /* ── Metric — KPI number blocks; inherits display tier but named for semantics */
 .type-metric {
   font-family: var(--font-mono-family);
@@ -835,8 +826,8 @@ select:focus-visible:not(.focus-ring) {
 .field-label {
   display: block;
   font-family: var(--font-primary-family);
-  font-size: var(--text-xs);
-  font-weight: var(--weight-bold);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
   line-height: 1.35;
   letter-spacing: var(--tracking-tight);
   text-transform: none;
@@ -1128,8 +1119,9 @@ html:not([data-theme='dark']) .code-block {
 }
 
 .crawl-terminal-json {
-  background: var(--terminal-bg);
-  color: var(--terminal-fg);
+  background: #1e1e1e !important;
+  color: #d4d4d4 !important;
+  border-color: #333333 !important;
   font-family: var(--font-mono-family);
   white-space: pre-wrap;
   word-break: break-word;
@@ -1137,6 +1129,32 @@ html:not([data-theme='dark']) .code-block {
   line-height: var(--font-mono-line-height);
   font-size: var(--font-mono-size);
   padding: var(--space-4) var(--space-5);
+}
+
+/* Force dark-theme JSON syntax colors only for explicit dark containers. */
+.crawl-terminal-json,
+.bg-zinc-950,
+.bg-zinc-900,
+[data-json-dark-theme='true'] {
+  --syntax-key: #9cdcfe;
+  --syntax-string: #ce9178;
+  --syntax-number: #b5cea8;
+  --syntax-boolean: #569cd6;
+  --syntax-null: #569cd6;
+  --syntax-punct: #d4d4d4;
+}
+
+/* Style quiet buttons situated over dark JSON views in light theme to be legible and look great */
+html:not([data-theme='dark']) .relative:has(> .crawl-terminal-json) .ui-button.button-quiet-surface,
+html:not([data-theme='dark']) .relative:has(+ .crawl-terminal-json) .ui-button.button-quiet-surface,
+html:not([data-theme='dark']) .group:has(> .crawl-terminal-json) .ui-button.button-quiet-surface {
+  color: #a1a1aa !important;
+}
+html:not([data-theme='dark']) .relative:has(> .crawl-terminal-json) .ui-button.button-quiet-surface:hover,
+html:not([data-theme='dark']) .relative:has(+ .crawl-terminal-json) .ui-button.button-quiet-surface:hover,
+html:not([data-theme='dark']) .group:has(> .crawl-terminal-json) .ui-button.button-quiet-surface:hover {
+  color: #f3f4f6 !important;
+  background-color: rgba(255, 255, 255, 0.1) !important;
 }
 
 /* ── JSON Syntax Highlighting (Themed) ── */

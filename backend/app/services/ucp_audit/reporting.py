@@ -6,7 +6,9 @@ from typing import Any, Iterable, Literal
 from app.services.ucp_audit.types import UCPComplianceReport
 
 _MARKDOWN_SPECIAL_CHARS = "\\`*_{}[]()#+-.!"
-_MARKDOWN_SELECTIVE_SAFE_CHARS = frozenset({".", "-"})
+# Keep `-` safe for bullet text, but still escape `.` so values like `1. foo`
+# do not accidentally render as ordered lists; see the selective markdown tests.
+_MARKDOWN_SELECTIVE_SAFE_CHARS = frozenset({"-"})
 
 
 def escape_markdown(

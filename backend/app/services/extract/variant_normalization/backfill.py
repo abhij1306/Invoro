@@ -22,6 +22,9 @@ currency_codes_upper = frozenset(
 )
 
 __all__ = (
+    "backfill_parent_scalar_axes_from_variants",
+    "backfill_variant_context",
+    "enforce_variant_currency_context",
     "_backfill_variant_context",
     "_backfill_parent_scalar_axes_from_variants",
     "_enforce_variant_currency_context",
@@ -215,3 +218,8 @@ def _backfill_variant_shared_fields_from_record(record: dict[str, Any]) -> None:
             {},
         ):
             variant["image_url"] = fallback_image
+
+
+backfill_parent_scalar_axes_from_variants = _backfill_parent_scalar_axes_from_variants
+backfill_variant_context = _backfill_variant_context
+enforce_variant_currency_context = _enforce_variant_currency_context

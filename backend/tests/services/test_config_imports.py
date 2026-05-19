@@ -119,6 +119,15 @@ def test_extraction_rules_exports_document_link_patterns_via___all__() -> None:
     assert "DETAIL_DOCUMENT_LINK_LABEL_PATTERNS" in extraction_rules.__all__
 
 
+def test_browser_runtime_reexports_stay_in___all__() -> None:
+    browser_runtime = importlib.import_module(
+        "app.services.acquisition.browser_runtime"
+    )
+
+    assert "block_unneeded_route" in browser_runtime.__all__
+    assert "real_chrome_candidate_paths" in browser_runtime.__all__
+
+
 def test_crawl_run_settings_exposes_normalized_acquisition_plan() -> None:
     settings = CrawlRunSettings.from_value(
         {

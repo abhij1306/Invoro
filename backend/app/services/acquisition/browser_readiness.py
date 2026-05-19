@@ -366,6 +366,9 @@ def classify_low_content_reason_impl(html: str, *, html_bytes: int) -> str | Non
     analysis = analyze_html(html)
     if not analysis.html.strip():
         return "empty_html"
+    title_text = analysis.title_text.lower()
+    if any(phrase in title_text for phrase in LOW_CONTENT_SHELL_PHRASES):
+        return "empty_terminal_page"
     if len(analysis.visible_text.strip()) >= 120:
         return None
     if any(

@@ -1,19 +1,30 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 
 from app.models.crawl_run import CrawlRun
 from app.services.acquisition.acquirer import AcquisitionResult
 from app.services.acquisition.acquirer import acquire as _acquire
+from app.services.acquisition.browser_runtime import real_chrome_browser_available
+from app.services.acquisition.host_protection_memory import note_host_hard_block
 from app.services.config.runtime_settings import crawler_runtime_settings
 from app.services.db_utils import mapping_or_empty
+from app.services.domain_memory_service import load_domain_selector_rules
 from app.services.domain_utils import normalize_domain
 from app.services.shared.field_coerce import validate_record_for_surface
 from app.services.llm.config_service import resolve_run_config
 from app.services.llm.runtime import (
     extract_records_directly as extract_records_directly_with_llm,
 )
+from app.services.adapters.registry import run_adapter
+from app.services.extract.detail.assembly.record_assembly import (
+    detail_record_rejection_reason,
+    infer_detail_failure_reason,
+)
+from app.services.platform_policy import detect_platform_family
+from app.services.pipeline.extract_records import extract_records
 from app.services.pipeline.direct_record_fallback import (
     apply_direct_record_llm_fallback as apply_direct_record_llm_fallback_impl,
     apply_llm_fallback,
@@ -43,6 +54,7 @@ from .extraction_retry_stage import (
     _apply_detail_rejection_guard,
     _build_acquisition_request,
     _log_extraction_outcome,
+    _remaining_url_budget_seconds,
     _retry_detail_challenge_shell_with_real_chrome,
     _retry_empty_extraction_with_browser,
     _retry_listing_integrity_with_stronger_tier,

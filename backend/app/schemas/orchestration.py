@@ -122,8 +122,8 @@ class PriceComparisonRow(BaseModel):
     product: str
     brand: str
     domain: str
-    price: Decimal | float | None = None
-    was_price: Decimal | float | None = None
+    price: Decimal | None = None
+    was_price: Decimal | None = None
     currency: str | None = None
     availability: str | None = None
     source_url: str

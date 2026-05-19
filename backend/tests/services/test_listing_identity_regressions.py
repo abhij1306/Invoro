@@ -198,3 +198,24 @@ def test_shop_path_is_not_detail_marker() -> None:
 def test_explicit_detail_markers_still_recognized(url: str) -> None:
     """/p/, /product/, /dp/, /spd/ equivalents remain detail markers."""
     assert listing_detail_like_path(url, is_job=False) is True
+
+
+def test_detail_like_productpage_url_counts_as_supported_without_price() -> None:
+    from app.services.extract.listing_candidate_ranking import listing_record_supported
+    from app.services.shared.field_coerce import is_title_noise
+
+    assert (
+        listing_record_supported(
+            {
+                "title": "Canvas trainers",
+                "url": "https://www2.hm.com/en_in/productpage.1317259001.html",
+                "_source": "dom_listing",
+            },
+            page_url="https://www2.hm.com/en_in/men/shoes/view-all.html",
+            surface="ecommerce_listing",
+            title_is_noise=is_title_noise,
+            url_is_structural=listing_url_is_structural,
+            detail_like_url=lambda url: listing_detail_like_path(url, is_job=False),
+        )
+        is True
+    )

@@ -1219,20 +1219,20 @@ function ViewColumn({
       </div>
 
       <div
-        className="max-h-[360px] w-full min-w-0 flex-1 overflow-auto rounded-lg border border-zinc-800 bg-zinc-950 p-3 font-mono text-[11px] text-zinc-100"
+        className="bg-background-elevated text-foreground max-h-[360px] w-full min-w-0 flex-1 overflow-auto rounded-lg border border-border p-3 font-mono text-[12.5px]"
         style={{ fontSynthesis: 'none' }}
       >
         {isJson ? (
           Object.keys(values).length > 0 ? (
             <pre
-              className="font-mono text-[11px] leading-relaxed break-all whitespace-pre-wrap"
+              className="font-mono text-[12.5px] leading-relaxed break-all whitespace-pre-wrap"
               dangerouslySetInnerHTML={{
                 __html: syntaxHighlightJson(JSON.stringify(values, null, 2)),
               }}
             />
           ) : (
-            <div className="flex flex-col items-center justify-center gap-1.5 py-6 text-center font-sans text-xs text-zinc-500">
-              <Info className="size-5 text-zinc-600" />
+            <div className="text-muted flex flex-col items-center justify-center gap-1.5 py-6 text-center font-sans text-xs">
+              <Info className="size-5 text-muted" />
               <span>No JSON data available for this sample.</span>
             </div>
           )
@@ -1247,15 +1247,15 @@ function ViewColumn({
                   className={cn(
                     'w-full min-w-0 rounded px-2 py-1 transition-colors',
                     highlighted
-                      ? 'border-l-2 border-red-500 bg-red-950/40 font-light text-red-200'
-                      : 'bg-zinc-900/50 text-zinc-300 hover:bg-zinc-800/50',
+                      ? 'border-l-2 border-danger bg-danger/10 font-light text-danger'
+                      : 'bg-background text-secondary hover:bg-background-alt',
                   )}
                 >
                   <div className="flex w-full min-w-0 items-center justify-between gap-4">
                     <span
                       className={cn(
                         'max-w-[45%] shrink-0 truncate font-light',
-                        highlighted ? 'font-normal text-red-300' : 'text-zinc-400',
+                        highlighted ? 'font-normal text-danger' : 'text-muted',
                       )}
                     >
                       {key}:
@@ -1264,8 +1264,8 @@ function ViewColumn({
                       className={cn(
                         'max-w-[55%] cursor-help truncate border-b border-dashed pb-0.5 font-light transition-colors select-all',
                         highlighted
-                          ? 'border-red-700/40 text-red-100 hover:border-red-500'
-                          : 'border-zinc-700/50 text-zinc-100 hover:border-zinc-500',
+                          ? 'border-danger/40 text-danger hover:border-danger'
+                          : 'border-border/60 text-foreground hover:border-border-strong',
                       )}
                       title={rawVal}
                     >

@@ -225,6 +225,7 @@ export default function DataEnrichmentPage() {
               type="button"
               variant="quiet"
               size="icon"
+              className="shrink-0"
               onClick={() => setHistoryOpen(true)}
               aria-label="Enrichment History"
             >

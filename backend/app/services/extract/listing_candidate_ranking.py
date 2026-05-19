@@ -20,6 +20,8 @@ from typing import Any, Callable
 from urllib.parse import urlsplit
 
 from app.services.config.extraction_rules import (
+    DETAIL_COLLECTION_PATH_TOKENS,
+    DETAIL_PRODUCT_PATH_TOKENS,
     JOB_POSTING_PATH_MARKERS,
     JOB_UTILITY_URL_TOKENS,
     LISTING_EDITORIAL_PATH_SEGMENTS,
@@ -68,6 +70,25 @@ def _record_url_signature(url: str) -> str:
     else:
         depth_bucket = "4_plus"
     return f"{prefix_bucket}|{detail_marker}|{depth_bucket}"
+
+
+def _listing_url_path_tokens(url: str) -> set[str]:
+    try:
+        parsed = urlsplit(str(url or "").strip())
+    except ValueError:
+        return set()
+    return {
+        token
+        for token in re.split(r"[^a-z0-9]+", str(parsed.path or "").lower())
+        if token
+    }
+
+
+def _listing_url_is_collection_like(url: str) -> bool:
+    path_tokens = _listing_url_path_tokens(url)
+    if any(token in path_tokens for token in DETAIL_PRODUCT_PATH_TOKENS):
+        return False
+    return any(token in path_tokens for token in DETAIL_COLLECTION_PATH_TOKENS)
 
 
 def _set_cohort_homogeneity(records: list[dict[str, Any]], *, page_url: str) -> float:
@@ -250,13 +271,15 @@ def _listing_record_set_score(
     utility_records = sum(bool(metrics["utility"]) for metrics in quality_metrics)
     clean_records = len(quality_metrics) - utility_records
     avg_quality = int(round(sum(quality_scores) / max(1, len(quality_scores)) * 100))
+    # Intentional priority: average quality outranks raw strong-record count so
+    # richer product cohorts beat thinner promo-heavy sets in `score > best_score`.
     return (
         cohort_pass,
+        avg_quality,
         strong_records,
         supported_records,
         detail_like_records,
         clean_records,
-        avg_quality,
         -utility_records,
         sum(quality_scores),
     )
@@ -295,6 +318,8 @@ def _listing_record_quality_metrics(
     if url and not url_is_structural(url, page_url):
         score += 8
     else:
+        score -= 12
+    if not is_job_surface and not detail_like and _listing_url_is_collection_like(url):
         score -= 12
     if detail_like:
         score += 5
@@ -364,17 +389,29 @@ def _record_has_supporting_signals(
         )
     if detail_like and job_surface:
         return True
-    return any(
+    url = str(record.get("url") or "").strip()
+    explicit_detail_tokens = set(DETAIL_PRODUCT_PATH_TOKENS) - {"product", "products"}
+    if detail_like and any(
+        token in _listing_url_path_tokens(url) for token in explicit_detail_tokens
+    ):
+        return True
+    if any(
         record.get(field_name) not in (None, "", [], {})
-        for field_name in (
-            "brand",
-            "description",
-            "image_url",
-            "price",
-            "rating",
-            "review_count",
-        )
-    )
+        for field_name in ("image_url", "rating", "review_count")
+    ):
+        return True
+    if record.get("brand") not in (None, "", [], {}):
+        return True
+    if record.get("description") not in (None, "", [], {}):
+        return True
+    if record.get("price") in (None, "", [], {}):
+        return False
+    if detail_like:
+        return True
+    if any(token in _listing_url_path_tokens(url) for token in DETAIL_PRODUCT_PATH_TOKENS):
+        return True
+    title = clean_text(record.get("title"))
+    return _unsupported_non_detail_ecommerce_merchandise_hint(title=title, url=url)
 
 
 def listing_record_supported(

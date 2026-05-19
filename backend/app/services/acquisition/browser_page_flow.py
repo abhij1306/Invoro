@@ -16,7 +16,10 @@ from app.services.acquisition.browser_page_helpers import (
     capture_listing_visual_elements,
     detail_expansion_can_skip,
     detail_expansion_extractability,
+    dismiss_safe_location_interstitial,
+    location_interstitial_detected,
     normalize_listing_recovery_mode as _normalize_listing_recovery_mode,
+    page_might_have_location_interstitial,
     select_primary_browser_html as _select_primary_browser_html,
 )
 from app.services.acquisition.browser_page_helpers import requested_content_extractability
@@ -27,6 +30,7 @@ from app.services.acquisition.browser_recovery import (
     recover_browser_challenge,
 )
 from app.services.acquisition.runtime import (
+    BlockPageClassification,
     classify_blocked_page_async,
 )
 from app.services.acquisition import browser_result_builder as _browser_result_builder
@@ -43,6 +47,7 @@ logger = logging.getLogger(__name__)
 _capture_listing_visual_elements = capture_listing_visual_elements
 build_browser_diagnostics = _browser_result_builder.build_browser_diagnostics
 build_browser_artifacts = _browser_result_builder.build_browser_artifacts
+BrowserFinalizeInput = _browser_result_builder.BrowserFinalizeInput
 
 
 def _detail_expansion_extractability(*args, **kwargs):

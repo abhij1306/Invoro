@@ -3,7 +3,7 @@ import Script from 'next/script';
 import './globals.css';
 
 // Next.js App Router root layout; invoked by file-system routing.
-import { JetBrains_Mono, Source_Sans_3 } from 'next/font/google';
+import { Inconsolata, Source_Sans_3 } from 'next/font/google';
 
 import { AppShell } from '../components/layout/app-shell';
 import { QueryProvider } from '../components/ui/query-provider';
@@ -16,9 +16,9 @@ const mainFont = Source_Sans_3({
   display: 'swap',
 });
 
-const monoFont = JetBrains_Mono({
+const monoFont = Inconsolata({
   subsets: ['latin'],
-  variable: '--font-jetbrains-mono',
+  variable: '--font-inconsolata',
   display: 'swap',
 });
 

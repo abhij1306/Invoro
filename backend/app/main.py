@@ -182,13 +182,6 @@ sanitize_header_value = _sanitize_header_value
 sanitize_header_name = _sanitize_header_name
 client_rate_limit_key = _client_rate_limit_key
 RATE_LIMIT_BUCKETS = MappingProxyType(_RATE_LIMIT_BUCKETS)
-TRUSTED_PROXIES = {
-    str(value).strip()
-    for value in crawler_runtime_settings.api_rate_limit_trusted_proxies
-    if str(value).strip()
-}
-
-
 def rate_limit_buckets_snapshot() -> OrderedDict[str, deque[float]]:
     return OrderedDict((key, deque(value)) for key, value in _RATE_LIMIT_BUCKETS.items())
 
@@ -206,8 +199,28 @@ def restore_rate_limit_buckets_for_testing(
     )
 
 
+_TRUSTED_PROXY_CACHE_KEY: tuple[str, ...] = ()
+_TRUSTED_PROXY_CACHE_SET: frozenset[str] = frozenset()
+
+
+def _trusted_proxy_set() -> frozenset[str]:
+    global _TRUSTED_PROXY_CACHE_KEY, _TRUSTED_PROXY_CACHE_SET
+    values = tuple(
+        normalized
+        for normalized in (
+            str(value).strip()
+            for value in crawler_runtime_settings.api_rate_limit_trusted_proxies
+        )
+        if normalized
+    )
+    if values != _TRUSTED_PROXY_CACHE_KEY:
+        _TRUSTED_PROXY_CACHE_KEY = values
+        _TRUSTED_PROXY_CACHE_SET = frozenset(values)
+    return _TRUSTED_PROXY_CACHE_SET
+
+
 def _is_trusted_proxy(proxy_ip: str) -> bool:
-    return proxy_ip in TRUSTED_PROXIES
+    return proxy_ip in _trusted_proxy_set()
 
 
 async def _consume_rate_limit(identifier: str) -> tuple[bool, int]:

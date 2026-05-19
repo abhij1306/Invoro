@@ -30,8 +30,8 @@ from app.services.extract.variant_normalization import deduplication
 from app.services.extract.variant_normalization import size_color_extraction
 
 __all__ = (
-    "_sanitize_variant_axes",
-    "_drop_polluted_parent_scalar_axes",
+    "drop_polluted_parent_scalar_axes",
+    "sanitize_variant_axes",
 )
 
 logger = logging.getLogger(__name__)
@@ -363,3 +363,7 @@ def _separate_dimension_style_label(size_value: str) -> str:
         if pattern.fullmatch(size_value):
             return label
     return ""
+
+
+drop_polluted_parent_scalar_axes = _drop_polluted_parent_scalar_axes
+sanitize_variant_axes = _sanitize_variant_axes

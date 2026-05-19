@@ -75,10 +75,12 @@ from app.services.acquisition.browser_stage_runner import (
 from app.services.acquisition import browser_pool as _browser_pool
 from app.services.acquisition.browser_pool import (
     SharedBrowserRuntime,
+    block_unneeded_route as _block_unneeded_route,
     browser_runtime_snapshot as _browser_runtime_snapshot_impl,
     get_browser_runtime as _get_browser_runtime_impl,
     patchright_browser_available,
     real_chrome_browser_available,
+    real_chrome_candidate_paths as _real_chrome_candidate_paths,
     real_chrome_executable_path,
     register_popup_guard_task,
     shutdown_browser_runtime as _shutdown_browser_runtime_impl,
@@ -152,6 +154,10 @@ def shutdown_browser_runtime_sync() -> None:
 
 def browser_runtime_snapshot() -> dict[str, int | bool]:
     return _browser_runtime_snapshot_impl()
+
+
+block_unneeded_route = _block_unneeded_route
+real_chrome_candidate_paths = _real_chrome_candidate_paths
 
 
 def _should_run_behavior_realism(engine: str, *, browser_reason: str | None) -> bool:
@@ -952,6 +958,7 @@ __all__ = [
     "browser_fetch",
     "build_browser_diagnostics_contract",
     "browser_runtime_snapshot",
+    "block_unneeded_route",
     "build_failed_browser_diagnostics",
     "capture_browser_screenshot",
     "classify_network_endpoint",
@@ -966,6 +973,7 @@ __all__ = [
     "patchright_browser_available",
     "read_network_payload_body",
     "real_chrome_browser_available",
+    "real_chrome_candidate_paths",
     "real_chrome_executable_path",
     "should_capture_network_payload",
     "shutdown_browser_runtime",

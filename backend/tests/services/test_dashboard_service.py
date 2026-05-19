@@ -32,11 +32,11 @@ from app.services.acquisition.host_protection_memory import (
 )
 from app.services.crawl.crud import create_crawl_run
 from app.services.dashboard_service import (
-    _session_transaction,
     reset_application_data,
     reset_crawl_data,
     reset_domain_memory,
     reset_product_intelligence,
+    session_transaction,
 )
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker
@@ -410,7 +410,7 @@ async def test_resets_leave_outer_transaction_control_to_caller() -> None:
 
     session = _Session()
 
-    async with _session_transaction(session):  # type: ignore[arg-type]
+    async with session_transaction(session):  # type: ignore[arg-type]
         pass
 
     assert session.nested_started is True

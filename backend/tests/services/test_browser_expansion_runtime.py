@@ -3419,6 +3419,41 @@ def test_classify_browser_outcome_marks_empty_category_as_low_content_shell() ->
     )
 
 
+def test_classify_browser_outcome_marks_site_maintenance_title_as_low_content_shell() -> (
+    None
+):
+    html = """
+    <html>
+      <head><title>Site Maintenance</title></head>
+      <body>
+        <main>
+          <h1>Site Maintenance</h1>
+          <p>
+            We're making a few updates to our site and working through a short
+            maintenance window so shopping is unavailable right now, but we will
+            be back shortly with full product access.
+          </p>
+        </main>
+      </body>
+    </html>
+    """
+
+    outcome = browser_runtime.classify_browser_outcome(
+        html=html,
+        html_bytes=len(html.encode("utf-8")),
+        blocked=False,
+    )
+
+    assert outcome == "low_content_shell"
+    assert (
+        browser_runtime.classify_low_content_reason(
+            html,
+            html_bytes=len(html.encode("utf-8")),
+        )
+        == "empty_terminal_page"
+    )
+
+
 def test_classify_low_content_reason_ignores_empty_phrase_on_contentful_page() -> None:
     html = """
     <html><body>

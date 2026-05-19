@@ -267,6 +267,9 @@ async def _session_transaction(session: AsyncSession):
         yield
 
 
+session_transaction = _session_transaction
+
+
 async def _count_rows(session: AsyncSession, model: type) -> int:
     return int(
         (await session.execute(select(func.count()).select_from(model))).scalar() or 0

@@ -741,6 +741,9 @@ def _best_agent_delta_url(
     return max(sampled_pages, key=rank)[0]
 
 
+best_agent_delta_url = _best_agent_delta_url
+
+
 def _shipping_found(schema_scores: list[UCPSchemaScore]) -> bool:
     return any(
         isinstance(offer, dict)

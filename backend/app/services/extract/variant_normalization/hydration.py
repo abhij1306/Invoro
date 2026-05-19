@@ -16,7 +16,7 @@ from app.services.shared.url_utils import (
     title_tokens,
 )
 
-__all__ = ("_hydrate_variant_axes",)
+__all__ = ("hydrate_variant_axes", "_hydrate_variant_axes")
 
 gender_possessive_re = (
     re.compile(str(GENDER_POSSESSIVE_PATTERN), re.I)
@@ -194,3 +194,6 @@ def _record_url_suffix_after_title(record: dict[str, Any]) -> str:
     if not suffix_tokens or len(suffix_tokens) > 4:
         return ""
     return title_preserving_acronyms(" ".join(suffix_tokens))
+
+
+hydrate_variant_axes = _hydrate_variant_axes

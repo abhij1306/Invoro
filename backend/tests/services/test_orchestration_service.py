@@ -124,7 +124,21 @@ async def test_orchestration_sequences_listing_detail_and_promotes_monitor(
         workflow_id=workflow.id,
         user=test_user,
     )
+    assert set(comparison) == {
+        "workflow_id",
+        "project_id",
+        "detail_run_id",
+        "rows",
+        "export_csv_url",
+        "export_json_url",
+        "crawl_studio_url",
+    }
+    assert comparison["workflow_id"] == workflow.id
+    assert comparison["project_id"] == project.id
     assert comparison["detail_run_id"] == detail_run.id
+    assert comparison["export_csv_url"] == f"/api/crawls/{detail_run.id}/export/csv"
+    assert comparison["export_json_url"] == f"/api/crawls/{detail_run.id}/export/json"
+    assert comparison["crawl_studio_url"] == f"/crawl?run_id={detail_run.id}"
     rows = comparison["rows"]
     assert isinstance(rows, list)
     assert len(rows) == 1

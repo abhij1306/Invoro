@@ -130,7 +130,7 @@ FILE_LOC_BUDGETS = {
     Path("app/services/extract/detail_variant_pruning.py"): 555,
     Path("app/services/extract/detail_image_cleanup.py"): 505,
     Path("app/services/extract/detail_price_core.py"): 1000,
-    Path("app/services/extract/detail_identity_core.py"): 1000,
+    Path("app/services/extract/detail/identity/core.py"): 1030,
     # Extract decomposition plan Slice 2 follow-up: split stage owners must stay
     # small after variant_record_normalization.py was removed.
     Path("app/services/extract/variant_normalization/contract.py"): 400,

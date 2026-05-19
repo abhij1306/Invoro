@@ -22,6 +22,9 @@ from app.services.shared.field_coerce import clean_text
 from app.services.extract.variant_normalization import size_color_extraction
 
 __all__ = (
+    "dedupe_and_prune_variant_rows",
+    "prune_child_size_rows_from_adult_products",
+    "prune_unrecognized_size_rows_when_real_sizes_exist",
     "_dedupe_and_prune_variant_rows",
     "_prune_unrecognized_size_rows_when_real_sizes_exist",
     "_prune_child_size_rows_from_adult_products",
@@ -207,3 +210,10 @@ def _richer_variant_pair(
     if variant_row_richness(right) > variant_row_richness(left):
         return right, left
     return left, right
+
+
+dedupe_and_prune_variant_rows = _dedupe_and_prune_variant_rows
+prune_child_size_rows_from_adult_products = _prune_child_size_rows_from_adult_products
+prune_unrecognized_size_rows_when_real_sizes_exist = (
+    _prune_unrecognized_size_rows_when_real_sizes_exist
+)

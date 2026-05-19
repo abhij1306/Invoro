@@ -18,7 +18,7 @@ from app.services.config.ucp_audit import (
     UCP_AUDIT_JOB_STATUS_QUEUED,
 )
 from app.services.ucp_audit.service import (
-    _best_agent_delta_url,
+    best_agent_delta_url,
     build_ucp_report_for_domain,
     build_ucp_audit_job_payload,
     create_ucp_audit_job,
@@ -302,4 +302,4 @@ def test_agent_delta_uses_richest_discounted_sample() -> None:
         ),
     ]
 
-    assert _best_agent_delta_url(sampled_pages, schema_scores) == sampled_pages[1][0]
+    assert best_agent_delta_url(sampled_pages, schema_scores) == sampled_pages[1][0]
