@@ -55,7 +55,8 @@
      Primary : Source Sans 3 (Google Fonts — SAP Fiori open-source typeface)
      Mono    : JetBrains Mono */
   --font-primary-family:
-    var(--font-primary-source, 'Source Sans 3'), 'Source Sans 3', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+    var(--font-primary-source, 'Source Sans 3'), 'Source Sans 3', system-ui, -apple-system,
+    'Helvetica Neue', Arial, sans-serif;
   --font-mono-family:
     var(--font-jetbrains-mono, 'JetBrains Mono'), 'JetBrains Mono', ui-monospace, Consolas,
     monospace;
@@ -1354,7 +1355,8 @@ html:not([data-theme='dark']) .code-block {
   overflow: hidden;
   text-overflow: ellipsis;
   font-size: var(--text-sm);
-  font-weight: var(--weight-normal);}
+  font-weight: var(--weight-normal);
+}
 
 .compact-data-table tbody tr {
   transition: background-color var(--transition-fast);
@@ -1501,7 +1503,7 @@ html:not([data-theme='dark']) .compact-data-table {
 }
 
 /* Hide redundant platform labels (e.g. 'Site', 'Feed') when badge is shown inside the table context */
-.commerce-table .ct-header-badge>span:first-child {
+.commerce-table .ct-header-badge > span:first-child {
   display: none;
 }
 
@@ -1609,10 +1611,12 @@ html:not([data-theme='dark']) .compact-data-table {
 }
 
 .skeleton {
-  background: linear-gradient(90deg,
-      var(--skeleton-base) 35%,
-      var(--skeleton-highlight) 50%,
-      var(--skeleton-base) 65%);
+  background: linear-gradient(
+    90deg,
+    var(--skeleton-base) 35%,
+    var(--skeleton-highlight) 50%,
+    var(--skeleton-base) 65%
+  );
   background-size: 1200px 100%;
   animation: shimmer 2.4s linear infinite;
   border-radius: var(--radius-sm);
@@ -1672,27 +1676,27 @@ html:not([data-theme='dark']) .compact-data-table {
   animation: spin 0.75s linear infinite;
 }
 
-.stagger-children>* {
+.stagger-children > * {
   animation: fade-in 180ms ease-out both;
 }
 
-.stagger-children>*:nth-child(2) {
+.stagger-children > *:nth-child(2) {
   animation-delay: 50ms;
 }
 
-.stagger-children>*:nth-child(3) {
+.stagger-children > *:nth-child(3) {
   animation-delay: 100ms;
 }
 
-.stagger-children>*:nth-child(4) {
+.stagger-children > *:nth-child(4) {
   animation-delay: 150ms;
 }
 
-.stagger-children>*:nth-child(5) {
+.stagger-children > *:nth-child(5) {
   animation-delay: 200ms;
 }
 
-.stagger-children>*:nth-child(6) {
+.stagger-children > *:nth-child(6) {
   animation-delay: 250ms;
 }
 
@@ -1708,7 +1712,6 @@ html[data-theme='dark'] .noise-overlay {
 
 /* ── Reduced motion */
 @media (prefers-reduced-motion: reduce) {
-
   *,
   *::before,
   *::after {

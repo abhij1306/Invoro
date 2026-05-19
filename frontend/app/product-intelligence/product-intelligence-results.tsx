@@ -256,13 +256,7 @@ function IconAction({
   onClick: () => void;
 }) {
   return (
-    <Button
-      type="button"
-      variant="quiet"
-      size="icon"
-      onClick={onClick}
-      aria-label={label}
-    >
+    <Button type="button" variant="quiet" size="icon" onClick={onClick} aria-label={label}>
       {children}
     </Button>
   );

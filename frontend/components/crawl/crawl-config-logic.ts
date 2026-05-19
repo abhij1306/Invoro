@@ -50,11 +50,7 @@ export const CAPTURE_NETWORK_OPTIONS = new Set<CaptureNetworkMode>([
   'matched_only',
   'all_small_json',
 ]);
-export const BROWSER_ENGINE_OPTIONS = new Set<BrowserEngine>([
-  'auto',
-  'patchright',
-  'real_chrome',
-]);
+export const BROWSER_ENGINE_OPTIONS = new Set<BrowserEngine>(['auto', 'patchright', 'real_chrome']);
 
 const DIAGNOSTICS_PRESETS: Record<DiagnosticsPreset, DomainRunProfile['diagnostics_profile']> = {
   lean: {

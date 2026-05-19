@@ -755,7 +755,7 @@ export function CrawlConfigScreen({
             </div>
 
             {(crawlTab === 'category' && categoryMode === 'bulk') ||
-              (crawlTab === 'pdp' && pdpMode === 'batch') ? (
+            (crawlTab === 'pdp' && pdpMode === 'batch') ? (
               <label className="grid gap-2">
                 <span className="type-control font-medium">URLs (one per line)</span>
                 <div className="relative">
@@ -848,7 +848,7 @@ export function CrawlConfigScreen({
                 <div className={RUN_SETUP_ROW_CLASS}>
                   <div className={RUN_SETUP_LABEL_CLASS}>
                     <Globe className="text-accent size-4 shrink-0" />
-                    <div className="type-body-sm font-semibold text-foreground">Domain</div>
+                    <div className="type-body-sm text-foreground font-semibold">Domain</div>
                   </div>
                   <Dropdown<CrawlDomain>
                     ariaLabel="Domain"
@@ -867,7 +867,7 @@ export function CrawlConfigScreen({
                   <div className={RUN_SETUP_LABEL_CLASS}>
                     <SlidersHorizontal className="text-accent size-4 shrink-0" />
                     <div className="flex items-center gap-1.5">
-                      <div className="type-body-sm font-semibold text-foreground">Mode</div>
+                      <div className="type-body-sm text-foreground font-semibold">Mode</div>
                       <Tooltip content="Advanced Mode exposes the full fetch, locality, diagnostics, and selector controls.">
                         <Info className="text-muted hover:text-secondary size-3.5 cursor-help transition-colors" />
                       </Tooltip>
@@ -892,7 +892,9 @@ export function CrawlConfigScreen({
                 <div className="flex h-[var(--control-height)] items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
                     <Sparkles className="text-accent size-4 shrink-0" />
-                    <span className="type-body-sm font-semibold text-foreground">LLM Processing</span>
+                    <span className="type-body-sm text-foreground font-semibold">
+                      LLM Processing
+                    </span>
                     <Tooltip content="Per-run enrichment only. This does not overwrite saved domain defaults.">
                       <Info className="text-muted hover:text-secondary size-3.5 cursor-help transition-colors" />
                     </Tooltip>
@@ -908,7 +910,7 @@ export function CrawlConfigScreen({
                   <div className="flex h-[var(--control-height)] items-center justify-between gap-3">
                     <div className="flex items-center gap-2">
                       <Globe className="text-accent size-4 shrink-0" />
-                      <span className="type-body-sm font-semibold text-foreground">Proxy List</span>
+                      <span className="type-body-sm text-foreground font-semibold">Proxy List</span>
                       <Tooltip content={'Example:\nhttp://host:port\nhttp://user:pass@host:port'}>
                         <Info className="text-muted hover:text-secondary size-3.5 cursor-help transition-colors" />
                       </Tooltip>
@@ -923,9 +925,7 @@ export function CrawlConfigScreen({
 
                 {proxyEnabled ? (
                   <div className="ml-8 flex flex-col gap-4">
-                    <div className="type-body-sm font-semibold text-foreground">
-                      Proxy URLs
-                    </div>
+                    <div className="type-body-sm text-foreground font-semibold">Proxy URLs</div>
                     <Textarea
                       value={proxyInput}
                       onChange={(event) => {
@@ -953,7 +953,9 @@ export function CrawlConfigScreen({
         {studioMode === 'advanced' ? (
           <Card className="section-card overflow-hidden p-0 xl:col-span-2">
             <header className="border-border flex h-10 items-center justify-between border-b bg-[color-mix(in_srgb,var(--bg-alt)_40%,var(--bg-panel))] px-6">
-              <span className="type-heading-3 text-foreground font-semibold">Field Configuration</span>
+              <span className="type-heading-3 text-foreground font-semibold">
+                Field Configuration
+              </span>
               <div className="flex items-center gap-2">
                 <Button
                   variant="quiet"
@@ -965,12 +967,7 @@ export function CrawlConfigScreen({
                   <Sparkles className="size-3" />
                   {generatingSelectors ? 'Generating...' : 'Generate'}
                 </Button>
-                <Button
-                  variant="quiet"
-                  type="button"
-                  size="sm"
-                  onClick={addManualField}
-                >
+                <Button variant="quiet" type="button" size="sm" onClick={addManualField}>
                   <Plus className="size-3" />
                   New Field
                 </Button>
@@ -1081,7 +1078,7 @@ export function CrawlConfigScreen({
                 </div>
                 <div className={ADVANCED_SUBSECTION_CLASS}>
                   <div className={ADVANCED_CONTROL_ROW_CLASS}>
-                    <div className="type-body-sm font-semibold text-foreground">Fetch Mode</div>
+                    <div className="type-body-sm text-foreground font-semibold">Fetch Mode</div>
                     <Dropdown<FetchMode>
                       ariaLabel="Fetch mode"
                       value={runProfile.fetch_profile.fetch_mode}
@@ -1105,7 +1102,7 @@ export function CrawlConfigScreen({
                     />
                   </div>
                   <div className={ADVANCED_CONTROL_ROW_CLASS}>
-                    <div className="type-body-sm font-semibold text-foreground">Browser Engine</div>
+                    <div className="type-body-sm text-foreground font-semibold">Browser Engine</div>
                     <Dropdown<BrowserEngine>
                       ariaLabel="Browser engine"
                       value={runProfile.acquisition_contract.preferred_browser_engine}
@@ -1128,7 +1125,7 @@ export function CrawlConfigScreen({
                     />
                   </div>
                   <div className={ADVANCED_CONTROL_ROW_CLASS}>
-                    <div className="type-body-sm font-semibold text-foreground">Extraction</div>
+                    <div className="type-body-sm text-foreground font-semibold">Extraction</div>
                     <Dropdown<ExtractionSource>
                       ariaLabel="Extraction source"
                       value={runProfile.fetch_profile.extraction_source}
@@ -1152,7 +1149,7 @@ export function CrawlConfigScreen({
                     />
                   </div>
                   <div className={ADVANCED_CONTROL_ROW_CLASS}>
-                    <div className="type-body-sm font-semibold text-foreground">JS Mode</div>
+                    <div className="type-body-sm text-foreground font-semibold">JS Mode</div>
                     <Dropdown<JsMode>
                       ariaLabel="JavaScript mode"
                       value={runProfile.fetch_profile.js_mode}
@@ -1175,7 +1172,7 @@ export function CrawlConfigScreen({
                     />
                   </div>
                   <div className={ADVANCED_CONTROL_ROW_CLASS}>
-                    <div className="type-body-sm font-semibold text-foreground">Traversal</div>
+                    <div className="type-body-sm text-foreground font-semibold">Traversal</div>
                     <Dropdown<TraversalDropdownValue>
                       ariaLabel="Traversal mode"
                       value={runProfile.fetch_profile.traversal_mode ?? 'off'}
@@ -1285,7 +1282,9 @@ export function CrawlConfigScreen({
                   />
                   <div className={ADVANCED_CONTROL_ROW_CLASS}>
                     <div className="flex items-center gap-2">
-                      <div className="type-body-sm font-semibold text-foreground">Host Memory TTL</div>
+                      <div className="type-body-sm text-foreground font-semibold">
+                        Host Memory TTL
+                      </div>
                       <Tooltip
                         content={`Blank uses default ${CRAWL_DEFAULTS.HOST_MEMORY_TTL_SECONDS}s. Lower TTL forgets host block and pacing memory sooner.`}
                       >
@@ -1317,7 +1316,7 @@ export function CrawlConfigScreen({
                 </div>
                 <div className={ADVANCED_SUBSECTION_CLASS}>
                   <div className={ADVANCED_CONTROL_ROW_CLASS}>
-                    <div className="type-body-sm font-semibold text-foreground">Geo Country</div>
+                    <div className="type-body-sm text-foreground font-semibold">Geo Country</div>
                     <Input
                       value={runProfile.locality_profile.geo_country}
                       onChange={(event) =>
@@ -1333,7 +1332,7 @@ export function CrawlConfigScreen({
                     />
                   </div>
                   <div className={ADVANCED_CONTROL_ROW_CLASS}>
-                    <div className="type-body-sm font-semibold text-foreground">Language Hint</div>
+                    <div className="type-body-sm text-foreground font-semibold">Language Hint</div>
                     <Input
                       value={runProfile.locality_profile.language_hint ?? ''}
                       onChange={(event) =>
@@ -1349,7 +1348,7 @@ export function CrawlConfigScreen({
                     />
                   </div>
                   <div className={ADVANCED_CONTROL_ROW_CLASS}>
-                    <div className="type-body-sm font-semibold text-foreground">Currency Hint</div>
+                    <div className="type-body-sm text-foreground font-semibold">Currency Hint</div>
                     <Input
                       value={runProfile.locality_profile.currency_hint ?? ''}
                       onChange={(event) =>
@@ -1376,7 +1375,7 @@ export function CrawlConfigScreen({
                 </div>
                 <div className={ADVANCED_SUBSECTION_CLASS}>
                   <div className={ADVANCED_CONTROL_ROW_CLASS}>
-                    <div className="type-body-sm font-semibold text-foreground">Diagnostics</div>
+                    <div className="type-body-sm text-foreground font-semibold">Diagnostics</div>
                     <Dropdown<DiagnosticsPreset>
                       ariaLabel="Diagnostics preset"
                       value={diagnosticsPreset}
@@ -1393,7 +1392,9 @@ export function CrawlConfigScreen({
                     />
                   </div>
                   <div className={ADVANCED_CONTROL_ROW_CLASS}>
-                    <div className="type-body-sm font-semibold text-foreground">Network Capture</div>
+                    <div className="type-body-sm text-foreground font-semibold">
+                      Network Capture
+                    </div>
                     <Dropdown<CaptureNetworkMode>
                       ariaLabel="Network capture"
                       value={runProfile.diagnostics_profile.capture_network}

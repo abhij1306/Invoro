@@ -63,7 +63,7 @@ export function MonitorListItem({
   return (
     <div
       className={cn(
-        'group grid gap-3 px-4 py-4 transition-colors hover:bg-background-alt md:grid-cols-[minmax(0,1fr)_auto]',
+        'group hover:bg-background-alt grid gap-3 px-4 py-4 transition-colors md:grid-cols-[minmax(0,1fr)_auto]',
         open && 'relative z-10',
       )}
     >
@@ -122,7 +122,7 @@ export function MonitorListItem({
               ref={menuRef}
               id={`monitor-actions-${id}`}
               role="menu"
-              className="border-border bg-background-elevated absolute right-0 z-20 mt-1 w-36 rounded-[var(--radius-md)] border py-1 shadow-card"
+              className="border-border bg-background-elevated shadow-card absolute right-0 z-20 mt-1 w-36 rounded-[var(--radius-md)] border py-1"
             >
               <ActionButton
                 ref={firstActionRef}
@@ -149,15 +149,14 @@ export function MonitorListItem({
   );
 }
 
-const ActionButton = forwardRef<HTMLButtonElement, {
-  icon: typeof Pause;
-  label: string;
-  onClick: () => void;
-}>(function ActionButton({
-  icon: Icon,
-  label,
-  onClick,
-}, ref) {
+const ActionButton = forwardRef<
+  HTMLButtonElement,
+  {
+    icon: typeof Pause;
+    label: string;
+    onClick: () => void;
+  }
+>(function ActionButton({ icon: Icon, label, onClick }, ref) {
   return (
     <button
       ref={ref}

@@ -105,7 +105,8 @@ def _section_with_saved_root_aliases(
     root_keys: set[str],
     root_aliases: dict[str, str],
 ) -> dict[str, object]:
-    section = dict(saved.get(section_key) or {})
+    raw_section = saved.get(section_key)
+    section = dict(raw_section) if isinstance(raw_section, dict) else {}
     for root_key in root_keys:
         if root_key not in saved:
             continue

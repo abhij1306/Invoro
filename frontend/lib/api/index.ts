@@ -330,9 +330,7 @@ export const api = {
   listOrchestrationWorkflows: (projectId: number) => {
     const query = new URLSearchParams();
     query.set('project_id', String(projectId));
-    return apiClient.get<OrchestrationWorkflow[]>(
-      withQuery('/api/orchestration/workflows', query),
-    );
+    return apiClient.get<OrchestrationWorkflow[]>(withQuery('/api/orchestration/workflows', query));
   },
   getOrchestrationWorkflow: (workflowId: number) =>
     apiClient.get<OrchestrationWorkflow>(`/api/orchestration/workflows/${workflowId}`),

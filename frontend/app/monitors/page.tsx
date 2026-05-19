@@ -94,7 +94,9 @@ export default function MonitorsPage() {
           </Button>
         }
       />
-      {notice ? <div className="alert-surface alert-success px-3 py-2 text-sm">{notice}</div> : null}
+      {notice ? (
+        <div className="alert-surface alert-success px-3 py-2 text-sm">{notice}</div>
+      ) : null}
       {error ? <InlineAlert message={error} /> : null}
       <SurfacePanel className="overflow-visible">
         <div className="border-divider flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">

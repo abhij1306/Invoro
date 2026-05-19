@@ -38,7 +38,6 @@ from app.services.acquisition.browser_storage_state import (
     mark_storage_state_persist_policy,
 )
 from app.services.acquisition.browser_page_flow import (
-    BrowserFinalizeInput,
     append_readiness_probe,
     finalize_browser_fetch,
     navigate_browser_page_impl,
@@ -47,6 +46,7 @@ from app.services.acquisition.browser_page_flow import (
     serialize_browser_page_content_impl,
     settle_browser_page_impl,
 )
+from app.services.acquisition.browser_result_builder import BrowserFinalizeInput
 from app.services.acquisition.browser_proxy_config import (
     display_proxy as _display_proxy,
 )
@@ -106,9 +106,9 @@ from app.services.acquisition.runtime import (
 )
 from app.services.acquisition.traversal import (
     execute_listing_traversal,
-    recover_listing_page_content,
     should_run_traversal,
 )
+from app.services.acquisition.traversal_recovery import recover_listing_page_content
 from app.services.config.browser_fingerprint_profiles import (
     BEHAVIOR_REALISM_ELIGIBLE_BROWSER_REASONS,
     WARMUP_ELIGIBLE_BROWSER_REASONS,
@@ -128,17 +128,15 @@ from app.services.domain_utils import normalize_domain
 logger = logging.getLogger(__name__)
 
 def _sync_browser_pool_compatibility() -> None:
-    _browser_pool.SharedBrowserRuntime = SharedBrowserRuntime
+    setattr(_browser_pool, "SharedBrowserRuntime", SharedBrowserRuntime)
     if _browser_pool._BROWSER_POOL is not _BROWSER_POOL:
         _browser_pool._BROWSER_POOL = _BROWSER_POOL
-    _browser_pool.build_playwright_context_spec = build_playwright_context_spec
-    _browser_pool._resolve_browser_binary = _resolve_browser_binary
-    _browser_pool.persist_context_storage_state = persist_context_storage_state
-    _browser_pool.Socks5AuthBridge = Socks5AuthBridge
-    _browser_pool.REAL_CHROME_IGNORE_DEFAULT_ARGS = REAL_CHROME_IGNORE_DEFAULT_ARGS
-    _browser_pool._patchright_async_playwright_factory = (
-        _patchright_async_playwright_factory
-    )
+    setattr(_browser_pool, "build_playwright_context_spec", build_playwright_context_spec)
+    setattr(_browser_pool, "_resolve_browser_binary", _resolve_browser_binary)
+    setattr(_browser_pool, "persist_context_storage_state", persist_context_storage_state)
+    setattr(_browser_pool, "Socks5AuthBridge", Socks5AuthBridge)
+    setattr(_browser_pool, "REAL_CHROME_IGNORE_DEFAULT_ARGS", REAL_CHROME_IGNORE_DEFAULT_ARGS)
+    setattr(_browser_pool, "_patchright_async_playwright_factory", _patchright_async_playwright_factory)
 
 
 _sync_browser_pool_compatibility()

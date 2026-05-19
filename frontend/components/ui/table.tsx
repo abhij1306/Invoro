@@ -67,7 +67,7 @@ export function TableRow({
     <tr
       {...props}
       className={cn(
-        'border-border h-[var(--table-row-height)] border-b transition-colors odd:bg-panel even:bg-background-alt hover:bg-accent-subtle',
+        'border-border odd:bg-panel even:bg-background-alt hover:bg-accent-subtle h-[var(--table-row-height)] border-b transition-colors',
         className,
       )}
     >
@@ -88,7 +88,7 @@ export function TableHead({
     <th
       {...props}
       className={cn(
-        'text-muted h-[var(--table-header-height)] bg-background-alt px-4 text-left align-middle [font-family:var(--table-header-font-family)] text-[length:var(--table-header-font-size)] font-bold tracking-[var(--table-header-tracking)]',
+        'text-muted bg-background-alt h-[var(--table-header-height)] px-4 text-left align-middle [font-family:var(--table-header-font-family)] text-[length:var(--table-header-font-size)] font-bold tracking-[var(--table-header-tracking)]',
         className,
       )}
     >

@@ -214,7 +214,7 @@ def _product_scope(soup: BeautifulSoup) -> Any:
     if heading is None:
         return soup
     node = heading.parent
-    best = soup
+    best: object = soup
     best_score = -1
     for _ in range(7):
         if node is None or not hasattr(node, "get_text"):

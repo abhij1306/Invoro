@@ -54,7 +54,7 @@ def _prune_irrelevant_detail_structured_payload(
     requested_title: str | None = None,
     requested_tokens: set[str] | None = None,
     requested_codes: set[str] | None = None,
-    detail_title_from_url: Callable[[str], str] | None = None,
+    detail_title_from_url: Callable[[str], str | None] | None = None,
     detail_identity_tokens: Callable[[object], set[str]] | None = None,
     detail_identity_codes_from_url: Callable[[str], set[str]] | None = None,
 ) -> object | None:

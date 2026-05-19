@@ -119,7 +119,9 @@ def meaningful_table(table: Tag) -> bool:
     text_blob = clean_text(table.get_text(" ", strip=True)).lower()
     if re.search(r"\b(?:sun|mon|tue|wed|thu|fri|sat)\b", text_blob) and re.search(r"\b(?:next|prev|today)\b", text_blob):
         return False
-    table_class = " ".join(table.get("class", [])).lower()
+    raw_class = table.get("class")
+    class_values = raw_class if isinstance(raw_class, list) else [raw_class]
+    table_class = " ".join(str(value) for value in class_values if value).lower()
     table_id = str(table.get("id") or "").lower()
     return not any(token in f"{table_class} {table_id}" for token in ("nav", "menu", "calendar", "layout"))
 
@@ -159,7 +161,7 @@ def _table_context(table: Tag, root: Tag) -> str:
         caption_text = clean_text(caption.get_text(" ", strip=True))
         if caption_text:
             return caption_text
-    current = table
+    current: Tag | None = table
     while current is not None and current is not root:
         previous = current.find_previous_sibling()
         while previous is not None:

@@ -45,7 +45,8 @@ __all__ = (
 
 def _safe_compile_patterns(name: str, patterns: object) -> tuple[re.Pattern[str], ...]:
     compiled: list[re.Pattern[str]] = []
-    for pattern in tuple(patterns or ()):
+    raw_patterns = patterns if isinstance(patterns, (list, tuple, set, frozenset)) else ()
+    for pattern in raw_patterns:
         text = str(pattern).strip()
         if not text:
             continue

@@ -49,7 +49,9 @@ export default function ProjectsPage() {
         <div className="border-divider flex items-center justify-between border-b px-4 py-3">
           <div>
             <p className="type-label m-0">Active projects</p>
-            <p className="text-muted m-0 text-sm">Grouped workflows, runs, monitors, and exports.</p>
+            <p className="text-muted m-0 text-sm">
+              Grouped workflows, runs, monitors, and exports.
+            </p>
           </div>
         </div>
         <TableSurface>
@@ -82,7 +84,9 @@ export default function ProjectsPage() {
                         <p className="text-muted m-0 truncate text-xs">{project.description}</p>
                       </div>
                     </TableCell>
-                    <TableCell className="truncate">{project.competitors.join(', ') || '-'}</TableCell>
+                    <TableCell className="truncate">
+                      {project.competitors.join(', ') || '-'}
+                    </TableCell>
                     <TableCell className="truncate">{project.category || '-'}</TableCell>
                     <TableCell>{formatRelativeTime(project.updated_at)}</TableCell>
                     <TableCell className="text-right">
@@ -98,7 +102,10 @@ export default function ProjectsPage() {
               </TableBody>
             </Table>
           ) : (
-            <DataRegionEmpty title="No projects yet" description="Create a guided pricing project." />
+            <DataRegionEmpty
+              title="No projects yet"
+              description="Create a guided pricing project."
+            />
           )}
         </TableSurface>
       </SurfacePanel>

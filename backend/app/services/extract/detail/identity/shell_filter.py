@@ -92,10 +92,11 @@ def looks_like_site_shell_record(record: dict[str, Any], *, page_url: str) -> bo
         if isinstance(confidence_payload, dict)
         else None
     )
-    try:
-        confidence_score = float(confidence_value)
-    except (TypeError, ValueError):
-        confidence_score = 0.0
+    confidence_score = (
+        float(confidence_value)
+        if isinstance(confidence_value, (int, float, str))
+        else 0.0
+    )
     description_text = clean_text(record.get("description"))
     has_rich_pdp_corroboration = bool(
         record.get("price") not in (None, "", [], {})

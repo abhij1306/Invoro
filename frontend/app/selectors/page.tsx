@@ -354,7 +354,11 @@ export default function SelectorsPage() {
             {loadingSuggestions ? 'Loading...' : 'Load Page'}
           </Button>
         </div>
-        {loadError ? <div className="mt-4"><InlineAlert message={loadError} /></div> : null}
+        {loadError ? (
+          <div className="mt-4">
+            <InlineAlert message={loadError} />
+          </div>
+        ) : null}
       </SectionCard>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.05fr)_minmax(420px,0.95fr)]">
@@ -433,9 +437,9 @@ export default function SelectorsPage() {
                               updateRow(row.key, { kind, state: nextEditedState(row.state) })
                             }
                             options={[
-                                { value: 'xpath', label: 'XPath' },
-                                { value: 'css_selector', label: 'CSS' },
-                                { value: 'regex', label: 'Regex' },
+                              { value: 'xpath', label: 'XPath' },
+                              { value: 'css_selector', label: 'CSS' },
+                              { value: 'regex', label: 'Regex' },
                             ]}
                             ariaLabel="Selector type"
                           />
@@ -513,9 +517,7 @@ export default function SelectorsPage() {
                         <Button
                           type="button"
                           variant={
-                            row.state === 'accepted' || row.state === 'saved'
-                              ? 'neutral'
-                              : 'quiet'
+                            row.state === 'accepted' || row.state === 'saved' ? 'neutral' : 'quiet'
                           }
                           onClick={() =>
                             updateRow(row.key, { state: nextSelectorRowState(row.state) })

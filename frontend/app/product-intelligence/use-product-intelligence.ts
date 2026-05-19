@@ -150,9 +150,8 @@ export function useProductIntelligence() {
   }, [discovery, uniqueSelectedUrls]);
   const acceptedMatchCount = useMemo(
     () =>
-      (detailQuery.data?.matches ?? []).filter(
-        (match) => match.review_status === 'accepted',
-      ).length,
+      (detailQuery.data?.matches ?? []).filter((match) => match.review_status === 'accepted')
+        .length,
     [detailQuery.data?.matches],
   );
 

@@ -398,7 +398,9 @@ class SharedBrowserRuntime:
         domain: str | None = None,
         locality_profile: dict[str, object] | None = None,
         allow_storage_state: bool = True,
+        inject_init_script: bool = False,
     ):
+        del inject_init_script
         normalized_proxy = _normalized_proxy_value(proxy)
         if self.launch_proxy is None:
             if normalized_proxy is not None:

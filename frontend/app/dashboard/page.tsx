@@ -208,7 +208,9 @@ export default function DashboardPage() {
                 <Badge tone={statusTone(status)} flat={isSubduedStatus(status)}>
                   {statusLabel(status)}
                 </Badge>
-                <span className="font-mono text-sm font-semibold tabular-nums text-primary">{count}</span>
+                <span className="text-primary font-mono text-sm font-semibold tabular-nums">
+                  {count}
+                </span>
               </div>
             ))}
           </div>
@@ -239,15 +241,15 @@ export default function DashboardPage() {
           )}
         </SurfaceSection>
         {/* Top domains */}
-        <SurfaceSection 
-          title="Top Domains" 
+        <SurfaceSection
+          title="Top Domains"
           description="By run count"
           bodyClassName="p-4 space-y-3"
         >
           {isLoading ? (
             <SkeletonRows count={5} />
           ) : data?.top_domains?.length ? (
-            <div className="divide-y divide-border/50">
+            <div className="divide-border/50 divide-y">
               {data.top_domains.map((item) => (
                 <DomainBar
                   key={item.domain}

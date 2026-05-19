@@ -211,8 +211,12 @@ def _apply_regex_filter(pattern: str | None, values: list[str]) -> list[str]:
     filtered: list[str] = []
     for value in values:
         try:
-            kwargs = {"timeout": timeout} if timeout is not None else {}
-            match = regex_lib.search(pattern, value, regex_lib.DOTALL, **kwargs)
+            match = regex_lib.search(
+                pattern,
+                value,
+                regex_lib.DOTALL,
+                timeout=timeout,
+            )
         except TimeoutError:
             logger.warning(
                 "Timed out while evaluating selector regex",

@@ -56,7 +56,7 @@ scalar_field_pollution_values = frozenset(
     for value in tuple(SCALAR_FIELD_POLLUTION_VALUES or ())
     if clean_text(value)
 )
-variant_separate_dimension_size_rules = []
+variant_separate_dimension_size_rules_list: list[tuple[re.Pattern[str], str]] = []
 for rule in tuple(VARIANT_SEPARATE_DIMENSION_SIZE_RULES or ()):
     if not isinstance(rule, dict):
         continue
@@ -65,13 +65,13 @@ for rule in tuple(VARIANT_SEPARATE_DIMENSION_SIZE_RULES or ()):
     if not pattern or not style:
         continue
     try:
-        variant_separate_dimension_size_rules.append((re.compile(pattern, re.I), style))
+        variant_separate_dimension_size_rules_list.append((re.compile(pattern, re.I), style))
     except re.error:
         logger.warning(
             "Skipping invalid variant separate-dimension size rule",
             extra={"pattern": pattern},
         )
-variant_separate_dimension_size_rules = tuple(variant_separate_dimension_size_rules)
+variant_separate_dimension_size_rules = tuple(variant_separate_dimension_size_rules_list)
 variant_title_stopwords = frozenset(
     clean_text(token).lower()
     for token in tuple(VARIANT_TITLE_STOPWORDS or ())

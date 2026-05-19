@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -31,7 +31,7 @@ class MonitorCreate(BaseModel):
     surface: str = Field(min_length=1)
     tracked_fields: list[str] = Field(default_factory=lambda: ["price"])
     schedule_interval_hours: int = Field(ge=MIN_SCHEDULE_INTERVAL_HOURS)
-    priority: MonitorPriority = MONITOR_PRIORITY_BACKGROUND
+    priority: MonitorPriority = cast(MonitorPriority, MONITOR_PRIORITY_BACKGROUND)
     retention_days: int = Field(default=30, ge=1, le=MAX_RETENTION_DAYS)
     requested_fields: list[str] = Field(default_factory=list)
     settings: dict[str, Any] = Field(default_factory=dict)

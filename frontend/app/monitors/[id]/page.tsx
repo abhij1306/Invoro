@@ -86,7 +86,9 @@ export default function MonitorDetailPage({
       <div className="page-stack">
         <PageHeader title="Monitor" />
         <InlineAlert
-          message={monitorQuery.error instanceof Error ? monitorQuery.error.message : 'Monitor not found.'}
+          message={
+            monitorQuery.error instanceof Error ? monitorQuery.error.message : 'Monitor not found.'
+          }
         />
       </div>
     );
@@ -97,7 +99,9 @@ export default function MonitorDetailPage({
   return (
     <div className="page-stack">
       <PageHeader title={monitor.name} description="Monitor detail and change history." />
-      {notice ? <div className="alert-surface alert-success px-3 py-2 text-sm">{notice}</div> : null}
+      {notice ? (
+        <div className="alert-surface alert-success px-3 py-2 text-sm">{notice}</div>
+      ) : null}
       <MonitorHeader
         monitor={monitor}
         runPending={runMutation.isPending}

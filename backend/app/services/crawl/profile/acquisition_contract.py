@@ -79,7 +79,12 @@ def build_success_acquisition_contract(
     extraction_source = str(diagnostics.get("extraction_source") or "").strip().lower()
     required_rendering = extraction_source in {"rendered_dom", "rendered_dom_visual"}
     required_traversal = bool(diagnostics.get("traversal_activated"))
-    required_network_payloads = int(float(diagnostics.get("network_payload_count") or 0)) > 0
+    raw_network_payload_count = diagnostics.get("network_payload_count")
+    required_network_payloads = (
+        float(raw_network_payload_count)
+        if isinstance(raw_network_payload_count, (int, float, str))
+        else 0.0
+    ) > 0
     handoff_eligible = (
         normalized_method == "browser"
         and preferred_engine != "auto"
@@ -181,8 +186,8 @@ async def note_acquisition_contract_failure(
     raw_source_run_id = profile.get("source_run_id")
     source_run_id = (
         int(raw_source_run_id)
-        if raw_source_run_id not in (None, "", [], {})
-        else int(existing.source_run_id or 1)
+        if isinstance(raw_source_run_id, (int, float, str)) and raw_source_run_id != ""
+        else 1
     )
     return await save_domain_run_profile(
         session,

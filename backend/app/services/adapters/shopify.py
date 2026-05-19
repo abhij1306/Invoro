@@ -324,17 +324,18 @@ class ShopifyAdapter(BaseAdapter):
                     anchor.get_text(" ", strip=True) if hasattr(anchor, "get_text") else "",
                 ]
             )
-            for parent in (anchor.find_parent("button"), anchor.find_parent("label")):
-                if parent is not None:
-                    candidates.extend(
-                        [
-                            parent.get("aria-label"),
-                            parent.get("title"),
-                            parent.get("data-value"),
-                            parent.get("data-option-value"),
-                            parent.get_text(" ", strip=True),
-                        ]
-                    )
+            if hasattr(anchor, "find_parent"):
+                for parent in (anchor.find_parent("button"), anchor.find_parent("label")):
+                    if parent is not None:
+                        candidates.extend(
+                            [
+                                parent.get("aria-label"),
+                                parent.get("title"),
+                                parent.get("data-value"),
+                                parent.get("data-option-value"),
+                                parent.get_text(" ", strip=True),
+                            ]
+                        )
         for candidate in candidates:
             value = self._clean_linked_axis_label(candidate)
             if value:

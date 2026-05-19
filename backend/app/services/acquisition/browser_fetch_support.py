@@ -8,7 +8,7 @@ from app.services.acquisition.browser_diagnostics import (
     build_browser_diagnostics_contract,
     build_failed_browser_diagnostics,
 )
-from app.services.acquisition.browser_page_flow import dismiss_safe_location_interstitial
+from app.services.acquisition.browser_page_helpers import dismiss_safe_location_interstitial
 from app.services.acquisition.runtime import PageFetchResult, copy_headers
 from app.services.shared.field_coerce import clean_text
 
@@ -83,10 +83,20 @@ def build_browser_fetch_result(
 
 
 def _status_code_or_zero(value: object) -> int:
-    try:
-        return int(value or 0)
-    except (TypeError, ValueError):
+    if value in (None, ""):
         return 0
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str):
+        try:
+            return int(value)
+        except ValueError:
+            return 0
+    return 0
 
 
 def build_browser_fetch_diagnostics(

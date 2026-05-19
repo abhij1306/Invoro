@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from collections.abc import Iterable
 from types import SimpleNamespace
 from urllib.parse import urlparse, urlunparse
 
@@ -123,7 +124,7 @@ def _manifest_url(value: str) -> str:
 def _declared_capabilities(payload: dict) -> list[str]:
     raw = payload.get("capabilities")
     if isinstance(raw, dict):
-        values = raw.keys()
+        values: Iterable[object] = raw.keys()
     elif isinstance(raw, list):
         values = raw
     else:

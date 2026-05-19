@@ -1054,7 +1054,7 @@ export const LogTerminal = memo(function LogTerminal({
                   )}
                 >
                   <div className="type-body text-muted font-medium opacity-60">
-                    {(group.index ?? (index + 1)).toString().padStart(2, '0')}
+                    {(group.index ?? index + 1).toString().padStart(2, '0')}
                   </div>
                   <div className="min-w-0">
                     {isRunEventGroup ? (

@@ -42,7 +42,11 @@ export function MonitorEvents({
   });
 
   if (query.error) {
-    return <DataRegionError message={query.error instanceof Error ? query.error.message : 'Events failed.'} />;
+    return (
+      <DataRegionError
+        message={query.error instanceof Error ? query.error.message : 'Events failed.'}
+      />
+    );
   }
 
   const events = query.data?.items ?? [];
@@ -72,13 +76,15 @@ export function MonitorEvents({
       {query.isPending ? (
         <div className="skeleton h-32 w-full rounded-[var(--radius-lg)]" />
       ) : events.length ? (
-        <div className="divide-border rounded-[var(--radius-lg)] border border-border">
+        <div className="divide-border border-border rounded-[var(--radius-lg)] border">
           {events.map((event) => (
             <div key={event.id} className="px-4 py-3">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="type-caption-mono text-accent">{event.event_type}</span>
                 {event.field_name ? <span className="type-control">{event.field_name}</span> : null}
-                <span className="text-muted type-caption truncate">{hostPath(event.source_url)}</span>
+                <span className="text-muted type-caption truncate">
+                  {hostPath(event.source_url)}
+                </span>
               </div>
               <p className="text-secondary type-body-sm mt-1">
                 {event.event_type === 'field_changed'
@@ -87,7 +93,9 @@ export function MonitorEvents({
                     ? 'New product detected'
                     : 'Product no longer found'}
               </p>
-              <p className="text-muted type-caption mt-1">{formatRelativeTime(event.detected_at)}</p>
+              <p className="text-muted type-caption mt-1">
+                {formatRelativeTime(event.detected_at)}
+              </p>
             </div>
           ))}
         </div>
@@ -95,13 +103,27 @@ export function MonitorEvents({
         <MonitorEmptyState kind="events" onRunNow={onRunNow} />
       )}
       <div className="flex justify-end gap-2">
-        <Button type="button" variant="neutral" size="sm" onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={page <= 1}>
+        <Button
+          type="button"
+          variant="neutral"
+          size="sm"
+          onClick={() => setPage((value) => Math.max(1, value - 1))}
+          disabled={page <= 1}
+        >
           Previous
         </Button>
-        <Button type="button" variant="neutral" size="sm" onClick={() => setPage((value) => value + 1)} disabled={!query.data || page * query.data.page_size >= query.data.total}>
+        <Button
+          type="button"
+          variant="neutral"
+          size="sm"
+          onClick={() => setPage((value) => value + 1)}
+          disabled={!query.data || page * query.data.page_size >= query.data.total}
+        >
           Next
         </Button>
-        {query.isFetching ? <RotateCw className="text-muted size-4 animate-spin self-center" /> : null}
+        {query.isFetching ? (
+          <RotateCw className="text-muted size-4 animate-spin self-center" />
+        ) : null}
       </div>
     </div>
   );

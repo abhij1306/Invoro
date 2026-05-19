@@ -9,9 +9,7 @@
       dark = matchMedia('(prefers-color-scheme:dark)').matches;
     }
   } catch {
-    dark =
-      typeof matchMedia === 'function' &&
-      matchMedia('(prefers-color-scheme:dark)').matches;
+    dark = typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme:dark)').matches;
   }
 
   document.documentElement.dataset.theme = dark ? 'dark' : 'light';

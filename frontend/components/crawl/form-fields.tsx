@@ -68,7 +68,7 @@ export function SettingSection({
               {renderedIcon}
             </div>
           ) : null}
-          <div className="type-body-sm font-semibold text-foreground min-w-0">{label}</div>
+          <div className="type-body-sm text-foreground min-w-0 font-semibold">{label}</div>
           <Tooltip content={description}>
             <Info className="text-muted hover:text-secondary size-3.5 cursor-help transition-colors" />
           </Tooltip>
@@ -120,7 +120,7 @@ export function SliderRow({
       className={cn('grid w-full gap-2.5 md:grid-cols-[160px_minmax(0,1fr)_100px] md:items-center')}
     >
       <div className="flex min-w-0 items-center gap-1.5">
-        <span className="type-body-sm font-semibold text-foreground">{label}</span>
+        <span className="type-body-sm text-foreground font-semibold">{label}</span>
         {description ? (
           <Tooltip content={description}>
             <Info className="text-muted hover:text-secondary size-3.5 cursor-help transition-colors" />
@@ -206,7 +206,7 @@ export function AdditionalFieldInput({
 
   return (
     <label className="grid gap-1.5">
-      <span className="type-body-sm font-semibold text-foreground">Additional Fields</span>
+      <span className="type-body-sm text-foreground font-semibold">Additional Fields</span>
       <Input
         value={value}
         onChange={(event) => handleChange(event.target.value)}

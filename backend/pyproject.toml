@@ -111,5 +111,6 @@ module = [
   "celery.*",
   "glom",
   "extruct",
+  "defusedxml",
 ]
 ignore_missing_imports = true

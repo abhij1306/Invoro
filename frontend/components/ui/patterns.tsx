@@ -24,7 +24,10 @@ function stableNodeSignature(value: ReactNode): string {
     const props = (value.props ?? {}) as Record<string, unknown>;
     const typeName = stableElementTypeName(value.type);
     const propEntries = Object.entries(props)
-      .filter(([key, propValue]) => key !== 'children' && key !== 'style' && typeof propValue !== 'function')
+      .filter(
+        ([key, propValue]) =>
+          key !== 'children' && key !== 'style' && typeof propValue !== 'function',
+      )
       .map(([key, propValue]) => `${key}:${stableNodeSignature(propValue as ReactNode)}`)
       .sort((left, right) => left.localeCompare(right));
     return `<${typeName}${propEntries.length ? ` ${propEntries.join(',')}` : ''}>${stableNodeSignature(props.children as ReactNode)}</${typeName}>`;
@@ -175,11 +178,11 @@ export function TabBar({
           aria-pressed={value === option.value}
           onClick={() => onChange(option.value)}
           className={cn(
-            'type-control relative z-10 inline-flex h-full min-w-[72px] shrink-0 items-center justify-center rounded-full text-sm font-semibold transition-all duration-200 ease-out select-none whitespace-nowrap',
+            'type-control relative z-10 inline-flex h-full min-w-[72px] shrink-0 items-center justify-center rounded-full text-sm font-semibold whitespace-nowrap transition-all duration-200 ease-out select-none',
             padX,
             value === option.value
-              ? 'border border-border bg-panel text-foreground shadow-xs'
-              : 'border border-transparent bg-transparent text-secondary opacity-95 hover:text-foreground hover:opacity-100',
+              ? 'border-border bg-panel text-foreground border shadow-xs'
+              : 'text-secondary hover:text-foreground border border-transparent bg-transparent opacity-95 hover:opacity-100',
           )}
         >
           {option.icon ? (
@@ -608,11 +611,13 @@ export function KVTile({
 }: Readonly<{ label: string; value: ReactNode; mono?: boolean; className?: string }>) {
   return (
     <div className={cn('bg-background-elevated rounded-[var(--radius-md)] px-2.5 py-2', className)}>
-      <div className="text-[10px] font-semibold tracking-wider text-muted uppercase font-sans">{label}</div>
+      <div className="text-muted font-sans text-[10px] font-semibold tracking-wider uppercase">
+        {label}
+      </div>
       <div
         className={cn(
           'text-foreground pt-1',
-          mono ? 'type-caption-mono font-medium !text-foreground' : 'type-control',
+          mono ? 'type-caption-mono !text-foreground font-medium' : 'type-control',
         )}
       >
         {value}

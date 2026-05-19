@@ -330,7 +330,10 @@ function Sidebar({ pathname }: Readonly<{ pathname: string }>) {
                   >
                     <Icon className="app-nav-icon" />
                     {item.href === '/monitors' && monitorPulse ? (
-                      <span className="bg-accent absolute right-2 size-1.5 rounded-full" aria-hidden />
+                      <span
+                        className="bg-accent absolute right-2 size-1.5 rounded-full"
+                        aria-hidden
+                      />
                     ) : null}
                     {!collapsed && <span className="truncate">{item.label}</span>}
                   </Link>

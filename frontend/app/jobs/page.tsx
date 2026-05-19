@@ -91,7 +91,7 @@ export default function JobsPage() {
         ) : jobsQuery.isError ? (
           <DataRegionError message="Failed to load jobs." />
         ) : jobs.length ? (
-          <div className="overflow-x-auto rounded-[var(--radius-md)] border border-border">
+          <div className="border-border overflow-x-auto rounded-[var(--radius-md)] border">
             <Table
               // 260px accounts for page header, navigation, filters, and padding.
               wrapperClassName="max-h-[max(200px,calc(100vh-260px))]"
@@ -114,7 +114,7 @@ export default function JobsPage() {
                   <TableHead>Progress</TableHead>
                   <TableHead>Started</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="text-right pr-4">Actions</TableHead>
+                  <TableHead className="pr-4 text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -122,13 +122,13 @@ export default function JobsPage() {
                   <TableRow key={job.run_id}>
                     <TableCell className="font-mono text-sm">{job.run_id}</TableCell>
                     <TableCell className="text-sm">{formatJobType(job.type)}</TableCell>
-                    <TableCell className="font-mono text-sm max-w-[320px] truncate" title={job.url}>
+                    <TableCell className="max-w-[320px] truncate font-mono text-sm" title={job.url}>
                       {job.url}
                     </TableCell>
                     <TableCell>
                       <ProgressBar percent={job.progress} />
                     </TableCell>
-                    <TableCell className="text-sm text-secondary">
+                    <TableCell className="text-secondary text-sm">
                       {formatTimestamp(job.started_at)}
                     </TableCell>
                     <TableCell>

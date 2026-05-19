@@ -43,7 +43,7 @@ def build_taxonomy_consistency_report(
 ) -> TaxonomyConsistencyReport:
     load_taxonomy_index()
     values = [
-        value
+        str(value)
         for value in (result.raw_product_type for result in results)
         if value not in (None, "")
     ]

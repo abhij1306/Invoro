@@ -19,9 +19,7 @@ import { Button } from '../ui/primitives';
 import { DataRegionError } from '../ui/patterns';
 import { MonitorEmptyState } from './monitor-empty-state';
 
-export function MonitorHistoryChart({
-  monitor,
-}: Readonly<{ monitor: MonitorJob }>) {
+export function MonitorHistoryChart({ monitor }: Readonly<{ monitor: MonitorJob }>) {
   const [expanded, setExpanded] = useState(false);
   const historyQuery = useQuery({
     queryKey: ['monitor-history', monitor.id],
@@ -34,13 +32,11 @@ export function MonitorHistoryChart({
 
   const rows = useMemo(() => {
     const history = historyQuery.data?.items ?? [];
-    return [...history]
-      .reverse()
-      .map((snapshot) => ({
-        time: formatJobsTimestamp(snapshot.created_at),
-        records: snapshot.record_count,
-        changes: snapshot.change_count,
-      }));
+    return [...history].reverse().map((snapshot) => ({
+      time: formatJobsTimestamp(snapshot.created_at),
+      records: snapshot.record_count,
+      changes: snapshot.change_count,
+    }));
   }, [historyQuery.data?.items]);
 
   const currentRecords = snapshotQuery.data ?? [];
@@ -72,8 +68,20 @@ export function MonitorHistoryChart({
                 borderRadius: 'var(--radius-md)',
               }}
             />
-            <Line type="monotone" dataKey="records" stroke="var(--accent)" strokeWidth={2} dot={false} />
-            <Line type="monotone" dataKey="changes" stroke="var(--warning)" strokeWidth={2} dot={false} />
+            <Line
+              type="monotone"
+              dataKey="records"
+              stroke="var(--accent)"
+              strokeWidth={2}
+              dot={false}
+            />
+            <Line
+              type="monotone"
+              dataKey="changes"
+              stroke="var(--warning)"
+              strokeWidth={2}
+              dot={false}
+            />
           </LineChart>
         </ResponsiveContainer>
       </div>
@@ -92,7 +100,12 @@ export function MonitorHistoryChart({
             ))}
           </div>
           {currentRecords.length > 10 ? (
-            <Button type="button" variant="neutral" size="sm" onClick={() => setExpanded((value) => !value)}>
+            <Button
+              type="button"
+              variant="neutral"
+              size="sm"
+              onClick={() => setExpanded((value) => !value)}
+            >
               {expanded ? 'Show less' : 'Show more'}
             </Button>
           ) : null}

@@ -28,8 +28,7 @@ export const monitorsApi = {
 
   get: (id: number | string) => apiClient.get<MonitorJob>(`/api/monitors/${id}`),
 
-  create: (payload: MonitorCreatePayload) =>
-    apiClient.post<MonitorJob>('/api/monitors', payload),
+  create: (payload: MonitorCreatePayload) => apiClient.post<MonitorJob>('/api/monitors', payload),
 
   update: (id: number | string, payload: MonitorUpdatePayload) =>
     apiClient.patch<MonitorJob>(`/api/monitors/${id}`, payload),
@@ -40,9 +39,7 @@ export const monitorsApi = {
     apiClient.post<RunNowResponse>(`/api/monitors/${id}/run/now`, {}),
 
   events: (id: number | string, params?: { page?: number; event_type?: MonitorEventType }) =>
-    apiClient.get<PaginatedResponse<MonitorEvent>>(
-      withQuery(`/api/monitors/${id}/events`, params),
-    ),
+    apiClient.get<PaginatedResponse<MonitorEvent>>(withQuery(`/api/monitors/${id}/events`, params)),
 
   history: (id: number | string, params?: { page?: number }) =>
     apiClient.get<PaginatedResponse<MonitorSnapshot>>(

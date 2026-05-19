@@ -33,7 +33,12 @@ function skipsHeadByDefault(surface: string) {
   return surface === 'ecommerce_detail' || surface === 'ecommerce_listing';
 }
 
-export function MonitorForm({ initial, onSubmit, onCancel, submitLabel }: Readonly<MonitorFormProps>) {
+export function MonitorForm({
+  initial,
+  onSubmit,
+  onCancel,
+  submitLabel,
+}: Readonly<MonitorFormProps>) {
   const initialHours = initial?.schedule_interval_hours ?? 24;
   const [name, setName] = useState(initial?.name ?? '');
   const [urlsText, setUrlsText] = useState((initial?.urls ?? []).join('\n'));
@@ -59,14 +64,19 @@ export function MonitorForm({ initial, onSubmit, onCancel, submitLabel }: Readon
   );
   const [proxyEnabled, setProxyEnabled] = useState(Boolean(initial?.settings?.proxy_enabled));
   const [jsRendering, setJsRendering] = useState(
-    String((initial?.settings?.fetch_profile as { js_mode?: string } | undefined)?.js_mode ?? '') ===
-      'enabled',
+    String(
+      (initial?.settings?.fetch_profile as { js_mode?: string } | undefined)?.js_mode ?? '',
+    ) === 'enabled',
   );
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   const urls = useMemo(
-    () => urlsText.split(/\r?\n/).map((url) => url.trim()).filter(Boolean),
+    () =>
+      urlsText
+        .split(/\r?\n/)
+        .map((url) => url.trim())
+        .filter(Boolean),
     [urlsText],
   );
   const availableFields = DEFAULT_FIELDS[surface] ?? ['price'];
@@ -160,18 +170,18 @@ export function MonitorForm({ initial, onSubmit, onCancel, submitLabel }: Readon
         />
       </Field>
       {urls.length > 500 ? (
-        <p className="text-warning type-caption">More than 500 URLs. Backend will reject this monitor.</p>
+        <p className="text-warning type-caption">
+          More than 500 URLs. Backend will reject this monitor.
+        </p>
       ) : null}
       {invalidUrls.length ? (
-        <p className="text-danger type-caption">{invalidUrls.length} URL(s) need http:// or https://.</p>
+        <p className="text-danger type-caption">
+          {invalidUrls.length} URL(s) need http:// or https://.
+        </p>
       ) : null}
       <div className="grid gap-4 md:grid-cols-2">
         <Field label="Surface">
-          <Dropdown
-            value={surface}
-            onChange={handleSurfaceChange}
-            options={surfaceOptions}
-          />
+          <Dropdown value={surface} onChange={handleSurfaceChange} options={surfaceOptions} />
         </Field>
         <Field label="Retention" hint={`Keep ${retentionDays} days of history`}>
           <input
@@ -203,7 +213,10 @@ export function MonitorForm({ initial, onSubmit, onCancel, submitLabel }: Readon
         </div>
       </div>
       <div className="grid gap-4 md:grid-cols-[1fr_160px]">
-        <Field label="Schedule Interval" hint={intervalHours < 1 ? 'Minimum is 1 hour.' : undefined}>
+        <Field
+          label="Schedule Interval"
+          hint={intervalHours < 1 ? 'Minimum is 1 hour.' : undefined}
+        >
           <Input
             type="number"
             min={1}

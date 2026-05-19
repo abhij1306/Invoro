@@ -1,7 +1,16 @@
 'use client';
 
 import * as DialogPrimitive from '@radix-ui/react-dialog';
-import { ArrowLeft, MoreHorizontal, Pause, Play, RotateCw, Settings, Trash2, X } from 'lucide-react';
+import {
+  ArrowLeft,
+  MoreHorizontal,
+  Pause,
+  Play,
+  RotateCw,
+  Settings,
+  Trash2,
+  X,
+} from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
 
@@ -65,7 +74,10 @@ export function MonitorHeader({
     <div className="border-border card-gradient rounded-[var(--radius-lg)] border p-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0 space-y-2">
-          <Link href="/monitors" className="text-muted hover:text-foreground type-caption inline-flex items-center gap-1">
+          <Link
+            href="/monitors"
+            className="text-muted hover:text-foreground type-caption inline-flex items-center gap-1"
+          >
             <ArrowLeft className="size-3.5" />
             Monitors
           </Link>
@@ -109,7 +121,7 @@ export function MonitorHeader({
               <MoreHorizontal className="size-4" />
             </Button>
             {menuOpen ? (
-              <div className="border-border bg-background-elevated absolute right-0 z-20 mt-1 w-36 rounded-[var(--radius-md)] border py-1 shadow-card">
+              <div className="border-border bg-background-elevated shadow-card absolute right-0 z-20 mt-1 w-36 rounded-[var(--radius-md)] border py-1">
                 <button
                   type="button"
                   onClick={() => {
@@ -136,7 +148,7 @@ export function MonitorHeader({
       <DialogPrimitive.Root open={editOpen} onOpenChange={setEditOpen}>
         <DialogPrimitive.Portal>
           <DialogPrimitive.Overlay className="fixed inset-0 z-[100] bg-[color-mix(in_srgb,var(--bg-base)_34%,black)]" />
-          <DialogPrimitive.Content className="border-border bg-background fixed top-0 right-0 z-[101] h-dvh w-[min(560px,100vw)] overflow-y-auto border-l p-5 shadow-card">
+          <DialogPrimitive.Content className="border-border bg-background shadow-card fixed top-0 right-0 z-[101] h-dvh w-[min(560px,100vw)] overflow-y-auto border-l p-5">
             <div className="mb-5 flex items-center justify-between gap-4">
               <DialogPrimitive.Title className="type-heading-3">Edit monitor</DialogPrimitive.Title>
               <DialogPrimitive.Close asChild>

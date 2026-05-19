@@ -252,6 +252,8 @@ def _apply_prepared_dom_fallbacks(
     *,
     selector_rules: list[dict[str, object]] | None,
 ) -> None:
+    if prepared.soup is None:
+        return
     apply_dom_fallbacks(
         prepared.dom_parser,
         prepared.soup,

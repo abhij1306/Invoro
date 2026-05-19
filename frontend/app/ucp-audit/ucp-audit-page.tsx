@@ -1,7 +1,16 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Play, RefreshCcw, ShieldCheck, Layers, AlertTriangle, Eye, CheckSquare, History } from 'lucide-react';
+import {
+  Play,
+  RefreshCcw,
+  ShieldCheck,
+  Layers,
+  AlertTriangle,
+  Eye,
+  CheckSquare,
+  History,
+} from 'lucide-react';
 
 import { InlineAlert, PageHeader } from '../../components/ui/patterns';
 import { Button, Input, Toggle } from '../../components/ui/primitives';
@@ -18,7 +27,9 @@ import { cn } from '../../lib/utils';
 
 export default function UcpAuditPage() {
   const controller = useUcpAudit();
-  const [activeTab, setActiveTab] = useState<'compliance' | 'findings' | 'agent-delta' | 'fix-sequence'>('compliance');
+  const [activeTab, setActiveTab] = useState<
+    'compliance' | 'findings' | 'agent-delta' | 'fix-sequence'
+  >('compliance');
   const [historyOpen, setHistoryOpen] = useState(false);
 
   const description =
@@ -39,7 +50,10 @@ export default function UcpAuditPage() {
       status: job.status,
       created_at: job.created_at,
       label: job.domain,
-      meta: job.summary?.overall_score != null ? `${job.summary.overall_score}/100 index` : 'Audit run queued',
+      meta:
+        job.summary?.overall_score != null
+          ? `${job.summary.overall_score}/100 index`
+          : 'Audit run queued',
     }));
   }, [controller.historyItems]);
 
@@ -50,12 +64,7 @@ export default function UcpAuditPage() {
         description={description}
         actions={
           <div className="flex w-full flex-wrap items-center justify-end gap-2">
-            <Button
-              type="button"
-              variant="neutral"
-              size="sm"
-              onClick={() => setHistoryOpen(true)}
-            >
+            <Button type="button" variant="neutral" size="sm" onClick={() => setHistoryOpen(true)}>
               <History className="size-3" />
               History
             </Button>
@@ -66,7 +75,9 @@ export default function UcpAuditPage() {
               onClick={() => void controller.detailQuery.refetch()}
               disabled={!controller.resolvedJobId || controller.detailQuery.isFetching}
             >
-              <RefreshCcw className={cn("size-3", controller.detailQuery.isFetching && "animate-spin")} />
+              <RefreshCcw
+                className={cn('size-3', controller.detailQuery.isFetching && 'animate-spin')}
+              />
               Refresh
             </Button>
             <Button
@@ -90,7 +101,7 @@ export default function UcpAuditPage() {
       ) : null}
 
       {/* Horizontal Compact Config Ribbon (Saves huge space) */}
-      <section className="border-border bg-panel rounded-[var(--radius-lg)] border p-4 shadow-sm border-l-4 border-l-accent relative overflow-hidden">
+      <section className="border-border bg-panel border-l-accent relative overflow-hidden rounded-[var(--radius-lg)] border border-l-4 p-4 shadow-sm">
         <div className="grid gap-4 sm:grid-cols-[1fr_140px_auto] sm:items-end">
           <label className="grid gap-1">
             <span className="field-label">Target Domain</span>
@@ -98,7 +109,7 @@ export default function UcpAuditPage() {
               value={controller.domain}
               onChange={(event) => controller.setDomain(event.target.value)}
               placeholder="example-domain.com"
-              className="font-mono text-sm h-[var(--control-height)] border-border focus:border-accent"
+              className="border-border focus:border-accent h-[var(--control-height)] font-mono text-sm"
               aria-label="Domain"
             />
           </label>
@@ -120,8 +131,8 @@ export default function UcpAuditPage() {
             />
           </label>
 
-          <div className="border-border flex h-[var(--control-height)] items-center justify-between gap-3 rounded-[var(--radius-md)] border px-3 bg-background/30 min-w-[130px]">
-            <span className="text-xs font-normal text-secondary">Agent Delta</span>
+          <div className="border-border bg-background/30 flex h-[var(--control-height)] min-w-[130px] items-center justify-between gap-3 rounded-[var(--radius-md)] border px-3">
+            <span className="text-secondary text-xs font-normal">Agent Delta</span>
             <Toggle
               checked={Boolean(controller.options.include_agent_delta)}
               onChange={(value) =>
@@ -137,12 +148,12 @@ export default function UcpAuditPage() {
       </section>
 
       {/* Full-Width Analytical Workspace Dashboard */}
-      <div className="page-stack gap-5 w-full">
+      <div className="page-stack w-full gap-5">
         {/* Overall Score & Dimension metrics */}
         <UcpScoreSummary report={controller.report} job={controller.activeJob} />
 
         {/* Workspace tab selectors */}
-        <div className="border-border bg-panel flex flex-wrap gap-1 rounded-[var(--radius-lg)] border p-1 w-full">
+        <div className="border-border bg-panel flex w-full flex-wrap gap-1 rounded-[var(--radius-lg)] border p-1">
           {tabOptions.map((tab) => {
             const TabIcon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -152,10 +163,10 @@ export default function UcpAuditPage() {
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
                 className={cn(
-                  'flex-1 min-w-[120px] flex items-center justify-center gap-2 py-2 px-3 text-xs font-normal rounded-[var(--radius-md)] transition-all cursor-pointer',
+                  'flex min-w-[120px] flex-1 cursor-pointer items-center justify-center gap-2 rounded-[var(--radius-md)] px-3 py-2 text-xs font-normal transition-all',
                   isActive
                     ? 'bg-accent text-accent-fg shadow-sm'
-                    : 'text-muted hover:bg-background-alt hover:text-foreground'
+                    : 'text-muted hover:bg-background-alt hover:text-foreground',
                 )}
               >
                 <TabIcon className="size-3.5" />
@@ -166,22 +177,16 @@ export default function UcpAuditPage() {
         </div>
 
         {/* Tab viewports spanning full width */}
-        <div className="animate-in fade-in duration-300 w-full min-w-0">
+        <div className="animate-in fade-in w-full min-w-0 duration-300">
           {activeTab === 'compliance' && (
             <UcpDimensionTable
               report={controller.report}
               loading={controller.detailQuery.isLoading}
             />
           )}
-          {activeTab === 'findings' && (
-            <UcpFindingsPanel report={controller.report} />
-          )}
-          {activeTab === 'agent-delta' && (
-            <UcpAgentViewPanel report={controller.report} />
-          )}
-          {activeTab === 'fix-sequence' && (
-            <UcpFixSequence report={controller.report} />
-          )}
+          {activeTab === 'findings' && <UcpFindingsPanel report={controller.report} />}
+          {activeTab === 'agent-delta' && <UcpAgentViewPanel report={controller.report} />}
+          {activeTab === 'fix-sequence' && <UcpFixSequence report={controller.report} />}
         </div>
       </div>
 

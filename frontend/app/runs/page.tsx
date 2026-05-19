@@ -113,10 +113,7 @@ function RunRow({
       {/* Records */}
       <TableCell className="text-right">
         <span
-          className={cn(
-            'text-sm tabular-nums',
-            recordCount > 0 ? 'text-primary' : 'text-muted',
-          )}
+          className={cn('text-sm tabular-nums', recordCount > 0 ? 'text-primary' : 'text-muted')}
         >
           {recordCount > 0 ? recordCount.toLocaleString() : '—'}
         </span>
@@ -124,9 +121,7 @@ function RunRow({
 
       {/* Date */}
       <TableCell className="text-right">
-        <span className="text-sm text-muted tabular-nums">
-          {formatDate(run.created_at)}
-        </span>
+        <span className="text-muted text-sm tabular-nums">{formatDate(run.created_at)}</span>
       </TableCell>
 
       {/* Actions */}

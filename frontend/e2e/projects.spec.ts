@@ -90,25 +90,49 @@ test('projects: create project, launch workflow, view results, and promote', asy
   });
   await page.route('**/api/orchestration/projects', async (route) => {
     if (route.request().method() === 'POST') {
-      await route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify(project) });
+      await route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify(project),
+      });
       return;
     }
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([project]) });
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([project]),
+    });
   });
   await page.route('**/api/orchestration/projects/501', async (route) => {
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(project) });
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(project),
+    });
   });
   await page.route('**/api/orchestration/workflows?project_id=501', async (route) => {
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([workflow]) });
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([workflow]),
+    });
   });
   await page.route('**/api/orchestration/workflows', async (route) => {
     const payload = route.request().postDataJSON();
     expect(payload.intent_inputs.listing_url).toBe('https://www.myntra.com/men-jeans');
     expect(payload.intent_inputs.competitors).toBeUndefined();
-    await route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify(workflow) });
+    await route.fulfill({
+      status: 201,
+      contentType: 'application/json',
+      body: JSON.stringify(workflow),
+    });
   });
   await page.route('**/api/orchestration/workflows/701/status', async (route) => {
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(workflow) });
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(workflow),
+    });
   });
   await page.route('**/api/orchestration/workflows/701/results/price-comparison', async (route) => {
     await route.fulfill({
@@ -159,10 +183,9 @@ test('projects: create project, launch workflow, view results, and promote', asy
   await expect(page.getByText('Workflow')).toBeVisible();
   await expect(page.getByText('Slim jeans')).toBeVisible();
   await expect(page.getByText('1299')).toBeVisible();
-  await expect(page.getByRole('banner').getByRole('link', { name: 'Crawl Studio' })).toHaveAttribute(
-    'href',
-    '/crawl?run_id=902',
-  );
+  await expect(
+    page.getByRole('banner').getByRole('link', { name: 'Crawl Studio' }),
+  ).toHaveAttribute('href', '/crawl?run_id=902');
 
   await page.getByRole('button', { name: 'Promote' }).click();
   await expect(page.getByText('Monitor created - monitor_id: 601')).toBeVisible();

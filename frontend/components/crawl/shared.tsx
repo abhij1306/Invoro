@@ -198,7 +198,7 @@ export function PreviewRow({
       <div
         className={cn(
           'type-body-sm text-foreground min-w-0 flex-1 text-right font-normal',
-          mono && 'type-caption-mono font-medium !text-foreground',
+          mono && 'type-caption-mono !text-foreground font-medium',
         )}
       >
         {value || '--'}

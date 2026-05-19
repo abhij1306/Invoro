@@ -116,4 +116,4 @@ async def mark_monitor_notifications_read(
         .values(read=True, read_at=utcnow())
     )
     await session.commit()
-    return int(result.rowcount or 0)
+    return int(getattr(result, "rowcount", 0) or 0)

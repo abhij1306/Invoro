@@ -413,14 +413,15 @@ def normalize_audience_values(
 ) -> list[str] | None:
     if not allowed_values:
         return None
-    terms = {
+    terms: dict[str, object] = {
         clean_text(item).casefold(): [clean_text(item).casefold()]
         for item in allowed_values
         if clean_text(item)
     }
     normalized: list[str] = []
     seen: set[str] = set()
-    for item in split_values(string_list(value, max_items=10, max_chars=60)):
+    values: list[object] = list(string_list(value, max_items=10, max_chars=60))
+    for item in split_values(values):
         canonical = normalize_from_terms([item], terms)
         if not canonical:
             continue

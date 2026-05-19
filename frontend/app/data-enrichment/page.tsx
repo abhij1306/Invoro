@@ -238,17 +238,21 @@ export default function DataEnrichmentPage() {
         ) : detailQuery.isLoading && !isRunning ? (
           <DataRegionLoading count={8} className="px-0" />
         ) : products.length ? (
-          <div className="flex flex-col lg:flex-row h-[600px] divide-y lg:divide-y-0 lg:divide-x divide-divider">
+          <div className="divide-divider flex h-[600px] flex-col divide-y lg:flex-row lg:divide-x lg:divide-y-0">
             {/* Sidebar: List of products */}
-            <div className="w-full lg:w-80 shrink-0 flex flex-col min-h-0 bg-background-alt/10">
-              <div className="border-divider border-b p-3 bg-subtle-panel/30">
-                <span className="type-caption-mono text-muted uppercase">Record Selector ({products.length})</span>
+            <div className="bg-background-alt/10 flex min-h-0 w-full shrink-0 flex-col lg:w-80">
+              <div className="border-divider bg-subtle-panel/30 border-b p-3">
+                <span className="type-caption-mono text-muted uppercase">
+                  Record Selector ({products.length})
+                </span>
               </div>
-              <div className="flex-1 overflow-y-auto p-2 space-y-1">
+              <div className="flex-1 space-y-1 overflow-y-auto p-2">
                 {products.map((product) => {
                   const isActive = product.id === resolvedProductId;
                   const isProcessing = product.status === 'pending' || product.status === 'running';
-                  const title = product.source_url ? product.source_url.replace(/^https?:\/\/(www\.)?/, '') : `Record #${product.source_record_id}`;
+                  const title = product.source_url
+                    ? product.source_url.replace(/^https?:\/\/(www\.)?/, '')
+                    : `Record #${product.source_record_id}`;
                   const formattedPrice = formatValue(product.price_normalized);
 
                   return (
@@ -257,14 +261,17 @@ export default function DataEnrichmentPage() {
                       type="button"
                       onClick={() => setSelectedProductId(product.id)}
                       className={cn(
-                        "w-full text-left rounded-[var(--radius-md)] border p-3 transition-colors flex flex-col gap-1.5",
+                        'flex w-full flex-col gap-1.5 rounded-[var(--radius-md)] border p-3 text-left transition-colors',
                         isActive
-                          ? "border-accent bg-accent-subtle/50"
-                          : "border-border bg-background hover:bg-background-elevated"
+                          ? 'border-accent bg-accent-subtle/50'
+                          : 'border-border bg-background hover:bg-background-elevated',
                       )}
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <Badge tone="neutral" className="h-5 shrink-0 px-1.5 font-mono text-xs opacity-75">
+                        <Badge
+                          tone="neutral"
+                          className="h-5 shrink-0 px-1.5 font-mono text-xs opacity-75"
+                        >
                           #{product.source_record_id}
                         </Badge>
                         {isProcessing ? (
@@ -274,7 +281,10 @@ export default function DataEnrichmentPage() {
                           </div>
                         ) : null}
                       </div>
-                      <div className="type-body-sm font-medium truncate w-full text-foreground" title={product.source_url}>
+                      <div
+                        className="type-body-sm text-foreground w-full truncate font-medium"
+                        title={product.source_url}
+                      >
                         {title}
                       </div>
                     </button>
@@ -284,9 +294,9 @@ export default function DataEnrichmentPage() {
             </div>
 
             {/* Content: Selected Product Detailed View */}
-            <div className="flex-1 min-w-0 flex flex-col min-h-0 bg-background">
+            <div className="bg-background flex min-h-0 min-w-0 flex-1 flex-col">
               {selectedProduct ? (
-                <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                <div className="flex-1 space-y-6 overflow-y-auto p-6">
                   {/* Header info */}
                   <div className="border-divider border-b pb-4">
                     <div className="flex items-center gap-2">
@@ -300,7 +310,7 @@ export default function DataEnrichmentPage() {
                         href={selectedProduct.source_url}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-accent type-body-sm flex items-center gap-1 mt-1 hover:underline truncate"
+                        className="text-accent type-body-sm mt-1 flex items-center gap-1 truncate hover:underline"
                       >
                         {selectedProduct.source_url}
                         <ExternalLink className="size-3 shrink-0" />
@@ -311,46 +321,71 @@ export default function DataEnrichmentPage() {
                   {/* Detail Groups */}
                   <div className="space-y-6">
                     {/* Core Attributes (Row 1: Full width) */}
-                    <div className="border-border bg-subtle-panel/20 rounded-[var(--radius-lg)] border p-4 space-y-4">
+                    <div className="border-border bg-subtle-panel/20 space-y-4 rounded-[var(--radius-lg)] border p-4">
                       <h3 className="type-label-mono text-muted flex items-center gap-1.5 uppercase">
                         <span className="bg-accent size-1.5 rounded-full" />
                         Core Attributes
                       </h3>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                        <KVTile label="Price (Normalized)" mono value={formatValue(selectedProduct.price_normalized) || '--'} />
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                        <KVTile
+                          label="Price (Normalized)"
+                          mono
+                          value={formatValue(selectedProduct.price_normalized) || '--'}
+                        />
                         <KVTile label="Color Family" value={selectedProduct.color_family || '--'} />
-                        <KVTile label="Size Normalized" value={selectedProduct.size_normalized?.join(', ') || '--'} />
+                        <KVTile
+                          label="Size Normalized"
+                          value={selectedProduct.size_normalized?.join(', ') || '--'}
+                        />
                         <KVTile label="Size System" value={selectedProduct.size_system || '--'} />
-                        <KVTile label="Gender Normalized" value={selectedProduct.gender_normalized || '--'} />
-                        <KVTile label="Materials Normalized" value={selectedProduct.materials_normalized?.join(', ') || '--'} />
-                        <KVTile label="Availability" value={selectedProduct.availability_normalized || '--'} />
+                        <KVTile
+                          label="Gender Normalized"
+                          value={selectedProduct.gender_normalized || '--'}
+                        />
+                        <KVTile
+                          label="Materials Normalized"
+                          value={selectedProduct.materials_normalized?.join(', ') || '--'}
+                        />
+                        <KVTile
+                          label="Availability"
+                          value={selectedProduct.availability_normalized || '--'}
+                        />
                       </div>
                     </div>
 
                     {/* Taxonomy & Context (Row 2: Full width) */}
-                    <div className="border-border bg-subtle-panel/20 rounded-[var(--radius-lg)] border p-4 space-y-4">
+                    <div className="border-border bg-subtle-panel/20 space-y-4 rounded-[var(--radius-lg)] border p-4">
                       <h3 className="type-label-mono text-muted flex items-center gap-1.5 uppercase">
                         <span className="bg-info size-1.5 rounded-full" />
                         Taxonomy & Context
                       </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                         <div className="md:col-span-2">
-                          <KVTile label="Category Path" value={selectedProduct.category_path || '--'} />
+                          <KVTile
+                            label="Category Path"
+                            value={selectedProduct.category_path || '--'}
+                          />
                         </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:col-span-1">
-                          <KVTile label="Audience" value={selectedProduct.audience?.join(', ') || '--'} />
-                          <KVTile label="Taxonomy Version" value={selectedProduct.taxonomy_version || '--'} />
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:col-span-1">
+                          <KVTile
+                            label="Audience"
+                            value={selectedProduct.audience?.join(', ') || '--'}
+                          />
+                          <KVTile
+                            label="Taxonomy Version"
+                            value={selectedProduct.taxonomy_version || '--'}
+                          />
                         </div>
                       </div>
                     </div>
 
                     {/* Semantic & AI Insights (Row 3: Full width) */}
-                    <div className="border-border bg-subtle-panel/20 rounded-[var(--radius-lg)] border p-4 space-y-4">
+                    <div className="border-border bg-subtle-panel/20 space-y-4 rounded-[var(--radius-lg)] border p-4">
                       <h3 className="type-label-mono text-muted flex items-center gap-1.5 uppercase">
                         <span className="bg-success size-1.5 rounded-full" />
                         AI & Semantic Enrichment
                       </h3>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
                         <KVTile
                           label="Intent Attributes"
                           value={
@@ -405,7 +440,11 @@ export default function DataEnrichmentPage() {
                             selectedProduct.suggested_bundles?.length ? (
                               <div className="flex flex-wrap gap-1.5 pt-1">
                                 {selectedProduct.suggested_bundles.map((bundle) => (
-                                  <Badge key={bundle} tone="success" className="text-xs font-normal">
+                                  <Badge
+                                    key={bundle}
+                                    tone="success"
+                                    className="text-xs font-normal"
+                                  >
                                     {bundle}
                                   </Badge>
                                 ))}
@@ -424,7 +463,10 @@ export default function DataEnrichmentPage() {
                             selectedProduct.seo_keywords?.length ? (
                               <div className="flex flex-wrap gap-1.5 pt-1">
                                 {selectedProduct.seo_keywords.map((kw) => (
-                                  <span key={kw} className="bg-background-elevated border-border text-secondary rounded-full border px-2 py-0.5 text-xs">
+                                  <span
+                                    key={kw}
+                                    className="bg-background-elevated border-border text-secondary rounded-full border px-2 py-0.5 text-xs"
+                                  >
                                     {kw}
                                   </span>
                                 ))}
@@ -439,8 +481,10 @@ export default function DataEnrichmentPage() {
                   </div>
                 </div>
               ) : (
-                <div className="flex-1 grid place-items-center text-center p-6">
-                  <div className="text-muted type-body">Select a record from the list to view full enrichment details.</div>
+                <div className="grid flex-1 place-items-center p-6 text-center">
+                  <div className="text-muted type-body">
+                    Select a record from the list to view full enrichment details.
+                  </div>
                 </div>
               )}
             </div>

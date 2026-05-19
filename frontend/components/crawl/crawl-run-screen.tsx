@@ -831,12 +831,7 @@ export function CrawlRunScreen({ runId }: Readonly<CrawlRunScreenProps>) {
         <PageHeader
           title="Crawl Studio"
           actions={
-            <Button
-              variant="action"
-              type="button"
-              size="sm"
-              onClick={resetToConfig}
-            >
+            <Button variant="action" type="button" size="sm" onClick={resetToConfig}>
               <Plus className="size-3" />
               New Crawl
             </Button>
@@ -878,12 +873,7 @@ export function CrawlRunScreen({ runId }: Readonly<CrawlRunScreenProps>) {
           )
         }
         actions={
-          <Button
-            variant="action"
-            type="button"
-            size="sm"
-            onClick={resetToConfig}
-          >
+          <Button variant="action" type="button" size="sm" onClick={resetToConfig}>
             <Plus className="size-3" />
             New Crawl
           </Button>
@@ -1011,7 +1001,12 @@ export function CrawlRunScreen({ runId }: Readonly<CrawlRunScreenProps>) {
               actions={
                 <>
                   {listingRun && batchFromResultsUrls.length ? (
-                    <Button variant="action" type="button" size="sm" onClick={triggerBatchCrawlFromResults}>
+                    <Button
+                      variant="action"
+                      type="button"
+                      size="sm"
+                      onClick={triggerBatchCrawlFromResults}
+                    >
                       <ArrowRightCircle className="size-3" />
                       {batchFromResultsLabel}
                     </Button>

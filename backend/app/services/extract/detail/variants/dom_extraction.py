@@ -93,6 +93,8 @@ logger = logging.getLogger(__name__)
 
 def _safe_int_config(value: object, default: int, name: str) -> int:
     try:
+        if not isinstance(value, (int, float, str)):
+            raise TypeError
         return max(1, int(value))
     except (TypeError, ValueError) as exc:
         logger.warning(
@@ -184,7 +186,11 @@ def _collect_variant_choice_entries(
     )
     entries_by_value: dict[str, dict[str, object]] = {}
     visible_text_cache: dict[int, str] = {}
-    option_limit = int(VARIANT_CHOICE_OPTION_LIMIT)
+    option_limit = _safe_int_config(
+        VARIANT_CHOICE_OPTION_LIMIT,
+        50,
+        "VARIANT_CHOICE_OPTION_LIMIT",
+    )
     option_nodes = list(container.select(str(VARIANT_STRONG_OPTION_SELECTOR)))[
         :option_limit
     ]
@@ -225,7 +231,7 @@ def _collect_variant_choice_entries(
             _log_url_color_fallback(
                 cleaned,
                 page_url=page_url,
-                option_url=option_url,
+                option_url=str(option_url or ""),
                 title_hint=title_hint,
                 original_value=original_cleaned,
             )
@@ -277,7 +283,7 @@ def _collect_variant_choice_entries(
             _log_url_color_fallback(
                 cleaned,
                 page_url=page_url,
-                option_url=option_url,
+                option_url=str(option_url or ""),
                 title_hint=title_hint,
                 original_value=original_cleaned,
             )

@@ -67,13 +67,7 @@ export function JsonModal({
       <div className="border-border bg-background-elevated fixed top-1/2 left-1/2 z-50 flex max-h-[80vh] w-[640px] max-w-[90vw] -translate-x-1/2 -translate-y-1/2 flex-col rounded-[var(--radius-md)] border shadow-xl">
         <div className="border-divider flex items-center justify-between border-b px-4 py-3">
           <h3 className="text-foreground type-heading text-sm font-medium">Raw JSON</h3>
-          <Button
-            type="button"
-            variant="quiet"
-            size="icon"
-            onClick={onClose}
-            aria-label="Close"
-          >
+          <Button type="button" variant="quiet" size="icon" onClick={onClose} aria-label="Close">
             <X className="size-3.5" />
           </Button>
         </div>

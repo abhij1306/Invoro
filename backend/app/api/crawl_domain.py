@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Annotated, NoReturn
+from typing import Annotated, Any, NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
@@ -42,7 +42,7 @@ from app.services.review import (
 
 router = APIRouter(prefix="/api/crawls", tags=["crawls"])
 
-RUN_NOT_FOUND_RESPONSE = {
+RUN_NOT_FOUND_RESPONSE: dict[int | str, dict[str, Any]] = {
     status.HTTP_404_NOT_FOUND: {"description": RUN_NOT_FOUND_DETAIL},
 }
 

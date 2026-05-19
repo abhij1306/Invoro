@@ -6,7 +6,16 @@ import { useQuery } from '@tanstack/react-query';
 import { monitorsApi } from '../../lib/api';
 import type { MonitorJob, MonitorSnapshotRecord } from '../../lib/api/types';
 import { formatRelativeTime } from '../../lib/format/date';
-import { Input, Skeleton, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/primitives';
+import {
+  Input,
+  Skeleton,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '../ui/primitives';
 import { DataRegionError } from '../ui/patterns';
 import { MonitorEmptyState } from './monitor-empty-state';
 
@@ -45,7 +54,13 @@ export function MonitorSnapshotTable({
   }, [monitor.tracked_fields, query, snapshotQuery.data, sortAsc, sortKey]);
 
   if (snapshotQuery.error) {
-    return <DataRegionError message={snapshotQuery.error instanceof Error ? snapshotQuery.error.message : 'Snapshot failed.'} />;
+    return (
+      <DataRegionError
+        message={
+          snapshotQuery.error instanceof Error ? snapshotQuery.error.message : 'Snapshot failed.'
+        }
+      />
+    );
   }
   if (snapshotQuery.isPending) {
     return <Skeleton className="h-72 w-full rounded-[var(--radius-lg)]" />;
@@ -86,7 +101,12 @@ export function MonitorSnapshotTable({
             {rows.map((record) => (
               <TableRow key={record.id}>
                 <TableCell className="max-w-[320px] truncate">
-                  <a href={record.source_url} target="_blank" rel="noreferrer" className="text-accent hover:underline">
+                  <a
+                    href={record.source_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-accent hover:underline"
+                  >
                     {hostPath(record.source_url)}
                   </a>
                 </TableCell>
@@ -106,7 +126,11 @@ export function MonitorSnapshotTable({
 function SortableHead({ label, onClick }: Readonly<{ label: string; onClick: () => void }>) {
   return (
     <TableHead>
-      <button type="button" onClick={onClick} className="type-caption text-muted hover:text-foreground">
+      <button
+        type="button"
+        onClick={onClick}
+        className="type-caption text-muted hover:text-foreground"
+      >
         {label}
       </button>
     </TableHead>

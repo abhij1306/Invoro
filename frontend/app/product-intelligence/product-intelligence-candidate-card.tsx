@@ -33,7 +33,7 @@ export function CandidateGroupSection({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <span
-              className="text-foreground type-body font-semibold truncate"
+              className="text-foreground type-body truncate font-semibold"
               title={group.sourceTitle}
             >
               {group.sourceTitle}
