@@ -166,7 +166,10 @@ export default function DataEnrichmentPage() {
         description={descriptionText}
         actions={
           <div className="flex w-full flex-wrap items-center justify-end gap-2">
-            <label className="border-border bg-background-elevated text-foreground hover:bg-accent/[0.04] inline-flex h-8 cursor-pointer items-center gap-2 rounded-[var(--radius-md)] border px-3 transition-colors text-xs font-normal">
+            <label
+              style={{ fontSize: '12px' }}
+              className="border-border bg-background-elevated text-foreground hover:bg-accent/[0.04] inline-flex h-7 cursor-pointer items-center gap-2 rounded-[var(--radius-md)] border px-2.5 transition-colors font-semibold"
+            >
               <input
                 type="checkbox"
                 checked={llmEnabled}

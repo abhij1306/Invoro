@@ -29,10 +29,17 @@ function stableNodeSignature(value: ReactNode): string {
           ? value.type.displayName
           : (value.type.name ?? 'component');
     const propEntries = Object.entries(props)
-      .filter(([key, propValue]) => key !== 'children' && typeof propValue !== 'function')
+      .filter(([key, propValue]) => key !== 'children' && key !== 'style' && typeof propValue !== 'function')
       .map(([key, propValue]) => `${key}:${stableNodeSignature(propValue as ReactNode)}`)
       .sort((left, right) => left.localeCompare(right));
     return `<${typeName}${propEntries.length ? ` ${propEntries.join(',')}` : ''}>${stableNodeSignature(props.children as ReactNode)}</${typeName}>`;
+  }
+  if (typeof value === 'object') {
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return '[object]';
+    }
   }
   return Children.toArray(value)
     .map((entry) => stableNodeSignature(entry))
@@ -84,7 +91,7 @@ export function SectionHeader({
           {/* type-heading-3: text-md, semibold, tight leading, tight tracking */}
           <h2 className="type-heading-3 m-0">{title}</h2>
         </div>
-        {description ? <div className="type-body">{description}</div> : null}
+        {description ? <div className="type-body-sm">{description}</div> : null}
       </div>
       {action ? <div className="shrink-0">{action}</div> : null}
     </div>

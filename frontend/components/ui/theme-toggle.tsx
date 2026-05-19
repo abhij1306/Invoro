@@ -23,15 +23,15 @@ export function ThemeToggle({ compact }: Readonly<{ compact?: boolean }>) {
       onClick={toggleTheme}
       className={cn(
         'focus-ring border-border bg-background-elevated text-foreground hover:border-border-strong hover:bg-background-alt inline-flex items-center justify-center rounded-[var(--radius-md)] border transition-[background-color,color,border-color]',
-        compact ? 'size-8' : 'size-9',
+        compact ? 'size-7' : 'size-8',
       )}
       aria-label="Toggle color theme"
       title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
     >
       {theme === 'dark' ? (
-        <Sun className={compact ? 'size-3.5' : 'size-4'} strokeWidth={2} aria-hidden />
+        <Sun className={compact ? 'size-3' : 'size-4'} strokeWidth={2} aria-hidden />
       ) : (
-        <Moon className={compact ? 'size-3.5' : 'size-4'} strokeWidth={2} aria-hidden />
+        <Moon className={compact ? 'size-3' : 'size-4'} strokeWidth={2} aria-hidden />
       )}
     </button>
   );

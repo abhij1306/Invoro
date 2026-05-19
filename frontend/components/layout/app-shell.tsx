@@ -35,7 +35,6 @@ import { ConfirmDialog } from '../ui/dialog';
 import type { TopBarState } from './top-bar-context';
 import { TopBarProvider, useTopBarHeader } from './top-bar-context';
 import { ThemeToggle } from '../ui/theme-toggle';
-import { AppFrame } from './app-frame';
 import './app-shell.module.css';
 import './auth-shell.module.css';
 
@@ -185,18 +184,18 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
 
   return (
     <TopBarProvider>
-      <AppFrame>
+      <div className="app-shell-root">
         <a
-          href="#hds-main"
+          href="#main-content"
           className="ui-on-accent-surface focus:bg-accent sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:rounded-md focus:px-3 focus:py-2 focus:text-sm"
         >
           Skip to main content
         </a>
-        <AppFrame.Sidebar>
+        <div className="app-shell-grid">
           <Sidebar pathname={pathname} />
-        </AppFrame.Sidebar>
-        <ShellContent pathname={pathname}>{children}</ShellContent>
-      </AppFrame>
+          <ShellContent pathname={pathname}>{children}</ShellContent>
+        </div>
+      </div>
     </TopBarProvider>
   );
 }
@@ -366,37 +365,35 @@ function ShellContent({ children, pathname }: Readonly<{ children: ReactNode; pa
   const resetLabel = resetPending ? 'Resetting Workspace...' : 'Reset Workspace';
 
   return (
-    <>
-      <AppFrame.Header>
-        <header className="app-topbar">
-          <div className="app-topbar-main">
-            <h1 className="app-topbar-title">{topBar.title}</h1>
+    <div className="app-main-col">
+      <header className="app-topbar">
+        <div className="app-topbar-main">
+          <h1 className="app-topbar-title">{topBar.title}</h1>
+        </div>
+        <div className="app-topbar-actions">
+          {topBar.actions ? (
+            <div className="flex flex-wrap items-center gap-2">{topBar.actions}</div>
+          ) : null}
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              onClick={handleSelectedReset}
+              disabled={resetPending}
+              variant="secondary"
+              size="sm"
+              className="text-[11px] font-semibold"
+            >
+              <Trash2 className="size-3" />
+              {resetLabel}
+            </Button>
           </div>
-          <div className="app-topbar-actions">
-            {topBar.actions ? (
-              <div className="flex flex-wrap items-center gap-2">{topBar.actions}</div>
-            ) : null}
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                onClick={handleSelectedReset}
-                disabled={resetPending}
-                variant="secondary"
-                size="sm"
-              >
-                <Trash2 className="size-3.5" />
-                {resetLabel}
-              </Button>
-            </div>
-            <ThemeToggle compact />
-          </div>
-        </header>
-      </AppFrame.Header>
+          <ThemeToggle compact />
+        </div>
+      </header>
 
-      <AppFrame.Main id="hds-main">
+      <main id="main-content" className="app-page-frame">
         <div className="app-page-inner">{children}</div>
-      </AppFrame.Main>
-
+      </main>
       <ConfirmDialog
         open={resetDialogOpen}
         onOpenChange={setResetDialogOpen}
@@ -408,7 +405,7 @@ function ShellContent({ children, pathname }: Readonly<{ children: ReactNode; pa
         error={resetError}
         onConfirm={() => void executeReset()}
       />
-    </>
+    </div>
   );
 }
 

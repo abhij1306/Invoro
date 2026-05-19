@@ -7,7 +7,7 @@ import { Slot } from '@radix-ui/react-slot';
 import { cn } from '../../lib/utils';
 
 export const buttonVariants = cva(
-  'focus-ring inline-flex items-center justify-center gap-1.5 rounded-[var(--radius-md)] border text-[length:var(--text-sm)] font-semibold leading-none whitespace-nowrap no-underline transition-[background-color,color,border-color,transform] disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 disabled:grayscale',
+  'focus-ring inline-flex items-center justify-center gap-1.5 rounded-[var(--radius-md)] border text-[11px] font-semibold leading-none whitespace-nowrap no-underline transition-[background-color,color,border-color,transform] disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 disabled:grayscale',
   {
     variants: {
       variant: {
@@ -22,7 +22,7 @@ export const buttonVariants = cva(
           'border-transparent bg-danger-bg text-danger hover:border-danger/20 hover:bg-danger-bg',
       },
       size: {
-        sm: 'h-7 px-2.5 text-[length:var(--text-xs)]',
+        sm: 'h-7 px-2.5 text-[11px]',
         md: 'h-8 px-3',
         lg: 'h-9 px-4',
         icon: 'size-8 p-0',
@@ -45,8 +45,15 @@ export function Button({
   variant,
   size,
   asChild = false,
+  style,
   ...props
 }: Readonly<ButtonProps>) {
   const Comp = asChild ? Slot : 'button';
-  return <Comp {...props} className={cn(buttonVariants({ variant, size }), className)} />;
+  return (
+    <Comp
+      {...props}
+      style={{ fontSize: '12px', ...style }}
+      className={cn(buttonVariants({ variant, size }), className)}
+    />
+  );
 }

@@ -57,7 +57,7 @@ function RunRow({
             <Tooltip content={run.url} align="start">
               <Link
                 href={`/crawl?run_id=${run.id}`}
-                className="link-accent text-primary type-body block max-w-[280px] truncate font-medium no-underline transition-colors"
+                className="link-accent text-primary block max-w-[280px] truncate text-sm font-medium no-underline transition-colors"
               >
                 {domain || `Run #${run.id}`}
               </Link>
@@ -94,7 +94,7 @@ function RunRow({
 
       {/* Mode */}
       <TableCell>
-        <span className="type-caption-mono bg-background-elevated text-muted rounded-[var(--radius-sm)] px-1.5 py-0.5">
+        <span className="bg-background-elevated text-muted rounded-[var(--radius-sm)] px-1.5 py-0.5 text-sm">
           {formatRunType(run.run_type)}
         </span>
       </TableCell>
@@ -104,6 +104,7 @@ function RunRow({
         <Badge
           tone={runExecutionTone(run.status, run.result_summary)}
           flat={isSubduedStatus(run.status)}
+          className="text-sm font-medium tracking-normal"
         >
           {runExecutionLabel(run.status, run.result_summary)}
         </Badge>
@@ -113,7 +114,7 @@ function RunRow({
       <TableCell className="text-right">
         <span
           className={cn(
-            'type-caption-mono tabular-nums',
+            'text-sm tabular-nums',
             recordCount > 0 ? 'text-primary' : 'text-muted',
           )}
         >
@@ -123,7 +124,7 @@ function RunRow({
 
       {/* Date */}
       <TableCell className="text-right">
-        <span className="type-caption-mono text-muted tabular-nums">
+        <span className="text-sm text-muted tabular-nums">
           {formatDate(run.created_at)}
         </span>
       </TableCell>
@@ -241,7 +242,7 @@ export default function RunsPage() {
               onKeyDown={(e) => {
                 if (e.key === 'Enter') applyFilters();
               }}
-              className="font-mono"
+              className="text-mono-body"
             />
           </div>
           <Dropdown<StatusFilter>

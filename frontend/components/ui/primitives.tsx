@@ -43,7 +43,7 @@ export function Title({
 
 export function Subtitle({ children }: Readonly<{ children: ReactNode }>) {
   return (
-    <p className="text-secondary mt-1.5 max-w-2xl text-sm leading-[var(--leading-relaxed)]">
+    <p className="text-secondary mt-1.5 max-w-2xl text-[11px] leading-[var(--leading-relaxed)]">
       {children}
     </p>
   );
@@ -237,8 +237,8 @@ export function Dropdown<T extends string>({
         disabled={disabled}
         onKeyDown={handleKeyDown}
         className={cn(
-          'focus-ring border-border bg-panel text-foreground hover:border-border-strong focus:border-accent flex w-full items-center gap-2 rounded-[var(--radius-md)] border px-3 text-[length:var(--text-sm)] leading-[1.4] font-normal transition-[background-color,border-color]',
-          size === 'sm' ? 'h-8 text-xs' : 'h-[var(--control-height)]',
+          'focus-ring border-border bg-panel text-foreground hover:border-border-strong focus:border-accent flex w-full items-center gap-2 rounded-[var(--radius-md)] border px-3 text-[length:var(--text-xs)] leading-[1.4] font-normal transition-[background-color,border-color]',
+          size === 'sm' ? 'h-8 text-[11px]' : 'h-[var(--control-height)]',
           align === 'center' ? 'justify-center text-center' : 'justify-between text-left',
           className,
         )}
@@ -262,52 +262,52 @@ export function Dropdown<T extends string>({
       </button>
       {open && typeof document !== 'undefined'
         ? createPortal(
-            <div
-              ref={listboxRef}
-              id={listboxId}
-              role="listbox"
-              onMouseEnter={cancelClose}
-              onMouseLeave={scheduleClose}
-              className={cn(
-                'border-border bg-background-elevated fixed z-[300] max-h-[320px] w-max overflow-y-auto rounded-[var(--radius-lg)] border py-1',
-                listboxPosition.side === 'bottom'
-                  ? 'animate-[dropdown-in_150ms_cubic-bezier(0.16,1,0.3,1)]'
-                  : 'animate-[dropdown-in-up_150ms_cubic-bezier(0.16,1,0.3,1)]',
-              )}
-              style={{
-                top: `${listboxPosition.top}px`,
-                left: `${listboxPosition.left}px`,
-                minWidth: `${listboxPosition.width}px`,
-              }}
-            >
-              {options.map((option, index) => {
-                const optionId = `${dropdownId}-option-${index}-${sanitizeIdSegment(option.value)}`;
-                return (
-                  <button
-                    key={option.value}
-                    id={optionId}
-                    role="option"
-                    aria-selected={option.value === value}
-                    onClick={() => {
-                      onChange(option.value);
-                      setOpen(false);
-                    }}
-                    onMouseDown={(e) => e.preventDefault()}
-                    className={cn(
-                      'flex w-full items-center py-2 text-[length:var(--text-sm)] leading-[var(--leading-snug)] transition-colors',
-                      align === 'center' ? 'justify-center px-8' : 'justify-start px-3',
-                      option.value === value
-                        ? 'bg-accent-subtle text-accent font-medium'
-                        : 'text-foreground hover:bg-background-alt',
-                    )}
-                  >
-                    {option.label}
-                  </button>
-                );
-              })}
-            </div>,
-            document.body,
-          )
+          <div
+            ref={listboxRef}
+            id={listboxId}
+            role="listbox"
+            onMouseEnter={cancelClose}
+            onMouseLeave={scheduleClose}
+            className={cn(
+              'border-border bg-background-elevated fixed z-[300] max-h-[320px] w-max overflow-y-auto rounded-[var(--radius-lg)] border py-1',
+              listboxPosition.side === 'bottom'
+                ? 'animate-[dropdown-in_150ms_cubic-bezier(0.16,1,0.3,1)]'
+                : 'animate-[dropdown-in-up_150ms_cubic-bezier(0.16,1,0.3,1)]',
+            )}
+            style={{
+              top: `${listboxPosition.top}px`,
+              left: `${listboxPosition.left}px`,
+              minWidth: `${listboxPosition.width}px`,
+            }}
+          >
+            {options.map((option, index) => {
+              const optionId = `${dropdownId}-option-${index}-${sanitizeIdSegment(option.value)}`;
+              return (
+                <button
+                  key={option.value}
+                  id={optionId}
+                  role="option"
+                  aria-selected={option.value === value}
+                  onClick={() => {
+                    onChange(option.value);
+                    setOpen(false);
+                  }}
+                  onMouseDown={(e) => e.preventDefault()}
+                  className={cn(
+                    'flex w-full items-center py-2 text-[length:var(--text-xs)] leading-[var(--leading-snug)] transition-colors',
+                    align === 'center' ? 'justify-center px-8' : 'justify-start px-3',
+                    option.value === value
+                      ? 'bg-accent-subtle text-accent font-medium'
+                      : 'text-foreground hover:bg-background-alt',
+                  )}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>,
+          document.body,
+        )
         : null}
     </div>
   );
@@ -369,8 +369,8 @@ export function Tooltip({
   });
   const enhancedChild = React.isValidElement(child)
     ? React.cloneElement(child, {
-        'aria-describedby': tooltipId,
-      } as React.HTMLAttributes<HTMLElement>)
+      'aria-describedby': tooltipId,
+    } as React.HTMLAttributes<HTMLElement>)
     : child;
 
   const updatePosition = React.useCallback(() => {
@@ -426,28 +426,28 @@ export function Tooltip({
       {enhancedChild}
       {open && typeof document !== 'undefined'
         ? createPortal(
+          <div
+            ref={tooltipRef}
+            id={tooltipId}
+            role="tooltip"
+            className={cn(
+              'pointer-events-none fixed w-max max-w-[min(420px,calc(100vw-24px))]',
+              'tooltip-surface bg-panel rounded-[var(--radius-md)] px-2 py-1.5',
+              'text-foreground z-[200] text-sm leading-normal font-medium break-words',
+            )}
+            style={{ left: `${position.left}px`, top: `${position.top}px` }}
+          >
+            {content}
             <div
-              ref={tooltipRef}
-              id={tooltipId}
-              role="tooltip"
-              className={cn(
-                'pointer-events-none fixed w-max max-w-[min(420px,calc(100vw-24px))]',
-                'tooltip-surface bg-panel rounded-[var(--radius-md)] px-2 py-1.5',
-                'text-foreground z-[200] text-sm leading-normal font-medium break-words',
-              )}
-              style={{ left: `${position.left}px`, top: `${position.top}px` }}
-            >
-              {content}
-              <div
-                className="border-border-strong bg-panel absolute -bottom-[6px] size-2.5 border-r border-b"
-                style={{
-                  left: align === 'start' ? '12px' : '50%',
-                  transform: align === 'start' ? 'rotate(45deg)' : 'translateX(-50%) rotate(45deg)',
-                }}
-              />
-            </div>,
-            document.body,
-          )
+              className="border-border-strong bg-panel absolute -bottom-[6px] size-2.5 border-r border-b"
+              style={{
+                left: align === 'start' ? '12px' : '50%',
+                transform: align === 'start' ? 'rotate(45deg)' : 'translateX(-50%) rotate(45deg)',
+              }}
+            />
+          </div>,
+          document.body,
+        )
         : null}
     </div>
   );

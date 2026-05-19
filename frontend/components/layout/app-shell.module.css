@@ -133,9 +133,9 @@
 :global(.app-sidebar-group-label) {
   margin: 20px 0 4px;
   padding: 0 10px;
-  font-size: var(--text-xs);
+  font-size: 10px;
   font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-wider);
+  letter-spacing: var(--tracking-widest);
   text-transform: uppercase;
   color: var(--text-muted);
 }
@@ -238,7 +238,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: var(--text-xl);
+  font-size: 20px;
   font-weight: var(--weight-semibold);
   letter-spacing: var(--tracking-tight);
   line-height: 1.2;
