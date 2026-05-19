@@ -22,6 +22,7 @@ from app.api.jobs import router as jobs_router
 from app.api.llm import router as llm_router
 from app.api.monitors import router as monitors_router
 from app.api.notifications import router as notifications_router
+from app.api.orchestration import router as orchestration_router
 from app.api.product_intelligence import router as product_intelligence_router
 from app.api.records import router as records_router
 from app.api.review import router as review_router
@@ -309,6 +310,7 @@ for router in [
     selectors_router,
     llm_router,
     product_intelligence_router,
+    orchestration_router,
     monitors_router,
     notifications_router,
     ucp_audit_router,

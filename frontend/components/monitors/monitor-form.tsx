@@ -282,7 +282,7 @@ export function MonitorForm({ initial, onSubmit, onCancel, submitLabel }: Readon
         </SettingSection>
       </div>
       <div className="flex justify-end gap-2">
-        <Button type="button" variant="ghost" onClick={onCancel} disabled={submitting}>
+        <Button type="button" variant="quiet" onClick={onCancel} disabled={submitting}>
           Cancel
         </Button>
         <Button type="button" onClick={() => void submit()} disabled={submitting}>

@@ -56,9 +56,8 @@ export function SettingsDrawer({
           <h2 className="text-foreground type-heading text-sm font-medium">Configuration</h2>
           <Button
             type="button"
-            variant="ghost"
+            variant="quiet"
             size="icon"
-            className="h-7 w-7"
             onClick={onClose}
             aria-label="Close settings"
           >

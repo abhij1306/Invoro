@@ -134,9 +134,8 @@ function CandidateCard({
       <div className="border-divider mt-3 flex items-center justify-between border-t pt-2.5">
         <Button
           type="button"
-          variant="ghost"
+          variant="quiet"
           size="sm"
-          className="text-muted hover:text-accent type-label-mono h-6 px-2 uppercase"
           onClick={() => controller.setJsonModalCandidate(candidate)}
         >
           <Code2 className="mr-1.5 size-3" /> Raw JSON

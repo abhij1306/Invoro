@@ -151,7 +151,7 @@ function SelectorRow({
           <div className="flex items-center gap-1">
             <Button
               type="button"
-              variant="ghost"
+              variant="quiet"
               size="icon"
               onClick={() => startEdit(record)}
               aria-label="Edit selector"
@@ -160,7 +160,7 @@ function SelectorRow({
             </Button>
             <Button
               type="button"
-              variant="danger"
+              variant="destructive"
               size="icon"
               onClick={() => void deleteRecord(record)}
               aria-label="Delete selector"
@@ -255,11 +255,11 @@ function SelectorEditForm({
         Active selector
       </label>
       <div className="flex flex-wrap gap-2">
-        <Button type="button" variant="accent" onClick={() => void saveEdit(record)}>
+        <Button type="button" variant="action" onClick={() => void saveEdit(record)}>
           <Save className="size-3.5" />
           Save
         </Button>
-        <Button type="button" variant="ghost" onClick={cancelEdit}>
+        <Button type="button" variant="quiet" onClick={cancelEdit}>
           <X className="size-3.5" />
           Cancel
         </Button>

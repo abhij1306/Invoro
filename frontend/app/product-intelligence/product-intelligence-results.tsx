@@ -111,22 +111,20 @@ function ToolbarActions({ controller }: ProductIntelligenceResultsProps) {
       <div className="flex items-center gap-1">
         <Button
           type="button"
-          variant="secondary"
+          variant="download"
           size="icon"
           onClick={() => downloadRows('urls', 'csv', controller.discovery)}
           disabled={!controller.discovery?.candidates.length}
-          className="h-8 w-8"
           aria-label="Download CSV"
         >
           <Download className="size-3.5" />
         </Button>
         <Button
           type="button"
-          variant="secondary"
+          variant="download"
           size="icon"
           onClick={() => downloadRows('urls', 'json', controller.discovery)}
           disabled={!controller.discovery?.candidates.length}
-          className="h-8 w-8"
           aria-label="Download JSON"
         >
           <Code2 className="size-3.5" />
@@ -228,19 +226,17 @@ function BulkActionBar({ controller }: ProductIntelligenceResultsProps) {
         <div className="ml-auto flex items-center gap-2">
           <Button
             type="button"
-            variant="ghost"
+            variant="quiet"
             size="sm"
             onClick={() => controller.setSelectedUrls([])}
-            className="text-muted h-7 px-2"
           >
             Clear
           </Button>
           <Button
             type="button"
-            variant="accent"
+            variant="action"
             size="sm"
             onClick={controller.sendSelectedToBatchCrawl}
-            className="h-7 px-3"
           >
             Batch Crawl
           </Button>
@@ -262,11 +258,10 @@ function IconAction({
   return (
     <Button
       type="button"
-      variant="ghost"
+      variant="quiet"
       size="icon"
       onClick={onClick}
       aria-label={label}
-      className="text-muted hover:text-foreground h-8 w-8"
     >
       {children}
     </Button>

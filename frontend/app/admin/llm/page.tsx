@@ -208,7 +208,7 @@ export default function AdminLlmPage() {
             <div className="flex flex-wrap gap-2">
               <Button
                 type="button"
-                variant="secondary"
+                variant="neutral"
                 onClick={() => void handleTest()}
                 disabled={testing}
               >
@@ -217,7 +217,7 @@ export default function AdminLlmPage() {
               </Button>
               <Button
                 type="button"
-                variant="accent"
+                variant="action"
                 onClick={() => void handleSave()}
                 disabled={saving || !form.model.trim()}
               >
@@ -264,7 +264,7 @@ export default function AdminLlmPage() {
                       </div>
                       <Button
                         type="button"
-                        variant="danger"
+                        variant="destructive"
                         size="icon"
                         onClick={() => void handleDelete(config.id)}
                         aria-label="Delete config"

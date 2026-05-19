@@ -29,6 +29,9 @@ App routes under `frontend/app`:
 - `/login`
 - `/register`
 - `/dashboard`
+- `/projects`
+- `/projects/new`
+- `/projects/[id]`
 - `/crawl`
 - `/crawl/category`
 - `/crawl/pdp`
@@ -203,6 +206,7 @@ The frontend currently uses live backend routes for:
 - ucp audit: `/api/ucp-audit/jobs`, `/api/ucp-audit/jobs/{id}`, `/api/ucp-audit/jobs/{id}/export.json`, `/api/ucp-audit/jobs/{id}/export.md`
 - jobs: `/api/jobs/active`
 - monitors: `/api/monitors`, `/api/monitors/{id}`, `/api/monitors/{id}/run/now`, `/api/monitors/{id}/events`, `/api/monitors/{id}/history`, `/api/monitors/{id}/snapshot/current`
+- orchestration: `/api/orchestration/projects`, `/api/orchestration/templates`, `/api/orchestration/workflows`, `/api/orchestration/workflows/{id}/status`, `/api/orchestration/workflows/{id}/promote`, `/api/orchestration/workflows/{id}/results/price-comparison`
 - notifications: `/api/notifications`, `/api/notifications/unread-count`, `/api/notifications/{id}/read`, `/api/notifications/monitors/{id}/read`
 
 ## 5. Known Client/Backend Drift

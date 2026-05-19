@@ -124,5 +124,5 @@ test('smoke: login to crawl and see exports', async ({ page }) => {
   await expect(page).toHaveURL(/run_id=101/);
   await expect(page.getByRole('button', { name: 'Excel (CSV)' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'JSON' }).first()).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Markdown' }).first()).toBeVisible();
+  await expect(page.getByRole('button', { name: 'History' })).toBeVisible();
 });

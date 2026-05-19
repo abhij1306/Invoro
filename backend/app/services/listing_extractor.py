@@ -3,7 +3,7 @@ import re
 import logging
 from typing import Any
 from bs4 import BeautifulSoup
-from selectolax.lexbor import LexborHTMLParser, SelectolaxError
+from selectolax.lexbor import LexborHTMLParser
 
 from app.services.config.extraction_rules import (
     EXTRACTION_RULES,
@@ -56,12 +56,7 @@ from app.services.extract.listing_card_fragments import (
     listing_card_html_fragments,
     listing_fragment_structural_signature,
     listing_node_attr,
-    listing_node_css,
-    listing_node_html as _node_html,
-    listing_node_signature as _node_signature,
-    listing_node_tag as _node_tag,
     listing_node_text,
-    select_listing_fragment_nodes,
 )
 from app.services.extract.listing_visual import visual_listing_records
 from app.services.extract.content_listing_handler import has_table_row_intent, table_row_records
@@ -71,18 +66,14 @@ from app.services.shared.field_coerce import (
     PRICE_RE,
     RATING_RE,
     REVIEW_COUNT_RE,
-    absolute_url,
     clean_text,
     coerce_field_value,
     extract_currency_code,
-    extract_price_text,
     finalize_record,
     is_title_noise,
-    same_host,
     surface_alias_lookup,
     surface_fields,
 )
-from app.services.field_url_normalization import same_site
 from app.services.extract.field_candidates import (
     add_candidate,
     finalize_candidate_value,

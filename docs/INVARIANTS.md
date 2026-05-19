@@ -282,7 +282,24 @@ HEAD pre-check is conservative. If HEAD, validator comparison, or fallback hashi
 
 ---
 
-## 12. Codebase Shape
+## 12. Orchestration — Sequencing Only
+
+**Rule:** Orchestration maps business goals to existing crawl and monitor primitives. It stores thin project/workflow/step shells and resolved template config. It must not implement extraction, add a parallel data store for extracted rows, or hide the underlying crawl run.
+
+The workflow runner creates normal `CrawlRun` rows and links them from `OrchestrationStepRun.run_id`. A continuation to recurring tracking creates a normal `MonitorJob`. Result views read existing `CrawlRecord.data`.
+
+The intent endpoint is propose-only. It may return a prefilled config, but `requires_user_confirmation` must stay true and it must not dispatch a run.
+
+**VIOLATION signatures:**
+- Orchestration code parses HTML, repairs fields, or changes extraction ranking.
+- Workflow result tables store extracted product rows outside `crawl_records`.
+- A workflow silently enables `llm_enabled`, rewrites `surface`, changes traversal intent, or injects a proxy profile without user-visible resolved config.
+- `/api/orchestration/intent` creates a project, workflow, crawl run, monitor, alert, or export.
+- A project view omits the crawl run ID or Crawl Studio route for the underlying run.
+
+---
+
+## 13. Codebase Shape
 
 **Rule:** Generic crawler paths stay generic. Pipeline boundaries use typed objects. CPU-bound parsing does not block async hot paths. New architecture must improve reusable coverage across multiple domains or surfaces, not just rescue one site, unless the user explicitly asks for a site-specific path.
 
@@ -295,7 +312,7 @@ HEAD pre-check is conservative. If HEAD, validator comparison, or fallback hashi
 
 ---
 
-## 13. Plans Must Be Verified, Not Just Written
+## 14. Plans Must Be Verified, Not Just Written
 
 **Rule:** A plan slice is not done until its verify step passes. A plan is not closed until `pytest tests -q` passes. Plans that are not verified are not done — they are abandoned, and their changes must be treated as untrusted.
 
@@ -308,7 +325,7 @@ HEAD pre-check is conservative. If HEAD, validator comparison, or fallback hashi
 
 ---
 
-## 14. Google Search Mimicry Footprint
+## 15. Google Search Mimicry Footprint
 
 **Rule:** Google native search discovery must mimic human behavior to avoid immediate blocks. 
 - **No random mouse jitter:** Never call `emit_browser_behavior_activity` on Google Search pages; erratic, high-speed mouse trajectories are a strong bot signal.

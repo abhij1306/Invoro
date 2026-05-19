@@ -832,7 +832,7 @@ export function CrawlRunScreen({ runId }: Readonly<CrawlRunScreenProps>) {
           title="Crawl Studio"
           actions={
             <Button
-              variant="primary"
+              variant="action"
               type="button"
               size="sm"
               onClick={resetToConfig}
@@ -879,7 +879,7 @@ export function CrawlRunScreen({ runId }: Readonly<CrawlRunScreenProps>) {
         }
         actions={
           <Button
-            variant="primary"
+            variant="action"
             type="button"
             size="sm"
             onClick={resetToConfig}
@@ -922,7 +922,7 @@ export function CrawlRunScreen({ runId }: Readonly<CrawlRunScreenProps>) {
           />
           <div>
             <Button
-              variant="secondary"
+              variant="neutral"
               type="button"
               size="sm"
               onClick={() => void retryFailedPanels()}
@@ -1011,14 +1011,14 @@ export function CrawlRunScreen({ runId }: Readonly<CrawlRunScreenProps>) {
               actions={
                 <>
                   {listingRun && batchFromResultsUrls.length ? (
-                    <Button variant="accent" type="button" size="sm" onClick={triggerBatchCrawlFromResults}>
+                    <Button variant="action" type="button" size="sm" onClick={triggerBatchCrawlFromResults}>
                       <ArrowRightCircle className="size-3" />
                       {batchFromResultsLabel}
                     </Button>
                   ) : null}
                   {listingRun && productIntelligenceRecords.length ? (
                     <Button
-                      variant="secondary"
+                      variant="neutral"
                       type="button"
                       size="sm"
                       onClick={triggerProductIntelligenceFromResults}
@@ -1029,7 +1029,7 @@ export function CrawlRunScreen({ runId }: Readonly<CrawlRunScreenProps>) {
                   ) : null}
                   {ecommerceDetailRun && dataEnrichmentRecords.length ? (
                     <Button
-                      variant="accent"
+                      variant="action"
                       type="button"
                       size="sm"
                       onClick={triggerDataEnrichmentFromResults}
@@ -1039,7 +1039,7 @@ export function CrawlRunScreen({ runId }: Readonly<CrawlRunScreenProps>) {
                     </Button>
                   ) : null}
                   <Button
-                    variant="secondary"
+                    variant="download"
                     type="button"
                     size="sm"
                     onClick={() => void downloadExport('csv')}
@@ -1048,7 +1048,7 @@ export function CrawlRunScreen({ runId }: Readonly<CrawlRunScreenProps>) {
                     Excel (CSV)
                   </Button>
                   <Button
-                    variant="secondary"
+                    variant="download"
                     type="button"
                     size="sm"
                     onClick={() => void downloadExport('json')}
@@ -1057,7 +1057,7 @@ export function CrawlRunScreen({ runId }: Readonly<CrawlRunScreenProps>) {
                     JSON
                   </Button>
                   <Button
-                    variant="secondary"
+                    variant="neutral"
                     type="button"
                     size="sm"
                     onClick={() => setHistoryOpen(true)}
@@ -1136,7 +1136,7 @@ export function CrawlRunScreen({ runId }: Readonly<CrawlRunScreenProps>) {
                                 Showing {tableRecords.length} of {tableTotal} records
                               </span>
                               <Button
-                                variant="secondary"
+                                variant="neutral"
                                 type="button"
                                 onClick={() => setTablePage((current) => current + 1)}
                               >
@@ -1165,7 +1165,7 @@ export function CrawlRunScreen({ runId }: Readonly<CrawlRunScreenProps>) {
                     <div className="relative min-h-[55vh]">
                       <div className="absolute top-2 right-2 z-10 flex items-center gap-2">
                         <Button
-                          variant="ghost"
+                          variant="quiet"
                           type="button"
                           onClick={() => void copyJson(records)}
                         >
@@ -1183,7 +1183,7 @@ export function CrawlRunScreen({ runId }: Readonly<CrawlRunScreenProps>) {
                             JSON previewing {jsonRecords.length} of {recordsTotal} records
                           </span>
                           <Button
-                            variant="secondary"
+                            variant="neutral"
                             type="button"
                             onClick={() =>
                               setJsonVisibleCount(
@@ -1321,7 +1321,7 @@ export function CrawlRunScreen({ runId }: Readonly<CrawlRunScreenProps>) {
                                           </div>
                                           <div className="flex flex-wrap gap-2">
                                             <Button
-                                              variant="secondary"
+                                              variant="neutral"
                                               type="button"
                                               size="sm"
                                               disabled={recipeActionPending !== null}
@@ -1338,7 +1338,7 @@ export function CrawlRunScreen({ runId }: Readonly<CrawlRunScreenProps>) {
                                               {keepPending ? 'Keeping…' : 'Keep'}
                                             </Button>
                                             <Button
-                                              variant="ghost"
+                                              variant="quiet"
                                               type="button"
                                               size="sm"
                                               disabled={recipeActionPending !== null}

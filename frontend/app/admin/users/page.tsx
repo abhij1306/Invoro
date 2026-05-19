@@ -158,7 +158,7 @@ export default function AdminUsersPage() {
                     <TableCell className="text-right">
                       <Button
                         type="button"
-                        variant="secondary"
+                        variant="neutral"
                         size="sm"
                         disabled={pendingUserId === user.id}
                         onClick={() => void updateUser(user.id, { is_active: !user.is_active })}

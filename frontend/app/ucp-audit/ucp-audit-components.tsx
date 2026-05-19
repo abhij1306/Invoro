@@ -653,11 +653,10 @@ export function UcpFixSequence({ report }: Readonly<{ report: UcpAuditReport | n
         </div>
         <Button
           type="button"
-          variant="secondary"
+          variant="download"
           size="sm"
           onClick={exportPlan}
           disabled={!ordered.length}
-          className="h-8 border-border bg-panel text-foreground cursor-pointer flex gap-1.5 items-center"
         >
           <Download className="size-3.5" />
           Export action plan
@@ -841,13 +840,13 @@ function FindingsTable({
         <div className="flex flex-wrap items-center gap-2">
           {report ? (
             <>
-              <Button asChild variant="secondary" size="sm" className="h-7 text-[11px] border-border bg-panel text-foreground cursor-pointer flex gap-1 items-center">
+              <Button asChild variant="download" size="sm">
                 <a href={api.exportUcpAuditJson(report.job_id)} target="_blank" rel="noreferrer">
                   <Download className="size-3" />
                   JSON
                 </a>
               </Button>
-              <Button asChild variant="secondary" size="sm" className="h-7 text-[11px] border-border bg-panel text-foreground cursor-pointer flex gap-1 items-center">
+              <Button asChild variant="download" size="sm">
                 <a href={api.exportUcpAuditMarkdown(report.job_id)} target="_blank" rel="noreferrer">
                   <Download className="size-3" />
                   Markdown

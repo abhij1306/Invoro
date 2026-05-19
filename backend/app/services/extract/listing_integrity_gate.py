@@ -1,24 +1,7 @@
 from __future__ import annotations
 
-__all__ = (
-    "IntegrityDecision",
-    "evaluate_listing_integrity",
-    "ensure_frozenset",
-)
-
-"""Listing Integrity Gate — product-grid vs promo-only-cluster decision.
-
-Single owner for the accept/reject decision on a ranked listing candidate set.
-Pure function: no I/O, no mutation of the input records list or its elements.
-
-Placement rationale: lives in ``backend/app/services/extract/`` because it is
-part of the listing-extraction bucket per ``docs/CODEBASE_MAP.md``.
-"""
-
-
-from collections.abc import Iterable, Mapping
-
 from collections import Counter
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -31,6 +14,14 @@ from app.services.config.runtime_settings import crawler_runtime_settings
 from app.services.extract.detail.identity.core import (
     listing_detail_like_path,
     listing_url_is_structural,
+)
+
+# Listing Integrity Gate owns product-grid vs promo-only-cluster decisions.
+# Keep it pure: no I/O, no mutation of input record lists or their elements.
+__all__ = (
+    "IntegrityDecision",
+    "evaluate_listing_integrity",
+    "ensure_frozenset",
 )
 
 

@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 from app.services.acquisition.dom_runtime import wait_for_dom_mutation_settle
 from app.services.acquisition.traversal_helpers import (
+    emit_event as _emit_event,
     remaining_timeout_ms as _remaining_timeout_ms,
 )
 from app.services.config.extraction_rules import TRAVERSAL_LISTING_RECOVERY_ACTIONS
@@ -34,6 +35,13 @@ async def _wait_for_dom_mutation_settle(page, **kwargs):
         wait_for_dom_mutation_settle,
     )
     await wait_impl(page, **kwargs)
+
+
+async def _find_actionable_locator(page, selector_group: str):
+    from app.services.acquisition import traversal
+
+    return await traversal._find_actionable_locator(page, selector_group)
+
 
 async def recover_listing_page_content(
     page,

@@ -42,7 +42,7 @@ export function RunProfileRow({
         </div>
         <Button
           type="button"
-          variant="accent"
+          variant="action"
           size="sm"
           disabled={!sourceRunId || profileSaveKey === saveKey}
           onClick={() => void saveProfile(domain, surface)}

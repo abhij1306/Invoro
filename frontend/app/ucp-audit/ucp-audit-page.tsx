@@ -52,28 +52,26 @@ export default function UcpAuditPage() {
           <div className="flex w-full flex-wrap items-center justify-end gap-2">
             <Button
               type="button"
-              variant="secondary"
+              variant="neutral"
               size="sm"
               onClick={() => setHistoryOpen(true)}
-              className="border-border bg-panel text-foreground hover:bg-background-alt"
             >
               <History className="size-3" />
               History
             </Button>
             <Button
               type="button"
-              variant="secondary"
+              variant="neutral"
               size="sm"
               onClick={() => void controller.detailQuery.refetch()}
               disabled={!controller.resolvedJobId || controller.detailQuery.isFetching}
-              className="border-border bg-panel text-foreground hover:bg-background-alt"
             >
               <RefreshCcw className={cn("size-3", controller.detailQuery.isFetching && "animate-spin")} />
               Refresh
             </Button>
             <Button
               type="button"
-              variant="accent"
+              variant="action"
               size="sm"
               onClick={controller.startAudit}
               disabled={controller.createPending || controller.isRunning}

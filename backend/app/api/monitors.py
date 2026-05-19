@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import csv
 import io
-from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status

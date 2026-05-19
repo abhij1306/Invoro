@@ -67,7 +67,7 @@ export default function JobsPage() {
           <div className="flex items-center gap-3">
             <span className="text-muted type-caption">Last refreshed {lastRefreshed}</span>
             <Button
-              variant="secondary"
+              variant="neutral"
               type="button"
               size="sm"
               onClick={() => void jobsQuery.refetch()}

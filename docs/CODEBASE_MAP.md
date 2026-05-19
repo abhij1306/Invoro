@@ -29,6 +29,7 @@ If a file is not listed, assume it is a helper under a listed owner.
 | `data_enrichment.py` | On-demand ecommerce detail enrichment jobs and enriched product rows |
 | `ucp_audit.py` | UCP audit job creation, history, detail, and report exports |
 | `monitors.py` | Product monitor CRUD, run-now dispatch, history/events/snapshot, and exports |
+| `orchestration.py` | Project/workflow shell, template listing, workflow launch/status, monitor promotion, and comparison results |
 | `notifications.py` | In-app monitor notification listing, unread counts, and read state |
 | `auth.py` | Login, register, `/me` |
 | `users.py`, `dashboard.py`, `jobs.py`, `health.py`, `metrics.py` | Named route modules |
@@ -63,6 +64,7 @@ If a file is not listed, assume it is a helper under a listed owner.
 | `UCPAuditJob`, `UCPAuditPageResult`, `UCPAuditReport` | `ucp_audit.py` | persisted UCP compliance audit jobs, sampled page payloads, and report artifacts |
 | `MonitorJob`, `MonitorEvent`, `MonitorSnapshot`, `MonitorSnapshotRecord`, `MonitorURLState` | `monitor.py` | recurring crawl monitors, field-level events, snapshots, and URL pre-check state |
 | `InAppNotification` | `notification.py` | user-visible monitor change alerts and read state |
+| `OrchestrationProject`, `OrchestrationWorkflowRun`, `OrchestrationStepRun` | `orchestration.py` | thin project/workflow shells that reference crawl runs and monitors |
 | `LLMConfig`, `LLMCostLog` | `llm.py` | LLM config and cost tracking |
 
 ### `schemas/` — request and response DTOs
@@ -85,6 +87,7 @@ If a file is not listed, assume it is a helper under a listed owner.
 | `data_enrichment/service.py` | On-demand enrichment job orchestration and persistence for ecommerce detail records |
 | `ucp_audit/*` | UCP compliance audit primitives, scoring, reporting, and job orchestration |
 | `monitor_service.py`, `monitor_scheduler_service.py`, `monitor_async_loop.py`, `monitor_change_detection.py`, `monitor_retention.py`, `monitor_alert_service.py` | Product monitoring CRUD support, due-job scheduling, dev scheduler loop, post-run diffing, retention, and in-app alerts |
+| `orchestration_service.py` | Use-case-first project/workflow sequencer that creates normal crawl runs and monitors |
 | `data_enrichment/deterministic.py` | Deterministic enrichment normalization, taxonomy matching, and product attribute diagnostics |
 | `data_enrichment/llm_diagnostics.py` | Data enrichment LLM rejection and skip-reason diagnostics |
 | `data_enrichment/shopify_catalog.py` | Shopify taxonomy and attribute repository loading/matching |
@@ -295,6 +298,7 @@ All selector memory is scoped by normalized `(domain, surface)`.
 | Path | Purpose |
 |---|---|
 | `app/` | Next.js App Router pages |
+| `app/projects/*` | Project list, UC-1 wizard, workflow overview/status, and price comparison view |
 | `app/product-intelligence/product-intelligence-components.tsx` | Product Intelligence local UI pieces |
 | `app/monitors/*`, `components/monitors/*` | Monitor list/detail/create UI, monitor form, events, history chart, snapshot table, loading and empty states |
 | `app/ucp-audit/*` | UCP audit operator page, hook, and local report components |

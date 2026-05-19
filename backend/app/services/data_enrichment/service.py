@@ -30,7 +30,6 @@ from app.services.data_enrichment.deterministic import (
     category_attribute_handles,
     load_attribute_repository,
     load_taxonomy_index,
-    match_category_path,
     normalize_from_terms,
     normalize_materials,
     normalize_sizes,

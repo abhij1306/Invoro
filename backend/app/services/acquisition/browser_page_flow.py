@@ -16,12 +16,9 @@ from app.services.acquisition.browser_page_helpers import (
     capture_listing_visual_elements,
     detail_expansion_can_skip,
     detail_expansion_extractability,
-    dismiss_safe_location_interstitial,
     normalize_listing_recovery_mode as _normalize_listing_recovery_mode,
-    page_might_have_location_interstitial,
     select_primary_browser_html as _select_primary_browser_html,
 )
-from app.services.acquisition.browser_page_helpers import location_interstitial_detected
 from app.services.acquisition.browser_page_helpers import requested_content_extractability
 from app.services.acquisition.browser_page_helpers import BeautifulSoup
 from app.services.acquisition.dom_runtime import get_page_html
@@ -31,10 +28,8 @@ from app.services.acquisition.browser_recovery import (
 )
 from app.services.acquisition.runtime import (
     classify_blocked_page_async,
-    BlockPageClassification,
 )
 from app.services.acquisition import browser_result_builder as _browser_result_builder
-from app.services.acquisition.browser_result_builder import BrowserFinalizeInput
 from app.services.config.selectors import (
     CARD_SELECTORS,
 )

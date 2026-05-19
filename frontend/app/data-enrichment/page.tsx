@@ -15,7 +15,7 @@ import {
   PageHeader,
   TableSurface,
 } from '../../components/ui/patterns';
-import { Badge, Button } from '../../components/ui/primitives';
+import { Badge, Button, buttonVariants } from '../../components/ui/primitives';
 import { api } from '../../lib/api';
 import { EnrichmentStatus, EnrichmentTableLoading } from './enrichment-components';
 import type {
@@ -163,8 +163,7 @@ export default function DataEnrichmentPage() {
         actions={
           <div className="flex w-full flex-wrap items-center justify-end gap-2">
             <label
-              style={{ fontSize: '12px' }}
-              className="border-border bg-background-elevated text-foreground hover:bg-accent/[0.04] inline-flex h-7 cursor-pointer items-center gap-2 rounded-[var(--radius-md)] border px-2.5 transition-colors font-semibold"
+              className={cn(buttonVariants({ variant: 'neutral', size: 'sm' }), 'cursor-pointer')}
             >
               <input
                 type="checkbox"
@@ -176,7 +175,7 @@ export default function DataEnrichmentPage() {
             </label>
             <Button
               type="button"
-              variant="accent"
+              variant="action"
               size="sm"
               disabled={!sourceRecordIds.length || createMutation.isPending || isRunning}
               onClick={() => createMutation.mutate()}
@@ -214,22 +213,20 @@ export default function DataEnrichmentPage() {
           <div className="flex items-center gap-2">
             <Button
               type="button"
-              variant="ghost"
+              variant="quiet"
               size="sm"
               onClick={() => void detailQuery.refetch()}
               disabled={!resolvedJobId || detailQuery.isFetching}
-              className="text-muted hover:text-foreground type-label-mono px-2"
             >
               <RefreshCcw className="mr-1.5 size-3" />
               Refresh
             </Button>
             <Button
               type="button"
-              variant="ghost"
-              size="sm"
+              variant="quiet"
+              size="icon"
               onClick={() => setHistoryOpen(true)}
               aria-label="Enrichment History"
-              className="text-muted hover:text-foreground w-8 p-0"
             >
               <History className="size-3.5" />
             </Button>

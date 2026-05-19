@@ -1135,9 +1135,8 @@ export const LogTerminal = memo(function LogTerminal({
                       {payload ? (
                         <Button
                           type="button"
-                          variant="ghost"
+                          variant="quiet"
                           size="sm"
-                          className="type-control h-7 px-2"
                           onClick={(event) => {
                             event.stopPropagation();
                             setPeekedGroupKey(group.key);
@@ -1197,9 +1196,8 @@ export const LogTerminal = memo(function LogTerminal({
                                 {row.payloadAction ? (
                                   <Button
                                     type="button"
-                                    variant="ghost"
+                                    variant="quiet"
                                     size="sm"
-                                    className="h-auto px-0 py-0 text-xs font-normal"
                                     onClick={() => {
                                       setPeekedGroupKey(group.key);
                                       setPeekedRecordIndex(0);
@@ -1261,22 +1259,22 @@ export const LogTerminal = memo(function LogTerminal({
                   {peekedGroup?.label ?? TERMINAL_STRINGS.SITE_PAYLOAD}
                 </div>
               </div>
-              <button
+              <Button
+                type="button"
+                variant="quiet"
+                size="sm"
                 onClick={() => setPeekedGroupKey(null)}
-                className="hover:text-foreground text-xs font-medium transition-colors"
-                style={{ color: 'var(--text-muted)' }}
               >
                 Close
-              </button>
+              </Button>
             </div>
             <div className="relative h-[calc(100%-56px)] overflow-hidden p-6">
               <div className="group relative h-full">
                 <div className="absolute top-3 right-3 z-10 opacity-0 transition-all group-hover:opacity-100">
                   <Button
                     type="button"
-                    variant="ghost"
+                    variant="quiet"
                     size="sm"
-                    className="h-7 bg-[#1e1e1e]/80 text-[10px] text-white backdrop-blur-sm hover:bg-white/10 hover:text-white"
                     onClick={() => {
                       if (!peekedGroup) return;
                       const currentRecord =

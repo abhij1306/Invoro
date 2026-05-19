@@ -19,6 +19,11 @@ from app.models.monitor import (
     MonitorURLState,
 )
 from app.models.notification import InAppNotification
+from app.models.orchestration import (
+    OrchestrationProject,
+    OrchestrationStepRun,
+    OrchestrationWorkflowRun,
+)
 from app.models.product_intelligence import (
     ProductIntelligenceCandidate,
     ProductIntelligenceJob,
@@ -53,6 +58,9 @@ __all__ = [
     "MonitorSnapshotRecord",
     "MonitorURLState",
     "InAppNotification",
+    "OrchestrationProject",
+    "OrchestrationWorkflowRun",
+    "OrchestrationStepRun",
     "ReviewPromotion",
     "UCPAuditJob",
     "UCPAuditPageResult",

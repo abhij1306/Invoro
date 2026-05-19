@@ -3,13 +3,13 @@
 import { Moon, Sun } from 'lucide-react';
 import { useSyncExternalStore } from 'react';
 
-import { cn } from '../../lib/utils';
+import { Button } from './button';
 
 type ThemeMode = 'light' | 'dark';
 const THEME_STORAGE_KEY = 'crawlerai-theme';
 const THEME_TRANSITION_ATTR = 'data-theme-transition';
 
-export function ThemeToggle({ compact }: Readonly<{ compact?: boolean }>) {
+export function ThemeToggle({ compact: _compact }: Readonly<{ compact?: boolean }>) {
   const theme = useSyncExternalStore(subscribeTheme, readTheme, () => 'light');
 
   function toggleTheme() {
@@ -18,22 +18,20 @@ export function ThemeToggle({ compact }: Readonly<{ compact?: boolean }>) {
   }
 
   return (
-    <button
+    <Button
       type="button"
       onClick={toggleTheme}
-      className={cn(
-        'focus-ring border-border bg-background-elevated text-foreground hover:border-border-strong hover:bg-background-alt inline-flex items-center justify-center rounded-[var(--radius-md)] border transition-[background-color,color,border-color]',
-        compact ? 'size-7' : 'size-8',
-      )}
+      variant="neutral"
+      size="icon"
       aria-label="Toggle color theme"
       title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
     >
       {theme === 'dark' ? (
-        <Sun className={compact ? 'size-3' : 'size-4'} strokeWidth={2} aria-hidden />
+        <Sun className="size-4" strokeWidth={2} aria-hidden />
       ) : (
-        <Moon className={compact ? 'size-3' : 'size-4'} strokeWidth={2} aria-hidden />
+        <Moon className="size-4" strokeWidth={2} aria-hidden />
       )}
-    </button>
+    </Button>
   );
 }
 

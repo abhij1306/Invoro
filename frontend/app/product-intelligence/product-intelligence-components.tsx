@@ -69,9 +69,8 @@ export function JsonModal({
           <h3 className="text-foreground type-heading text-sm font-medium">Raw JSON</h3>
           <Button
             type="button"
-            variant="ghost"
+            variant="quiet"
             size="icon"
-            className="h-7 w-7"
             onClick={onClose}
             aria-label="Close"
           >
@@ -87,18 +86,16 @@ export function JsonModal({
         <div className="border-divider flex items-center justify-end gap-2 border-t px-4 py-3">
           <Button
             type="button"
-            variant="ghost"
+            variant="quiet"
             size="sm"
-            className="h-7 text-xs"
             onClick={() => void navigator.clipboard.writeText(text)}
           >
             <Copy className="mr-1 size-3" /> Copy
           </Button>
           <Button
             type="button"
-            variant="accent"
+            variant="download"
             size="sm"
-            className="h-7 text-xs"
             onClick={() => {
               const blob = new Blob([text], { type: 'application/json' });
               const url = URL.createObjectURL(blob);

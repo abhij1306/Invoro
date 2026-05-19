@@ -734,7 +734,7 @@ export function CrawlConfigScreen({
                 ) : null}
               </div>
               <Button
-                variant="accent"
+                variant="action"
                 size="sm"
                 type="submit"
                 disabled={!canSubmit}
@@ -956,28 +956,26 @@ export function CrawlConfigScreen({
               <span className="type-heading-3 text-foreground font-semibold">Field Configuration</span>
               <div className="flex items-center gap-2">
                 <Button
-                  variant="ghost"
+                  variant="quiet"
                   type="button"
                   size="sm"
                   onClick={() => void generateFieldSelectors()}
                   disabled={generatingSelectors}
-                  className="rounded-[var(--radius-md)]"
                 >
                   <Sparkles className="size-3" />
                   {generatingSelectors ? 'Generating...' : 'Generate'}
                 </Button>
                 <Button
-                  variant="ghost"
+                  variant="quiet"
                   type="button"
                   size="sm"
                   onClick={addManualField}
-                  className="rounded-[var(--radius-md)]"
                 >
                   <Plus className="size-3" />
                   New Field
                 </Button>
                 <Button
-                  variant="accent"
+                  variant="action"
                   type="button"
                   size="sm"
                   onClick={() => void saveToDomainMemory()}
@@ -989,7 +987,6 @@ export function CrawlConfigScreen({
                         (row.cssSelector.trim() || row.xpath.trim() || row.regex.trim()),
                     )
                   }
-                  className="rounded-[var(--radius-md)]"
                 >
                   {savingDomainMemory ? 'Saving...' : 'Save to Memory'}
                 </Button>

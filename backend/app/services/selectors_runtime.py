@@ -41,9 +41,9 @@ from app.services.dom.xpath_service import (
     extract_selector_value,
     validate_or_convert_xpath,
 )
+from app.services.url_safety import ensure_public_crawl_targets
 
 coerce_int = _coerce_int
-from app.services.url_safety import ensure_public_crawl_targets
 
 
 def infer_surface(*, url: str, expected_fields: Iterable[str] | None = None) -> str:

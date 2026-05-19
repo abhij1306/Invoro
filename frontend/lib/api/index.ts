@@ -46,6 +46,14 @@ import type {
   LlmConnectionTestResponse,
   LlmCostLogRecord,
   InAppNotification,
+  OrchestrationProject,
+  OrchestrationProjectCreatePayload,
+  OrchestrationPromotePayload,
+  OrchestrationPromoteResponse,
+  OrchestrationTemplate,
+  OrchestrationWorkflow,
+  OrchestrationWorkflowCreatePayload,
+  PriceComparisonResponse,
 } from './types';
 
 function withQuery(path: string, query: URLSearchParams) {
@@ -309,6 +317,36 @@ export const api = {
     apiClient.post<LlmConnectionTestResponse>('/api/llm/test-connection', payload),
   listLlmCostLog: () => apiClient.get<LlmCostLogRecord[]>('/api/llm/cost-log'),
   listJobs: () => apiClient.get<ActiveJob[]>('/api/jobs/active'),
+  listOrchestrationProjects: () =>
+    apiClient.get<OrchestrationProject[]>('/api/orchestration/projects'),
+  createOrchestrationProject: (payload: OrchestrationProjectCreatePayload) =>
+    apiClient.post<OrchestrationProject>('/api/orchestration/projects', payload),
+  getOrchestrationProject: (projectId: number) =>
+    apiClient.get<OrchestrationProject>(`/api/orchestration/projects/${projectId}`),
+  listOrchestrationTemplates: () =>
+    apiClient.get<OrchestrationTemplate[]>('/api/orchestration/templates'),
+  createOrchestrationWorkflow: (payload: OrchestrationWorkflowCreatePayload) =>
+    apiClient.post<OrchestrationWorkflow>('/api/orchestration/workflows', payload),
+  listOrchestrationWorkflows: (projectId: number) => {
+    const query = new URLSearchParams();
+    query.set('project_id', String(projectId));
+    return apiClient.get<OrchestrationWorkflow[]>(
+      withQuery('/api/orchestration/workflows', query),
+    );
+  },
+  getOrchestrationWorkflow: (workflowId: number) =>
+    apiClient.get<OrchestrationWorkflow>(`/api/orchestration/workflows/${workflowId}`),
+  getOrchestrationWorkflowStatus: (workflowId: number) =>
+    apiClient.get<OrchestrationWorkflow>(`/api/orchestration/workflows/${workflowId}/status`),
+  promoteOrchestrationWorkflow: (workflowId: number, payload: OrchestrationPromotePayload) =>
+    apiClient.post<OrchestrationPromoteResponse>(
+      `/api/orchestration/workflows/${workflowId}/promote`,
+      payload,
+    ),
+  getPriceComparison: (workflowId: number) =>
+    apiClient.get<PriceComparisonResponse>(
+      `/api/orchestration/workflows/${workflowId}/results/price-comparison`,
+    ),
 };
 
 // Named exports for easier consumption in components

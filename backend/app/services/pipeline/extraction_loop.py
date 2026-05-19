@@ -1,31 +1,14 @@
 from __future__ import annotations
 
-import asyncio
 import logging
 import time
 
 from app.models.crawl_run import CrawlRun
 from app.services.acquisition.acquirer import AcquisitionResult
 from app.services.acquisition.acquirer import acquire as _acquire
-from app.services.acquisition.host_protection_memory import note_host_hard_block
-from app.services.adapters.registry import run_adapter
-from app.services.acquisition.browser_runtime import real_chrome_browser_available
 from app.services.config.runtime_settings import crawler_runtime_settings
-from app.services.domain_memory_service import load_domain_selector_rules
-from app.services.pipeline.extract_records import extract_records
-from app.services.extract.detail.assembly.record_assembly import (
-    detail_record_rejection_reason,
-    infer_detail_failure_reason,
-)
-from app.services.platform_policy import detect_platform_family
-from app.services.pipeline.extraction_retry_stage import (
-    remaining_url_budget_seconds as _remaining_url_budget_seconds,
-)
 from app.services.db_utils import mapping_or_empty
 from app.services.domain_utils import normalize_domain
-from app.services.crawl.profile import (
-    apply_acquisition_contract_to_profile,
-)
 from app.services.shared.field_coerce import validate_record_for_surface
 from app.services.llm.config_service import resolve_run_config
 from app.services.llm.runtime import (
@@ -55,7 +38,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .extraction_retry_decision import (
     annotate_field_repair as _annotate_field_repair,
     empty_extraction_browser_retry_decision as _empty_extraction_browser_retry_decision,
-    low_quality_extraction_browser_retry_decision as _low_quality_extraction_browser_retry_decision,
 )
 from .extraction_retry_stage import (
     _apply_detail_rejection_guard,
@@ -84,7 +66,6 @@ from .runtime_helpers import (
     browser_result_is_extractable as _browser_result_is_extractable,
     effective_blocked as _effective_blocked,
     mark_run_failed,
-    merge_browser_diagnostics as _merge_browser_diagnostics,
     record_detail_expansion_extraction_outcome as _record_detail_expansion_extraction_outcome,
     screenshot_required as _screenshot_required,
     suppress_empty_downstream_record_logs as _suppress_empty_downstream_record_logs,

@@ -1,7 +1,12 @@
 import { render } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { RunSummaryChips } from './patterns';
+import { TopBarProvider } from '../layout/top-bar-context';
+import { PageHeader, RunSummaryChips } from './patterns';
+
+vi.mock('next/navigation', () => ({
+  usePathname: () => '/projects/1',
+}));
 
 describe('RunSummaryChips', () => {
   afterEach(() => {
@@ -17,5 +22,25 @@ describe('RunSummaryChips', () => {
       call.some((entry) => String(entry).includes('Encountered two children with the same key')),
     );
     expect(duplicateKeyWarning).toBe(false);
+  });
+});
+
+describe('PageHeader', () => {
+  it('accepts fragment actions without crashing', () => {
+    expect(() =>
+      render(
+        <TopBarProvider>
+          <PageHeader
+            title="Project"
+            actions={
+              <>
+                <button type="button">CSV</button>
+                <button type="button">Promote</button>
+              </>
+            }
+          />
+        </TopBarProvider>,
+      ),
+    ).not.toThrow();
   });
 });

@@ -25,7 +25,6 @@ from app.services.config.extraction_rules import (
     UNRESOLVED_TEMPLATE_URL_TOKENS,
 )
 from app.services.config.surface_hints import detail_path_hints
-from app.services.extraction_html_helpers import html_to_text
 from app.services.shared.coerce_primitives import safe_int as _safe_int
 from app.services.shared.field_coerce import absolute_url, clean_text, extract_urls
 

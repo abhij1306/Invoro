@@ -345,10 +345,10 @@ export default function SelectorsPage() {
           </label>
           <Button
             type="button"
-            variant="accent"
+            variant="action"
             onClick={() => void loadPageAndSuggestions()}
             disabled={loadingSuggestions}
-            className="w-full xl:w-auto h-[40px] px-6"
+            className="w-full xl:w-auto"
           >
             <Sparkles className="size-3.5" />
             {loadingSuggestions ? 'Loading...' : 'Load Page'}
@@ -393,7 +393,7 @@ export default function SelectorsPage() {
           title="Field Rows"
           description="Review LLM suggestions, edit selectors manually, test arbitrary XPath/CSS/regex, then accept the rows you want to save."
           action={
-            <Button type="button" variant="ghost" onClick={addFieldRow}>
+            <Button type="button" variant="quiet" onClick={addFieldRow}>
               <Plus className="size-3.5" />
               Add Field
             </Button>
@@ -469,10 +469,9 @@ export default function SelectorsPage() {
                         <div className="flex items-center justify-end xl:h-[40px]">
                           <Button
                             type="button"
-                            variant="danger"
+                            variant="destructive"
                             size="icon"
                             onClick={() => removeFieldRow(row.key)}
-                            className="size-10"
                             aria-label="Delete field row"
                           >
                             <Trash2 className="size-4" />
@@ -495,7 +494,7 @@ export default function SelectorsPage() {
                       <div className="flex flex-wrap items-center gap-3">
                         <Button
                           type="button"
-                          variant="secondary"
+                          variant="neutral"
                           onClick={() => void redetectRow(row)}
                           disabled={activeDetectKey === row.key}
                         >
@@ -504,7 +503,7 @@ export default function SelectorsPage() {
                         </Button>
                         <Button
                           type="button"
-                          variant="secondary"
+                          variant="neutral"
                           onClick={() => void testRow(row)}
                           disabled={activeTestKey === row.key}
                         >
@@ -515,8 +514,8 @@ export default function SelectorsPage() {
                           type="button"
                           variant={
                             row.state === 'accepted' || row.state === 'saved'
-                              ? 'secondary'
-                              : 'ghost'
+                              ? 'neutral'
+                              : 'quiet'
                           }
                           onClick={() =>
                             updateRow(row.key, { state: nextSelectorRowState(row.state) })
@@ -556,7 +555,7 @@ export default function SelectorsPage() {
           <div className="border-border flex justify-end border-t pt-4">
             <Button
               type="button"
-              variant="accent"
+              variant="action"
               onClick={() => void saveAcceptedRows()}
               disabled={savingAccepted || !rows.some((row) => row.state === 'accepted')}
             >

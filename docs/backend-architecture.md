@@ -43,6 +43,7 @@ Routers registered in `backend/app/main.py`:
 - `/api/llm`
 - `/api/data-enrichment`
 - `/api/monitors`
+- `/api/orchestration`
 - `/api/health`
 - `/api/metrics`
 
@@ -56,6 +57,7 @@ Important route groups:
 - `api/llm.py`: provider catalog, config CRUD, connection test, cost log
 - `api/data_enrichment.py`: on-demand ecommerce detail enrichment jobs and enriched product row lookup
 - `api/monitors.py`: monitor CRUD, run-now dispatch, event/history/current-snapshot lookup, and JSON/CSV exports
+- `api/orchestration.py`: project shells, static workflow templates, workflow launch/status, monitor promotion, and price-comparison views over normal crawl records
 
 Domain-recipe routes live under `api/crawl_domain.py`:
 
@@ -168,6 +170,7 @@ Primary files:
 - `pipeline/runtime_helpers.py`
 - `data_enrichment/service.py`
 - `monitor_service.py`, `monitor_scheduler_service.py`, `monitor_async_loop.py`, `monitor_change_detection.py`, `monitor_retention.py`
+- `orchestration_service.py`
 - `data_enrichment/deterministic.py`
 - `data_enrichment/shopify_catalog.py`
 
@@ -195,6 +198,7 @@ Current live behavior:
 - `pipeline/extraction_loop.py` stays the per-URL stage orchestrator; record extraction, acquisition-contract memory, retry families, direct-record LLM fallback, browser diagnostics merge, typed result objects, and public failure-state persistence live in dedicated pipeline helper modules
 - Data Enrichment is separate from the crawl pipeline: it reads persisted ecommerce detail `CrawlRecord` rows, writes `EnrichedProduct` rows, and only updates source-record enrichment status metadata.
 - Product Monitoring is a recurring crawl orchestration layer: `MonitorJob` rows store URL sets, schedule interval, priority, tracked fields, retention, and crawl settings; scheduler drivers call `MonitorSchedulerService.check_due_jobs()`; monitor runs are normal `CrawlRun` rows tagged with `settings.monitor_id`; `MonitorChangeDetectionService` diffs completed run records against the latest snapshot; `monitor_alert_service.py` creates in-app notifications for tracked field changes; retention purges monitor snapshots/events only.
+- Orchestration is a use-case-first sequencing layer: `OrchestrationProject` groups business context, `OrchestrationWorkflowRun` stores resolved versioned template config, and `OrchestrationStepRun` links steps to normal `CrawlRun` rows. The MVP template is `competitive_pricing_snapshot`, which launches listing first, starts detail from completed listing record URLs, renders comparison rows from detail records, and promotes to normal `MonitorJob` rows. It does not implement extraction or mutate pipeline behavior.
 - Scheduler driver split is explicit: `SCHEDULER_DRIVER=dev` starts `AsyncSchedulerLoop` from FastAPI lifespan with no Celery Beat; `SCHEDULER_DRIVER=celery` registers Celery Beat tasks `monitor.check_due_jobs` and `monitor.purge_expired_snapshots`.
 
 ### 6.3 Acquisition and browser runtime
@@ -496,6 +500,9 @@ Primary models:
 - `LLMConfig`
 - `LLMCostLog`
 - `DomainMemory`
+- `OrchestrationProject`
+- `OrchestrationWorkflowRun`
+- `OrchestrationStepRun`
 
 Notable current schema direction:
 
@@ -504,6 +511,7 @@ Notable current schema direction:
 - URL identity keys on records
 - enrichment status metadata on crawl records, with derived enrichment data stored separately in `enriched_products`
 - UCP audit report storage separated from crawl records, with JSON/Markdown artifacts in `ucp_audit_reports`
+- orchestration project/workflow/step shells store references and resolved config only; extracted data stays in `crawl_records`, recurring state stays in monitor tables
 - domain-memory storage
 - split crawl-data reset versus domain-memory reset, so destructive cleanup no longer wipes learned selectors/profiles/cookies by default
 

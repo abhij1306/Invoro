@@ -7,7 +7,6 @@ __all__ = (
 )
 
 import logging
-from typing import Any
 
 from bs4 import BeautifulSoup
 

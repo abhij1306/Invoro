@@ -132,7 +132,7 @@ function RunRow({
       {/* Actions */}
       <TableCell className="text-right whitespace-nowrap">
         <div className="flex items-center justify-end gap-1.5 px-0 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
-          <Button variant="accent" size="sm" asChild className="h-7 px-3">
+          <Button variant="action" size="sm" asChild>
             <Link href={`/crawl?run_id=${run.id}` as Route}>
               Open
               <ArrowRightCircle className="ml-1 size-3" />
@@ -140,7 +140,7 @@ function RunRow({
           </Button>
           <Button
             type="button"
-            variant="danger"
+            variant="destructive"
             size="sm"
             onClick={onDelete}
             disabled={!canDelete || pendingDelete}
@@ -223,7 +223,7 @@ export default function RunsPage() {
         title="Run History"
         actions={
           <Link href="/crawl" className="no-underline">
-            <Button variant="primary" size="sm">
+            <Button variant="action" size="sm">
               <Plus className="size-3.5" />
               New Crawl
             </Button>
@@ -264,7 +264,7 @@ export default function RunsPage() {
           <Button onClick={applyFilters} size="sm">
             Filter
           </Button>
-          <Button variant="ghost" onClick={resetFilters} size="sm">
+          <Button variant="quiet" onClick={resetFilters} size="sm">
             Reset
           </Button>
         </div>

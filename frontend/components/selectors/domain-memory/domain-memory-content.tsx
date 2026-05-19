@@ -91,7 +91,7 @@ function domainMemoryActions(controller: DomainMemoryWorkspaceController) {
     <div className="flex flex-wrap items-center gap-2">
       <Button
         type="button"
-        variant="secondary"
+        variant="destructive"
         size="sm"
         onClick={() => {
           controller.setResetError('');
@@ -104,7 +104,7 @@ function domainMemoryActions(controller: DomainMemoryWorkspaceController) {
       </Button>
       <Button
         type="button"
-        variant="secondary"
+        variant="neutral"
         size="sm"
         onClick={() => void controller.loadWorkspace()}
         disabled={controller.loading || controller.resetPending}
@@ -128,7 +128,7 @@ function DomainDetail({ controller }: DomainMemoryContentProps) {
         {selectedWorkspace.surfaces.some((surface) => surface.selectorCount) ? (
           <Button
             type="button"
-            variant="danger"
+            variant="destructive"
             size="sm"
             onClick={() => void controller.deleteDomainSelectors(selectedWorkspace.domain)}
           >

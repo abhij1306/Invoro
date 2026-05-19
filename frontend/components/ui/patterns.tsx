@@ -22,12 +22,7 @@ function stableNodeSignature(value: ReactNode): string {
   }
   if (isValidElement(value)) {
     const props = (value.props ?? {}) as Record<string, unknown>;
-    const typeName =
-      typeof value.type === 'string'
-        ? value.type
-        : 'displayName' in value.type && typeof value.type.displayName === 'string'
-          ? value.type.displayName
-          : (value.type.name ?? 'component');
+    const typeName = stableElementTypeName(value.type);
     const propEntries = Object.entries(props)
       .filter(([key, propValue]) => key !== 'children' && key !== 'style' && typeof propValue !== 'function')
       .map(([key, propValue]) => `${key}:${stableNodeSignature(propValue as ReactNode)}`)
@@ -44,6 +39,20 @@ function stableNodeSignature(value: ReactNode): string {
   return Children.toArray(value)
     .map((entry) => stableNodeSignature(entry))
     .join('|');
+}
+
+function stableElementTypeName(type: unknown): string {
+  if (typeof type === 'string') return type;
+  if (typeof type === 'symbol') return type.description ?? 'symbol';
+  if (typeof type === 'function' || (typeof type === 'object' && type !== null)) {
+    if ('displayName' in type && typeof type.displayName === 'string') {
+      return type.displayName;
+    }
+    if ('name' in type && typeof type.name === 'string') {
+      return type.name;
+    }
+  }
+  return 'component';
 }
 
 /* ─── PageHeader ─────────────────────────────────────────────────────────── */
@@ -109,12 +118,12 @@ export function TabBar({
 }: Readonly<{
   value: string;
   onChange: (value: string) => void;
-  options: Array<{ value: string; label: string }>;
+  options: Array<{ value: string; label: ReactNode; icon?: ReactNode }>;
   compact?: boolean;
   className?: string;
   variant?: 'pill' | 'underline';
 }>) {
-  const padX = compact ? 'px-2.5' : 'px-3.5';
+  const padX = compact ? 'px-3' : 'px-4';
 
   if (variant === 'underline') {
     return (
@@ -138,7 +147,14 @@ export function TabBar({
                 : 'text-secondary hover:text-foreground hover:border-border border-b-2 border-transparent',
             )}
           >
-            {option.label}
+            {option.icon ? (
+              <span className="inline-flex items-center gap-1.5">
+                <span className="shrink-0">{option.icon}</span>
+                <span>{option.label}</span>
+              </span>
+            ) : (
+              option.label
+            )}
           </button>
         ))}
       </div>
@@ -148,7 +164,7 @@ export function TabBar({
   return (
     <div
       className={cn(
-        'segmented-root inline-flex h-[36px] items-stretch gap-1 rounded-[4px] p-[4px]',
+        'inline-flex h-[36px] items-center gap-1.5 rounded-full border border-[color-mix(in_srgb,var(--border)_45%,transparent_55%)] bg-[color-mix(in_srgb,var(--bg-alt)_95%,var(--text-primary)_5%)] p-[3px] shadow-[inset_0_1px_1px_rgba(0,0,0,0.02)] transition-all',
         className,
       )}
     >
@@ -159,14 +175,21 @@ export function TabBar({
           aria-pressed={value === option.value}
           onClick={() => onChange(option.value)}
           className={cn(
-            'type-control relative z-10 inline-flex min-w-[72px] shrink-0 items-center justify-center rounded-[4px] border px-3 py-0 whitespace-nowrap transition-colors duration-150',
+            'type-control relative z-10 inline-flex h-full min-w-[72px] shrink-0 items-center justify-center rounded-full text-sm font-semibold transition-all duration-200 ease-out select-none whitespace-nowrap',
             padX,
             value === option.value
-              ? 'border-border bg-panel text-foreground'
-              : 'border-transparent bg-transparent text-secondary opacity-100 hover:text-foreground',
+              ? 'border border-border bg-panel text-foreground shadow-xs'
+              : 'border border-transparent bg-transparent text-secondary opacity-95 hover:text-foreground hover:opacity-100',
           )}
         >
-          {option.label}
+          {option.icon ? (
+            <span className="inline-flex items-center gap-1.5">
+              <span className="shrink-0">{option.icon}</span>
+              <span>{option.label}</span>
+            </span>
+          ) : (
+            option.label
+          )}
         </button>
       ))}
     </div>

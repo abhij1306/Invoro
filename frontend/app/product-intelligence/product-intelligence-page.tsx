@@ -84,7 +84,7 @@ function productIntelligenceActions(controller: ProductIntelligenceController) {
       {controller.acceptedMatchCount > 0 ? (
         <Button
           type="button"
-          variant="secondary"
+          variant="neutral"
           size="sm"
           onClick={() => void controller.createMonitorFromJob()}
           disabled={controller.creatingMonitor || controller.resolvedActiveJobId === null}
@@ -96,7 +96,7 @@ function productIntelligenceActions(controller: ProductIntelligenceController) {
       ) : null}
       <Button
         type="button"
-        variant="accent"
+        variant="action"
         size="sm"
         onClick={() => void controller.discover()}
         disabled={controller.pending || !controller.visibleSourceRecords.length}
@@ -106,7 +106,7 @@ function productIntelligenceActions(controller: ProductIntelligenceController) {
       </Button>
       <Button
         type="button"
-        variant="accent"
+        variant="action"
         size="sm"
         onClick={controller.sendSelectedToBatchCrawl}
         disabled={!controller.uniqueSelectedUrls.length}

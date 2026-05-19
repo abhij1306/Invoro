@@ -143,7 +143,7 @@ export default function DashboardPage() {
           <div className="flex items-center gap-3">
             <Button
               type="button"
-              variant="primary"
+              variant="neutral"
               size="sm"
               onClick={() => void handleRefresh()}
               disabled={isRefreshing || isLoading}

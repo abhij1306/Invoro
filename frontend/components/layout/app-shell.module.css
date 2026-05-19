@@ -255,22 +255,8 @@
 }
 
 :global(.app-topbar .app-icon-button:hover) {
-  background: rgba(255, 255, 255, 0.08) !important;
-  color: var(--shell-text, var(--text-primary)) !important;
-}
-
-:global(.app-topbar .app-topbar-button.ui-button) {
-  background: rgba(255, 255, 255, 0.08) !important;
-  border-color: transparent !important;
-  color: var(--shell-text, #ffffff) !important;
-  box-shadow: none !important;
-}
-
-:global(.app-topbar .app-topbar-button.ui-button:hover:not(:disabled)) {
-  background: rgba(255, 255, 255, 0.18) !important;
-  border-color: transparent !important;
-  color: var(--shell-text, #ffffff) !important;
-  transform: none !important;
+  background: var(--button-topbar-hover-bg, var(--accent-subtle)) !important;
+  color: var(--button-topbar-fg, var(--shell-text, var(--text-primary))) !important;
 }
 
 :global(.app-page-frame) {

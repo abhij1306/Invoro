@@ -176,11 +176,11 @@ export function ActionButton({
   return (
     <Button
       type="button"
-      variant={danger ? 'danger' : 'secondary'}
+      variant={danger ? 'destructive' : 'neutral'}
       size="sm"
       disabled={disabled}
       onClick={onClick}
-      className="type-control h-8 min-w-0 px-3"
+      className="min-w-0"
     >
       {label}
     </Button>

@@ -93,7 +93,7 @@ export function MonitorListItem({
       <div className="flex items-center justify-end gap-2">
         <Button
           type="button"
-          variant="secondary"
+          variant="neutral"
           size="sm"
           onClick={() => onRunNow(id)}
           disabled={running || monitor.status !== 'active'}
@@ -107,7 +107,7 @@ export function MonitorListItem({
           <Button
             ref={buttonRef}
             type="button"
-            variant="ghost"
+            variant="quiet"
             size="icon"
             aria-label="Monitor actions"
             aria-haspopup="menu"

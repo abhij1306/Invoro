@@ -304,11 +304,11 @@ export function ManualFieldEditor({
             {onTest ? (
               <Button
                 type="button"
-                variant="secondary"
+                variant="neutral"
                 size="sm"
                 onClick={onTest}
                 disabled={testing || testDisabled}
-                className="type-control h-8 min-w-[64px]"
+                className="min-w-[64px]"
               >
                 {testing ? '...' : 'Test'}
               </Button>

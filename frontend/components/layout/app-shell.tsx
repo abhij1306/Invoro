@@ -17,6 +17,7 @@ import {
   Clock3,
   DatabaseZap,
   FileChartColumn,
+  FolderKanban,
   Grid2x2,
   Radar,
   SearchCheck,
@@ -47,6 +48,7 @@ const navGroups = [
     label: 'Workspace',
     items: [
       { href: '/dashboard', label: 'Dashboard', icon: Grid2x2 },
+      { href: '/projects', label: 'Projects', icon: FolderKanban },
       { href: '/crawl', label: 'Crawl Studio', icon: WandSparkles },
       { href: '/runs', label: 'History', icon: Clock3 },
       { href: '/monitors', label: 'Monitors', icon: Radar },
@@ -426,6 +428,21 @@ function ShellContent({
           {topBar.actions ? (
             <div className="flex flex-wrap items-center gap-2">{topBar.actions}</div>
           ) : null}
+          {canResetWorkspace ? (
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                onClick={handleSelectedReset}
+                disabled={resetPending}
+                variant="destructive"
+                size="sm"
+              >
+                <Trash2 className="size-3" />
+                {resetLabel}
+              </Button>
+            </div>
+          ) : null}
+          <ThemeToggle compact />
           <div className="relative">
             <button
               type="button"
@@ -491,22 +508,6 @@ function ShellContent({
               </div>
             ) : null}
           </div>
-          {canResetWorkspace ? (
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                onClick={handleSelectedReset}
-                disabled={resetPending}
-                variant="secondary"
-                size="sm"
-                className="app-topbar-button text-[11px] font-semibold"
-              >
-                <Trash2 className="size-3" />
-                {resetLabel}
-              </Button>
-            </div>
-          ) : null}
-          <ThemeToggle compact />
         </div>
       </header>
 
@@ -540,6 +541,11 @@ function getFallbackHeader(pathname: string): TopBarState {
     return {
       title: 'Crawl Studio',
       description: 'Configure sources, run jobs, and monitor execution.',
+    };
+  if (pathname.startsWith('/projects'))
+    return {
+      title: 'Projects',
+      description: 'Goal-based workflows over crawl, monitor, and export primitives.',
     };
   if (pathname.startsWith('/data-enrichment'))
     return {

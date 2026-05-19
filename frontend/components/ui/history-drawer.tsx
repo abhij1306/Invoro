@@ -61,9 +61,8 @@ export function HistoryDrawer({
           </div>
           <Button
             type="button"
-            variant="ghost"
+            variant="quiet"
             size="icon"
-            className="h-7 w-7"
             onClick={onClose}
             aria-label="Close history"
           >

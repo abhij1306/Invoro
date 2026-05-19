@@ -92,7 +92,7 @@ export function MonitorHistoryChart({
             ))}
           </div>
           {currentRecords.length > 10 ? (
-            <Button type="button" variant="secondary" size="sm" onClick={() => setExpanded((value) => !value)}>
+            <Button type="button" variant="neutral" size="sm" onClick={() => setExpanded((value) => !value)}>
               {expanded ? 'Show less' : 'Show more'}
             </Button>
           ) : null}

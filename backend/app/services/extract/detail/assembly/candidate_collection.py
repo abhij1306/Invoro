@@ -18,94 +18,44 @@ __all__ = (
 )
 
 import logging
-import re
 from typing import Any
 
 from bs4 import BeautifulSoup
 
 from app.services.confidence import score_record_confidence
 from app.services.config.field_mappings import (
-    DOM_HIGH_VALUE_FIELDS,
-    DOM_OPTIONAL_CUE_FIELDS,
     ECOMMERCE_DETAIL_JS_STATE_PRIORITY_FIELDS,
     IMAGE_URL_FIELD,
     TITLE_FIELD,
     URL_FIELD,
-    VARIANT_AXIS_FIELD_NAMES,
-    VARIANT_DOM_FIELD_NAMES,
 )
 from app.services.config.extraction_rules import (
     DETAIL_CATEGORY_SOURCE_RANKS,
-    DETAIL_PRODUCT_IMAGE_CUE_SELECTOR,
-    DETAIL_IMAGE_RAW_SOUP_FALLBACK_MAX_WINNING_IMAGES,
     DETAIL_LONG_TEXT_RANK_FIELDS,
     DETAIL_LONG_TEXT_SOURCE_RANKS,
     DETAIL_LONG_TEXT_THIN_DESCRIPTION_WORDS,
-    DETAIL_LONG_TEXT_TRUNCATED_TAIL_TOKENS,
     DETAIL_TITLE_SOURCE_RANKS,
     SOURCE_PRIORITY,
 )
 from app.services.config.runtime_settings import crawler_runtime_settings
-from app.services.extraction_context import (
-    collect_structured_source_payloads,
-    prepare_extraction_context,
-)
-from app.services.structured_sources import harvest_js_state_objects
 from app.services.shared.field_coerce import (
     STRUCTURED_OBJECT_FIELDS,
     STRUCTURED_OBJECT_LIST_FIELDS,
-    clean_text,
     coerce_field_value,
     finalize_record,
-    is_title_noise,
-    object_dict as _object_dict,
-    object_list as _object_list,
-    surface_alias_lookup,
-    surface_fields,
-    text_or_none,
 )
 from app.services.extract.field_candidates import (
     add_candidate,
     collect_structured_candidates,
     finalize_candidate_value,
-    record_score,
-)
-from app.services.dom.selector_engine import (
-    dedupe_image_urls,
-    extract_page_images,
-    requested_content_extractability,
-)
-from app.services.js_state.state_normalizer import map_js_state_to_fields
-from app.services.network_payload_mapper import map_network_payloads_to_fields
-from app.services.extract.detail.assembly.dom_fallbacks import apply_dom_fallbacks
-from app.services.extract.detail.variants.dom_extraction import (
-    extract_variants_from_dom as _extract_variants_from_dom,
-)
-from app.services.extract.detail.assembly.dom_section_targets import (
-    primary_dom_context,
-    record_has_rich_existing_variants,
-)
-from app.services.extract.detail.assembly.raw_signals import (
-    breadcrumb_category_from_dom,
-)
-from app.services.extract.detail.identity.shell_filter import (
-    detail_url_has_multiple_product_segments as _detail_url_has_multiple_product_segments,
-    looks_like_site_shell_record as _looks_like_site_shell_record,
 )
 from app.services.extract.detail.identity.core import (
     detail_identity_codes_from_url as _detail_identity_codes_from_url,
     detail_identity_tokens as _detail_identity_tokens,
-    detail_redirect_identity_is_mismatched as _detail_redirect_identity_is_mismatched,
     detail_title_from_url as _detail_title_from_url,
     detail_url_candidate_is_low_signal as _detail_url_candidate_is_low_signal,
-    detail_url_is_collection_like as _detail_url_is_collection_like,
-    detail_url_is_utility as _detail_url_is_utility,
     preferred_detail_identity_url as _preferred_detail_identity_url,
-    prune_irrelevant_detail_dom_nodes,
-    record_matches_requested_detail_identity as _record_matches_requested_detail_identity,
 )
-from app.services.extract.detail.assembly.final_cleanup import repair_ecommerce_detail_record_quality
-from app.services.extract.table_extractor import extract_tables
 from app.services.extract.detail.images.dedupe import dedupe_primary_and_additional_images
 from app.services.extract.detail.assembly import dom_completion as _detail_dom_completion
 from app.services.extract.detail.images import materialize as _detail_image_materialize
@@ -117,16 +67,6 @@ from app.services.extract.detail.price.core import (
 )
 from app.services.extract.detail.assembly.title_scorer import (
     promote_detail_title,
-    title_needs_promotion,
-)
-from app.services.extract.variant_choice_traversal import variant_dom_cues_present
-from app.services.field_policy import exact_requested_field_key
-from app.services.extract.detail.assembly.tiers import (
-    DetailTierExecutor,
-    DetailTierInputs,
-    DetailTierRuntime,
-    DetailTierState,
-    PreparedDetailExtraction,
 )
 
 logger = logging.getLogger(__name__)

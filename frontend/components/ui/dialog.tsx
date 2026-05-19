@@ -57,7 +57,7 @@ export function ConfirmDialog({
             <DialogPrimitive.Close asChild>
               <Button
                 type="button"
-                variant="ghost"
+                variant="quiet"
                 size="icon"
                 aria-label="Close"
                 disabled={pending}
@@ -76,13 +76,13 @@ export function ConfirmDialog({
           ) : null}
           <div className="mt-5 flex justify-end gap-2">
             <DialogPrimitive.Close asChild>
-              <Button type="button" variant="ghost" disabled={pending}>
+              <Button type="button" variant="quiet" disabled={pending}>
                 {cancelLabel}
               </Button>
             </DialogPrimitive.Close>
             <Button
               type="button"
-              variant={danger ? 'danger' : 'primary'}
+              variant={danger ? 'destructive' : 'action'}
               disabled={pending}
               onClick={onConfirm}
             >

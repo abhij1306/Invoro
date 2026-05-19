@@ -83,14 +83,14 @@ export function MonitorHeader({
         <div className="flex flex-wrap items-center gap-2">
           <Button
             type="button"
-            variant="secondary"
+            variant="neutral"
             disabled={statusPending}
             onClick={() => void updateStatus(active ? 'paused' : 'active')}
           >
             {active ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}
             {active ? 'Pause' : 'Resume'}
           </Button>
-          <Button type="button" variant="secondary" onClick={() => setEditOpen(true)}>
+          <Button type="button" variant="neutral" onClick={() => setEditOpen(true)}>
             <Settings className="size-3.5" />
             Edit
           </Button>
@@ -101,7 +101,7 @@ export function MonitorHeader({
           <div className="relative">
             <Button
               type="button"
-              variant="ghost"
+              variant="quiet"
               size="icon"
               aria-label="More actions"
               onClick={() => setMenuOpen((value) => !value)}
@@ -140,7 +140,7 @@ export function MonitorHeader({
             <div className="mb-5 flex items-center justify-between gap-4">
               <DialogPrimitive.Title className="type-heading-3">Edit monitor</DialogPrimitive.Title>
               <DialogPrimitive.Close asChild>
-                <Button type="button" variant="ghost" size="icon" aria-label="Close">
+                <Button type="button" variant="quiet" size="icon" aria-label="Close">
                   <X className="size-4" />
                 </Button>
               </DialogPrimitive.Close>

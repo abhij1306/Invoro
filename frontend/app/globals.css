@@ -92,21 +92,21 @@
   --syntax-null: #7f8c98;
   --syntax-punct: #55616b;
 
-  /* ── Accent — SAP Fiori Primary Blue */
-  --accent: #0a6ed1;
-  --accent-hover: #0854a0;
-  --accent-warm: #0a6ed1;
+  /* ── Accent — reuse former shellbar navy */
+  --accent: #354a5f;
+  --accent-hover: #2c3e53;
+  --accent-warm: #354a5f;
   --accent-foreground: #ffffff;
   --accent-fg: #ffffff;
-  --accent-subtle: rgba(10, 110, 209, 0.05);
-  --accent-dim: rgba(10, 110, 209, 0.1);
-  --accent-text: #0a6ed1;
+  --accent-subtle: rgba(53, 74, 95, 0.08);
+  --accent-dim: rgba(53, 74, 95, 0.14);
+  --accent-text: #354a5f;
 
-  /* ── Shellbar (Classic Belize Deep Navy) */
-  --surface-header: #354a5f;
-  --shell-text: #ffffff;
-  --shell-muted: #d0e0f0;
-  --shell-border: #2c3e53;
+  /* ── Shellbar — light surface, no dark strip */
+  --surface-header: #ffffff;
+  --shell-text: var(--text-primary);
+  --shell-muted: var(--text-muted);
+  --shell-border: var(--border);
 
   /* ── Semantic states */
   --success: #2b7c2b;
@@ -146,11 +146,40 @@
   --divider: var(--border);
 
   /* ── Interactive component tokens */
-  --button-primary-bg: var(--accent);
-  --button-primary-hover-bg: var(--accent-hover);
-  --button-primary-fg: #ffffff;
-  --button-primary-hover-fg: #ffffff;
-  --button-filled-fg: #ffffff;
+  --button-height: var(--control-height);
+  --button-padding-x: 12px;
+  --button-font-size: var(--text-sm);
+  --button-action-bg: var(--accent);
+  --button-action-hover-bg: var(--accent-hover);
+  --button-action-border: var(--accent);
+  --button-action-hover-border: var(--accent-hover);
+  --button-action-fg: #ffffff;
+  --button-download-bg: #f7fbff;
+  --button-download-hover-bg: #eaf4ff;
+  --button-download-border: #9fc7ef;
+  --button-download-hover-border: var(--accent);
+  --button-download-fg: #0a5ca8;
+  --button-destructive-bg: var(--danger-bg);
+  --button-destructive-hover-bg: #ffdede;
+  --button-destructive-border: #f2b8b8;
+  --button-destructive-hover-border: var(--danger);
+  --button-destructive-fg: var(--danger);
+  --button-neutral-bg: var(--bg-elevated);
+  --button-neutral-hover-bg: var(--bg-alt);
+  --button-neutral-border: var(--border);
+  --button-neutral-hover-border: var(--border-strong);
+  --button-neutral-fg: var(--text-primary);
+  --button-quiet-bg: transparent;
+  --button-quiet-hover-bg: var(--accent-subtle);
+  --button-quiet-border: transparent;
+  --button-quiet-hover-border: transparent;
+  --button-quiet-fg: var(--text-secondary);
+  --button-quiet-hover-fg: var(--text-primary);
+  --button-topbar-bg: transparent;
+  --button-topbar-hover-bg: var(--accent-subtle);
+  --button-topbar-border: transparent;
+  --button-topbar-hover-border: transparent;
+  --button-topbar-fg: var(--shell-text);
   --segmented-bg: var(--bg-alt);
   --segmented-shadow: var(--shadow-xs-value);
   --tab-active-fg: #ffffff;
@@ -360,11 +389,37 @@ html[data-theme='dark'] {
   --divider: var(--border);
 
   /* ── Interactive component tokens */
-  --button-primary-bg: var(--accent);
-  --button-primary-hover-bg: var(--accent-hover);
-  --button-primary-fg: var(--accent-fg);
-  --button-primary-hover-fg: var(--accent-fg);
-  --button-filled-fg: var(--accent-fg);
+  --button-action-bg: var(--accent);
+  --button-action-hover-bg: var(--accent-hover);
+  --button-action-border: var(--accent);
+  --button-action-hover-border: var(--accent-hover);
+  --button-action-fg: var(--accent-fg);
+  --button-download-bg: rgba(56, 189, 248, 0.1);
+  --button-download-hover-bg: rgba(56, 189, 248, 0.18);
+  --button-download-border: rgba(56, 189, 248, 0.28);
+  --button-download-hover-border: var(--accent);
+  --button-download-fg: var(--accent);
+  --button-destructive-bg: var(--danger-bg);
+  --button-destructive-hover-bg: rgba(239, 83, 80, 0.16);
+  --button-destructive-border: rgba(239, 83, 80, 0.24);
+  --button-destructive-hover-border: var(--danger);
+  --button-destructive-fg: var(--danger);
+  --button-neutral-bg: var(--bg-elevated);
+  --button-neutral-hover-bg: var(--bg-panel-strong);
+  --button-neutral-border: var(--border);
+  --button-neutral-hover-border: var(--border-strong);
+  --button-neutral-fg: var(--text-primary);
+  --button-quiet-bg: transparent;
+  --button-quiet-hover-bg: rgba(255, 255, 255, 0.06);
+  --button-quiet-border: transparent;
+  --button-quiet-hover-border: transparent;
+  --button-quiet-fg: var(--text-secondary);
+  --button-quiet-hover-fg: var(--text-primary);
+  --button-topbar-bg: rgba(255, 255, 255, 0.06);
+  --button-topbar-hover-bg: rgba(255, 255, 255, 0.12);
+  --button-topbar-border: transparent;
+  --button-topbar-hover-border: transparent;
+  --button-topbar-fg: var(--shell-text);
   --segmented-bg: rgba(255, 255, 255, 0.04);
   --segmented-shadow: var(--shadow-xs-value);
   --tab-active-fg: #020617;
@@ -663,12 +718,12 @@ select:focus-visible:not(.focus-ring) {
 
 /* Subheading — card titles, drawer headers, group names */
 .type-subheading {
-  font-family: var(--font-mono-family);
+  font-family: var(--font-primary-family);
   font-size: var(--text-xs);
   font-weight: var(--weight-bold);
   line-height: var(--leading-snug);
-  letter-spacing: var(--tracking-wider);
-  text-transform: uppercase;
+  letter-spacing: var(--tracking-tight);
+  text-transform: none;
   color: var(--text-muted);
 }
 
@@ -712,22 +767,22 @@ select:focus-visible:not(.focus-ring) {
 /* ── TIER 4: Label */
 /* Field labels, column headers, group tags — uppercase but restrained */
 .type-label {
-  font-family: var(--font-mono-family);
+  font-family: var(--font-primary-family);
   font-size: var(--text-sm);
   font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-widest);
-  text-transform: uppercase;
+  letter-spacing: var(--tracking-tight);
+  text-transform: none;
   line-height: 1.35;
   color: var(--text-muted);
 }
 
 /* Mono label — table column headers, terminal section markers */
 .type-label-mono {
-  font-family: var(--font-mono-family);
+  font-family: var(--font-primary-family);
   font-size: var(--text-sm);
   font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-widest);
-  text-transform: uppercase;
+  letter-spacing: var(--tracking-tight);
+  text-transform: none;
   line-height: 1.35;
   color: var(--text-muted);
   font-synthesis: none;
@@ -753,11 +808,11 @@ select:focus-visible:not(.focus-ring) {
 }
 
 .field-label {
-  font-family: var(--font-mono-family);
+  font-family: var(--font-primary-family);
   font-size: 10px;
   font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-wider);
-  text-transform: uppercase;
+  letter-spacing: var(--tracking-tight);
+  text-transform: none;
   color: var(--text-muted);
 }
 
@@ -778,12 +833,12 @@ select:focus-visible:not(.focus-ring) {
    ═══════════════════════════════════════════════════════════════════════════ */
 .field-label {
   display: block;
-  font-family: var(--font-mono-family);
+  font-family: var(--font-primary-family);
   font-size: var(--text-xs);
   font-weight: var(--weight-bold);
   line-height: 1.35;
-  letter-spacing: var(--tracking-wider);
-  text-transform: uppercase;
+  letter-spacing: var(--tracking-tight);
+  text-transform: none;
   color: var(--text-muted);
   margin-bottom: var(--space-1);
 }
@@ -838,68 +893,144 @@ select:focus-visible:not(.focus-ring) {
   backdrop-filter: none;
 }
 
-.ui-on-accent-surface {
-  color: var(--button-filled-fg) !important;
+.button-action-surface,
+.button-download-surface,
+.button-destructive-surface,
+.button-neutral-surface,
+.button-quiet-surface,
+.button-topbar-surface,
+.button-link-surface {
+  box-shadow: none;
 }
 
-.ui-on-accent-surface svg {
+.button-action-surface {
+  border-color: var(--button-action-border);
+  background: var(--button-action-bg);
+  color: var(--button-action-fg);
+}
+
+.button-action-surface:hover:not(:disabled) {
+  border-color: var(--button-action-hover-border);
+  background: var(--button-action-hover-bg);
+  color: var(--button-action-fg);
+}
+
+.button-download-surface {
+  border-color: var(--button-download-border);
+  background: var(--button-download-bg);
+  color: var(--button-download-fg);
+}
+
+.button-download-surface:hover:not(:disabled) {
+  border-color: var(--button-download-hover-border);
+  background: var(--button-download-hover-bg);
+  color: var(--button-download-fg);
+}
+
+.button-destructive-surface {
+  border-color: var(--button-destructive-border);
+  background: var(--button-destructive-bg);
+  color: var(--button-destructive-fg);
+}
+
+.button-destructive-surface:hover:not(:disabled) {
+  border-color: var(--button-destructive-hover-border);
+  background: var(--button-destructive-hover-bg);
+  color: var(--button-destructive-fg);
+}
+
+.button-neutral-surface {
+  border-color: var(--button-neutral-border);
+  background: var(--button-neutral-bg);
+  color: var(--button-neutral-fg);
+}
+
+.button-neutral-surface:hover:not(:disabled) {
+  border-color: var(--button-neutral-hover-border);
+  background: var(--button-neutral-hover-bg);
+  color: var(--button-neutral-fg);
+}
+
+.button-quiet-surface {
+  border-color: var(--button-quiet-border);
+  background: var(--button-quiet-bg);
+  color: var(--button-quiet-fg);
+}
+
+.button-quiet-surface:hover:not(:disabled) {
+  border-color: var(--button-quiet-hover-border);
+  background: var(--button-quiet-hover-bg);
+  color: var(--button-quiet-hover-fg);
+}
+
+.button-topbar-surface {
+  border-color: var(--button-topbar-border);
+  background: var(--button-topbar-bg);
+  color: var(--button-topbar-fg);
+}
+
+.button-topbar-surface:hover:not(:disabled) {
+  border-color: var(--button-topbar-hover-border);
+  background: var(--button-topbar-hover-bg);
+  color: var(--button-topbar-fg);
+}
+
+.button-link-surface {
+  height: auto;
+  border-color: transparent;
+  background: transparent;
+  color: var(--accent-text, var(--accent));
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 0.16em;
+}
+
+.button-link-surface:hover:not(:disabled) {
+  color: var(--accent-hover);
+  background: transparent;
+}
+
+.ui-button svg {
   color: inherit !important;
   stroke: currentColor;
 }
 
-.button-primary-surface {
-  border-color: var(--button-primary-bg);
-  background: var(--button-primary-bg);
-  color: var(--button-primary-fg);
-  box-shadow:
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.15),
-    0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  transition: transform var(--transition-fast), background-color var(--transition-fast), box-shadow var(--transition-fast);
-}
-
-.button-primary-surface:hover {
-  border-color: var(--button-primary-hover-bg);
-  background: var(--button-primary-hover-bg);
-  color: var(--button-primary-hover-fg);
-  transform: translateY(-1px);
-  box-shadow:
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.2),
-    0 4px 12px 0 rgba(79, 70, 229, 0.15);
-  /* Indigo hover glow */
-}
-
-html[data-theme='dark'] .button-primary-surface:hover {
-  box-shadow:
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.15),
-    0 4px 12px 0 rgba(56, 189, 248, 0.25);
-  /* Sky Blue hover glow */
+.ui-on-accent-surface {
+  color: var(--button-action-fg) !important;
 }
 
 /* Ensure anchors styled as buttons have correct text/icon color */
-a.ui-button.button-primary-surface,
-a.ui-button.button-primary-surface:hover,
-a.ui-button.button-primary-surface:focus-visible {
-  color: var(--button-primary-fg) !important;
+a.ui-button.button-action-surface,
+a.ui-button.button-action-surface:hover,
+a.ui-button.button-action-surface:focus-visible {
+  color: var(--button-action-fg) !important;
 }
-a.ui-button.ui-on-accent-surface,
-a.ui-button.ui-on-accent-surface:hover,
-a.ui-button.ui-on-accent-surface:focus-visible {
-  color: var(--accent-fg) !important;
+
+a.ui-button.button-download-surface,
+a.ui-button.button-download-surface:hover,
+a.ui-button.button-download-surface:focus-visible {
+  color: var(--button-download-fg) !important;
 }
-a.ui-button.text-foreground,
-a.ui-button.text-foreground:hover,
-a.ui-button.text-foreground:focus-visible {
-  color: var(--text-primary) !important;
+
+a.ui-button.button-destructive-surface,
+a.ui-button.button-destructive-surface:hover,
+a.ui-button.button-destructive-surface:focus-visible {
+  color: var(--button-destructive-fg) !important;
 }
-a.ui-button.text-secondary,
-a.ui-button.text-secondary:hover,
-a.ui-button.text-secondary:focus-visible {
-  color: var(--text-secondary) !important;
+
+a.ui-button.button-neutral-surface,
+a.ui-button.button-neutral-surface:hover,
+a.ui-button.button-neutral-surface:focus-visible {
+  color: var(--button-neutral-fg) !important;
 }
-a.ui-button.text-danger,
-a.ui-button.text-danger:hover,
-a.ui-button.text-danger:focus-visible {
-  color: var(--danger) !important;
+
+a.ui-button.button-quiet-surface,
+a.ui-button.button-quiet-surface:focus-visible {
+  color: var(--button-quiet-fg) !important;
+}
+
+a.ui-button.button-quiet-surface:hover {
+  color: var(--button-quiet-hover-fg) !important;
 }
 
 .bg-warning\/12 {

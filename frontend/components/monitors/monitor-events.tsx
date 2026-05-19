@@ -60,7 +60,7 @@ export function MonitorEvents({
         />
         <Button
           type="button"
-          variant="secondary"
+          variant="neutral"
           size="sm"
           onClick={() => markReadMutation.mutate()}
           disabled={markReadMutation.isPending}
@@ -95,10 +95,10 @@ export function MonitorEvents({
         <MonitorEmptyState kind="events" onRunNow={onRunNow} />
       )}
       <div className="flex justify-end gap-2">
-        <Button type="button" variant="secondary" size="sm" onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={page <= 1}>
+        <Button type="button" variant="neutral" size="sm" onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={page <= 1}>
           Previous
         </Button>
-        <Button type="button" variant="secondary" size="sm" onClick={() => setPage((value) => value + 1)} disabled={!query.data || page * query.data.page_size >= query.data.total}>
+        <Button type="button" variant="neutral" size="sm" onClick={() => setPage((value) => value + 1)} disabled={!query.data || page * query.data.page_size >= query.data.total}>
           Next
         </Button>
         {query.isFetching ? <RotateCw className="text-muted size-4 animate-spin self-center" /> : null}

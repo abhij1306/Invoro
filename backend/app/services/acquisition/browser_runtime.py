@@ -75,7 +75,6 @@ from app.services.acquisition.browser_stage_runner import (
 from app.services.acquisition import browser_pool as _browser_pool
 from app.services.acquisition.browser_pool import (
     SharedBrowserRuntime,
-    block_unneeded_route as _block_unneeded_route,
     browser_runtime_snapshot as _browser_runtime_snapshot_impl,
     get_browser_runtime as _get_browser_runtime_impl,
     patchright_browser_available,
@@ -95,7 +94,6 @@ from app.services.config.browser_fingerprint_profiles import REAL_CHROME_IGNORE_
 from app.services.acquisition.browser_identity import build_playwright_context_spec
 from app.services.acquisition.browser_pool import (
     browser_pool_state as _BROWSER_POOL,
-    real_chrome_candidate_paths as _real_chrome_candidate_paths,
     resolve_browser_binary as _resolve_browser_binary,
 )
 from app.services.acquisition.browser_storage_state import persist_context_storage_state

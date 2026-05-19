@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-import asyncio
 from dataclasses import dataclass, field
 import logging
 import time
 from urllib.parse import urljoin
 
-from app.services.acquisition.dom_runtime import get_page_html, wait_for_dom_mutation_settle
+from app.services.acquisition.dom_runtime import get_page_html
 from app.services.config.runtime_settings import crawler_runtime_settings
 from app.services.config.selectors import PAGINATION_SELECTORS
 
@@ -33,10 +32,7 @@ from app.services.acquisition.traversal_helpers import (
 )
 from app.services.acquisition.traversal_recovery import (
     click_with_retry,
-    dismiss_overlays_if_needed,
     find_aom_actionable_locator as _find_aom_actionable_locator,
-    locator_still_resolves,
-    recover_listing_page_content,
 )
 
 logger = logging.getLogger(__name__)
