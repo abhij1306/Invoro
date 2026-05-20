@@ -59,13 +59,16 @@ from app.services.config.browser_surface_probe import (
 )
 from app.services.crawl.crud import get_run
 from browser_surface_probe.report_rendering import (
-    _build_agent_summary,
-    _render_markdown,
+    build_agent_summary,
+    render_markdown,
+)
+from browser_surface_probe.value_coercion import (
+    BROWSER_VERSION_RE,
+    object_dict,
+    object_list,
+    string_list,
 )
 
-_BROWSER_VERSION_RE = re.compile(
-    r"\b(?:Chrome|Chromium|Edg|Firefox|HeadlessChrome)/(\d+)", re.IGNORECASE
-)
 _IP_RE = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
 _WHITESPACE_RE = re.compile(r"\s+")
 _NON_ALNUM_RE = re.compile(r"[^a-z0-9]+")
@@ -121,16 +124,9 @@ def _coerce_proxy_profile(value: object) -> dict[str, object]:
     return dict(value) if isinstance(value, dict) else {}
 
 
-def _object_dict(value: object) -> dict[str, object]:
-    return dict(value) if isinstance(value, dict) else {}
-
-
-def _object_list(value: object) -> list[object]:
-    return list(value) if isinstance(value, list) else []
-
-
-def _string_list(value: object) -> list[str]:
-    return [str(item) for item in _object_list(value)]
+_object_dict = object_dict
+_object_list = object_list
+_string_list = string_list
 
 
 def _int_list(value: object) -> list[int]:
@@ -247,7 +243,7 @@ def _report_root(base_dir: str | None) -> Path:
 def _extract_versions(values: list[str]) -> list[int]:
     versions: list[int] = []
     for value in values:
-        for match in _BROWSER_VERSION_RE.findall(str(value or "")):
+        for match in BROWSER_VERSION_RE.findall(str(value or "")):
             try:
                 versions.append(int(match))
             except ValueError:
@@ -2029,9 +2025,9 @@ async def build_report(
         "target_diagnostics": target_diagnostics,
     }
     report["findings"] = build_findings(report)
-    report["agent_summary"] = _build_agent_summary(report)
+    report["agent_summary"] = build_agent_summary(report)
     (report_dir / "report.json").write_text(_json_dump(report), encoding="utf-8")
-    (report_dir / "report.md").write_text(_render_markdown(report), encoding="utf-8")
+    (report_dir / "report.md").write_text(render_markdown(report), encoding="utf-8")
     return report
 
 

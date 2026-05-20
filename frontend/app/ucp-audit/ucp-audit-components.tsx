@@ -293,7 +293,7 @@ export function UcpScoreSummary({
 
           <div className="mt-4 flex w-full flex-col gap-2.5 px-2">
             <div className="border-border/40 flex items-center justify-between border-b pb-1.5">
-              <span className="text-muted font-mono text-[9px] font-normal tracking-wider uppercase">
+              <span className="text-muted font-mono text-[9px] font-normal uppercase">
                 CRITICAL GAPS
               </span>
               <span className="text-danger bg-danger/10 rounded px-1.5 py-0.5 font-mono text-xs leading-none font-normal">
@@ -301,7 +301,7 @@ export function UcpScoreSummary({
               </span>
             </div>
             <div className="border-border/40 flex items-center justify-between border-b pb-1.5">
-              <span className="text-muted font-mono text-[9px] font-normal tracking-wider uppercase">
+              <span className="text-muted font-mono text-[9px] font-normal uppercase">
                 ADVISORIES
               </span>
               <span className="text-warning bg-warning/10 rounded px-1.5 py-0.5 font-mono text-xs leading-none font-normal">
@@ -309,7 +309,7 @@ export function UcpScoreSummary({
               </span>
             </div>
             <div className="flex items-center justify-between pt-0.5">
-              <span className="text-muted font-mono text-[9px] font-normal tracking-wider uppercase">
+              <span className="text-muted font-mono text-[9px] font-normal uppercase">
                 RUN STATUS
               </span>
               <span
@@ -1075,7 +1075,7 @@ function DimensionScoreCard({
     >
       {blocked ? (
         <div className="bg-background/10 absolute inset-0 z-10 flex items-center justify-center rounded-[var(--radius-md)] backdrop-blur-[0.5px]">
-          <span className="text-danger border-danger/45 bg-background/90 rotate-12 rounded border px-2 py-0.5 font-mono text-xs font-normal tracking-widest shadow">
+          <span className="text-danger border-danger/45 bg-background/90 rotate-12 rounded border px-2 py-0.5 font-mono text-xs font-normal shadow">
             BLOCKED
           </span>
         </div>
@@ -1109,7 +1109,7 @@ function DimensionScoreCard({
           <Badge tone={badgeTone(dimension.status)} className="scale-90 font-mono font-normal">
             {dimension.status}
           </Badge>
-          <span className="text-muted font-mono text-[9px] font-normal tracking-wide uppercase">
+          <span className="text-muted font-mono text-[9px] font-normal uppercase">
             {dimension.dimension_id}
           </span>
         </div>
@@ -1168,7 +1168,7 @@ function ScoreRing({
           {score}
         </div>
         {!compact && (
-          <div className="text-muted mt-0.5 font-mono text-[9px] leading-none font-normal tracking-wider uppercase">
+          <div className="text-muted mt-0.5 font-mono text-[9px] leading-none font-normal uppercase">
             /100
           </div>
         )}
@@ -1345,7 +1345,7 @@ function MiniStat({
 }>) {
   return (
     <div className="border-border bg-background/25 flex min-w-[70px] flex-col justify-between rounded-[var(--radius-md)] border p-2">
-      <div className="text-muted font-mono text-[9px] leading-none font-normal tracking-wider uppercase">
+      <div className="text-muted font-mono text-[9px] leading-none font-normal uppercase">
         {label}
       </div>
       <div
@@ -1465,7 +1465,7 @@ function EvidenceFields({ row }: Readonly<{ row: Record<string, unknown> }>) {
           key={key}
           className="flex w-full min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px]"
         >
-          <span className="text-muted/80 shrink-0 font-mono text-[8.5px] font-normal tracking-wider uppercase">
+          <span className="text-muted/80 shrink-0 font-mono text-[8.5px] font-normal uppercase">
             {key}:
           </span>
           <span className="text-secondary font-mono font-normal break-all">

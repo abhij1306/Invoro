@@ -1198,7 +1198,7 @@ export const LogTerminal = memo(function LogTerminal({
                     </div>
                   ) : null}
                   <div className="flex items-center justify-end gap-1.5 pr-2">
-                    <span className="text-muted font-mono text-xs tracking-wider uppercase">
+                    <span className="text-muted font-mono text-xs uppercase">
                       {live && groups.length > 0 && group.key === groups[groups.length - 1].key ? (
                         <span className="text-accent flex items-center gap-1.5 font-semibold">
                           <span className="relative flex size-1.5">
@@ -1245,7 +1245,7 @@ export const LogTerminal = memo(function LogTerminal({
                                   : 'bg-transparent',
                               )}
                             >
-                              <span className="text-muted font-mono text-xs font-medium tabular-nums">
+                              <span className="text-muted font-mono text-xs font-normal tabular-nums">
                                 {row.createdAt ? formatTimeHms(row.createdAt) : '--'}
                               </span>
                               <div className="flex justify-center">

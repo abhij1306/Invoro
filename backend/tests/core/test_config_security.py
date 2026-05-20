@@ -46,3 +46,17 @@ def test_admin_password_strength_requires_16_characters() -> None:
         "Short123!"
     )
     assert config.admin_password_strength_issues("VeryStrongPassword123!") == []
+
+
+def test_admin_password_strength_edge_cases() -> None:
+    assert config.admin_password_strength_issues("Abcdefghijklm1!x") == []
+    assert "an uppercase letter" in config.admin_password_strength_issues(
+        "abcdefghijklm1!x"
+    )
+    assert "a lowercase letter" in config.admin_password_strength_issues(
+        "ABCDEFGHIJKLM1!X"
+    )
+    assert "a digit" in config.admin_password_strength_issues("Abcdefghijklmn!x")
+    assert "a special character" in config.admin_password_strength_issues(
+        "Abcdefghijklm12x"
+    )

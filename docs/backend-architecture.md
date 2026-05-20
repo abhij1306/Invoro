@@ -322,7 +322,7 @@ Primary files:
 - `extract/network_listing_mapper.py`
 - `extract/field_candidates/*`
 - `structured_sources.py`
-- `js_state/state_normalizer.py`
+- `js_state/state_normalizer/`
 - `js_state/job_mapper.py`
 - `js_state/helpers.py`
 - `network_payload_mapper.py`

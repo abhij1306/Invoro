@@ -174,7 +174,7 @@ Canonical config owner:
 | `listing_extractor.py` | Listing-page extraction |
 | `structured_sources.py` | JSON-LD, microdata, OG, Nuxt, harvested JS state |
 | `extract/field_candidates/*` | Field candidate collection, structured payload traversal, structured variant row assembly, finalization, and scoring |
-| `js_state/state_normalizer.py` | JS state to ecommerce field mapping and product payload selection |
+| `js_state/state_normalizer/` | JS state facade plus focused ecommerce payload, variant, identity, and product mapping modules |
 | `js_state/job_mapper.py` | Configured job-detail JS-state mapping and reusable state-path traversal |
 | `js_state/helpers.py` | Shared JS-state variant selection, availability, stock, price, and compact-row helpers |
 | `js_state/variant_options.py` | JS-state variant axis, option-value, and display-label normalization |
@@ -247,7 +247,7 @@ Canonical config owners:
 | `config/js_state_field_specs.py` | JS-state product and variant field mapping specs |
 | `config/public_record_policy.py` | Public persisted/exported record exclusions, URL safety, and identity value policy |
 | `config/variant_policy.py` | Public variant axes, flat variant transport fields, and variant axis aliases |
-| `config/extraction_rules.py` | extraction/runtime selector tokens, structured-source key maps, detail selectors, shell/utility path rules |
+| `config/extraction_rules/` | extraction/runtime selector tokens split by common, image, detail, variant, listing/structured, and job concerns |
 | `config/extraction_price_rules.py` | Detail price selectors, JSON-LD price fields, currency decimal places, and price repair thresholds |
 | `config/variant_migration_rules.py` | Variant migration selectors, validation thresholds, and residual noise/url gates |
 | `config/selectors.py` | DOM selectors |

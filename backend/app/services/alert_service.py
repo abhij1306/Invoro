@@ -91,7 +91,7 @@ async def create_alert(
             update_schedule=False,
         )
         await session.refresh(monitor)
-    except (RuntimeError, SQLAlchemyError, ValueError) as exc:
+    except (RuntimeError, SQLAlchemyError, TypeError, ValueError) as exc:
         await _discard_failed_alert(session, monitor_id=int(monitor.id))
         raise ValueError(f"Initial alert poll failed: {exc}") from exc
     return monitor, run_id
@@ -171,7 +171,14 @@ async def alert_run_delta_count(session: AsyncSession, *, run_id: int) -> int:
     if run is None:
         return 0
     raw_count = run.summary_dict().get("monitor_change_count")
-    return int(raw_count) if isinstance(raw_count, int | float | str) else 0
+    if isinstance(raw_count, int | float):
+        return int(raw_count)
+    if isinstance(raw_count, str):
+        try:
+            return int(raw_count)
+        except (TypeError, ValueError):
+            return 0
+    return 0
 
 
 async def alert_history(

@@ -40,7 +40,7 @@ function DomainBar({
   return (
     <div className="flex items-center gap-3 py-1.5">
       <span
-        className="text-secondary min-w-0 flex-1 truncate font-mono text-[13px] font-medium normal-case"
+        className="text-secondary min-w-0 flex-1 truncate font-mono text-[13px] font-normal normal-case"
         title={domain}
       >
         {domain}
@@ -51,7 +51,7 @@ function DomainBar({
           style={{ width: `${pct}%` }}
         />
       </div>
-      <span className="text-muted w-8 text-right font-mono text-[13px] font-medium">{count}</span>
+      <span className="text-muted w-8 text-right font-mono text-[13px] font-normal">{count}</span>
     </div>
   );
 }
@@ -208,7 +208,7 @@ export default function DashboardPage() {
                 <Badge tone={statusTone(status)} flat={isSubduedStatus(status)}>
                   {statusLabel(status)}
                 </Badge>
-                <span className="text-primary font-mono text-sm font-semibold tabular-nums">
+                <span className="text-primary font-mono text-sm font-normal tabular-nums">
                   {count}
                 </span>
               </div>

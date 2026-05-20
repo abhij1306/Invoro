@@ -47,6 +47,27 @@ ALLOWED_PRIVATE_SERVICE_IMPORTS = {
     "extract/field_candidates/structured_payloads.py -> .variant_rows:_structured_variants_from_product_payload",
     "extract/field_candidates/structured_payloads.py -> .variant_rows:_variant_axes_from_rows",
     "extract/field_candidates/variant_rows.py -> .structured_values:_coerce_structured_candidate_value",
+    # Package-private split modules behind stable public facades.
+    "config/extraction_rules/__init__.py -> ._common:_STATIC_EXPORTS",
+    "config/extraction_rules/__init__.py -> ._extra_exports:_EXTRA_EXPORTS",
+    "js_state/state_normalizer/__init__.py -> ._common:_VARIANT_FIELD_SPEC",
+    "js_state/state_normalizer/_facade.py -> ._identity:_mapped_product_family_matches",
+    "js_state/state_normalizer/_facade.py -> ._identity:_mapped_product_identity_matches",
+    "js_state/state_normalizer/_facade.py -> ._identity:_mapped_record_matches_page_url",
+    "js_state/state_normalizer/_facade.py -> ._identity:_merge_same_product_record",
+    "js_state/state_normalizer/_facade.py -> ._identity:_merge_variant_fields",
+    "js_state/state_normalizer/_facade.py -> ._payloads:_find_product_payloads",
+    "js_state/state_normalizer/_facade.py -> ._payloads:_looks_like_product_payload",
+    "js_state/state_normalizer/_facade.py -> ._payloads:_normalized_state_payload",
+    "js_state/state_normalizer/_facade.py -> ._product_mapping:_map_product_payload",
+    "js_state/state_normalizer/_payloads.py -> ._variant_rows:_product_variant_rows",
+    "js_state/state_normalizer/_product_mapping.py -> ._variant_mapping:_connection_nodes",
+    "js_state/state_normalizer/_product_mapping.py -> ._variant_mapping:_name_or_value",
+    "js_state/state_normalizer/_product_mapping.py -> ._variant_mapping:_normalize_variant",
+    "js_state/state_normalizer/_product_mapping.py -> ._variant_mapping:_option_names",
+    "js_state/state_normalizer/_product_mapping.py -> ._variant_rows:_product_variant_rows",
+    "js_state/state_normalizer/_variant_rows.py -> ._variant_mapping:_option_names",
+    "js_state/state_normalizer/_variant_rows.py -> ._variant_mapping:_variant_axis_raw_value",
     "pipeline/extraction_loop.py -> .record_extraction_stage:_best_adapter_result",
     "pipeline/extraction_loop.py -> .record_extraction_stage:_extract_records_for_acquisition",
     "pipeline/extraction_loop.py -> .record_extraction_stage:_update_acquisition_contract_memory",
@@ -144,9 +165,16 @@ FILE_LOC_BUDGETS = {
     Path("app/services/acquisition/browser_page_flow.py"): 1000,
     # Traversal owns mode orchestration; helper/recovery mechanics live beside it.
     Path("app/services/acquisition/traversal.py"): 1000,
-    # Config owners.
-    # Config rules own typed extraction constants and category/nav URL rules.
-    Path("app/services/config/extraction_rules.py"): 1960,
+    # Config extraction rules are split by concern behind a stable package facade.
+    Path("app/services/config/extraction_rules/__init__.py"): 80,
+    Path("app/services/config/extraction_rules/_common.py"): 260,
+    Path("app/services/config/extraction_rules/_detail.py"): 560,
+    Path("app/services/config/extraction_rules/_detail_sections.py"): 80,
+    Path("app/services/config/extraction_rules/_extra_exports.py"): 280,
+    Path("app/services/config/extraction_rules/_images.py"): 100,
+    Path("app/services/config/extraction_rules/_jobs.py"): 80,
+    Path("app/services/config/extraction_rules/_listing_structured.py"): 650,
+    Path("app/services/config/extraction_rules/_variants.py"): 340,
     Path("app/services/pipeline/extract_records.py"): 700,
     Path("app/services/extract/detail_dom_section_targets.py"): 160,
     Path("app/services/extract/detail_dom_fallbacks.py"): 360,
@@ -185,7 +213,14 @@ FILE_LOC_BUDGETS = {
     Path("app/services/extract/detail_record_assembly.py"): 495,
     # Ratcheted for host-policy TTL compatibility and handoff failure isolation.
     Path("app/services/fetch/fetch_context.py"): 1010,
-    Path("app/services/js_state/state_normalizer.py"): 1505,
+    Path("app/services/js_state/state_normalizer/__init__.py"): 80,
+    Path("app/services/js_state/state_normalizer/_common.py"): 120,
+    Path("app/services/js_state/state_normalizer/_facade.py"): 180,
+    Path("app/services/js_state/state_normalizer/_identity.py"): 240,
+    Path("app/services/js_state/state_normalizer/_payloads.py"): 260,
+    Path("app/services/js_state/state_normalizer/_product_mapping.py"): 460,
+    Path("app/services/js_state/state_normalizer/_variant_mapping.py"): 280,
+    Path("app/services/js_state/state_normalizer/_variant_rows.py"): 240,
     # Extraction loop owns stage orchestration; retry and record extraction stages are split out.
     Path("app/services/pipeline/extraction_loop.py"): 1000,
     # Run progress owns batch-level summary/merge/quality aggregation, evicted
@@ -449,7 +484,7 @@ def test_root_binary_assets_are_not_committed_without_context() -> None:
 
 def test_config_modules_do_not_mutate_globals_from_export_data() -> None:
     offenders: list[str] = []
-    for path in (SERVICES_ROOT / "config").glob("*.py"):
+    for path in (SERVICES_ROOT / "config").rglob("*.py"):
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         for node in ast.walk(tree):
             if not isinstance(node, ast.Call):
@@ -483,6 +518,8 @@ def test_pylint_useful_checks_are_not_blanket_disabled() -> None:
 def test_high_risk_services_do_not_use_broad_exception_catches() -> None:
     high_risk_paths = [
         SERVICES_ROOT / "alert_service.py",
+        SERVICES_ROOT / "acquisition" / "traversal_helpers.py",
+        SERVICES_ROOT / "acquisition" / "traversal_recovery.py",
         SERVICES_ROOT / "listing_extractor.py",
         SERVICES_ROOT / "llm" / "provider_client.py",
     ]

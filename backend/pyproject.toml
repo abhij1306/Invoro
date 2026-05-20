@@ -93,16 +93,16 @@ disable = [
 
 [tool.pylint.design]
 max-args = 8
-max-branches = 18
-max-locals = 20
+max-branches = 12
+max-locals = 15
 max-returns = 8
-max-statements = 60
+max-statements = 50
 max-attributes = 12
 max-public-methods = 24
-max-module-lines = 1200
+max-module-lines = 1000
 
 [tool.pylint.similarities]
-min-similarity-lines = 12
+min-similarity-lines = 5
 
 [tool.vulture]
 min_confidence = 100

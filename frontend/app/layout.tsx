@@ -3,13 +3,13 @@ import Script from 'next/script';
 import './globals.css';
 
 // Next.js App Router root layout; invoked by file-system routing.
-import { Inconsolata, Manrope } from 'next/font/google';
+import { Inconsolata, Figtree } from 'next/font/google';
 
 import { AppShell } from '../components/layout/app-shell';
 import { QueryProvider } from '../components/ui/query-provider';
 
-// Primary UI font — Manrope for premium SaaS aesthetic
-const mainFont = Manrope({
+// Primary UI font — Figtree for premium SaaS aesthetic
+const mainFont = Figtree({
   subsets: ['latin'],
   weight: ['300', '400', '500', '600', '700', '800'],
   variable: '--font-primary-source',

@@ -25,7 +25,13 @@ from app.services.monitor_change_detection import ensure_monitor_change_detectio
 from app.services.monitor_service import utcnow
 from app.services.monitor_webhook_service import dispatch_alert_webhooks
 from app.services.pipeline import run_complete_callbacks
-from app.services.alert_service import alert_response, create_alert, list_alerts, update_alert
+from app.services.alert_service import (
+    alert_response,
+    alert_run_delta_count,
+    create_alert,
+    list_alerts,
+    update_alert,
+)
 
 
 class _Response:
@@ -555,6 +561,55 @@ async def test_create_alert_failure_cleans_up_partial_monitor(
 
     monitors = list((await db_session.scalars(select(MonitorJob))).all())
     assert monitors == []
+
+
+@pytest.mark.asyncio
+async def test_create_alert_type_error_cleans_up_partial_monitor(
+    db_session,
+    test_user,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def _fail_poll(*args, **kwargs):
+        del args, kwargs
+        raise TypeError("bad summary")
+
+    monkeypatch.setattr("app.services.alert_service.run_alert_poll", _fail_poll)
+
+    with pytest.raises(ValueError, match="Initial alert poll failed: bad summary"):
+        await create_alert(
+            db_session,
+            user=test_user,
+            payload=AlertCreate(
+                url="https://example.com/product/1",
+                target_fields=["price"],
+                poll_interval_seconds=300,
+            ),
+        )
+
+    monitors = list((await db_session.scalars(select(MonitorJob))).all())
+    assert monitors == []
+
+
+@pytest.mark.asyncio
+async def test_alert_run_delta_count_handles_bad_summary_count() -> None:
+    class _Run:
+        def __init__(self, value):
+            self.value = value
+
+        def summary_dict(self):
+            return {"monitor_change_count": self.value}
+
+    class _Session:
+        def __init__(self, value):
+            self.value = value
+
+        async def get(self, *_args):
+            return _Run(self.value)
+
+    assert await alert_run_delta_count(_Session(2.9), run_id=1) == 2
+    assert await alert_run_delta_count(_Session("3"), run_id=1) == 3
+    assert await alert_run_delta_count(_Session("bad"), run_id=1) == 0
+    assert await alert_run_delta_count(_Session(None), run_id=1) == 0
 
 
 @pytest.mark.asyncio

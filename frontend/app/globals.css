@@ -64,10 +64,10 @@
   color-scheme: light;
 
   /* ── Fonts
-     Primary : Manrope (Google Fonts — premium sans-serif)
+     Primary : Figtree (Google Fonts — premium sans-serif)
      Mono    : Inconsolata */
   --font-primary-family:
-    var(--font-primary-source, 'Manrope'), 'Manrope', system-ui, -apple-system, sans-serif;
+    var(--font-primary-source, 'Figtree'), 'Figtree', system-ui, -apple-system, sans-serif;
   --font-mono-family:
     var(--font-inconsolata, 'Inconsolata'), 'Inconsolata', ui-monospace, monospace;
   --font-serif: Georgia, serif;

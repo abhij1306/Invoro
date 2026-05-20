@@ -14,6 +14,10 @@ _STATIC_EXPORTS: dict[str, Any] = {
     if not name.startswith("_")
 }
 
+
+def _static_export_tuple(key: str, default: tuple[Any, ...] = ()) -> tuple[Any, ...]:
+    return tuple(_STATIC_EXPORTS.get(key, default) or ())
+
 DETAIL_PRICE_CENT_MAGNITUDE_RATIO = 100
 DETAIL_PRICE_MAGNITUDE_EPSILON = 0.01
 DETAIL_PRICE_COMPARISON_TOLERANCE = Decimal("0.01")
@@ -41,7 +45,7 @@ CURRENCY_DECIMAL_PLACES = {
 }
 
 DETAIL_ORIGINAL_PRICE_SELECTORS = (
-    *tuple(_STATIC_EXPORTS.get("DETAIL_ORIGINAL_PRICE_SELECTORS", ())),
+    *_static_export_tuple("DETAIL_ORIGINAL_PRICE_SELECTORS"),
     "s",
     "del",
     "[class*='compare' i][class*='price' i]",
@@ -57,7 +61,7 @@ DETAIL_ORIGINAL_PRICE_SELECTORS = (
     "[aria-label*='was price' i]",
 )
 DETAIL_CURRENT_PRICE_SELECTORS = (
-    *tuple(_STATIC_EXPORTS.get("DETAIL_CURRENT_PRICE_SELECTORS", ())),
+    *_static_export_tuple("DETAIL_CURRENT_PRICE_SELECTORS"),
     "button[aria-label*='$']",
     "[role='button'][aria-label*='$']",
     "[aria-label*='$'][class*='buy' i]",
@@ -65,52 +69,51 @@ DETAIL_CURRENT_PRICE_SELECTORS = (
 )
 DETAIL_JSONLD_GRAPH_FIELDS = tuple(
     str(field).strip()
-    for field in tuple(_STATIC_EXPORTS.get("DETAIL_JSONLD_GRAPH_FIELDS", ("@graph",)))
+    for field in _static_export_tuple("DETAIL_JSONLD_GRAPH_FIELDS", ("@graph",))
     if str(field).strip()
 )
 DETAIL_JSONLD_TYPE_FIELDS = tuple(
     str(field).strip()
-    for field in tuple(_STATIC_EXPORTS.get("DETAIL_JSONLD_TYPE_FIELDS", ("@type",)))
+    for field in _static_export_tuple("DETAIL_JSONLD_TYPE_FIELDS", ("@type",))
     if str(field).strip()
 )
 DETAIL_JSONLD_OFFER_FIELDS = tuple(
     str(field).strip()
-    for field in tuple(
-        _STATIC_EXPORTS.get("DETAIL_JSONLD_OFFER_FIELDS", ("offers", "offer"))
+    for field in _static_export_tuple(
+        "DETAIL_JSONLD_OFFER_FIELDS",
+        ("offers", "offer"),
     )
     if str(field).strip()
 )
 DETAIL_JSONLD_PRICE_FIELDS = tuple(
     str(field).strip()
-    for field in tuple(
-        _STATIC_EXPORTS.get("DETAIL_JSONLD_PRICE_FIELDS", ("price", "lowPrice"))
+    for field in _static_export_tuple(
+        "DETAIL_JSONLD_PRICE_FIELDS",
+        ("price", "lowPrice"),
     )
     if str(field).strip()
 )
 DETAIL_JSONLD_ORIGINAL_PRICE_FIELDS = tuple(
     str(field).strip()
-    for field in tuple(
-        _STATIC_EXPORTS.get("DETAIL_JSONLD_ORIGINAL_PRICE_FIELDS", ("highPrice",))
+    for field in _static_export_tuple(
+        "DETAIL_JSONLD_ORIGINAL_PRICE_FIELDS",
+        ("highPrice",),
     )
     if str(field).strip()
 )
 DETAIL_JSONLD_PRICE_SPECIFICATION_FIELDS = tuple(
     str(field).strip()
-    for field in tuple(
-        _STATIC_EXPORTS.get(
-            "DETAIL_JSONLD_PRICE_SPECIFICATION_FIELDS",
-            ("priceSpecification",),
-        )
+    for field in _static_export_tuple(
+        "DETAIL_JSONLD_PRICE_SPECIFICATION_FIELDS",
+        ("priceSpecification",),
     )
     if str(field).strip()
 )
 DETAIL_JSONLD_CURRENCY_FIELDS = tuple(
     str(field).strip()
-    for field in tuple(
-        _STATIC_EXPORTS.get(
-            "DETAIL_JSONLD_CURRENCY_FIELDS",
-            ("priceCurrency", "currency"),
-        )
+    for field in _static_export_tuple(
+        "DETAIL_JSONLD_CURRENCY_FIELDS",
+        ("priceCurrency", "currency"),
     )
     if str(field).strip()
 )
@@ -127,12 +130,12 @@ DETAIL_INSTALLMENT_PRICE_TEXT_TOKENS = (
 DETAIL_AUTHORITATIVE_PRICE_SOURCES = ("adapter", "json_ld", "network_payload")
 DETAIL_STRICT_PARENT_PRICE_SOURCES = ("network_payload",)
 DETAIL_LOW_SIGNAL_ZERO_PRICE_SOURCE_SET = frozenset(
-    _STATIC_EXPORTS.get("DETAIL_LOW_SIGNAL_ZERO_PRICE_SOURCES", ())
+    _static_export_tuple("DETAIL_LOW_SIGNAL_ZERO_PRICE_SOURCES")
 )
 DETAIL_AUTHORITATIVE_PRICE_SOURCE_SET = frozenset(DETAIL_AUTHORITATIVE_PRICE_SOURCES)
 DETAIL_STRICT_PARENT_PRICE_SOURCE_SET = frozenset(DETAIL_STRICT_PARENT_PRICE_SOURCES)
 DETAIL_CENT_BASED_PRICE_CURRENCY_SET = frozenset(
-    _STATIC_EXPORTS.get("DETAIL_CENT_BASED_PRICE_CURRENCIES", ())
+    _static_export_tuple("DETAIL_CENT_BASED_PRICE_CURRENCIES")
 )
 DETAIL_PRICE_CENT_MAGNITUDE_RATIO_DECIMAL = Decimal(
     str(DETAIL_PRICE_CENT_MAGNITUDE_RATIO)

@@ -266,11 +266,40 @@ def test_build_agent_summary_surfaces_canvas_hash_and_webgl_renderer() -> None:
         "target_diagnostics": [],
     }
 
-    summary = probe._build_agent_summary(report)
+    summary = probe.build_agent_summary(report)
 
     assert summary["baseline"]["canvas_image_data_hash"] == "fnv1a:deadbeef"
     assert summary["baseline"]["canvas_data_url_prefix"] == "data:image/png;base64,abc"
     assert summary["baseline"]["webgl_renderer"] == "ANGLE (Intel, Demo)"
+
+
+def test_build_agent_summary_truncates_non_list_evidence() -> None:
+    summary = probe.build_agent_summary(
+        {
+            "metadata": {},
+            "baseline": {"consensus": {}, "drift": {}},
+            "findings": [
+                {
+                    "severity": "warn",
+                    "category": "large",
+                    "message": "large evidence",
+                    "evidence": "x" * 250,
+                },
+                {
+                    "severity": "warn",
+                    "category": "object",
+                    "message": "object evidence",
+                    "evidence": {"value": "y" * 250},
+                },
+            ],
+            "sites": {},
+            "target_diagnostics": [],
+        }
+    )
+
+    findings = summary["findings"]
+    assert len(findings[0]["evidence"]) == 200
+    assert len(findings[1]["evidence"]) == 200
 
 
 def test_build_findings_flags_screen_and_viewport_drift() -> None:

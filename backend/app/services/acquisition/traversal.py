@@ -34,6 +34,7 @@ from app.services.acquisition.traversal_helpers import (
     wait_for_transition as _wait_for_transition,
 )
 from app.services.acquisition.traversal_recovery import (
+    PlaywrightError,
     click_with_retry,
     dismiss_overlays_if_needed,
     find_aom_actionable_locator as _find_aom_actionable_locator,
@@ -42,6 +43,7 @@ from app.services.acquisition.traversal_recovery import (
 
 __all__ = [
     "TraversalResult",
+    "PlaywrightError",
     "click_with_retry",
     "count_listing_cards",
     "dismiss_overlays_if_needed",
