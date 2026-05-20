@@ -29,6 +29,10 @@ If a file is not listed, assume it is a helper under a listed owner.
 | `data_enrichment.py` | On-demand ecommerce detail enrichment jobs and enriched product rows |
 | `ucp_audit.py` | UCP audit job creation, history, detail, and report exports |
 | `monitors.py` | Product monitor CRUD, run-now dispatch, history/events/snapshot, and exports |
+| `alertes.py` | Agentic Delta Engine alert CRUD, test poll, history, and webhook delivery log |
+| `public_alerts.py` | API-key authenticated `/api/v1/alerts` public alert surface |
+| `api_keys.py` | Dashboard API-key create/list/revoke endpoints; returns plaintext only on create |
+| `public/*` | Public API v1 envelope, rate-limit helpers, HTTP-only extraction, domain info, capabilities, and deferred watch/batch routes |
 | `orchestration.py` | Project/workflow shell, template listing, workflow launch/status, monitor promotion, and comparison results |
 | `notifications.py` | In-app monitor notification listing, unread counts, and read state |
 | `auth.py` | Login, register, `/me` |
@@ -43,6 +47,7 @@ If a file is not listed, assume it is a helper under a listed owner.
 | `redis.py` | Shared Redis connection |
 | `security.py` | JWT, password hashing, encryption |
 | `dependencies.py` | FastAPI auth dependency helpers |
+| `public_auth.py` | Public API-key hashing/authentication and `/api/v1` user resolution |
 | `telemetry.py`, `metrics.py` | Observability |
 
 ### `models/` — ORM entities
@@ -50,6 +55,7 @@ If a file is not listed, assume it is a helper under a listed owner.
 | Model | File | Purpose |
 |---|---|---|
 | `User` | `user.py` | account, role, token version |
+| `ApiKey` | `api_key.py` | public API bearer-key ownership and validation |
 | `CrawlRun` | `crawl_run.py` | run state, surface, settings, summary |
 | `CrawlRecord` | `crawl_run.py` | extracted record payload and provenance |
 | `CrawlLog` | `crawl_run.py` | run logs |
@@ -62,7 +68,7 @@ If a file is not listed, assume it is a helper under a listed owner.
 | `ProductIntelligenceJob`, `ProductIntelligenceSourceProduct`, `ProductIntelligenceCandidate`, `ProductIntelligenceMatch` | `product_intelligence.py` | web product matching and price comparison jobs |
 | `DataEnrichmentJob`, `EnrichedProduct` | `data_enrichment.py` | on-demand ecommerce detail enrichment jobs and derived enriched product rows |
 | `UCPAuditJob`, `UCPAuditPageResult`, `UCPAuditReport` | `ucp_audit.py` | persisted UCP compliance audit jobs, sampled page payloads, and report artifacts |
-| `MonitorJob`, `MonitorEvent`, `MonitorSnapshot`, `MonitorSnapshotRecord`, `MonitorURLState` | `monitor.py` | recurring crawl monitors, field-level events, snapshots, and URL pre-check state |
+| `MonitorJob`, `MonitorEvent`, `MonitorSnapshot`, `MonitorSnapshotRecord`, `MonitorURLState`, `MonitorWebhookDelivery` | `monitor.py` | recurring crawl monitors, agentic alerts, field-level events, snapshots, URL pre-check state, and webhook delivery logs |
 | `InAppNotification` | `notification.py` | user-visible monitor change alerts and read state |
 | `OrchestrationProject`, `OrchestrationWorkflowRun`, `OrchestrationStepRun` | `orchestration.py` | thin project/workflow shells that reference crawl runs and monitors |
 | `LLMConfig`, `LLMCostLog` | `llm.py` | LLM config and cost tracking |
@@ -70,6 +76,8 @@ If a file is not listed, assume it is a helper under a listed owner.
 ### `schemas/` — request and response DTOs
 
 `crawl.py`, `user.py`, `llm.py`, `selectors.py`, `data_enrichment.py`, `ucp_audit.py`, `common.py`
+
+Public API schemas live in `api_key.py` and `public_api.py`.
 
 ---
 
@@ -87,7 +95,10 @@ If a file is not listed, assume it is a helper under a listed owner.
 | `data_enrichment/service.py` | On-demand enrichment job orchestration and persistence for ecommerce detail records |
 | `ucp_audit/*` | UCP compliance audit primitives, scoring, reporting, and job orchestration |
 | `monitor_service.py`, `monitor_scheduler_service.py`, `monitor_async_loop.py`, `monitor_change_detection.py`, `monitor_retention.py`, `monitor_alert_service.py` | Product monitoring CRUD support, due-job scheduling, dev scheduler loop, post-run diffing, retention, and in-app alerts |
+| `alert_service.py`, `monitor_condition.py`, `monitor_webhook_service.py` | Agentic Delta Engine alert wrappers, sandboxed condition evaluation, and webhook dispatch/logging |
 | `orchestration_service.py` | Use-case-first project/workflow sequencer that creates normal crawl runs and monitors |
+| `public_api/extraction_service.py` | Public HTTP-only single-product extraction wrapper over normal crawl creation and per-URL pipeline processing |
+| `public_api/domain_info_service.py` | Read-only public domain readiness view over domain memory, run profiles, and recent crawl rows |
 | `data_enrichment/deterministic.py` | Deterministic enrichment normalization, taxonomy matching, and product attribute diagnostics |
 | `data_enrichment/llm_diagnostics.py` | Data enrichment LLM rejection and skip-reason diagnostics |
 | `data_enrichment/shopify_catalog.py` | Shopify taxonomy and attribute repository loading/matching |
@@ -241,6 +252,19 @@ Canonical config owners:
 | `config/network_payload_specs.py` | payload specs and endpoint tokens |
 | `config/data_enrichment.py` | data enrichment statuses, limits, and taxonomy file path |
 | `config/monitor_settings.py` | monitor statuses, priorities, scheduler limits, retention limits, and HEAD pre-check constants |
+| `config/public_api.py` | public API key prefixes, envelopes, error codes, rate limits, extraction caps, MCP env names, and static capabilities |
+
+### `mcp/` — local agent tool adapters
+
+| File | Purpose |
+|---|---|
+| `alert_server.py` | Local stdio JSON-RPC/MCP-style wrapper for `alert_product`, `get_alert_status`, `cancel_alert`, and `list_alerts` over `/api/v1/alerts` |
+
+### `mcp_server/` — hosted MCP wrapper
+
+| File | Purpose |
+|---|---|
+| `client.py`, `tools.py`, `server.py`, `config.py` | Stateless FastMCP HTTP/SSE server for `extract_product`, `check_domain`, and `list_capabilities`; calls public REST API only |
 
 ---
 
@@ -299,7 +323,7 @@ All selector memory is scoped by normalized `(domain, surface)`.
 | `app/` | Next.js App Router pages |
 | `app/projects/*` | Project list, UC-1 wizard, workflow overview/status, and price comparison view |
 | `app/product-intelligence/product-intelligence-components.tsx` | Product Intelligence local UI pieces |
-| `app/monitors/*`, `components/monitors/*` | Monitor list/detail/create UI, monitor form, events, history chart, snapshot table, loading and empty states |
+| `app/monitors/*`, `app/alerts/*`, `components/monitors/*` | Monitor and alert list/detail/create UI, monitor/alert forms, events, history chart, snapshot table, webhook delivery log, loading and empty states |
 | `app/ucp-audit/*` | UCP audit operator page, hook, and local report components |
 | `components/layout/` | shell, auth, nav, theme, scoped shell CSS modules |
 | `components/ui/button.tsx`, `badge.tsx`, `input.tsx`, `card.tsx`, `metric.tsx`, `table.tsx`, `alert.tsx`, `dialog.tsx` | typed UI primitive owners |

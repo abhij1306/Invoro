@@ -1,5 +1,5 @@
 import { apiClient, getApiBaseUrl } from './client';
-export { monitorsApi } from './monitors';
+export { alertsApi, monitorsApi } from './monitors';
 import type {
   ActiveJob,
   CrawlCreatePayload,

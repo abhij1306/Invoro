@@ -59,15 +59,7 @@ export default function MonitorDetailPage({
   });
 
   const editMutation = useMutation({
-    mutationFn: (payload: MonitorUpdatePayload) =>
-      monitorsApi.update(monitorId, {
-        name: payload.name,
-        tracked_fields: payload.tracked_fields,
-        schedule_interval_hours: payload.schedule_interval_hours,
-        priority: payload.priority,
-        retention_days: payload.retention_days,
-        settings: payload.settings,
-      }),
+    mutationFn: (payload: MonitorUpdatePayload) => monitorsApi.update(monitorId, payload),
     onSuccess: () => {
       setNotice('Monitor saved.');
       queryClient.invalidateQueries({ queryKey: ['monitor', monitorId] });
@@ -103,7 +95,10 @@ export default function MonitorDetailPage({
 
   return (
     <div className="page-stack">
-      <PageHeader title={monitor.name} description="Monitor detail and change history." />
+      <PageHeader
+        title={monitor.name}
+        description="Monitor detail and change history."
+      />
       {notice ? (
         <div className="alert-surface alert-success px-3 py-2 text-sm">{notice}</div>
       ) : null}

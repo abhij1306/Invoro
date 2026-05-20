@@ -17,11 +17,13 @@ from app.services.config.monitor_settings import (
     MONITOR_PRIORITY_PRIORITY,
     MONITOR_STATUS_ACTIVE,
     MONITOR_STATUS_ARCHIVED,
+    MONITOR_STATUS_ERROR,
     MONITOR_STATUS_PAUSED,
+    MONITOR_STATUS_TRIGGERED,
 )
 
 MonitorPriority = Literal["on_demand", "priority", "background"]
-MonitorStatus = Literal["active", "paused", "archived"]
+MonitorStatus = Literal["active", "paused", "archived", "triggered", "error"]
 MonitorEventType = Literal["field_changed", "record_new", "record_removed"]
 
 
@@ -35,6 +37,9 @@ class MonitorCreate(BaseModel):
     retention_days: int = Field(default=30, ge=1, le=MAX_RETENTION_DAYS)
     requested_fields: list[str] = Field(default_factory=list)
     settings: dict[str, Any] = Field(default_factory=dict)
+    condition: str | None = None
+    webhook_url: str | None = None
+    poll_interval_seconds: int | None = None
 
     @field_validator("urls")
     @classmethod
@@ -79,6 +84,9 @@ class MonitorUpdate(BaseModel):
     retention_days: int | None = Field(default=None, ge=1, le=MAX_RETENTION_DAYS)
     status: MonitorStatus | None = None
     settings: dict[str, Any] | None = None
+    condition: str | None = None
+    webhook_url: str | None = None
+    poll_interval_seconds: int | None = None
 
     @field_validator("tracked_fields")
     @classmethod
@@ -111,6 +119,14 @@ class MonitorJobResponse(BaseModel):
     retention_days: int
     status: MonitorStatus
     settings: dict[str, Any]
+    condition: str | None = None
+    webhook_url: str | None = None
+    poll_interval_seconds: int | None = None
+    last_known_values: dict[str, Any] = Field(default_factory=dict)
+    last_checked_at: datetime | None = None
+    consecutive_failure_count: int = 0
+    last_error: str | None = None
+    last_crawl_method: str | None = None
     last_run_at: datetime | None = None
     next_run_at: datetime | None = None
     created_at: datetime
@@ -132,6 +148,7 @@ class MonitorEventResponse(BaseModel):
     detected_at: datetime
     notified_at: datetime | None = None
     notification_status: str
+    condition_met: bool = False
 
 
 class MonitorSnapshotResponse(BaseModel):
@@ -169,6 +186,8 @@ MONITOR_STATUSES = {
     MONITOR_STATUS_ACTIVE,
     MONITOR_STATUS_PAUSED,
     MONITOR_STATUS_ARCHIVED,
+    MONITOR_STATUS_TRIGGERED,
+    MONITOR_STATUS_ERROR,
 }
 MONITOR_PRIORITIES = {
     MONITOR_PRIORITY_ON_DEMAND,

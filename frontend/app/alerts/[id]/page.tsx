@@ -1,0 +1,179 @@
+'use client';
+
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useRouter } from 'next/navigation';
+import { use, useMemo, useState } from 'react';
+
+import { alertsApi } from '../../../lib/api';
+import type {
+  MonitorJob,
+  MonitorStatus,
+  AlertJob,
+  AlertUpdatePayload,
+} from '../../../lib/api/types';
+import { MonitorEvents } from '../../../components/monitors/monitor-events';
+import { MonitorHeader } from '../../../components/monitors/monitor-header';
+import { MonitorHistoryChart } from '../../../components/monitors/monitor-history-chart';
+import { MonitorSnapshotTable } from '../../../components/monitors/monitor-snapshot-table';
+import { MonitorDetailSkeleton } from '../../../components/monitors/monitor-skeleton';
+import { MonitorWebhookDeliveries } from '../../../components/monitors/monitor-webhook-deliveries';
+import { InlineAlert, PageHeader, SurfacePanel, TabBar } from '../../../components/ui/patterns';
+
+type TabValue = 'events' | 'history' | 'snapshot' | 'deliveries';
+
+const tabs: Array<{ value: TabValue; label: string }> = [
+  { value: 'events', label: 'Events' },
+  { value: 'history', label: 'History' },
+  { value: 'snapshot', label: 'Current Snapshot' },
+  { value: 'deliveries', label: 'Webhook Log' },
+];
+
+export default function AlertDetailPage({
+  params,
+}: Readonly<{
+  params: Promise<{ id: string }> | { id: string };
+}>) {
+  const resolvedParams = isThenable(params) ? use(params) : params;
+  const alertId = resolvedParams.id;
+  const alertIdNumber = Number(alertId);
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const [tab, setTab] = useState<TabValue>('events');
+  const [notice, setNotice] = useState('');
+  const [runError, setRunError] = useState('');
+
+  const alertQuery = useQuery({
+    queryKey: ['alert', alertId],
+    queryFn: () => alertsApi.get(alertId),
+  });
+
+  const monitor = useMemo(
+    () => (alertQuery.data ? alertToMonitor(alertQuery.data) : null),
+    [alertQuery.data],
+  );
+
+  const runMutation = useMutation({
+    mutationFn: () => alertsApi.test(alertId),
+    onSuccess: (response) => {
+      setNotice(`Poll completed · run_id: ${response.run_id}`);
+      setRunError('');
+      queryClient.invalidateQueries({ queryKey: ['alert', alertId] });
+    },
+    onError: (error) => {
+      setRunError(error instanceof Error ? error.message : 'Alert poll failed.');
+    },
+  });
+
+  const statusMutation = useMutation({
+    mutationFn: (status: MonitorStatus) => alertsApi.update(alertId, { status }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['alert', alertId] }),
+  });
+
+  const editMutation = useMutation({
+    mutationFn: (payload: AlertUpdatePayload) => alertsApi.update(alertId, payload),
+    onSuccess: () => {
+      setNotice('Alert saved.');
+      queryClient.invalidateQueries({ queryKey: ['alert', alertId] });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => alertsApi.remove(alertId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['alerts'] });
+      router.push('/alerts');
+    },
+  });
+
+  if (alertQuery.isPending) {
+    return <MonitorDetailSkeleton />;
+  }
+
+  if (alertQuery.error || !monitor) {
+    return (
+      <div className="page-stack">
+        <PageHeader title="Product Alert" />
+        <InlineAlert
+          message={
+            alertQuery.error instanceof Error ? alertQuery.error.message : 'Alert not found.'
+          }
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="page-stack">
+      <PageHeader
+        title="Product Alert"
+        description="Alert configuration, deltas, and webhook delivery log."
+      />
+      {notice ? (
+        <div className="alert-surface alert-success px-3 py-2 text-sm">{notice}</div>
+      ) : null}
+      <MonitorHeader
+        monitor={monitor}
+        runPending={runMutation.isPending}
+        runError={runError}
+        onRunNow={() => runMutation.mutate()}
+        onUpdateStatus={(status) => statusMutation.mutateAsync(status).then(() => undefined)}
+        onDelete={() => deleteMutation.mutateAsync().then(() => undefined)}
+        onSave={(payload) =>
+          editMutation.mutateAsync(payload as AlertUpdatePayload).then(() => undefined)
+        }
+      />
+      <SurfacePanel>
+        <div className="border-divider border-b px-4 pt-2">
+          <TabBar
+            value={tab}
+            onChange={(value) => setTab(value as TabValue)}
+            options={tabs}
+            variant="underline"
+          />
+        </div>
+        <div className="p-4">
+          {tab === 'events' ? (
+            <MonitorEvents monitorId={alertIdNumber} onRunNow={() => runMutation.mutate()} />
+          ) : null}
+          {tab === 'history' ? <MonitorHistoryChart monitor={monitor} /> : null}
+          {tab === 'snapshot' ? (
+            <MonitorSnapshotTable monitor={monitor} onRunNow={() => runMutation.mutate()} />
+          ) : null}
+          {tab === 'deliveries' ? <MonitorWebhookDeliveries monitorId={alertIdNumber} /> : null}
+        </div>
+      </SurfacePanel>
+    </div>
+  );
+}
+
+function alertToMonitor(alert: AlertJob): MonitorJob {
+  return {
+    id: alert.id,
+    name: alert.url,
+    urls: [alert.url],
+    domains: [alert.domain],
+    surface: alert.surface,
+    tracked_fields: alert.target_fields,
+    schedule_interval_hours: 1,
+    priority: 'background',
+    retention_days: 90,
+    status: alert.status,
+    settings: {},
+    condition: alert.condition,
+    webhook_url: alert.webhook_url,
+    poll_interval_seconds: alert.poll_interval_seconds,
+    last_known_values: alert.last_known_values,
+    last_checked_at: alert.last_checked_at,
+    last_error: alert.last_error,
+    last_crawl_method: alert.last_crawl_method,
+    last_run_at: null,
+    next_run_at: null,
+    created_at: alert.created_at,
+    updated_at: alert.updated_at,
+    change_count: 0,
+  };
+}
+
+function isThenable(value: unknown): value is Promise<{ id: string }> {
+  return typeof value === 'object' && value !== null && 'then' in value;
+}

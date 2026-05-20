@@ -22,12 +22,15 @@ from app.services.config.monitor_settings import (
     ECOMMERCE_SURFACES,
     MAX_RETENTION_DAYS,
     MIN_SCHEDULE_INTERVAL_HOURS,
+    MIN_ALERT_POLL_INTERVAL_SECONDS,
     MONITOR_PRIORITY_BACKGROUND,
     MONITOR_PRIORITY_ON_DEMAND,
     MONITOR_PRIORITY_PRIORITY,
     MONITOR_STATUS_ACTIVE,
     MONITOR_STATUS_ARCHIVED,
+    MONITOR_STATUS_ERROR,
     MONITOR_STATUS_PAUSED,
+    MONITOR_STATUS_TRIGGERED,
     SKIP_HEAD_CHECK_KEY,
 )
 from app.services.crawl.utils import normalize_target_url
@@ -48,6 +51,11 @@ def utcnow() -> datetime:
 
 def next_run_time(now: datetime, interval_hours: int) -> datetime:
     return now + timedelta(hours=max(MIN_SCHEDULE_INTERVAL_HOURS, int(interval_hours)))
+
+
+def next_alert_run_time(now: datetime, interval_seconds: int | None) -> datetime:
+    seconds = max(MIN_ALERT_POLL_INTERVAL_SECONDS, int(interval_seconds or 0))
+    return now + timedelta(seconds=seconds)
 
 
 def monitor_domains(urls: list[str]) -> list[str]:
@@ -90,7 +98,19 @@ async def create_monitor(
         requested_fields=requested_fields,
         status=MONITOR_STATUS_ACTIVE,
         last_run_at=None,
-        next_run_at=next_run_time(now, interval),
+        next_run_at=(
+            next_alert_run_time(now, _optional_int(payload.get("poll_interval_seconds")))
+            if payload.get("poll_interval_seconds") is not None
+            else next_run_time(now, interval)
+        ),
+        condition=_optional_text(payload.get("condition")),
+        webhook_url=_optional_text(payload.get("webhook_url")),
+        poll_interval_seconds=_optional_int(payload.get("poll_interval_seconds")),
+        last_known_values={},
+        last_checked_at=None,
+        consecutive_failure_count=0,
+        last_error=None,
+        last_crawl_method=None,
     )
     session.add(monitor)
     await session.flush()
@@ -106,12 +126,24 @@ async def list_monitors(
     *,
     status: str | None = None,
     priority: str | None = None,
+    user_id: int | None = None,
+    alerts_only: bool = False,
+    monitors_only: bool = False,
+    exclude_archived: bool = False,
 ) -> list[MonitorJob]:
     statement = select(MonitorJob)
     if status:
         statement = statement.where(MonitorJob.status == status)
     if priority:
         statement = statement.where(MonitorJob.priority == priority)
+    if user_id is not None:
+        statement = statement.where(MonitorJob.user_id == user_id)
+    if alerts_only:
+        statement = statement.where(MonitorJob.poll_interval_seconds.is_not(None))
+    if monitors_only:
+        statement = statement.where(MonitorJob.poll_interval_seconds.is_(None))
+    if exclude_archived:
+        statement = statement.where(MonitorJob.status != MONITOR_STATUS_ARCHIVED)
     result = await session.scalars(statement.order_by(MonitorJob.updated_at.desc()))
     return list(result.all())
 
@@ -140,6 +172,12 @@ async def update_monitor(
     if payload.get("schedule_interval_hours") is not None:
         monitor.schedule_interval_hours = _bounded_interval(payload.get("schedule_interval_hours"))
         monitor.next_run_at = next_run_time(utcnow(), monitor.schedule_interval_hours)
+    if payload.get("poll_interval_seconds") is not None:
+        monitor.poll_interval_seconds = max(
+            MIN_ALERT_POLL_INTERVAL_SECONDS,
+            _int_value(payload.get("poll_interval_seconds"), MIN_ALERT_POLL_INTERVAL_SECONDS),
+        )
+        monitor.next_run_at = next_alert_run_time(utcnow(), monitor.poll_interval_seconds)
     if payload.get("priority") is not None:
         monitor.priority = _priority(payload.get("priority"))
     if payload.get("retention_days") is not None:
@@ -149,7 +187,15 @@ async def update_monitor(
     if payload.get("status") is not None:
         monitor.status = _status(payload.get("status"))
         if monitor.status == MONITOR_STATUS_ACTIVE and monitor.next_run_at is None:
-            monitor.next_run_at = next_run_time(utcnow(), monitor.schedule_interval_hours)
+            monitor.next_run_at = (
+                next_alert_run_time(utcnow(), monitor.poll_interval_seconds)
+                if monitor.poll_interval_seconds
+                else next_run_time(utcnow(), monitor.schedule_interval_hours)
+            )
+    if "condition" in payload:
+        monitor.condition = _optional_text(payload.get("condition"))
+    if "webhook_url" in payload:
+        monitor.webhook_url = _optional_text(payload.get("webhook_url"))
     await session.commit()
     await session.refresh(monitor)
     return monitor
@@ -347,6 +393,8 @@ def _status(value: object) -> str:
         MONITOR_STATUS_ACTIVE,
         MONITOR_STATUS_PAUSED,
         MONITOR_STATUS_ARCHIVED,
+        MONITOR_STATUS_TRIGGERED,
+        MONITOR_STATUS_ERROR,
     }:
         raise ValueError("Invalid monitor status")
     return status
@@ -357,6 +405,17 @@ def _int_value(value: object, default: int) -> int:
         return int(value) if isinstance(value, (int, float)) else int(str(value))
     except (TypeError, ValueError):
         return default
+
+
+def _optional_int(value: object) -> int | None:
+    if value is None or value == "":
+        return None
+    return _int_value(value, MIN_ALERT_POLL_INTERVAL_SECONDS)
+
+
+def _optional_text(value: object) -> str | None:
+    text = str(value or "").strip()
+    return text or None
 
 
 def _monitor_settings(settings: object, surface: str) -> dict[str, object]:

@@ -52,6 +52,7 @@ const navGroups = [
       { href: '/crawl', label: 'Crawl Studio', icon: WandSparkles },
       { href: '/runs', label: 'History', icon: Clock3 },
       { href: '/monitors', label: 'Monitors', icon: Radar },
+      { href: '/alerts', label: 'Product Alerts', icon: Bell },
       { href: '/data-enrichment', label: 'Data Enrichment', icon: FileChartColumn },
       { href: '/product-intelligence', label: 'Product Intelligence', icon: BrainCircuit },
       { href: '/ucp-audit', label: 'UCP Audit', icon: ClipboardCheck },
@@ -455,7 +456,7 @@ function ShellContent({
             >
               <Bell className="size-3.5" />
               {(notificationCountQuery.data?.count ?? 0) > 0 ? (
-                <span className="bg-danger absolute -top-1 -right-1 min-w-4 rounded-full px-1 text-xs leading-4 font-semibold text-white text-center">
+                <span className="bg-danger absolute -top-1 -right-1 min-w-4 rounded-full px-1 text-center text-xs leading-4 font-semibold text-white">
                   {notificationCountQuery.data?.count}
                 </span>
               ) : null}
@@ -488,9 +489,7 @@ function ShellContent({
                           <p className="text-foreground m-0 truncate text-sm font-medium">
                             {item.message}
                           </p>
-                          <p className="type-caption m-0">
-                            {formatRelativeTime(item.created_at)}
-                          </p>
+                          <p className="type-caption m-0">{formatRelativeTime(item.created_at)}</p>
                         </Link>
                         <button
                           type="button"
@@ -559,6 +558,11 @@ function getFallbackHeader(pathname: string): TopBarState {
     return {
       title: 'Monitors',
       description: 'Schedule recurring crawls and inspect changes.',
+    };
+  if (pathname.startsWith('/alerts'))
+    return {
+      title: 'Product Alerts',
+      description: 'Track single-product price and availability deltas.',
     };
   if (pathname.startsWith('/product-intelligence'))
     return {

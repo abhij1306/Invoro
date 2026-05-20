@@ -9,13 +9,20 @@ from collections.abc import Mapping
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from time import monotonic
+from time import perf_counter
 from types import MappingProxyType
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 
 from app.api.auth import router as auth_router
+from app.api.api_keys import router as api_keys_router
+from app.api.public.capabilities import router as public_capabilities_router
+from app.api.public.domains import router as public_domains_router
+from app.api.public.extract import router as public_extract_router
+from app.api.public.watches import router as public_watches_router
 from app.api.crawl_domain import router as crawl_domain_router
 from app.api.crawls import router as crawls_router
 from app.api.data_enrichment import router as data_enrichment_router
@@ -26,13 +33,15 @@ from app.api.monitors import router as monitors_router
 from app.api.notifications import router as notifications_router
 from app.api.orchestration import router as orchestration_router
 from app.api.product_intelligence import router as product_intelligence_router
+from app.api.public_alerts import router as public_alerts_router
 from app.api.records import router as records_router
 from app.api.review import router as review_router
 from app.api.selectors import router as selectors_router
 from app.api.users import router as users_router
 from app.api.ucp_audit import router as ucp_audit_router
+from app.api.alerts import router as alerts_router
 from app.core.config import get_frontend_origins, settings
-from app.core.dependencies import shutdown_run_dispatchers
+from app.core.dependencies import get_db, shutdown_run_dispatchers
 from app.core.metrics import (
     check_browser_pool,
     check_database,
@@ -41,6 +50,7 @@ from app.core.metrics import (
 )
 from app.core.redis import close_redis
 from app.core.database import SessionLocal, dispose_engine
+from app.core.public_auth import authenticate_public_api_key
 from app.core.telemetry import (
     configure_logging,
     generate_correlation_id,
@@ -60,6 +70,13 @@ from app.services.llm.provider_client import close_llm_provider_clients
 from app.services.config.monitor_settings import (
     SCHEDULER_DRIVER_DEV,
     SCHEDULER_POLL_INTERVAL_SECONDS,
+)
+from app.api.public.common import PublicApiError, public_error_response
+from app.api.public.rate_limit import consume_public_rate_limit, public_rate_scope
+from app.services.config.public_api import (
+    PUBLIC_API_ERROR_API_KEY_REQUIRED,
+    PUBLIC_API_ERROR_INVALID_API_KEY,
+    PUBLIC_API_ERROR_RATE_LIMITED,
 )
 from app.services.monitor_async_loop import AsyncSchedulerLoop
 from app.services.monitor_change_detection import ensure_monitor_change_detection_registered
@@ -133,6 +150,54 @@ app.add_middleware(
 )
 
 
+@app.middleware("http")
+async def public_api_middleware(request: Request, call_next) -> Response:
+    if not request.url.path.startswith("/api/v1"):
+        return await call_next(request)
+    request.state.public_api_started_at = perf_counter()
+    request.state.public_rate_limit_headers = {
+        "X-RateLimit-Limit": "0",
+        "X-RateLimit-Remaining": "0",
+        "X-RateLimit-Reset": "0",
+    }
+    try:
+        async with _public_auth_session(request) as session:
+            principal = await authenticate_public_api_key(
+                session,
+                request.headers.get("authorization"),
+                touch=True,
+            )
+    except HTTPException as exc:
+        detail = exc.detail if isinstance(exc.detail, dict) else {}
+        return public_error_response(
+            request,
+            code=str(detail.get("code") or PUBLIC_API_ERROR_INVALID_API_KEY),
+            message=str(detail.get("message") or exc.detail or "Invalid API key"),
+            status_code=exc.status_code,
+        )
+    request.state.public_api_key_id = principal.api_key_id
+    request.state.public_api_user_id = principal.user_id
+
+    decision = await consume_public_rate_limit(
+        _crawler_app_state(request.app).rate_limit_buckets,
+        _crawler_app_state(request.app).rate_limit_lock,
+        api_key_id=principal.api_key_id,
+        scope=public_rate_scope(request.url.path),
+    )
+    request.state.public_rate_limit_headers = decision.headers()
+    if not decision.allowed:
+        return public_error_response(
+            request,
+            code=PUBLIC_API_ERROR_RATE_LIMITED,
+            message="Rate limit exceeded.",
+            status_code=429,
+        )
+    response = await call_next(request)
+    for name, value in decision.headers().items():
+        response.headers[name] = value
+    return response
+
+
 def _crawler_app_state(fastapi_app: FastAPI | None = None) -> CrawlerAppState:
     target = app if fastapi_app is None else fastapi_app
     state = getattr(target.state, "crawler", None)
@@ -144,6 +209,27 @@ def _crawler_app_state(fastapi_app: FastAPI | None = None) -> CrawlerAppState:
         state = CrawlerAppState()
         target.state.crawler = state
     return state
+
+
+@asynccontextmanager
+async def _public_auth_session(request: Request):
+    override = request.app.dependency_overrides.get(get_db)
+    if override is None:
+        async with SessionLocal() as session:
+            yield session
+        return
+    value = override()
+    if hasattr(value, "__anext__"):
+        session = await value.__anext__()
+        try:
+            yield session
+        finally:
+            try:
+                await value.__anext__()
+            except StopAsyncIteration:
+                pass
+        return
+    yield value
 
 
 def _sanitize_header_value(value: str) -> str:
@@ -188,6 +274,7 @@ def _rate_limit_exempt_path(path: str) -> bool:
         path == "/health"
         or path.startswith("/health/")
         or path.startswith("/api/metrics")
+        or path.startswith("/api/v1")
     )
 
 
@@ -316,6 +403,53 @@ async def correlation_middleware(request: Request, call_next) -> Response:
     return response
 
 
+@app.exception_handler(PublicApiError)
+async def public_api_error_handler(request: Request, exc: PublicApiError) -> JSONResponse:
+    if request.url.path.startswith("/api/v1"):
+        return public_error_response(
+            request,
+            code=exc.code,
+            message=exc.message,
+            status_code=exc.status_code,
+            details=exc.details,
+        )
+    return JSONResponse({"detail": exc.message}, status_code=exc.status_code)
+
+
+@app.exception_handler(HTTPException)
+async def public_http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
+    if not request.url.path.startswith("/api/v1"):
+        return JSONResponse({"detail": exc.detail}, status_code=exc.status_code, headers=exc.headers)
+    detail = exc.detail if isinstance(exc.detail, dict) else {}
+    if detail.get("status") == "error":
+        return JSONResponse(detail, status_code=exc.status_code, headers=exc.headers)
+    nested = detail.get("error") if isinstance(detail.get("error"), dict) else {}
+    return public_error_response(
+        request,
+        code=str(detail.get("code") or nested.get("code") or PUBLIC_API_ERROR_INVALID_API_KEY),
+        message=str(detail.get("message") or nested.get("message") or exc.detail or "Request failed"),
+        status_code=exc.status_code,
+        details=detail.get("details") if isinstance(detail.get("details"), dict) else {},
+        headers=exc.headers,
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def public_validation_exception_handler(
+    request: Request,
+    exc: RequestValidationError,
+) -> JSONResponse:
+    if not request.url.path.startswith("/api/v1"):
+        return JSONResponse({"detail": exc.errors()}, status_code=422)
+    return public_error_response(
+        request,
+        code="VALIDATION_ERROR",
+        message="Request validation failed.",
+        status_code=422,
+        details={"errors": exc.errors()},
+    )
+
+
 async def _health_checks() -> dict[str, bool]:
     return {
         "database": await check_database(),
@@ -357,6 +491,7 @@ async def metrics() -> Response:
 # use the int path converter, so non-run domain-memory routes are not shadowed.
 for router in [
     auth_router,
+    api_keys_router,
     users_router,
     dashboard_router,
     crawl_domain_router,
@@ -370,6 +505,12 @@ for router in [
     product_intelligence_router,
     orchestration_router,
     monitors_router,
+    alerts_router,
+    public_extract_router,
+    public_domains_router,
+    public_capabilities_router,
+    public_watches_router,
+    public_alerts_router,
     notifications_router,
     ucp_audit_router,
 ]:

@@ -6,7 +6,7 @@ import { Plus } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 import { monitorsApi } from '../../lib/api';
-import type { MonitorPriority, MonitorStatus } from '../../lib/api/types';
+import type { MonitorJob, MonitorPriority, MonitorStatus } from '../../lib/api/types';
 import { STORAGE_KEYS } from '../../lib/constants/storage-keys';
 import { Button, Dropdown } from '../../components/ui/primitives';
 import { ConfirmDialog } from '../../components/ui/dialog';
@@ -61,14 +61,22 @@ export default function MonitorsPage() {
 
   const deleteMutation = useMutation({
     mutationFn: monitorsApi.remove,
-    onSuccess: async () => {
+    onSuccess: async (_data, deletedId) => {
       setNotice('Monitor deleted.');
       setDeleteTargetId(null);
-      await queryClient.invalidateQueries({ queryKey: ['monitors'] });
+      queryClient.setQueriesData<MonitorJob[]>({ queryKey: ['monitors'] }, (cached) =>
+        cached?.filter((monitor) => monitor.id !== deletedId),
+      );
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['monitors'] }),
+        queryClient.invalidateQueries({ queryKey: ['sidebar-monitors'] }),
+      ]);
     },
     onError: (mutationError) =>
       setError(mutationError instanceof Error ? mutationError.message : 'Delete failed.'),
   });
+
+  const monitors = useMemo(() => monitorsQuery.data ?? [], [monitorsQuery.data]);
 
   async function runNow(id: number) {
     setRunningId(id);
@@ -83,8 +91,6 @@ export default function MonitorsPage() {
       setRunningId(null);
     }
   }
-
-  const monitors = useMemo(() => monitorsQuery.data ?? [], [monitorsQuery.data]);
 
   return (
     <div className="page-stack">
