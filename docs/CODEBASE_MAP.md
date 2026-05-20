@@ -31,6 +31,8 @@ If a file is not listed, assume it is a helper under a listed owner.
 | `monitors.py` | Product monitor CRUD, run-now dispatch, history/events/snapshot, and exports |
 | `alertes.py` | Agentic Delta Engine alert CRUD, test poll, history, and webhook delivery log |
 | `public_alerts.py` | API-key authenticated `/api/v1/alerts` public alert surface |
+| `api_keys.py` | Dashboard API-key create/list/revoke endpoints; returns plaintext only on create |
+| `public/*` | Public API v1 envelope, rate-limit helpers, HTTP-only extraction, domain info, capabilities, and deferred watch/batch routes |
 | `orchestration.py` | Project/workflow shell, template listing, workflow launch/status, monitor promotion, and comparison results |
 | `notifications.py` | In-app monitor notification listing, unread counts, and read state |
 | `auth.py` | Login, register, `/me` |
@@ -45,6 +47,7 @@ If a file is not listed, assume it is a helper under a listed owner.
 | `redis.py` | Shared Redis connection |
 | `security.py` | JWT, password hashing, encryption |
 | `dependencies.py` | FastAPI auth dependency helpers |
+| `public_auth.py` | Public API-key hashing/authentication and `/api/v1` user resolution |
 | `telemetry.py`, `metrics.py` | Observability |
 
 ### `models/` — ORM entities
@@ -74,6 +77,8 @@ If a file is not listed, assume it is a helper under a listed owner.
 
 `crawl.py`, `user.py`, `llm.py`, `selectors.py`, `data_enrichment.py`, `ucp_audit.py`, `common.py`
 
+Public API schemas live in `api_key.py` and `public_api.py`.
+
 ---
 
 ## Bucket 2: Crawl Ingestion + Orchestration
@@ -92,6 +97,8 @@ If a file is not listed, assume it is a helper under a listed owner.
 | `monitor_service.py`, `monitor_scheduler_service.py`, `monitor_async_loop.py`, `monitor_change_detection.py`, `monitor_retention.py`, `monitor_alert_service.py` | Product monitoring CRUD support, due-job scheduling, dev scheduler loop, post-run diffing, retention, and in-app alerts |
 | `alert_service.py`, `monitor_condition.py`, `monitor_webhook_service.py` | Agentic Delta Engine alert wrappers, sandboxed condition evaluation, and webhook dispatch/logging |
 | `orchestration_service.py` | Use-case-first project/workflow sequencer that creates normal crawl runs and monitors |
+| `public_api/extraction_service.py` | Public HTTP-only single-product extraction wrapper over normal crawl creation and per-URL pipeline processing |
+| `public_api/domain_info_service.py` | Read-only public domain readiness view over domain memory, run profiles, and recent crawl rows |
 | `data_enrichment/deterministic.py` | Deterministic enrichment normalization, taxonomy matching, and product attribute diagnostics |
 | `data_enrichment/llm_diagnostics.py` | Data enrichment LLM rejection and skip-reason diagnostics |
 | `data_enrichment/shopify_catalog.py` | Shopify taxonomy and attribute repository loading/matching |
@@ -245,12 +252,19 @@ Canonical config owners:
 | `config/network_payload_specs.py` | payload specs and endpoint tokens |
 | `config/data_enrichment.py` | data enrichment statuses, limits, and taxonomy file path |
 | `config/monitor_settings.py` | monitor statuses, priorities, scheduler limits, retention limits, and HEAD pre-check constants |
+| `config/public_api.py` | public API key prefixes, envelopes, error codes, rate limits, extraction caps, MCP env names, and static capabilities |
 
 ### `mcp/` — local agent tool adapters
 
 | File | Purpose |
 |---|---|
 | `alert_server.py` | Local stdio JSON-RPC/MCP-style wrapper for `alert_product`, `get_alert_status`, `cancel_alert`, and `list_alerts` over `/api/v1/alerts` |
+
+### `mcp_server/` — hosted MCP wrapper
+
+| File | Purpose |
+|---|---|
+| `client.py`, `tools.py`, `server.py`, `config.py` | Stateless FastMCP HTTP/SSE server for `extract_product`, `check_domain`, and `list_capabilities`; calls public REST API only |
 
 ---
 

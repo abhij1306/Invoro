@@ -114,8 +114,8 @@ Crawl a single URL and return extracted structured data synchronously.
 - `url` — required. Must be a valid HTTP/HTTPS URL.
 - `surface` — required. `"ecommerce"` in v1.
 - `fields` — optional. If omitted, all fields for the surface are returned.
-- `options.use_cache` — if true and a recent cached extraction exists for this URL, return it without re-crawling. Default: false.
-- `options.max_wait_seconds` — client-specified timeout. Max 60. Default: 30.
+- `options.use_cache` — accepted in v1 but currently a no-op; public extraction always performs a fresh HTTP-only run.
+- `options.max_wait_seconds` — client-specified timeout. Public launch caps this at 10 seconds.
 
 **Response:**
 ```json
@@ -152,7 +152,7 @@ All price values are returned as **numbers, not strings**. Currency is always a 
 
 #### `POST /api/v1/extract/batch`
 
-Submit multiple URLs for extraction. Returns a `batch_id` immediately; results are fetched asynchronously.
+Deferred in the lightweight public launch. The route validates the basic request shape and returns structured `WORKER_REQUIRED`; it does not create workers, durable batch rows, or background jobs.
 
 **Request:**
 ```json
@@ -187,7 +187,7 @@ If `webhook_url` was provided, CrawlerAI POSTs the full batch result to that URL
 
 ### 4.5 Watch (Delta Monitoring) Endpoints
 
-These are the same endpoints described in the Delta Engine spec, exposed as part of the public API.
+These endpoints are part of the long-term public API shape, but they are deferred in the lightweight public launch. Routes return structured `WORKER_REQUIRED` until the Delta Engine worker deployment is approved.
 
 | Method | Path | Description |
 |---|---|---|
@@ -440,7 +440,7 @@ A Python SDK and a TypeScript SDK are the natural follow-ons once the API is sta
 | Single-URL synchronous extraction | Full site crawl via API |
 | Batch extraction (async) | Sitemap discovery via API |
 | Watch CRUD + webhook dispatch | Streaming/WebSocket push |
-| MCP tools for extract + watch | MCP tools for crawl studio config |
+| MCP tools for extract + domain readiness | MCP tools for crawl studio config |
 | Hosted + local MCP deployment | ACP payment flow integration |
 | API key auth | OAuth / team-scoped tokens |
 | Ecommerce surface only | Jobs / content surfaces |
