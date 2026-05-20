@@ -13,6 +13,7 @@ from app.services.config.extraction_rules import (
     COMMERCE_FIELD_HINTS,
     JOB_FIELD_HINTS,
     LISTING_URL_HINTS,
+    SELECTOR_RUNTIME_PRIMARY_IFRAME_MAX_PAGE_TEXT,
 )
 from app.services.config.runtime_settings import crawler_runtime_settings
 from app.services.domain_memory_service import (
@@ -586,7 +587,7 @@ def _selector_rule_count(value: object) -> int:
 def _primary_iframe_candidate(page_url: str, html: str) -> str:
     soup = BeautifulSoup(str(html or ""), "html.parser")
     page_text = html_to_text(html)
-    if len(page_text) > 400:
+    if len(page_text) > int(SELECTOR_RUNTIME_PRIMARY_IFRAME_MAX_PAGE_TEXT):
         return ""
     for frame in soup.select("iframe[src]"):
         src = str(frame.get("src") or "").strip()

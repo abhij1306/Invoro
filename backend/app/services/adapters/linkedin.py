@@ -70,7 +70,7 @@ class LinkedInAdapter(SelectolaxJobAdapter):
                     "company": selectolax_node_text(company_el) or None,
                     "location": selectolax_node_text(location_el) or None,
                     "posted_date": selectolax_node_attr(date_el, "datetime"),
-                    "apply_url": selectolax_node_attr(link_el, "href") or "",
+                    "apply_url": selectolax_node_attr(link_el, "href") or None,
                 }
             )
         return records

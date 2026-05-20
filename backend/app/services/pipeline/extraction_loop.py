@@ -99,11 +99,21 @@ __all__ = [
     "STAGE_NORMALIZE",
     "STAGE_PERSIST",
     "URLProcessingContext",
+    "_remaining_url_budget_seconds",
+    "asyncio",
     "best_adapter_result",
+    "detail_record_rejection_reason",
+    "detect_platform_family",
     "empty_extraction_browser_retry_decision",
+    "extract_records",
+    "infer_detail_failure_reason",
+    "load_domain_selector_rules",
     "mark_run_failed",
+    "note_host_hard_block",
     "process_single_url",
+    "real_chrome_browser_available",
     "resolved_url_processing_config",
+    "run_adapter",
 ]
 
 acquire = _acquire

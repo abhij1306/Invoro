@@ -102,22 +102,38 @@ async def extract_public_product(
             details={"error_type": type(exc).__name__},
         ) from exc
 
-    verdict = str(getattr(result, "verdict", "") or "")
-    metrics = dict(getattr(result, "url_metrics", {}) or {})
-    if _browser_was_required(metrics):
-        raise PublicApiError(
-            PUBLIC_API_ERROR_BROWSER_REQUIRED,
-            "This URL requires browser rendering.",
-            status_code=422,
-        )
-    if verdict == VERDICT_BLOCKED or bool(metrics.get("blocked")):
-        raise PublicApiError(PUBLIC_API_ERROR_BOT_BLOCK, "Target blocked HTTP acquisition.", status_code=403)
-    if verdict in {VERDICT_ERROR, VERDICT_EMPTY}:
-        raise PublicApiError(PUBLIC_API_ERROR_EXTRACTION_FAILED, "No public product record was extracted.", status_code=422)
+    try:
+        verdict = str(getattr(result, "verdict", "") or "")
+        metrics = dict(getattr(result, "url_metrics", {}) or {})
+        if _browser_was_required(metrics):
+            raise PublicApiError(
+                PUBLIC_API_ERROR_BROWSER_REQUIRED,
+                "This URL requires browser rendering.",
+                status_code=422,
+            )
+        if verdict == VERDICT_BLOCKED or bool(metrics.get("blocked")):
+            raise PublicApiError(
+                PUBLIC_API_ERROR_BOT_BLOCK,
+                "Target blocked HTTP acquisition.",
+                status_code=403,
+            )
+        if verdict in {VERDICT_ERROR, VERDICT_EMPTY}:
+            raise PublicApiError(
+                PUBLIC_API_ERROR_EXTRACTION_FAILED,
+                "No public product record was extracted.",
+                status_code=422,
+            )
 
-    record = await _first_record(session, run_id=int(run.id))
-    if record is None:
-        raise PublicApiError(PUBLIC_API_ERROR_EXTRACTION_FAILED, "No public product record was extracted.", status_code=422)
+        record = await _first_record(session, run_id=int(run.id))
+        if record is None:
+            raise PublicApiError(
+                PUBLIC_API_ERROR_EXTRACTION_FAILED,
+                "No public product record was extracted.",
+                status_code=422,
+            )
+    except PublicApiError as exc:
+        await mark_run_failed(session, run.id, exc.message)
+        raise
     update_run_status(run, CrawlStatus.COMPLETED)
     await session.commit()
     return _shape_product_response(record, requested_fields=requested_fields)

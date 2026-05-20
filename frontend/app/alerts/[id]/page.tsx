@@ -5,12 +5,8 @@ import { useRouter } from 'next/navigation';
 import { use, useMemo, useState } from 'react';
 
 import { alertsApi } from '../../../lib/api';
-import type {
-  MonitorJob,
-  MonitorStatus,
-  AlertJob,
-  AlertUpdatePayload,
-} from '../../../lib/api/types';
+import type { MonitorStatus, AlertUpdatePayload } from '../../../lib/api/types';
+import { alertToMonitor } from '../alert-helpers';
 import { MonitorEvents } from '../../../components/monitors/monitor-events';
 import { MonitorHeader } from '../../../components/monitors/monitor-header';
 import { MonitorHistoryChart } from '../../../components/monitors/monitor-history-chart';
@@ -144,34 +140,6 @@ export default function AlertDetailPage({
       </SurfacePanel>
     </div>
   );
-}
-
-function alertToMonitor(alert: AlertJob): MonitorJob {
-  return {
-    id: alert.id,
-    name: alert.url,
-    urls: [alert.url],
-    domains: [alert.domain],
-    surface: alert.surface,
-    tracked_fields: alert.target_fields,
-    schedule_interval_hours: 1,
-    priority: 'background',
-    retention_days: 90,
-    status: alert.status,
-    settings: {},
-    condition: alert.condition,
-    webhook_url: alert.webhook_url,
-    poll_interval_seconds: alert.poll_interval_seconds,
-    last_known_values: alert.last_known_values,
-    last_checked_at: alert.last_checked_at,
-    last_error: alert.last_error,
-    last_crawl_method: alert.last_crawl_method,
-    last_run_at: null,
-    next_run_at: null,
-    created_at: alert.created_at,
-    updated_at: alert.updated_at,
-    change_count: 0,
-  };
 }
 
 function isThenable(value: unknown): value is Promise<{ id: string }> {

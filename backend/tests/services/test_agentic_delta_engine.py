@@ -10,6 +10,7 @@ from app.main import app
 from app.models.api_key import ApiKey
 from app.models.monitor import MonitorEvent, MonitorJob, MonitorWebhookDelivery
 from app.mcp.alert_server import AlertMCPServer
+from app.schemas.alert import AlertCreate
 from app.services.config.monitor_settings import (
     MONITOR_EVENT_FIELD_CHANGED,
     MONITOR_PRIORITY_BACKGROUND,
@@ -20,7 +21,7 @@ from app.services.config.monitor_settings import (
 from app.services.monitor_condition import condition_matches, validate_condition
 from app.services.monitor_service import utcnow
 from app.services.monitor_webhook_service import dispatch_alert_webhooks
-from app.services.alert_service import list_alerts, alert_response
+from app.services.alert_service import alert_response, create_alert, list_alerts
 
 
 class _Response:
@@ -175,6 +176,91 @@ async def test_public_alert_list_uses_api_key_envelope(
     assert payload["data"][0]["id"] == monitor.id
     assert payload["data"][0]["target_fields"] == ["price"]
     assert alert_response((await list_alerts(db_session, user_id=test_user.id))[0]).id == monitor.id
+
+
+@pytest.mark.asyncio
+async def test_public_alert_create_uses_public_api_contract(
+    public_client: AsyncClient,
+    db_session,
+    test_user,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    raw_key = "crawlerai_create_alert_key"
+    db_session.add(
+        ApiKey(
+            user_id=test_user.id,
+            name="test",
+            key_prefix="crawlerai",
+            key_hash=hash_api_key(raw_key),
+            is_active=True,
+        )
+    )
+    await db_session.commit()
+
+    monitor = MonitorJob(
+        id=123,
+        user_id=test_user.id,
+        name="Alert example.com",
+        urls=["https://example.com/product/1"],
+        domains=["example.com"],
+        surface="ecommerce_detail",
+        tracked_fields=["price"],
+        schedule_interval_hours=1,
+        priority=MONITOR_PRIORITY_BACKGROUND,
+        retention_days=90,
+        settings={SKIP_HEAD_CHECK_KEY: True},
+        requested_fields=["price"],
+        status=MONITOR_STATUS_ACTIVE,
+        poll_interval_seconds=300,
+        last_known_values={"price": "129.99"},
+        created_at=utcnow(),
+        updated_at=utcnow(),
+    )
+
+    async def _fake_create_alert(session, *, user, payload):
+        del session, user, payload
+        return monitor, None
+
+    monkeypatch.setattr("app.api.public_alerts.create_alert", _fake_create_alert)
+
+    response = await public_client.post(
+        "/api/v1/alerts",
+        headers={"Authorization": f"Bearer {raw_key}"},
+        json={"url": "https://example.com/product/1", "target_fields": ["price"]},
+    )
+
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["status"] == "ok"
+    assert payload["data"]["id"] == 123
+    assert payload["data"]["target_fields"] == ["price"]
+
+
+@pytest.mark.asyncio
+async def test_create_alert_failure_cleans_up_partial_monitor(
+    db_session,
+    test_user,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def _fail_poll(*args, **kwargs):
+        del args, kwargs
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr("app.services.alert_service.run_alert_poll", _fail_poll)
+
+    with pytest.raises(ValueError, match="Initial alert poll failed: boom"):
+        await create_alert(
+            db_session,
+            user=test_user,
+            payload=AlertCreate(
+                url="https://example.com/product/1",
+                target_fields=["price"],
+                poll_interval_seconds=300,
+            ),
+        )
+
+    monitors = list((await db_session.scalars(select(MonitorJob))).all())
+    assert monitors == []
 
 
 @pytest.mark.asyncio

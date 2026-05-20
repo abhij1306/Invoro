@@ -1,12 +1,20 @@
 from __future__ import annotations
 
+from typing import cast
+
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.crawl_run import CrawlRun
-from app.models.monitor import MonitorEvent, MonitorJob
+from app.models.monitor import MonitorJob
 from app.models.user import User
-from app.schemas.alert import AlertCreate, AlertHistoryItem, AlertResponse, AlertUpdate
+from app.schemas.alert import (
+    AlertCreate,
+    AlertHistoryItem,
+    AlertResponse,
+    AlertStatus,
+    AlertUpdate,
+)
 from app.services.config.monitor_settings import (
     MAX_ALERTS_PER_USER,
     MONITOR_ID_SETTING_KEY,
@@ -82,10 +90,7 @@ async def create_alert(
         )
         await session.refresh(monitor)
     except Exception as exc:
-        monitor.status = MONITOR_STATUS_ERROR
-        monitor.last_error = f"{type(exc).__name__}: {exc}"
-        monitor.last_checked_at = utcnow()
-        await session.commit()
+        await _discard_failed_alert(session, monitor_id=int(monitor.id))
         raise ValueError(f"Initial alert poll failed: {exc}") from exc
     return monitor, run_id
 
@@ -157,6 +162,13 @@ async def test_alert(session: AsyncSession, *, alert_id: int, user_id: int) -> t
     return monitor, run_id
 
 
+async def alert_run_delta_count(session: AsyncSession, *, run_id: int) -> int:
+    run = await session.get(CrawlRun, run_id)
+    if run is None:
+        return 0
+    return int(run.summary_dict().get("monitor_change_count") or 0)
+
+
 async def alert_history(
     session: AsyncSession,
     *,
@@ -201,16 +213,20 @@ async def run_alert_poll(
         "settings": settings,
         "requested_fields": list(monitor.requested_fields or monitor.tracked_fields or []),
     }
-    run = await create_crawl_run(session, int(monitor.user_id), payload)
+    if monitor.user_id is None:
+        raise ValueError("Alert monitor is missing a user id")
+    run = await create_crawl_run(session, monitor.user_id, payload)
     await process_run(session, int(run.id))
     loaded_run = await session.get(CrawlRun, int(run.id))
     if loaded_run is not None and update_schedule:
         monitor.last_run_at = utcnow()
+        await session.flush()
     return int(run.id)
 
 
 def alert_response(monitor: MonitorJob) -> AlertResponse:
     url = (monitor.urls or [""])[0]
+    status = cast(AlertStatus, str(monitor.status))
     return AlertResponse(
         id=monitor.id,
         url=url,
@@ -220,7 +236,7 @@ def alert_response(monitor: MonitorJob) -> AlertResponse:
         condition=monitor.condition,
         webhook_url=monitor.webhook_url,
         poll_interval_seconds=int(monitor.poll_interval_seconds or 0),
-        status=monitor.status,
+        status=status,
         last_checked_at=monitor.last_checked_at,
         last_known_values=dict(monitor.last_known_values or {}),
         last_error=monitor.last_error,
@@ -233,3 +249,12 @@ def alert_response(monitor: MonitorJob) -> AlertResponse:
 def _alert_name(url: str) -> str:
     domain = normalize_domain(url) or "alert"
     return f"Alert {domain}"[:100]
+
+
+async def _discard_failed_alert(session: AsyncSession, *, monitor_id: int) -> None:
+    await session.rollback()
+    monitor = await session.get(MonitorJob, monitor_id)
+    if monitor is None:
+        return
+    await session.delete(monitor)
+    await session.commit()

@@ -24,7 +24,11 @@ from app.services.config.extraction_rules import (
 from app.services.config.variant_migration_rules import (
     DETAIL_VARIANT_CONTEXT_NOISE_TOKENS_EXTRA,
     DETAIL_VARIANT_SOFT_SCOPE_SELECTOR,
+    VARIANT_SOFT_SCOPE_FIELDSET_SIGNAL_SELECTOR,
     VARIANT_SOFT_SCOPE_MIN_RADIO_INPUTS,
+    VARIANT_SOFT_SCOPE_MIN_RADIO_INPUTS_FALLBACK,
+    VARIANT_SOFT_SCOPE_ROLE_OPTION_SELECTOR,
+    VARIANT_SOFT_SCOPE_STRONG_NODE_SELECTOR,
 )
 from app.services.shared.field_coerce import clean_text
 from app.services.runtime_metrics import incr as increment_runtime_metric
@@ -111,7 +115,7 @@ def _variant_soft_scope_roots(soup: Any, *, max_roots: int | None) -> list[Any]:
     try:
         min_radio_inputs = max(1, int(VARIANT_SOFT_SCOPE_MIN_RADIO_INPUTS))
     except (TypeError, ValueError):
-        min_radio_inputs = 2
+        min_radio_inputs = VARIANT_SOFT_SCOPE_MIN_RADIO_INPUTS_FALLBACK
     roots: list[Any] = []
     seen: set[int] = set()
     for node in soup.select(_variant_soft_scope_selector):
@@ -133,23 +137,13 @@ def _node_has_soft_variant_signal(node: Any, *, min_radio_inputs: int) -> bool:
     if tag_name == "select":
         return len(node.find_all("option")) >= 2 if hasattr(node, "find_all") else False
     if tag_name == "fieldset":
-        return bool(
-            node.select(
-                "input[type='radio'], input[type='checkbox'], "
-                "[role='radio'], [role='option'], button, [data-option-value]"
-            )
-        )
+        return bool(node.select(VARIANT_SOFT_SCOPE_FIELDSET_SIGNAL_SELECTOR))
     role = str(node.get("role") or "").strip().lower() if hasattr(node, "get") else ""
     if role in {"radiogroup", "group"} and len(
-        node.select("a[href], button, [data-testid='swatch' i], [data-testid*='swatch-option' i]")
+        node.select(VARIANT_SOFT_SCOPE_ROLE_OPTION_SELECTOR)
     ) >= min_radio_inputs:
         return True
-    strong_nodes = node.select(
-        "input[type='radio'], input[type='checkbox'], "
-        "[role='radio'], [role='button'], [data-option], [data-option-value], "
-        "[data-selected], [data-testid='swatch' i], [data-testid*='swatch-option' i], "
-        "button, a[href]"
-    )
+    strong_nodes = node.select(VARIANT_SOFT_SCOPE_STRONG_NODE_SELECTOR)
     clean_nodes = [
         candidate
         for candidate in strong_nodes

@@ -705,7 +705,7 @@ async def _evict_idle_browser_runtimes_locked() -> None:
                 _BROWSER_POOL.proxied.pop(proxied_key, None)
         await runtime.close()
     while sum(len(pool) for _pool_name, pool in pools) > max_entries:
-        remaining: list[
+        eviction_candidates: list[
             tuple[str, str | tuple[str, str], SharedBrowserRuntime, float]
         ] = []
         for pool_name, pool in pools:
@@ -719,11 +719,11 @@ async def _evict_idle_browser_runtimes_locked() -> None:
                     normalized_key = (str(key[0]), str(key[1]))
                 else:
                     continue
-                remaining.append((pool_name, normalized_key, runtime, last_used))
-        if not remaining:
+                eviction_candidates.append((pool_name, normalized_key, runtime, last_used))
+        if not eviction_candidates:
             break
-        remaining.sort(key=lambda item: (item[2].eviction_key()[0], item[3]))
-        pool_name, key, runtime, candidate_last_used = remaining[0]
+        eviction_candidates.sort(key=lambda item: (item[2].eviction_key()[0], item[3]))
+        pool_name, key, runtime, candidate_last_used = eviction_candidates[0]
         active_and_queued, last_used = runtime.eviction_key()
         if active_and_queued != 0 or last_used != candidate_last_used:
             continue

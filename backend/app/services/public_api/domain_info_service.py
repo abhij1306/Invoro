@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.crawl_run import CrawlRun
@@ -55,15 +56,17 @@ async def _load_profile(session: AsyncSession, domain: str) -> DomainRunProfile 
 
 async def _last_crawled_at(session: AsyncSession, domain: str) -> datetime | None:
     result = await session.execute(
-        select(CrawlRun)
+        select(CrawlRun.completed_at, CrawlRun.created_at)
         .where(CrawlRun.surface == PUBLIC_API_INTERNAL_ECOMMERCE_SURFACE)
+        .where(or_(*_domain_url_filters(domain)))
         .order_by(CrawlRun.completed_at.desc().nullslast(), CrawlRun.created_at.desc())
-        .limit(100)
+        .limit(1)
     )
-    for run in result.scalars().all():
-        if normalize_domain(run.url) == domain:
-            return run.completed_at or run.created_at
-    return None
+    row = result.first()
+    if row is None:
+        return None
+    completed_at, created_at = row
+    return completed_at or created_at
 
 
 def _has_active_selectors(memory: DomainMemory | None) -> bool:
@@ -81,3 +84,19 @@ def _acquisition_profile(profile: DomainRunProfile | None) -> str:
     if fetch_profile or contract:
         return "http_preferred"
     return "unknown"
+
+
+def _domain_url_filters(domain: str) -> list[Any]:
+    lower_url = func.lower(CrawlRun.url)
+    filters: list[Any] = []
+    for scheme in ("http", "https"):
+        for host in (domain, f"www.{domain}"):
+            prefix = f"{scheme}://{host}"
+            filters.extend(
+                (
+                    lower_url == prefix,
+                    lower_url.like(f"{prefix}/%"),
+                    lower_url.like(f"{prefix}:%"),
+                )
+            )
+    return filters

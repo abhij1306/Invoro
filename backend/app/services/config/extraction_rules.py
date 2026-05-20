@@ -346,7 +346,7 @@ DETAIL_LONG_TEXT_UI_TAIL_PHRASES = (
     "learn more",
 )
 DETAIL_LONG_TEXT_LEADING_ATTRIBUTE_BLOB_PATTERN = (
-    r"^(?:[a-z][\w:-]*\s*=\s*(?:\"[^\"]*\"|'[^']*')\s*){1,8}"
+    r"^(?:[a-zA-Z][\w:-]*\s*=\s*(?:\"[^\"]*\"|'[^']*')\s*){1,8}"
 )
 DETAIL_LONG_TEXT_TRUNCATED_TAIL_TOKENS = frozenset(
     {
@@ -864,6 +864,7 @@ DETAIL_GENDER_TERMS = {
         "gender-neutral",
     ),
 }
+SELECTOR_RUNTIME_PRIMARY_IFRAME_MAX_PAGE_TEXT = 400
 ORACLE_HCM_CX_CONFIG_RE = re.compile(
     r"(?:var\s+|window\.)?CX_CONFIG\s*=\s*(\{.*?\})\s*(?:;|</script>)",
     re.DOTALL,
@@ -884,11 +885,17 @@ ORACLE_HCM_DEFAULT_FACETS = (
     "LOCATIONS;WORK_LOCATIONS;WORKPLACE_TYPES;TITLES;CATEGORIES;"
     "ORGANIZATIONS;POSTING_DATES;FLEX_FIELDS"
 )
+ORACLE_HCM_EXPAND_FIELDS = (
+    "requisitionList.workLocation,requisitionList.otherWorkLocations,"
+    "requisitionList.secondaryLocations,flexFieldsFacet.values,"
+    "requisitionList.requisitionFlexFields"
+)
 ORACLE_HCM_LOCATION_LIST_KEYS = (
     "workLocation",
     "otherWorkLocations",
     "secondaryLocations",
 )
+INDEED_DEFAULT_BASE_ORIGIN = "https://www.indeed.com"
 DETAIL_FULFILLMENT_LONG_TEXT_PATTERNS = (
     r"\b(?:shipping|delivery|pickup|pick\s*up)\b.{0,80}\b(?:checkout|options?|available)\b",
     r"\bget\s+it\s+today\b.{0,120}\b(?:shipping|delivery|pickup|pick\s*up)\b",
@@ -1767,6 +1774,7 @@ _EXTRA_EXPORTS = [
     "DETAIL_GUIDE_GLOSSARY_HEADING_TOKENS",
     "DETAIL_GUIDE_GLOSSARY_HEADING_MIN_HITS",
     "DETAIL_LONG_TEXT_DISCLAIMER_PATTERNS",
+    "DETAIL_LONG_TEXT_LEADING_ATTRIBUTE_BLOB_PATTERN",
     "DETAIL_LONG_TEXT_MAX_SECTION_BLOCKS",
     "DETAIL_LONG_TEXT_MAX_SECTION_CHARS",
     "DETAIL_LONG_TEXT_UI_TAIL_MIN_PRODUCT_WORDS",
@@ -1841,20 +1849,24 @@ _EXTRA_EXPORTS = [
     "LISTING_STRUCTURAL_QUERY_CATEGORY_TOKENS",
     "LISTING_STRUCTURAL_QUERY_FILTER_TOKENS",
     "LISTING_PRODUCT_DETAIL_ID_RE",
+    "SELECTOR_RUNTIME_PRIMARY_IFRAME_MAX_PAGE_TEXT",
     "LONG_TEXT_FIELDS",
     "MATERIAL_KEYWORDS",
     "ORACLE_HCM_CX_CONFIG_RE",
     "ORACLE_HCM_DEFAULT_FACETS",
+    "ORACLE_HCM_EXPAND_FIELDS",
     "ORACLE_HCM_JOB_PATH_RE",
     "ORACLE_HCM_LANG_PATH_RE",
     "ORACLE_HCM_LOCATION_LIST_KEYS",
     "ORACLE_HCM_SITE_PATH_RE",
+    "INDEED_DEFAULT_BASE_ORIGIN",
     "OPTION_VALUE_NOISE_WORDS",
     "ORG_SUFFIXES",
     "REMOTE_BOOLEAN_FALSE_TOKENS",
     "REMOTE_BOOLEAN_TRUE_TOKENS",
     "PRICE_VALUE_FIELDS",
     "PRICE_SOURCE_KEY_FIELDS",
+    "AMAZON_DETAIL_TABLE_IGNORED_LABELS",
     "AMAZON_PRICE_OFFSCREEN_SELECTOR",
     "AMAZON_PRICE_WHOLE_SELECTOR",
     "AMAZON_PRICE_FRACTION_SELECTOR",

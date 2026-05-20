@@ -14,11 +14,18 @@ __all__ = (
 )
 
 from typing import Any
+from urllib.parse import urlsplit
 
 from soupsieve import match as selector_matches
 
 from app.services.config.extraction_rules import DETAIL_VARIANT_SCOPE_SELECTOR
 from app.services.config.variant_migration_rules import (
+    VARIANT_OPTION_ATTRIBUTE_NAMES,
+    VARIANT_SCOPE_SOURCE_SOFT,
+    VARIANT_SCOPE_SOURCE_TRUSTED,
+    VARIANT_SELECTED_SIGNAL_ATTRIBUTE_NAMES,
+    VARIANT_SELECTED_SIGNAL_TOKENS,
+    VARIANT_SELECTED_SIGNAL_TRUE_VALUES,
     VARIANT_STRONG_OPTION_SELECTOR,
     VARIANT_WEAK_OPTION_SELECTOR,
 )
@@ -80,9 +87,9 @@ def variant_scope_source(node: Any) -> str:
     current = node
     while current is not None:
         if node_matches_selector(current, str(DETAIL_VARIANT_SCOPE_SELECTOR or "")):
-            return "trusted_scope"
+            return VARIANT_SCOPE_SOURCE_TRUSTED
         current = getattr(current, "parent", None)
-    return "soft_scope"
+    return VARIANT_SCOPE_SOURCE_SOFT
 
 
 def variant_option_node_types(node: Any, *, extractor_path: str) -> list[str]:
@@ -124,7 +131,10 @@ def weak_variant_option_node_allowed(node: Any, *, container: Any, page_url: str
         return True
     if not hasattr(node, "get"):
         return False
-    if any(node.get(attr) not in (None, "", [], {}) for attr in ("data-option", "data-option-value", "data-variant")):
+    if any(
+        node.get(attr) not in (None, "", [], {})
+        for attr in VARIANT_OPTION_ATTRIBUTE_NAMES
+    ):
         return True
     if anchor_has_selected_variant_signal(node):
         return True
@@ -138,18 +148,18 @@ def anchor_is_variant_candidate(node: Any, *, page_url: str) -> bool:
     href = text_or_none(node.get("href")) if hasattr(node, "get") else None
     if not href:
         return False
-    from urllib.parse import urlsplit
-    return urlsplit(absolute_url(page_url, href)).path.rstrip("/") != urlsplit(page_url).path.rstrip("/")
+    return urlsplit(absolute_url(page_url, href)).path.rstrip("/") != urlsplit(
+        page_url
+    ).path.rstrip("/")
 
 
 def anchor_has_selected_variant_signal(node: Any) -> bool:
     if not hasattr(node, "get"):
         return False
-    if any(
-        node.get(attr) not in (None, "", [], {})
-        for attr in ("data-selected", "aria-current", "aria-pressed")
-    ):
-        return True
+    for attr in VARIANT_SELECTED_SIGNAL_ATTRIBUTE_NAMES:
+        raw = text_or_none(node.get(attr))
+        if raw and raw.strip().lower() in VARIANT_SELECTED_SIGNAL_TRUE_VALUES:
+            return True
     probe_parts: list[str] = []
     for attr_name in ("class", "id", "data-testid"):
         value = node.get(attr_name)
@@ -158,4 +168,4 @@ def anchor_has_selected_variant_signal(node: Any) -> bool:
         elif value not in (None, "", [], {}):
             probe_parts.append(str(value))
     probe = clean_text(" ".join(probe_parts)).lower()
-    return any(token in probe for token in ("selected", "current", "checked"))
+    return any(token in probe for token in VARIANT_SELECTED_SIGNAL_TOKENS)

@@ -1219,7 +1219,7 @@ function ViewColumn({
       </div>
 
       <div
-        className="bg-background-elevated text-foreground max-h-[360px] w-full min-w-0 flex-1 overflow-auto rounded-lg border border-border p-3 font-mono text-[12.5px]"
+        className="bg-background-elevated text-foreground border-border max-h-[360px] w-full min-w-0 flex-1 overflow-auto rounded-lg border p-3 font-mono text-[12.5px]"
         style={{ fontSynthesis: 'none' }}
       >
         {isJson ? (
@@ -1232,7 +1232,7 @@ function ViewColumn({
             />
           ) : (
             <div className="text-muted flex flex-col items-center justify-center gap-1.5 py-6 text-center font-sans text-xs">
-              <Info className="size-5 text-muted" />
+              <Info className="text-muted size-5" />
               <span>No JSON data available for this sample.</span>
             </div>
           )
@@ -1247,7 +1247,7 @@ function ViewColumn({
                   className={cn(
                     'w-full min-w-0 rounded px-2 py-1 transition-colors',
                     highlighted
-                      ? 'border-l-2 border-danger bg-danger/10 font-light text-danger'
+                      ? 'border-danger bg-danger/10 text-danger border-l-2 font-light'
                       : 'bg-background text-secondary hover:bg-background-alt',
                   )}
                 >
@@ -1255,7 +1255,7 @@ function ViewColumn({
                     <span
                       className={cn(
                         'max-w-[45%] shrink-0 truncate font-light',
-                        highlighted ? 'font-normal text-danger' : 'text-muted',
+                        highlighted ? 'text-danger font-normal' : 'text-muted',
                       )}
                     >
                       {key}:

@@ -221,14 +221,16 @@ function StageChip({ stage }: { stage: LogStage }) {
   if (stage === 'persistence') Icon = HardDrive;
 
   return (
-    <div className={cn(
-      "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold tracking-wide uppercase border shadow-sm",
-      stage === 'acquisition' && 'bg-blue-500/10 border-blue-500/20 text-blue-500',
-      stage === 'extraction' && 'bg-indigo-500/10 border-indigo-500/20 text-indigo-500',
-      stage === 'normalize' && 'bg-amber-500/10 border-amber-500/20 text-amber-500',
-      stage === 'persistence' && 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500',
-      stage === 'system' && 'bg-slate-500/10 border-slate-500/20 text-slate-500'
-    )}>
+    <div
+      className={cn(
+        'inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-xs font-semibold tracking-wide uppercase shadow-sm',
+        stage === 'acquisition' && 'border-blue-500/20 bg-blue-500/10 text-blue-500',
+        stage === 'extraction' && 'border-indigo-500/20 bg-indigo-500/10 text-indigo-500',
+        stage === 'normalize' && 'border-amber-500/20 bg-amber-500/10 text-amber-500',
+        stage === 'persistence' && 'border-emerald-500/20 bg-emerald-500/10 text-emerald-500',
+        stage === 'system' && 'border-slate-500/20 bg-slate-500/10 text-slate-500',
+      )}
+    >
       <Icon className="size-3" />
       <span>{config.label}</span>
     </div>
@@ -991,10 +993,20 @@ export const LogTerminal = memo(function LogTerminal({
       >
         <div className="flex items-center gap-2">
           <span className="relative flex size-2">
-            <span className={cn("absolute inline-flex h-full w-full animate-ping rounded-full opacity-75", live ? "bg-emerald-500" : "bg-slate-400")}></span>
-            <span className={cn("relative inline-flex size-2 rounded-full", live ? "bg-emerald-500" : "bg-slate-400")}></span>
+            <span
+              className={cn(
+                'absolute inline-flex h-full w-full animate-ping rounded-full opacity-75',
+                live ? 'bg-emerald-500' : 'bg-slate-400',
+              )}
+            ></span>
+            <span
+              className={cn(
+                'relative inline-flex size-2 rounded-full',
+                live ? 'bg-emerald-500' : 'bg-slate-400',
+              )}
+            ></span>
           </span>
-          <span className="text-muted type-label-mono tracking-[0.25em] uppercase text-xs">
+          <span className="text-muted type-label-mono text-xs tracking-[0.25em] uppercase">
             activity_stream.log
           </span>
         </div>
@@ -1077,18 +1089,18 @@ export const LogTerminal = memo(function LogTerminal({
                     }
                   }}
                   className={cn(
-                    'group/row grid w-full cursor-pointer items-center gap-3 px-6 py-1 text-xs text-left transition-colors outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-inset',
+                    'group/row grid w-full cursor-pointer items-center gap-3 px-6 py-1 text-left text-xs transition-colors outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-inset',
                     isRunEventGroup
                       ? 'grid-cols-[32px_minmax(280px,1fr)_auto_minmax(260px,1.4fr)_60px]'
                       : 'grid-cols-[32px_minmax(280px,2fr)_75px_80px_85px_auto_minmax(200px,1.2fr)_80px_70px]',
                     severityTone(group, index),
                   )}
                 >
-                  <div className="text-muted font-medium opacity-60 text-xs">
+                  <div className="text-muted text-xs font-medium opacity-60">
                     {(group.index ?? index + 1).toString().padStart(2, '0')}
                   </div>
-                  <div className="min-w-0 flex items-center gap-2">
-                    {!isRunEventGroup && <Globe className="size-3.5 text-muted shrink-0" />}
+                  <div className="flex min-w-0 items-center gap-2">
+                    {!isRunEventGroup && <Globe className="text-muted size-3.5 shrink-0" />}
                     {isRunEventGroup ? (
                       <span
                         className="text-secondary block truncate text-xs font-medium"
@@ -1112,32 +1124,52 @@ export const LogTerminal = memo(function LogTerminal({
                   </div>
                   {!isRunEventGroup ? (
                     <>
-                      <div className="flex items-center gap-1 rounded-md border border-border bg-[color-mix(in_srgb,var(--bg-alt)_50%,transparent)] px-1.5 py-0.5 text-xs text-secondary font-medium whitespace-nowrap shadow-sm" title="Fields Extracted">
-                        <Database className="size-3 text-muted shrink-0" />
-                        <span>{coverage.foundCount}/{coverage.totalCount || 0}</span>
+                      <div
+                        className="border-border text-secondary flex items-center gap-1 rounded-md border bg-[color-mix(in_srgb,var(--bg-alt)_50%,transparent)] px-1.5 py-0.5 text-xs font-medium whitespace-nowrap shadow-sm"
+                        title="Fields Extracted"
+                      >
+                        <Database className="text-muted size-3 shrink-0" />
+                        <span>
+                          {coverage.foundCount}/{coverage.totalCount || 0}
+                        </span>
                       </div>
-                      <div className="flex items-center gap-1 rounded-md border border-border bg-[color-mix(in_srgb,var(--bg-alt)_50%,transparent)] px-1.5 py-0.5 text-xs text-secondary font-medium whitespace-nowrap shadow-sm" title="Confidence Score">
-                        <CheckCircle2 className={cn("size-3 shrink-0", confidence ? toneForConfidence(confidence.level) : "text-muted")} />
-                        <span className={cn(confidence ? toneForConfidence(confidence.level) : "text-muted")}>
+                      <div
+                        className="border-border text-secondary flex items-center gap-1 rounded-md border bg-[color-mix(in_srgb,var(--bg-alt)_50%,transparent)] px-1.5 py-0.5 text-xs font-medium whitespace-nowrap shadow-sm"
+                        title="Confidence Score"
+                      >
+                        <CheckCircle2
+                          className={cn(
+                            'size-3 shrink-0',
+                            confidence ? toneForConfidence(confidence.level) : 'text-muted',
+                          )}
+                        />
+                        <span
+                          className={cn(
+                            confidence ? toneForConfidence(confidence.level) : 'text-muted',
+                          )}
+                        >
                           {confidence ? `${Math.round(confidence.score * 100)}%` : '--'}
                         </span>
                       </div>
-                      <div className="flex items-center gap-1 rounded-md border border-border bg-[color-mix(in_srgb,var(--bg-alt)_50%,transparent)] px-1.5 py-0.5 text-xs text-secondary font-medium whitespace-nowrap shadow-sm" title="Duration">
-                        <Clock className="size-3 text-muted shrink-0" />
+                      <div
+                        className="border-border text-secondary flex items-center gap-1 rounded-md border bg-[color-mix(in_srgb,var(--bg-alt)_50%,transparent)] px-1.5 py-0.5 text-xs font-medium whitespace-nowrap shadow-sm"
+                        title="Duration"
+                      >
+                        <Clock className="text-muted size-3 shrink-0" />
                         <span>{durationMs !== null ? formatDurationMs(durationMs) : '--'}</span>
                       </div>
                     </>
                   ) : null}
                   <div className="flex items-center justify-center">
                     {isRunEventGroup ? (
-                      <div className="text-muted type-label-mono uppercase text-xs">Run</div>
+                      <div className="text-muted type-label-mono text-xs uppercase">Run</div>
                     ) : group.lastStage !== 'system' ? (
                       <StageChip stage={group.lastStage} />
                     ) : null}
                   </div>
                   <div className="min-w-0">
                     <div
-                      className="text-secondary text-xs truncate"
+                      className="text-secondary truncate text-xs"
                       title={summaryLog?.message || ''}
                     >
                       {summaryLog
@@ -1161,26 +1193,37 @@ export const LogTerminal = memo(function LogTerminal({
                           Peek
                         </Button>
                       ) : (
-                        <span className="type-caption opacity-25 text-xs">--</span>
+                        <span className="type-caption text-xs opacity-25">--</span>
                       )}
                     </div>
                   ) : null}
                   <div className="flex items-center justify-end gap-1.5 pr-2">
-                    <span className="text-xs text-muted font-mono uppercase tracking-wider">
+                    <span className="text-muted font-mono text-xs tracking-wider uppercase">
                       {live && groups.length > 0 && group.key === groups[groups.length - 1].key ? (
-                        <span className="flex items-center gap-1.5 text-accent font-semibold">
+                        <span className="text-accent flex items-center gap-1.5 font-semibold">
                           <span className="relative flex size-1.5">
-                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-75"></span>
-                            <span className="relative inline-flex size-1.5 rounded-full bg-accent"></span>
+                            <span className="bg-accent absolute inline-flex h-full w-full animate-ping rounded-full opacity-75"></span>
+                            <span className="bg-accent relative inline-flex size-1.5 rounded-full"></span>
                           </span>
                           Active
                         </span>
+                      ) : expanded ? (
+                        'Less'
                       ) : (
-                        expanded ? 'Less' : 'More'
+                        'More'
                       )}
                     </span>
-                    {!(live && groups.length > 0 && group.key === groups[groups.length - 1].key) && (
-                      <ChevronDown className={cn("size-3.5 text-muted transition-transform duration-200", expanded && "rotate-180")} />
+                    {!(
+                      live &&
+                      groups.length > 0 &&
+                      group.key === groups[groups.length - 1].key
+                    ) && (
+                      <ChevronDown
+                        className={cn(
+                          'text-muted size-3.5 transition-transform duration-200',
+                          expanded && 'rotate-180',
+                        )}
+                      />
                     )}
                   </div>
                 </div>
@@ -1206,7 +1249,7 @@ export const LogTerminal = memo(function LogTerminal({
                                 {row.createdAt ? formatTimeHms(row.createdAt) : '--'}
                               </span>
                               <div className="flex justify-center">
-                                <IconComponent className={cn("size-3.5", iconStyle.iconCls)} />
+                                <IconComponent className={cn('size-3.5', iconStyle.iconCls)} />
                               </div>
                               <div className="flex">
                                 <StageChip stage={row.stage} />
@@ -1272,9 +1315,7 @@ export const LogTerminal = memo(function LogTerminal({
               }}
             >
               <div className="min-w-0 flex-1">
-                <div className="text-accent type-label-mono">
-                  {TERMINAL_STRINGS.PAYLOAD_PEEK}
-                </div>
+                <div className="text-accent type-label-mono">{TERMINAL_STRINGS.PAYLOAD_PEEK}</div>
                 <div
                   className="mt-0.5 truncate pr-4 text-xs font-medium tabular-nums"
                   style={{ color: 'var(--text-muted)' }}

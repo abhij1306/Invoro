@@ -32,7 +32,11 @@ class PublicApiClient:
             )
         payload = _safe_json(response)
         if response.status_code >= 400:
-            return _api_error(payload, fallback=response.text)
+            api_error = extract_api_error_from_payload(payload, response.text)
+            if api_error is not None:
+                code, message = api_error
+                return _tool_error(code, message)
+            return _tool_error("API_ERROR", response.text or "API error")
         return payload
 
 
@@ -44,17 +48,22 @@ def _safe_json(response: httpx.Response) -> dict[str, Any]:
     return payload if isinstance(payload, dict) else {}
 
 
-def _api_error(payload: dict[str, Any], *, fallback: str) -> dict[str, Any]:
+def extract_api_error_from_payload(
+    payload: dict[str, Any],
+    response_text: str,
+) -> tuple[str, str] | None:
     error = payload.get("error")
     if not isinstance(error, dict):
         detail = payload.get("detail")
-        error = detail.get("error") if isinstance(detail, dict) else None
+        if isinstance(detail, dict):
+            nested_error = detail.get("error")
+            error = nested_error if isinstance(nested_error, dict) else detail
     if isinstance(error, dict):
-        return _tool_error(
+        return (
             str(error.get("code") or "API_ERROR"),
-            str(error.get("message") or "API error"),
+            str(error.get("message") or response_text or "API error"),
         )
-    return _tool_error("API_ERROR", fallback or "API error")
+    return None
 
 
 def _tool_error(code: str, message: str) -> dict[str, Any]:

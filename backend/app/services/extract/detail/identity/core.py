@@ -2,6 +2,7 @@ from __future__ import annotations
 
 __all__ = (
     "prune_irrelevant_detail_dom_nodes",
+    "detail_title_fallback_looks_like_code",
     "listing_url_is_structural",
     "listing_detail_like_path",
     "detail_identity_codes_match",
@@ -893,6 +894,9 @@ def _detail_title_fallback_looks_like_code(value: object) -> bool:
     return bool(
         compact and re.search(r"\d", compact) and re.fullmatch(pattern, compact)
     )
+
+
+detail_title_fallback_looks_like_code = _detail_title_fallback_looks_like_code
 
 
 def _detail_url_matches_requested_identity(

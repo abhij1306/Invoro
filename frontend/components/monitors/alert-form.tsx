@@ -24,9 +24,20 @@ const intervalOptions = [
 
 export function AlertForm({ initial, onSubmit, onCancel, submitLabel }: Readonly<AlertFormProps>) {
   const initialUrl = initial?.urls?.[0] ?? '';
-  const initialFields = initial?.tracked_fields?.length
-    ? initial.tracked_fields.filter((field) => fieldOptions.includes(field))
-    : ['price', 'availability'];
+  const initialFields = (() => {
+    const initialTrackedFields = initial?.tracked_fields ?? [];
+    if (!initialTrackedFields.length) {
+      return ['price', 'availability'];
+    }
+    const filteredFields = initialTrackedFields.filter((field) => fieldOptions.includes(field));
+    const droppedFields = initialTrackedFields.filter((field) => !fieldOptions.includes(field));
+    if (process.env.NODE_ENV === 'development' && droppedFields.length) {
+      console.warn(
+        `alert-form initial.tracked_fields contained unsupported fields: ${droppedFields.join(', ')}`,
+      );
+    }
+    return filteredFields;
+  })();
   const [url, setUrl] = useState(initialUrl);
   const [targetFields, setTargetFields] = useState<string[]>(initialFields);
   const [condition, setCondition] = useState(initial?.condition ?? '');

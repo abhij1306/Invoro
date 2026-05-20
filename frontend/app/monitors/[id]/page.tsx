@@ -95,10 +95,7 @@ export default function MonitorDetailPage({
 
   return (
     <div className="page-stack">
-      <PageHeader
-        title={monitor.name}
-        description="Monitor detail and change history."
-      />
+      <PageHeader title={monitor.name} description="Monitor detail and change history." />
       {notice ? (
         <div className="alert-surface alert-success px-3 py-2 text-sm">{notice}</div>
       ) : null}

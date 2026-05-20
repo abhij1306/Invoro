@@ -112,10 +112,7 @@ export function TableCell({
   return (
     <td
       {...props}
-      className={cn(
-        'text-primary type-body-sm px-4 py-0 align-middle',
-        className,
-      )}
+      className={cn('text-primary type-body-sm px-4 py-0 align-middle', className)}
       colSpan={colSpan}
     >
       {children}

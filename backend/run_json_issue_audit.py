@@ -4,6 +4,7 @@ import argparse
 import json
 import re
 from collections import Counter
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -60,13 +61,13 @@ NOISE_RES = [re.compile(pattern, re.I) for pattern in NOISE_PATTERNS]
 APPAREL_VARIANT_HINT_RES = [re.compile(pattern, re.I) for pattern in APPAREL_VARIANT_HINT_PATTERNS]
 
 
+@dataclass(slots=True)
 class Issue:
-    def __init__(self, category: str, severity: str, field: str, message: str, evidence: Any = None):
-        self.category = category
-        self.severity = severity
-        self.field = field
-        self.message = message
-        self.evidence = evidence
+    category: str
+    severity: str
+    field: str
+    message: str
+    evidence: Any = None
 
     def as_dict(self) -> dict[str, Any]:
         row: dict[str, Any] = {
@@ -113,6 +114,16 @@ def _looks_price(value: Any) -> bool:
 
 def _looks_currency(value: Any) -> bool:
     return bool(CURRENCY_RE.match(_safe_str(value)))
+
+
+def _price_number(value: Any) -> float | None:
+    text = _safe_str(value).replace(",", "")
+    if not text:
+        return None
+    try:
+        return float(text)
+    except ValueError:
+        return None
 
 
 def _variant_signature(variant: dict[str, Any]) -> tuple[tuple[str, str], ...]:
@@ -183,12 +194,9 @@ def _find_incorrect_fields(record: dict[str, Any], issues: list[Issue]) -> None:
         value = record.get(key)
         if value in (None, ""):
             continue
-        if _looks_price(value):
-            try:
-                if float(str(value).replace(",", "")) < 0:
-                    issues.append(Issue("logical_errors", "high", key, "negative price", value))
-            except ValueError:
-                pass
+        parsed_value = _price_number(value)
+        if parsed_value is not None and parsed_value < 0:
+            issues.append(Issue("logical_errors", "high", key, "negative price", value))
 
     brand = _safe_str(record.get("brand"))
     if brand and re.search(r"[a-z]", brand) and brand == brand.lower() and len(brand) >= 4:
@@ -511,8 +519,12 @@ def _find_logical_errors(record: dict[str, Any], issues: list[Issue]) -> None:
     sale_price = record.get("sale_price")
     original_price = record.get("original_price")
 
-    if _looks_price(price) and _looks_price(original_price):
-        if float(str(price)) > float(str(original_price)):
+    parsed_price = _price_number(price)
+    parsed_sale_price = _price_number(sale_price)
+    parsed_original_price = _price_number(original_price)
+
+    if parsed_price is not None and parsed_original_price is not None:
+        if parsed_price > parsed_original_price:
             issues.append(
                 Issue(
                     "logical_errors",
@@ -523,8 +535,8 @@ def _find_logical_errors(record: dict[str, Any], issues: list[Issue]) -> None:
                 )
             )
 
-    if _looks_price(price) and _looks_price(sale_price):
-        if float(str(sale_price)) > float(str(price)):
+    if parsed_price is not None and parsed_sale_price is not None:
+        if parsed_sale_price > parsed_price:
             issues.append(
                 Issue(
                     "logical_errors",
@@ -641,7 +653,8 @@ def main() -> int:
 
     audited = [audit_record(record) for record in records]
 
-    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    generated_at = datetime.now(UTC)
+    stamp = generated_at.strftime("%Y%m%dT%H%M%SZ")
     out_dir = (
         Path(args.output_dir).resolve()
         if str(args.output_dir or "").strip()
@@ -650,7 +663,7 @@ def main() -> int:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     json_path = out_dir / f"{stamp}__{input_path.stem}__issue_audit.json"
-    generated_iso = datetime.now(UTC).isoformat()
+    generated_iso = generated_at.isoformat()
     weighted_category_counts: Counter[str] = Counter()
     for row in audited:
         for key, value in dict(row["category_counts"]).items():

@@ -611,9 +611,7 @@ export function KVTile({
 }: Readonly<{ label: string; value: ReactNode; mono?: boolean; className?: string }>) {
   return (
     <div className={cn('bg-background-elevated rounded-[var(--radius-md)] px-2.5 py-2', className)}>
-      <div className="type-micro-label">
-        {label}
-      </div>
+      <div className="type-micro-label">{label}</div>
       <div
         className={cn(
           'text-foreground pt-1',

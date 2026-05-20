@@ -37,7 +37,9 @@ export function MonitorWebhookDeliveries({ monitorId }: Readonly<{ monitorId: nu
             {delivery.response_code ? (
               <span className="text-secondary type-caption">HTTP {delivery.response_code}</span>
             ) : null}
-            <span className="text-muted type-caption">{formatRelativeTime(delivery.created_at)}</span>
+            <span className="text-muted type-caption">
+              {formatRelativeTime(delivery.created_at)}
+            </span>
           </div>
           {delivery.error_message ? (
             <p className="text-danger type-caption mt-1">{delivery.error_message}</p>

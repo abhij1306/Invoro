@@ -64,18 +64,20 @@ async def test_public_extract_runs_http_only_and_shapes_record(
         _fake_process_single_url,
     )
     app.dependency_overrides[get_db] = _override_db
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver") as client:
-        response = await client.post(
-            "/api/v1/extract",
-            headers={"Authorization": f"Bearer {raw_key}"},
-            json={
-                "url": "https://example.com/product/1",
-                "surface": "ecommerce",
-                "fields": ["product_name", "price"],
-                "options": {"use_cache": True},
-            },
-        )
-    app.dependency_overrides.clear()
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver") as client:
+            response = await client.post(
+                "/api/v1/extract",
+                headers={"Authorization": f"Bearer {raw_key}"},
+                json={
+                    "url": "https://example.com/product/1",
+                    "surface": "ecommerce",
+                    "fields": ["product_name", "price"],
+                    "options": {"use_cache": True},
+                },
+            )
+    finally:
+        app.dependency_overrides.clear()
 
     assert response.status_code == 200
     payload = response.json()
@@ -107,13 +109,15 @@ async def test_public_extract_rejects_unsupported_surface(db_session, test_user)
         yield db_session
 
     app.dependency_overrides[get_db] = _override_db
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver") as client:
-        response = await client.post(
-            "/api/v1/extract",
-            headers={"Authorization": f"Bearer {raw_key}"},
-            json={"url": "https://example.com/product/1", "surface": "jobs"},
-        )
-    app.dependency_overrides.clear()
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver") as client:
+            response = await client.post(
+                "/api/v1/extract",
+                headers={"Authorization": f"Bearer {raw_key}"},
+                json={"url": "https://example.com/product/1", "surface": "jobs"},
+            )
+    finally:
+        app.dependency_overrides.clear()
 
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "INVALID_SURFACE"

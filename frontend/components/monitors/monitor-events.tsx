@@ -82,7 +82,9 @@ export function MonitorEvents({
               <div className="flex flex-wrap items-center gap-2">
                 <span className="type-caption-mono text-accent">{event.event_type}</span>
                 {event.field_name ? <span className="type-control">{event.field_name}</span> : null}
-                {event.condition_met ? <span className="type-caption-mono text-success">condition met</span> : null}
+                {event.condition_met ? (
+                  <span className="type-caption-mono text-success">condition met</span>
+                ) : null}
                 <span className="text-muted type-caption truncate">
                   {hostPath(event.source_url)}
                 </span>

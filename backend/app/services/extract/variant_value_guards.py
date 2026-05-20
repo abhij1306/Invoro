@@ -10,6 +10,10 @@ from collections.abc import Callable
 from urllib.parse import urlparse
 
 from app.services.config.variant_migration_rules import (
+    VARIANT_COLOR_AXIS_FIELD,
+    VARIANT_PRODUCT_DETAIL_PATH_MARKERS,
+    VARIANT_PUBLIC_URL_FIELD_NAMES,
+    VARIANT_PUBLIC_URL_SCHEMES,
     VARIANT_URL_BLOCKED_PATH_PREFIXES,
     VARIANT_URL_BLOCKED_PATH_SUFFIXES,
 )
@@ -40,23 +44,31 @@ def variant_axis_value_exceeds_word_limit(
     max_words: int,
     color_extractor: Callable[[object], str],
 ) -> bool:
-    if len([token for token in clean_text(value).split() if token]) <= max_words:
+    word_count = len([token for token in clean_text(value).split() if token])
+    if word_count <= max_words:
         return False
-    return not (axis_key == "color" and color_extractor(value))
+    try:
+        return not (axis_key == VARIANT_COLOR_AXIS_FIELD and color_extractor(value))
+    except Exception:
+        return True
 
 
 def drop_invalid_variant_urls(variant: dict[str, object]) -> None:
-    for field_name in ("url", "image_url"):
+    for field_name in VARIANT_PUBLIC_URL_FIELD_NAMES:
         value = text_or_none(variant.get(field_name))
-        if value and (variant_url_is_product_like(value) if field_name == "url" else _url_is_public_http(value)):
+        if value and (
+            variant_url_is_product_like(value)
+            if field_name == "url"
+            else _url_is_public_http(urlparse(value))
+        ):
             continue
         variant.pop(field_name, None)
 
 
 def variant_url_is_product_like(value: str) -> bool:
-    if not _url_is_public_http(value):
-        return False
     parsed = urlparse(value)
+    if not _url_is_public_http(parsed):
+        return False
     path = parsed.path.rstrip("/").casefold()
     query = parsed.query.casefold()
     if _path_has_product_detail_marker(path):
@@ -79,14 +91,7 @@ def _variant_query_tokens() -> tuple[str, ...]:
 
 
 def _path_has_product_detail_marker(path: str) -> bool:
-    for marker in (
-        "/products/",
-        "/product/",
-        "/p/",
-        "/dp/",
-        "/c/product/",
-        "/catalog/product/",
-    ):
+    for marker in VARIANT_PRODUCT_DETAIL_PATH_MARKERS:
         if marker not in path:
             continue
         marker_stem = marker.rstrip("/")
@@ -96,6 +101,10 @@ def _path_has_product_detail_marker(path: str) -> bool:
     return False
 
 
-def _url_is_public_http(value: str) -> bool:
-    parsed = urlparse(value)
-    return parsed.scheme.lower() in {"http", "https"} and bool(parsed.netloc)
+def _url_is_public_http(parsed: object) -> bool:
+    if not hasattr(parsed, "scheme") or not hasattr(parsed, "netloc"):
+        return False
+    return (
+        str(getattr(parsed, "scheme", "")).lower() in VARIANT_PUBLIC_URL_SCHEMES
+        and bool(getattr(parsed, "netloc", ""))
+    )

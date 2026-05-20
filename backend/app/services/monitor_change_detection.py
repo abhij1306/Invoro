@@ -313,7 +313,8 @@ def _condition_met(monitor: MonitorJob, values: dict[str, Any], event: MonitorEv
 
 def _crawl_method(run: CrawlRun, record: CrawlRecord) -> str:
     trace = record.source_trace if isinstance(record.source_trace, dict) else {}
-    acquisition = trace.get("acquisition") if isinstance(trace.get("acquisition"), dict) else {}
+    acquisition_raw = trace.get("acquisition")
+    acquisition = acquisition_raw if isinstance(acquisition_raw, dict) else {}
     method = acquisition.get("method") or acquisition.get("fetch_method")
     if method:
         return str(method)

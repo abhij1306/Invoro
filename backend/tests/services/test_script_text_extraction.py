@@ -92,6 +92,25 @@ def test_harvest_js_state_objects_reads_custom_window_state_assignment() -> None
     assert state_objects["__myx"]["pdpData"]["id"] == 77
 
 
+def test_harvest_js_state_objects_parses_next_f_payload_with_escaped_quotes() -> None:
+    html = """
+    <html>
+      <head>
+        <script>
+          self.__next_f.push([1,"0:{\\"product\\":{\\"title\\":\\"Widget \\\\\\"Deluxe\\\\\\"\\"}}"])
+        </script>
+      </head>
+    </html>
+    """
+
+    state_objects = harvest_js_state_objects(
+        BeautifulSoup(html, "html.parser"),
+        html,
+    )
+
+    assert state_objects["__NEXT_F__"][0]["product"]["title"] == 'Widget "Deluxe"'
+
+
 @pytest.mark.asyncio
 async def test_iter_script_text_nodes_async_matches_sync_output() -> None:
     html = """

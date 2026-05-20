@@ -4,7 +4,21 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+LLMCostLogErrorCategory = Literal[
+    "none",
+    "rate_limited",
+    "timeout",
+    "auth_failure",
+    "client_error",
+    "provider_error",
+    "parse_failure",
+    "validation_failure",
+    "circuit_open",
+    "budget_exceeded",
+    "missing_config",
+]
 
 
 class LLMConfigResponse(BaseModel):
@@ -69,17 +83,12 @@ class LLMCostLogResponse(BaseModel):
     cost_usd: Decimal
     domain: str
     outcome: Literal["success", "error"] = "success"
-    error_category: Literal[
-        "",
-        "rate_limited",
-        "timeout",
-        "auth_failure",
-        "client_error",
-        "provider_error",
-        "parse_failure",
-        "validation_failure",
-        "circuit_open",
-        "missing_config",
-    ] = ""
+    error_category: LLMCostLogErrorCategory = "none"
     error_message: str = ""
     created_at: datetime
+
+    @field_validator("error_category", mode="before")
+    @classmethod
+    def _normalize_error_category(cls, value: object) -> str:
+        normalized = str(value or "").strip().lower()
+        return normalized or "none"

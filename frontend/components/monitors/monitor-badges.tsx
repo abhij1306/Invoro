@@ -4,16 +4,14 @@ import { Badge } from '../ui/primitives';
 import type { MonitorPriority, MonitorStatus } from '../../lib/api/types';
 
 export function MonitorStatusBadge({ status }: Readonly<{ status: MonitorStatus }>) {
-  const tone =
-    status === 'active'
-      ? 'info'
-      : status === 'paused'
-        ? 'warning'
-        : status === 'error'
-          ? 'danger'
-          : status === 'triggered'
-            ? 'accent'
-            : 'neutral';
+  const toneMap: Record<MonitorStatus, 'info' | 'warning' | 'danger' | 'accent' | 'neutral'> = {
+    active: 'info',
+    paused: 'warning',
+    error: 'danger',
+    triggered: 'accent',
+    archived: 'neutral',
+  };
+  const tone = toneMap[status] ?? 'neutral';
   return <Badge tone={tone}>{status}</Badge>;
 }
 

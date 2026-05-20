@@ -14,6 +14,7 @@ def build_server():
     from fastmcp import FastMCP
 
     mcp = FastMCP("crawlerai")
+    client = PublicApiClient(api_key=api_key(), base_url=api_base_url())
 
     @mcp.tool
     async def extract_product(
@@ -21,7 +22,6 @@ def build_server():
         fields: list[str] | None = None,
         use_cache: bool = False,
     ) -> dict[str, Any]:
-        client = PublicApiClient(api_key=api_key(), base_url=api_base_url())
         return await _extract_product(
             client,
             url=url,
@@ -31,7 +31,6 @@ def build_server():
 
     @mcp.tool
     async def check_domain(domain: str) -> dict[str, Any]:
-        client = PublicApiClient(api_key=api_key(), base_url=api_base_url())
         return await _check_domain(client, domain=domain)
 
     @mcp.tool

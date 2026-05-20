@@ -15,6 +15,37 @@ from app.services.config.monitor_settings import (
 AlertStatus = Literal["active", "paused", "triggered", "error", "archived"]
 
 
+def validate_target_fields(value: list[str] | None) -> list[str] | None:
+    if value is None:
+        return None
+    fields: list[str] = []
+    seen: set[str] = set()
+    for item in value:
+        field = str(item or "").strip()
+        if not field or field in seen:
+            continue
+        if field not in ALERT_ALLOWED_FIELDS:
+            raise ValueError(f"Unsupported target field: {field}")
+        fields.append(field)
+        seen.add(field)
+    if not fields:
+        raise ValueError("target_fields must not be empty")
+    if len(fields) > MAX_ALERT_TARGET_FIELDS:
+        raise ValueError("too many target_fields")
+    return fields
+
+
+def validate_webhook_url(value: str | None) -> str | None:
+    if value is None:
+        return None
+    url = value.strip()
+    if not url:
+        return None
+    if not url.startswith(("http://", "https://")):
+        raise ValueError("webhook_url must start with http:// or https://")
+    return url
+
+
 class AlertCreate(BaseModel):
     url: str
     target_fields: list[str] = Field(default_factory=lambda: list(ALERT_DEFAULT_TARGET_FIELDS))
@@ -33,33 +64,12 @@ class AlertCreate(BaseModel):
     @field_validator("target_fields")
     @classmethod
     def _validate_fields(cls, value: list[str]) -> list[str]:
-        fields: list[str] = []
-        seen: set[str] = set()
-        for item in value:
-            field = str(item or "").strip()
-            if not field or field in seen:
-                continue
-            if field not in ALERT_ALLOWED_FIELDS:
-                raise ValueError(f"Unsupported target field: {field}")
-            fields.append(field)
-            seen.add(field)
-        if not fields:
-            raise ValueError("target_fields must not be empty")
-        if len(fields) > MAX_ALERT_TARGET_FIELDS:
-            raise ValueError("too many target_fields")
-        return fields
+        return list(validate_target_fields(value) or [])
 
     @field_validator("webhook_url")
     @classmethod
     def _validate_webhook(cls, value: str | None) -> str | None:
-        if value is None:
-            return None
-        url = value.strip()
-        if not url:
-            return None
-        if not url.startswith(("http://", "https://")):
-            raise ValueError("webhook_url must start with http:// or https://")
-        return url
+        return validate_webhook_url(value)
 
 
 class AlertUpdate(BaseModel):
@@ -72,14 +82,12 @@ class AlertUpdate(BaseModel):
     @field_validator("target_fields")
     @classmethod
     def _validate_fields(cls, value: list[str] | None) -> list[str] | None:
-        if value is None:
-            return None
-        return AlertCreate(url="https://example.com", target_fields=value).target_fields
+        return validate_target_fields(value)
 
     @field_validator("webhook_url")
     @classmethod
     def _validate_webhook(cls, value: str | None) -> str | None:
-        return AlertCreate(url="https://example.com", webhook_url=value).webhook_url
+        return validate_webhook_url(value)
 
 
 class AlertResponse(BaseModel):

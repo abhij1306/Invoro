@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from fastapi import Depends, Header, HTTPException, Request, status
 from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_db
@@ -14,6 +16,8 @@ from app.services.config.public_api import (
     PUBLIC_API_ERROR_API_KEY_REQUIRED,
     PUBLIC_API_ERROR_INVALID_API_KEY,
 )
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -64,7 +68,14 @@ async def authenticate_public_api_key(
         )
     if touch:
         api_key.last_used_at = datetime.now(UTC)
-        await session.commit()
+        try:
+            await session.commit()
+        except SQLAlchemyError:
+            await session.rollback()
+            logger.exception(
+                "Failed to update last_used_at for api_key.id=%s",
+                api_key.id,
+            )
     return PublicApiPrincipal(api_key_id=int(api_key.id), user_id=int(user.id))
 
 

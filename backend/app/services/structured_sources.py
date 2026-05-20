@@ -40,7 +40,7 @@ _NON_STATE_ASSIGNMENT_REGEXES = tuple(
     if str(pattern).strip()
 )
 _NEXT_F_PUSH_REGEX = re.compile(
-    r"self\.__next_f\.push\(\[1,\"(.*?)\"\]\)",
+    r'self\.__next_f\.push\(\[1,"((?:\\.|[^"\\])*)"\]\)',
     re.S,
 )
 logger = logging.getLogger(__name__)

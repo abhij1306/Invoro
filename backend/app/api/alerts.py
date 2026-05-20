@@ -16,6 +16,7 @@ from app.schemas.alert import (
 )
 from app.services.monitor_webhook_service import list_webhook_deliveries
 from app.services.alert_service import (
+    alert_run_delta_count,
     create_alert,
     delete_alert,
     get_alert,
@@ -136,7 +137,7 @@ async def alert_test(
         alert=alert_response(monitor),
         run_id=run_id,
         current_snapshot=dict(monitor.last_known_values or {}),
-        delta_count=0,
+        delta_count=await alert_run_delta_count(session, run_id=run_id),
     )
 
 

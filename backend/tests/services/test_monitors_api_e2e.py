@@ -314,9 +314,13 @@ async def test_monitor_api_end_to_end_with_monitor_form_settings(
     archive_response = await monitors_api_client.delete(f"/api/monitors/{monitor_id}")
     assert archive_response.status_code == 204
 
+    deleted_get = await monitors_api_client.get(f"/api/monitors/{monitor_id}")
+    assert deleted_get.status_code == 404
+    assert deleted_get.json()["detail"] == "Monitor not found"
+
     archived_run_now = await monitors_api_client.post(f"/api/monitors/{monitor_id}/run/now")
-    assert archived_run_now.status_code == 400
-    assert archived_run_now.json()["detail"] == "Monitor is archived"
+    assert archived_run_now.status_code == 404
+    assert archived_run_now.json()["detail"] == "Monitor not found"
 
 
 @pytest.mark.asyncio

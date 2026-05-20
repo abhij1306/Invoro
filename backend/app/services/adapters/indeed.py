@@ -10,6 +10,7 @@ from app.services.adapters.base import (
     selectolax_node_attr,
     selectolax_node_text,
 )
+from app.services.config.extraction_rules import INDEED_DEFAULT_BASE_ORIGIN
 
 
 class IndeedAdapter(SelectolaxJobAdapter):
@@ -46,7 +47,7 @@ class IndeedAdapter(SelectolaxJobAdapter):
         base_origin = (
             f"{parsed_url.scheme}://{parsed_url.netloc}"
             if parsed_url.scheme and parsed_url.netloc
-            else "https://www.indeed.com"
+            else INDEED_DEFAULT_BASE_ORIGIN
         )
         cards = parser.css(".job_seen_beacon, .tapItem, [data-jk]")
         for card in cards:

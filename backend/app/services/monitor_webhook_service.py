@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import json
+import random
 from typing import Any
 
 import httpx
@@ -13,6 +15,9 @@ from app.services.config.monitor_settings import (
     WEBHOOK_DELIVERY_TIMEOUT_SECONDS,
     WEBHOOK_MAX_RETRY_ATTEMPTS,
     WEBHOOK_PAYLOAD_MAX_BYTES,
+    WEBHOOK_RETRY_BACKOFF_BASE_SECONDS,
+    WEBHOOK_RETRY_BACKOFF_MAX_SECONDS,
+    WEBHOOK_RETRY_JITTER_SECONDS,
     WEBHOOK_STATUS_FAILED,
     WEBHOOK_STATUS_SENT,
     WEBHOOK_STATUS_SKIPPED,
@@ -104,6 +109,8 @@ async def _deliver_payload(
             except Exception as exc:
                 delivery.error_message = f"{type(exc).__name__}: {exc}"
             session.add(delivery)
+            if attempt < WEBHOOK_MAX_RETRY_ATTEMPTS:
+                await asyncio.sleep(_retry_backoff_seconds(attempt))
 
 
 def _webhook_payload(monitor: MonitorJob, event: MonitorEvent) -> dict[str, Any]:
@@ -132,3 +139,11 @@ def _payload_preview(payload: dict[str, Any]) -> dict[str, Any]:
         "condition": payload.get("condition"),
         "delta": payload.get("delta"),
     }
+
+
+def _retry_backoff_seconds(attempt: int) -> float:
+    backoff = min(
+        WEBHOOK_RETRY_BACKOFF_MAX_SECONDS,
+        WEBHOOK_RETRY_BACKOFF_BASE_SECONDS * (2 ** max(0, attempt - 1)),
+    )
+    return backoff + random.uniform(0.0, WEBHOOK_RETRY_JITTER_SECONDS)

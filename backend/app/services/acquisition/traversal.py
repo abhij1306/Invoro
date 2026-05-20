@@ -34,12 +34,22 @@ from app.services.acquisition.traversal_helpers import (
     wait_for_transition as _wait_for_transition,
 )
 from app.services.acquisition.traversal_recovery import (
-    PlaywrightError,
     click_with_retry,
     dismiss_overlays_if_needed,
     find_aom_actionable_locator as _find_aom_actionable_locator,
     locator_still_resolves,
 )
+
+__all__ = [
+    "TraversalResult",
+    "click_with_retry",
+    "count_listing_cards",
+    "dismiss_overlays_if_needed",
+    "execute_listing_traversal",
+    "locator_still_resolves",
+    "wait_for_dom_mutation_settle",
+    "wait_for_load_more_card_gain",
+]
 
 logger = logging.getLogger(__name__)
 

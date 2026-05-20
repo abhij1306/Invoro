@@ -120,7 +120,7 @@ class PaycomAdapter(PublicEndpointAdapter):
                 json.JSONDecodeError,
             ):
                 break
-            previews = body.get("jobPostingPreviews", [])
+            previews = body.get("jobPostingPreviews")
             if not isinstance(previews, list) or not previews:
                 break
             for preview in previews:

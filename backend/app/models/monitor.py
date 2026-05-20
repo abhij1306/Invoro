@@ -149,7 +149,6 @@ class MonitorWebhookDelivery(CreatedAtMixin, Base):
     __tablename__ = "monitor_webhook_deliveries"
     __table_args__ = (
         Index("ix_monitor_webhook_deliveries_monitor_created", "monitor_id", "created_at"),
-        Index("ix_monitor_webhook_deliveries_event", "event_id"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)

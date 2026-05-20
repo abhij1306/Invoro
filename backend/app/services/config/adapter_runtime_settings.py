@@ -30,6 +30,8 @@ class AdapterRuntimeSettings(BaseSettings):
     jibe_listing_default_page: str = "1"
     algolia_jobs_hits_per_page: int = 100
     firestore_jobs_page_size: int = 100
+    oracle_hcm_detail_page_size: int = 25
+    oracle_hcm_listing_page_size: int = 100
     paycom_listing_page_size: int = 100
     saashr_pagination_size: int = 50
     saashr_job_reqs_sort: str = "desc"
@@ -74,6 +76,10 @@ class AdapterRuntimeSettings(BaseSettings):
             raise ValueError("algolia_jobs_hits_per_page must be > 0")
         if self.firestore_jobs_page_size <= 0:
             raise ValueError("firestore_jobs_page_size must be > 0")
+        if self.oracle_hcm_detail_page_size <= 0:
+            raise ValueError("oracle_hcm_detail_page_size must be > 0")
+        if self.oracle_hcm_listing_page_size <= 0:
+            raise ValueError("oracle_hcm_listing_page_size must be > 0")
         if self.saashr_pagination_size <= 0:
             raise ValueError("saashr_pagination_size must be > 0")
         if not str(self.saashr_job_reqs_sort or "").strip():

@@ -156,9 +156,7 @@ export default function ProjectDetailPage() {
       {deleteMutation.isError ? (
         <InlineAlert
           message={
-            deleteMutation.error instanceof Error
-              ? deleteMutation.error.message
-              : 'Delete failed.'
+            deleteMutation.error instanceof Error ? deleteMutation.error.message : 'Delete failed.'
           }
         />
       ) : null}

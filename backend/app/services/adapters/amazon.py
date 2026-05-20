@@ -97,7 +97,7 @@ def _price_from_price_node(price_node: object) -> str | None:
     )
     fraction = re.sub(r"\D+", "", selectolax_node_text(fraction_node))[
         :decimal_places
-    ].zfill(decimal_places)
+    ].ljust(decimal_places, "0")
     symbol_prefix = symbol or ""
     if re.fullmatch(r"[A-Z]{3}", symbol_prefix.strip(), re.I):
         symbol_prefix = f"{symbol_prefix.strip()} "
@@ -171,9 +171,13 @@ class AmazonAdapter(BaseAdapter):
     ]
 
     async def can_handle(self, url: str, html: str) -> bool:
-        return any(d in url for d in self.domains)
+        parsed = urlparse(url)
+        hostname = parsed.hostname or ""
+        return any(hostname == d or hostname.endswith(f".{d}") for d in self.domains)
 
-    async def extract(self, url: str, html: str, surface: str, proxy: str | None = None) -> AdapterResult:
+    async def extract(
+        self, url: str, html: str, surface: str, proxy: str | None = None
+    ) -> AdapterResult:
         del proxy
         parser = LexborHTMLParser(html)
         records = []
@@ -289,7 +293,7 @@ class AmazonAdapter(BaseAdapter):
         values: list[str] = []
         for node in parser.css("#feature-bullets li, #feature-bullets .a-list-item"):
             text = _clean_detail_text(selectolax_node_text(node))
-            if not text or text.lower() in {"", "see more product details"}:
+            if not text or text.lower() == "see more product details":
                 continue
             if text not in values:
                 values.append(text)

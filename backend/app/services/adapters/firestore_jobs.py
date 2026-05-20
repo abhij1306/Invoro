@@ -53,7 +53,8 @@ class FirestoreJobsAdapter(PublicEndpointAdapter):
             return None
         title = clean_text(data.get("title"))
         slug = clean_text(data.get("slug"))
-        company = data.get("company") if isinstance(data.get("company"), dict) else {}
+        company_raw = data.get("company")
+        company = company_raw if isinstance(company_raw, dict) else {}
         company_slug = clean_text(company.get("username") or company.get("usernameLow"))
         if not title or not slug:
             return None
@@ -116,17 +117,25 @@ def _decode_firestore_value(value: object) -> Any:
     for number_key in ("integerValue", "doubleValue"):
         if number_key in value:
             raw = value.get(number_key)
+            if raw is None:
+                return None
             try:
                 return float(raw) if "." in str(raw) else int(str(raw))
             except (TypeError, ValueError):
                 return raw
     if "mapValue" in value:
-        fields = (value.get("mapValue") or {}).get("fields")
+        map_value = value.get("mapValue")
+        if not isinstance(map_value, dict):
+            return {}
+        fields = map_value.get("fields")
         if not isinstance(fields, dict):
             return {}
         return {key: _decode_firestore_value(item) for key, item in fields.items()}
     if "arrayValue" in value:
-        values = (value.get("arrayValue") or {}).get("values")
+        array_value = value.get("arrayValue")
+        if not isinstance(array_value, dict):
+            return []
+        values = array_value.get("values")
         if not isinstance(values, list):
             return []
         return [_decode_firestore_value(item) for item in values]

@@ -131,6 +131,8 @@ async def list_monitors(
     monitors_only: bool = False,
     exclude_archived: bool = False,
 ) -> list[MonitorJob]:
+    if alerts_only and monitors_only:
+        raise ValueError("alerts_only and monitors_only cannot both be true")
     statement = select(MonitorJob)
     if status:
         statement = statement.where(MonitorJob.status == status)

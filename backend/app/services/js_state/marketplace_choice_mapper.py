@@ -14,7 +14,12 @@ from app.services.js_state.helpers import compact_dict
 def extract_marketplace_choice_products(value: Any) -> list[dict[str, Any]]:
     buckets: dict[str, dict[str, Any]] = {}
     _collect_marketplace_choice_products(value, buckets=buckets, depth=0)
-    return [compact_dict(product) for product in buckets.values() if compact_dict(product)]
+    products: list[dict[str, Any]] = []
+    for product in buckets.values():
+        compacted = compact_dict(product)
+        if compacted:
+            products.append(compacted)
+    return products
 
 
 def _collect_marketplace_choice_products(
@@ -104,9 +109,10 @@ def _marketplace_choice_product(value: dict[str, Any]) -> dict[str, Any]:
                 if row:
                     variants.append(row)
             continue
+        selected_variant_choice = category.get("selectedVariantChoice")
         selected = (
-            category.get("selectedVariantChoice")
-            if isinstance(category.get("selectedVariantChoice"), dict)
+            selected_variant_choice
+            if isinstance(selected_variant_choice, dict)
             else None
         )
         raw_selected_choice = selected.get("choice") if isinstance(selected, dict) else None

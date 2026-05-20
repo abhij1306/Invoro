@@ -3,11 +3,13 @@ from __future__ import annotations
 import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.dependencies import get_current_user, get_db
-from app.core.public_auth import hash_api_key
+from app.core.public_auth import PublicApiPrincipal, authenticate_public_api_key, hash_api_key
 from app.main import app
 from app.models.api_key import ApiKey
+from app.models.user import User
 from app.services.config.public_api import PUBLIC_API_ERROR_API_KEY_REQUIRED
 
 
@@ -86,3 +88,36 @@ async def test_public_capabilities_uses_api_key_envelope(
     payload = response.json()
     assert payload["status"] == "ok"
     assert "extract_product" in payload["data"]["tools"]
+
+
+@pytest.mark.asyncio
+async def test_authenticate_public_api_key_allows_failed_touch_commit() -> None:
+    class _Session:
+        def __init__(self) -> None:
+            self.api_key = ApiKey(
+                id=7,
+                user_id=11,
+                name="test",
+                key_prefix="crawlerai",
+                key_hash=hash_api_key("secret"),
+                is_active=True,
+            )
+            self.user = User(id=11, email="test@example.com", hashed_password="x", is_active=True)
+            self.rolled_back = False
+
+        async def scalar(self, _statement):
+            return self.api_key
+
+        async def get(self, model, _id):
+            return self.user if model is User else None
+
+        async def commit(self):
+            raise SQLAlchemyError("boom")
+
+        async def rollback(self):
+            self.rolled_back = True
+
+    session = _Session()
+    principal = await authenticate_public_api_key(session, "Bearer secret", touch=True)
+    assert principal == PublicApiPrincipal(api_key_id=7, user_id=11)
+    assert session.rolled_back is True

@@ -44,6 +44,14 @@ from app.services.platform_policy import (
 
 logger = logging.getLogger(__name__)
 
+__all__ = [
+    "BlockPageClassification",
+    "dismiss_safe_location_interstitial",
+    "finalize_browser_fetch",
+    "location_interstitial_detected",
+    "page_might_have_location_interstitial",
+]
+
 _capture_listing_visual_elements = capture_listing_visual_elements
 build_browser_diagnostics = _browser_result_builder.build_browser_diagnostics
 build_browser_artifacts = _browser_result_builder.build_browser_artifacts

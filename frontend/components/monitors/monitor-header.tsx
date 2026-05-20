@@ -22,6 +22,7 @@ import type {
   AlertUpdatePayload,
 } from '../../lib/api/types';
 import { formatNextRun, formatRelativeTime } from '../../lib/format/date';
+import { formatSeconds } from '../../lib/format/time';
 import { cn } from '../../lib/utils';
 import { Button } from '../ui/primitives';
 import { ConfirmDialog } from '../ui/dialog';
@@ -219,10 +220,4 @@ export function MonitorHeader({
       />
     </div>
   );
-}
-
-function formatSeconds(seconds: number) {
-  if (seconds >= 3600) return `${Math.round(seconds / 3600)}h`;
-  if (seconds >= 60) return `${Math.round(seconds / 60)}m`;
-  return `${seconds}s`;
 }

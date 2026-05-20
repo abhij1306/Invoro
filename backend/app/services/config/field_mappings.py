@@ -48,10 +48,10 @@ BRAND_LIKE_FIELDS = frozenset({"brand", "company", "dealer_name", "vendor"})
 TITLE_STRUCTURED_VALUE_KEYS = (
     "name",
     "title",
-    "values",
     "label",
     "text",
     "value",
+    "values",
 )
 PRICE_DICT_PREFERRED_KEYS = (
     "formattedPrice",

@@ -34,12 +34,14 @@ async def test_public_domain_info_reads_domain_memory(db_session, test_user) -> 
         yield db_session
 
     app.dependency_overrides[get_db] = _override_db
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver") as client:
-        response = await client.get(
-            "/api/v1/domains/example.com",
-            headers={"Authorization": f"Bearer {raw_key}"},
-        )
-    app.dependency_overrides.clear()
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver") as client:
+            response = await client.get(
+                "/api/v1/domains/example.com",
+                headers={"Authorization": f"Bearer {raw_key}"},
+            )
+    finally:
+        app.dependency_overrides.clear()
 
     assert response.status_code == 200
     data = response.json()["data"]

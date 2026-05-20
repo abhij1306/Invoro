@@ -1,16 +1,17 @@
 from __future__ import annotations
 
-from time import perf_counter
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from fastapi import APIRouter, Depends, Query, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.public.common import PublicApiError, public_success
 from app.core.dependencies import get_db
 from app.core.public_auth import get_public_api_user
 from app.models.user import User
 from app.schemas.alert import AlertCreate, AlertUpdate
 from app.services.alert_service import (
+    alert_run_delta_count,
     create_alert,
     delete_alert,
     get_alert,
@@ -24,25 +25,6 @@ from app.services.alert_service import (
 router = APIRouter(prefix="/api/v1/alerts", tags=["public-alerts"])
 
 
-def _envelope(data: Any, request: Request, started_at: float) -> dict[str, Any]:
-    return {
-        "status": "ok",
-        "data": data,
-        "meta": {
-            "request_id": request.headers.get("x-request-id", ""),
-            "duration_ms": int((perf_counter() - started_at) * 1000),
-        },
-    }
-
-
-def _error(code: str, message: str, request: Request) -> dict[str, Any]:
-    return {
-        "status": "error",
-        "error": {"code": code, "message": message, "details": {}},
-        "meta": {"request_id": request.headers.get("x-request-id", "")},
-    }
-
-
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def public_alert_create(
     payload: AlertCreate,
@@ -50,15 +32,15 @@ async def public_alert_create(
     session: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[User, Depends(get_public_api_user)],
 ) -> dict[str, Any]:
-    started_at = perf_counter()
     try:
         monitor, _ = await create_alert(session, user=user, payload=payload)
     except ValueError as exc:
-        raise HTTPException(
+        raise PublicApiError(
+            "ALERT_CREATE_FAILED",
+            str(exc),
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=_error("ALERT_CREATE_FAILED", str(exc), request),
         ) from exc
-    return _envelope(alert_response(monitor).model_dump(mode="json"), request, started_at)
+    return public_success(alert_response(monitor).model_dump(mode="json"), request)
 
 
 @router.get("")
@@ -68,10 +50,9 @@ async def public_alert_list(
     user: Annotated[User, Depends(get_public_api_user)],
     status_filter: Annotated[str | None, Query(alias="status")] = None,
 ) -> dict[str, Any]:
-    started_at = perf_counter()
     monitors = await list_alerts(session, user_id=int(user.id), status=status_filter)
     data = [alert_response(monitor).model_dump(mode="json") for monitor in monitors]
-    return _envelope(data, request, started_at)
+    return public_success(data, request)
 
 
 @router.get("/{alert_id}")
@@ -81,12 +62,15 @@ async def public_alert_get(
     session: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[User, Depends(get_public_api_user)],
 ) -> dict[str, Any]:
-    started_at = perf_counter()
     try:
         monitor = await get_alert(session, alert_id, user_id=int(user.id))
     except LookupError as exc:
-        raise HTTPException(status_code=404, detail=_error("ALERT_NOT_FOUND", str(exc), request)) from exc
-    return _envelope(alert_response(monitor).model_dump(mode="json"), request, started_at)
+        raise PublicApiError(
+            "ALERT_NOT_FOUND",
+            str(exc),
+            status_code=status.HTTP_404_NOT_FOUND,
+        ) from exc
+    return public_success(alert_response(monitor).model_dump(mode="json"), request)
 
 
 @router.patch("/{alert_id}")
@@ -97,14 +81,21 @@ async def public_alert_patch(
     session: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[User, Depends(get_public_api_user)],
 ) -> dict[str, Any]:
-    started_at = perf_counter()
     try:
         monitor = await update_alert(session, alert_id=alert_id, user_id=int(user.id), payload=payload)
     except LookupError as exc:
-        raise HTTPException(status_code=404, detail=_error("ALERT_NOT_FOUND", str(exc), request)) from exc
+        raise PublicApiError(
+            "ALERT_NOT_FOUND",
+            str(exc),
+            status_code=status.HTTP_404_NOT_FOUND,
+        ) from exc
     except ValueError as exc:
-        raise HTTPException(status_code=422, detail=_error("ALERT_UPDATE_FAILED", str(exc), request)) from exc
-    return _envelope(alert_response(monitor).model_dump(mode="json"), request, started_at)
+        raise PublicApiError(
+            "ALERT_UPDATE_FAILED",
+            str(exc),
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        ) from exc
+    return public_success(alert_response(monitor).model_dump(mode="json"), request)
 
 
 @router.delete("/{alert_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -117,7 +108,11 @@ async def public_alert_delete(
     try:
         await delete_alert(session, alert_id=alert_id, user_id=int(user.id))
     except LookupError as exc:
-        raise HTTPException(status_code=404, detail=_error("ALERT_NOT_FOUND", str(exc), request)) from exc
+        raise PublicApiError(
+            "ALERT_NOT_FOUND",
+            str(exc),
+            status_code=status.HTTP_404_NOT_FOUND,
+        ) from exc
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -130,7 +125,6 @@ async def public_alert_history(
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=200)] = 50,
 ) -> dict[str, Any]:
-    started_at = perf_counter()
     try:
         items, total = await alert_history(
             session,
@@ -140,8 +134,12 @@ async def public_alert_history(
             limit=page_size,
         )
     except LookupError as exc:
-        raise HTTPException(status_code=404, detail=_error("ALERT_NOT_FOUND", str(exc), request)) from exc
-    return _envelope(
+        raise PublicApiError(
+            "ALERT_NOT_FOUND",
+            str(exc),
+            status_code=status.HTTP_404_NOT_FOUND,
+        ) from exc
+    return public_success(
         {
             "items": [item.model_dump(mode="json") for item in items],
             "total": total,
@@ -149,7 +147,6 @@ async def public_alert_history(
             "page_size": page_size,
         },
         request,
-        started_at,
     )
 
 
@@ -160,18 +157,20 @@ async def public_alert_test(
     session: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[User, Depends(get_public_api_user)],
 ) -> dict[str, Any]:
-    started_at = perf_counter()
     try:
         monitor, run_id = await test_alert(session, alert_id=alert_id, user_id=int(user.id))
     except LookupError as exc:
-        raise HTTPException(status_code=404, detail=_error("ALERT_NOT_FOUND", str(exc), request)) from exc
-    return _envelope(
+        raise PublicApiError(
+            "ALERT_NOT_FOUND",
+            str(exc),
+            status_code=status.HTTP_404_NOT_FOUND,
+        ) from exc
+    return public_success(
         {
             "alert": alert_response(monitor).model_dump(mode="json"),
             "run_id": run_id,
             "current_snapshot": dict(monitor.last_known_values or {}),
-            "delta_count": 0,
+            "delta_count": await alert_run_delta_count(session, run_id=run_id),
         },
         request,
-        started_at,
     )

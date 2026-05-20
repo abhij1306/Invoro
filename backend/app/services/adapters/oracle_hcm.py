@@ -12,6 +12,7 @@ from app.services.config.adapter_runtime_settings import adapter_runtime_setting
 from app.services.config.extraction_rules import (
     ORACLE_HCM_CX_CONFIG_RE,
     ORACLE_HCM_DEFAULT_FACETS,
+    ORACLE_HCM_EXPAND_FIELDS,
     ORACLE_HCM_JOB_PATH_RE,
     ORACLE_HCM_LANG_PATH_RE,
     ORACLE_HCM_LOCATION_LIST_KEYS,
@@ -47,7 +48,11 @@ class OracleHCMAdapter(PublicEndpointAdapter):
             if "detail" in str(surface or "").lower()
             else ""
         )
-        page_size = 100 if "listing" in str(surface or "").lower() else 25
+        page_size = (
+            adapter_runtime_settings.oracle_hcm_listing_page_size
+            if "listing" in str(surface or "").lower()
+            else adapter_runtime_settings.oracle_hcm_detail_page_size
+        )
         offset = 0
         records: list[dict] = []
         seen_job_ids: set[str] = set()
@@ -117,13 +122,9 @@ class OracleHCMAdapter(PublicEndpointAdapter):
             f"findReqs;siteNumber={site_number},facetsList={ORACLE_HCM_DEFAULT_FACETS},"
             f"offset={offset},limit={limit},sortBy=POSTING_DATES_DESC"
         )
-        expand = (
-            "requisitionList.workLocation,requisitionList.otherWorkLocations,"
-            "requisitionList.secondaryLocations,flexFieldsFacet.values,requisitionList.requisitionFlexFields"
-        )
         return (
             f"{base_url}/hcmRestApi/resources/latest/recruitingCEJobRequisitions"
-            f"?onlyData=true&expand={expand}&finder={finder}"
+            f"?onlyData=true&expand={ORACLE_HCM_EXPAND_FIELDS}&finder={finder}"
         )
 
     def _normalize_requisition(

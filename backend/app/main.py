@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from time import monotonic
 from time import perf_counter
-from types import MappingProxyType
+from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
@@ -74,7 +74,6 @@ from app.services.config.monitor_settings import (
 from app.api.public.common import PublicApiError, public_error_response
 from app.api.public.rate_limit import consume_public_rate_limit, public_rate_scope
 from app.services.config.public_api import (
-    PUBLIC_API_ERROR_API_KEY_REQUIRED,
     PUBLIC_API_ERROR_INVALID_API_KEY,
     PUBLIC_API_ERROR_RATE_LIMITED,
 )
@@ -168,7 +167,7 @@ async def public_api_middleware(request: Request, call_next) -> Response:
                 touch=True,
             )
     except HTTPException as exc:
-        detail = exc.detail if isinstance(exc.detail, dict) else {}
+        detail: dict[str, Any] = exc.detail if isinstance(exc.detail, dict) else {}
         return public_error_response(
             request,
             code=str(detail.get("code") or PUBLIC_API_ERROR_INVALID_API_KEY),
@@ -420,17 +419,18 @@ async def public_api_error_handler(request: Request, exc: PublicApiError) -> JSO
 async def public_http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
     if not request.url.path.startswith("/api/v1"):
         return JSONResponse({"detail": exc.detail}, status_code=exc.status_code, headers=exc.headers)
-    detail = exc.detail if isinstance(exc.detail, dict) else {}
+    detail: dict[str, Any] = exc.detail if isinstance(exc.detail, dict) else {}
     if detail.get("status") == "error":
         return JSONResponse(detail, status_code=exc.status_code, headers=exc.headers)
-    nested = detail.get("error") if isinstance(detail.get("error"), dict) else {}
+    nested_raw = detail.get("error")
+    nested: dict[str, Any] = nested_raw if isinstance(nested_raw, dict) else {}
     return public_error_response(
         request,
         code=str(detail.get("code") or nested.get("code") or PUBLIC_API_ERROR_INVALID_API_KEY),
         message=str(detail.get("message") or nested.get("message") or exc.detail or "Request failed"),
         status_code=exc.status_code,
         details=detail.get("details") if isinstance(detail.get("details"), dict) else {},
-        headers=exc.headers,
+        headers=dict(exc.headers) if exc.headers else None,
     )
 
 

@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 __all__ = (
-    "detail_cross_product_text_type_tokens",
-    "detail_cross_product_text_generic_tokens",
     "drop_cross_product_variant_rows",
     "drop_parent_shared_variant_axes",
     "prune_axisless_rows_when_axisful_rows_exist",
@@ -33,8 +31,8 @@ from app.services.shared.field_coerce import clean_text, text_or_none
 
 _PUBLIC_VARIANT_AXIS_FIELDS = tuple(str(field).strip().lower() for field in PUBLIC_VARIANT_AXIS_FIELDS if str(field).strip())
 _VARIANT_TITLE_STOPWORDS = frozenset(clean_text(token).lower() for token in tuple(VARIANT_TITLE_STOPWORDS or ()) if clean_text(token))
-detail_cross_product_text_type_tokens = frozenset(clean_text(token).lower() for token in tuple(DETAIL_CROSS_PRODUCT_TEXT_TYPE_TOKENS or ()) if clean_text(token))
-detail_cross_product_text_generic_tokens = frozenset(clean_text(token).lower() for token in tuple(DETAIL_CROSS_PRODUCT_TEXT_GENERIC_TOKENS or ()) if clean_text(token))
+_detail_cross_product_text_type_tokens = frozenset(clean_text(token).lower() for token in tuple(DETAIL_CROSS_PRODUCT_TEXT_TYPE_TOKENS or ()) if clean_text(token))
+_detail_cross_product_text_generic_tokens = frozenset(clean_text(token).lower() for token in tuple(DETAIL_CROSS_PRODUCT_TEXT_GENERIC_TOKENS or ()) if clean_text(token))
 try:
     _VARIANT_OPTION_LABEL_MAX_WORDS = max(1, int(VARIANT_OPTION_LABEL_MAX_WORDS))
 except (TypeError, ValueError):
@@ -147,15 +145,20 @@ def drop_subset_variants_when_richer_alternative_exists(record: dict[str, Any]) 
     rows = [variant for variant in variants if isinstance(variant, dict)]
     if len(rows) < 2:
         return
-    superset_axis_keys: set[tuple[tuple[str, str], ...]] = set()
+    redundant_subset_keys: set[tuple[tuple[str, str], ...]] = set()
     for variant in rows:
         axis_items = tuple(_variant_row_axis_map(variant).items())
         if len(axis_items) < 2:
             continue
         for subset_size in range(1, len(axis_items)):
             for subset in combinations(axis_items, subset_size):
-                superset_axis_keys.add(tuple(sorted(subset)))
-    kept = [variant for variant in rows if not _variant_row_axis_key(variant) or _variant_row_axis_key(variant) not in superset_axis_keys]
+                redundant_subset_keys.add(tuple(sorted(subset)))
+    kept = [
+        variant
+        for variant in rows
+        if not _variant_row_axis_key(variant)
+        or _variant_row_axis_key(variant) not in redundant_subset_keys
+    ]
     _replace_or_drop_variants(record, kept)
 
 
@@ -222,7 +225,10 @@ def _variant_row_looks_like_foreign_product(record: dict[str, Any], variant: dic
     unmatched_tokens = color_tokens - parent_tokens
     if len(unmatched_tokens) < 2:
         return False
-    product_like_tokens = unmatched_tokens & (detail_cross_product_text_type_tokens | detail_cross_product_text_generic_tokens)
+    product_like_tokens = unmatched_tokens & (
+        _detail_cross_product_text_type_tokens
+        | _detail_cross_product_text_generic_tokens
+    )
     return bool(product_like_tokens) or "(" in color_value or ")" in color_value
 
 
@@ -288,7 +294,26 @@ def _variant_row_is_low_signal_numeric_only(variant: object) -> bool:
 def _numeric_only_variants_add_no_signal(record: dict[str, Any], variants: list[dict[str, Any]]) -> bool:
     parent_price = text_or_none(record.get("price"))
     parent_currency = text_or_none(record.get("currency"))
-    return all(isinstance(variant, dict) and text_or_none(variant.get("price")) in (None, parent_price) and text_or_none(variant.get("currency")) in (None, parent_currency) for variant in variants)
+    return all(
+        _variant_matches_parent_price_signal(
+            variant,
+            parent_price=parent_price,
+            parent_currency=parent_currency,
+        )
+        for variant in variants
+    )
+
+
+def _variant_matches_parent_price_signal(
+    variant: dict[str, Any],
+    *,
+    parent_price: str | None,
+    parent_currency: str | None,
+) -> bool:
+    return (
+        text_or_none(variant.get("price")) in (None, parent_price)
+        and text_or_none(variant.get("currency")) in (None, parent_currency)
+    )
 
 
 def _replace_or_drop_variants(record: dict[str, Any], variants: list[dict[str, Any]]) -> None:

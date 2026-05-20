@@ -34,8 +34,7 @@ from app.services.selectors_runtime import (
     list_selector_records,
     update_selector_record,
 )
-from sqlalchemy import desc
-from sqlalchemy import select
+from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -224,20 +223,6 @@ def _load_record_html(record: CrawlRecord) -> str:
         return ""
 
 
-def _serialize_record(record: CrawlRecord) -> dict:
-    return {
-        "id": record.id,
-        "run_id": record.run_id,
-        "source_url": record.source_url,
-        "data": mapping_or_empty(record.data),
-        "raw_data": mapping_or_empty(record.raw_data),
-        "discovered_data": mapping_or_empty(record.discovered_data),
-        "source_trace": mapping_or_empty(record.source_trace),
-        "raw_html_path": record.raw_html_path,
-        "created_at": record.created_at,
-    }
-
-
 def _review_bucket_rows(record: CrawlRecord) -> list[dict]:
     discovered_data = mapping_or_empty(record.discovered_data)
     rows = discovered_data.get("review_bucket")
@@ -325,7 +310,7 @@ async def _promote_review_bucket_fields(
 
         discovered_data = dict(mapping_or_empty(record.discovered_data))
         mapped_source_fields = {
-            source_field for source_field in normalized_mapping.keys() if source_field
+            source_field for source_field in normalized_mapping if source_field
         }
         discovered_data["review_bucket"] = [
             row

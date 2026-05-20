@@ -33,7 +33,6 @@ from app.services.config.field_mappings import (
     BRAND_LIKE_FIELDS,
     FIELD_ALIASES,
     TITLE_FIELD,
-    TITLE_STRUCTURED_VALUE_KEYS,
     URL_FIELD,
     WEIGHT_FIELD,
 )
@@ -779,7 +778,7 @@ def _coerce_title_text(value: object) -> str | None:
     if is_structured_input:
         structured = coerce_structured_scalar(
             value,
-            keys=tuple(TITLE_STRUCTURED_VALUE_KEYS or ()),
+            keys=("values", "title", "name", "label", "text", "value"),
         )
         if structured:
             value = structured

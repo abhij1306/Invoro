@@ -24,8 +24,15 @@ async def api_key_create(
         user_id=int(user.id),
         name=payload.name,
     )
-    data = ApiKeyResponse.model_validate(row, from_attributes=True).model_dump()
-    return ApiKeyCreatedResponse(**data, api_key=raw_key)
+    return ApiKeyCreatedResponse(
+        id=int(row.id),
+        name=row.name,
+        key_prefix=row.key_prefix,
+        is_active=bool(row.is_active),
+        last_used_at=row.last_used_at,
+        created_at=row.created_at,
+        api_key=raw_key,
+    )
 
 
 @router.get("")

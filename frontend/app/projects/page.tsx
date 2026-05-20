@@ -45,7 +45,9 @@ export default function ProjectsPage() {
       await queryClient.invalidateQueries({ queryKey: ['orchestration-projects'] });
     },
     onError: (mutationError) =>
-      setError(mutationError instanceof Error ? mutationError.message : 'Unable to delete project.'),
+      setError(
+        mutationError instanceof Error ? mutationError.message : 'Unable to delete project.',
+      ),
   });
   const projects = projectsQuery.data ?? [];
 

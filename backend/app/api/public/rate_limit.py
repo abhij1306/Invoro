@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import OrderedDict, deque
 from dataclasses import dataclass
+from math import ceil
 from time import monotonic
 
 from app.services.config.public_api import (
@@ -113,11 +114,11 @@ def _bucket_for(buckets: OrderedDict[str, deque[float]], key: str) -> deque[floa
 
 
 def _trim(bucket: deque[float], cutoff: float) -> None:
-    while bucket and bucket[0] <= cutoff:
+    while bucket and bucket[0] < cutoff:
         bucket.popleft()
 
 
 def _retry_after(bucket: deque[float], *, now: float, window_seconds: int) -> int:
     if not bucket:
         return int(window_seconds)
-    return max(1, int(bucket[0] + window_seconds - now))
+    return max(1, ceil(bucket[0] + window_seconds - now))

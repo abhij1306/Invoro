@@ -26,9 +26,12 @@ async def create_api_key(
     name: str,
 ) -> tuple[ApiKey, str]:
     raw_key = generate_api_key()
+    cleaned_name = str(name or "").strip()
+    if not cleaned_name:
+        raise ValueError("API key name must not be empty")
     row = ApiKey(
         user_id=user_id,
-        name=str(name or "").strip(),
+        name=cleaned_name,
         key_prefix=raw_key[:PUBLIC_API_KEY_PREFIX_DISPLAY_LENGTH],
         key_hash=hash_api_key(raw_key),
         is_active=True,

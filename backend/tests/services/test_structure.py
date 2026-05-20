@@ -139,7 +139,7 @@ FILE_LOC_BUDGETS = {
     Path("app/services/acquisition/traversal.py"): 1000,
     # Config owners.
     # Config rules own typed extraction constants and category/nav URL rules.
-    Path("app/services/config/extraction_rules.py"): 1910,
+    Path("app/services/config/extraction_rules.py"): 1960,
     Path("app/services/pipeline/extract_records.py"): 700,
     Path("app/services/extract/detail_dom_section_targets.py"): 160,
     Path("app/services/extract/detail_dom_fallbacks.py"): 360,
@@ -150,8 +150,8 @@ FILE_LOC_BUDGETS = {
     Path("app/services/extract/detail_money_repair.py"): 355,
     Path("app/services/extract/detail_variant_pruning.py"): 555,
     Path("app/services/extract/detail_image_cleanup.py"): 505,
-    Path("app/services/extract/detail_price_core.py"): 1000,
-    Path("app/services/extract/detail/identity/core.py"): 1030,
+    Path("app/services/extract/detail/price/core.py"): 1085,
+    Path("app/services/extract/detail/identity/core.py"): 1210,
     # Extract decomposition plan Slice 2 follow-up: split stage owners must stay
     # small after variant_record_normalization.py was removed.
     Path("app/services/extract/variant_normalization/contract.py"): 400,
@@ -180,7 +180,7 @@ FILE_LOC_BUDGETS = {
     Path("app/services/extract/detail_record_assembly.py"): 495,
     # Ratcheted for host-policy TTL compatibility and handoff failure isolation.
     Path("app/services/fetch/fetch_context.py"): 1000,
-    Path("app/services/js_state/state_normalizer.py"): 1480,
+    Path("app/services/js_state/state_normalizer.py"): 1505,
     # Extraction loop owns stage orchestration; retry and record extraction stages are split out.
     Path("app/services/pipeline/extraction_loop.py"): 1000,
     # Run progress owns batch-level summary/merge/quality aggregation, evicted

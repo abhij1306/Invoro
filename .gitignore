@@ -19,20 +19,8 @@ __pycache__/
 *.db
 *.db-*
 
-backend/.venv/
-backend/.hypothesis/
-backend/__pycache__/
-backend/.pytest_cache/
 backend/.pytest-tmp/
-backend/.mypy_cache/
-backend/.ruff_cache/
 backend/alembic.ini
-crawlerai.db
-crawlerai.db-*
-backend/crawlerai.db
-backend/crawlerai.db-*
-backend/crawler.db
-backend/crawler.db-*
 backend/artifacts/
 backend/.coverage
 backend/.tmp_project_requirements.txt
@@ -46,7 +34,6 @@ frontend/test-results/
 
 backend/cookie_store/
 backend/prune_test_out.txt
-backend/crawlerai_backend.egg-info/
 *.egg-info/
 
 *.log

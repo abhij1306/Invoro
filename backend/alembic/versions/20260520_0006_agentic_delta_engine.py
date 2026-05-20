@@ -67,11 +67,6 @@ def upgrade() -> None:
         "monitor_webhook_deliveries",
         ["monitor_id", "created_at"],
     )
-    op.create_index(
-        "ix_monitor_webhook_deliveries_event",
-        "monitor_webhook_deliveries",
-        ["event_id"],
-    )
 
     op.create_table(
         "api_keys",
@@ -89,7 +84,6 @@ def upgrade() -> None:
     )
     op.create_index("ix_api_keys_user_id", "api_keys", ["user_id"])
     op.create_index("ix_api_keys_key_prefix", "api_keys", ["key_prefix"])
-    op.create_index("ix_api_keys_key_hash", "api_keys", ["key_hash"])
     op.create_index("ix_api_keys_is_active", "api_keys", ["is_active"])
 
     op.alter_column("monitor_jobs", "last_known_values", server_default=None)
@@ -99,11 +93,9 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_index("ix_api_keys_is_active", table_name="api_keys")
-    op.drop_index("ix_api_keys_key_hash", table_name="api_keys")
     op.drop_index("ix_api_keys_key_prefix", table_name="api_keys")
     op.drop_index("ix_api_keys_user_id", table_name="api_keys")
     op.drop_table("api_keys")
-    op.drop_index("ix_monitor_webhook_deliveries_event", table_name="monitor_webhook_deliveries")
     op.drop_index("ix_monitor_webhook_deliveries_monitor_created", table_name="monitor_webhook_deliveries")
     op.drop_index("ix_monitor_webhook_deliveries_status", table_name="monitor_webhook_deliveries")
     op.drop_index("ix_monitor_webhook_deliveries_event_id", table_name="monitor_webhook_deliveries")

@@ -11,6 +11,7 @@ __all__ = (
     "looks_like_utility_url",
     "looks_like_utility_record",
     "title_contains_token_phrase",
+    "utility_url_token_matches",
     "unsupported_non_detail_ecommerce_merchandise_hint",
 )
 
@@ -437,6 +438,8 @@ def listing_record_supported(
     source_kind = str(record.get("_source") or "").strip().lower()
     if not title or not url or title_is_noise(title):
         return False
+    if re.search(r"\.(?:pdf|docx?|pptx?)(?:$|[?#])", url, flags=re.I):
+        return False
     if url_is_structural(url, page_url):
         return False
     if looks_like_utility_record(title=title, url=url):
@@ -700,6 +703,9 @@ def _utility_url_token_matches(normalized_url: str, token: str) -> bool:
         )
     pattern = rf"(?:^|[-_/?#]){re.escape(normalized_token)}(?:[-_/?#]|$)"
     return re.search(pattern, normalized_url) is not None
+
+
+utility_url_token_matches = _utility_url_token_matches
 
 
 def title_contains_token_phrase(title: str, token: str) -> bool:

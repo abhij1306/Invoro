@@ -171,17 +171,17 @@ def test_dell_financing_url_is_utility() -> None:
 
 
 def test_utility_url_token_requires_leading_boundary() -> None:
-    from app.services.extract.listing_candidate_ranking import _utility_url_token_matches
+    from app.services.extract.listing_candidate_ranking import utility_url_token_matches
 
     assert (
-        _utility_url_token_matches(
+        utility_url_token_matches(
             "https://example.com/products/mycart-bag",
             "cart",
         )
         is False
     )
     assert (
-        _utility_url_token_matches(
+        utility_url_token_matches(
             "https://example.com/cart/bag",
             "cart",
         )

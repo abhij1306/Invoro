@@ -8,6 +8,7 @@ from typing import Any
 
 import httpx
 
+from app.mcp_server.client import extract_api_error_from_payload
 from app.services.config.monitor_settings import (
     MCP_API_BASE_URL_ENV,
     MCP_API_KEY_ENV,
@@ -43,7 +44,7 @@ class AlertMCPServer:
             },
             {
                 "name": "get_alert_status",
-                "description": "Get status and latest values for a alert.",
+                "description": "Get status and latest values for an alert.",
                 "inputSchema": {
                     "type": "object",
                     "properties": {"alert_id": {"type": "string"}},
@@ -52,7 +53,7 @@ class AlertMCPServer:
             },
             {
                 "name": "cancel_alert",
-                "description": "Cancel and delete a alert.",
+                "description": "Cancel and delete an alert.",
                 "inputSchema": {
                     "type": "object",
                     "properties": {"alert_id": {"type": "string"}},
@@ -105,12 +106,10 @@ class AlertMCPServer:
             return {"status": "ok", "data": {"cancelled": True}}
         payload = response.json()
         if response.status_code >= 400:
-            error = payload.get("error") if isinstance(payload, dict) else None
-            if not isinstance(error, dict):
-                detail = payload.get("detail") if isinstance(payload, dict) else str(payload)
-                error = detail.get("error") if isinstance(detail, dict) else None
-            if isinstance(error, dict):
-                return _tool_error(str(error.get("code") or "API_ERROR"), str(error.get("message") or "API error"))
+            api_error = extract_api_error_from_payload(payload, response.text)
+            if api_error is not None:
+                code, message = api_error
+                return _tool_error(code, message)
             return _tool_error("API_ERROR", response.text)
         return payload
 
@@ -129,13 +128,17 @@ async def _handle_message(server: AlertMCPServer, message: dict[str, Any]) -> di
     method = message.get("method")
     request_id = message.get("id")
     try:
+        result: Any
         if method == "initialize":
             result = {"protocolVersion": "2024-11-05", "serverInfo": {"name": "crawlerai", "version": "0.1.0"}}
         elif method == "tools/list":
             result = {"tools": server.tools()}
         elif method == "tools/call":
-            params = message.get("params") if isinstance(message.get("params"), dict) else {}
-            result = await server.call_tool(str(params.get("name")), dict(params.get("arguments") or {}))
+            params_value = message.get("params")
+            params = params_value if isinstance(params_value, dict) else {}
+            arguments_value = params.get("arguments")
+            arguments = arguments_value if isinstance(arguments_value, dict) else {}
+            result = await server.call_tool(str(params.get("name")), dict(arguments))
         else:
             raise ValueError(f"Unsupported method: {method}")
         return {"jsonrpc": "2.0", "id": request_id, "result": result}

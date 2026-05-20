@@ -6,9 +6,18 @@ __all__ = (
 )
 
 import logging
+import re
 from dataclasses import dataclass, field
 
-from app.services.config.variant_migration_rules import VARIANT_GROUP_MIN_CONFIDENCE
+from app.services.config.variant_migration_rules import (
+    VARIANT_CONFIDENT_OPTION_NODE_TYPES,
+    VARIANT_CONTAINER_CHROME_TAGS,
+    VARIANT_CONTAINER_SEMANTIC_TOKENS,
+    VARIANT_GROUP_MIN_CONFIDENCE,
+    VARIANT_SCOPE_SOURCE_FULL_PAGE,
+    VARIANT_SCOPE_SOURCE_SOFT,
+    VARIANT_SCOPE_SOURCE_TRUSTED,
+)
 from app.services.config.variant_policy import PUBLIC_VARIANT_AXIS_FIELDS
 from app.services.extract.variant_dom_cues import variant_context_noise_tokens
 from app.services.extract.variant_value_guards import variant_url_is_product_like
@@ -49,14 +58,7 @@ class VariantGroupValidator:
             score += 0.15
         if group.container_tag == "fieldset":
             score += 0.25
-        if set(group.option_node_types) & {
-            "input_radio",
-            "input_checkbox",
-            "role_radio",
-            "role_option",
-            "option",
-            "data_selected",
-        }:
+        if set(group.option_node_types) & VARIANT_CONFIDENT_OPTION_NODE_TYPES:
             score += 0.2
         if 2 <= len(group.values) <= 8:
             score += 0.1
@@ -67,7 +69,7 @@ class VariantGroupValidator:
         urls = {str(entry.get("url")) for entry in group.entries if entry.get("url")}
         if len(urls) >= 2 and all(variant_url_is_product_like(url) for url in urls):
             score += 0.15
-        if group.scope_source == "trusted_scope":
+        if group.scope_source == VARIANT_SCOPE_SOURCE_TRUSTED:
             score += 0.1
         if group.extractor_path in {"select", "choice_radio"}:
             score += 0.05
@@ -78,16 +80,16 @@ class VariantGroupValidator:
         if len(urls) == 1 and not variant_url_is_product_like(next(iter(urls))):
             score -= 0.4
             reasons.append("all_urls_identical_non_product")
-        if group.container_tag in {"nav", "header", "footer", "aside"}:
+        if group.container_tag in VARIANT_CONTAINER_CHROME_TAGS:
             score -= 0.4
             reasons.append(f"chrome_container:{group.container_tag}")
         product_url_set = len(urls) >= 2 and all(variant_url_is_product_like(url) for url in urls)
         if set(group.option_node_types) == {"a"} and not product_url_set:
             score -= 0.3
             reasons.append("all_options_are_anchors")
-        if group.scope_source == "soft_scope":
+        if group.scope_source == VARIANT_SCOPE_SOURCE_SOFT:
             score -= 0.1
-        elif group.scope_source == "full_page":
+        elif group.scope_source == VARIANT_SCOPE_SOURCE_FULL_PAGE:
             score -= 0.3
             reasons.append("full_page_scope")
         group.confidence = max(0.0, min(1.0, score))
@@ -117,7 +119,11 @@ def _container_has_variant_semantics(group: VariantCandidateGroup) -> bool:
             *group.ancestor_class_tokens[:3],
         ]
     ).lower()
-    return any(token in probe for token in ("variant", "option", "selector", "swatch", "radiogroup"))
+    normalized_probe = re.sub(r"[_-]+", " ", probe)
+    probe_tokens = {
+        token for token in re.split(r"[^a-z0-9]+", normalized_probe) if token
+    }
+    return bool(probe_tokens & set(VARIANT_CONTAINER_SEMANTIC_TOKENS))
 
 
 def _name_has_compound_public_axis(value: object) -> bool:

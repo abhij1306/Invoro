@@ -7,6 +7,7 @@ import { forwardRef, useEffect, useRef, useState } from 'react';
 
 import type { MonitorJob } from '../../lib/api/types';
 import { formatNextRun, formatRelativeTime } from '../../lib/format/date';
+import { formatSeconds } from '../../lib/format/time';
 import { cn } from '../../lib/utils';
 import { Button } from '../ui/primitives';
 import { MonitorPriorityBadge, MonitorStatusBadge } from './monitor-badges';
@@ -198,12 +199,6 @@ const ActionButton = forwardRef<
     </button>
   );
 });
-
-function formatSeconds(seconds: number) {
-  if (seconds >= 3600) return `${Math.round(seconds / 3600)}h`;
-  if (seconds >= 60) return `${Math.round(seconds / 60)}m`;
-  return `${seconds}s`;
-}
 
 function formatValue(value: unknown) {
   if (value === null || value === undefined || value === '') return 'empty';

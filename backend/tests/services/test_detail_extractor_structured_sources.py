@@ -31,7 +31,7 @@ from app.services.extract.detail.assembly import raw_signals as detail_raw_signa
 from app.services.extract.detail.assembly import dom_completion as detail_dom_completion
 from app.services.extract.detail.assembly.title_scorer import title_needs_promotion
 from app.services.extract.detail.identity.core import (
-    _detail_title_fallback_looks_like_code,
+    detail_title_fallback_looks_like_code,
     detail_redirect_identity_is_mismatched,
     detail_slug_title_fallback_from_url,
 )
@@ -5278,7 +5278,7 @@ def test_detail_slug_title_fallback_keeps_semantic_slug_with_model_suffix() -> N
 
 
 def test_detail_title_fallback_code_guard_skips_multi_token_numeric_slug() -> None:
-    assert _detail_title_fallback_looks_like_code("iphone-16-pro") is False
+    assert detail_title_fallback_looks_like_code("iphone-16-pro") is False
     assert (
         detail_slug_title_fallback_from_url(
             "https://example.com/products/iphone-16-pro"

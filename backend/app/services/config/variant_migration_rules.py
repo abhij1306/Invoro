@@ -11,7 +11,67 @@ DETAIL_VARIANT_SOFT_SCOPE_SELECTOR = (
     "[data-testid*='swatch' i], [data-component*='variant' i], fieldset, "
     "[role='radiogroup'], [role='group'][aria-label], select"
 )
+VARIANT_SCOPE_SOURCE_TRUSTED = "trusted_scope"
+VARIANT_SCOPE_SOURCE_SOFT = "soft_scope"
+VARIANT_SCOPE_SOURCE_FULL_PAGE = "full_page"
+VARIANT_COLOR_AXIS_FIELD = "color"
 VARIANT_SOFT_SCOPE_MIN_RADIO_INPUTS = 2
+VARIANT_SOFT_SCOPE_MIN_RADIO_INPUTS_FALLBACK = 2
+VARIANT_SOFT_SCOPE_FIELDSET_SIGNAL_SELECTOR = (
+    "input[type='radio'], input[type='checkbox'], "
+    "[role='radio'], [role='option'], button, [data-option-value]"
+)
+VARIANT_SOFT_SCOPE_ROLE_OPTION_SELECTOR = (
+    "a[href], button, [data-testid='swatch' i], [data-testid*='swatch-option' i]"
+)
+VARIANT_SOFT_SCOPE_STRONG_NODE_SELECTOR = (
+    "input[type='radio'], input[type='checkbox'], "
+    "[role='radio'], [role='button'], [data-option], [data-option-value], "
+    "[data-selected], [data-testid='swatch' i], [data-testid*='swatch-option' i], "
+    "button, a[href]"
+)
+VARIANT_OPTION_ATTRIBUTE_NAMES = (
+    "data-option",
+    "data-option-value",
+    "data-variant",
+)
+VARIANT_SELECTED_SIGNAL_ATTRIBUTE_NAMES = (
+    "data-selected",
+    "aria-current",
+    "aria-pressed",
+)
+VARIANT_SELECTED_SIGNAL_TRUE_VALUES = frozenset(
+    {"1", "checked", "current", "selected", "true", "yes"}
+)
+VARIANT_SELECTED_SIGNAL_TOKENS = ("selected", "current", "checked")
+VARIANT_CONFIDENT_OPTION_NODE_TYPES = frozenset(
+    {
+        "input_radio",
+        "input_checkbox",
+        "role_radio",
+        "role_option",
+        "option",
+        "data_selected",
+    }
+)
+VARIANT_CONTAINER_CHROME_TAGS = frozenset({"nav", "header", "footer", "aside"})
+VARIANT_CONTAINER_SEMANTIC_TOKENS = (
+    "variant",
+    "option",
+    "selector",
+    "swatch",
+    "radiogroup",
+)
+VARIANT_PUBLIC_URL_FIELD_NAMES = ("url", "image_url")
+VARIANT_PUBLIC_URL_SCHEMES = frozenset({"http", "https"})
+VARIANT_PRODUCT_DETAIL_PATH_MARKERS = (
+    "/products/",
+    "/product/",
+    "/p/",
+    "/dp/",
+    "/c/product/",
+    "/catalog/product/",
+)
 VARIANT_URL_BLOCKED_PATH_SUFFIXES = frozenset({
     "/reviews", "/review", "/print", "/share", "/overview", "/specifications",
     "/specs", "/wishlist", "/cart", "/returns-policy", "/credit", "/payment",
