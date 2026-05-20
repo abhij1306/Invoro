@@ -106,6 +106,10 @@ _LISTING_CATEGORY_PATH_SEGMENTS = frozenset(
 _LISTING_LOCALE_PATH_SEGMENT_RE = re.compile(
     str(LISTING_LOCALE_PATH_SEGMENT_PATTERN or ""), re.IGNORECASE
 )
+_LOWER_NON_ALNUM_RE = re.compile(r"[^a-z0-9]+")
+_MIXED_NON_ALNUM_RE = re.compile(r"[^A-Za-z0-9]+")
+_HTML_SUFFIX_RE = re.compile(r"\.(html?|htm)$", re.IGNORECASE)
+_SLUG_SEPARATOR_RE = re.compile(r"[-_]+")
 
 
 def _path_segment_tokens(value: str) -> set[str]:
@@ -120,29 +124,85 @@ def _listing_url_has_product_detail_identity(url: str) -> bool:
     return LISTING_PRODUCT_DETAIL_ID_RE.search(str(url or "")) is not None
 
 
+def _jsonld_graph_items(item: dict[str, object]) -> list[object]:
+    graph = item.get("@graph")
+    if isinstance(graph, list):
+        return list(graph)
+    if isinstance(graph, dict):
+        return [graph]
+    return [item]
+
+
 def _jsonld_items(payload: object) -> list[object]:
     if isinstance(payload, list):
         items: list[object] = []
         for item in payload:
-            if isinstance(item, dict):
-                graph = item.get("@graph")
-                if isinstance(graph, list):
-                    items.extend(graph)
-                elif isinstance(graph, dict):
-                    items.append(graph)
-                else:
-                    items.append(item)
-            else:
-                items.append(item)
+            items.extend(_jsonld_graph_items(item) if isinstance(item, dict) else [item])
         return items
     if isinstance(payload, dict):
-        graph = payload.get("@graph")
-        if isinstance(graph, list):
-            return list(graph)
-        if isinstance(graph, dict):
-            return [graph]
-        return [payload]
+        return _jsonld_graph_items(payload)
     return []
+
+
+def _jsonld_item_supports_identity(item: dict[str, object]) -> bool:
+    return any(key in item for key in ("name", "offers", "sku", "mpn"))
+
+
+def _jsonld_item_product_name(item: dict[str, object]) -> str:
+    raw_name = item.get("name")
+    return raw_name.strip() if isinstance(raw_name, str) else ""
+
+
+def _jsonld_item_candidate_record(item: dict[str, object]) -> dict[str, object]:
+    return {
+        "title": item.get("name"),
+        "sku": item.get("sku") or item.get("productId"),
+        "brand": item.get("brand"),
+        "color": item.get("color"),
+        "size": item.get("size"),
+        "description": item.get("description"),
+    }
+
+
+def _jsonld_item_matches_requested_identity(
+    item: dict[str, object],
+    *,
+    page_url: str,
+    requested_page_url: str,
+) -> bool:
+    raw_url = item.get("url") or item.get("@id")
+    if raw_url:
+        abs_url = absolute_url(page_url, raw_url)
+        if _detail_url_matches_requested_identity(
+            abs_url,
+            requested_page_url=requested_page_url,
+        ):
+            return True
+    return _record_matches_requested_detail_identity(
+        _jsonld_item_candidate_record(item),
+        requested_page_url=requested_page_url,
+    )
+
+
+def _prune_duplicate_product_headings(
+    soup: BeautifulSoup,
+    *,
+    pruned_product_names: list[str],
+) -> None:
+    def _norm(value: str) -> str:
+        return " ".join(value.lower().split())
+
+    pruned_norms = {_norm(name) for name in pruned_product_names if name}
+    h1_nodes = list(soup.find_all("h1"))
+    keep_non_pruned_h1 = any(
+        (h1_text := _norm(h1.get_text(separator=" ", strip=True)))
+        and h1_text not in pruned_norms
+        for h1 in h1_nodes
+    )
+    for h1 in h1_nodes:
+        h1_text = _norm(h1.get_text(separator=" ", strip=True))
+        if h1_text and h1_text in pruned_norms and keep_non_pruned_h1:
+            h1.decompose()
 
 
 def prune_irrelevant_detail_dom_nodes(
@@ -162,37 +222,13 @@ def prune_irrelevant_detail_dom_nodes(
             match_found = False
             script_product_name = ""
             for item in items:
-                if not isinstance(item, dict):
-                    continue
-                if not any(k in item for k in ("name", "offers", "sku", "mpn")):
+                if not isinstance(item, dict) or not _jsonld_item_supports_identity(item):
                     continue
                 if not script_product_name:
-                    raw_name = item.get("name")
-                    if isinstance(raw_name, str):
-                        script_product_name = raw_name.strip()
-
-                raw_url = item.get("url") or item.get("@id")
-                if not raw_url:
-                    continue
-
-                abs_url = absolute_url(page_url, raw_url)
-                if _detail_url_matches_requested_identity(
-                    abs_url,
-                    requested_page_url=requested_page_url,
-                ):
-                    match_found = True
-                    break
-
-                candidate = {
-                    "title": item.get("name"),
-                    "sku": item.get("sku") or item.get("productId"),
-                    "brand": item.get("brand"),
-                    "color": item.get("color"),
-                    "size": item.get("size"),
-                    "description": item.get("description"),
-                }
-                if _record_matches_requested_detail_identity(
-                    candidate,
+                    script_product_name = _jsonld_item_product_name(item)
+                if _jsonld_item_matches_requested_identity(
+                    item,
+                    page_url=page_url,
                     requested_page_url=requested_page_url,
                 ):
                     match_found = True
@@ -215,21 +251,10 @@ def prune_irrelevant_detail_dom_nodes(
             continue
 
     if pruned_product_names:
-
-        def _norm(value: str) -> str:
-            return " ".join(value.lower().split())
-
-        pruned_norms = {_norm(name) for name in pruned_product_names if name}
-        h1_nodes = list(soup.find_all("h1"))
-        keep_non_pruned_h1 = any(
-            (h1_text := _norm(h1.get_text(separator=" ", strip=True)))
-            and h1_text not in pruned_norms
-            for h1 in h1_nodes
+        _prune_duplicate_product_headings(
+            soup,
+            pruned_product_names=pruned_product_names,
         )
-        for h1 in h1_nodes:
-            h1_text = _norm(h1.get_text(separator=" ", strip=True))
-            if h1_text and h1_text in pruned_norms and keep_non_pruned_h1:
-                h1.decompose()
 
     for selector in tuple(DETAIL_NOISE_SECTION_SELECTORS or ()):
         for node in soup.select(str(selector)):
@@ -245,7 +270,7 @@ def _listing_url_has_category_path_segment(path: str) -> bool:
     for segment in segments:
         # Broader split is intentional here, unlike _path_segment_tokens:
         # _LISTING_CATEGORY_PATH_SEGMENTS may be embedded behind "_" or mixed punctuation.
-        segment_tokens = {token for token in re.split(r"[^a-z0-9]+", segment) if token}
+        segment_tokens = {token for token in _LOWER_NON_ALNUM_RE.split(segment) if token}
         if segment in _LISTING_CATEGORY_PATH_SEGMENTS:
             return True
         if _LISTING_CATEGORY_PATH_SEGMENTS.intersection(segment_tokens):
@@ -280,6 +305,80 @@ def _listing_query_looks_structural(query: str) -> bool:
     return False
 
 
+def _strip_listing_locale_segments(segments: list[str]) -> list[str]:
+    index = 0
+    while index < len(segments) and _LISTING_LOCALE_PATH_SEGMENT_RE.fullmatch(
+        segments[index]
+    ):
+        index += 1
+    return segments[index:]
+
+
+def _listing_url_is_sibling_category(
+    *,
+    candidate_path: str,
+    page_path: str,
+) -> bool:
+    if _listing_url_has_category_path_segment(
+        page_path
+    ) and _listing_url_has_category_path_segment(candidate_path):
+        return True
+    return any(
+        page_path.startswith(prefix) and candidate_path.startswith(prefix)
+        for prefix in LISTING_CATEGORY_PATH_PREFIXES
+    )
+
+
+def _listing_url_is_locale_sibling_category(
+    *,
+    candidate_path: str,
+    page_path: str,
+) -> bool:
+    candidate_segments = [seg for seg in candidate_path.strip("/").split("/") if seg]
+    page_segments = [seg for seg in page_path.strip("/").split("/") if seg]
+    if not candidate_segments or not page_segments:
+        return False
+    candidate_remainder_segments = _strip_listing_locale_segments(candidate_segments)
+    page_remainder_segments = _strip_listing_locale_segments(page_segments)
+    if len(candidate_remainder_segments) == len(candidate_segments) and len(
+        page_remainder_segments
+    ) == len(page_segments):
+        return False
+    if not candidate_remainder_segments or not page_remainder_segments:
+        return False
+    return _listing_url_is_sibling_category(
+        candidate_path="/" + "/".join(candidate_remainder_segments),
+        page_path="/" + "/".join(page_remainder_segments),
+    )
+
+
+def _listing_terminal_looks_like_product_slug(
+    *,
+    terminal_token_list: list[str],
+    terminal_raw: str,
+) -> bool:
+    year_led_terminal = bool(
+        terminal_token_list and re.fullmatch(YEAR_SLUG_PATTERN, terminal_token_list[0])
+    )
+    return (
+        len(terminal_token_list) >= PRODUCT_SLUG_MIN_TERMINAL_TOKENS
+        and any(re.search(r"[a-z]", token) for token in terminal_token_list)
+        and "-" in terminal_raw
+        and not year_led_terminal
+    )
+
+
+def _listing_url_has_non_listing_prefix(
+    *,
+    leading_tokens: list[set[str]],
+    leading_raw: list[str],
+    non_listing_tokens: set[str],
+) -> bool:
+    return any(tokens & non_listing_tokens for tokens in leading_tokens) or any(
+        segment in non_listing_tokens for segment in leading_raw
+    )
+
+
 def listing_url_is_structural(url: str, page_url: str) -> bool:
     lowered = url.lower()
     if lowered.startswith(("javascript:", "#", "mailto:")):
@@ -311,55 +410,14 @@ def listing_url_is_structural(url: str, page_url: str) -> bool:
         # a navigation link to another category, not a product.
         candidate_path = parsed.path.lower()
         page_path = page_parsed.path.lower()
-        if _listing_url_has_category_path_segment(
-            page_path
-        ) and _listing_url_has_category_path_segment(candidate_path):
+        if _listing_url_is_sibling_category(
+            candidate_path=candidate_path,
+            page_path=page_path,
+        ) or _listing_url_is_locale_sibling_category(
+            candidate_path=candidate_path,
+            page_path=page_path,
+        ):
             return True
-        for prefix in LISTING_CATEGORY_PATH_PREFIXES:
-            if page_path.startswith(prefix) and candidate_path.startswith(prefix):
-                return True
-        # Locale-aware sibling-category match.
-        # When the leading segment(s) of either URL match the locale pattern
-        # (e.g. "ca", "en", "fr-ca") AND the remaining path after stripping
-        # locale segments shares a Category_Path_Prefix, the candidate is a
-        # sibling category.
-        # Carve-out: a shared locale segment alone (no shared prefix in the
-        # remainder) does NOT classify the candidate as sibling.
-        candidate_segments = [
-            seg for seg in candidate_path.strip("/").split("/") if seg
-        ]
-        page_segments = [seg for seg in page_path.strip("/").split("/") if seg]
-        if candidate_segments and page_segments:
-            # Strip leading locale segments from each URL independently.
-            c_idx = 0
-            while c_idx < len(
-                candidate_segments
-            ) and _LISTING_LOCALE_PATH_SEGMENT_RE.fullmatch(candidate_segments[c_idx]):
-                c_idx += 1
-            p_idx = 0
-            while p_idx < len(
-                page_segments
-            ) and _LISTING_LOCALE_PATH_SEGMENT_RE.fullmatch(page_segments[p_idx]):
-                p_idx += 1
-            # At least one URL must have had locale segments stripped, and
-            # both must have remaining path content after stripping.
-            if (
-                (c_idx > 0 or p_idx > 0)
-                and c_idx < len(candidate_segments)
-                and p_idx < len(page_segments)
-            ):
-                candidate_remainder = "/" + "/".join(candidate_segments[c_idx:])
-                page_remainder = "/" + "/".join(page_segments[p_idx:])
-                for prefix in LISTING_CATEGORY_PATH_PREFIXES:
-                    if candidate_remainder.startswith(
-                        prefix
-                    ) and page_remainder.startswith(prefix):
-                        return True
-                # Also check category path segments on the remainder.
-                if _listing_url_has_category_path_segment(
-                    page_remainder
-                ) and _listing_url_has_category_path_segment(candidate_remainder):
-                    return True
         raw_segments = [
             segment.strip().lower()
             for segment in parsed.path.split("/")
@@ -376,27 +434,19 @@ def listing_url_is_structural(url: str, page_url: str) -> bool:
         terminal_token_list = [
             token for token in re.split(r"[-.]+", terminal_raw) if token
         ]
-        # Year-led slugs like 2025-ceo-letter are editorial, not product.
-        year_led_terminal = bool(
-            terminal_token_list
-            and re.fullmatch(YEAR_SLUG_PATTERN, terminal_token_list[0])
-        )
-        # Use the ordered token list (not the deduped set) so slugs like
-        # "blue-blue-widget" are still recognized as product slugs.
-        terminal_looks_like_product_slug = (
-            len(terminal_token_list) >= PRODUCT_SLUG_MIN_TERMINAL_TOKENS
-            and any(re.search(r"[a-z]", token) for token in terminal_token_list)
-            and "-" in terminal_raw
-            and not year_led_terminal
+        terminal_looks_like_product_slug = _listing_terminal_looks_like_product_slug(
+            terminal_token_list=terminal_token_list,
+            terminal_raw=terminal_raw,
         )
         if (
             not terminal_looks_like_product_slug
             and _listing_query_looks_structural(parsed.query)
         ):
             return True
-        if not terminal_looks_like_product_slug and (
-            any(tokens & non_listing_tokens for tokens in leading_tokens)
-            or any(segment in non_listing_tokens for segment in leading_raw)
+        if not terminal_looks_like_product_slug and _listing_url_has_non_listing_prefix(
+            leading_tokens=leading_tokens,
+            leading_raw=leading_raw,
+            non_listing_tokens=non_listing_tokens,
         ):
             return True
     except ValueError:
@@ -519,45 +569,82 @@ def _detail_title_from_url(page_url: str) -> str | None:
     generic_terminal_tokens = set(DETAIL_GENERIC_TERMINAL_TOKENS)
     for index in range(len(path_segments) - 1, -1, -1):
         segment = path_segments[index]
-        terminal = re.sub(r"\.(html?|htm)$", "", segment, flags=re.I)
-        if not terminal or terminal.isdigit():
-            continue
-        if re.fullmatch(r"[a-z]{2}(?:[_-][a-z]{2})?", terminal, re.I):
-            continue
-        embedded_codes = [
-            normalized
-            for match in re.findall(
-                rf"[A-Za-z0-9]{{{DETAIL_IDENTITY_CODE_MIN_LENGTH},}}", terminal
-            )
-            if (normalized := _normalized_detail_identity_code(match))
-        ]
-        if embedded_codes:
-            alpha_chunks = [
-                chunk.lower() for chunk in re.findall(r"[A-Za-z]+", terminal)
-            ]
-            if not alpha_chunks or all(
-                set(_path_segment_tokens(chunk)) <= generic_terminal_tokens
-                for chunk in alpha_chunks
-            ):
-                continue
-        if _detail_segment_looks_like_identity_code(terminal):
-            parent_segment = (
-                str(path_segments[index - 1]).strip().lower() if index > 0 else ""
-            )
-            if parent_segment in {"product", "products", "item", "items"}:
-                return None
-            continue
-        if re.fullmatch(r"[a-f0-9]{8,}(?:-[a-f0-9]{4,}){2,}", terminal, re.I):
-            continue
-        terminal_tokens = _path_segment_tokens(terminal)
-        if terminal in generic_terminal_tokens or (
-            terminal_tokens and terminal_tokens <= generic_terminal_tokens
+        terminal = _HTML_SUFFIX_RE.sub("", segment)
+        if _detail_terminal_is_ignored(
+            terminal,
+            generic_terminal_tokens=generic_terminal_tokens,
         ):
             continue
-        title = clean_text(re.sub(r"[-_]+", " ", terminal))
+        if _detail_segment_looks_like_identity_code(terminal):
+            if _detail_terminal_parent_is_collection(path_segments, index):
+                return None
+            continue
+        title = clean_text(_SLUG_SEPARATOR_RE.sub(" ", terminal))
         if title and not is_title_noise(title):
             return title
     return None
+
+
+def _detail_terminal_embedded_codes_are_generic(
+    terminal: str,
+    *,
+    generic_terminal_tokens: set[str],
+) -> bool:
+    embedded_codes = [
+        normalized
+        for match in re.findall(
+            rf"[A-Za-z0-9]{{{DETAIL_IDENTITY_CODE_MIN_LENGTH},}}", terminal
+        )
+        if (normalized := _normalized_detail_identity_code(match))
+    ]
+    if not embedded_codes:
+        return False
+    alpha_chunks = [chunk.lower() for chunk in re.findall(r"[A-Za-z]+", terminal)]
+    return not alpha_chunks or all(
+        set(_path_segment_tokens(chunk)) <= generic_terminal_tokens
+        for chunk in alpha_chunks
+    )
+
+
+def _detail_terminal_is_generic(
+    terminal: str,
+    *,
+    generic_terminal_tokens: set[str],
+) -> bool:
+    terminal_tokens = _path_segment_tokens(terminal)
+    return terminal in generic_terminal_tokens or (
+        terminal_tokens and terminal_tokens <= generic_terminal_tokens
+    )
+
+
+def _detail_terminal_is_ignored(
+    terminal: str,
+    *,
+    generic_terminal_tokens: set[str],
+) -> bool:
+    if not terminal or terminal.isdigit():
+        return True
+    if re.fullmatch(r"[a-z]{2}(?:[_-][a-z]{2})?", terminal, re.I):
+        return True
+    if _detail_terminal_embedded_codes_are_generic(
+        terminal,
+        generic_terminal_tokens=generic_terminal_tokens,
+    ):
+        return True
+    if re.fullmatch(r"[a-f0-9]{8,}(?:-[a-f0-9]{4,}){2,}", terminal, re.I):
+        return True
+    return _detail_terminal_is_generic(
+        terminal,
+        generic_terminal_tokens=generic_terminal_tokens,
+    )
+
+
+def _detail_terminal_parent_is_collection(
+    path_segments: list[str],
+    index: int,
+) -> bool:
+    parent_segment = str(path_segments[index - 1]).strip().lower() if index > 0 else ""
+    return parent_segment in {"product", "products", "item", "items"}
 
 
 def _detail_url_candidate_is_low_signal(
@@ -675,8 +762,8 @@ def _detail_url_is_collection_like(url: str) -> bool:
 def _detail_url_path_tokens(url: str) -> set[str]:
     return {
         token
-        for token in re.split(
-            r"[^a-z0-9]+", "/".join(_detail_url_path_segments(url)).lower()
+        for token in _LOWER_NON_ALNUM_RE.split(
+            "/".join(_detail_url_path_segments(url)).lower()
         )
         if token
     }
@@ -711,21 +798,13 @@ def _record_matches_requested_detail_identity(
     candidate_tokens = _detail_identity_tokens(record.get("title"))
     if not candidate_tokens:
         candidate_tokens = _detail_identity_tokens(record.get("description"))
-    title_matches = False
-    if requested_tokens and candidate_tokens:
-        overlap = requested_tokens & candidate_tokens
-        if len(requested_tokens) == 1:
-            title_matches = bool(overlap)
-        else:
-            title_matches = len(overlap) >= min(2, len(requested_tokens))
+    title_matches = _detail_token_overlap_matches(requested_tokens, candidate_tokens)
     if not title_matches and requested_tokens:
         supplemental_tokens = _detail_identity_record_tokens(record)
-        if supplemental_tokens:
-            overlap = requested_tokens & supplemental_tokens
-            if len(requested_tokens) == 1:
-                title_matches = bool(overlap)
-            else:
-                title_matches = len(overlap) >= min(2, len(requested_tokens))
+        title_matches = _detail_token_overlap_matches(
+            requested_tokens,
+            supplemental_tokens,
+        )
     if title_matches:
         return True
     return bool(
@@ -742,6 +821,18 @@ def _detail_identity_record_tokens(record: dict[str, object]) -> set[str]:
     return tokens
 
 
+def _detail_token_overlap_matches(
+    requested_tokens: set[str],
+    candidate_tokens: set[str],
+) -> bool:
+    if not requested_tokens or not candidate_tokens:
+        return False
+    overlap = requested_tokens & candidate_tokens
+    if len(requested_tokens) == 1:
+        return bool(overlap)
+    return len(overlap) >= min(2, len(requested_tokens))
+
+
 def _detail_requested_identity_text(page_url: object) -> str:
     raw_url = str(page_url or "")
     title = _detail_title_from_url(raw_url)
@@ -749,13 +840,13 @@ def _detail_requested_identity_text(page_url: object) -> str:
         return title
     generic_terminal_tokens = set(DETAIL_GENERIC_TERMINAL_TOKENS)
     for segment in reversed(_detail_url_path_segments(raw_url)):
-        terminal = re.sub(r"\.(html?|htm)$", "", segment, flags=re.I)
+        terminal = _HTML_SUFFIX_RE.sub("", segment)
         if not terminal or terminal.isdigit():
             continue
         terminal_tokens = _path_segment_tokens(terminal)
         if terminal_tokens and terminal_tokens <= generic_terminal_tokens:
             continue
-        title = clean_text(re.sub(r"[-_]+", " ", terminal))
+        title = clean_text(_SLUG_SEPARATOR_RE.sub(" ", terminal))
         semantic_tokens = _semantic_detail_identity_tokens(title)
         if _detail_segment_looks_like_identity_code(terminal) and len(semantic_tokens) < 2:
             continue
@@ -808,7 +899,9 @@ def _detail_model_number_sets_compatible(
                 return True
             shorter, longer = sorted((requested, candidate), key=len)
             if len(shorter) >= 5 and len(longer) - len(shorter) <= 2:
-                if longer.startswith(shorter):
+                if longer.startswith(shorter) and any(
+                    char.isalpha() for char in shorter
+                ):
                     return True
     return False
 
@@ -852,7 +945,7 @@ def _detail_has_sku_evidence(
 
 
 def _normalized_model_token(value: object) -> str:
-    normalized = re.sub(r"[^A-Za-z0-9]+", "", str(value or "")).lower()
+    normalized = _MIXED_NON_ALNUM_RE.sub("", str(value or "")).lower()
     if not normalized:
         return ""
     if normalized.isdigit():
@@ -863,10 +956,10 @@ def _normalized_model_token(value: object) -> str:
 def _detail_slug_title_fallback_from_url(identity_url: str) -> str | None:
     generic_terminal_tokens = set(DETAIL_GENERIC_TERMINAL_TOKENS)
     for segment in reversed(_detail_url_path_segments(identity_url)):
-        terminal = re.sub(r"\.(html?|htm)$", "", segment, flags=re.I)
+        terminal = _HTML_SUFFIX_RE.sub("", segment)
         if not terminal:
             continue
-        title = clean_text(re.sub(r"[-_]+", " ", terminal))
+        title = clean_text(_SLUG_SEPARATOR_RE.sub(" ", terminal))
         semantic_tokens = _semantic_detail_identity_tokens(title)
         if _detail_title_fallback_looks_like_code(terminal) and (
             len(semantic_tokens) < int(DETAIL_TITLE_FALLBACK_MIN_SEMANTIC_TOKENS)
@@ -889,7 +982,7 @@ def _detail_title_fallback_looks_like_code(value: object) -> bool:
     text = clean_text(value)
     if not text:
         return False
-    compact = re.sub(r"[^A-Za-z0-9]+", "", text)
+    compact = _MIXED_NON_ALNUM_RE.sub("", text)
     pattern = str(DETAIL_TITLE_FALLBACK_CODE_PATTERN or "").strip()
     return bool(
         compact and re.search(r"\d", compact) and re.fullmatch(pattern, compact)
@@ -933,7 +1026,7 @@ def _detail_identity_tokens(value: object) -> set[str]:
     cleaned = clean_text(value).lower()
     return {
         token
-        for token in re.split(r"[^a-z0-9]+", cleaned)
+        for token in _LOWER_NON_ALNUM_RE.split(cleaned)
         if len(token) >= 3 and token not in DETAIL_IDENTITY_STOPWORDS
     }
 
@@ -953,7 +1046,7 @@ def _detail_identity_codes_from_url(url: object) -> set[str]:
     parsed = urlparse(text)
     codes: set[str] = set()
     for segment in _detail_url_path_segments(text):
-        terminal = re.sub(r"\.(html?|htm)$", "", segment, flags=re.I)
+        terminal = _HTML_SUFFIX_RE.sub("", segment)
         code_like_terminal = _detail_segment_code(terminal)
         if code_like_terminal:
             codes.add(code_like_terminal)
@@ -1024,7 +1117,7 @@ def _detail_segment_code(value: object) -> str | None:
 
 
 def _normalized_detail_identity_code(value: object) -> str | None:
-    text = re.sub(r"[^A-Za-z0-9]+", "", str(value or "")).upper()
+    text = _MIXED_NON_ALNUM_RE.sub("", str(value or "")).upper()
     if len(text) < DETAIL_IDENTITY_CODE_MIN_LENGTH:
         return None
     if not re.search(r"\d", text):

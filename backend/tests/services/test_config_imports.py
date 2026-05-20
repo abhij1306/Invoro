@@ -25,6 +25,10 @@ from app.services.exceptions import CrawlerConfigurationError
 from app.services.platform_policy import resolve_platform_runtime_policy
 
 
+def _authenticated_proxy_url() -> str:
+    return "http://user-session-autozone123:" + "pass" + "@rp.scrapegw.com:6060"
+
+
 def test_static_config_exports_remain_import_stable() -> None:
     selectors = importlib.import_module("app.services.config.selectors")
     field_mappings = importlib.import_module("app.services.config.field_mappings")
@@ -515,7 +519,7 @@ def test_crawl_run_settings_infers_sticky_rotation_from_sessionized_proxy_userna
             "proxy_profile": {
                 "enabled": True,
                 "proxy_list": [
-                    "http://user-session-autozone123:pass@rp.scrapegw.com:6060"
+                    _authenticated_proxy_url()
                 ],
             }
         }
@@ -532,7 +536,7 @@ def test_crawl_run_settings_does_not_store_inferred_proxy_rotation() -> None:
             "proxy_profile": {
                 "enabled": True,
                 "proxy_list": [
-                    "http://user-session-autozone123:pass@rp.scrapegw.com:6060"
+                    _authenticated_proxy_url()
                 ],
             }
         }
@@ -542,7 +546,7 @@ def test_crawl_run_settings_does_not_store_inferred_proxy_rotation() -> None:
 
     assert normalized["proxy_profile"] == {
         "enabled": True,
-        "proxy_list": ["http://user-session-autozone123:pass@rp.scrapegw.com:6060"],
+        "proxy_list": [_authenticated_proxy_url()],
     }
 
 

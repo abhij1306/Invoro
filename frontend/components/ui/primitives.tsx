@@ -322,12 +322,12 @@ export function Toggle({
       onClick={() => onChange(!checked)}
       className={cn(
         'focus-ring relative inline-flex h-[20px] w-[36px] shrink-0 cursor-pointer items-center rounded-full transition-[background-color]',
-        checked ? 'bg-accent' : 'bg-border-strong',
+        checked ? 'bg-[var(--toggle-track-on)]' : 'bg-[var(--toggle-track-off)]',
       )}
     >
       <span
         className={cn(
-          'inline-block h-[15px] w-[15px] rounded-full bg-white transition-transform',
+          'inline-block h-[15px] w-[15px] rounded-full bg-[var(--toggle-thumb)] shadow-[0_1px_2px_rgba(0,0,0,0.28)] transition-transform',
           checked ? 'translate-x-[19px]' : 'translate-x-[2px]',
         )}
       />

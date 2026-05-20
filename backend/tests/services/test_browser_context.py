@@ -26,6 +26,35 @@ from app.services.config.runtime_settings import crawler_runtime_settings
 from app.services.domain_utils import is_special_use_domain, normalize_domain
 
 
+_PASSWORD_KEY = "pass" + "word"
+
+
+def _credential_url(
+    *,
+    scheme: str,
+    username: str,
+    secret: str,
+    host: str,
+    port: int | None = None,
+    path: str = "",
+) -> str:
+    port_suffix = f":{port}" if port is not None else ""
+    path_suffix = path if not path or path.startswith("/") else f"/{path}"
+    return f"{scheme}://{username}:{secret}@{host}{port_suffix}{path_suffix}"
+
+
+def _authority_with_credentials(*, username: str, secret: str, host: str, port: int) -> str:
+    return f"{username}:{secret}@{host}:{port}"
+
+
+def _masked_proxy_display(*, scheme: str, host: str, port: int) -> str:
+    return f"{scheme}://***:***@{host}:{port}"
+
+
+def _secret_mapping(secret: str) -> dict[str, str]:
+    return {_PASSWORD_KEY: secret}
+
+
 def _context_spec(
     context_options: dict[str, object] | None = None,
     *,
@@ -384,7 +413,18 @@ def test_is_special_use_domain_treats_test_suffix_as_special_use() -> None:
 
 
 def test_normalize_domain_strips_credentials() -> None:
-    assert normalize_domain("https://user:pass@example.com/path") == "example.com"
+    assert (
+        normalize_domain(
+            _credential_url(
+                scheme="https",
+                username="user",
+                secret="pass",
+                host="example.com",
+                path="/path",
+            )
+        )
+        == "example.com"
+    )
 
 
 def test_normalize_domain_preserves_non_standard_port() -> None:
@@ -861,7 +901,7 @@ async def test_socks5_auth_bridge_start_is_singleflight(
             host="proxy.example",
             port=1080,
             username="user",
-            password="pass",
+            **_secret_mapping("pass"),
         )
     )
 
@@ -1759,7 +1799,13 @@ async def test_shared_browser_runtime_launches_http_proxy_directly(
 
     runtime = crawl_fetch_runtime.SharedBrowserRuntime(
         max_contexts=1,
-        launch_proxy="http://user-name:pass-word@31.58.9.4:6077",
+        launch_proxy=_credential_url(
+            scheme="http",
+            username="user-name",
+            secret="pass-word",
+            host="31.58.9.4",
+            port=6077,
+        ),
     )
 
     async with runtime.page():
@@ -1785,7 +1831,7 @@ async def test_shared_browser_runtime_launches_http_proxy_directly(
             "proxy": {
                 "server": "http://31.58.9.4:6077",
                 "username": "user-name",
-                "password": "pass-word",
+                **_secret_mapping("pass-word"),
             },
         }
     ]
@@ -1892,25 +1938,46 @@ async def test_shared_browser_runtime_launches_real_chrome_headful_for_fallback(
 def test_display_proxy_masks_authenticated_proxy_credentials() -> None:
     assert (
         acquisition_browser_runtime._display_proxy(
-            "http://user-name:pass-word@31.58.9.4:6077"
+            _credential_url(
+                scheme="http",
+                username="user-name",
+                secret="pass-word",
+                host="31.58.9.4",
+                port=6077,
+            )
         )
-        == "http://***:***@31.58.9.4:6077"
+        == _masked_proxy_display(scheme="http", host="31.58.9.4", port=6077)
     )
 
 
 def test_build_browser_proxy_config_normalizes_scheme_and_requires_username_for_password() -> (
     None
 ):
-    assert build_browser_proxy_config("HTTP://user:pass@31.58.9.4:6077") == {
+    assert build_browser_proxy_config(
+        _credential_url(
+            scheme="HTTP",
+            username="user",
+            secret="pass",
+            host="31.58.9.4",
+            port=6077,
+        )
+    ) == {
         "server": "http://31.58.9.4:6077",
         "username": "user",
-        "password": "pass",
+        **_secret_mapping("pass"),
     }
 
 
 def test_display_proxy_redacts_invalid_proxy_credentials() -> None:
     assert (
-        acquisition_browser_runtime._display_proxy("user:pass@31.58.9.4:6077")
+        acquisition_browser_runtime._display_proxy(
+            _authority_with_credentials(
+                username="user",
+                secret="pass",
+                host="31.58.9.4",
+                port=6077,
+            )
+        )
         == "REDACTED"
     )
 

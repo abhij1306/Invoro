@@ -2648,8 +2648,93 @@ async def test_fetch_page_emits_http_strategy_and_escalation_events(
     assert result.method == "browser"
     messages = [message for _level, message in events]
     assert any(message.startswith("Acquisition strategy: http-first") for message in messages)
+    assert any(
+        "curl_attempts=1, httpx_fallback_max_attempts="
+        in message
+        for message in messages
+    )
     assert any("HTTP attempt 1/" in message for message in messages)
     assert any("Escalating to browser after HTTP result" in message for message in messages)
+
+
+@pytest.mark.asyncio
+async def test_fetch_page_http_only_retries_retryable_status_without_browser(
+    monkeypatch: pytest.MonkeyPatch,
+    patch_settings,
+) -> None:
+    await crawl_fetch_runtime.reset_fetch_runtime_state()
+    patch_settings(
+        force_httpx=True,
+        http_max_retries=2,
+        http_retry_backoff_base_ms=0,
+        http_retry_backoff_max_ms=0,
+    )
+    url = "https://example.com/products/widget"
+    events: list[tuple[str, str]] = []
+    http_attempts: list[int] = []
+
+    async def _on_event(level: str, message: str) -> None:
+        events.append((level, message))
+
+    async def _http_retry_then_success(
+        request_url: str,
+        timeout: float,
+        *,
+        proxy: str | None = None,
+    ):
+        del timeout, proxy
+        http_attempts.append(1)
+        attempt_number = len(http_attempts)
+        if attempt_number == 1:
+            return PageFetchResult(
+                url=request_url,
+                final_url=request_url,
+                html="<html><body>retry me</body></html>",
+                status_code=503,
+                method="httpx",
+                blocked=False,
+            )
+        return PageFetchResult(
+            url=request_url,
+            final_url=request_url,
+            html="<html><body>ok</body></html>",
+            status_code=200,
+            method="httpx",
+            blocked=False,
+        )
+
+    async def _always_escalate(*args, **kwargs):
+        del args, kwargs
+        return True
+
+    async def _unexpected_browser(request_url, timeout, **kwargs):
+        raise AssertionError(
+            f"browser should not run for http_only retry path: {request_url} {timeout} {kwargs}"
+        )
+
+    monkeypatch.setattr(crawl_fetch_runtime, "_http_fetch", _http_retry_then_success)
+    monkeypatch.setattr(
+        crawl_fetch_runtime,
+        "_should_escalate_to_browser_async",
+        _always_escalate,
+    )
+    monkeypatch.setattr(crawl_fetch_runtime, "_browser_fetch", _unexpected_browser)
+
+    try:
+        result = await crawl_fetch_runtime.fetch_page(
+            url,
+            surface="ecommerce_detail",
+            fetch_mode="http_only",
+            on_event=_on_event,
+        )
+    finally:
+        await crawl_fetch_runtime.reset_fetch_runtime_state()
+
+    assert result.method == "httpx"
+    assert result.status_code == 200
+    assert len(http_attempts) == 2
+    messages = [message for _level, message in events]
+    assert any("returned retryable status 503" in message for message in messages)
 
 
 @pytest.mark.asyncio

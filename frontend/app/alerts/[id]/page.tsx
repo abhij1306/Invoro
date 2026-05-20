@@ -6,6 +6,7 @@ import { use, useMemo, useState } from 'react';
 
 import { alertsApi } from '../../../lib/api';
 import type { MonitorStatus, AlertUpdatePayload } from '../../../lib/api/types';
+import { isThenable } from '../../../lib/params';
 import { alertToMonitor } from '../alert-helpers';
 import { MonitorEvents } from '../../../components/monitors/monitor-events';
 import { MonitorHeader } from '../../../components/monitors/monitor-header';
@@ -140,8 +141,4 @@ export default function AlertDetailPage({
       </SurfacePanel>
     </div>
   );
-}
-
-function isThenable(value: unknown): value is Promise<{ id: string }> {
-  return typeof value === 'object' && value !== null && 'then' in value;
 }

@@ -26,14 +26,10 @@ class PublicApiError(Exception):
 
 
 def public_success(data: Any, request: Request) -> dict[str, Any]:
-    started_at = float(getattr(request.state, "public_api_started_at", perf_counter()))
     return {
         "status": PUBLIC_API_STATUS_OK,
         "data": data,
-        "meta": {
-            "request_id": request.headers.get("x-request-id", ""),
-            "duration_ms": int((perf_counter() - started_at) * 1000),
-        },
+        "meta": _public_meta(request),
     }
 
 
@@ -51,7 +47,7 @@ def public_error_payload(
             "message": message,
             "details": details or {},
         },
-        "meta": {"request_id": request.headers.get("x-request-id", "")},
+        "meta": _public_meta(request),
     }
 
 
@@ -81,3 +77,11 @@ def public_error_response(
 def public_rate_headers(request: Request) -> dict[str, str]:
     headers = getattr(request.state, "public_rate_limit_headers", None)
     return dict(headers) if isinstance(headers, dict) else {}
+
+
+def _public_meta(request: Request) -> dict[str, Any]:
+    meta: dict[str, Any] = {"request_id": request.headers.get("x-request-id", "")}
+    started_at = getattr(request.state, "public_api_started_at", None)
+    if isinstance(started_at, (int, float)):
+        meta["duration_ms"] = int(max(0.0, perf_counter() - float(started_at)) * 1000)
+    return meta

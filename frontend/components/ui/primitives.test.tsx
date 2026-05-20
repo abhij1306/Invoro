@@ -1,7 +1,8 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { Dropdown } from './primitives';
+import { Dropdown, Toggle } from './primitives';
+
 describe('Dropdown', () => {
   it('sanitizes option IDs and correctly manages aria-activedescendant for accessibility', () => {
     const handleChange = vi.fn();
@@ -35,5 +36,24 @@ describe('Dropdown', () => {
     expect(otherOption.id).toMatch(/commerce-listing$/);
     expect(otherOption.id).not.toBe('');
     expect(otherOption.id).not.toContain(' ');
+  });
+});
+
+describe('Toggle', () => {
+  it('uses dedicated track tokens instead of button accent tokens', () => {
+    const handleChange = vi.fn();
+
+    const { rerender } = render(
+      <Toggle checked={false} onChange={handleChange} ariaLabel="Proxy" />,
+    );
+
+    const toggle = screen.getByRole('switch', { name: 'Proxy' });
+    expect(toggle).toHaveClass('bg-[var(--toggle-track-off)]');
+    expect(toggle).not.toHaveClass('bg-accent');
+
+    rerender(<Toggle checked={true} onChange={handleChange} ariaLabel="Proxy" />);
+
+    expect(toggle).toHaveClass('bg-[var(--toggle-track-on)]');
+    expect(toggle).not.toHaveClass('bg-accent');
   });
 });

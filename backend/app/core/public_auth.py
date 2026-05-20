@@ -14,6 +14,7 @@ from app.models.api_key import ApiKey
 from app.models.user import User
 from app.services.config.public_api import (
     PUBLIC_API_ERROR_API_KEY_REQUIRED,
+    PUBLIC_API_ERROR_AUTH_UNAVAILABLE,
     PUBLIC_API_ERROR_INVALID_API_KEY,
 )
 
@@ -76,6 +77,13 @@ async def authenticate_public_api_key(
                 "Failed to update last_used_at for api_key.id=%s",
                 api_key.id,
             )
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail={
+                    "code": PUBLIC_API_ERROR_AUTH_UNAVAILABLE,
+                    "message": "API key authentication unavailable",
+                },
+            ) from None
     return PublicApiPrincipal(api_key_id=int(api_key.id), user_id=int(user.id))
 
 

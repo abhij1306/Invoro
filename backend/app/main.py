@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import logging
 import re
 from collections import OrderedDict, deque
@@ -82,6 +83,7 @@ from app.services.monitor_change_detection import ensure_monitor_change_detectio
 from app.services.monitor_scheduler_service import MonitorSchedulerService
 
 logger = logging.getLogger("app")
+_PUBLIC_API_PREFIX = "/api/v1"
 
 
 @dataclass
@@ -151,7 +153,7 @@ app.add_middleware(
 
 @app.middleware("http")
 async def public_api_middleware(request: Request, call_next) -> Response:
-    if not request.url.path.startswith("/api/v1"):
+    if not request.url.path.startswith(_PUBLIC_API_PREFIX):
         return await call_next(request)
     request.state.public_api_started_at = perf_counter()
     request.state.public_rate_limit_headers = {
@@ -218,15 +220,21 @@ async def _public_auth_session(request: Request):
             yield session
         return
     value = override()
-    if hasattr(value, "__anext__"):
-        session = await value.__anext__()
+    if inspect.isawaitable(value):
+        value = await value
+    if inspect.isasyncgen(value):
+        session = await anext(value)
         try:
             yield session
         finally:
-            try:
-                await value.__anext__()
-            except StopAsyncIteration:
-                pass
+            await value.aclose()
+        return
+    if inspect.isgenerator(value):
+        session = next(value)
+        try:
+            yield session
+        finally:
+            value.close()
         return
     yield value
 
@@ -273,7 +281,7 @@ def _rate_limit_exempt_path(path: str) -> bool:
         path == "/health"
         or path.startswith("/health/")
         or path.startswith("/api/metrics")
-        or path.startswith("/api/v1")
+        or path.startswith(_PUBLIC_API_PREFIX)
     )
 
 
@@ -404,7 +412,7 @@ async def correlation_middleware(request: Request, call_next) -> Response:
 
 @app.exception_handler(PublicApiError)
 async def public_api_error_handler(request: Request, exc: PublicApiError) -> JSONResponse:
-    if request.url.path.startswith("/api/v1"):
+    if request.url.path.startswith(_PUBLIC_API_PREFIX):
         return public_error_response(
             request,
             code=exc.code,
@@ -417,7 +425,7 @@ async def public_api_error_handler(request: Request, exc: PublicApiError) -> JSO
 
 @app.exception_handler(HTTPException)
 async def public_http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
-    if not request.url.path.startswith("/api/v1"):
+    if not request.url.path.startswith(_PUBLIC_API_PREFIX):
         return JSONResponse({"detail": exc.detail}, status_code=exc.status_code, headers=exc.headers)
     detail: dict[str, Any] = exc.detail if isinstance(exc.detail, dict) else {}
     if detail.get("status") == "error":
@@ -439,7 +447,7 @@ async def public_validation_exception_handler(
     request: Request,
     exc: RequestValidationError,
 ) -> JSONResponse:
-    if not request.url.path.startswith("/api/v1"):
+    if not request.url.path.startswith(_PUBLIC_API_PREFIX):
         return JSONResponse({"detail": exc.errors()}, status_code=422)
     return public_error_response(
         request,

@@ -63,6 +63,17 @@ def test_coerce_brand_rejects_url_like_values() -> None:
     )
 
 
+def test_coerce_title_supports_structured_values_key() -> None:
+    assert (
+        coerce_field_value(
+            "title",
+            {"values": "Widget Prime"},
+            "https://example.com/products/widget-prime",
+        )
+        == "Widget Prime"
+    )
+
+
 def test_coerce_brand_keeps_non_url_scheme_text_but_rejects_full_bare_host() -> None:
     assert coerce_field_value("brand", "foo:bar", "https://example.com/p/x") == "foo:bar"
     assert coerce_field_value("brand", "shop.example.com", "https://example.com/p/x") is None

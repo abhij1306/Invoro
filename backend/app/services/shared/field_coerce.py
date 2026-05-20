@@ -33,6 +33,7 @@ from app.services.config.field_mappings import (
     BRAND_LIKE_FIELDS,
     FIELD_ALIASES,
     TITLE_FIELD,
+    TITLE_STRUCTURED_VALUE_KEYS,
     URL_FIELD,
     WEIGHT_FIELD,
 )
@@ -164,6 +165,27 @@ def clean_record(record: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _surface_field_type_error(
+    *,
+    field_name: str,
+    normalized_field: str,
+    value: object,
+    scalar_list_fields: set[str],
+) -> str | None:
+    if normalized_field in STRUCTURED_OBJECT_LIST_FIELDS and not isinstance(value, list):
+        return f"{field_name} expected list"
+    if normalized_field in STRUCTURED_OBJECT_FIELDS and not isinstance(value, dict):
+        return f"{field_name} expected object"
+    if (
+        normalized_field not in STRUCTURED_OBJECT_FIELDS
+        and normalized_field not in STRUCTURED_OBJECT_LIST_FIELDS
+        and not (normalized_field in scalar_list_fields and isinstance(value, list))
+        and isinstance(value, (dict, list, set, frozenset))
+    ):
+        return f"{field_name} expected scalar"
+    return None
+
+
 def validate_record_for_surface(
     record: dict[str, Any],
     surface: str,
@@ -194,29 +216,16 @@ def validate_record_for_surface(
         normalized_field = normalize_field_key(field_name)
         if normalized_field not in allowed_fields:
             continue
-        if (
-            strict_types
-            and normalized_field in STRUCTURED_OBJECT_LIST_FIELDS
-            and not isinstance(value, list)
-        ):
-            validation_errors.append(f"{field_name} expected list")
-            continue
-        if (
-            strict_types
-            and normalized_field in STRUCTURED_OBJECT_FIELDS
-            and not isinstance(value, dict)
-        ):
-            validation_errors.append(f"{field_name} expected object")
-            continue
-        if (
-            strict_types
-            and normalized_field not in STRUCTURED_OBJECT_FIELDS
-            and normalized_field not in STRUCTURED_OBJECT_LIST_FIELDS
-            and not (normalized_field in scalar_list_fields and isinstance(value, list))
-            and isinstance(value, (dict, list, set, frozenset))
-        ):
-            validation_errors.append(f"{field_name} expected scalar")
-            continue
+        if strict_types:
+            type_error = _surface_field_type_error(
+                field_name=field_name,
+                normalized_field=normalized_field,
+                value=value,
+                scalar_list_fields=scalar_list_fields,
+            )
+            if type_error:
+                validation_errors.append(type_error)
+                continue
         validated_fields[field_name] = value
     if str(surface or "").strip().lower().startswith("ecommerce_"):
         for field_name in (
@@ -322,19 +331,23 @@ def _split_multivalue_text_rows(value: str) -> list[str]:
     return rows
 
 
+def _iter_structured_multi_values(value: object) -> list[object]:
+    if isinstance(value, dict):
+        return list(value.values())
+    if isinstance(value, (list, tuple, set)):
+        return list(value)
+    return []
+
+
 def _coerce_structured_multi_rows(field_name: str, value: object) -> list[str]:
     if value in (None, "", [], {}):
         return []
     if isinstance(value, bool):
         return []
-    if isinstance(value, dict):
-        rows: list[str] = []
-        for item in value.values():
-            rows.extend(_coerce_structured_multi_rows(field_name, item))
-        return rows
-    if isinstance(value, (list, tuple, set)):
+    iterable_values = _iter_structured_multi_values(value)
+    if iterable_values:
         rows = []
-        for item in value:
+        for item in iterable_values:
             rows.extend(_coerce_structured_multi_rows(field_name, item))
         return rows
     if isinstance(value, str):
@@ -384,6 +397,11 @@ def coerce_structured_scalar(
                 return text
         return None
     return coerce_text(value)
+
+
+def _join_text_parts(parts: list[str | None], *, separator: str) -> str | None:
+    cleaned_parts = [part for part in parts if part]
+    return separator.join(cleaned_parts) if cleaned_parts else None
 
 
 def _sanitize_option_scalar(field_name: str, value: object) -> str | None:
@@ -460,31 +478,50 @@ def coerce_location(value: object) -> str | None:
             if address_text:
                 return address_text
         if isinstance(address, dict):
-            parts = [
-                text_or_none(address.get("streetAddress")),
-                text_or_none(address.get("addressLocality")),
-                text_or_none(address.get("addressRegion")),
-                text_or_none(address.get("postalCode")),
-                text_or_none(address.get("addressCountry")),
-            ]
-            cleaned_parts = [part for part in parts if part]
-            if cleaned_parts:
-                return ", ".join(cleaned_parts)
-        parts = [
-            text_or_none(value.get("name")),
-            text_or_none(value.get("addressLocality")),
-            text_or_none(value.get("addressRegion")),
-            text_or_none(value.get("addressCountry")),
-        ]
-        cleaned_parts = [part for part in parts if part]
-        if cleaned_parts:
-            return ", ".join(cleaned_parts)
-        return None
+            joined_address = _join_text_parts(
+                [
+                    text_or_none(address.get("streetAddress")),
+                    text_or_none(address.get("addressLocality")),
+                    text_or_none(address.get("addressRegion")),
+                    text_or_none(address.get("postalCode")),
+                    text_or_none(address.get("addressCountry")),
+                ],
+                separator=", ",
+            )
+            if joined_address:
+                return joined_address
+        return _join_text_parts(
+            [
+                text_or_none(value.get("name")),
+                text_or_none(value.get("addressLocality")),
+                text_or_none(value.get("addressRegion")),
+                text_or_none(value.get("addressCountry")),
+            ],
+            separator=", ",
+        )
     if isinstance(value, list):
-        parts = [coerce_location(item) for item in value]
-        cleaned_parts = [part for part in parts if part]
-        return " | ".join(cleaned_parts) if cleaned_parts else None
+        return _join_text_parts(
+            [coerce_location(item) for item in value],
+            separator=" | ",
+        )
     return coerce_text(value)
+
+
+def _salary_from_nested_value(
+    nested: dict[str, object],
+    *,
+    currency: str | None,
+) -> str | None:
+    minimum = text_or_none(nested.get("minValue"))
+    maximum = text_or_none(nested.get("maxValue"))
+    amount = text_or_none(nested.get("value"))
+    unit = text_or_none(nested.get("unitText"))
+    numbers = " - ".join(part for part in (minimum, maximum) if part)
+    if not numbers:
+        numbers = amount or ""
+    if not numbers:
+        return None
+    return " ".join(piece for piece in (currency, numbers, unit) if piece)
 
 
 def salary_from_json(value: object) -> str | None:
@@ -496,15 +533,9 @@ def salary_from_json(value: object) -> str | None:
         )
         nested = value.get("value")
         if isinstance(nested, dict):
-            minimum = text_or_none(nested.get("minValue"))
-            maximum = text_or_none(nested.get("maxValue"))
-            amount = text_or_none(nested.get("value"))
-            unit = text_or_none(nested.get("unitText"))
-            numbers = " - ".join(part for part in (minimum, maximum) if part)
-            if not numbers:
-                numbers = amount or ""
-            if numbers:
-                return " ".join(piece for piece in (currency, numbers, unit) if piece)
+            nested_salary = _salary_from_nested_value(nested, currency=currency)
+            if nested_salary:
+                return nested_salary
         text = coerce_text(value.get("value"))
         if text:
             return f"{currency} {text}".strip() if currency else text
@@ -778,7 +809,7 @@ def _coerce_title_text(value: object) -> str | None:
     if is_structured_input:
         structured = coerce_structured_scalar(
             value,
-            keys=("values", "title", "name", "label", "text", "value"),
+            keys=TITLE_STRUCTURED_VALUE_KEYS,
         )
         if structured:
             value = structured

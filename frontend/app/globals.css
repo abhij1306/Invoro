@@ -103,15 +103,15 @@
   --syntax-null: #64748b;
   --syntax-punct: #475569;
 
-  /* ── Accent — Vibrant Indigo / Premium SaaS */
-  --accent: #4f46e5;
-  --accent-hover: #4338ca;
-  --accent-warm: #6366f1;
+  /* ── Accent — Windows-style bright blue */
+  --accent: #4c84c8;
+  --accent-hover: #3d6aa0;
+  --accent-warm: #76a6df;
   --accent-foreground: #ffffff;
   --accent-fg: #ffffff;
-  --accent-subtle: rgba(79, 70, 229, 0.06);
-  --accent-dim: rgba(79, 70, 229, 0.12);
-  --accent-text: #4f46e5;
+  --accent-subtle: rgba(76, 132, 200, 0.08);
+  --accent-dim: rgba(76, 132, 200, 0.16);
+  --accent-text: #3d6aa0;
 
   /* ── Shellbar */
   --surface-header: #ffffff;
@@ -170,7 +170,7 @@
   --button-download-hover-bg: #ede9fe;
   --button-download-border: #ddd6fe;
   --button-download-hover-border: var(--accent);
-  --button-download-fg: #4f46e5;
+  --button-download-fg: var(--accent-text);
   --button-destructive-bg: var(--bg-elevated);
   --button-destructive-hover-bg: var(--danger-bg);
   --button-destructive-border: #fca5a5;
@@ -197,6 +197,9 @@
   --tab-active-fg: #ffffff;
   --slider-value-bg: var(--accent-subtle);
   --slider-thumb-border: #ffffff;
+  --toggle-track-on: var(--accent);
+  --toggle-track-off: var(--border-strong);
+  --toggle-thumb: #ffffff;
 
   /* ── Terminal / Code surfaces */
   --terminal-bg: #ffffff;
@@ -333,17 +336,17 @@ html[data-theme='dark'] {
   --text-secondary: #a1a1aa;
   --text-muted: #71717a;
 
-  /* ── Accent — Premium White/Light Slate */
-  --accent: #f4f4f5;
-  --accent-hover: #ffffff;
-  --accent-warm: #e4e4e7;
-  --accent-foreground: #09090b;
-  --accent-fg: #09090b;
-  --accent-subtle: rgba(244, 244, 245, 0.08);
-  --accent-dim: rgba(244, 244, 245, 0.16);
-  --accent-text: #f4f4f5;
-  --logo-mark-bg: #ffffff;
-  --logo-mark-fg: #09090b;
+  /* ── Accent — same bright blue as light theme */
+  --accent: #4c84c8;
+  --accent-hover: #76a6df;
+  --accent-warm: #9dc0e8;
+  --accent-foreground: #ffffff;
+  --accent-fg: #ffffff;
+  --accent-subtle: rgba(76, 132, 200, 0.18);
+  --accent-dim: rgba(76, 132, 200, 0.32);
+  --accent-text: #9dc0e8;
+  --logo-mark-bg: var(--accent);
+  --logo-mark-fg: #ffffff;
 
   /* ── Shellbar (dark mode — blends with sidebar) */
   --surface-header: #09090b;
@@ -425,6 +428,9 @@ html[data-theme='dark'] {
   --tab-active-fg: #f4f4f5;
   --slider-value-bg: var(--accent-subtle);
   --slider-thumb-border: var(--bg-base);
+  --toggle-track-on: var(--accent);
+  --toggle-track-off: #3f3f46;
+  --toggle-thumb: #ffffff;
 
   /* ── Terminal / Code surfaces */
   --terminal-bg: #121214;
@@ -1156,9 +1162,9 @@ html:not([data-theme='dark']) .code-block {
 }
 
 .crawl-terminal-json {
-  background: var(--terminal-code-bg) !important;
-  color: var(--terminal-fg) !important;
-  border-color: var(--terminal-border) !important;
+  background: #09090b !important;
+  color: #d4d4d4 !important;
+  border-color: #27272a !important;
   font-family: var(--font-mono-family);
   white-space: pre-wrap;
   word-break: break-word;
@@ -1168,7 +1174,8 @@ html:not([data-theme='dark']) .code-block {
   padding: var(--space-4) var(--space-5);
 }
 
-/* Force dark-theme JSON syntax colors only for explicit dark containers. */
+/* Force dark-theme JSON syntax colors for JSON views and explicit dark containers. */
+.crawl-terminal-json,
 .bg-zinc-950,
 .bg-zinc-900,
 [data-json-dark-theme='true'] {

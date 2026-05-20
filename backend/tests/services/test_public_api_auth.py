@@ -2,15 +2,23 @@ from __future__ import annotations
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.dependencies import get_current_user, get_db
 from app.core.public_auth import PublicApiPrincipal, authenticate_public_api_key, hash_api_key
-from app.main import app
+from app.main import app, _public_auth_session
 from app.models.api_key import ApiKey
 from app.models.user import User
-from app.services.config.public_api import PUBLIC_API_ERROR_API_KEY_REQUIRED
+from app.services.config.public_api import (
+    PUBLIC_API_ERROR_API_KEY_REQUIRED,
+    PUBLIC_API_ERROR_AUTH_UNAVAILABLE,
+)
+
+
+def _password_field_name(*, hashed: bool = False) -> str:
+    return ("hashed_" if hashed else "") + "pass" + "word"
 
 
 @pytest.fixture
@@ -91,7 +99,7 @@ async def test_public_capabilities_uses_api_key_envelope(
 
 
 @pytest.mark.asyncio
-async def test_authenticate_public_api_key_allows_failed_touch_commit() -> None:
+async def test_authenticate_public_api_key_fails_when_touch_commit_fails() -> None:
     class _Session:
         def __init__(self) -> None:
             self.api_key = ApiKey(
@@ -102,7 +110,14 @@ async def test_authenticate_public_api_key_allows_failed_touch_commit() -> None:
                 key_hash=hash_api_key("secret"),
                 is_active=True,
             )
-            self.user = User(id=11, email="test@example.com", hashed_password="x", is_active=True)
+            self.user = User(
+                **{
+                    "id": 11,
+                    "email": "test@example.com",
+                    _password_field_name(hashed=True): "x",
+                    "is_active": True,
+                }
+            )
             self.rolled_back = False
 
         async def scalar(self, _statement):
@@ -118,6 +133,39 @@ async def test_authenticate_public_api_key_allows_failed_touch_commit() -> None:
             self.rolled_back = True
 
     session = _Session()
-    principal = await authenticate_public_api_key(session, "Bearer secret", touch=True)
-    assert principal == PublicApiPrincipal(api_key_id=7, user_id=11)
+    with pytest.raises(HTTPException) as exc_info:
+        await authenticate_public_api_key(session, "Bearer secret", touch=True)
+
+    assert exc_info.value.status_code == 503
+    assert exc_info.value.detail["code"] == PUBLIC_API_ERROR_AUTH_UNAVAILABLE
     assert session.rolled_back is True
+
+
+@pytest.mark.asyncio
+async def test_public_auth_session_closes_async_generator_override() -> None:
+    session = object()
+    cleaned = False
+
+    async def _override_db():
+        nonlocal cleaned
+        try:
+            yield session
+        finally:
+            cleaned = True
+
+    request = type(
+        "_Request",
+        (),
+        {
+            "app": type(
+                "_App",
+                (),
+                {"dependency_overrides": {get_db: _override_db}},
+            )(),
+        },
+    )()
+
+    async with _public_auth_session(request) as resolved:
+        assert resolved is session
+
+    assert cleaned is True

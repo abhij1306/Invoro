@@ -106,7 +106,7 @@ async def _deliver_payload(
                     session.add(delivery)
                     return
                 delivery.error_message = f"HTTP {response.status_code}"
-            except Exception as exc:
+            except (httpx.RequestError, httpx.TimeoutException) as exc:
                 delivery.error_message = f"{type(exc).__name__}: {exc}"
             session.add(delivery)
             if attempt < WEBHOOK_MAX_RETRY_ATTEMPTS:

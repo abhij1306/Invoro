@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, cast
 
 import httpx
 import pytest
@@ -664,8 +664,9 @@ def test_detail_expansion_extractability_uses_default_dom_probe_fields_without_r
     )
 
     assert seen_probe_fields is not None
-    assert "description" in seen_probe_fields
-    assert "materials" in seen_probe_fields
+    probe_fields = cast(set[str], seen_probe_fields)
+    assert "description" in probe_fields
+    assert "materials" in probe_fields
 
 
 @dataclass

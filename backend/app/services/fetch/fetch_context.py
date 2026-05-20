@@ -319,6 +319,12 @@ def _acquisition_strategy_message(
             f"(reason={_browser_first_reason(context=context, prefer_browser=prefer_browser, host_preference_enabled=host_preference_enabled)}, "
             f"fetch_mode={context.fetch_mode})"
         )
+    if not crawler_runtime_settings.force_httpx:
+        return (
+            "Acquisition strategy: http-first "
+            f"(fetch_mode={context.fetch_mode}, timeout={_resolve_http_timeout(context):.1f}s, "
+            f"curl_attempts=1, httpx_fallback_max_attempts={_http_max_attempts()})"
+        )
     return (
         "Acquisition strategy: http-first "
         f"(fetch_mode={context.fetch_mode}, timeout={_resolve_http_timeout(context):.1f}s, "
@@ -862,6 +868,10 @@ async def _handle_http_result(
         surface=context.surface,
         runtime_policy=result_runtime_policy,
     )
+    browser_escalation_allowed = should_browser_escalate and _browser_escalation_allowed(
+        context=context,
+        runtime_policy=result_runtime_policy,
+    )
     if should_browser_escalate and (vendor or bool(result.blocked)):
         await note_host_hard_block(
             result.final_url or result.url or context.url,
@@ -875,10 +885,25 @@ async def _handle_http_result(
             result.final_url or result.url or context.url,
             ttl_seconds=context.host_memory_ttl_seconds,
         )
-    if should_browser_escalate and _browser_escalation_allowed(
-        context=context,
-        runtime_policy=result_runtime_policy,
+    if (
+        context.fetch_mode == "http_only"
+        and _retryable_status_for_http_fetch(result.status_code)
+        and not vendor
+        and not browser_escalation_allowed
+        and attempt < max_attempts
     ):
+        delay_ms = _retry_delay_ms(attempt)
+        await _emit_fetch_event(
+            context.on_event,
+            "info",
+            (
+                f"HTTP attempt {attempt}/{max_attempts} returned retryable status "
+                f"{result.status_code}; retrying in {delay_ms}ms"
+            ),
+        )
+        await _sleep_retry_delay(delay_ms=delay_ms)
+        return _retry_sentinel, False
+    if browser_escalation_allowed:
         browser_reason = context.browser_reason or (
             f"vendor-block:{vendor}" if vendor else "http-escalation"
         )
@@ -908,23 +933,6 @@ async def _handle_http_result(
             result=browser_result,
         )
         return browser_result, bool(vendor)
-    if (
-        _retryable_status_for_http_fetch(result.status_code)
-        and not vendor
-        and not should_browser_escalate
-        and attempt < max_attempts
-    ):
-        delay_ms = _retry_delay_ms(attempt)
-        await _emit_fetch_event(
-            context.on_event,
-            "info",
-            (
-                f"HTTP attempt {attempt}/{max_attempts} returned retryable status "
-                f"{result.status_code}; retrying in {delay_ms}ms"
-            ),
-        )
-        await _sleep_retry_delay(delay_ms=delay_ms)
-        return _retry_sentinel, False
     if is_non_retryable_http_status(result.status_code):
         logger.info(
             "Returning non-retryable HTTP status %s for %s without browser fallback",

@@ -1370,11 +1370,12 @@ def _validated_target_url(value: object) -> str:
     host = str(parsed.hostname).strip().lower().rstrip(".")
     if host == "localhost" or host.endswith(".localhost"):
         raise ValueError("target URL host must not be local")
+    address = None
     try:
         address = ip_address(host)
     except ValueError:
-        return url
-    if (
+        pass
+    if address is not None and (
         address.is_loopback
         or address.is_private
         or address.is_link_local

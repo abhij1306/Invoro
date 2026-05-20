@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from typing import cast
-
+from pydantic import TypeAdapter, ValidationError
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -39,6 +38,8 @@ from app.services.monitor_service import (
     update_monitor,
     utcnow,
 )
+
+_ALERT_STATUS_ADAPTER = TypeAdapter(AlertStatus)
 
 
 async def create_alert(
@@ -226,7 +227,12 @@ async def run_alert_poll(
 
 def alert_response(monitor: MonitorJob) -> AlertResponse:
     url = (monitor.urls or [""])[0]
-    status = cast(AlertStatus, str(monitor.status))
+    try:
+        status = _ALERT_STATUS_ADAPTER.validate_python(str(monitor.status))
+    except ValidationError as exc:
+        raise ValueError(
+            f"Invalid alert status for monitor {monitor.id}: {monitor.status!r}"
+        ) from exc
     return AlertResponse(
         id=monitor.id,
         url=url,

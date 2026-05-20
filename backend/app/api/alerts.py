@@ -148,8 +148,8 @@ async def alert_deliveries(
     user: Annotated[User, Depends(get_current_user)],
 ) -> list[WebhookDeliveryResponse]:
     try:
-        await get_alert(session, alert_id, user_id=int(user.id))
+        monitor = await get_alert(session, alert_id, user_id=int(user.id))
     except LookupError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-    rows = await list_webhook_deliveries(session, monitor_id=alert_id)
+    rows = await list_webhook_deliveries(session, monitor_id=int(monitor.id))
     return [WebhookDeliveryResponse.model_validate(row, from_attributes=True) for row in rows]

@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 
 import { monitorsApi } from '../../../lib/api';
 import type { MonitorStatus, MonitorUpdatePayload } from '../../../lib/api/types';
+import { isThenable } from '../../../lib/params';
 import { MonitorEvents } from '../../../components/monitors/monitor-events';
 import { MonitorHeader } from '../../../components/monitors/monitor-header';
 import { MonitorHistoryChart } from '../../../components/monitors/monitor-history-chart';
@@ -129,8 +130,4 @@ export default function MonitorDetailPage({
       </SurfacePanel>
     </div>
   );
-}
-
-function isThenable(value: unknown): value is Promise<{ id: string }> {
-  return typeof value === 'object' && value !== null && 'then' in value;
 }

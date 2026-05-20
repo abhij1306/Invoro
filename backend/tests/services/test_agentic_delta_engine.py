@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+import httpx
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select
 
@@ -41,6 +42,37 @@ class _HttpClient:
     async def post(self, url, *, json):
         self.posts.append({"url": url, "json": json})
         return _Response()
+
+
+class _FailingHttpClient:
+    def __init__(self, *args, **kwargs):
+        pass
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return False
+
+    async def post(self, url, *, json):
+        del json
+        request = httpx.Request("POST", url)
+        raise httpx.RequestError("network down", request=request)
+
+
+class _BuggyHttpClient:
+    def __init__(self, *args, **kwargs):
+        pass
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return False
+
+    async def post(self, url, *, json):
+        del url, json
+        raise ValueError("boom")
 
 
 @pytest.fixture
@@ -125,9 +157,130 @@ async def test_alert_webhook_delivery_logs_success(db_session, test_user, monkey
 
 
 @pytest.mark.asyncio
+async def test_alert_webhook_delivery_logs_request_errors(db_session, test_user, monkeypatch) -> None:
+    monitor = MonitorJob(
+        user_id=test_user.id,
+        name="Alert example.com",
+        urls=["https://example.com/product/1"],
+        domains=["example.com"],
+        surface="ecommerce_detail",
+        tracked_fields=["price"],
+        schedule_interval_hours=1,
+        priority=MONITOR_PRIORITY_BACKGROUND,
+        retention_days=90,
+        settings={SKIP_HEAD_CHECK_KEY: True},
+        requested_fields=["price"],
+        status=MONITOR_STATUS_ACTIVE,
+        condition="price < 150",
+        webhook_url="https://agent.example/webhook",
+        poll_interval_seconds=300,
+        last_known_values={"price": "129.99"},
+        last_crawl_method="http",
+    )
+    db_session.add(monitor)
+    await db_session.flush()
+    event = MonitorEvent(
+        monitor_id=monitor.id,
+        run_id=None,
+        source_url="https://example.com/product/1",
+        event_type=MONITOR_EVENT_FIELD_CHANGED,
+        field_name="price",
+        old_value="159.99",
+        new_value="129.99",
+        detected_at=utcnow(),
+        condition_met=True,
+    )
+    db_session.add(event)
+    await db_session.flush()
+    monkeypatch.setattr("app.services.monitor_webhook_service.httpx.AsyncClient", _FailingHttpClient)
+    monkeypatch.setattr("app.services.monitor_webhook_service.WEBHOOK_MAX_RETRY_ATTEMPTS", 1)
+
+    await dispatch_alert_webhooks(db_session, monitor=monitor, events=[event])
+    await db_session.commit()
+
+    delivery = await db_session.scalar(select(MonitorWebhookDelivery))
+    assert delivery is not None
+    assert delivery.status != WEBHOOK_STATUS_SENT
+    assert delivery.error_message == "RequestError: network down"
+
+
+@pytest.mark.asyncio
+async def test_alert_webhook_delivery_propagates_unexpected_errors(
+    db_session,
+    test_user,
+    monkeypatch,
+) -> None:
+    monitor = MonitorJob(
+        user_id=test_user.id,
+        name="Alert example.com",
+        urls=["https://example.com/product/1"],
+        domains=["example.com"],
+        surface="ecommerce_detail",
+        tracked_fields=["price"],
+        schedule_interval_hours=1,
+        priority=MONITOR_PRIORITY_BACKGROUND,
+        retention_days=90,
+        settings={SKIP_HEAD_CHECK_KEY: True},
+        requested_fields=["price"],
+        status=MONITOR_STATUS_ACTIVE,
+        condition="price < 150",
+        webhook_url="https://agent.example/webhook",
+        poll_interval_seconds=300,
+        last_known_values={"price": "129.99"},
+        last_crawl_method="http",
+    )
+    db_session.add(monitor)
+    await db_session.flush()
+    event = MonitorEvent(
+        monitor_id=monitor.id,
+        run_id=None,
+        source_url="https://example.com/product/1",
+        event_type=MONITOR_EVENT_FIELD_CHANGED,
+        field_name="price",
+        old_value="159.99",
+        new_value="129.99",
+        detected_at=utcnow(),
+        condition_met=True,
+    )
+    db_session.add(event)
+    await db_session.flush()
+    monkeypatch.setattr("app.services.monitor_webhook_service.httpx.AsyncClient", _BuggyHttpClient)
+    monkeypatch.setattr("app.services.monitor_webhook_service.WEBHOOK_MAX_RETRY_ATTEMPTS", 1)
+
+    with pytest.raises(ValueError, match="boom"):
+        await dispatch_alert_webhooks(db_session, monitor=monitor, events=[event])
+
+
+def test_alert_response_rejects_invalid_status() -> None:
+    monitor = MonitorJob(
+        id=99,
+        user_id=1,
+        name="Alert example.com",
+        urls=["https://example.com/product/1"],
+        domains=["example.com"],
+        surface="ecommerce_detail",
+        tracked_fields=["price"],
+        schedule_interval_hours=1,
+        priority=MONITOR_PRIORITY_BACKGROUND,
+        retention_days=90,
+        settings={SKIP_HEAD_CHECK_KEY: True},
+        requested_fields=["price"],
+        status="invalid-status",
+        poll_interval_seconds=300,
+        created_at=utcnow(),
+        updated_at=utcnow(),
+    )
+
+    with pytest.raises(ValueError, match="Invalid alert status"):
+        alert_response(monitor)
+
+
+@pytest.mark.asyncio
 async def test_public_alert_api_requires_api_key(public_client: AsyncClient) -> None:
     response = await public_client.get("/api/v1/alerts")
     assert response.status_code == 401
+    assert response.json()["meta"]["duration_ms"] >= 0
+
 
 
 @pytest.mark.asyncio

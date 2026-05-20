@@ -46,12 +46,12 @@ ROUTE_BARCODE_TO_SKU = True
 NAVIGATION_URL_FIELDS = frozenset({URL_FIELD, APPLY_URL_FIELD, CANONICAL_URL_FIELD})
 BRAND_LIKE_FIELDS = frozenset({"brand", "company", "dealer_name", "vendor"})
 TITLE_STRUCTURED_VALUE_KEYS = (
-    "name",
+    "values",
     "title",
+    "name",
     "label",
     "text",
     "value",
-    "values",
 )
 PRICE_DICT_PREFERRED_KEYS = (
     "formattedPrice",

@@ -1,8 +1,7 @@
 'use client';
 
 import { Globe2, Info, Shield } from 'lucide-react';
-import { cloneElement, useMemo, useState } from 'react';
-import type { ReactElement } from 'react';
+import { useMemo, useState } from 'react';
 
 import type { CrawlSurface, MonitorCreatePayload, MonitorPriority } from '../../lib/api/types';
 import { cn } from '../../lib/utils';
@@ -287,28 +286,37 @@ export function MonitorForm({
                 icon={<Info />}
                 checked={advancedOpen}
                 onChange={setAdvancedOpen}
+                rowClassName="h-auto min-h-12 px-3 py-2"
+                bodyClassName="space-y-3.5 px-3 py-3"
               >
-                <div className="space-y-2">
-                  <AdvancedToggleRow
+                <div className="space-y-3.5">
+                  <SettingSection
                     label="Proxy"
                     description="Allow proxy settings to be passed with this monitor."
                     icon={<Shield />}
                     checked={proxyEnabled}
                     onChange={setProxyEnabled}
                   />
-                  <AdvancedToggleRow
+                  <SettingSection
                     label="JS rendering"
                     description="Prefer rendered DOM acquisition for monitor runs."
                     icon={<Globe2 />}
                     checked={jsRendering}
                     onChange={setJsRendering}
                   />
-                  <AdvancedToggleRow
-                    label="Skip HEAD pre-check"
-                    description="Ecommerce monitors recrawl on schedule instead of trusting CDN validators."
-                    checked={skipHeadCheck}
-                    onChange={setSkipHeadCheck}
-                  />
+                  <div className="border-border bg-panel flex items-center justify-between gap-3 rounded-[var(--radius-md)] border px-3 py-2">
+                    <div>
+                      <p className="type-body-sm m-0 font-medium">Skip HEAD pre-check</p>
+                      <p className="type-caption m-0">
+                        Ecommerce monitors recrawl on schedule instead of trusting CDN validators.
+                      </p>
+                    </div>
+                    <Toggle
+                      checked={skipHeadCheck}
+                      onChange={setSkipHeadCheck}
+                      ariaLabel="Skip HEAD pre-check"
+                    />
+                  </div>
                 </div>
               </SettingSection>
             </div>
@@ -329,48 +337,6 @@ export function MonitorForm({
           </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-function AdvancedToggleRow({
-  label,
-  description,
-  icon,
-  checked,
-  onChange,
-}: Readonly<{
-  label: string;
-  description: string;
-  icon?: ReactElement<{ className?: string }>;
-  checked: boolean;
-  onChange: (value: boolean) => void;
-}>) {
-  const renderedIcon = icon
-    ? cloneElement(icon, {
-        className: cn(icon.props.className, 'size-4'),
-      })
-    : null;
-
-  return (
-    <div className="border-border bg-panel grid min-h-12 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-[var(--radius-md)] border px-3 py-2">
-      <div className="flex min-w-0 items-center gap-2.5">
-        {renderedIcon ? (
-          <div className="border-border bg-setting-icon-bg text-secondary flex size-8 shrink-0 items-center justify-center rounded-[var(--radius-md)] border">
-            {renderedIcon}
-          </div>
-        ) : null}
-        <div className="min-w-0">
-          <div className="flex min-w-0 items-center gap-1.5">
-            <p className="type-body-sm text-foreground m-0 truncate font-medium">{label}</p>
-            <Tooltip content={description}>
-              <Info className="text-muted hover:text-secondary size-3.5 shrink-0 cursor-help transition-colors" />
-            </Tooltip>
-          </div>
-          {!icon ? <p className="type-caption m-0 mt-0.5">{description}</p> : null}
-        </div>
-      </div>
-      <Toggle checked={checked} onChange={onChange} ariaLabel={label} />
     </div>
   );
 }

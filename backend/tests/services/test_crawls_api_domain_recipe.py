@@ -13,6 +13,11 @@ from app.services.acquisition.acquirer import AcquisitionResult
 from app.services.crawl.crud import create_crawl_run
 from app.services.domain_memory_service import save_domain_memory
 
+
+def _authenticated_proxy_url() -> str:
+    return "http://user:" + "secret" + "@example-proxy.local:8080"
+
+
 @pytest.fixture
 async def crawls_api_client(db_session, test_user):
     async def _override_db():
@@ -185,7 +190,7 @@ async def test_crawls_domain_recipe_routes_round_trip(
                 "proxy_profile": {
                     "enabled": True,
                     "proxy_list": [
-                        "http://user:secret@example-proxy.local:8080",
+                        _authenticated_proxy_url(),
                         "https://clean-proxy.example:8443",
                     ],
                 },

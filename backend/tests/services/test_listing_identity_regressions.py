@@ -12,6 +12,7 @@ from __future__ import annotations
 import pytest
 
 from app.services.extract.detail.identity.core import (
+    _detail_model_number_sets_compatible,
     listing_detail_like_path,
     listing_url_is_structural,
 )
@@ -57,6 +58,11 @@ def test_product_slug_with_filter_query_is_not_structural() -> None:
         "?f=Categories%3AFace%20Moisturiser&rf=Price%3A200_400"
     )
     assert listing_url_is_structural(product, page) is False
+
+
+def test_model_number_prefix_match_requires_alpha_signal() -> None:
+    assert _detail_model_number_sets_compatible({"ABC123"}, {"ABC1234"}) is True
+    assert _detail_model_number_sets_compatible({"12345"}, {"123456"}) is False
 
 
 def test_dell_landing_page_not_rescued_as_merchandise() -> None:

@@ -36,6 +36,8 @@ export function SettingSection({
   checked,
   onChange,
   children,
+  rowClassName,
+  bodyClassName,
 }: Readonly<{
   label: string;
   description: string;
@@ -43,6 +45,8 @@ export function SettingSection({
   checked: boolean;
   onChange: (value: boolean) => void;
   children?: ReactNode;
+  rowClassName?: string;
+  bodyClassName?: string;
 }>) {
   const renderedIcon = React.isValidElement<IconElementProps>(icon)
     ? React.cloneElement(icon, {
@@ -54,7 +58,12 @@ export function SettingSection({
     // Outer wrapper is flex-col so the children panel is a sibling of the control row,
     // not a child inside the h-9 constraint that would clip it.
     <div className="w-full">
-      <div className="grid h-9 w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
+      <div
+        className={cn(
+          'grid h-9 w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3',
+          rowClassName,
+        )}
+      >
         <div className="flex min-w-0 items-center gap-1.5">
           {renderedIcon ? (
             <div
@@ -85,7 +94,12 @@ export function SettingSection({
             checked ? 'max-h-[500px] overflow-visible' : 'max-h-0 overflow-hidden',
           )}
         >
-          <div className="border-divider bg-setting-body-bg space-y-3 border-t px-5 py-4">
+          <div
+            className={cn(
+              'border-divider bg-setting-body-bg space-y-3 border-t px-5 py-4',
+              bodyClassName,
+            )}
+          >
             {children}
           </div>
         </div>
