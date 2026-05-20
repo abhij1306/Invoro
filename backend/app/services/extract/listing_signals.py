@@ -92,6 +92,18 @@ def _same_url_anchor_text_candidates(card, url: str) -> list[str]:
     return texts
 
 
+def _ancestor_anchor_nodes(card) -> list[object]:
+    anchors: list[object] = []
+    current = getattr(card, "parent", None)
+    depth = 0
+    while current is not None and depth < 3:
+        if listing_node_tag(current) == "a" and listing_node_attr(current, "href"):
+            anchors.append(current)
+        current = getattr(current, "parent", None)
+        depth += 1
+    return anchors
+
+
 def _extract_price_signal_from_card(card) -> str | None:
     candidates: list[tuple[int, int, str]] = []
     order = 0
@@ -296,6 +308,7 @@ def _select_primary_anchor(
     anchors = []
     if listing_node_attr(card, "href"):
         anchors.append(card)
+    anchors.extend(_ancestor_anchor_nodes(card))
     anchors.extend(listing_node_css(card, "a[href]"))
     for anchor in anchors:
         url = absolute_url(page_url, listing_node_attr(anchor, "href"))
@@ -347,7 +360,7 @@ def _select_primary_card_url(
     page_url: str,
 ) -> str:
     selectors = ",".join(f"[{attr}]" for attr in LISTING_CARD_URL_ATTRS)
-    candidates = [card, *listing_node_css(card, selectors)]
+    candidates = [card, *_ancestor_anchor_nodes(card), *listing_node_css(card, selectors)]
     for candidate in candidates:
         for attr_name in LISTING_CARD_URL_ATTRS:
             url = absolute_url(page_url, listing_node_attr(candidate, attr_name))

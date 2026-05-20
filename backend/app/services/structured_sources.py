@@ -9,6 +9,7 @@ from typing import Any
 from bs4 import BeautifulSoup
 from app.services.config.extraction_rules import (
     EMBEDDED_ASSIGNMENT_NAMES,
+    HYDRATED_STATE_GLOBAL_ONLY_PATTERNS,
     HYDRATED_STATE_PATTERNS,
     HYDRATED_STATE_SCRIPT_IDS,
     NON_STATE_ASSIGNMENT_PATTERNS,
@@ -381,6 +382,14 @@ def _assignment_patterns(
 ) -> tuple[re.Pattern[str], ...]:
     escaped = re.escape(state_name)
     if not declarations_only:
+        if state_name in HYDRATED_STATE_GLOBAL_ONLY_PATTERNS:
+            return (
+                re.compile(rf"(?:window|self|globalThis)\s*\.\s*{escaped}\s*=\s*", re.S),
+                re.compile(
+                    rf"(?:window|self|globalThis)\s*\[\s*['\"]{escaped}['\"]\s*\]\s*=\s*",
+                    re.S,
+                ),
+            )
         return (
             re.compile(rf"(?:window|self|globalThis)\s*\.\s*{escaped}\s*=\s*", re.S),
             re.compile(

@@ -761,11 +761,14 @@ def _looks_like_product_payload(value: Any) -> bool:
 
 
 def _payload_type_is_non_product(value: dict[str, Any]) -> bool:
-    raw_type = clean_text(
-        value.get("type")
-        or value.get("product_type")
-        or value.get("productType")
-        or value.get("@type")
+    raw_type = (
+        clean_text(
+            value.get("type")
+            or value.get("product_type")
+            or value.get("productType")
+            or value.get("@type")
+        )
+        or ""
     ).casefold()
     if not raw_type:
         return False

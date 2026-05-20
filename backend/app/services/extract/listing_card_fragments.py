@@ -286,9 +286,29 @@ def base_listing_fragment_score(node) -> int:
 
 def _node_listing_links(node) -> list[object]:
     links = []
+    seen: set[tuple[str, str] | tuple[str, int]] = set()
+
+    def append_link(candidate: object) -> None:
+        href = listing_node_attr(candidate, "href")
+        marker: tuple[str, str] | tuple[str, int] = (
+            ("href", href) if href else ("id", id(candidate))
+        )
+        if marker in seen:
+            return
+        seen.add(marker)
+        links.append(candidate)
+
     if listing_node_attr(node, "href"):
-        links.append(node)
-    links.extend(listing_node_css(node, "a[href]"))
+        append_link(node)
+    current = getattr(node, "parent", None)
+    depth = 0
+    while current is not None and depth < 3:
+        if listing_node_tag(current) == "a" and listing_node_attr(current, "href"):
+            append_link(current)
+        current = getattr(current, "parent", None)
+        depth += 1
+    for link in listing_node_css(node, "a[href]"):
+        append_link(link)
     return links
 
 

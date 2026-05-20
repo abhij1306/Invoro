@@ -187,6 +187,31 @@ def test_detail_price_backfill_skips_dom_price_when_product_is_out_of_stock() ->
     assert "price" not in record.get("_field_sources", {})
 
 
+def test_detail_price_backfill_keeps_original_price_when_out_of_stock_price_blocked() -> None:
+    record = {
+        "url": "https://example.com/products/widget",
+        "availability": "out_of_stock",
+        "_field_sources": {"availability": ["json_ld"]},
+    }
+    html = """
+    <html>
+      <head>
+        <script type="application/ld+json">
+        {"@type":"Product","offers":{"@type":"Offer","highPrice":"39.99","priceCurrency":"USD"}}
+        </script>
+      </head>
+      <body><main><h1>Widget</h1></main></body>
+    </html>
+    """
+
+    backfill_detail_price_from_html(record, html=html)
+
+    assert "price" not in record
+    assert record["original_price"] == "39.99"
+    assert record["currency"] == "USD"
+    assert record["_field_sources"]["original_price"] == ["json_ld"]
+
+
 def test_select_variant_falls_back_to_partial_axis_match() -> None:
     variants = [
         {"size": "M", "availability": "out_of_stock"},

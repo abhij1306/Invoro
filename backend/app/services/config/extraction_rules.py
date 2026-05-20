@@ -54,6 +54,7 @@ HYDRATED_STATE_PATTERNS = tuple(
         ]
     )
 )
+HYDRATED_STATE_GLOBAL_ONLY_PATTERNS = frozenset({"INITIAL_STATE"})
 SHIPPING_DATE_FIELD = "shipping_date"
 SPECIAL_DAYS_FIELD = "special_days"
 IS_AVAILABLE_FIELD = "is_available"
@@ -285,7 +286,6 @@ DETAIL_LOW_SIGNAL_TITLE_VALUES = frozenset(
         "mens shoes",
         "men's shoes",
         "plp",
-        "prime",
         "womens shoes",
         "women's shoes",
         "shoes",
@@ -302,8 +302,17 @@ DETAIL_LOW_SIGNAL_PRODUCT_TYPE_VALUES = frozenset(
     {"criteoproductrail", "giftoption", "promotionalcallout"}
 )
 DETAIL_ARTIFACT_PRODUCT_TYPE_VALUES = frozenset(
-    {"brightcove video", "criteoproductrail", "default", "tag", "inline"}
+    {
+        "brightcove video",
+        "criteoproductrail",
+        "default",
+        "giftoption",
+        "inline",
+        "promotionalcallout",
+        "tag",
+    }
 )
+TITLE_PROMOTION_EXACT_VALUES = frozenset({"prime"})
 DETAIL_ARTIFACT_PRODUCT_TYPE_PATTERNS = (r"^(?=.*\d)[a-z0-9]+(?:_[a-z0-9]+){2,}$",)
 DETAIL_ARTIFACT_IDENTIFIER_VALUES = frozenset(
     {"description", "details", "product details", "specification", "specifications"}
@@ -1244,7 +1253,39 @@ JOB_POSTING_PATH_MARKERS = tuple(
         )
     )
 )
+JOB_LISTING_HUB_TITLE_PREFIXES = (
+    "remote ",
+)
+JOB_LISTING_HUB_TITLE_SUFFIXES = (
+    " jobs",
+    " careers",
+    " openings",
+)
+JOB_LISTING_HUB_TERMINAL_SUFFIXES = (
+    "-jobs",
+    "-careers",
+    "-openings",
+)
 DETAIL_IDENTITY_CODE_MIN_LENGTH = 8
+DETAIL_TITLE_FALLBACK_CODE_PATTERN = r"[A-Za-z0-9]{4,12}"
+DETAIL_TITLE_FALLBACK_MIN_SEMANTIC_TOKENS = 2
+DETAIL_TITLE_FALLBACK_ROUTE_TOKENS = frozenset({"dp", "s"})
+DETAIL_MODEL_NUMBER_TOKEN_PATTERNS = (
+    (
+        r"(?<![A-Za-z0-9])(?=[A-Za-z0-9_-]*[A-Za-z])"
+        r"(?=[A-Za-z0-9_-]*\d)[A-Za-z0-9][A-Za-z0-9_-]{2,}"
+        r"[A-Za-z0-9](?![A-Za-z0-9])"
+    ),
+    (
+        r"(?<![A-Za-z0-9])(?=[A-Za-z0-9]*[A-Za-z])"
+        r"(?=[A-Za-z0-9]*\d)[A-Za-z0-9]{2,12}(?![A-Za-z0-9])"
+    ),
+    r"(?<![A-Za-z0-9])\d{5,}(?![A-Za-z0-9])",
+)
+DETAIL_MODEL_SMALL_NUMERIC_TOKEN_PATTERN = (
+    r"(?<![A-Za-z0-9])\d{1,4}(?![A-Za-z0-9])"
+)
+DETAIL_MODEL_CONFLICT_MIN_SHARED_WORDS = 2
 REMOTE_BOOLEAN_TRUE_TOKENS = frozenset(
     {"true", "1", "yes", "remote", "fully remote", "work from home", "telecommute"}
 )
@@ -1748,6 +1789,7 @@ _EXTRA_EXPORTS = [
     "VARIANT_CONTEXT_NOISE_ANCESTOR_DEPTH",
     "VARIANT_SCOPE_MAX_ROOTS",
     "DETAIL_LOW_SIGNAL_TITLE_VALUES",
+    "TITLE_PROMOTION_EXACT_VALUES",
     "DETAIL_BREADCRUMB_ROOT_LABELS",
     "DETAIL_BREADCRUMB_SELECTORS",
     "DETAIL_BREADCRUMB_CONTAINER_SELECTORS",
@@ -1765,6 +1807,12 @@ _EXTRA_EXPORTS = [
     "DETAIL_GENDER_TERMS",
     "DETAIL_GENERIC_TERMINAL_TOKENS",
     "DETAIL_IDENTITY_CODE_MIN_LENGTH",
+    "DETAIL_MODEL_CONFLICT_MIN_SHARED_WORDS",
+    "DETAIL_MODEL_NUMBER_TOKEN_PATTERNS",
+    "DETAIL_MODEL_SMALL_NUMERIC_TOKEN_PATTERN",
+    "DETAIL_TITLE_FALLBACK_CODE_PATTERN",
+    "DETAIL_TITLE_FALLBACK_MIN_SEMANTIC_TOKENS",
+    "DETAIL_TITLE_FALLBACK_ROUTE_TOKENS",
     "DETAIL_DOM_SCALAR_SIZE_PATTERN",
     "DETAIL_TITLE_DIMENSION_SIZE_PATTERN",
     "DETAIL_IDENTITY_STOPWORDS",
@@ -1781,6 +1829,9 @@ _EXTRA_EXPORTS = [
     "INTEGER_VALUE_FIELDS",
     "JSON_RECORD_LIST_KEYS",
     "JOB_LISTING_DETAIL_ROOT_MARKERS",
+    "JOB_LISTING_HUB_TERMINAL_SUFFIXES",
+    "JOB_LISTING_HUB_TITLE_PREFIXES",
+    "JOB_LISTING_HUB_TITLE_SUFFIXES",
     "JOB_POSTING_PATH_MARKERS",
     "LISTING_CHROME_TEXT_LIMIT",
     "LISTING_PRICE_NODE_SELECTORS",

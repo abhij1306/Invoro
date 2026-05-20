@@ -5,6 +5,7 @@ import pytest
 from app.services.adapters.adp import ADPAdapter
 from app.services.adapters.amazon import AmazonAdapter
 from app.services.adapters.belk import BelkAdapter
+from app.services.adapters.bullhorn import BullhornAdapter
 from app.services.adapters.ebay import EbayAdapter
 from app.services.adapters.indeed import IndeedAdapter
 from app.services.adapters.linkedin import LinkedInAdapter
@@ -16,6 +17,7 @@ from app.services.extract.detail.assembly.record_assembly import (
 )
 from app.services.extraction_html_helpers import extract_job_sections
 from app.services.listing_extractor import extract_listing_records
+from app.services.pipeline.extract_records import extract_records
 from app.services.dom.xpath_service import extract_selector_value
 from tests.fixtures.loader import read_optional_artifact_text
 
@@ -1939,3 +1941,136 @@ async def test_adp_adapter_preserves_css_listing_output() -> None:
     assert record["location"] == "Bengaluru"
     assert record["posted_date"] == "2 days ago"
     assert record["apply_url"].endswith("jobId=123456#123456")
+
+
+@pytest.mark.asyncio
+async def test_job_listing_pipeline_preserves_adp_adapter_rows_with_query_job_ids() -> None:
+    url = "https://workforcenow.adp.com/mascsr/default/mdf/recruitment/recruitment.html?cid=tenant&selectedMenuKey=CurrentOpenings"
+    html = """
+    <html>
+      <body>
+        <div class="current-openings-item" id="job_item_view_main_div_9202786317663_1">
+          <sdf-link id="lblTitle_9202786317663_1">ORAL SURGEON<a href="#"></a></sdf-link>
+          <label class="current-opening-location-item"><span>New York, NY, US</span></label>
+          <span class="current-opening-post-date">8 days ago</span>
+        </div>
+        <div class="current-openings-item" id="job_item_view_main_div_9202786030399_1">
+          <sdf-link id="lblTitle_9202786030399_1">PHARMACIST<a href="#"></a></sdf-link>
+          <label class="current-opening-location-item"><span>Queens, NY, US</span></label>
+          <span class="current-opening-post-date">9 days ago</span>
+        </div>
+      </body>
+    </html>
+    """
+    adapter_result = await ADPAdapter().extract(url, html, "job_listing")
+
+    rows = extract_records(
+        html,
+        url,
+        "job_listing",
+        max_records=10,
+        adapter_records=adapter_result.records,
+    )
+
+    assert [row["title"] for row in rows] == ["ORAL SURGEON", "PHARMACIST"]
+    assert [("jobId=9202786317663_1" in row["url"]) for row in rows] == [True, False]
+    assert [("jobId=9202786030399_1" in row["url"]) for row in rows] == [False, True]
+
+
+def test_job_listing_pipeline_prefers_icims_adapter_rows_over_career_nav_chrome() -> None:
+    url = "https://ehccareers-emory.icims.com/jobs/search?pr=0&searchRelation=keyword_all"
+    html = """
+    <html>
+      <body>
+        <div class="job-card">
+          <a href="https://www.emoryhealthcare.org/careers/life-at-emory">
+            <h3>Life at Emory Back Life at Emory Hospitals Our Communities</h3>
+          </a>
+        </div>
+        <div class="job-card">
+          <a href="https://www.emoryhealthcare.org/careers/how-we-hire">
+            <h3>How We Hire Back How We Hire Eligibility Requirements Hiring Disclosures</h3>
+          </a>
+        </div>
+      </body>
+    </html>
+    """
+    adapter_records = [
+        {
+            "title": "Blood Bank Medical Lab Scientist",
+            "url": "https://clinical-emory.icims.com/jobs/166851/blood-bank-medical-lab-scientist/job?hub=14",
+            "location": "Atlanta, GA",
+            "company": "Emory Univ Hospital",
+            "job_id": "166851",
+        },
+        {
+            "title": "Director, Enterprise Sterile Processing",
+            "url": "https://non-clinical-emory.icims.com/jobs/166766/director-enterprise-sterile-processing/job?hub=14",
+            "location": "Atlanta, GA",
+            "company": "Emory Healthcare Inc.",
+            "job_id": "166766",
+        },
+    ]
+
+    rows = extract_records(
+        html,
+        url,
+        "job_listing",
+        max_records=10,
+        adapter_records=adapter_records,
+    )
+
+    assert [row["title"] for row in rows] == [
+        "Blood Bank Medical Lab Scientist",
+        "Director, Enterprise Sterile Processing",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_bullhorn_adapter_extracts_public_job_board_rows(monkeypatch) -> None:
+    html = """
+    <script>
+      var API_BASE='https://public-rest32.bullhornstaffing.com/rest-services/a7084/query/JobBoardPost';
+      var url=API_BASE+"?where=(branchCode=%27Internal%27) AND (isOpen=true) AND (isDeleted=false)&fields="+FIELDS;
+    </script>
+    """
+    captured_urls: list[str] = []
+
+    async def fake_request_json(self, url, **kwargs):
+        del self, kwargs
+        captured_urls.append(url)
+        return {
+            "data": [
+                {
+                    "id": 123,
+                    "title": "Talent Acquisition Associate",
+                    "publishedCategory": {"name": "Recruiting"},
+                    "address": {"city": "Houston", "state": "TX"},
+                    "employmentType": "Direct Hire",
+                    "dateLastPublished": 1779200924763,
+                    "publicDescription": "<p>Build strong candidate pipelines.</p>",
+                }
+            ]
+        }
+
+    monkeypatch.setattr(BullhornAdapter, "_request_json", fake_request_json)
+
+    assert await BullhornAdapter().can_handle("https://www.vc5partners.com/jobs/", html)
+
+    result = await BullhornAdapter().extract(
+        "https://www.vc5partners.com/jobs/",
+        html,
+        "job_listing",
+    )
+
+    assert len(result.records) == 1
+    record = result.records[0]
+    assert record["title"] == "Talent Acquisition Associate"
+    assert record["job_id"] == "123"
+    assert record["location"] == "Houston, TX"
+    assert record["department"] == "Recruiting"
+    assert record["job_type"] == "Direct Hire"
+    assert record["posted_date"] == "2026-05-19"
+    assert record["description"] == "Build strong candidate pipelines."
+    assert "branchCode" in captured_urls[0]
+    assert "%28branchCode" in captured_urls[0]

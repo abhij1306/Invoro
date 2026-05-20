@@ -248,7 +248,18 @@ def detail_title_value_is_low_signal(value: object) -> bool:
 
 def detail_product_type_is_low_signal(value: object) -> bool:
     text = clean_text(value)
-    return bool(text and text.lower() in low_signal_product_type_values)
+    lowered = text.lower()
+    return bool(
+        lowered
+        and (
+            lowered in low_signal_product_type_values
+            or lowered in DETAIL_ARTIFACT_PRODUCT_TYPE_VALUES
+            or any(
+                pattern.fullmatch(lowered)
+                for pattern in detail_artifact_product_type_patterns
+            )
+        )
+    )
 
 
 def detail_scalar_size_is_low_signal(value: str, *, title: object) -> bool:

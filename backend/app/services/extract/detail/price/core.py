@@ -98,95 +98,105 @@ def backfill_detail_price_from_html(
     if not html_currency_conflicts_with_host and currency != jsonld_price_bundle[2]:
         jsonld_price_bundle = _detail_jsonld_price_bundle(soup, currency=currency)
     jsonld_price, jsonld_original_price, jsonld_currency = jsonld_price_bundle
-    if _unavailable_record_blocks_dom_price_backfill(
+    current_price_backfill_blocked = _unavailable_record_blocks_dom_price_backfill(
         record,
         jsonld_price=jsonld_price,
-    ):
+        visible_price=visible_price,
+    )
+    if current_price_backfill_blocked:
         _drop_unavailable_dom_backfilled_detail_price(record)
-        return
-    if html_currency_conflicts_with_host:
-        price = visible_price or text_or_none(record.get("price"))
     else:
-        price = jsonld_price or _detail_price_from_html(
-            soup,
-            currency=currency,
-            jsonld_price_bundle=jsonld_price_bundle,
-        )
+        if html_currency_conflicts_with_host:
+            price = visible_price or text_or_none(record.get("price"))
+        else:
+            price = jsonld_price or _detail_price_from_html(
+                soup,
+                currency=currency,
+                jsonld_price_bundle=jsonld_price_bundle,
+            )
+            if price in (None, "", [], {}):
+                price = text_or_none(record.get("price"))
+        price_source = "json_ld" if jsonld_price else "dom_text"
+        if visible_price and (
+            _detail_price_is_cent_magnitude_copy(price, visible_price)
+            or _should_override_record_price_from_dom(
+                record=record,
+                dom_price=visible_price,
+                record_price_is_low_signal=record_price_is_low_signal,
+            )
+        ):
+            price = visible_price
+            price_source = "dom_text"
         if price in (None, "", [], {}):
-            price = text_or_none(record.get("price"))
-    price_source = "json_ld" if jsonld_price else "dom_text"
-    if visible_price and (
-        _detail_price_is_cent_magnitude_copy(price, visible_price)
-        or _should_override_record_price_from_dom(
-            record=record,
-            dom_price=visible_price,
-            record_price_is_low_signal=record_price_is_low_signal,
-        )
-    ):
-        price = visible_price
-        price_source = "dom_text"
-    if price in (None, "", [], {}):
-        return
-    if (
-        price_source == "json_ld"
-        and jsonld_currency
-        and text_or_none(record.get("currency")) != jsonld_currency
-    ):
-        record["currency"] = jsonld_currency
-        currency = jsonld_currency
-        append_record_field_source(record, "currency", "json_ld")
-    if (
-        price_source == "json_ld"
-        and price == jsonld_price
-        and not (
-            record_field_sources(record, "price") & DETAIL_AUTHORITATIVE_PRICE_SOURCE_SET
-        )
-    ):
-        record["price"] = price
-        append_record_field_source(record, "price", "json_ld")
-    if _should_override_record_price_from_dom(
-        record=record,
-        dom_price=price,
-        record_price_is_low_signal=record_price_is_low_signal,
-    ):
-        record["price"] = price
-        append_record_field_source(record, "price", "dom_text")
-    if isinstance(selected_variant, dict) and (
-        selected_variant.get("price") in (None, "", [], {})
-        or _detail_price_value_is_low_signal(selected_variant.get("price"))
-        or _detail_price_is_cent_magnitude_copy(selected_variant.get("price"), price)
-    ):
-        selected_variant["price"] = price
-        if currency and selected_variant.get("currency") in (None, "", [], {}):
-            selected_variant["currency"] = currency
-    variants = record.get("variants")
-    if isinstance(variants, list):
-        for variant in variants:
-            if not isinstance(variant, dict):
-                continue
+            price = None
+        if price not in (None, "", [], {}):
             if (
                 price_source == "json_ld"
                 and jsonld_currency
-                and _detail_price_is_visible_outlier(variant.get("price"), price)
+                and text_or_none(record.get("currency")) != jsonld_currency
+            ):
+                record["currency"] = jsonld_currency
+                currency = jsonld_currency
+                append_record_field_source(record, "currency", "json_ld")
+            if (
+                price_source == "json_ld"
+                and price == jsonld_price
                 and not (
-                    record_field_sources(record, "variants")
+                    record_field_sources(record, "price")
                     & DETAIL_AUTHORITATIVE_PRICE_SOURCE_SET
                 )
             ):
-                variant["price"] = price
-                variant["currency"] = jsonld_currency
-                continue
-            if (
-                variant.get("price") not in (None, "", [], {})
-                and not _detail_price_value_is_low_signal(variant.get("price"))
-                and not _detail_price_is_cent_magnitude_copy(
-                    variant.get("price"), price
+                record["price"] = price
+                append_record_field_source(record, "price", "json_ld")
+            if _should_override_record_price_from_dom(
+                record=record,
+                dom_price=price,
+                record_price_is_low_signal=record_price_is_low_signal,
+            ):
+                record["price"] = price
+                append_record_field_source(record, "price", "dom_text")
+            if isinstance(selected_variant, dict) and (
+                selected_variant.get("price") in (None, "", [], {})
+                or _detail_price_value_is_low_signal(selected_variant.get("price"))
+                or _detail_price_is_cent_magnitude_copy(
+                    selected_variant.get("price"), price
                 )
             ):
-                continue
-            variant["price"] = price
-            if currency and variant.get("currency") in (None, "", [], {}):
-                variant["currency"] = currency
+                selected_variant["price"] = price
+                if currency and selected_variant.get("currency") in (None, "", [], {}):
+                    selected_variant["currency"] = currency
+            variants = record.get("variants")
+            if isinstance(variants, list):
+                for variant in variants:
+                    if not isinstance(variant, dict):
+                        continue
+                    if (
+                        price_source == "json_ld"
+                        and jsonld_currency
+                        and _detail_price_is_visible_outlier(
+                            variant.get("price"), price
+                        )
+                        and not (
+                            record_field_sources(record, "variants")
+                            & DETAIL_AUTHORITATIVE_PRICE_SOURCE_SET
+                        )
+                    ):
+                        variant["price"] = price
+                        variant["currency"] = jsonld_currency
+                        continue
+                    if (
+                        variant.get("price") not in (None, "", [], {})
+                        and not _detail_price_value_is_low_signal(
+                            variant.get("price")
+                        )
+                        and not _detail_price_is_cent_magnitude_copy(
+                            variant.get("price"), price
+                        )
+                    ):
+                        continue
+                    variant["price"] = price
+                    if currency and variant.get("currency") in (None, "", [], {}):
+                        variant["currency"] = currency
 
     original_price = jsonld_original_price or _detail_original_price_from_html(
         soup,
@@ -202,6 +212,13 @@ def backfill_detail_price_from_html(
         original_price_source = "json_ld" if jsonld_original_price else "dom_text"
         record["original_price"] = original_price
         append_record_field_source(record, "original_price", original_price_source)
+        if (
+            original_price_source == "json_ld"
+            and jsonld_currency
+            and record.get("currency") in (None, "", [], {})
+        ):
+            record["currency"] = jsonld_currency
+            append_record_field_source(record, "currency", "json_ld")
     if (
         isinstance(selected_variant, dict)
         and original_price not in (None, "", [], {})
@@ -215,10 +232,13 @@ def _unavailable_record_blocks_dom_price_backfill(
     record: dict[str, Any],
     *,
     jsonld_price: object,
+    visible_price: object,
 ) -> bool:
     if text_or_none(record.get("availability")) != AVAILABILITY_OUT_OF_STOCK:
         return False
     if jsonld_price not in (None, "", [], {}):
+        return False
+    if visible_price not in (None, "", [], {}):
         return False
     return _price_sources_are_non_authoritative(record)
 
@@ -243,9 +263,8 @@ def _drop_unavailable_dom_backfilled_detail_price(record: dict[str, Any]) -> Non
 
 
 def _price_sources_are_non_authoritative(record: dict[str, Any]) -> bool:
-    return not (
-        record_field_sources(record, "price") & DETAIL_AUTHORITATIVE_PRICE_SOURCE_SET
-    )
+    price_sources = record_field_sources(record, "price")
+    return bool(price_sources) and not (price_sources & DETAIL_AUTHORITATIVE_PRICE_SOURCE_SET)
 
 
 def drop_low_signal_zero_detail_price(record: dict[str, Any]) -> None:

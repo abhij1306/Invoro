@@ -123,7 +123,7 @@ def _resolve_browser_binary(engine: str) -> tuple[str | None, str]:
     if normalized_engine == _PATCHRIGHT_BROWSER_ENGINE:
         return None, _PATCHRIGHT_BROWSER_ENGINE
     if normalized_engine == _CHROMIUM_BROWSER_ENGINE:
-        return None, _PATCHRIGHT_BROWSER_ENGINE
+        return None, _CHROMIUM_BROWSER_ENGINE
     executable_path = real_chrome_executable_path()
     if executable_path is None:
         return None, _REAL_CHROME_BROWSER_ENGINE
@@ -694,6 +694,36 @@ async def _evict_idle_browser_runtimes_locked() -> None:
         )
         if current_runtime is not runtime:
             continue
+        active_and_queued, last_used = runtime.eviction_key()
+        if active_and_queued != 0 or last_used != candidate_last_used:
+            continue
+        if pool_name == "direct":
+            _BROWSER_POOL.direct.pop(str(key), None)
+        else:
+            proxied_key = key if isinstance(key, tuple) and len(key) == 2 else None
+            if proxied_key is not None:
+                _BROWSER_POOL.proxied.pop(proxied_key, None)
+        await runtime.close()
+    while sum(len(pool) for _pool_name, pool in pools) > max_entries:
+        remaining: list[
+            tuple[str, str | tuple[str, str], SharedBrowserRuntime, float]
+        ] = []
+        for pool_name, pool in pools:
+            for key, runtime in tuple(pool.items()):
+                active_and_queued, last_used = runtime.eviction_key()
+                if active_and_queued != 0:
+                    continue
+                if pool_name == "direct":
+                    normalized_key = str(key)
+                elif isinstance(key, tuple) and len(key) == 2:
+                    normalized_key = (str(key[0]), str(key[1]))
+                else:
+                    continue
+                remaining.append((pool_name, normalized_key, runtime, last_used))
+        if not remaining:
+            break
+        remaining.sort(key=lambda item: (item[2].eviction_key()[0], item[3]))
+        pool_name, key, runtime, candidate_last_used = remaining[0]
         active_and_queued, last_used = runtime.eviction_key()
         if active_and_queued != 0 or last_used != candidate_last_used:
             continue

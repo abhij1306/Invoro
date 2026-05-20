@@ -27,7 +27,11 @@ def _coerce_int(
 
 
 def _coerce_optional_int(
-    value: object, minimum: int = 0, maximum: int | None = None
+    value: object,
+    minimum: int = 0,
+    maximum: int | None = None,
+    *,
+    reject_non_positive: bool = False,
 ) -> int | None:
     if value is None:
         return None
@@ -36,8 +40,9 @@ def _coerce_optional_int(
         return None
     try:
         result = int(text)
-        if result < minimum:
+        if reject_non_positive and result <= 0:
             return None
+        result = max(result, minimum)
         if maximum is not None:
             result = min(result, maximum)
         return result
@@ -254,6 +259,7 @@ class CrawlRunSettings:
                     "source_run_id": _coerce_optional_int(
                         last_quality_success.get("source_run_id"),
                         1,
+                        reject_non_positive=True,
                     ),
                     "timestamp": _clean_str(last_quality_success.get("timestamp")),
                 }

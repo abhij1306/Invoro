@@ -533,6 +533,55 @@ async def test_serialize_browser_page_content_reuses_prefetched_html_without_pag
     assert listing_recovery_diagnostics["status"] == "skipped"
 
 
+@pytest.mark.asyncio
+async def test_settle_browser_page_skips_platform_selector_when_probe_is_ready() -> None:
+    calls = {"probe": 0, "wait": 0}
+
+    async def get_page_html_impl(_page):
+        return "<html><body>Searching...</body></html>"
+
+    async def probe_browser_readiness(*_args, **_kwargs):
+        calls["probe"] += 1
+        return {
+            "is_ready": True,
+            "matched_listing_selectors": 0 if calls["probe"] == 1 else 1,
+            "structured_data_present": False,
+        }
+
+    async def wait_for_listing_readiness(*_args, **_kwargs):
+        calls["wait"] += 1
+        return {"status": "ok"}
+
+    result = await browser_page_flow.settle_browser_page_impl(
+        SimpleNamespace(),
+        url="https://careers.clarkassociatesinc.biz/",
+        surface="job_listing",
+        requested_fields=None,
+        timeout_seconds=5,
+        readiness_override={
+            "platform": "clark_careers",
+            "selectors": ["li[data-testid='careers-search-result-listing']"],
+            "max_wait_ms": 20000,
+        },
+        readiness_policy={"require_networkidle": True},
+        phase_timings_ms={},
+        crawler_runtime_settings=crawler_runtime_settings,
+        get_page_html_impl=get_page_html_impl,
+        probe_browser_readiness=probe_browser_readiness,
+        wait_for_listing_readiness=wait_for_listing_readiness,
+        expand_detail_content_if_needed=None,
+        append_readiness_probe=browser_page_flow.append_readiness_probe,
+        elapsed_ms=lambda _started_at: 0,
+    )
+
+    _current_probe, readiness_probes, *_rest = result
+
+    assert calls["wait"] == 0
+    assert [probe["stage"] for probe in readiness_probes] == [
+        "after_navigation",
+    ]
+
+
 def test_detail_expansion_extractability_reuses_supplied_soup_without_reparse(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -4668,6 +4717,58 @@ async def test_origin_warmup_caps_budget_to_preserve_navigation_time(
 
     assert len(page.spawned_pages) == 1
     assert page.spawned_pages[0].goto_timeout_calls == [8000]
+
+
+@pytest.mark.asyncio
+async def test_origin_warmup_keeps_minimum_budget_for_short_url_timeout(
+    patch_settings,
+) -> None:
+    patch_settings(
+        origin_warmup_max_budget_ratio=0.4,
+        browser_navigation_domcontentloaded_timeout_ms=15000,
+    )
+    page = _FakeExpansionPage(base_html="<html><body><h1>Widget</h1></body></html>")
+
+    await browser_runtime._maybe_warm_origin_before_navigation(
+        page,
+        url="https://example.com/products/widget",
+        surface="ecommerce_detail",
+        browser_engine="real_chrome",
+        browser_reason="http-escalation",
+        host_policy_snapshot=None,
+        proxy_profile=None,
+        timeout_seconds=1,
+        phase_timings_ms={},
+    )
+
+    assert len(page.spawned_pages) == 1
+    assert page.spawned_pages[0].goto_timeout_calls == [750]
+
+
+@pytest.mark.asyncio
+async def test_origin_warmup_zero_ratio_preserves_minimum_budget(
+    patch_settings,
+) -> None:
+    patch_settings(
+        origin_warmup_max_budget_ratio=0,
+        browser_navigation_domcontentloaded_timeout_ms=15000,
+    )
+    page = _FakeExpansionPage(base_html="<html><body><h1>Widget</h1></body></html>")
+
+    await browser_runtime._maybe_warm_origin_before_navigation(
+        page,
+        url="https://example.com/products/widget",
+        surface="ecommerce_detail",
+        browser_engine="real_chrome",
+        browser_reason="http-escalation",
+        host_policy_snapshot=None,
+        proxy_profile=None,
+        timeout_seconds=10,
+        phase_timings_ms={},
+    )
+
+    assert len(page.spawned_pages) == 1
+    assert page.spawned_pages[0].goto_timeout_calls == [750]
 
 
 @pytest.mark.asyncio

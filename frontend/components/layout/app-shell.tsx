@@ -488,7 +488,7 @@ function ShellContent({
                           <p className="text-foreground m-0 truncate text-sm font-medium">
                             {item.message}
                           </p>
-                          <p className="text-muted type-caption m-0">
+                          <p className="type-caption m-0">
                             {formatRelativeTime(item.created_at)}
                           </p>
                         </Link>

@@ -87,7 +87,8 @@ def is_title_noise(title: object) -> bool:
         return True
     if "star" in lowered and RATING_RE.search(lowered) and len(cleaned.split()) <= 4:
         return True
-    if lowered in LISTING_TITLE_CTA_TITLES:
+    cta_normalized = re.sub(r"[\s.。…]+$", "", lowered)
+    if lowered in LISTING_TITLE_CTA_TITLES or cta_normalized in LISTING_TITLE_CTA_TITLES:
         return True
     if lowered in DETAIL_LOW_SIGNAL_TITLE_VALUES:
         return True

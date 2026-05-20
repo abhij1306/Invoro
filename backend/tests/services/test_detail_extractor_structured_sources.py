@@ -13,6 +13,7 @@ from app.services.extract.detail.assembly.record_assembly import (
 )
 from app.services.extract.detail.variants.dom_options import variant_option_availability
 from app.services.extract.detail.price.core import (
+    backfill_detail_price_from_html,
     detail_currency_hint_is_host_level,
     reconcile_parent_price_against_variant_range,
     reconcile_detail_currency_with_url,
@@ -28,8 +29,16 @@ from app.services.extract.detail.variants.pruning import (
 )
 from app.services.extract.detail.assembly import raw_signals as detail_raw_signals
 from app.services.extract.detail.assembly import dom_completion as detail_dom_completion
+from app.services.extract.detail.assembly.title_scorer import title_needs_promotion
+from app.services.extract.detail.identity.core import (
+    _detail_title_fallback_looks_like_code,
+    detail_redirect_identity_is_mismatched,
+    detail_slug_title_fallback_from_url,
+)
+from app.services.extract.detail.text.sanitizer import detail_product_type_is_low_signal
 from app.services.extract.variant_normalization import normalize_variant_record
 from app.services.pipeline.extract_records import extract_records
+from app.services.structured_sources import harvest_js_state_objects
 from tests.fixtures.loader import read_optional_artifact_text
 
 
@@ -941,6 +950,23 @@ def test_extract_ecommerce_detail_reads_plain_initial_state_variants() -> None:
         variant.get("availability") == "out_of_stock"
         for variant in record["variants"]
     )
+
+
+def test_plain_initial_state_requires_global_assignment() -> None:
+    html = """
+    <html>
+      <head>
+        <script>
+        var INITIAL_STATE = {"product": {"name": "Unrelated Widget"}};
+        window.ACTUAL_STATE = {"product": {"name": "Real Widget"}};
+        </script>
+      </head>
+    </html>
+    """
+
+    state_objects = harvest_js_state_objects(None, html)
+
+    assert "INITIAL_STATE" not in state_objects
 
 
 def test_extract_ecommerce_detail_gender_from_explicit_structured_attribute() -> None:
@@ -5228,6 +5254,51 @@ def test_repair_ecommerce_detail_replaces_mismatched_title_when_slug_evidence_ma
     assert record["title"] == "Rambler Ceramic Stackable 8Oz"
 
 
+def test_detail_title_prime_is_not_promoted_when_supported_by_url() -> None:
+    assert not title_needs_promotion(
+        "Prime",
+        page_url="https://example.com/products/prime",
+    )
+
+
+def test_detail_title_prime_is_not_promoted_when_supported_by_terminal_slug_tokens() -> None:
+    assert not title_needs_promotion(
+        "Prime",
+        page_url="https://example.com/products/prime-day-shirt",
+    )
+
+
+def test_detail_slug_title_fallback_keeps_semantic_slug_with_model_suffix() -> None:
+    assert (
+        detail_slug_title_fallback_from_url(
+            "https://example.com/products/rambler-stackable-8oz"
+        )
+        == "rambler stackable 8oz"
+    )
+
+
+def test_detail_title_fallback_code_guard_skips_multi_token_numeric_slug() -> None:
+    assert _detail_title_fallback_looks_like_code("iphone-16-pro") is False
+    assert (
+        detail_slug_title_fallback_from_url(
+            "https://example.com/products/iphone-16-pro"
+        )
+        == "iphone 16 pro"
+    )
+
+
+def test_detail_product_type_low_signal_includes_artifact_values() -> None:
+    assert detail_product_type_is_low_signal("promotionalcallout")
+
+
+def test_detail_redirect_identity_detects_model_conflict_without_sku_evidence() -> None:
+    assert detail_redirect_identity_is_mismatched(
+        {"title": "Canon EOS R5 Camera", "price": "3999.00"},
+        page_url="https://example.com/products/canon-eos-r6-camera",
+        requested_page_url="https://example.com/products/canon-eos-r6-camera",
+    )
+
+
 def test_currency_reconcile_keeps_adapter_localized_price_over_host_hint() -> None:
     record = {
         "price": "INR 2,153.05",
@@ -5946,6 +6017,44 @@ def test_extract_detail_rejects_same_url_model_number_title_mismatch() -> None:
     assert rows == []
 
 
+def test_extract_detail_accepts_same_url_bare_size_number_difference() -> None:
+    rows = extract_detail_records(
+        "<html><body><main><h1>Cloud Runner Size 12</h1></main></body></html>",
+        "https://example.com/products/cloud-runner-size-10",
+        "ecommerce_detail",
+        None,
+        adapter_records=[
+            {
+                "title": "Cloud Runner Size 12",
+                "price": "84.00",
+                "currency": "USD",
+            }
+        ],
+    )
+
+    assert len(rows) == 1
+    assert rows[0]["title"] == "Cloud Runner Size 12"
+
+
+def test_extract_detail_accepts_same_url_generic_numeric_path_difference() -> None:
+    rows = extract_detail_records(
+        "<html><body><main><h1>Product 2 Pack</h1></main></body></html>",
+        "https://example.com/product/1234",
+        "ecommerce_detail",
+        None,
+        adapter_records=[
+            {
+                "title": "Product 2 Pack",
+                "price": "12.00",
+                "currency": "USD",
+            }
+        ],
+    )
+
+    assert len(rows) == 1
+    assert rows[0]["title"] == "Product 2 Pack"
+
+
 def test_build_detail_record_replaces_low_signal_prime_title_from_identity() -> None:
     record = build_detail_record(
         "<html><body><main><h1>Stan Smith Shoes</h1></main></body></html>",
@@ -5964,6 +6073,17 @@ def test_build_detail_record_replaces_low_signal_prime_title_from_identity() -> 
 
     assert record["title"] != "prime"
     assert "Stan Smith Shoes" in record["title"]
+
+
+def test_missing_detail_title_does_not_fall_back_to_parent_category_segment() -> None:
+    record = build_detail_record(
+        "<html><body><main><div data-testid='price'>$12.00</div></main></body></html>",
+        "https://example.com/mens-shoes/product/1234.html",
+        "ecommerce_detail",
+        None,
+    )
+
+    assert "title" not in record
 
 
 def test_build_detail_record_drops_redundant_product_details() -> None:
@@ -7494,6 +7614,29 @@ def test_extract_detail_ignores_nordstrom_sold_out_gift_option_price_from_artifa
     assert "price" not in record
     assert "currency" not in record
     assert "variant_count" not in record
+
+
+def test_out_of_stock_record_allows_dom_variant_price_repair() -> None:
+    record = {
+        "url": "https://example.com/products/widget",
+        "availability": "out_of_stock",
+        "variants": [{"sku": "WIDGET-S"}],
+        "_field_sources": {"availability": ["json_ld"]},
+    }
+
+    backfill_detail_price_from_html(
+        record,
+        html="""
+        <html>
+          <head><meta property="product:price:currency" content="USD"></head>
+          <body><main><div data-testid="price">$19.99</div></main></body>
+        </html>
+        """,
+    )
+
+    assert "price" not in record
+    assert record["variants"][0]["price"] == "19.99"
+    assert record["variants"][0]["currency"] == "USD"
 
 
 def test_extract_detail_recovers_end_option_variants_from_artifact() -> None:

@@ -248,6 +248,10 @@ def _visual_cluster_to_record(
     )
     extracted_price = extract_price_text(price_text, prefer_last=False, allow_unmarked=True)
     is_job = surface.startswith("job_")
+    if is_job and not (
+        _visual_title_bound_to_href(title_item, href) or _visual_title_matches_url(title, href)
+    ):
+        return None
     if not is_job and not extracted_price and not _visual_title_matches_url(title, href):
         return None
     record = {
@@ -394,6 +398,15 @@ def _visual_primary_anchor_item(
         )
     )
     return anchors[0]
+
+
+def _visual_title_bound_to_href(
+    title_item: dict[str, Any] | None,
+    href: str,
+) -> bool:
+    if title_item is None:
+        return False
+    return bool(href and str(title_item.get("href") or "") == href)
 
 
 def _visual_brand_item_aligned(

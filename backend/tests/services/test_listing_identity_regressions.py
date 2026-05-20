@@ -139,6 +139,12 @@ def test_looks_like_utility_url_rejects_hyphenated_policy_pages() -> None:
 
     assert looks_like_utility_url("https://content.abfrl.in/shipping-policy") is True
     assert looks_like_utility_url("https://content.abfrl.in/returns-cancel-policy") is True
+    assert (
+        looks_like_utility_url(
+            "https://euremotejobs.com/job/account-manager-generator-customers/"
+        )
+        is False
+    )
 
 
 def test_dell_spd_product_url_is_not_utility() -> None:
@@ -159,6 +165,25 @@ def test_dell_financing_url_is_utility() -> None:
         looks_like_utility_record(
             title="Learn More about financing offers",
             url="https://www.dell.com/financing/comm/mfe/us/en/learn-more",
+        )
+        is True
+    )
+
+
+def test_utility_url_token_requires_leading_boundary() -> None:
+    from app.services.extract.listing_candidate_ranking import _utility_url_token_matches
+
+    assert (
+        _utility_url_token_matches(
+            "https://example.com/products/mycart-bag",
+            "cart",
+        )
+        is False
+    )
+    assert (
+        _utility_url_token_matches(
+            "https://example.com/cart/bag",
+            "cart",
         )
         is True
     )

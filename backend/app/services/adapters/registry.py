@@ -6,7 +6,7 @@ from importlib import import_module
 import inspect
 import logging
 
-from app.services.adapters.base import AdapterResult, BaseAdapter
+from app.services.adapters.base import AdapterResult, BaseAdapter, SelectolaxJobAdapter
 from app.services.acquisition_plan import AcquisitionPlan
 from app.services.platform_policy import (
     configured_adapter_names,
@@ -16,8 +16,11 @@ from app.services.platform_policy import (
 logger = logging.getLogger(__name__)
 
 _ADAPTER_FACTORIES: dict[str, tuple[str, str]] = {
+    "algolia_jobs": ("app.services.adapters.algolia_jobs", "AlgoliaJobsAdapter"),
+    "firestore_jobs": ("app.services.adapters.firestore_jobs", "FirestoreJobsAdapter"),
     "amazon": ("app.services.adapters.amazon", "AmazonAdapter"),
     "belk": ("app.services.adapters.belk", "BelkAdapter"),
+    "bullhorn": ("app.services.adapters.bullhorn", "BullhornAdapter"),
     "walmart": ("app.services.adapters.walmart", "WalmartAdapter"),
     "ebay": ("app.services.adapters.ebay", "EbayAdapter"),
     "adp": ("app.services.adapters.adp", "ADPAdapter"),
@@ -57,7 +60,13 @@ def _build_adapter(adapter_name: str) -> BaseAdapter | None:
 def registered_adapters() -> tuple[BaseAdapter, ...]:
     adapters: list[BaseAdapter] = []
     unknown: list[str] = []
-    for adapter_name in configured_adapter_names():
+    adapter_names = list(configured_adapter_names())
+    adapter_names.extend(
+        adapter_name
+        for adapter_name in _ADAPTER_FACTORIES
+        if adapter_name not in adapter_names
+    )
+    for adapter_name in adapter_names:
         adapter = _build_adapter(adapter_name)
         if adapter is None:
             unknown.append(adapter_name)
@@ -137,8 +146,14 @@ def _surface_allows_adapter(adapter: BaseAdapter, surface: str | None) -> bool:
         adapter_hint=adapter.name,
     )
     if normalized_surface.startswith("job_"):
-        return is_job_adapter
-    return not is_job_adapter
+        return is_job_adapter or _adapter_declares_job_surface(adapter)
+    return not (is_job_adapter or _adapter_declares_job_surface(adapter))
+
+
+def _adapter_declares_job_surface(adapter: BaseAdapter) -> bool:
+    return bool(getattr(adapter, "job_surface_only", False)) or isinstance(
+        adapter, SelectolaxJobAdapter
+    )
 
 
 async def try_blocked_adapter_recovery(

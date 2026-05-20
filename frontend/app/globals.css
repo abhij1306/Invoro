@@ -41,17 +41,18 @@
   --shadow-setting-icon-active: var(--setting-icon-active-shadow);
   --font-sans: var(--font-primary-family);
   --font-mono: var(--font-mono-family);
+  --font-size-2xs: var(--text-2xs);
   --font-size-xs: var(--text-xs);
   --font-size-sm: var(--text-sm);
   --font-size-base: var(--text-base);
   --font-size-lg: var(--text-lg);
   --font-size-xl: var(--text-xl);
   --font-size-2xl: var(--text-2xl);
-  --leading-none: var(--leading-none);
-  --leading-tight: var(--leading-tight);
-  --leading-snug: var(--leading-snug);
-  --leading-normal: var(--leading-normal);
-  --leading-relaxed: var(--leading-relaxed);
+  --leading-none: 1;
+  --leading-tight: 1.2;
+  --leading-snug: 1.35;
+  --leading-normal: 1.45;
+  --leading-relaxed: 1.55;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -234,8 +235,10 @@
   /* ══ TYPE SCALE ══════════════════════════════════════════════════════════
      Body = --text-base. Display metrics sit above page titles.
      ════════════════════════════════════════════════════════════════════════ */
+  --text-2xs: 0.625rem;
+  /* 10px — dense micro-labels */
   --text-xs: 0.8125rem;
-  /* 13px — badges, timestamps, micro-labels */
+  /* 13px — badges, timestamps */
   --text-sm: 0.875rem;
   /* 14px — table data, secondary UI chrome, sidebar */
   --text-base: 0.9375rem;
@@ -803,7 +806,7 @@ select:focus-visible:not(.focus-ring) {
 /* Micro label — used for very tight mini-stats tiles and uppercase hints */
 .type-micro-label {
   font-family: var(--font-primary-family);
-  font-size: 10px;
+  font-size: var(--text-2xs);
   font-weight: var(--weight-bold);
   letter-spacing: var(--tracking-wider);
   text-transform: uppercase;

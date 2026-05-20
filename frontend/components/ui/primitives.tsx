@@ -232,7 +232,7 @@ export function Dropdown<T extends string>({
         onKeyDown={handleKeyDown}
         className={cn(
           'focus-ring border-border bg-panel text-foreground hover:border-border-strong focus:border-accent flex w-full items-center gap-2 rounded-[var(--radius-md)] border px-3 text-xs leading-[1.4] font-normal transition-[background-color,border-color]',
-          size === 'sm' ? 'h-8 text-xs' : 'h-[var(--control-height)]',
+          size === 'sm' ? 'h-8' : 'h-[var(--control-height)]',
           align === 'center' ? 'justify-center text-center' : 'justify-between text-left',
           className,
         )}

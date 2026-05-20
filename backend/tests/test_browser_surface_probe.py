@@ -177,6 +177,14 @@ def test_load_baseline_probe_script_exposes_js_entrypoint() -> None:
     assert "getHighEntropyValues" in script
 
 
+def test_baseline_probe_closes_audio_context() -> None:
+    script = probe.load_baseline_probe_script()
+
+    assert "finally" in script
+    assert "osc.stop" in script
+    assert "ctx.close" in script
+
+
 def test_build_findings_surfaces_webdriver_headless_and_webrtc() -> None:
     categories = _finding_categories(
         _report(

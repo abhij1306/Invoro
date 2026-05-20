@@ -2483,10 +2483,11 @@
       "description": "[itemprop='description'], .product-description, [data-description], meta[name='description'], meta[property='og:description']",
       "features": "[data-section='features'], .features, .product-features, #features",
       "image_url": "[itemprop='image'], meta[property='og:image']",
-      "job_type": "[itemprop='employmentType']",
-      "location": ".job-location, [itemprop='jobLocation'] [itemprop='name']",
+      "job_type": "[itemprop='employmentType'], .meta-type",
+      "location": ".job-location, .meta-location, [itemprop='jobLocation'] [itemprop='name']",
       "original_price": ".original-price, .compare-price, [data-original-price]",
       "price": "[itemprop='price'], .price, .product-price",
+      "posted_date": ".job-time",
       "publication_date": "time[datetime], [itemprop='datePublished'], .post-date, .published, .posted-on, .date",
       "qualifications": "[data-section='qualifications'], .qualifications, #qualifications",
       "rating": "[itemprop='ratingValue']",
@@ -3588,7 +3589,10 @@
     "items": [
       "/applicant/",
       "/careerexplorer/",
+      "/careers/how-we-hire",
+      "/careers/life-at-",
       "/help/",
+      "/maps/place/",
       "/savedsearches"
     ]
   },
@@ -4545,7 +4549,11 @@
       "store",
       "top rated",
       "products",
-      "sale"
+      "sale",
+      "job type",
+      "job category",
+      "experience level",
+      "location"
     ]
   },
   "LISTING_NETWORK_BACKFILL_FIELDS": {

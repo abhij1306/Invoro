@@ -1248,7 +1248,7 @@ export const LogTerminal = memo(function LogTerminal({
               }}
             >
               <div className="min-w-0 flex-1">
-                <div className="text-accent type-label-mono font-bold uppercase">
+                <div className="text-accent type-label-mono">
                   {TERMINAL_STRINGS.PAYLOAD_PEEK}
                 </div>
                 <div

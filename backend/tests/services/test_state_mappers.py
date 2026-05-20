@@ -135,6 +135,33 @@ def test_map_js_state_to_fields_treats_shopify_product_level_prices_as_cents() -
     assert mapped["original_price"] == "USD 220.00"
 
 
+def test_map_js_state_to_fields_handles_null_product_type() -> None:
+    mapped = map_js_state_to_fields(
+        {
+            "__NEXT_DATA__": {
+                "props": {
+                    "pageProps": {
+                        "product": {
+                            "id": 123,
+                            "title": "Trail Runner",
+                            "type": None,
+                            "product_type": None,
+                            "productType": None,
+                            "@type": None,
+                            "price": 99,
+                            "currency": "USD",
+                        }
+                    }
+                }
+            }
+        },
+        surface="ecommerce_detail",
+        page_url="https://store.example.com/products/trail-runner",
+    )
+
+    assert mapped["title"] == "Trail Runner"
+
+
 def test_map_js_state_to_fields_recovers_shopify_available_sizes_rows() -> None:
     mapped = map_js_state_to_fields(
         {

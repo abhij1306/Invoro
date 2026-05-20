@@ -42,6 +42,13 @@ def test_detect_platform_family_for_real_client_ats_urls() -> None:
         )
         == "adp"
     )
+    assert (
+        detect_platform_family(
+            "https://careers.clarkassociatesinc.biz/",
+            "<main><careers-search-header></careers-search-header><script src='_framework/blazor.web.js'></script></main>",
+        )
+        == "clark_careers"
+    )
 
 
 def test_resolve_listing_readiness_override_uses_platform_registry_config() -> None:
@@ -66,6 +73,17 @@ def test_resolve_listing_readiness_override_uses_platform_registry_config() -> N
         "platform": "adp",
         "domain": "workforcenow.adp.com",
         "selectors": [".current-openings-item", "[id^='lblTitle_']"],
+        "max_wait_ms": 20000,
+    }
+    assert resolve_listing_readiness_override(
+        "https://careers.clarkassociatesinc.biz/"
+    ) == {
+        "platform": "clark_careers",
+        "domain": "careers.clarkassociatesinc.biz",
+        "selectors": [
+            "li[data-testid='careers-search-result-listing']",
+            "[data-testid='careers-search-result-listing-job-title']",
+        ],
         "max_wait_ms": 20000,
     }
 

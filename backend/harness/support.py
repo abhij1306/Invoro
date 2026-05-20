@@ -28,9 +28,8 @@ from app.services.publish import VERDICT_PARTIAL, VERDICT_SUCCESS
 from app.services.publish.metrics import diagnostics_indicate_block
 from app.services.config.extraction_rules import (
     LISTING_UTILITY_TITLE_PATTERNS,
-    LISTING_UTILITY_TITLE_TOKENS,
-    LISTING_UTILITY_URL_TOKENS,
 )
+from app.services.extract.listing_candidate_ranking import looks_like_utility_record
 from app.services.config.public_record_policy import PUBLIC_RECORD_LEGACY_VARIANT_FIELDS
 from app.services.config.variant_policy import PUBLIC_VARIANT_AXIS_FIELDS
 from sqlalchemy import select
@@ -756,17 +755,7 @@ def _sample_record_audit(sample_records: list[dict[str, object]]) -> dict[str, o
 
 
 def _looks_like_utility_record(*, title: object, url: object) -> bool:
-    normalized_title = " ".join(str(title or "").strip().lower().split())
-    normalized_url = str(url or "").strip().lower()
-    if normalized_title:
-        if any(pattern.search(normalized_title) for pattern in _UTILITY_TITLE_REGEXES):
-            return True
-        if any(token in normalized_title for token in LISTING_UTILITY_TITLE_TOKENS):
-            return True
-    return bool(
-        normalized_url
-        and any(token in normalized_url for token in LISTING_UTILITY_URL_TOKENS)
-    )
+    return looks_like_utility_record(title=str(title or ""), url=str(url or ""))
 
 
 def _identity_path(url: str) -> str:

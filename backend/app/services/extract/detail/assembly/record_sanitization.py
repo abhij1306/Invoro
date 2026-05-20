@@ -11,7 +11,6 @@ import logging
 import re
 from difflib import SequenceMatcher
 from typing import Any
-from urllib.parse import urlparse
 
 
 from app.services.config.extraction_rules import (
@@ -25,10 +24,12 @@ from app.services.config.extraction_rules import (
 )
 from app.services.shared.field_coerce import (
     clean_text,
+    is_title_noise,
     text_or_none,
 )
 from app.services.extract.detail.identity.core import (
     detail_identity_codes_from_url as _detail_identity_codes_from_url,
+    detail_slug_title_fallback_from_url as _detail_slug_title_fallback_from_url,
     detail_title_from_url as _detail_title_from_url,
     semantic_detail_identity_tokens as _semantic_detail_identity_tokens,
 )
@@ -135,8 +136,8 @@ def sanitize_detail_identity_scalars(
             and not description_backed
         ):
             return
-        fallback_title = _preferred_detail_title_from_identity_url(identity_url)
-        if fallback_title:
+        fallback_title = _detail_slug_title_fallback_from_url(identity_url)
+        if fallback_title and not _fallback_title_is_low_signal(fallback_title):
             record["title"] = (
                 fallback_title.title() if fallback_is_safe else fallback_title
             )
@@ -144,32 +145,15 @@ def sanitize_detail_identity_scalars(
             field_sources["title"] = ["url_slug"]
 
 
-def _preferred_detail_title_from_identity_url(identity_url: str) -> str | None:
-    fallback_title = _detail_title_from_url(identity_url)
-    if fallback_title and not _title_fallback_looks_like_code(fallback_title):
-        return fallback_title
-    parsed = urlparse(str(identity_url or ""))
-    segments = [segment for segment in parsed.path.strip("/").split("/") if segment]
-    for segment in reversed(segments):
-        terminal = re.sub(r"\.(html?|htm)$", "", segment, flags=re.I)
-        if _title_fallback_looks_like_code(terminal):
-            continue
-        title = clean_text(re.sub(r"[-_]+", " ", terminal))
-        if len(_semantic_detail_identity_tokens(title)) >= 2:
-            return title
-    return fallback_title
-
-
-def _title_fallback_looks_like_code(value: object) -> bool:
-    text = clean_text(value)
-    if not text:
-        return False
-    compact = re.sub(r"[^A-Za-z0-9]+", "", text)
+def _fallback_title_is_low_signal(title: object) -> bool:
+    text = clean_text(title)
     return bool(
-        compact
-        and re.search(r"\d", compact)
-        and re.fullmatch(r"[A-Za-z0-9]{4,12}", compact)
+        not text
+        or detail_title_looks_like_placeholder(text)
+        or detail_title_value_is_low_signal(text)
+        or is_title_noise(text)
     )
+
 
 def _repair_detail_title_from_requested_identity(
     record: dict[str, Any],

@@ -10,6 +10,7 @@ __all__ = (
     "detail_query_identity_codes_from_url",
     "detail_identity_tokens",
     "detail_redirect_identity_is_mismatched",
+    "detail_slug_title_fallback_from_url",
     "detail_title_from_url",
     "detail_url_candidate_is_low_signal",
     "detail_url_is_collection_like",
@@ -35,9 +36,14 @@ from app.services.config.extraction_rules import (
     DETAIL_IDENTITY_CODE_MIN_LENGTH,
     DETAIL_NOISE_SECTION_SELECTORS,
     DETAIL_IDENTITY_STOPWORDS,
+    DETAIL_MODEL_CONFLICT_MIN_SHARED_WORDS,
+    DETAIL_MODEL_NUMBER_TOKEN_PATTERNS,
+    DETAIL_MODEL_SMALL_NUMERIC_TOKEN_PATTERN,
     DETAIL_NON_PAGE_FILE_EXTENSIONS,
     DETAIL_PRODUCT_PATH_TOKENS,
     DETAIL_SEARCH_QUERY_KEYS,
+    DETAIL_TITLE_FALLBACK_CODE_PATTERN,
+    DETAIL_TITLE_FALLBACK_MIN_SEMANTIC_TOKENS,
     DETAIL_UTILITY_PATH_TOKENS,
     AVAILABILITY_UNKNOWN,
     JOB_LISTING_DETAIL_ROOT_MARKERS,
@@ -284,7 +290,10 @@ def listing_url_is_structural(url: str, page_url: str) -> bool:
         page_parsed = urlparse(page_url)
         if parsed.path in ("", "/"):
             return True
-        if parsed.path.rstrip("/").lower() == page_parsed.path.rstrip("/").lower():
+        same_path = parsed.path.rstrip("/").lower() == page_parsed.path.rstrip("/").lower()
+        if same_path and _job_detail_query_has_identity(parsed.query):
+            return False
+        if same_path:
             return True
         if _listing_url_has_product_detail_identity(lowered):
             return False
@@ -462,7 +471,7 @@ def _job_detail_like_path(url: str) -> bool:
     if not terminal or _job_listing_url_is_hub(url):
         return False
     query = parsed.query.lower()
-    if any(token in query for token in ("showjob=", "jobid=", "job_id=", "gh_jid=")):
+    if _job_detail_query_has_identity(query):
         return True
     if any(marker in parsed.path.lower() for marker in JOB_LISTING_DETAIL_PATH_MARKERS):
         return True
@@ -480,6 +489,11 @@ def _job_detail_like_path(url: str) -> bool:
         ):
             return True
     return False
+
+
+def _job_detail_query_has_identity(query: str) -> bool:
+    lowered = str(query or "").lower()
+    return any(token in lowered for token in ("showjob=", "jobid=", "job_id=", "gh_jid="))
 
 
 def _detail_url_path_segments(url: str) -> list[str]:
@@ -728,33 +742,157 @@ def _detail_identity_record_tokens(record: dict[str, object]) -> set[str]:
 
 
 def _detail_requested_identity_text(page_url: object) -> str:
-    title = _detail_title_from_url(str(page_url or ""))
+    raw_url = str(page_url or "")
+    title = _detail_title_from_url(raw_url)
     if title:
         return title
-    return " ".join(_detail_url_path_segments(str(page_url or "")))
+    generic_terminal_tokens = set(DETAIL_GENERIC_TERMINAL_TOKENS)
+    for segment in reversed(_detail_url_path_segments(raw_url)):
+        terminal = re.sub(r"\.(html?|htm)$", "", segment, flags=re.I)
+        if not terminal or terminal.isdigit():
+            continue
+        terminal_tokens = _path_segment_tokens(terminal)
+        if terminal_tokens and terminal_tokens <= generic_terminal_tokens:
+            continue
+        title = clean_text(re.sub(r"[-_]+", " ", terminal))
+        semantic_tokens = _semantic_detail_identity_tokens(title)
+        if _detail_segment_looks_like_identity_code(terminal) and len(semantic_tokens) < 2:
+            continue
+        if semantic_tokens:
+            return title
+    return ""
 
 
 def _detail_model_numbers_conflict(
     requested_title: object,
     candidate_title: object,
+    *,
+    record: dict[str, object] | None = None,
 ) -> bool:
     requested_numbers = _detail_model_number_tokens(requested_title)
     candidate_numbers = _detail_model_number_tokens(candidate_title)
     if not requested_numbers or not candidate_numbers:
+        requested_numbers = _detail_small_numeric_model_tokens(requested_title)
+        candidate_numbers = _detail_small_numeric_model_tokens(candidate_title)
+        if not (
+            requested_numbers
+            and candidate_numbers
+            and _detail_has_sku_evidence(
+                record or {}, tokens=requested_numbers | candidate_numbers
+            )
+        ):
+            return False
+    if not requested_numbers or not candidate_numbers:
         return False
-    if requested_numbers & candidate_numbers:
+    if _detail_model_number_sets_compatible(requested_numbers, candidate_numbers):
         return False
     requested_words = _semantic_detail_identity_tokens(requested_title)
     candidate_words = _semantic_detail_identity_tokens(candidate_title)
     shared_words = requested_words & candidate_words
-    return len(shared_words) >= min(2, len(requested_words), len(candidate_words))
+    required_shared_words = min(
+        int(DETAIL_MODEL_CONFLICT_MIN_SHARED_WORDS),
+        len(requested_words),
+        len(candidate_words),
+    )
+    return required_shared_words > 0 and len(shared_words) >= required_shared_words
+
+
+def _detail_model_number_sets_compatible(
+    requested_numbers: set[str],
+    candidate_numbers: set[str],
+) -> bool:
+    for requested in requested_numbers:
+        for candidate in candidate_numbers:
+            if requested == candidate:
+                return True
+            shorter, longer = sorted((requested, candidate), key=len)
+            if len(shorter) >= 5 and len(longer) - len(shorter) <= 2:
+                if longer.startswith(shorter):
+                    return True
+    return False
 
 
 def _detail_model_number_tokens(value: object) -> set[str]:
+    tokens: set[str] = set()
+    text = clean_text(value)
+    for pattern in tuple(DETAIL_MODEL_NUMBER_TOKEN_PATTERNS or ()):
+        if not str(pattern).strip():
+            continue
+        for match in re.findall(str(pattern), text):
+            raw_token = match[0] if isinstance(match, tuple) else match
+            normalized = _normalized_model_token(raw_token)
+            if normalized:
+                tokens.add(normalized)
+    return tokens
+
+
+def _detail_small_numeric_model_tokens(value: object) -> set[str]:
+    pattern = str(DETAIL_MODEL_SMALL_NUMERIC_TOKEN_PATTERN or "").strip()
+    if not pattern:
+        return set()
     return {
         token.lstrip("0") or "0"
-        for token in re.findall(r"(?<![A-Za-z0-9])\d{1,4}(?![A-Za-z0-9])", clean_text(value))
+        for token in re.findall(pattern, clean_text(value))
     }
+
+
+def _detail_has_sku_evidence(
+    record: dict[str, object],
+    *,
+    tokens: set[str],
+) -> bool:
+    if not tokens:
+        return False
+    for field_name in ("sku", "product_id", "variant_id", "part_number", "barcode"):
+        normalized = _normalized_model_token(record.get(field_name))
+        if normalized and any(token in normalized for token in tokens):
+            return True
+    return False
+
+
+def _normalized_model_token(value: object) -> str:
+    normalized = re.sub(r"[^A-Za-z0-9]+", "", str(value or "")).lower()
+    if not normalized:
+        return ""
+    if normalized.isdigit():
+        return normalized.lstrip("0") or "0"
+    return normalized
+
+
+def _detail_slug_title_fallback_from_url(identity_url: str) -> str | None:
+    generic_terminal_tokens = set(DETAIL_GENERIC_TERMINAL_TOKENS)
+    for segment in reversed(_detail_url_path_segments(identity_url)):
+        terminal = re.sub(r"\.(html?|htm)$", "", segment, flags=re.I)
+        if not terminal:
+            continue
+        title = clean_text(re.sub(r"[-_]+", " ", terminal))
+        semantic_tokens = _semantic_detail_identity_tokens(title)
+        if _detail_title_fallback_looks_like_code(terminal) and (
+            len(semantic_tokens) < int(DETAIL_TITLE_FALLBACK_MIN_SEMANTIC_TOKENS)
+        ):
+            continue
+        terminal_tokens = _path_segment_tokens(terminal)
+        if terminal_tokens and terminal_tokens <= generic_terminal_tokens:
+            continue
+        if len(semantic_tokens) >= int(DETAIL_TITLE_FALLBACK_MIN_SEMANTIC_TOKENS):
+            return title
+    return None
+
+
+def _detail_title_fallback_looks_like_code(value: object) -> bool:
+    terminal = str(value or "").strip()
+    if not terminal:
+        return False
+    if re.search(r"[^A-Za-z0-9]", terminal):
+        return False
+    text = clean_text(value)
+    if not text:
+        return False
+    compact = re.sub(r"[^A-Za-z0-9]+", "", text)
+    pattern = str(DETAIL_TITLE_FALLBACK_CODE_PATTERN or "").strip()
+    return bool(
+        compact and re.search(r"\d", compact) and re.fullmatch(pattern, compact)
+    )
 
 
 def _detail_url_matches_requested_identity(
@@ -928,7 +1066,11 @@ def _detail_redirect_identity_is_mismatched(
         requested_tokens = _detail_identity_tokens(requested_title)
         candidate_title = record.get("title")
         candidate_tokens = _detail_identity_tokens(record.get("title"))
-        if _detail_model_numbers_conflict(requested_title, candidate_title):
+        if _detail_model_numbers_conflict(
+            requested_title,
+            candidate_title,
+            record=record,
+        ):
             return True
         has_strong_same_url_product_evidence = any(
             record.get(field_name) not in (None, "", [], {})
@@ -1032,6 +1174,7 @@ def _detail_redirect_identity_is_mismatched(
     detail_query_identity_codes_from_url,
     detail_identity_tokens,
     detail_redirect_identity_is_mismatched,
+    detail_slug_title_fallback_from_url,
     detail_title_from_url,
     detail_url_candidate_is_low_signal,
     detail_url_is_collection_like,
@@ -1047,6 +1190,7 @@ def _detail_redirect_identity_is_mismatched(
     _detail_query_identity_codes_from_url,
     _detail_identity_tokens,
     _detail_redirect_identity_is_mismatched,
+    _detail_slug_title_fallback_from_url,
     _detail_title_from_url,
     _detail_url_candidate_is_low_signal,
     _detail_url_is_collection_like,

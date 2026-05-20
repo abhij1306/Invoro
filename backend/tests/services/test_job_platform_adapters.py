@@ -4,12 +4,15 @@ import httpx
 import pytest
 
 from app.services.acquisition.http_client import HttpFetchResult, request_result
+from app.services.adapters import registry as adapter_registry
 from app.services.adapters.base import (
     AdapterResult,
     BaseAdapter,
     PublicEndpointAdapter,
     SelectolaxJobAdapter,
 )
+from app.services.adapters.algolia_jobs import AlgoliaJobsAdapter
+from app.services.adapters.firestore_jobs import FirestoreJobsAdapter
 from app.services.adapters.jibe import JibeAdapter
 from app.services.adapters.oracle_hcm import OracleHCMAdapter
 from app.services.adapters.registry import registered_adapters, run_adapter
@@ -20,11 +23,17 @@ from app.services.adapters.workday import WorkdayAdapter
 from app.services.adapters.registry import normalize_adapter_acquisition_url
 from app.services.config.adapter_runtime_settings import adapter_runtime_settings
 from app.services.extract.listing_candidate_ranking import (
+    best_listing_candidate_set,
+    job_listing_title_is_hub,
+    job_listing_url_is_hub,
     job_listing_url_looks_like_posting,
 )
+from app.services.extract.detail.identity.core import listing_url_is_structural
+from app.services.extract.listing_visual import visual_listing_records
 from app.services.listing_extractor import (
     extract_listing_records,
 )
+from app.services.shared.text_coerce import is_title_noise
 
 
 class _DummyAdapter(BaseAdapter):
@@ -78,6 +87,27 @@ class _ProxyPublicEndpointAdapter(PublicEndpointAdapter):
     ) -> list[dict]:
         self.captured_proxy = proxy
         return [{"url": url, "surface": surface}]
+
+
+class _UnconfiguredPublicJobAdapter(PublicEndpointAdapter):
+    name = "new_public_jobs"
+    platform_family = "new_public_jobs"
+    job_surface_only = True
+
+    async def can_handle(self, url: str, html: str) -> bool:
+        del url, html
+        return True
+
+    async def _try_public_endpoint(
+        self,
+        url: str,
+        html: str,
+        surface: str,
+        *,
+        proxy: str | None = None,
+    ) -> list[dict]:
+        del html, surface, proxy
+        return [{"url": url, "title": "Engineer"}]
 
 
 class _AsyncSelectolaxAdapter(SelectolaxJobAdapter):
@@ -174,6 +204,25 @@ async def test_run_adapter_skips_job_platform_adapter_for_commerce_surface(
     )
 
     assert result is None
+
+
+@pytest.mark.asyncio
+async def test_run_adapter_allows_job_declared_adapter_without_platform_config(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "app.services.adapters.registry.registered_adapters",
+        lambda: (_UnconfiguredPublicJobAdapter(),),
+    )
+
+    result = await run_adapter(
+        "https://example.com/jobs",
+        "<html></html>",
+        "job_listing",
+    )
+
+    assert result is not None
+    assert result.records == [{"url": "https://example.com/jobs", "title": "Engineer"}]
 
 
 @pytest.mark.asyncio
@@ -858,6 +907,198 @@ def test_registered_adapters_include_workday_and_ultipro() -> None:
     assert "ultipro_ukg" in names
 
 
+def test_registered_adapters_include_factory_entries_without_platform_config(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(adapter_registry, "configured_adapter_names", lambda: ())
+    adapter_registry.registered_adapters.cache_clear()
+    try:
+        names = {adapter.name for adapter in adapter_registry.registered_adapters()}
+    finally:
+        adapter_registry.registered_adapters.cache_clear()
+
+    assert "bullhorn" in names
+
+
+def test_listing_dedupe_keeps_distinct_urls_with_same_job_id() -> None:
+    records = best_listing_candidate_set(
+        [
+            (
+                "adapter",
+                [
+                    {
+                        "job_id": "123",
+                        "title": "Software Engineer",
+                        "url": "https://example.com/jobs/software-engineer",
+                    },
+                    {
+                        "job_id": "123",
+                        "title": "Data Engineer",
+                        "url": "https://example.com/jobs/data-engineer",
+                    },
+                ],
+            )
+        ],
+        page_url="https://example.com/jobs",
+        surface="job_listing",
+        max_records=10,
+        title_is_noise=lambda _title: False,
+        url_is_structural=lambda _url, _page_url: False,
+        detail_like_url=lambda _url: True,
+    )
+
+    assert {record["url"] for record in records} == {
+        "https://example.com/jobs/software-engineer",
+        "https://example.com/jobs/data-engineer",
+    }
+
+
+@pytest.mark.asyncio
+async def test_algolia_jobs_adapter_extracts_public_job_index(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    adapter = AlgoliaJobsAdapter()
+    html = """
+    <script>
+      window.__NUXT__.config = {public:{
+        algoliaApplicationId:"APPID",
+        algoliaApiKey:"search-key",
+        algoliaJobsIndexSuperRanked:"jobs_prod_super_ranked"
+      }}
+    </script>
+    """
+    calls: list[tuple[str, dict[str, object]]] = []
+
+    async def _fake_request_json(url: str, **kwargs):
+        calls.append((url, kwargs))
+        return {
+            "hits": [
+                {
+                    "objectID": "19640",
+                    "title": "AI Policy Lead",
+                    "company_name": "Talos Network",
+                    "card_locations": ["Brussels, Belgium"],
+                    "salary": "EUR 5,000/month",
+                    "tags_role_type": ["Full-time"],
+                    "description_short": "<p>Shape AI policy.</p>",
+                    "url_external": "https://example.org/role",
+                    "posted_at_relative": "1 day ago",
+                }
+            ]
+        }
+
+    monkeypatch.setattr(adapter, "_request_json", _fake_request_json)
+
+    assert await adapter.can_handle("https://jobs.80000hours.org/jobs", html)
+    records = await adapter.try_public_endpoint(
+        "https://jobs.80000hours.org/jobs",
+        html,
+        "job_listing",
+    )
+
+    assert len(records) == 1
+    assert records[0] == {
+        "title": "AI Policy Lead",
+        "url": "https://example.org/role",
+        "apply_url": "https://example.org/role",
+        "job_id": "19640",
+        "company": "Talos Network",
+        "location": "Brussels, Belgium",
+        "salary": "EUR 5,000/month",
+        "job_type": "Full-time",
+        "posted_date": "1 day ago",
+        "description": "Shape AI policy.",
+    }
+    assert calls[0][0] == "https://APPID-dsn.algolia.net/1/indexes/jobs_prod_super_ranked/query"
+    assert calls[0][1]["headers"]["X-Algolia-Application-Id"] == "APPID"
+
+
+@pytest.mark.asyncio
+async def test_firestore_jobs_adapter_extracts_public_published_jobs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    adapter = FirestoreJobsAdapter()
+    calls: list[tuple[str, dict[str, object]]] = []
+
+    async def _fake_request_json(url: str, **kwargs):
+        calls.append((url, kwargs))
+        return [
+            {
+                "document": {
+                    "name": "projects/djplatform/databases/(default)/documents/jobs/job123",
+                    "fields": {
+                        "title": {"stringValue": "Senior Python Developer"},
+                        "slug": {"stringValue": "senior-python-developer"},
+                        "publishedAt": {"timestampValue": "2026-05-16T00:51:48Z"},
+                        "locationSlugs": {
+                            "arrayValue": {"values": [{"stringValue": "PL"}]}
+                        },
+                        "type": {
+                            "mapValue": {
+                                "fields": {
+                                    "name": {
+                                        "mapValue": {
+                                            "fields": {
+                                                "display": {"stringValue": "Part Time"}
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "salary": {
+                            "mapValue": {
+                                "fields": {
+                                    "public": {"booleanValue": True},
+                                    "currency": {"stringValue": "USD"},
+                                    "from": {"doubleValue": 24.63},
+                                    "to": {"doubleValue": 35.58},
+                                    "type": {"stringValue": "hourly"},
+                                }
+                            }
+                        },
+                        "company": {
+                            "mapValue": {
+                                "fields": {
+                                    "username": {"stringValue": "monterail"},
+                                    "name": {"stringValue": "Monterail"},
+                                }
+                            }
+                        },
+                    },
+                }
+            }
+        ]
+
+    monkeypatch.setattr(adapter, "_request_json", _fake_request_json)
+
+    assert await adapter.can_handle("https://dynamitejobs.com/remote-jobs", "")
+    records = await adapter.try_public_endpoint(
+        "https://dynamitejobs.com/remote-jobs",
+        "",
+        "job_listing",
+    )
+
+    assert records == [
+        {
+            "title": "Senior Python Developer",
+            "url": "https://dynamitejobs.com/company/monterail/remote-job/senior-python-developer",
+            "job_id": "job123",
+            "company": "Monterail",
+            "location": "PL",
+            "job_type": "Part Time",
+            "posted_date": "2026-05-16T00:51:48Z",
+            "salary": "USD 24.63 - 35.58 hourly",
+        }
+    ]
+    assert "firestore.googleapis.com" in calls[0][0]
+    assert calls[0][1]["json_body"]["structuredQuery"]["where"]["fieldFilter"] == {
+        "field": {"fieldPath": "status"},
+        "op": "EQUAL",
+        "value": {"stringValue": "published"},
+    }
+
+
 @pytest.mark.asyncio
 async def test_jibe_adapter_uses_shared_request_json_contract(
     monkeypatch: pytest.MonkeyPatch,
@@ -1111,6 +1352,100 @@ def test_extract_listing_records_preserves_job_cards_inside_filtered_container()
             "salary": "$1,886",
         }
     ]
+
+
+def test_job_listing_filters_remote_category_hub_links() -> None:
+    page_url = "https://euremotejobs.com/"
+    html = """
+    <html>
+      <body>
+        <footer>
+          <a href="https://euremotejobs.com/jobs/remote-marketing-jobs/">Remote Marketing Jobs</a>
+          <a href="https://euremotejobs.com/jobs/remote-sales-jobs/">Remote Sales Jobs</a>
+        </footer>
+      </body>
+    </html>
+    """
+
+    assert job_listing_title_is_hub("Remote Marketing Jobs")
+    assert job_listing_url_is_hub("https://euremotejobs.com/jobs/remote-marketing-jobs/")
+    assert extract_listing_records(html, page_url, "job_listing", max_records=10) == []
+
+
+def test_job_listing_extracts_anchor_wrapped_job_cards() -> None:
+    html = """
+    <html>
+      <body>
+        <a href="https://euremotejobs.com/job/fraud-data-analyst/" class="job-card-link">
+          <div class="job-card">
+            <div class="job-logo"><img class="company_logo" alt="Patrianna"></div>
+            <div class="job-details">
+              <h2 class="job-title">Fraud Data Analyst</h2>
+              <div class="company-name">Patrianna</div>
+              <div class="job-meta">
+                <div class="meta-item meta-location">EMEA</div>
+                <div class="meta-item meta-type">Full Time</div>
+              </div>
+            </div>
+            <div class="job-time">Posted 2 days ago</div>
+          </div>
+        </a>
+      </body>
+    </html>
+    """
+
+    records = extract_listing_records(
+        html,
+        "https://euremotejobs.com/",
+        "job_listing",
+        max_records=10,
+    )
+
+    assert records == [
+        {
+            "source_url": "https://euremotejobs.com/",
+            "_source": "dom_listing",
+            "title": "Fraud Data Analyst",
+            "url": "https://euremotejobs.com/job/fraud-data-analyst/",
+            "company": "Patrianna",
+            "location": "EMEA",
+            "job_type": "Full Time",
+            "posted_date": "Posted 2 days ago",
+        }
+    ]
+
+
+def test_visual_job_listing_rejects_unbound_neighbor_title() -> None:
+    records = visual_listing_records(
+        [
+            {
+                "tag": "a",
+                "text": "Read more",
+                "href": "https://dynamitejobs.com/company/movebuddhacom/remote-job/senior-wordpress-developer-2",
+                "x": 40,
+                "y": 100,
+                "width": 120,
+                "height": 20,
+                "score": 16,
+            },
+            {
+                "tag": "h3",
+                "text": "Full-Time AI-Powered Video Editor",
+                "x": 42,
+                "y": 150,
+                "width": 260,
+                "height": 24,
+                "score": 8,
+            },
+        ],
+        page_url="https://dynamitejobs.com/remote-jobs",
+        surface="job_listing",
+        max_records=10,
+        title_is_noise=is_title_noise,
+        url_is_structural=listing_url_is_structural,
+    )
+
+    assert records == []
 
 
 def test_oracle_hcm_adapter_extracts_site_number_and_job_id_from_candidate_experience_paths() -> (

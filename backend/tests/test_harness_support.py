@@ -825,6 +825,41 @@ def test_evaluate_quality_accepts_non_utility_listing_rows_without_price_when_fi
     assert quality["quality_checks"]["listing_noise_ok"] is True
 
 
+def test_evaluate_quality_does_not_flag_job_account_slug_as_utility() -> None:
+    site = {
+        "name": "EU Remote Jobs",
+        "url": "https://euremotejobs.com/",
+        "surface": "job_listing",
+        "quality_expectations": {"require_listing_noise_free": True},
+    }
+    result = {
+        "status": "completed",
+        "verdict": "success",
+        "records": 1,
+        "sample_records": [
+            {
+                "title": "Account Manager: Generator Customers",
+                "url": "https://euremotejobs.com/job/account-manager-generator-customers/",
+                "populated_fields": 7,
+                "price_present": False,
+            }
+        ],
+        "sample_semantics": {
+            "price_present": False,
+            "variant_count": 0,
+            "variants_with_axes_count": 0,
+            "variants_all_have_axes": False,
+            "variants_with_price_count": 0,
+            "legacy_variant_keys_present": False,
+        },
+        "failure_mode": "success",
+    }
+
+    quality = evaluate_quality(site, result)
+
+    assert quality["quality_checks"]["listing_noise_ok"] is True
+
+
 def test_acceptance_runner_uses_quality_verdict_for_curated_sites() -> None:
     site = {
         "name": "Catalog",

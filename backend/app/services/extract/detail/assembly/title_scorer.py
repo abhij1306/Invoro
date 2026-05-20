@@ -12,6 +12,7 @@ from typing import Any
 
 from app.services.config.extraction_rules import (
     DETAIL_LOW_SIGNAL_TITLE_VALUES,
+    TITLE_PROMOTION_EXACT_VALUES,
     TITLE_PROMOTION_PREFIXES,
     TITLE_PROMOTION_SEPARATOR,
     TITLE_PROMOTION_SUBSTRINGS,
@@ -21,6 +22,11 @@ from app.services.shared.field_coerce import is_title_noise, text_or_none
 _low_signal_title_values = frozenset(
     str(value).strip().lower()
     for value in tuple(DETAIL_LOW_SIGNAL_TITLE_VALUES or ())
+    if str(value).strip()
+)
+_title_promotion_exact_values = frozenset(
+    str(value).strip().lower()
+    for value in tuple(TITLE_PROMOTION_EXACT_VALUES or ())
     if str(value).strip()
 )
 
@@ -36,6 +42,7 @@ def promote_detail_title(
     title = text_or_none(record.get("title"))
     if not title or not title_needs_promotion(title, page_url=page_url):
         return None
+    force_semantic_replacement = title.strip().lower() in _title_promotion_exact_values
     values = list(candidates.get("title", []))
     sources = list(candidate_sources.get("title", []))
     ranked_candidates = sorted(
@@ -69,6 +76,7 @@ def promote_detail_title(
             and (
                 rank < current_rank
                 or (rank == current_rank and len(candidate) > len(title))
+                or (force_semantic_replacement and len(candidate) > len(title))
             )
         ),
         None,
@@ -84,10 +92,12 @@ def title_needs_promotion(title: str, *, page_url: str) -> bool:
     host = str(urlparse(page_url).hostname or "").strip().lower()
     if not normalized_title:
         return False
+    if normalized_title in _low_signal_title_values:
+        return not _title_supported_by_url(normalized_title, page_url=page_url)
     if is_title_noise(normalized_title):
         return True
-    if normalized_title in _low_signal_title_values:
-        return True
+    if normalized_title in _title_promotion_exact_values:
+        return not _title_supported_by_url(normalized_title, page_url=page_url)
     if any(normalized_title.startswith(prefix) for prefix in TITLE_PROMOTION_PREFIXES):
         return True
     if TITLE_PROMOTION_SEPARATOR in normalized_title:
@@ -100,3 +110,21 @@ def title_needs_promotion(title: str, *, page_url: str) -> bool:
     compact_title = re.sub(r"[^a-z0-9]+", "", normalized_title)
     compact_host = re.sub(r"[^a-z0-9]+", "", host_label)
     return compact_title == compact_host
+
+
+def _title_supported_by_url(title: str, *, page_url: str) -> bool:
+    title_tokens = {
+        token for token in re.split(r"[^a-z0-9]+", title.lower()) if len(token) >= 3
+    }
+    if not title_tokens:
+        return False
+    segments = [
+        segment
+        for segment in urlparse(page_url).path.lower().strip("/").split("/")
+        if segment
+    ]
+    path_segment = segments[-1] if segments else ""
+    path_tokens = {
+        token for token in re.split(r"[^a-z0-9]+", path_segment) if len(token) >= 3
+    }
+    return bool(path_tokens) and title_tokens <= path_tokens

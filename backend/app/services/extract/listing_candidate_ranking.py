@@ -17,12 +17,15 @@ __all__ = (
 import re
 from collections import Counter
 from typing import Any, Callable
-from urllib.parse import urlsplit
+from urllib.parse import parse_qsl, urlsplit
 
 from app.services.config.extraction_rules import (
     DETAIL_COLLECTION_PATH_TOKENS,
     DETAIL_PRODUCT_PATH_TOKENS,
     JOB_POSTING_PATH_MARKERS,
+    JOB_LISTING_HUB_TERMINAL_SUFFIXES,
+    JOB_LISTING_HUB_TITLE_PREFIXES,
+    JOB_LISTING_HUB_TITLE_SUFFIXES,
     JOB_UTILITY_URL_TOKENS,
     LISTING_EDITORIAL_PATH_SEGMENTS,
     LISTING_EDITORIAL_TITLE_PATTERNS,
@@ -216,11 +219,17 @@ def _listing_record_dedupe_key(
         )
         if product_id:
             return f"id:{product_id.lower()}"
+        job_id = clean_text(record.get("job_id") or record.get("requisition_id"))
+        if job_id:
+            return f"job:{job_id.lower()}"
         return ""
     if detail_like_url is not None and detail_like_url(url):
         parsed = urlsplit(url)
         host = str(parsed.hostname or "").lower()
         path = str(parsed.path or "").rstrip("/").lower()
+        query_identity = _job_detail_query_identity(parsed.query)
+        if host and path and query_identity:
+            return f"path:{host}{path}?{query_identity}"
         if host and path:
             return f"path:{host}{path}"
     return f"url:{url}"
@@ -511,6 +520,11 @@ def job_listing_title_is_hub(title: str) -> bool:
         return False
     if lowered in {"jobs", "careers", "openings"}:
         return True
+    if lowered.endswith(tuple(JOB_LISTING_HUB_TITLE_SUFFIXES)) and (
+        lowered.startswith(tuple(JOB_LISTING_HUB_TITLE_PREFIXES))
+        or len([token for token in re.split(r"[^a-z0-9]+", lowered) if token]) <= 4
+    ):
+        return True
     return lowered.startswith(
         (
             "jobs in ",
@@ -545,15 +559,27 @@ def job_listing_url_is_hub(url: str) -> bool:
         )
     ):
         return True
+    if terminal.endswith(tuple(JOB_LISTING_HUB_TERMINAL_SUFFIXES)) and not re.search(
+        r"\d{4,}", terminal
+    ):
+        return True
     return False
 
 
 def job_listing_url_is_utility(url: str) -> bool:
-    lowered = url.lower()
     return any(
-        token in lowered
+        _utility_url_token_matches(str(url or "").strip().lower(), token)
         for token in JOB_UTILITY_URL_TOKENS
     )
+
+
+def _job_detail_query_identity(query: str) -> str:
+    for key, value in parse_qsl(str(query or ""), keep_blank_values=True):
+        normalized_key = str(key or "").strip().lower()
+        normalized_value = str(value or "").strip().lower()
+        if normalized_key in {"showjob", "jobid", "job_id", "gh_jid"} and normalized_value:
+            return f"{normalized_key}={normalized_value}"
+    return ""
 
 
 def _path_segment_tokens(value: str) -> set[str]:
@@ -642,7 +668,7 @@ def looks_like_utility_url(url: str) -> bool:
     ):
         return True
     return any(
-        re.search(rf"{re.escape(token)}(?:[-_/?#]|$)", normalized_url)
+        _utility_url_token_matches(normalized_url, token)
         for token in LISTING_UTILITY_URL_TOKENS
     )
 
@@ -650,6 +676,30 @@ def looks_like_utility_url(url: str) -> bool:
 def looks_like_utility_record(*, title: str, url: str) -> bool:
     """Single canonical utility-record check. Title or URL signals are sufficient."""
     return looks_like_utility_title(title) or looks_like_utility_url(url)
+
+
+def _utility_url_token_matches(normalized_url: str, token: str) -> bool:
+    normalized_token = str(token or "").strip().lower()
+    if not normalized_url or not normalized_token:
+        return False
+    if normalized_token.startswith("/"):
+        parsed = urlsplit(normalized_url)
+        path = str(parsed.path or "").lower()
+        token_segment = normalized_token.strip("/")
+        if not token_segment:
+            return normalized_token in normalized_url
+        if "/" in token_segment:
+            return normalized_token in path
+        return any(
+            segment == token_segment
+            or (
+                token_segment in {"privacy", "returns", "shipping", "terms"}
+                and segment.startswith(f"{token_segment}-")
+            )
+            for segment in path.strip("/").split("/")
+        )
+    pattern = rf"(?:^|[-_/?#]){re.escape(normalized_token)}(?:[-_/?#]|$)"
+    return re.search(pattern, normalized_url) is not None
 
 
 def title_contains_token_phrase(title: str, token: str) -> bool:

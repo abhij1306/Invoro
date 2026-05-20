@@ -1,6 +1,81 @@
 {
   "platforms": [
     {
+      "family": "bullhorn",
+      "domain_patterns": [
+        "bullhornstaffing.com"
+      ],
+      "html_contains": [
+        "bullhornstaffing.com/rest-services",
+        "JobBoardPost"
+      ],
+      "adapter_names": [
+        "bullhorn"
+      ],
+      "job_platform": true,
+      "requires_browser": false,
+      "network_signature_patterns": [
+        "bullhornstaffing.com/rest-services"
+      ]
+    },
+    {
+      "family": "algolia_jobs",
+      "html_contains": [
+        "algoliaapplicationid",
+        "algoliaapikey",
+        "algoliajobsindex"
+      ],
+      "adapter_names": [
+        "algolia_jobs"
+      ],
+      "job_platform": true,
+      "requires_browser": false,
+      "network_signature_patterns": [
+        "algolia.net"
+      ]
+    },
+    {
+      "family": "firestore_jobs",
+      "domain_patterns": [
+        "dynamitejobs.com"
+      ],
+      "html_contains": [
+        "firebase",
+        "djplatform"
+      ],
+      "adapter_names": [
+        "firestore_jobs"
+      ],
+      "job_platform": true,
+      "requires_browser": false,
+      "network_signature_patterns": [
+        "firestore.googleapis.com"
+      ]
+    },
+    {
+      "family": "clark_careers",
+      "domain_patterns": [
+        "careers.clarkassociatesinc.biz"
+      ],
+      "html_contains": [
+        "careers-search-header",
+        "blazor.web.js"
+      ],
+      "job_platform": true,
+      "requires_browser": true,
+      "readiness_domains": [
+        "careers.clarkassociatesinc.biz"
+      ],
+      "readiness_path_patterns": [
+        "^/$"
+      ],
+      "readiness_selectors": [
+        "li[data-testid='careers-search-result-listing']",
+        "[data-testid='careers-search-result-listing-job-title']"
+      ],
+      "readiness_max_wait_ms": 20000
+    },
+    {
       "family": "icims",
       "domain_patterns": [
         "icims.com"

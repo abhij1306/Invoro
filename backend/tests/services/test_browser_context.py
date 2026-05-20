@@ -37,6 +37,13 @@ def _context_spec(
     )
 
 
+def test_chromium_browser_binary_is_labeled_chromium() -> None:
+    assert acquisition_browser_pool._resolve_browser_binary("chromium") == (
+        None,
+        "chromium",
+    )
+
+
 def _make_fingerprint(
     *,
     screen: dict[str, object] | None = None,

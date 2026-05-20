@@ -460,7 +460,7 @@ def test_crawl_run_settings_fetch_profile_keeps_legacy_top_level_host_memory_ttl
     assert normalized["host_memory_ttl_seconds"] == 1800
 
 
-def test_crawl_run_settings_fetch_profile_treats_zero_host_memory_ttl_as_disabled() -> (
+def test_crawl_run_settings_fetch_profile_clamps_zero_host_memory_ttl_to_minimum() -> (
     None
 ):
     settings = CrawlRunSettings.from_value({"host_memory_ttl_seconds": 0})
@@ -468,9 +468,10 @@ def test_crawl_run_settings_fetch_profile_treats_zero_host_memory_ttl_as_disable
     profile = settings.fetch_profile()
     normalized = settings.normalized_for_storage()
 
-    assert profile["host_memory_ttl_seconds"] is None
-    assert normalized["fetch_profile"]["host_memory_ttl_seconds"] is None
-    assert "host_memory_ttl_seconds" not in normalized
+    minimum = crawler_runtime_settings.host_memory_ttl_min_seconds
+    assert profile["host_memory_ttl_seconds"] == minimum
+    assert normalized["fetch_profile"]["host_memory_ttl_seconds"] == minimum
+    assert normalized["host_memory_ttl_seconds"] == minimum
 
     nested_settings = CrawlRunSettings.from_value(
         {"fetch_profile": {"host_memory_ttl_seconds": 0}}
@@ -478,9 +479,9 @@ def test_crawl_run_settings_fetch_profile_treats_zero_host_memory_ttl_as_disable
     nested_profile = nested_settings.fetch_profile()
     nested_normalized = nested_settings.normalized_for_storage()
 
-    assert nested_profile["host_memory_ttl_seconds"] is None
-    assert nested_normalized["fetch_profile"]["host_memory_ttl_seconds"] is None
-    assert "host_memory_ttl_seconds" not in nested_normalized
+    assert nested_profile["host_memory_ttl_seconds"] == minimum
+    assert nested_normalized["fetch_profile"]["host_memory_ttl_seconds"] == minimum
+    assert nested_normalized["host_memory_ttl_seconds"] == minimum
 
 
 def test_crawl_run_settings_ignores_blank_or_invalid_host_memory_ttl() -> None:
@@ -492,6 +493,18 @@ def test_crawl_run_settings_ignores_blank_or_invalid_host_memory_ttl() -> None:
         assert profile["host_memory_ttl_seconds"] is None
         assert normalized["fetch_profile"]["host_memory_ttl_seconds"] is None
         assert "host_memory_ttl_seconds" not in normalized
+
+
+def test_crawl_run_settings_clamps_positive_host_memory_ttl_below_minimum(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(crawler_runtime_settings, "host_memory_ttl_min_seconds", 60)
+
+    settings = CrawlRunSettings.from_value({"host_memory_ttl_seconds": 10})
+    normalized = settings.normalized_for_storage()
+
+    assert settings.fetch_profile()["host_memory_ttl_seconds"] == 60
+    assert normalized["host_memory_ttl_seconds"] == 60
 
 
 def test_crawl_run_settings_infers_sticky_rotation_from_sessionized_proxy_username() -> (

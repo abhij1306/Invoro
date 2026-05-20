@@ -162,10 +162,12 @@
       return detected.slice(0, 50);
     };
     const collectAudio = () => {
+      let ctx;
+      let osc;
       try {
         const AudioCtor = window.AudioContext || window.webkitAudioContext;
-        const ctx = new AudioCtor();
-        const osc = ctx.createOscillator();
+        ctx = new AudioCtor();
+        osc = ctx.createOscillator();
         const analyser = ctx.createAnalyser();
         const gain = ctx.createGain();
         gain.gain.value = 0;
@@ -175,7 +177,6 @@
         osc.start(0);
         const buffer = new Float32Array(analyser.frequencyBinCount);
         analyser.getFloatFrequencyData(buffer);
-        osc.stop(0);
         const sum = buffer.reduce((left, right) => left + right, 0);
         return {
           fingerprint: sum.toFixed(2),
@@ -189,6 +190,21 @@
           channel_count: null,
           error: _error.message,
         };
+      } finally {
+        try {
+          if (osc) {
+            osc.stop(0);
+          }
+        } catch (_stopError) {
+          // Oscillator may already be stopped or may not have started.
+        }
+        try {
+          if (ctx && typeof ctx.close === "function") {
+            ctx.close();
+          }
+        } catch (_closeError) {
+          // AudioContext close failures are non-fatal for fingerprint capture.
+        }
       }
     };
     const collectPermissions = async () => {
