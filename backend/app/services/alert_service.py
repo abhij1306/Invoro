@@ -130,7 +130,9 @@ async def update_alert(
     if "condition" in data:
         validate_condition(data.get("condition"))
     if data.get("target_fields") is not None:
-        data["tracked_fields"] = data.pop("target_fields")
+        target_fields = data.pop("target_fields")
+        data["tracked_fields"] = target_fields
+        data["requested_fields"] = preserve_requested_fields(target_fields)
     if data.get("status") == MONITOR_STATUS_ARCHIVED:
         raise ValueError("Use DELETE to archive an alert")
     if data.get("status") not in {

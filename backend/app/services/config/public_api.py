@@ -62,7 +62,15 @@ PUBLIC_API_MCP_DEFAULT_BASE_URL = "https://api.crawlerai.com/api/v1"
 PUBLIC_API_CAPABILITIES = {
     "version": "v1",
     "surfaces": [PUBLIC_API_SURFACE_ECOMMERCE],
-    "tools": ["extract_product", "check_domain", "list_capabilities"],
-    "deferred": ["extract_batch", "watches"],
+    "tools": [
+        "extract_product",
+        "alert_product",
+        "get_alert_status",
+        "cancel_alert",
+        "list_alerts",
+        "check_domain",
+        "list_capabilities",
+    ],
+    "deferred": ["extract_batch"],
     "deployment": "railway-ready",
 }

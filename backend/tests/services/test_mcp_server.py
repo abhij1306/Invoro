@@ -34,7 +34,9 @@ async def test_mcp_tools_call_public_api(monkeypatch: pytest.MonkeyPatch) -> Non
 
     assert product["status"] == "ok"
     assert domain["status"] == "ok"
-    assert caps["data"]["tools"] == ["extract_product", "check_domain", "list_capabilities"]
+    assert "extract_product" in caps["data"]["tools"]
+    assert "alert_product" in caps["data"]["tools"]
+    assert "watches" not in caps["data"]["deferred"]
     assert calls[0] == {
         "method": "POST",
         "url": "https://api.test/api/v1/extract",

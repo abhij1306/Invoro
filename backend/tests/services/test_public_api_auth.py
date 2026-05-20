@@ -96,6 +96,8 @@ async def test_public_capabilities_uses_api_key_envelope(
     payload = response.json()
     assert payload["status"] == "ok"
     assert "extract_product" in payload["data"]["tools"]
+    assert "alert_product" in payload["data"]["tools"]
+    assert "watches" not in payload["data"]["deferred"]
 
 
 @pytest.mark.asyncio

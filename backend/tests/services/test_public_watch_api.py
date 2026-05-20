@@ -10,7 +10,7 @@ from app.models.api_key import ApiKey
 
 
 @pytest.mark.asyncio
-async def test_public_watches_are_deferred(db_session, test_user) -> None:
+async def test_public_watches_route_is_not_registered_after_alert_rename(db_session, test_user) -> None:
     raw_key = "crawlerai_watch_key"
     db_session.add(ApiKey(user_id=test_user.id, name="watch", key_prefix="crawlerai", key_hash=hash_api_key(raw_key), is_active=True))
     await db_session.commit()
@@ -28,5 +28,4 @@ async def test_public_watches_are_deferred(db_session, test_user) -> None:
     finally:
         app.dependency_overrides.clear()
 
-    assert response.status_code == 501
-    assert response.json()["error"]["code"] == "WORKER_REQUIRED"
+    assert response.status_code == 404

@@ -272,6 +272,10 @@ Monitor scheduling is explicit:
 - On-demand runs must not change `next_run_at`.
 - Retention must purge monitor snapshots/events beyond each monitor's `retention_days` without deleting `CrawlRun` or `CrawlRecord` rows.
 
+Product alerts are the public single-product monitoring contract. UI/API/MCP naming must use `alert`/`alerts`: console routes live under `/api/alerts`, public routes under `/api/v1/alerts`, and MCP tools use alert names. Do not register new `watch`/`watches` routes or tools. Historical plan/spec wording may mention watches, but runtime code must not expose that name.
+
+Alert `target_fields` are the extraction request owner for alert polls. Creating or updating an alert must keep `MonitorJob.tracked_fields` and `MonitorJob.requested_fields` aligned to the alert target fields so future polls extract exactly what the alert asks to monitor.
+
 HEAD pre-check is conservative. If HEAD, validator comparison, or fallback hashing fails, the monitor must proceed with a full crawl. It must never skip silently on transport failure.
 
 **VIOLATION signatures:**
@@ -279,6 +283,8 @@ HEAD pre-check is conservative. If HEAD, validator comparison, or fallback hashi
 - A run-now API call delays the next scheduled run by rewriting `next_run_at`.
 - HEAD failure or 405 causes a scheduled monitor to skip a crawl.
 - Retention deletes crawl runs or crawl records instead of only monitor-owned history/event rows.
+- `/api/v1/watches`, `/api/watches`, `watch_product`, `list_watches`, or similar runtime names are exposed after the alert rename.
+- Updating an alert from `["price", "availability"]` to `["sku"]` leaves old fields in `requested_fields`.
 
 ---
 

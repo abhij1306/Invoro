@@ -9,9 +9,10 @@ from app.core.dependencies import get_current_user, get_db
 from app.core.public_auth import hash_api_key
 from app.main import app
 from app.models.api_key import ApiKey
+from app.services.acquisition.acquirer import AcquisitionResult
 from app.models.monitor import MonitorEvent, MonitorJob, MonitorWebhookDelivery
 from app.mcp.alert_server import AlertMCPServer
-from app.schemas.alert import AlertCreate
+from app.schemas.alert import AlertCreate, AlertUpdate
 from app.services.config.monitor_settings import (
     MONITOR_EVENT_FIELD_CHANGED,
     MONITOR_PRIORITY_BACKGROUND,
@@ -20,9 +21,11 @@ from app.services.config.monitor_settings import (
     WEBHOOK_STATUS_SENT,
 )
 from app.services.monitor_condition import condition_matches, validate_condition
+from app.services.monitor_change_detection import ensure_monitor_change_detection_registered
 from app.services.monitor_service import utcnow
 from app.services.monitor_webhook_service import dispatch_alert_webhooks
-from app.services.alert_service import alert_response, create_alert, list_alerts
+from app.services.pipeline import run_complete_callbacks
+from app.services.alert_service import alert_response, create_alert, list_alerts, update_alert
 
 
 class _Response:
@@ -73,6 +76,36 @@ class _BuggyHttpClient:
     async def post(self, url, *, json):
         del url, json
         raise ValueError("boom")
+
+
+class _ExistingSessionLocal:
+    def __init__(self, session):
+        self._session = session
+
+    async def __aenter__(self):
+        return self._session
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return False
+
+
+def _detail_html(*, title: str, price: str, availability: str, sku: str = "W-100") -> str:
+    return f"""
+    <html>
+      <head>
+        <script type="application/ld+json">
+        {{
+          "@context": "https://schema.org",
+          "@type": "Product",
+          "name": "{title}",
+          "sku": "{sku}",
+          "offers": {{"price": "{price}", "availability": "{availability}"}}
+        }}
+        </script>
+      </head>
+      <body><h1>{title}</h1><span>{price}</span></body>
+    </html>
+    """
 
 
 @pytest.fixture
@@ -276,6 +309,114 @@ def test_alert_response_rejects_invalid_status() -> None:
 
 
 @pytest.mark.asyncio
+async def test_alert_api_end_to_end_with_dummy_product_change(
+    public_client: AsyncClient,
+    db_session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    url = "https://dummy-alert.example/products/widget-prime"
+    html_by_url = {
+        url: _detail_html(
+            title="Widget Prime",
+            price="19.99",
+            availability="InStock",
+        )
+    }
+
+    monkeypatch.setattr(run_complete_callbacks, "_run_complete_callbacks", {})
+    ensure_monitor_change_detection_registered()
+    monkeypatch.setattr(
+        "app.services.monitor_change_detection.SessionLocal",
+        lambda: _ExistingSessionLocal(db_session),
+    )
+
+    async def _allow(url_value: str, *, user_agent: str = "*"):
+        del user_agent
+        return type(
+            "RobotsResult",
+            (),
+            {
+                "allowed": True,
+                "outcome": "allowed",
+                "robots_url": f"{url_value.rstrip('/')}/robots.txt",
+                "error": None,
+            },
+        )()
+
+    async def _fake_acquire(request):
+        return AcquisitionResult(
+            request=request,
+            final_url=request.url,
+            html=html_by_url[request.url],
+            method="test",
+            status_code=200,
+        )
+
+    async def _noop_prewarm() -> None:
+        return None
+
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.check_url_crawlability",
+        _allow,
+    )
+    monkeypatch.setattr("app.services.pipeline.extraction_loop.acquire", _fake_acquire)
+    monkeypatch.setattr("app.services.crawl.batch_runtime._prewarm_browser_pool", _noop_prewarm)
+
+    create_response = await public_client.post(
+        "/api/alerts",
+        json={
+            "url": url,
+            "target_fields": ["price", "availability"],
+            "condition": "price < 20",
+            "webhook_url": "https://agent.example/webhook",
+            "poll_interval_seconds": 60,
+        },
+    )
+
+    assert create_response.status_code == 201
+    alert = create_response.json()
+    alert_id = alert["id"]
+    assert alert["url"] == url
+    assert alert["target_fields"] == ["price", "availability"]
+    assert alert["last_known_values"] == {
+        "price": "19.99",
+        "availability": "in_stock",
+    }
+
+    html_by_url[url] = _detail_html(
+        title="Widget Prime",
+        price="17.49",
+        availability="OutOfStock",
+    )
+
+    test_response = await public_client.post(f"/api/alerts/{alert_id}/test")
+
+    assert test_response.status_code == 200
+    test_payload = test_response.json()
+    assert test_payload["delta_count"] == 2
+    assert test_payload["current_snapshot"] == {
+        "price": "17.49",
+        "availability": "out_of_stock",
+    }
+    assert test_payload["alert"]["status"] == "triggered"
+
+    history_response = await public_client.get(f"/api/alerts/{alert_id}/history")
+    assert history_response.status_code == 200
+    history_payload = history_response.json()
+    assert history_payload["total"] == 3
+    changed_fields = {
+        item["field_name"]
+        for item in history_payload["items"]
+        if item["event_type"] == MONITOR_EVENT_FIELD_CHANGED
+    }
+    assert changed_fields == {"price", "availability"}
+
+    deliveries_response = await public_client.get(f"/api/alerts/{alert_id}/deliveries")
+    assert deliveries_response.status_code == 200
+    assert deliveries_response.json() == []
+
+
+@pytest.mark.asyncio
 async def test_public_alert_api_requires_api_key(public_client: AsyncClient) -> None:
     response = await public_client.get("/api/v1/alerts")
     assert response.status_code == 401
@@ -414,6 +555,38 @@ async def test_create_alert_failure_cleans_up_partial_monitor(
 
     monitors = list((await db_session.scalars(select(MonitorJob))).all())
     assert monitors == []
+
+
+@pytest.mark.asyncio
+async def test_alert_target_field_update_replaces_requested_fields(db_session, test_user) -> None:
+    monitor = MonitorJob(
+        user_id=test_user.id,
+        name="Alert example.com",
+        urls=["https://example.com/product/1"],
+        domains=["example.com"],
+        surface="ecommerce_detail",
+        tracked_fields=["price", "availability"],
+        schedule_interval_hours=1,
+        priority=MONITOR_PRIORITY_BACKGROUND,
+        retention_days=90,
+        settings={SKIP_HEAD_CHECK_KEY: True},
+        requested_fields=["price", "availability"],
+        status=MONITOR_STATUS_ACTIVE,
+        poll_interval_seconds=300,
+        last_known_values={"price": "129.99", "availability": "in_stock"},
+    )
+    db_session.add(monitor)
+    await db_session.commit()
+
+    updated = await update_alert(
+        db_session,
+        alert_id=int(monitor.id),
+        user_id=int(test_user.id),
+        payload=AlertUpdate(target_fields=["sku"]),
+    )
+
+    assert updated.tracked_fields == ["sku"]
+    assert updated.requested_fields == ["sku"]
 
 
 @pytest.mark.asyncio

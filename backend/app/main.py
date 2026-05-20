@@ -23,7 +23,6 @@ from app.api.api_keys import router as api_keys_router
 from app.api.public.capabilities import router as public_capabilities_router
 from app.api.public.domains import router as public_domains_router
 from app.api.public.extract import router as public_extract_router
-from app.api.public.watches import router as public_watches_router
 from app.api.crawl_domain import router as crawl_domain_router
 from app.api.crawls import router as crawls_router
 from app.api.data_enrichment import router as data_enrichment_router
@@ -517,7 +516,6 @@ for router in [
     public_extract_router,
     public_domains_router,
     public_capabilities_router,
-    public_watches_router,
     public_alerts_router,
     notifications_router,
     ucp_audit_router,
