@@ -1,6 +1,6 @@
 <div align="center">
 
-![CrawlerAI Logo](image.png)
+![CrawlerAI Logo](docs/assets/crawlerai-logo.png)
 
 # 🤖 CrawlerAI
 

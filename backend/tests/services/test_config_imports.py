@@ -110,7 +110,7 @@ def test_extraction_rules_export_keys_cover_module_references() -> None:
     assert "LISTING_EDITORIAL_URL_TOKENS" in extraction_rules.__all__
     assert "LISTING_EDITORIAL_PATH_SEGMENTS" in extraction_rules.__all__
     assert set(exports) <= set(extraction_rules.__all__)
-    assert "SOURCE_TIERS" in vars(extraction_rules)
+    assert getattr(extraction_rules, "SOURCE_TIERS")
     assert (
         extraction_rules.AVAILABILITY_OUT_OF_STOCK
         in extraction_rules.NOISY_PRODUCT_ATTRIBUTE_KEYS

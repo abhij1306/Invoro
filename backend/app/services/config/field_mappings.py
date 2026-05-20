@@ -18,9 +18,6 @@ _STATIC_EXPORTS = {
     if not name.startswith("_")
 }
 
-for _name, _value in _STATIC_EXPORTS.items():
-    globals()[_name] = _value if _value is not None else ()
-
 COLOR_FIELD = "color"
 TITLE_FIELD = "title"
 SIZE_FIELD = "size"
@@ -126,9 +123,10 @@ _EXTRA_EXPORTS = [
 
 def __getattr__(name: str) -> Any:
     try:
-        return _STATIC_EXPORTS[name]
+        value = _STATIC_EXPORTS[name]
     except KeyError as exc:
         raise AttributeError(name) from exc
+    return value if value is not None else ()
 
 
 __all__ = sorted(list(_STATIC_EXPORTS.keys()) + _EXTRA_EXPORTS)

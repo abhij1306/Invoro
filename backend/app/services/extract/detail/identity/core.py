@@ -77,6 +77,13 @@ from app.services.shared.field_coerce import (
     text_or_none,
 )
 from app.services.field_url_normalization import same_site
+from app.services.extract.detail.identity.jsonld_identity import (
+    jsonld_item_candidate_record,
+    jsonld_item_product_name,
+    jsonld_item_supports_identity,
+    jsonld_items,
+    prune_duplicate_product_headings,
+)
 
 logger = logging.getLogger(__name__)
 _DETAIL_IDENTITY_QUERY_KEYS = frozenset(
@@ -124,46 +131,6 @@ def _listing_url_has_product_detail_identity(url: str) -> bool:
     return LISTING_PRODUCT_DETAIL_ID_RE.search(str(url or "")) is not None
 
 
-def _jsonld_graph_items(item: dict[str, object]) -> list[object]:
-    graph = item.get("@graph")
-    if isinstance(graph, list):
-        return list(graph)
-    if isinstance(graph, dict):
-        return [graph]
-    return [item]
-
-
-def _jsonld_items(payload: object) -> list[object]:
-    if isinstance(payload, list):
-        items: list[object] = []
-        for item in payload:
-            items.extend(_jsonld_graph_items(item) if isinstance(item, dict) else [item])
-        return items
-    if isinstance(payload, dict):
-        return _jsonld_graph_items(payload)
-    return []
-
-
-def _jsonld_item_supports_identity(item: dict[str, object]) -> bool:
-    return any(key in item for key in ("name", "offers", "sku", "mpn"))
-
-
-def _jsonld_item_product_name(item: dict[str, object]) -> str:
-    raw_name = item.get("name")
-    return raw_name.strip() if isinstance(raw_name, str) else ""
-
-
-def _jsonld_item_candidate_record(item: dict[str, object]) -> dict[str, object]:
-    return {
-        "title": item.get("name"),
-        "sku": item.get("sku") or item.get("productId"),
-        "brand": item.get("brand"),
-        "color": item.get("color"),
-        "size": item.get("size"),
-        "description": item.get("description"),
-    }
-
-
 def _jsonld_item_matches_requested_identity(
     item: dict[str, object],
     *,
@@ -179,30 +146,9 @@ def _jsonld_item_matches_requested_identity(
         ):
             return True
     return _record_matches_requested_detail_identity(
-        _jsonld_item_candidate_record(item),
+        jsonld_item_candidate_record(item),
         requested_page_url=requested_page_url,
     )
-
-
-def _prune_duplicate_product_headings(
-    soup: BeautifulSoup,
-    *,
-    pruned_product_names: list[str],
-) -> None:
-    def _norm(value: str) -> str:
-        return " ".join(value.lower().split())
-
-    pruned_norms = {_norm(name) for name in pruned_product_names if name}
-    h1_nodes = list(soup.find_all("h1"))
-    keep_non_pruned_h1 = any(
-        (h1_text := _norm(h1.get_text(separator=" ", strip=True)))
-        and h1_text not in pruned_norms
-        for h1 in h1_nodes
-    )
-    for h1 in h1_nodes:
-        h1_text = _norm(h1.get_text(separator=" ", strip=True))
-        if h1_text and h1_text in pruned_norms and keep_non_pruned_h1:
-            h1.decompose()
 
 
 def prune_irrelevant_detail_dom_nodes(
@@ -215,17 +161,17 @@ def prune_irrelevant_detail_dom_nodes(
     for script in soup.select("script[type='application/ld+json']"):
         try:
             payload = json.loads(script.get_text())
-            items = _jsonld_items(payload)
+            items = jsonld_items(payload)
             if not items:
                 continue
 
             match_found = False
             script_product_name = ""
             for item in items:
-                if not isinstance(item, dict) or not _jsonld_item_supports_identity(item):
+                if not isinstance(item, dict) or not jsonld_item_supports_identity(item):
                     continue
                 if not script_product_name:
-                    script_product_name = _jsonld_item_product_name(item)
+                    script_product_name = jsonld_item_product_name(item)
                 if _jsonld_item_matches_requested_identity(
                     item,
                     page_url=page_url,
@@ -251,7 +197,7 @@ def prune_irrelevant_detail_dom_nodes(
             continue
 
     if pruned_product_names:
-        _prune_duplicate_product_headings(
+        prune_duplicate_product_headings(
             soup,
             pruned_product_names=pruned_product_names,
         )
@@ -612,7 +558,7 @@ def _detail_terminal_is_generic(
     generic_terminal_tokens: set[str],
 ) -> bool:
     terminal_tokens = _path_segment_tokens(terminal)
-    return terminal in generic_terminal_tokens or (
+    return terminal in generic_terminal_tokens or bool(
         terminal_tokens and terminal_tokens <= generic_terminal_tokens
     )
 

@@ -178,6 +178,30 @@ Backfilling parent `price`, `currency`, `availability`, `color`, `size`, or `ima
 
 **Fix:** Parent detail fields are extracted directly. Public variants are flat rows plus `variant_count`. Remove `selected_variant` dependencies instead of compensating for them.
 
+### AP-21: Import-time globals mutation from exported config
+
+Loading JSON config and writing each key into `globals()` makes config invisible to static analysis and easy to break silently.
+
+**Violation looks like:** `for name, value in exports.items(): globals()[name] = value` in `app/services/config/*`.
+
+**Fix:** Keep exported config in an explicit typed mapping, define code-owned constants directly, and expose compatibility values through deliberate module `__getattr__`/`__all__` only when needed.
+
+### AP-22: Blanket lint muzzle
+
+Disabling Pylint's size, complexity, duplicate-code, or function-doc checks globally turns the lint config into decoration.
+
+**Violation looks like:** `too-many-branches`, `too-many-statements`, `too-many-lines`, or `duplicate-code` in the global disable list.
+
+**Fix:** Set realistic design thresholds, add focused local suppressions only when justified, and prefer structure tests for project-specific architecture limits.
+
+### AP-23: Context-free root assets
+
+Binary assets in the repository root become mystery blobs and make README/docs coupling hard to understand.
+
+**Violation looks like:** `image.png` or another binary image committed at repo root with no descriptive path.
+
+**Fix:** Move assets under `docs/assets/` or the owning frontend/static asset folder with a descriptive filename, then update references.
+
 ---
 
 ## Required Hygiene Gates

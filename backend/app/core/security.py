@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 from datetime import UTC, datetime, timedelta
 
 from app.core.config import settings
@@ -37,8 +38,8 @@ def decode_access_token(token: str) -> dict[str, str]:
 
 def _fernet() -> Fernet:
     key = settings.encryption_key.encode("utf-8")
-    padded = base64.urlsafe_b64encode(key.ljust(32, b"0")[:32])
-    return Fernet(padded)
+    derived_key = base64.urlsafe_b64encode(hashlib.sha256(key).digest())
+    return Fernet(derived_key)
 
 
 def encrypt_secret(value: str) -> str:

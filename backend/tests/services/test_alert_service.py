@@ -1,0 +1,76 @@
+from __future__ import annotations
+
+import pytest
+
+from app.schemas.alert import AlertCreate, AlertUpdate
+from app.services.alert_service import create_alert, update_alert
+from app.services.config.monitor_settings import MONITOR_STATUS_ARCHIVED
+
+
+@pytest.mark.asyncio
+async def test_create_alert_aligns_requested_fields_with_targets(
+    db_session,
+    test_user,
+    monkeypatch,
+) -> None:
+    async def _poll(_session, *, monitor, suppress_webhooks, update_schedule):
+        assert suppress_webhooks is True
+        assert update_schedule is False
+        return 77
+
+    monkeypatch.setattr("app.services.alert_service.run_alert_poll", _poll)
+
+    monitor, run_id = await create_alert(
+        db_session,
+        user=test_user,
+        payload=AlertCreate(
+            url="https://example.com/products/widget",
+            target_fields=["price", "availability"],
+            condition="price < 50",
+            poll_interval_seconds=300,
+        ),
+    )
+
+    assert run_id == 77
+    assert monitor.tracked_fields == ["price", "availability"]
+    assert monitor.requested_fields == ["price", "availability"]
+    assert monitor.settings["skip_head_check"] is True
+
+
+@pytest.mark.asyncio
+async def test_update_alert_keeps_target_and_requested_fields_aligned(
+    db_session,
+    test_user,
+    monkeypatch,
+) -> None:
+    async def _poll(_session, *, monitor, suppress_webhooks, update_schedule):
+        return 88
+
+    monkeypatch.setattr("app.services.alert_service.run_alert_poll", _poll)
+    monitor, _ = await create_alert(
+        db_session,
+        user=test_user,
+        payload=AlertCreate(
+            url="https://example.com/products/widget",
+            target_fields=["price", "availability"],
+        ),
+    )
+
+    updated = await update_alert(
+        db_session,
+        alert_id=monitor.id,
+        user_id=test_user.id,
+        payload=AlertUpdate(target_fields=["sku"]),
+    )
+
+    assert updated.tracked_fields == ["sku"]
+    assert updated.requested_fields == ["sku"]
+    with pytest.raises(ValueError, match="Use DELETE"):
+        await update_alert(
+            db_session,
+            alert_id=monitor.id,
+            user_id=test_user.id,
+            payload=AlertUpdate(status=MONITOR_STATUS_ARCHIVED),
+        )
+
+

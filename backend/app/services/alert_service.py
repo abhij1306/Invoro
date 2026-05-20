@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pydantic import TypeAdapter, ValidationError
 from sqlalchemy import func, select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.crawl_run import CrawlRun
@@ -39,7 +40,7 @@ from app.services.monitor_service import (
     utcnow,
 )
 
-_ALERT_STATUS_ADAPTER = TypeAdapter(AlertStatus)
+_ALERT_STATUS_ADAPTER: TypeAdapter[AlertStatus] = TypeAdapter(AlertStatus)
 
 
 async def create_alert(
@@ -90,7 +91,7 @@ async def create_alert(
             update_schedule=False,
         )
         await session.refresh(monitor)
-    except Exception as exc:
+    except (RuntimeError, SQLAlchemyError, ValueError) as exc:
         await _discard_failed_alert(session, monitor_id=int(monitor.id))
         raise ValueError(f"Initial alert poll failed: {exc}") from exc
     return monitor, run_id
@@ -169,7 +170,8 @@ async def alert_run_delta_count(session: AsyncSession, *, run_id: int) -> int:
     run = await session.get(CrawlRun, run_id)
     if run is None:
         return 0
-    return int(run.summary_dict().get("monitor_change_count") or 0)
+    raw_count = run.summary_dict().get("monitor_change_count")
+    return int(raw_count) if isinstance(raw_count, int | float | str) else 0
 
 
 async def alert_history(

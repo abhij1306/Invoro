@@ -14,6 +14,7 @@ If a file is not listed, assume it is a helper under a listed owner.
 | `run_test_sites_acceptance.py` | Acceptance runner for curated test-site batches |
 | `harness_support.py` | Acceptance helpers, `TEST_SITES.md` parsing, explicit-surface handling, audit shaping |
 | `test_site_sets/commerce_browser_heavy.json` | Commerce acceptance manifest and quality expectations |
+| `browser_surface_probe/core.py`, `browser_surface_probe/report_rendering.py` | Browser-surface diagnostic harness and report rendering |
 
 ### `api/` — route handlers only
 
@@ -173,7 +174,8 @@ Canonical config owner:
 | `listing_extractor.py` | Listing-page extraction |
 | `structured_sources.py` | JSON-LD, microdata, OG, Nuxt, harvested JS state |
 | `extract/field_candidates/*` | Field candidate collection, structured payload traversal, structured variant row assembly, finalization, and scoring |
-| `js_state/state_normalizer.py` | JS state to field mapping (canonical owner) |
+| `js_state/state_normalizer.py` | JS state to ecommerce field mapping and product payload selection |
+| `js_state/job_mapper.py` | Configured job-detail JS-state mapping and reusable state-path traversal |
 | `js_state/helpers.py` | Shared JS-state variant selection, availability, stock, price, and compact-row helpers |
 | `js_state/variant_options.py` | JS-state variant axis, option-value, and display-label normalization |
 | `network_payload_mapper.py` | Network payload to field mapping |
@@ -214,6 +216,7 @@ Canonical config owner:
 | `extract/detail/variants/numbered_options.py` | DOM-axis hydration for raw numbered option variant rows |
 | `extract/detail/assembly/raw_signals.py` | Raw detail breadcrumb category and deterministic gender signal helpers |
 | `extract/detail/identity/core.py` | Detail/listing URL identity, redirect identity, and requested-detail matching |
+| `extract/detail/identity/jsonld_identity.py` | JSON-LD identity helpers and duplicate product heading pruning |
 | `extract/detail/price/core.py` | Detail price, currency reconciliation, visible PDP price backfill, and magnitude repair |
 | `extract/detail/assembly/final_cleanup.py` | Ecommerce detail final cleanup orchestrator |
 | `extract/detail/assembly/record_sanitization.py` | Detail placeholder, identity scalar, category, materials, and title cleanup |
@@ -245,6 +248,7 @@ Canonical config owners:
 | `config/public_record_policy.py` | Public persisted/exported record exclusions, URL safety, and identity value policy |
 | `config/variant_policy.py` | Public variant axes, flat variant transport fields, and variant axis aliases |
 | `config/extraction_rules.py` | extraction/runtime selector tokens, structured-source key maps, detail selectors, shell/utility path rules |
+| `config/extraction_price_rules.py` | Detail price selectors, JSON-LD price fields, currency decimal places, and price repair thresholds |
 | `config/variant_migration_rules.py` | Variant migration selectors, validation thresholds, and residual noise/url gates |
 | `config/selectors.py` | DOM selectors |
 | `config/platforms.json` | adapter metadata, signatures, JS mappings, readiness selectors |

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 from typing import Literal
 
 from pydantic import AliasChoices, Field, field_validator
@@ -25,6 +26,10 @@ class Settings(BaseSettings):
     )
 
     app_name: str = "CrawlerAI"
+    app_env: str = Field(
+        default="development",
+        validation_alias=AliasChoices("APP_ENV", "app_env"),
+    )
     backend_host: str = "127.0.0.1"
     backend_port: int = 8000
     frontend_url: str = "http://127.0.0.1:3000"
@@ -126,8 +131,9 @@ _INSECURE_DEFAULTS = {
     "replace-with-64-byte-random-secret",
     "replace-with-32-byte-minimum-secret",
 }
-_INSECURE_ADMIN_PASSWORD_DEFAULTS = {"YourSecurePassword123!"}
+_INSECURE_ADMIN_PASSWORD_DEFAULTS = {"AdminPassword123!", "YourSecurePassword123!"}
 _INSECURE_ADMIN_EMAIL_DEFAULTS = {"admin@admin.com", "admin@example.invalid"}
+_MIN_ADMIN_PASSWORD_LENGTH = 16
 
 
 def _is_non_dev_environment(env_name: str) -> bool:
@@ -135,13 +141,27 @@ def _is_non_dev_environment(env_name: str) -> bool:
     return normalized not in {"", "development", "dev", "local", "test", "testing"}
 
 
+def admin_password_strength_issues(password: str) -> list[str]:
+    issues: list[str] = []
+    if len(password) < _MIN_ADMIN_PASSWORD_LENGTH:
+        issues.append(f"at least {_MIN_ADMIN_PASSWORD_LENGTH} characters")
+    if not re.search(r"[A-Z]", password):
+        issues.append("an uppercase letter")
+    if not re.search(r"[a-z]", password):
+        issues.append("a lowercase letter")
+    if not re.search(r"\d", password):
+        issues.append("a digit")
+    if not re.search(r"[^A-Za-z0-9]", password):
+        issues.append("a special character")
+    return issues
+
+
 def _check_secret_defaults() -> None:
     """Warn loudly (or crash outside dev/test) if default secrets are still set."""
     import logging
-    import os
 
     logger = logging.getLogger("app.core.config")
-    env = os.getenv("APP_ENV", "development").lower()
+    env = str(settings.app_env or "development").lower()
     issues: list[str] = []
     if settings.jwt_secret_key in _INSECURE_DEFAULTS:
         issues.append("jwt_secret_key is set to a default value")
@@ -151,6 +171,13 @@ def _check_secret_defaults() -> None:
     default_admin_email = str(settings.default_admin_email or "").strip().lower()
     if default_admin_password in _INSECURE_ADMIN_PASSWORD_DEFAULTS:
         issues.append("default_admin_password is set to an insecure placeholder value")
+    if settings.bootstrap_admin_once and default_admin_password:
+        password_issues = admin_password_strength_issues(default_admin_password)
+        if password_issues:
+            issues.append(
+                "default_admin_password must include "
+                + ", ".join(password_issues)
+            )
     if settings.bootstrap_admin_once and not default_admin_password:
         issues.append(
             "bootstrap_admin_once requires a non-empty default_admin_password"

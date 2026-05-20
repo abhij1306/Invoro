@@ -477,7 +477,7 @@ def apply_listing_integrity_gate(
         decision = evaluate_listing_integrity(
             records, page_url=page_url, surface=surface
         )
-    except Exception:
+    except (KeyError, RuntimeError, TypeError, ValueError):
         logger.error(
             "evaluate_listing_integrity failed for page_url=%s surface=%s records=%d",
             page_url,

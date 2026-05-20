@@ -15,9 +15,6 @@ _STATIC_EXPORTS = {
     if not name.startswith("_")
 }
 
-for _name, _value in _STATIC_EXPORTS.items():
-    globals()[_name] = _value
-
 SELECTOR_SELF_HEAL_TARGET_LIMIT = 6
 SELECTOR_SELF_HEAL_DEFAULT_MIN_CONFIDENCE = 0.55
 if "SELECTOR_SYNTHESIS_KEEP_WORTHY_TAGS" in _STATIC_EXPORTS:

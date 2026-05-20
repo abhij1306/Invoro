@@ -62,7 +62,7 @@ async def _close_provider_client(
         return
     try:
         await client.aclose()
-    except Exception:
+    except (httpx.HTTPError, RuntimeError):
         logger.warning(
             "Failed to close shared %s LLM client",
             client_name,

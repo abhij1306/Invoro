@@ -1,9 +1,11 @@
 # Authentication and user lifecycle service.
 from __future__ import annotations
 
-import re
-
-from app.core.config import load_admin_bootstrap_settings, settings  # noqa: F401
+from app.core.config import (
+    admin_password_strength_issues,
+    load_admin_bootstrap_settings,
+    settings,  # noqa: F401
+)
 from app.core.security import create_access_token, hash_password, verify_password
 from app.models.user import User
 from sqlalchemy import select
@@ -15,17 +17,7 @@ BOOTSTRAP_ADMIN_ONCE = "BOOTSTRAP_ADMIN_ONCE"
 
 
 def _validate_default_admin_password(password: str) -> None:
-    issues: list[str] = []
-    if len(password) < 12:
-        issues.append("at least 12 characters")
-    if not re.search(r"[A-Z]", password):
-        issues.append("an uppercase letter")
-    if not re.search(r"[a-z]", password):
-        issues.append("a lowercase letter")
-    if not re.search(r"\d", password):
-        issues.append("a digit")
-    if not re.search(r"[^A-Za-z0-9]", password):
-        issues.append("a special character")
+    issues = admin_password_strength_issues(password)
     if issues:
         raise RuntimeError(
             f"{DEFAULT_ADMIN_PASSWORD} must include " + ", ".join(issues) + "."

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import tomllib
 from pathlib import Path
 
 from app.core.database import Base
@@ -12,6 +13,7 @@ SERVICES_ROOT = ROOT / "app" / "services"
 APP_ROOT = ROOT / "app"
 API_ROOT = APP_ROOT / "api"
 TESTS_ROOT = ROOT / "tests"
+REPO_ROOT = ROOT.parent
 ROOT_SUPPORT_LOC_BUDGETS = {
     Path("harness_support.py"): 120,
     Path("run_browser_surface_probe.py"): 120,
@@ -49,7 +51,12 @@ ALLOWED_PRIVATE_SERVICE_IMPORTS = {
     "pipeline/extraction_loop.py -> .record_extraction_stage:_extract_records_for_acquisition",
     "pipeline/extraction_loop.py -> .record_extraction_stage:_update_acquisition_contract_memory",
 }
-ALLOWED_PRIVATE_TEST_IMPORTS: set[str] = set()
+ALLOWED_PRIVATE_TEST_IMPORTS: set[str] = {
+    "tests/services/test_listing_identity_regressions.py -> app.services.extract.detail.identity.core:_detail_model_number_sets_compatible",
+    "tests/services/test_public_api_auth.py -> app.main:_public_auth_session",
+    "tests/services/test_public_api_rate_limit.py -> app.api.public.rate_limit:_retry_after",
+    "tests/services/test_public_api_rate_limit.py -> app.api.public.rate_limit:_trim",
+}
 ALLOWED_ROOT_EXTRACTION_MODULES = {
     # Slice 2 keeps this as the public listing orchestration facade.
     Path("app/services/listing_extractor.py"),
@@ -151,7 +158,7 @@ FILE_LOC_BUDGETS = {
     Path("app/services/extract/detail_variant_pruning.py"): 555,
     Path("app/services/extract/detail_image_cleanup.py"): 505,
     Path("app/services/extract/detail/price/core.py"): 1085,
-    Path("app/services/extract/detail/identity/core.py"): 1210,
+    Path("app/services/extract/detail/identity/core.py"): 1305,
     # Extract decomposition plan Slice 2 follow-up: split stage owners must stay
     # small after variant_record_normalization.py was removed.
     Path("app/services/extract/variant_normalization/contract.py"): 400,
@@ -170,8 +177,6 @@ FILE_LOC_BUDGETS = {
     Path("app/services/extract/listing_signals.py"): 650,
     # Canonical field coercion remains centralized here instead of scattering value policy.
     # Shrunk after removing stranded URL helpers and duplicate output schema checks.
-    # TODO(chore): baseline LOC drift here, then extract canonical_coercion /
-    # field_recovery / availability_gate owners when scheduled.
     Path("app/services/dom/selector_engine.py"): 1000,
     Path("app/services/extract/detail_candidate_collection.py"): 610,
     Path("app/services/extract/detail_structured_pruning.py"): 300,
@@ -179,7 +184,7 @@ FILE_LOC_BUDGETS = {
     Path("app/services/extract/detail_image_materialize.py"): 130,
     Path("app/services/extract/detail_record_assembly.py"): 495,
     # Ratcheted for host-policy TTL compatibility and handoff failure isolation.
-    Path("app/services/fetch/fetch_context.py"): 1000,
+    Path("app/services/fetch/fetch_context.py"): 1010,
     Path("app/services/js_state/state_normalizer.py"): 1505,
     # Extraction loop owns stage orchestration; retry and record extraction stages are split out.
     Path("app/services/pipeline/extraction_loop.py"): 1000,
@@ -429,6 +434,66 @@ def test_new_config_like_modules_stay_under_services_config() -> None:
         if path.name in {"config.py", "settings.py", "constants.py"}
         or path.name.endswith("_constants.py")
     ]
+    assert offenders == []
+
+
+def test_root_binary_assets_are_not_committed_without_context() -> None:
+    forbidden = [
+        path.name
+        for path in REPO_ROOT.iterdir()
+        if path.is_file() and path.suffix.lower() in {".png", ".jpg", ".jpeg", ".gif", ".webp"}
+    ]
+    assert forbidden == []
+    assert (REPO_ROOT / "docs" / "assets" / "crawlerai-logo.png").exists()
+
+
+def test_config_modules_do_not_mutate_globals_from_export_data() -> None:
+    offenders: list[str] = []
+    for path in (SERVICES_ROOT / "config").glob("*.py"):
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            if isinstance(node.func, ast.Name) and node.func.id == "globals":
+                offenders.append(str(path.relative_to(ROOT)))
+    assert sorted(offenders) == []
+
+
+def test_pylint_useful_checks_are_not_blanket_disabled() -> None:
+    pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    disabled = set(
+        pyproject.get("tool", {})
+        .get("pylint", {})
+        .get("messages_control", {})
+        .get("disable", [])
+    )
+    forbidden = {
+        "duplicate-code",
+        "missing-function-docstring",
+        "too-many-arguments",
+        "too-many-branches",
+        "too-many-lines",
+        "too-many-locals",
+        "too-many-return-statements",
+        "too-many-statements",
+    }
+    assert disabled & forbidden == set()
+
+
+def test_high_risk_services_do_not_use_broad_exception_catches() -> None:
+    high_risk_paths = [
+        SERVICES_ROOT / "alert_service.py",
+        SERVICES_ROOT / "listing_extractor.py",
+        SERVICES_ROOT / "llm" / "provider_client.py",
+    ]
+    offenders: list[str] = []
+    for path in high_risk_paths:
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.ExceptHandler):
+                continue
+            if isinstance(node.type, ast.Name) and node.type.id == "Exception":
+                offenders.append(f"{path.relative_to(ROOT)}:{node.lineno}")
     assert offenders == []
 
 

@@ -45,7 +45,7 @@ async def _prewarm_browser_pool() -> None:
     try:
         runtime = await get_browser_runtime(browser_engine="patchright")
         await runtime.ensure()
-    except Exception:
+    except (RuntimeError, SQLAlchemyError):
         logger.debug("Browser pool pre-warm failed; will launch on demand", exc_info=True)
 
 
@@ -124,7 +124,7 @@ async def _rollback_url_session(session: AsyncSession, *, context: str) -> bool:
         await session.rollback()
         session.expire_all()
         return True
-    except Exception:
+    except (RuntimeError, SQLAlchemyError):
         logger.debug("Session rollback failed during %s", context, exc_info=True)
         return False
 
@@ -153,7 +153,7 @@ async def _recover_url_failure(
             exc=exc,
             log_message=log_message,
         )
-    except Exception as original_session_error:
+    except (RuntimeError, SQLAlchemyError) as original_session_error:
         recovery_error = original_session_error
         logger.debug(
             "Original session unusable for URL failure recovery; falling back to SessionLocal",
@@ -169,7 +169,7 @@ async def _recover_url_failure(
                     exc=exc,
                     log_message=log_message,
                 )
-        except Exception as fallback_error:
+        except (RuntimeError, SQLAlchemyError) as fallback_error:
             recovery_error = fallback_error
             logger.exception(
                 "Failed to persist URL failure log for run=%s url=%s",
@@ -179,7 +179,7 @@ async def _recover_url_failure(
         await _rollback_url_session(session, context="after URL recovery fallback")
         try:
             reloaded_run = await session.get(CrawlRun, run_id, populate_existing=True)
-        except Exception as reload_error:
+        except (RuntimeError, SQLAlchemyError) as reload_error:
             logger.debug(
                 "Failed to reload run after URL failure recovery; keeping current instance",
                 exc_info=True,

@@ -173,7 +173,9 @@ async def update_monitor(
                 [*_field_list(monitor.requested_fields), *monitor.tracked_fields]
             )
     if payload.get("requested_fields") is not None:
-        monitor.requested_fields = preserve_requested_fields(payload.get("requested_fields"))
+        monitor.requested_fields = preserve_requested_fields(
+            _field_list(payload.get("requested_fields"))
+        )
     if payload.get("schedule_interval_hours") is not None:
         monitor.schedule_interval_hours = _bounded_interval(payload.get("schedule_interval_hours"))
         monitor.next_run_at = next_run_time(utcnow(), monitor.schedule_interval_hours)

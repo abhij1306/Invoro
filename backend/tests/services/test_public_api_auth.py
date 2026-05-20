@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.dependencies import get_current_user, get_db
-from app.core.public_auth import PublicApiPrincipal, authenticate_public_api_key, hash_api_key
+from app.core.public_auth import authenticate_public_api_key, hash_api_key
 from app.main import app, _public_auth_session
 from app.models.api_key import ApiKey
 from app.models.user import User

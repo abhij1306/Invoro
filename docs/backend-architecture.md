@@ -253,7 +253,7 @@ Current live behavior:
 - browser runtime is pooled and exposes runtime snapshots
 - `browserforge`-backed context identity is active
 - browser fetch uses `patchright` as the primary acquisition engine. There is no legacy `playwright-stealth` stack and no silent generic Chromium fallback. Explicit `real_chrome` remains an escalation lane for protected ecommerce detail pages and Product Intelligence native Google discovery when `C:\Program Files\Google\Chrome\Application\chrome.exe` (or `CRAWLER_RUNTIME_BROWSER_REAL_CHROME_EXECUTABLE_PATH`) is available.
-- `run_browser_surface_probe.py` is the canonical browser-surface verification harness for acquisition changes. It runs through the same shared browser runtime as crawls and writes timestamped `browser_surface_probe` artifacts with direct JS baseline, Sannysoft/Pixelscan/CreepJS extracted values, consensus drift, connection source metadata, and normalized findings.
+- `run_browser_surface_probe.py` is the canonical browser-surface verification harness for acquisition changes. It runs through the same shared browser runtime as crawls and writes timestamped `browser_surface_probe` artifacts with direct JS baseline, Sannysoft/Pixelscan/CreepJS extracted values, consensus drift, connection source metadata, and normalized findings. Report summary/Markdown rendering lives in `browser_surface_probe/report_rendering.py`.
 - the browser-surface probe treats `window.chrome.runtime` as healthy when its type is `object`, and its `isTrusted` behavioral smoke now uses real Playwright mouse input against a temporary overlay target instead of JS-dispatched synthetic events, so probe findings reflect actual runtime leaks instead of expected DOM-event semantics
 - browser contexts now reload engine-scoped per-run Playwright storage state first and then fall back to engine-scoped domain cookie memory, so `chromium`, `patchright`, and `real_chrome` do not replay each other's cookies/localStorage while still reusing learned state inside the same lane
 - domain cookie memory is intentionally filtered acquisition memory, not a verbatim storage-state cache: challenge-only bot-defense state (for example PerimeterX `_px*`, `pxcts`, PX localStorage) is dropped on load/save, and blocked browser runs do not persist domain memory
@@ -323,6 +323,7 @@ Primary files:
 - `extract/field_candidates/*`
 - `structured_sources.py`
 - `js_state/state_normalizer.py`
+- `js_state/job_mapper.py`
 - `js_state/helpers.py`
 - `network_payload_mapper.py`
 - `field_value_*`
@@ -358,7 +359,7 @@ Important implemented features:
 - detail extraction now has a DOM variant fallback for `ecommerce_detail` pages when structured data and JS state leave variant axes empty
 - listing candidate quality lives in `extract/listing_candidate_ranking.py`; listing extraction now delegates candidate admission, support-signal checks, utility rejection, dedupe, and set ranking to that owner
 - structured listing JSON-LD handling lives in `extract/structured_listing_handler.py`, article/content card text parsing lives in `extract/article_card_parser.py`, network listing row/backfill mapping lives in `extract/network_listing_mapper.py`, and structured field-candidate responsibilities live in `extract/field_candidates/*`; `listing_extractor.py` and `extraction_runtime.py` keep orchestration
-- extraction config is split by concept: `field_mappings.py` owns schemas/aliases/field-name primitives, `js_state_field_specs.py` owns glom specs, `variant_policy.py` owns variant axes and flat transport fields, and `public_record_policy.py` owns public persisted/exported record policy
+- extraction config is split by concept: `field_mappings.py` owns schemas/aliases/field-name primitives, `js_state_field_specs.py` owns glom specs, `variant_policy.py` owns variant axes and flat transport fields, `extraction_price_rules.py` owns price selectors/JSON-LD price fields/currency-price thresholds, and `public_record_policy.py` owns public persisted/exported record policy
 - variant record normalization has its own owner in `extract/variant_normalization/`; `detail_extractor.py` extracts candidates and delegates final variant axis/value cleanup
 - DOM variant recovery now recognizes radio/checkbox-based size and color groups, associates labels via `for`/parent label structure, and carries stock-derived availability (`0 Left`, `17 Left`, etc.) into `variants` and `selected_variant`
 - JS-state ecommerce-detail mapping now scores candidate product payloads so richer nested PDP nodes beat shallow landing/navigation shells, and generic direct-axis variant keys such as `condition`, `grade`, `storage`, and `memory` are normalized without adapter-specific branches

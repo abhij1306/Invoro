@@ -26,7 +26,7 @@ from app.services.config.extraction_rules import (
     DETAIL_LOW_SIGNAL_PRODUCT_TYPE_VALUES,
     ECOMMERCE_DESCRIPTION_BLOCK_LIMIT,
 )
-from app.services.extraction_html_helpers import extract_job_sections, html_to_text
+from app.services.extraction_html_helpers import html_to_text
 from app.services.field_policy import normalize_field_key
 from app.services.dom.selector_engine import dedupe_image_urls, extract_feature_rows
 from app.services.extract.variant_identity_merge import (
@@ -58,11 +58,13 @@ from app.services.js_state.helpers import (
     variant_attribute,
     variant_axes,
 )
+from app.services.js_state import job_mapper as _job_mapper
 from app.services.platform_policy import JSStateExtractorConfig, platform_js_state_extractors
 
 logger = logging.getLogger(__name__)
 PRODUCT_FIELD_SPEC = JS_STATE_PRODUCT_FIELD_SPEC
 _VARIANT_FIELD_SPEC = JS_STATE_VARIANT_FIELD_SPEC
+map_configured_state_payload = _job_mapper.map_configured_state_payload
 
 def _as_list(value: object) -> list[Any]:
     return value if isinstance(value, list) else []
@@ -270,7 +272,7 @@ def map_js_state_to_fields(
     if not js_state_objects:
         return {}
     if normalized_surface == "job_detail":
-        return _map_job_detail_state(js_state_objects)
+        return _job_mapper.map_job_detail_state(js_state_objects)
     if normalized_surface == "ecommerce_detail":
         return _map_ecommerce_detail_state(js_state_objects, page_url=page_url)
     logger.warning(
@@ -279,89 +281,6 @@ def map_js_state_to_fields(
         page_url,
     )
     return {}
-
-def _map_job_detail_state(js_state_objects: dict[str, Any]) -> dict[str, Any]:
-    mapped = _map_platform_job_detail_state(js_state_objects)
-    if not mapped:
-        return {}
-    description_html = str(mapped.pop("description_html", "") or "").strip()
-    if description_html:
-        mapped.update(extract_job_sections(description_html))
-        if "description" not in mapped:
-            mapped["description"] = html_to_text(description_html)
-    if mapped.get("apply_url") and not mapped.get("url"):
-        mapped["url"] = mapped["apply_url"]
-    return mapped
-
-def _map_platform_job_detail_state(js_state_objects: dict[str, Any]) -> dict[str, Any]:
-    for state_key, payload in js_state_objects.items():
-        if not isinstance(payload, dict):
-            continue
-        extractors = platform_js_state_extractors(
-            surface="job_detail",
-            state_key=state_key,
-        )
-        for extractor in extractors:
-            mapped = _map_configured_state_payload(
-                payload,
-                root_paths=extractor.root_paths.get(state_key, []),
-                field_paths=extractor.field_paths,
-            )
-            if mapped:
-                return mapped
-    return {}
-
-def _map_configured_state_payload(
-    payload: dict[str, Any],
-    *,
-    root_paths: list[list[str]],
-    field_paths: dict[str, list[list[str]]],
-) -> dict[str, Any]:
-    merged: dict[str, Any] = {}
-    for root_path in root_paths:
-        candidate = _path_value(payload, root_path)
-        if not isinstance(candidate, dict):
-            continue
-        mapped = compact_dict(
-            {
-                field_name: _first_path_value(candidate, paths)
-                for field_name, paths in field_paths.items()
-            }
-        )
-        for field_name, value in mapped.items():
-            if merged.get(field_name) in (None, "", [], {}) and value not in (
-                None,
-                "",
-                [],
-                {},
-            ):
-                merged[field_name] = value
-    return compact_dict(merged)
-
-def _first_path_value(payload: dict[str, Any], paths: list[list[str]]) -> Any:
-    for path in paths:
-        value = _path_value(payload, path)
-        if value not in (None, "", [], {}):
-            return value
-    return None
-
-def _path_value(payload: Any, path: list[str]) -> Any:
-    current = payload
-    for segment in path:
-        if isinstance(current, dict):
-            current = current.get(segment)
-            continue
-        if isinstance(current, list):
-            try:
-                current = current[int(segment)]
-            except (TypeError, ValueError, IndexError):
-                return None
-            continue
-        return None
-    return current
-
-
-map_configured_state_payload = _map_configured_state_payload
 
 def _map_ecommerce_detail_state(
     js_state_objects: dict[str, Any],
@@ -427,7 +346,7 @@ def _extract_product_payloads_from_normalized(
         state_key=state_key,
     ):
         for root_path in extractor.root_paths.get(state_key, []):
-            candidate = _path_value(normalized_payload, root_path)
+            candidate = _job_mapper.path_value(normalized_payload, root_path)
             if _looks_like_product_payload(candidate):
                 products.append((dict(candidate), extractor))
     products.extend(

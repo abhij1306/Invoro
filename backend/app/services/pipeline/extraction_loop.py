@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import asyncio
+import asyncio  # noqa: F401 - kept for tests that patch asyncio.to_thread on this module.
 import logging
 import time
 
