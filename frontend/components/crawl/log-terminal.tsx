@@ -4,6 +4,8 @@ import {
   Activity,
   AlertTriangle,
   CheckCircle2,
+  ChevronDown,
+  Clock,
   Copy,
   Database,
   Dot,
@@ -209,6 +211,29 @@ export const STAGE_CONFIG: Record<LogStage, LogStageConfig> = {
     panelClass: 'border-border bg-subtle-panel-bg',
   },
 };
+
+function StageChip({ stage }: { stage: LogStage }) {
+  const config = STAGE_CONFIG[stage];
+  let Icon = Activity;
+  if (stage === 'acquisition') Icon = Globe;
+  if (stage === 'extraction') Icon = Database;
+  if (stage === 'normalize') Icon = Layers;
+  if (stage === 'persistence') Icon = HardDrive;
+
+  return (
+    <div className={cn(
+      "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold tracking-wide uppercase border shadow-sm",
+      stage === 'acquisition' && 'bg-blue-500/10 border-blue-500/20 text-blue-500',
+      stage === 'extraction' && 'bg-indigo-500/10 border-indigo-500/20 text-indigo-500',
+      stage === 'normalize' && 'bg-amber-500/10 border-amber-500/20 text-amber-500',
+      stage === 'persistence' && 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500',
+      stage === 'system' && 'bg-slate-500/10 border-slate-500/20 text-slate-500'
+    )}>
+      <Icon className="size-3" />
+      <span>{config.label}</span>
+    </div>
+  );
+}
 
 export const TERMINAL_STRINGS = {
   FIELDS: 'Fields',
@@ -750,7 +775,7 @@ function ShortenedUrl({ url }: { url: string }) {
       href={url}
       target="_blank"
       rel="noopener noreferrer"
-      className="text-info decoration-info/20 hover:text-accent type-body underline underline-offset-4 transition-colors"
+      className="text-info decoration-info/20 hover:text-accent underline underline-offset-4 transition-colors"
       title={url}
       onClick={(e) => e.stopPropagation()}
     >
@@ -964,9 +989,15 @@ export const LogTerminal = memo(function LogTerminal({
         className="flex h-9 items-center justify-between border-b bg-[color-mix(in_srgb,var(--text-primary)_5%,transparent)] px-6"
         style={{ borderColor: 'var(--terminal-border)' }}
       >
-        <span className="text-muted type-label-mono tracking-[0.25em] uppercase">
-          activity_stream.log
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="relative flex size-2">
+            <span className={cn("absolute inline-flex h-full w-full animate-ping rounded-full opacity-75", live ? "bg-emerald-500" : "bg-slate-400")}></span>
+            <span className={cn("relative inline-flex size-2 rounded-full", live ? "bg-emerald-500" : "bg-slate-400")}></span>
+          </span>
+          <span className="text-muted type-label-mono tracking-[0.25em] uppercase text-xs">
+            activity_stream.log
+          </span>
+        </div>
         <div className="flex items-center gap-3">
           <div className="group/scrubber relative flex h-2 w-32 cursor-crosshair items-center rounded-sm bg-[color-mix(in_srgb,var(--text-primary)_8%,transparent)]">
             {timelineTicks.map((tick) => (
@@ -1046,20 +1077,21 @@ export const LogTerminal = memo(function LogTerminal({
                     }
                   }}
                   className={cn(
-                    'group/row grid w-full cursor-pointer items-center gap-3 px-6 py-2.5 text-left transition-colors outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-inset',
+                    'group/row grid w-full cursor-pointer items-center gap-3 px-6 py-1 text-xs text-left transition-colors outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-inset',
                     isRunEventGroup
                       ? 'grid-cols-[32px_minmax(280px,1fr)_auto_minmax(260px,1.4fr)_60px]'
-                      : 'grid-cols-[32px_minmax(280px,2fr)_80px_100px_100px_auto_minmax(200px,1.2fr)_80px_60px]',
+                      : 'grid-cols-[32px_minmax(280px,2fr)_75px_80px_85px_auto_minmax(200px,1.2fr)_80px_70px]',
                     severityTone(group, index),
                   )}
                 >
-                  <div className="type-body text-muted font-medium opacity-60">
+                  <div className="text-muted font-medium opacity-60 text-xs">
                     {(group.index ?? index + 1).toString().padStart(2, '0')}
                   </div>
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex items-center gap-2">
+                    {!isRunEventGroup && <Globe className="size-3.5 text-muted shrink-0" />}
                     {isRunEventGroup ? (
                       <span
-                        className="text-secondary block truncate text-sm font-medium"
+                        className="text-secondary block truncate text-xs font-medium"
                         title={group.label}
                         onClick={(e) => e.stopPropagation()}
                       >
@@ -1071,7 +1103,7 @@ export const LogTerminal = memo(function LogTerminal({
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={(e) => e.stopPropagation()}
-                        className="text-info block truncate text-sm font-normal underline-offset-4 hover:underline"
+                        className="text-info block truncate text-xs font-normal underline-offset-4 hover:underline"
                         title={group.url}
                       >
                         {formatShortUrlLabel(group.url)}
@@ -1080,49 +1112,32 @@ export const LogTerminal = memo(function LogTerminal({
                   </div>
                   {!isRunEventGroup ? (
                     <>
-                      <div className="type-body text-secondary font-medium whitespace-nowrap">
-                        <span className="text-muted mr-1.5 font-sans text-sm font-bold tracking-wider uppercase">
-                          F:
-                        </span>
-                        {coverage.foundCount}/{coverage.totalCount || 0}
+                      <div className="flex items-center gap-1 rounded-md border border-border bg-[color-mix(in_srgb,var(--bg-alt)_50%,transparent)] px-1.5 py-0.5 text-xs text-secondary font-medium whitespace-nowrap shadow-sm" title="Fields Extracted">
+                        <Database className="size-3 text-muted shrink-0" />
+                        <span>{coverage.foundCount}/{coverage.totalCount || 0}</span>
                       </div>
-                      <div className="type-body font-medium whitespace-nowrap">
-                        <span className="text-muted mr-1.5 font-sans text-sm font-bold tracking-wider uppercase">
-                          C:
-                        </span>
-                        <span
-                          className={cn(
-                            confidence ? toneForConfidence(confidence.level) : 'text-muted',
-                          )}
-                        >
+                      <div className="flex items-center gap-1 rounded-md border border-border bg-[color-mix(in_srgb,var(--bg-alt)_50%,transparent)] px-1.5 py-0.5 text-xs text-secondary font-medium whitespace-nowrap shadow-sm" title="Confidence Score">
+                        <CheckCircle2 className={cn("size-3 shrink-0", confidence ? toneForConfidence(confidence.level) : "text-muted")} />
+                        <span className={cn(confidence ? toneForConfidence(confidence.level) : "text-muted")}>
                           {confidence ? `${Math.round(confidence.score * 100)}%` : '--'}
                         </span>
                       </div>
-                      <div className="type-body text-secondary font-medium whitespace-nowrap">
-                        <span className="text-muted mr-1.5 font-sans text-sm font-bold tracking-wider uppercase">
-                          T:
-                        </span>
-                        {durationMs !== null ? formatDurationMs(durationMs) : '--'}
+                      <div className="flex items-center gap-1 rounded-md border border-border bg-[color-mix(in_srgb,var(--bg-alt)_50%,transparent)] px-1.5 py-0.5 text-xs text-secondary font-medium whitespace-nowrap shadow-sm" title="Duration">
+                        <Clock className="size-3 text-muted shrink-0" />
+                        <span>{durationMs !== null ? formatDurationMs(durationMs) : '--'}</span>
                       </div>
                     </>
                   ) : null}
                   <div className="flex items-center justify-center">
                     {isRunEventGroup ? (
-                      <div className="text-muted type-label-mono uppercase">Run</div>
+                      <div className="text-muted type-label-mono uppercase text-xs">Run</div>
                     ) : group.lastStage !== 'system' ? (
-                      <div
-                        className={cn(
-                          'rounded px-1.5 py-0.5 text-sm font-bold tracking-wider uppercase',
-                          STAGE_CONFIG[group.lastStage].chipClass,
-                        )}
-                      >
-                        {STAGE_CONFIG[group.lastStage].label}
-                      </div>
+                      <StageChip stage={group.lastStage} />
                     ) : null}
                   </div>
                   <div className="min-w-0">
                     <div
-                      className="type-control text-secondary truncate"
+                      className="text-secondary text-xs truncate"
                       title={summaryLog?.message || ''}
                     >
                       {summaryLog
@@ -1146,18 +1161,27 @@ export const LogTerminal = memo(function LogTerminal({
                           Peek
                         </Button>
                       ) : (
-                        <span className="type-caption opacity-25">--</span>
+                        <span className="type-caption opacity-25 text-xs">--</span>
                       )}
                     </div>
                   ) : null}
-                  <div className="pr-2 text-right">
-                    <div className="text-muted group-hover/row:text-secondary type-label-mono uppercase transition-colors">
-                      {live && groups.length > 0 && group.key === groups[groups.length - 1].key
-                        ? 'Active'
-                        : expanded
-                          ? 'Less'
-                          : 'More'}
-                    </div>
+                  <div className="flex items-center justify-end gap-1.5 pr-2">
+                    <span className="text-xs text-muted font-mono uppercase tracking-wider">
+                      {live && groups.length > 0 && group.key === groups[groups.length - 1].key ? (
+                        <span className="flex items-center gap-1.5 text-accent font-semibold">
+                          <span className="relative flex size-1.5">
+                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-75"></span>
+                            <span className="relative inline-flex size-1.5 rounded-full bg-accent"></span>
+                          </span>
+                          Active
+                        </span>
+                      ) : (
+                        expanded ? 'Less' : 'More'
+                      )}
+                    </span>
+                    {!(live && groups.length > 0 && group.key === groups[groups.length - 1].key) && (
+                      <ChevronDown className={cn("size-3.5 text-muted transition-transform duration-200", expanded && "rotate-180")} />
+                    )}
                   </div>
                 </div>
 
@@ -1166,11 +1190,13 @@ export const LogTerminal = memo(function LogTerminal({
                     <div className="overflow-hidden">
                       {expandedRows.length ? (
                         expandedRows.map((row, expandedIndex) => {
+                          const IconComponent = getLogIcon(row.level, row.message);
+                          const iconStyle = getLogIconStyle(row.level, row.message);
                           return (
                             <div
                               key={row.key}
                               className={cn(
-                                'grid grid-cols-[64px_84px_minmax(0,1fr)_auto] items-center gap-4 px-6 py-2 text-xs',
+                                'grid grid-cols-[64px_24px_105px_minmax(0,1fr)_auto] items-center gap-4 px-6 py-0.5 text-xs',
                                 expandedIndex % 2 === 0
                                   ? 'bg-[color-mix(in_srgb,var(--bg-alt)_35%,transparent)]'
                                   : 'bg-transparent',
@@ -1179,15 +1205,13 @@ export const LogTerminal = memo(function LogTerminal({
                               <span className="text-muted font-mono text-xs font-medium tabular-nums">
                                 {row.createdAt ? formatTimeHms(row.createdAt) : '--'}
                               </span>
-                              <span
-                                className={cn(
-                                  'inline-flex text-xs font-semibold tracking-wider uppercase',
-                                  STAGE_CONFIG[row.stage].textOnlyClass,
-                                )}
-                              >
-                                {STAGE_CONFIG[row.stage].label}
-                              </span>
-                              <span className="type-body text-secondary min-w-0 font-medium break-words">
+                              <div className="flex justify-center">
+                                <IconComponent className={cn("size-3.5", iconStyle.iconCls)} />
+                              </div>
+                              <div className="flex">
+                                <StageChip stage={row.stage} />
+                              </div>
+                              <span className="text-secondary min-w-0 text-xs font-medium break-words">
                                 {!row.createdAt
                                   ? row.message
                                   : renderLogContent(row.message, row.stage === 'system')}
@@ -1222,7 +1246,7 @@ export const LogTerminal = memo(function LogTerminal({
             );
           })
         ) : (
-          <div className="px-6 py-8 text-center text-sm italic opacity-55">
+          <div className="px-6 py-8 text-center text-xs italic opacity-55">
             {live ? 'Waiting for log stream...' : 'No log activity recorded'}
           </div>
         )}

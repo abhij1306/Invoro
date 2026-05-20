@@ -33,7 +33,7 @@ export const monitorsApi = {
   update: (id: number | string, payload: MonitorUpdatePayload) =>
     apiClient.patch<MonitorJob>(`/api/monitors/${id}`, payload),
 
-  archive: (id: number | string) => apiClient.delete<void>(`/api/monitors/${id}`),
+  remove: (id: number | string) => apiClient.delete<void>(`/api/monitors/${id}`),
 
   runNow: (id: number | string) =>
     apiClient.post<RunNowResponse>(`/api/monitors/${id}/run/now`, {}),

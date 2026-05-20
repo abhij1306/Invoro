@@ -1,11 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ExternalLink, FileDown, Play, Radar } from 'lucide-react';
+import { ExternalLink, FileDown, Play, Radar, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
+import { ConfirmDialog } from '../../../components/ui/dialog';
 import { Badge, Button } from '../../../components/ui/primitives';
 import {
   DataRegionEmpty,
@@ -30,9 +31,11 @@ import { formatRelativeTime } from '../../../lib/format/date';
 
 export default function ProjectDetailPage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const queryClient = useQueryClient();
   const projectId = Number(params.id);
   const [notice, setNotice] = useState('');
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   const projectQuery = useQuery({
     queryKey: ['orchestration-project', projectId],
@@ -72,6 +75,13 @@ export default function ProjectDetailPage() {
       setNotice(`Monitor created - monitor_id: ${response.monitor_id}`);
       await queryClient.invalidateQueries({ queryKey: ['orchestration-workflow-status'] });
       await queryClient.invalidateQueries({ queryKey: ['monitors'] });
+    },
+  });
+  const deleteMutation = useMutation({
+    mutationFn: () => api.deleteOrchestrationProject(projectId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['orchestration-projects'] });
+      router.push('/projects');
     },
   });
 
@@ -118,6 +128,16 @@ export default function ProjectDetailPage() {
               <Radar className="size-3.5" />
               Promote
             </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="destructive"
+              disabled={deleteMutation.isPending}
+              onClick={() => setDeleteOpen(true)}
+            >
+              <Trash2 className="size-3.5" />
+              Delete
+            </Button>
           </div>
         }
       />
@@ -130,6 +150,15 @@ export default function ProjectDetailPage() {
             promoteMutation.error instanceof Error
               ? promoteMutation.error.message
               : 'Promotion failed.'
+          }
+        />
+      ) : null}
+      {deleteMutation.isError ? (
+        <InlineAlert
+          message={
+            deleteMutation.error instanceof Error
+              ? deleteMutation.error.message
+              : 'Delete failed.'
           }
         />
       ) : null}
@@ -245,6 +274,16 @@ export default function ProjectDetailPage() {
           </TableSurface>
         </SurfacePanel>
       </div>
+      <ConfirmDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title="Delete this project?"
+        description={`This permanently deletes project "${projectQuery.data.name}" and its workflow shells. Linked crawl runs and promoted monitors stay.`}
+        confirmLabel="Delete Project"
+        pending={deleteMutation.isPending}
+        danger
+        onConfirm={() => deleteMutation.mutate()}
+      />
     </div>
   );
 }

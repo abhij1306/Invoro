@@ -176,7 +176,7 @@
   background: var(--accent-subtle) !important;
   color: var(--accent) !important;
   font-weight: var(--weight-semibold);
-  box-shadow: inset 3px 0 0 var(--accent);
+  border-left: 3px solid var(--accent);
   border-top-left-radius: 0;
   border-bottom-left-radius: 0;
 }

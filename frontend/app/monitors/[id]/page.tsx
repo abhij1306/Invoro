@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { use } from 'react';
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 import { monitorsApi } from '../../../lib/api';
 import type { MonitorStatus, MonitorUpdatePayload } from '../../../lib/api/types';
@@ -29,6 +30,7 @@ export default function MonitorDetailPage({
   const resolvedParams = isThenable(params) ? use(params) : params;
   const monitorId = resolvedParams.id;
   const monitorIdNumber = Number(monitorId);
+  const router = useRouter();
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<TabValue>('events');
   const [notice, setNotice] = useState('');
@@ -72,9 +74,12 @@ export default function MonitorDetailPage({
     },
   });
 
-  const archiveMutation = useMutation({
-    mutationFn: () => monitorsApi.archive(monitorId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['monitor', monitorId] }),
+  const deleteMutation = useMutation({
+    mutationFn: () => monitorsApi.remove(monitorId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['monitors'] });
+      router.push('/monitors');
+    },
   });
 
   if (monitorQuery.isPending) {
@@ -108,7 +113,7 @@ export default function MonitorDetailPage({
         runError={runError}
         onRunNow={() => runMutation.mutate()}
         onUpdateStatus={(status) => statusMutation.mutateAsync(status).then(() => undefined)}
-        onArchive={() => archiveMutation.mutateAsync().then(() => undefined)}
+        onDelete={() => deleteMutation.mutateAsync().then(() => undefined)}
         onSave={(payload) => editMutation.mutateAsync(payload).then(() => undefined)}
       />
       <SurfacePanel>

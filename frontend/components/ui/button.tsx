@@ -26,9 +26,9 @@ export const buttonVariants = cva(
         danger: 'button-destructive-surface',
       },
       size: {
-        sm: '',
-        md: '',
-        lg: '',
+        sm: 'ui-button-sm',
+        md: 'ui-button-md',
+        lg: 'ui-button-lg',
         icon: 'w-[var(--button-height)] px-0',
       },
     },

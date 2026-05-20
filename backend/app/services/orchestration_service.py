@@ -93,6 +93,17 @@ async def get_project(
     return project
 
 
+async def delete_project(
+    session: AsyncSession,
+    *,
+    project_id: int,
+    user: User,
+) -> None:
+    project = await get_project(session, project_id=project_id, user=user)
+    await session.delete(project)
+    await session.commit()
+
+
 async def create_workflow(
     session: AsyncSession,
     *,

@@ -323,6 +323,8 @@ export const api = {
     apiClient.post<OrchestrationProject>('/api/orchestration/projects', payload),
   getOrchestrationProject: (projectId: number) =>
     apiClient.get<OrchestrationProject>(`/api/orchestration/projects/${projectId}`),
+  deleteOrchestrationProject: (projectId: number) =>
+    apiClient.delete<void>(`/api/orchestration/projects/${projectId}`),
   listOrchestrationTemplates: () =>
     apiClient.get<OrchestrationTemplate[]>('/api/orchestration/templates'),
   createOrchestrationWorkflow: (payload: OrchestrationWorkflowCreatePayload) =>

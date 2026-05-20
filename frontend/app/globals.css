@@ -64,87 +64,86 @@
   color-scheme: light;
 
   /* ── Fonts
-     Primary : Source Sans 3 (Google Fonts — SAP Fiori open-source typeface)
+     Primary : Manrope (Google Fonts — premium sans-serif)
      Mono    : Inconsolata */
   --font-primary-family:
-    var(--font-primary-source, 'Source Sans 3'), 'Source Sans 3', system-ui, -apple-system,
-    'Helvetica Neue', Arial, sans-serif;
+    var(--font-primary-source, 'Manrope'), 'Manrope', system-ui, -apple-system,
+    sans-serif;
   --font-mono-family:
-    var(--font-inconsolata, 'Inconsolata'), 'Inconsolata', ui-monospace, Consolas,
-    monospace;
+    var(--font-inconsolata, 'Inconsolata'), 'Inconsolata', ui-monospace, monospace;
   --font-serif: Georgia, serif;
 
   /* ── Mono size tokens */
-  --font-mono-size: 14.5px;
-  --font-mono-size-sm: 12px;
-  --font-mono-line-height: 1.4;
+  --font-mono-size: 14px;
+  --font-mono-size-sm: 11.5px;
+  --font-mono-line-height: 1.45;
 
-  /* ── Surfaces — SAP Fiori Belize / Horizon Morning grey-blue page base */
-  --bg-base: #eff3f6;
-  --bg-alt: #f3f5f7;
+  /* ── Surfaces — Premium Slate Off-white */
+  --bg-base: #f8fafc;
+  --bg-alt: #f1f5f9;
   --bg-panel: #ffffff;
   --bg-elevated: #ffffff;
-  --bg-panel-strong: #e1e7ec;
+  --bg-panel-strong: #e2e8f0;
   --bg-sidebar: #ffffff;
 
-  /* ── Borders — crisp SAP Fiori standard borders */
-  --border: #d9d9d9;
-  --border-strong: #b0bac5;
+  /* ── Borders — Slate hairline borders */
+  --border: #e2e8f0;
+  --border-strong: #cbd5e1;
   --border-focus: var(--accent);
 
-  /* ── Typography — SAP Fiori standard charcoal text */
-  --text-primary: #32363a;
-  --text-secondary: #55616b;
-  --text-muted: #7f8c98;
+  /* ── Typography — Sharp Slate darks */
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
 
   /* ── JSON Syntax Highlighting */
-  --syntax-key: #0a6ed1;
-  --syntax-string: #b00000;
-  --syntax-number: #136a13;
-  --syntax-boolean: #0a6ed1;
-  --syntax-null: #7f8c98;
-  --syntax-punct: #55616b;
+  --syntax-key: #4f46e5;
+  --syntax-string: #059669;
+  --syntax-number: #d97706;
+  --syntax-boolean: #2563eb;
+  --syntax-null: #64748b;
+  --syntax-punct: #475569;
 
-  /* ── Accent — reuse former shellbar navy */
-  --accent: #354a5f;
-  --accent-hover: #2c3e53;
-  --accent-warm: #354a5f;
+  /* ── Accent — Vibrant Indigo / Premium SaaS */
+  --accent: #4f46e5;
+  --accent-hover: #4338ca;
+  --accent-warm: #6366f1;
   --accent-foreground: #ffffff;
   --accent-fg: #ffffff;
-  --accent-subtle: rgba(53, 74, 95, 0.08);
-  --accent-dim: rgba(53, 74, 95, 0.14);
-  --accent-text: #354a5f;
+  --accent-subtle: rgba(79, 70, 229, 0.06);
+  --accent-dim: rgba(79, 70, 229, 0.12);
+  --accent-text: #4f46e5;
 
-  /* ── Shellbar — light surface, no dark strip */
+  /* ── Shellbar */
   --surface-header: #ffffff;
   --shell-text: var(--text-primary);
   --shell-muted: var(--text-muted);
   --shell-border: var(--border);
 
   /* ── Semantic states */
-  --success: #2b7c2b;
-  --success-bg: #f0f9f0;
-  --warning: #e06000;
-  --warning-bg: #fff5ed;
-  --danger: #bb0000;
-  --danger-bg: #fff0f0;
-  --info: #0a6ed1;
-  --info-bg: #f0f5fa;
+  --success: #10b981;
+  --success-bg: #ecfdf5;
+  --warning: #f59e0b;
+  --warning-bg: #fffbeb;
+  --danger: #ef4444;
+  --danger-bg: #fef2f2;
+  --info: #3b82f6;
+  --info-bg: #eff6ff;
 
   --status-active-bg: var(--success-bg);
   --status-running-bg: var(--accent-subtle);
   --status-killed-bg: var(--danger-bg);
   --status-paused-bg: var(--warning-bg);
-  --status-neutral-bg: #f3f5f7;
+  --status-neutral-bg: #f1f5f9;
 
-  /* ── Shadows — flat, soft diffused Fiori style */
-  --shadow-xs-value: 0 1px 2px rgba(0, 0, 0, 0.05);
-  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.05);
-  --shadow-lg-value: 0 8px 16px rgba(0, 0, 0, 0.06);
-  --shadow-modal: 0 12px 24px rgba(0, 0, 0, 0.12);
-  --shadow-card-value: 0 2px 4px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
-  --shadow-elevated-value: 0 8px 16px rgba(0, 0, 0, 0.08);
+  /* ── Shadows — soft premium elevations */
+  --shadow-xs-value: 0 1px 2px rgba(0, 0, 0, 0.03);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.02);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  --shadow-lg-value: 0 10px 15px -3px rgba(0, 0, 0, 0.04), 0 4px 6px -2px rgba(0, 0, 0, 0.02);
+  --shadow-modal: 0 20px 25px -5px rgba(0, 0, 0, 0.08), 0 10px 10px -5px rgba(0, 0, 0, 0.03);
+  --shadow-card-value: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
+  --shadow-elevated-value: 0 20px 25px -5px rgba(0, 0, 0, 0.06), 0 10px 10px -5px rgba(0, 0, 0, 0.02);
 
   /* ── Surface — elegant gradient */
   --gradient-card: linear-gradient(to bottom, #ffffff 0%, #fcfdfd 100%);
@@ -152,7 +151,7 @@
   /* ── Component surface tokens */
   --surface-card: var(--bg-panel);
   --surface-sidebar: var(--bg-sidebar);
-  --surface-card-highlight: rgba(10, 110, 209, 0.015);
+  --surface-card-highlight: rgba(79, 70, 229, 0.015);
   --surface-card-edge: var(--border);
   --subtle-panel-bg: var(--bg-alt);
   --subtle-panel-border: var(--border);
@@ -160,21 +159,21 @@
 
   /* ── Interactive component tokens */
   --button-height: var(--control-height);
-  --button-padding-x: 12px;
-  --button-font-size: var(--text-sm);
+  --button-padding-x: 14px;
+  --button-font-size: 12px;
   --button-action-bg: var(--accent);
   --button-action-hover-bg: var(--accent-hover);
   --button-action-border: var(--accent);
   --button-action-hover-border: var(--accent-hover);
   --button-action-fg: #ffffff;
-  --button-download-bg: #f7fbff;
-  --button-download-hover-bg: #eaf4ff;
-  --button-download-border: #9fc7ef;
+  --button-download-bg: var(--bg-elevated);
+  --button-download-hover-bg: #ede9fe;
+  --button-download-border: #ddd6fe;
   --button-download-hover-border: var(--accent);
-  --button-download-fg: #0a5ca8;
-  --button-destructive-bg: var(--danger-bg);
-  --button-destructive-hover-bg: #ffdede;
-  --button-destructive-border: #f2b8b8;
+  --button-download-fg: #4f46e5;
+  --button-destructive-bg: var(--bg-elevated);
+  --button-destructive-hover-bg: var(--danger-bg);
+  --button-destructive-border: #fca5a5;
   --button-destructive-hover-border: var(--danger);
   --button-destructive-fg: var(--danger);
   --button-neutral-bg: var(--bg-elevated);
@@ -201,21 +200,21 @@
 
   /* ── Terminal / Code surfaces */
   --terminal-bg: #ffffff;
-  --terminal-fg: #32363a;
-  --terminal-code-bg: #f3f5f7;
+  --terminal-fg: var(--text-primary);
+  --terminal-code-bg: #f8fafc;
   --terminal-border: var(--border);
   --terminal-shadow: var(--shadow-sm);
 
   /* ── Alert border/text tokens */
   --alert-success-bg: var(--success-bg);
-  --alert-success-border: #c8e1c8;
-  --alert-success-text: var(--success);
+  --alert-success-border: #a7f3d0;
+  --alert-success-text: #047857;
   --alert-warning-bg: var(--warning-bg);
-  --alert-warning-border: #f5d4bd;
-  --alert-warning-text: var(--warning);
+  --alert-warning-border: #fde68a;
+  --alert-warning-text: #b45309;
   --alert-danger-bg: var(--danger-bg);
-  --alert-danger-border: #f8c8c8;
-  --alert-danger-text: var(--danger);
+  --alert-danger-border: #fecaca;
+  --alert-danger-text: #b91c1c;
 
   /* ── Settings panel */
   --setting-surface-active-bg: var(--accent-subtle);
@@ -225,30 +224,21 @@
   --setting-icon-active-shadow: var(--shadow-xs-value);
 
   /* ── Skeleton loader */
-  --skeleton-base: #e1e7ec;
-  --skeleton-highlight: #f3f5f7;
+  --skeleton-base: #e2e8f0;
+  --skeleton-highlight: #f1f5f9;
 
   /* ── Logo */
   --logo-mark-bg: var(--accent);
   --logo-mark-fg: #ffffff;
 
-  /* ══ TYPE SCALE ══════════════════════════════════════════════════════════
-     Body = --text-base. Display metrics sit above page titles.
-     ════════════════════════════════════════════════════════════════════════ */
-  --text-2xs: 0.625rem;
-  /* 10px — dense micro-labels */
+  /* ══ TYPE SCALE ══════════════════════════════════════════════════════════ */
+  --text-2xs: 0.6875rem;
   --text-xs: 0.8125rem;
-  /* 13px — badges, timestamps */
   --text-sm: 0.875rem;
-  /* 14px — table data, secondary UI chrome, sidebar */
   --text-base: 0.9375rem;
-  /* 15px — primary body, form fields, buttons */
   --text-lg: 1.0625rem;
-  /* 17px — card titles, section headings */
   --text-xl: 1.375rem;
-  /* 22px — page titles ONLY */
-  --text-2xl: 1.75rem;
-  /* 28px — KPI display numbers */
+  --text-2xl: 1.875rem;
 
   /* ── Weights */
   --weight-light: 300;
@@ -259,22 +249,18 @@
 
   /* ── Line heights */
   --leading-none: 1;
-  --leading-tight: 1.2;
-  /* display / headings */
-  --leading-snug: 1.35;
-  /* subheadings / controls */
-  --leading-normal: 1.45;
-  /* body reading rhythm */
-  --leading-relaxed: 1.55;
-  /* long-form reading */
+  --leading-tight: 1.25;
+  --leading-snug: 1.4;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.625;
 
   /* ── Letter spacing */
-  --tracking-tighter: -0.015em;
+  --tracking-tighter: -0.02em;
   --tracking-tight: -0.01em;
   --tracking-normal: 0em;
-  --tracking-wide: 0.02em;
-  --tracking-wider: 0.04em;
-  --tracking-widest: 0.08em;
+  --tracking-wide: 0.025em;
+  --tracking-wider: 0.05em;
+  --tracking-widest: 0.1em;
 
   /* ══ SPACING SCALE ═══════════════════════════════════════════════════════ */
   --space-1: 4px;
@@ -289,32 +275,32 @@
   --space-12: 48px;
   --space-16: 64px;
 
-  --content-gutter: var(--space-5);
+  --content-gutter: var(--space-6);
 
   --control-height: 32px;
   --interactive-border-width: 1px;
 
-  /* ── Border radius — Fiori uses clean small roundings (4px/8px) */
-  --radius-xs: 2px;
-  --radius-sm: 3px;
-  --radius-md: 4px;
-  --radius-lg: 4px;
-  --radius-xl: 6px;
-  --radius-2xl: 8px;
+  /* ── Border radius — clean modern rounded curves */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 20px;
 
   /* ── Table typography */
   --table-font-size: var(--text-sm);
   --table-header-font-size: var(--text-xs);
   --table-header-font-family: var(--font-primary-family);
-  --table-header-weight: var(--weight-bold);
+  --table-header-weight: var(--weight-semibold);
   --table-header-tracking: var(--tracking-wider);
-  --table-header-height: 36px;
-  --table-row-height: 38px;
+  --table-header-height: 40px;
+  --table-row-height: 44px;
 
   /* ── Transitions */
-  --transition-fast: 100ms ease;
-  --transition-base: 150ms ease;
-  --transition-slow: 250ms ease;
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
 
   /* ── Chart / metric color palette */
   --metric-runs-color: var(--accent);
@@ -324,82 +310,81 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   DARK THEME — CrawlerAI Console
-   Palette: neutral charcoal base · Sky Blue accent (original)
+   DARK THEME — CrawlerAI Console · High-Fidelity Deep Space-Indigo
    ═══════════════════════════════════════════════════════════════════════════ */
 html[data-theme='dark'] {
   color-scheme: dark;
 
-  /* ── Surfaces — Neutral Charcoal base (original) */
-  --bg-base: #141414;
-  --bg-alt: #1a1a1a;
-  --bg-panel: #1e1e1e;
-  --bg-elevated: #252526;
-  --bg-panel-strong: #2d2d2d;
-  --bg-sidebar: #0f0f0f;
+  /* ── Surfaces — Immersive Slate/Zinc gray base (VS Code / Windows 11 style) */
+  --bg-base: #09090b;
+  --bg-alt: #121214;
+  --bg-panel: #18181b;
+  --bg-elevated: #242427;
+  --bg-panel-strong: #3f3f46;
+  --bg-sidebar: #09090b;
 
   /* ── Borders */
-  --border: #333333;
-  --border-strong: #444444;
+  --border: #27272a;
+  --border-strong: #3f3f46;
   --border-focus: var(--accent);
 
   /* ── Typography */
-  --text-primary: #f3f4f6;
+  --text-primary: #f4f4f5;
   --text-secondary: #a1a1aa;
   --text-muted: #71717a;
 
-  /* ── Accent — Sky Blue (original) */
-  --accent: #38bdf8;
-  --accent-hover: #7dd3fc;
-  --accent-warm: #38bdf8;
-  --accent-foreground: #020617;
-  --accent-fg: #020617;
-  --accent-subtle: rgba(56, 189, 248, 0.1);
-  --accent-dim: rgba(56, 189, 248, 0.2);
-  --accent-text: #38bdf8;
-  --logo-mark-bg: var(--accent);
-  --logo-mark-fg: #020617;
+  /* ── Accent — Premium White/Light Slate */
+  --accent: #f4f4f5;
+  --accent-hover: #ffffff;
+  --accent-warm: #e4e4e7;
+  --accent-foreground: #09090b;
+  --accent-fg: #09090b;
+  --accent-subtle: rgba(244, 244, 245, 0.08);
+  --accent-dim: rgba(244, 244, 245, 0.16);
+  --accent-text: #f4f4f5;
+  --logo-mark-bg: #ffffff;
+  --logo-mark-fg: #09090b;
 
   /* ── Shellbar (dark mode — blends with sidebar) */
-  --surface-header: #1e1e1e;
-  --shell-text: #f3f4f6;
+  --surface-header: #09090b;
+  --shell-text: #f4f4f5;
   --shell-muted: #71717a;
-  --shell-border: #333333;
+  --shell-border: #27272a;
 
   /* ── Semantic states */
-  --success: #00e6a8;
-  --success-bg: rgba(0, 230, 168, 0.1);
-  --warning: #ffb74d;
-  --warning-bg: rgba(255, 183, 77, 0.1);
-  --danger: #ef5350;
-  --danger-bg: rgba(239, 83, 80, 0.1);
-  --info: #4fc3f7;
-  --info-bg: rgba(79, 195, 247, 0.1);
+  --success: #10b981;
+  --success-bg: rgba(16, 185, 129, 0.1);
+  --warning: #f59e0b;
+  --warning-bg: rgba(245, 158, 11, 0.1);
+  --danger: #ef4444;
+  --danger-bg: rgba(239, 68, 68, 0.1);
+  --info: #3b82f6;
+  --info-bg: rgba(59, 130, 246, 0.1);
 
   --status-active-bg: var(--success-bg);
   --status-running-bg: var(--accent-subtle);
   --status-killed-bg: var(--danger-bg);
   --status-paused-bg: var(--warning-bg);
-  --status-neutral-bg: #181b21;
+  --status-neutral-bg: #18181b;
 
   /* ── Shadows */
-  --shadow-xs-value: 0 1px 2px 0 rgba(0, 0, 0, 0.4);
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.5);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
-  --shadow-lg-value: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
-  --shadow-modal: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
-  --shadow-card-value: 0 1px 3px 0 rgba(0, 0, 0, 0.2), 0 4px 12px 0 rgba(0, 0, 0, 0.3);
-  --shadow-elevated-value: 0 12px 24px -4px rgba(0, 0, 0, 0.4), 0 4px 12px -2px rgba(0, 0, 0, 0.2);
+  --shadow-xs-value: 0 1px 2px 0 rgba(0, 0, 0, 0.6);
+  --shadow-sm: 0 2px 4px 0 rgba(0, 0, 0, 0.7);
+  --shadow-md: 0 6px 12px -2px rgba(0, 0, 0, 0.7);
+  --shadow-lg-value: 0 12px 20px -4px rgba(0, 0, 0, 0.8);
+  --shadow-modal: 0 30px 60px -15px rgba(0, 0, 0, 0.9);
+  --shadow-card-value: 0 2px 6px 0 rgba(0, 0, 0, 0.4);
+  --shadow-elevated-value: 0 20px 40px -8px rgba(0, 0, 0, 0.8);
 
   /* ── Surface — elegant gradient */
-  --gradient-card: linear-gradient(to bottom, #1e1e1e 0%, #1a1a1a 100%);
+  --gradient-card: linear-gradient(to bottom, #18181b 0%, #121214 100%);
 
   /* ── Component surface tokens */
   --surface-card: var(--bg-panel);
   --surface-sidebar: var(--bg-sidebar);
-  --surface-card-highlight: rgba(255, 255, 255, 0.015);
+  --surface-card-highlight: rgba(255, 255, 255, 0.01);
   --surface-card-edge: var(--border);
-  --subtle-panel-bg: var(--bg-elevated);
+  --subtle-panel-bg: var(--bg-alt);
   --subtle-panel-border: var(--border);
   --divider: var(--border);
 
@@ -409,42 +394,42 @@ html[data-theme='dark'] {
   --button-action-border: var(--accent);
   --button-action-hover-border: var(--accent-hover);
   --button-action-fg: var(--accent-fg);
-  --button-download-bg: rgba(56, 189, 248, 0.1);
-  --button-download-hover-bg: rgba(56, 189, 248, 0.18);
-  --button-download-border: rgba(56, 189, 248, 0.28);
+  --button-download-bg: var(--bg-panel);
+  --button-download-hover-bg: rgba(244, 244, 245, 0.08);
+  --button-download-border: rgba(244, 244, 245, 0.24);
   --button-download-hover-border: var(--accent);
   --button-download-fg: var(--accent);
-  --button-destructive-bg: var(--danger-bg);
-  --button-destructive-hover-bg: rgba(239, 83, 80, 0.16);
-  --button-destructive-border: rgba(239, 83, 80, 0.24);
+  --button-destructive-bg: var(--bg-panel);
+  --button-destructive-hover-bg: rgba(239, 68, 68, 0.08);
+  --button-destructive-border: rgba(239, 68, 68, 0.24);
   --button-destructive-hover-border: var(--danger);
   --button-destructive-fg: var(--danger);
-  --button-neutral-bg: var(--bg-elevated);
-  --button-neutral-hover-bg: var(--bg-panel-strong);
+  --button-neutral-bg: var(--bg-panel);
+  --button-neutral-hover-bg: var(--bg-elevated);
   --button-neutral-border: var(--border);
   --button-neutral-hover-border: var(--border-strong);
   --button-neutral-fg: var(--text-primary);
   --button-quiet-bg: transparent;
-  --button-quiet-hover-bg: rgba(255, 255, 255, 0.06);
+  --button-quiet-hover-bg: rgba(255, 255, 255, 0.04);
   --button-quiet-border: transparent;
   --button-quiet-hover-border: transparent;
   --button-quiet-fg: var(--text-secondary);
   --button-quiet-hover-fg: var(--text-primary);
-  --button-topbar-bg: rgba(255, 255, 255, 0.06);
-  --button-topbar-hover-bg: rgba(255, 255, 255, 0.12);
+  --button-topbar-bg: rgba(255, 255, 255, 0.04);
+  --button-topbar-hover-bg: rgba(255, 255, 255, 0.08);
   --button-topbar-border: transparent;
   --button-topbar-hover-border: transparent;
   --button-topbar-fg: var(--shell-text);
-  --segmented-bg: rgba(255, 255, 255, 0.04);
+  --segmented-bg: rgba(255, 255, 255, 0.03);
   --segmented-shadow: var(--shadow-xs-value);
-  --tab-active-fg: #020617;
+  --tab-active-fg: #f4f4f5;
   --slider-value-bg: var(--accent-subtle);
   --slider-thumb-border: var(--bg-base);
 
   /* ── Terminal / Code surfaces */
-  --terminal-bg: #1e1e1e;
-  --terminal-fg: #d4d4d4;
-  --terminal-code-bg: #1a1a1a;
+  --terminal-bg: #121214;
+  --terminal-fg: var(--text-primary);
+  --terminal-code-bg: #09090b;
   --terminal-border: var(--border);
   --terminal-shadow: var(--shadow-md);
 
@@ -458,25 +443,25 @@ html[data-theme='dark'] {
 
   /* ── Alert border/text tokens */
   --alert-success-bg: var(--success-bg);
-  --alert-success-border: rgba(0, 230, 168, 0.2);
+  --alert-success-border: rgba(16, 185, 129, 0.2);
   --alert-success-text: var(--success);
   --alert-warning-bg: var(--warning-bg);
-  --alert-warning-border: rgba(255, 183, 77, 0.2);
+  --alert-warning-border: rgba(245, 158, 11, 0.2);
   --alert-warning-text: var(--warning);
   --alert-danger-bg: var(--danger-bg);
-  --alert-danger-border: rgba(239, 83, 80, 0.2);
+  --alert-danger-border: rgba(239, 68, 68, 0.2);
   --alert-danger-text: var(--danger);
 
   /* ── Settings panel */
   --setting-surface-active-bg: var(--accent-subtle);
-  --setting-body-bg: #1a1a1a;
-  --setting-icon-bg: #0f0f0f;
+  --setting-body-bg: #121214;
+  --setting-icon-bg: #09090b;
   --setting-icon-active-bg: var(--accent-subtle);
   --setting-icon-active-shadow: var(--shadow-xs-value);
 
   /* ── Skeleton loader */
-  --skeleton-base: #1e1e1e;
-  --skeleton-highlight: #252526;
+  --skeleton-base: #18181b;
+  --skeleton-highlight: #242427;
 
   /* ── Chart / metric color palette */
   --metric-runs-color: var(--accent);
@@ -1050,6 +1035,33 @@ a.ui-button.button-quiet-surface:hover {
   color: var(--button-quiet-hover-fg) !important;
 }
 
+.ui-button {
+  height: var(--button-height) !important;
+  font-size: var(--button-font-size) !important;
+  font-weight: var(--weight-semibold) !important;
+}
+
+/* Button Size Overrides */
+.ui-button-sm {
+  --button-height: 32px !important;
+  --button-font-size: 12px !important;
+  --button-padding-x: 14px !important;
+  border-radius: var(--radius-md) !important;
+  gap: 6px !important;
+}
+
+.ui-button-md {
+  --button-height: 32px !important;
+  --button-font-size: 12px !important;
+  --button-padding-x: 14px !important;
+}
+
+.ui-button-lg {
+  --button-height: 32px !important;
+  --button-font-size: 12px !important;
+  --button-padding-x: 20px !important;
+}
+
 .bg-warning\/12 {
   background: color-mix(in srgb, var(--warning) 12%, transparent);
 }
@@ -1144,9 +1156,9 @@ html:not([data-theme='dark']) .code-block {
 }
 
 .crawl-terminal-json {
-  background: #1e1e1e !important;
-  color: #d4d4d4 !important;
-  border-color: #333333 !important;
+  background: var(--terminal-code-bg) !important;
+  color: var(--terminal-fg) !important;
+  border-color: var(--terminal-border) !important;
   font-family: var(--font-mono-family);
   white-space: pre-wrap;
   word-break: break-word;
@@ -1157,7 +1169,6 @@ html:not([data-theme='dark']) .code-block {
 }
 
 /* Force dark-theme JSON syntax colors only for explicit dark containers. */
-.crawl-terminal-json,
 .bg-zinc-950,
 .bg-zinc-900,
 [data-json-dark-theme='true'] {
@@ -1167,19 +1178,6 @@ html:not([data-theme='dark']) .code-block {
   --syntax-boolean: #569cd6;
   --syntax-null: #569cd6;
   --syntax-punct: #d4d4d4;
-}
-
-/* Style quiet buttons situated over dark JSON views in light theme to be legible and look great */
-html:not([data-theme='dark']) .relative:has(> .crawl-terminal-json) .ui-button.button-quiet-surface,
-html:not([data-theme='dark']) .relative:has(+ .crawl-terminal-json) .ui-button.button-quiet-surface,
-html:not([data-theme='dark']) .group:has(> .crawl-terminal-json) .ui-button.button-quiet-surface {
-  color: #a1a1aa !important;
-}
-html:not([data-theme='dark']) .relative:has(> .crawl-terminal-json) .ui-button.button-quiet-surface:hover,
-html:not([data-theme='dark']) .relative:has(+ .crawl-terminal-json) .ui-button.button-quiet-surface:hover,
-html:not([data-theme='dark']) .group:has(> .crawl-terminal-json) .ui-button.button-quiet-surface:hover {
-  color: #f3f4f6 !important;
-  background-color: rgba(255, 255, 255, 0.1) !important;
 }
 
 /* ── JSON Syntax Highlighting (Themed) ── */

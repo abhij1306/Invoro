@@ -24,6 +24,7 @@ export default function NewMonitorPage() {
       <PageHeader title="New Monitor" description="Create a recurring extraction monitor." />
       <SurfacePanel className="p-5">
         <MonitorForm
+          layout="grid"
           submitLabel="Create Monitor"
           onSubmit={submit}
           onCancel={() => router.push('/monitors')}

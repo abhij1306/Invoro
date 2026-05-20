@@ -29,12 +29,12 @@ export function normalizeField(value: string) {
 
 export function stringifyCell(value: unknown) {
   if (value == null) return '';
-  if (typeof value === 'string') return value;
+  if (typeof value === 'string') return decodeEscapedTextForDisplay(value);
   return JSON.stringify(value);
 }
 
 export function decodeUrlForDisplay(value: string) {
-  const text = String(value || '').trim();
+  const text = decodeEscapedTextForDisplay(String(value || '')).trim();
   if (!/^https?:\/\//i.test(text)) return text;
   try {
     return decodeURI(text);
@@ -73,6 +73,25 @@ export function decodeUrlsForDisplay<T>(value: T): T {
     ) as T;
   }
   return value;
+}
+
+function decodeEscapedTextForDisplay(value: string) {
+  let text = String(value || '');
+  if (!text.includes('\\')) return text;
+  const backslashMarker = '\0BACKSLASH\0';
+  text = text.replace(/\\\\/g, backslashMarker);
+  text = text
+    .replace(/\\u([0-9a-fA-F]{4})/g, (_, code: string) =>
+      String.fromCharCode(Number.parseInt(code, 16)),
+    )
+    .replace(/\\\//g, '/')
+    .replace(/\\"/g, '"')
+    .replace(/\\'/g, "'")
+    .replace(/\\n/g, '\n')
+    .replace(/\\r/g, '\r')
+    .replace(/\\t/g, '\t');
+  text = text.replaceAll(backslashMarker, '\\');
+  return text.replace(/\\"/g, '"').replace(/\\'/g, "'");
 }
 
 export function humanizeFieldName(value: string) {

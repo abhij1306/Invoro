@@ -155,12 +155,10 @@ async def update_monitor(
     return monitor
 
 
-async def archive_monitor(session: AsyncSession, monitor_id: int) -> MonitorJob:
+async def delete_monitor(session: AsyncSession, monitor_id: int) -> None:
     monitor = await get_monitor(session, monitor_id)
-    monitor.status = MONITOR_STATUS_ARCHIVED
+    await session.delete(monitor)
     await session.commit()
-    await session.refresh(monitor)
-    return monitor
 
 
 async def monitor_change_count_since(

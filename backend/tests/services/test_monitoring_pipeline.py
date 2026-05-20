@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import contextlib
 from types import SimpleNamespace
 
 import pytest
@@ -7,8 +9,11 @@ from sqlalchemy import select
 
 from app.api.product_intelligence import router as product_intelligence_router
 from app.core.celery_app import celery_app
+from app.core.config import settings
+from app.models.crawl_run import CrawlRun
 from app.models.monitor import MonitorEvent, MonitorJob
 from app.models.notification import InAppNotification
+from app.services.dispatch import local_dispatcher as local_dispatch_module
 from app.services.config.monitor_settings import (
     MONITOR_EVENT_FIELD_CHANGED,
     MONITOR_PRIORITY_BACKGROUND,
@@ -54,7 +59,7 @@ def test_monitor_change_detection_registration_replaces_stale_callback(monkeypat
 
 
 @pytest.mark.asyncio
-async def test_dispatch_monitor_run_starts_created_run(monkeypatch):
+async def test_dispatch_monitor_run_uses_dispatched_run_from_payload_factory(monkeypatch):
     calls: list[tuple[str, int]] = []
 
     async def fake_create_run(session, user_id, payload):
@@ -62,17 +67,9 @@ async def test_dispatch_monitor_run_starts_created_run(monkeypatch):
         assert payload["settings"]["monitor_id"] == 42
         return SimpleNamespace(id=123)
 
-    async def fake_dispatch_run(session, run):
-        calls.append(("dispatch", run.id))
-        return run
-
     monkeypatch.setattr(
         "app.services.monitor_scheduler_service.create_crawl_run_from_payload",
         fake_create_run,
-    )
-    monkeypatch.setattr(
-        "app.services.monitor_scheduler_service.dispatch_run",
-        fake_dispatch_run,
     )
 
     monitor = SimpleNamespace(
@@ -91,7 +88,57 @@ async def test_dispatch_monitor_run_starts_created_run(monkeypatch):
     )
 
     assert run_ids == [123]
-    assert calls == [("create", 7), ("dispatch", 123)]
+    assert calls == [("create", 7)]
+
+
+@pytest.mark.asyncio
+async def test_dispatch_monitor_run_does_not_redispatch_new_run(
+    db_session,
+    test_user,
+    monkeypatch,
+):
+    monkeypatch.setattr(settings, "celery_dispatch_enabled", False)
+    monitor = await create_monitor(
+        db_session,
+        user=test_user,
+        payload={
+            "name": "price watch",
+            "urls": ["https://example.com/product/1"],
+            "surface": "ecommerce_detail",
+            "tracked_fields": ["price"],
+            "schedule_interval_hours": 24,
+            "priority": MONITOR_PRIORITY_BACKGROUND,
+        },
+    )
+
+    created_tasks: list[int] = []
+
+    def _fake_track(run_id: int) -> asyncio.Task[None]:
+        created_tasks.append(run_id)
+        task = asyncio.create_task(asyncio.sleep(60))
+        local_dispatch_module._local_run_tasks[run_id] = task
+        return task
+
+    monkeypatch.setattr(local_dispatch_module, "track_local_run_task", _fake_track)
+
+    run_ids = await MonitorSchedulerService().dispatch_monitor_run(
+        db_session,
+        monitor,
+        list(monitor.urls or []),
+    )
+
+    assert len(run_ids) == 1
+    assert created_tasks == run_ids
+
+    run = await db_session.get(CrawlRun, run_ids[0])
+    assert run is not None
+    assert run.status == "pending"
+
+    local_task = local_dispatch_module._local_run_tasks.pop(run_ids[0], None)
+    if local_task is not None:
+        local_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await local_task
 
 
 @pytest.mark.asyncio

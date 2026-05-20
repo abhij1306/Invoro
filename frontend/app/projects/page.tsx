@@ -1,13 +1,16 @@
 'use client';
 
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
-import { ArrowRightCircle, Plus } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ArrowRightCircle, Plus, Trash2 } from 'lucide-react';
+import { useState } from 'react';
 
+import { ConfirmDialog } from '../../components/ui/dialog';
 import { Button } from '../../components/ui/primitives';
 import {
   DataRegionEmpty,
   DataRegionError,
+  InlineAlert,
   DataRegionLoading,
   PageHeader,
   SurfacePanel,
@@ -25,9 +28,24 @@ import { api } from '../../lib/api';
 import { formatRelativeTime } from '../../lib/format/date';
 
 export default function ProjectsPage() {
+  const queryClient = useQueryClient();
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: number;
+    name: string;
+  } | null>(null);
+  const [error, setError] = useState('');
   const projectsQuery = useQuery({
     queryKey: ['orchestration-projects'],
     queryFn: api.listOrchestrationProjects,
+  });
+  const deleteMutation = useMutation({
+    mutationFn: (projectId: number) => api.deleteOrchestrationProject(projectId),
+    onSuccess: async () => {
+      setDeleteTarget(null);
+      await queryClient.invalidateQueries({ queryKey: ['orchestration-projects'] });
+    },
+    onError: (mutationError) =>
+      setError(mutationError instanceof Error ? mutationError.message : 'Unable to delete project.'),
   });
   const projects = projectsQuery.data ?? [];
 
@@ -45,6 +63,7 @@ export default function ProjectsPage() {
           </Button>
         }
       />
+      {error ? <InlineAlert message={error} /> : null}
       <SurfacePanel>
         <div className="border-divider flex items-center justify-between border-b px-4 py-3">
           <div>
@@ -67,7 +86,7 @@ export default function ProjectsPage() {
                   <TableHead className="w-[20%]">Competitors</TableHead>
                   <TableHead className="w-[18%]">Category</TableHead>
                   <TableHead className="w-[18%]">Updated</TableHead>
-                  <TableHead className="w-[12%] text-right">Action</TableHead>
+                  <TableHead className="w-[16%] text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -90,12 +109,23 @@ export default function ProjectsPage() {
                     <TableCell className="truncate">{project.category || '-'}</TableCell>
                     <TableCell>{formatRelativeTime(project.updated_at)}</TableCell>
                     <TableCell className="text-right">
-                      <Button asChild size="sm" variant="action">
-                        <Link href={`/projects/${project.id}`}>
-                          Open
-                          <ArrowRightCircle className="size-3" />
-                        </Link>
-                      </Button>
+                      <div className="flex justify-end gap-2">
+                        <Button asChild size="sm" variant="action">
+                          <Link href={`/projects/${project.id}`}>
+                            Open
+                            <ArrowRightCircle className="size-3" />
+                          </Link>
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => setDeleteTarget({ id: project.id, name: project.name })}
+                        >
+                          <Trash2 className="size-3.5" />
+                          Delete
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -109,6 +139,27 @@ export default function ProjectsPage() {
           )}
         </TableSurface>
       </SurfacePanel>
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+        title="Delete this project?"
+        description={
+          deleteTarget
+            ? `This permanently deletes project "${deleteTarget.name}" and its workflow shells. Linked crawl runs and promoted monitors stay.`
+            : ''
+        }
+        confirmLabel="Delete Project"
+        pending={deleteMutation.isPending}
+        danger
+        error={error || undefined}
+        onConfirm={() => {
+          if (deleteTarget) {
+            deleteMutation.mutate(deleteTarget.id);
+          }
+        }}
+      />
     </div>
   );
 }

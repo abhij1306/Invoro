@@ -24,10 +24,10 @@ from app.schemas.monitor import (
 from app.services.config.monitor_settings import MONITOR_STATUS_ARCHIVED, MONITOR_STATUS_PAUSED
 from app.services.monitor_scheduler_service import MonitorSchedulerService
 from app.services.monitor_service import (
-    archive_monitor,
     batch_monitor_change_counts,
     create_monitor,
     current_snapshot_records,
+    delete_monitor,
     get_monitor,
     list_events,
     list_monitors,
@@ -120,7 +120,7 @@ async def monitor_delete(
     _user: Annotated[User, Depends(get_current_user)],
 ) -> Response:
     try:
-        await archive_monitor(session, monitor_id)
+        await delete_monitor(session, monitor_id)
     except LookupError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -24,7 +24,6 @@ from app.services.config.monitor_settings import (
     SKIP_HEAD_CHECK_KEY,
 )
 from app.services.crawl.ingestion_service import create_crawl_run_from_payload
-from app.services.crawl.service import dispatch_run
 from app.services.domain_utils import normalize_domain
 from app.services.monitor_service import PRIORITY_ORDER, next_run_time, utcnow
 
@@ -120,7 +119,6 @@ class MonitorSchedulerService:
                 user_id,
                 payload,
             )
-            await dispatch_run(session, run)
             run_ids.append(int(run.id))
         return run_ids
 

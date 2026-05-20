@@ -15,7 +15,7 @@ interface MonitorListItemProps {
   onRunNow: (id: number) => void;
   onPause: (id: number) => void;
   onResume: (id: number) => void;
-  onArchive: (id: number) => void;
+  onDelete: (id: number) => void;
   running?: boolean;
 }
 
@@ -24,7 +24,7 @@ export function MonitorListItem({
   onRunNow,
   onPause,
   onResume,
-  onArchive,
+  onDelete,
   running = false,
 }: Readonly<MonitorListItemProps>) {
   const [open, setOpen] = useState(false);
@@ -135,10 +135,10 @@ export function MonitorListItem({
               />
               <ActionButton
                 icon={Trash2}
-                label="Archive"
+                label="Delete"
                 onClick={() => {
                   setOpen(false);
-                  onArchive(id);
+                  onDelete(id);
                 }}
               />
             </div>

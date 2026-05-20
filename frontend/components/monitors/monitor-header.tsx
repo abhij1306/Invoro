@@ -29,7 +29,7 @@ type MonitorHeaderProps = Readonly<{
   runError: string;
   onRunNow: () => void;
   onUpdateStatus: (status: MonitorStatus) => Promise<void>;
-  onArchive: () => Promise<void>;
+  onDelete: () => Promise<void>;
   onSave: (payload: MonitorUpdatePayload) => Promise<void>;
 }>;
 
@@ -39,14 +39,14 @@ export function MonitorHeader({
   runError,
   onRunNow,
   onUpdateStatus,
-  onArchive,
+  onDelete,
   onSave,
 }: MonitorHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
-  const [archiveOpen, setArchiveOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [statusPending, setStatusPending] = useState(false);
-  const [archivePending, setArchivePending] = useState(false);
+  const [deletePending, setDeletePending] = useState(false);
   const active = monitor.status === 'active';
   const visibleDomains = monitor.domains.slice(0, 3).join(', ');
   const hiddenDomains = Math.max(0, monitor.domains.length - 3);
@@ -60,13 +60,13 @@ export function MonitorHeader({
     }
   }
 
-  async function archive() {
-    setArchivePending(true);
+  async function remove() {
+    setDeletePending(true);
     try {
-      await onArchive();
-      setArchiveOpen(false);
+      await onDelete();
+      setDeleteOpen(false);
     } finally {
-      setArchivePending(false);
+      setDeletePending(false);
     }
   }
 
@@ -126,12 +126,12 @@ export function MonitorHeader({
                   type="button"
                   onClick={() => {
                     setMenuOpen(false);
-                    setArchiveOpen(true);
+                    setDeleteOpen(true);
                   }}
                   className="text-danger hover:bg-danger-bg flex w-full items-center gap-2 px-3 py-2 text-sm"
                 >
                   <Trash2 className="size-3.5" />
-                  Archive
+                  Delete
                 </button>
               </div>
             ) : null}
@@ -170,14 +170,14 @@ export function MonitorHeader({
         </DialogPrimitive.Portal>
       </DialogPrimitive.Root>
       <ConfirmDialog
-        open={archiveOpen}
-        onOpenChange={setArchiveOpen}
-        title="Archive this monitor?"
-        description="Scheduled runs stop after archive. Existing snapshots and events remain until retention purge."
-        confirmLabel="Archive Monitor"
-        pending={archivePending}
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title="Delete this monitor?"
+        description="This permanently deletes the monitor, its snapshots, events, URL state, and notifications."
+        confirmLabel="Delete Monitor"
+        pending={deletePending}
         danger
-        onConfirm={() => void archive()}
+        onConfirm={() => void remove()}
       />
     </div>
   );

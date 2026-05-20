@@ -9,6 +9,7 @@ import { monitorsApi } from '../../lib/api';
 import type { MonitorPriority, MonitorStatus } from '../../lib/api/types';
 import { STORAGE_KEYS } from '../../lib/constants/storage-keys';
 import { Button, Dropdown } from '../../components/ui/primitives';
+import { ConfirmDialog } from '../../components/ui/dialog';
 import { InlineAlert, PageHeader, SurfacePanel, TabBar } from '../../components/ui/patterns';
 import { MonitorEmptyState } from '../../components/monitors/monitor-empty-state';
 import { MonitorListItem } from '../../components/monitors/monitor-list-item';
@@ -35,6 +36,7 @@ export default function MonitorsPage() {
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const [runningId, setRunningId] = useState<number | null>(null);
+  const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
 
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEYS.MONITORS_LAST_VISIT, new Date().toISOString());
@@ -57,11 +59,15 @@ export default function MonitorsPage() {
       setError(mutationError instanceof Error ? mutationError.message : 'Monitor update failed.'),
   });
 
-  const archiveMutation = useMutation({
-    mutationFn: monitorsApi.archive,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['monitors'] }),
+  const deleteMutation = useMutation({
+    mutationFn: monitorsApi.remove,
+    onSuccess: async () => {
+      setNotice('Monitor deleted.');
+      setDeleteTargetId(null);
+      await queryClient.invalidateQueries({ queryKey: ['monitors'] });
+    },
     onError: (mutationError) =>
-      setError(mutationError instanceof Error ? mutationError.message : 'Archive failed.'),
+      setError(mutationError instanceof Error ? mutationError.message : 'Delete failed.'),
   });
 
   async function runNow(id: number) {
@@ -128,7 +134,7 @@ export default function MonitorsPage() {
                 onRunNow={(id) => void runNow(id)}
                 onPause={(id) => updateMutation.mutate({ id, status: 'paused' })}
                 onResume={(id) => updateMutation.mutate({ id, status: 'active' })}
-                onArchive={(id) => archiveMutation.mutate(id)}
+                onDelete={(id) => setDeleteTargetId(id)}
               />
             ))}
           </div>
@@ -138,6 +144,23 @@ export default function MonitorsPage() {
           </div>
         )}
       </SurfacePanel>
+      <ConfirmDialog
+        open={deleteTargetId !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTargetId(null);
+        }}
+        title="Delete this monitor?"
+        description="This permanently deletes the monitor, its snapshots, events, URL state, and notifications."
+        confirmLabel="Delete Monitor"
+        pending={deleteMutation.isPending}
+        danger
+        error={error || undefined}
+        onConfirm={() => {
+          if (deleteTargetId !== null) {
+            deleteMutation.mutate(deleteTargetId);
+          }
+        }}
+      />
     </div>
   );
 }

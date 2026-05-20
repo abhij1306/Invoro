@@ -10,6 +10,16 @@ function escapeHtml(input: string): string {
     .replace(/'/g, '&#039;');
 }
 
+function displayJsonStringToken(token: string): string {
+  const hasColon = token.endsWith(':');
+  const rawString = hasColon ? token.slice(0, -1) : token;
+  try {
+    return `"${JSON.parse(rawString)}"${hasColon ? ':' : ''}`;
+  } catch {
+    return token;
+  }
+}
+
 export function syntaxHighlightJson(json: string) {
   if (!json) return '';
 
@@ -25,19 +35,20 @@ export function syntaxHighlightJson(json: string) {
       highlighted += escapeHtml(json.slice(lastIndex, m.index));
     }
     const match = m[0];
-    const escaped = escapeHtml(match);
     if (/^[\{\}\[\],]$/.test(match)) {
-      highlighted += `<span class="syntax-punct">${escaped}</span>`;
+      highlighted += `<span class="syntax-punct">${escapeHtml(match)}</span>`;
     } else {
       let cls = 'syntax-number';
+      let displayToken = match;
       if (match.startsWith('"')) {
         cls = /:$/.test(match) ? 'syntax-key' : 'syntax-string';
+        displayToken = displayJsonStringToken(match);
       } else if (match === 'true' || match === 'false') {
         cls = 'syntax-boolean';
       } else if (match === 'null') {
         cls = 'syntax-null';
       }
-      highlighted += `<span class="${cls}">${escaped}</span>`;
+      highlighted += `<span class="${cls}">${escapeHtml(displayToken)}</span>`;
     }
     lastIndex = m.index + match.length;
   }

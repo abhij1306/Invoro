@@ -292,11 +292,11 @@ export default function RunsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[30%]">Run</TableHead>
-                  <TableHead className="w-[15%]">Type</TableHead>
-                  <TableHead className="w-[15%]">Status</TableHead>
-                  <TableHead className="w-[10%] text-right">Records</TableHead>
+                  <TableHead className="w-[10%]">Type</TableHead>
+                  <TableHead className="w-[12%]">Status</TableHead>
+                  <TableHead className="w-[8%] text-right">Records</TableHead>
                   <TableHead className="w-[15%] text-right">Started</TableHead>
-                  <TableHead className="w-[15%] text-right">Actions</TableHead>
+                  <TableHead className="w-[25%] text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

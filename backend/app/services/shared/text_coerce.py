@@ -69,7 +69,8 @@ def _decode_common_escaped_text(value: str) -> str:
         .replace("\\r", "\r")
         .replace("\\t", "\t")
     )
-    return text.replace(backslash_marker, "\\")
+    text = text.replace(backslash_marker, "\\")
+    return text.replace('\\"', '"').replace("\\'", "'")
 
 
 def is_title_noise(title: object) -> bool:

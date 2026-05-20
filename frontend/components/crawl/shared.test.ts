@@ -145,6 +145,12 @@ describe('formatCellDisplay', () => {
       formatCellDisplay('https://www.shop.ving.run/product/%E0%B8%AA%E0%B8%B5%E0%B8%94%E0%B8%B3'),
     ).toBe('https://www.shop.ving.run/product/สีดำ');
   });
+
+  it('decodes escaped quotes in description text for UI display', () => {
+    expect(formatCellDisplay(String.raw`meaning \\"Dragon Well\\" tea`)).toBe(
+      'meaning "Dragon Well" tea',
+    );
+  });
 });
 
 describe('decodeUrlsForDisplay', () => {
@@ -157,6 +163,16 @@ describe('decodeUrlsForDisplay', () => {
     ).toEqual({
       url: 'https://www.shop.ving.run/product/สีดำ',
       images: ['https://cdn.example.com/a.jpg'],
+    });
+  });
+
+  it('decodes escaped description strings nested inside preview records', () => {
+    expect(
+      decodeUrlsForDisplay({
+        description: String.raw`meaning \\"Dragon Well\\" tea`,
+      }),
+    ).toEqual({
+      description: 'meaning "Dragon Well" tea',
     });
   });
 });
