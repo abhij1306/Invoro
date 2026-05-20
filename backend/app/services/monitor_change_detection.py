@@ -20,11 +20,17 @@ from app.services.config.monitor_settings import (
     MONITOR_EVENT_RECORD_NEW,
     MONITOR_EVENT_RECORD_REMOVED,
     MONITOR_ID_SETTING_KEY,
+    MONITOR_STATUS_ERROR,
+    MONITOR_STATUS_TRIGGERED,
+    MONITOR_SUPPRESS_WEBHOOKS_SETTING_KEY,
     NOTIFICATION_STATUS_PENDING,
     TRACKED_FIELD_ALIASES,
+    ALERT_CONSECUTIVE_FAILURE_LIMIT,
 )
+from app.services.monitor_condition import condition_matches
 from app.services.monitor_alert_service import create_monitor_change_notification
 from app.services.monitor_service import utcnow
+from app.services.monitor_webhook_service import dispatch_alert_webhooks
 from app.services.pipeline.run_complete_callbacks import register_run_complete_callback
 
 _CALLBACK_KEY = "monitor_change_detection"
@@ -137,12 +143,38 @@ class MonitorChangeDetectionService:
                     )
                 )
             for event in events:
+                if event.event_type == MONITOR_EVENT_FIELD_CHANGED:
+                    event.condition_met = _condition_met(monitor, dict(monitor.last_known_values or {}), event)
                 session.add(event)
+            if current:
+                first_record = next(iter(current.values()))
+                monitor.last_known_values = _tracked_values(first_record, tracked_fields)
+                monitor.last_checked_at = detected_at
+                monitor.last_crawl_method = _crawl_method(run, first_record)
+                monitor.consecutive_failure_count = 0
+                monitor.last_error = None
+            else:
+                monitor.last_checked_at = detected_at
+                monitor.consecutive_failure_count = int(monitor.consecutive_failure_count or 0) + 1
+                monitor.last_error = "No records extracted for alert poll"
+                if (
+                    monitor.poll_interval_seconds
+                    and monitor.consecutive_failure_count >= ALERT_CONSECUTIVE_FAILURE_LIMIT
+                ):
+                    monitor.status = MONITOR_STATUS_ERROR
+            if monitor.poll_interval_seconds and any(event.condition_met for event in events):
+                monitor.status = MONITOR_STATUS_TRIGGERED
+            await session.flush()
             await create_monitor_change_notification(
                 session,
                 monitor=monitor,
                 events=events,
             )
+            if (
+                monitor.poll_interval_seconds
+                and not bool(settings.get(MONITOR_SUPPRESS_WEBHOOKS_SETTING_KEY, False))
+            ):
+                await dispatch_alert_webhooks(session, monitor=monitor, events=events)
             summary = dict(run.result_summary or {})
             summary["monitor_change_count"] = len(events)
             run.result_summary = summary
@@ -264,3 +296,26 @@ def _as_int(value: object) -> int | None:
     except (TypeError, ValueError):
         return None
     return parsed if parsed > 0 else None
+
+
+def _condition_met(monitor: MonitorJob, values: dict[str, Any], event: MonitorEvent) -> bool:
+    if not monitor.poll_interval_seconds:
+        return False
+    if event.field_name:
+        values[event.field_name] = event.new_value
+    try:
+        return condition_matches(monitor.condition, values)
+    except ValueError:
+        monitor.last_error = "Invalid alert condition"
+        monitor.status = MONITOR_STATUS_ERROR
+        return False
+
+
+def _crawl_method(run: CrawlRun, record: CrawlRecord) -> str:
+    trace = record.source_trace if isinstance(record.source_trace, dict) else {}
+    acquisition = trace.get("acquisition") if isinstance(trace.get("acquisition"), dict) else {}
+    method = acquisition.get("method") or acquisition.get("fetch_method")
+    if method:
+        return str(method)
+    summary = run.result_summary if isinstance(run.result_summary, dict) else {}
+    return str(summary.get("crawl_method") or "unknown")

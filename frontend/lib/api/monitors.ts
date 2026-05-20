@@ -11,6 +11,12 @@ import type {
   MonitorUpdatePayload,
   PaginatedResponse,
   RunNowResponse,
+  AlertCreatePayload,
+  AlertHistoryItem,
+  AlertJob,
+  AlertTestResponse,
+  AlertUpdatePayload,
+  WebhookDelivery,
 } from './types';
 
 function withQuery(path: string, params?: Record<string, string | number | undefined>) {
@@ -48,4 +54,28 @@ export const monitorsApi = {
 
   currentSnapshot: (id: number | string) =>
     apiClient.get<MonitorSnapshotRecord[]>(`/api/monitors/${id}/snapshot/current`),
+};
+
+export const alertsApi = {
+  list: (params?: { status?: MonitorStatus }) =>
+    apiClient.get<AlertJob[]>(withQuery('/api/alerts', params)),
+
+  get: (id: number | string) => apiClient.get<AlertJob>(`/api/alerts/${id}`),
+
+  create: (payload: AlertCreatePayload) => apiClient.post<AlertJob>('/api/alerts', payload),
+
+  update: (id: number | string, payload: AlertUpdatePayload) =>
+    apiClient.patch<AlertJob>(`/api/alerts/${id}`, payload),
+
+  remove: (id: number | string) => apiClient.delete<void>(`/api/alerts/${id}`),
+
+  test: (id: number | string) => apiClient.post<AlertTestResponse>(`/api/alerts/${id}/test`, {}),
+
+  history: (id: number | string, params?: { page?: number }) =>
+    apiClient.get<PaginatedResponse<AlertHistoryItem>>(
+      withQuery(`/api/alerts/${id}/history`, params),
+    ),
+
+  deliveries: (id: number | string) =>
+    apiClient.get<WebhookDelivery[]>(`/api/alerts/${id}/deliveries`),
 };

@@ -25,7 +25,7 @@ from app.services.config.monitor_settings import (
 )
 from app.services.crawl.ingestion_service import create_crawl_run_from_payload
 from app.services.domain_utils import normalize_domain
-from app.services.monitor_service import PRIORITY_ORDER, next_run_time, utcnow
+from app.services.monitor_service import PRIORITY_ORDER, next_run_time, next_alert_run_time, utcnow
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +48,11 @@ class MonitorSchedulerService:
                     if monitor.priority != MONITOR_PRIORITY_ON_DEMAND:
                         dispatched_regular += 1
                 monitor.last_run_at = now
-                monitor.next_run_at = next_run_time(now, monitor.schedule_interval_hours)
+                monitor.next_run_at = (
+                    next_alert_run_time(now, monitor.poll_interval_seconds)
+                    if monitor.poll_interval_seconds
+                    else next_run_time(now, monitor.schedule_interval_hours)
+                )
                 await session.commit()
 
     async def pre_check_url(self, url: str, state: MonitorURLState) -> bool:

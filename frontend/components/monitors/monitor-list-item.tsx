@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import type { Route } from 'next';
 import { MoreHorizontal, Pause, Play, RotateCw, Trash2 } from 'lucide-react';
 import { forwardRef, useEffect, useRef, useState } from 'react';
 
@@ -12,6 +13,7 @@ import { MonitorPriorityBadge, MonitorStatusBadge } from './monitor-badges';
 
 interface MonitorListItemProps {
   monitor: MonitorJob;
+  detailHref?: Route;
   onRunNow: (id: number) => void;
   onPause: (id: number) => void;
   onResume: (id: number) => void;
@@ -21,6 +23,7 @@ interface MonitorListItemProps {
 
 export function MonitorListItem({
   monitor,
+  detailHref,
   onRunNow,
   onPause,
   onResume,
@@ -33,6 +36,9 @@ export function MonitorListItem({
   const firstActionRef = useRef<HTMLButtonElement>(null);
   const id = monitor.id;
   const active = monitor.status === 'active';
+  const isAlert = Boolean(monitor.poll_interval_seconds);
+  const firstUrl = monitor.urls[0] ?? '';
+  const currentValues = monitor.last_known_values ?? {};
 
   useEffect(() => {
     if (!open) return;
@@ -76,19 +82,41 @@ export function MonitorListItem({
             )}
             aria-hidden
           />
-          <Link href={`/monitors/${id}`} className="type-subheading text-foreground truncate">
-            {monitor.name}
+          <Link
+            href={detailHref ?? (`/monitors/${id}` as Route)}
+            className="type-subheading text-foreground truncate"
+          >
+            {isAlert ? hostPath(firstUrl) : monitor.name}
           </Link>
           <MonitorStatusBadge status={monitor.status} />
           <MonitorPriorityBadge priority={monitor.priority} />
         </div>
         <div className="text-secondary type-body-sm mt-2 flex flex-wrap gap-x-3 gap-y-1">
-          <span>{monitor.urls.length} URLs</span>
-          <span>every {monitor.schedule_interval_hours}h</span>
-          <span>{formatNextRun(monitor.next_run_at)}</span>
+          <span>{isAlert ? 'alert' : `${monitor.urls.length} URLs`}</span>
+          <span>
+            every{' '}
+            {isAlert
+              ? formatSeconds(monitor.poll_interval_seconds ?? 0)
+              : `${monitor.schedule_interval_hours}h`}
+          </span>
+          <span>
+            {monitor.last_checked_at
+              ? `checked ${formatRelativeTime(monitor.last_checked_at)}`
+              : formatNextRun(monitor.next_run_at)}
+          </span>
           <span>{monitor.change_count ?? 0} changes</span>
           {monitor.last_run_at ? <span>last {formatRelativeTime(monitor.last_run_at)}</span> : null}
         </div>
+        {isAlert ? (
+          <div className="text-muted type-caption mt-1 flex flex-wrap gap-x-3 gap-y-1">
+            {monitor.tracked_fields.map((field) => (
+              <span key={field}>
+                {field}: {formatValue(currentValues[field])}
+              </span>
+            ))}
+            {monitor.last_error ? <span className="text-danger">{monitor.last_error}</span> : null}
+          </div>
+        ) : null}
       </div>
       <div className="flex items-center justify-end gap-2">
         <Button
@@ -170,3 +198,24 @@ const ActionButton = forwardRef<
     </button>
   );
 });
+
+function formatSeconds(seconds: number) {
+  if (seconds >= 3600) return `${Math.round(seconds / 3600)}h`;
+  if (seconds >= 60) return `${Math.round(seconds / 60)}m`;
+  return `${seconds}s`;
+}
+
+function formatValue(value: unknown) {
+  if (value === null || value === undefined || value === '') return 'empty';
+  if (typeof value === 'object') return JSON.stringify(value);
+  return String(value);
+}
+
+function hostPath(url: string) {
+  try {
+    const parsed = new URL(url);
+    return `${parsed.hostname}${parsed.pathname}`;
+  } catch {
+    return url || 'Alert';
+  }
+}

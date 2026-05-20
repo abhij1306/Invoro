@@ -1,103 +1,112 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { use } from 'react';
-import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { use, useMemo, useState } from 'react';
 
-import { monitorsApi } from '../../../lib/api';
-import type { MonitorStatus, MonitorUpdatePayload } from '../../../lib/api/types';
+import { alertsApi } from '../../../lib/api';
+import type {
+  MonitorJob,
+  MonitorStatus,
+  AlertJob,
+  AlertUpdatePayload,
+} from '../../../lib/api/types';
 import { MonitorEvents } from '../../../components/monitors/monitor-events';
 import { MonitorHeader } from '../../../components/monitors/monitor-header';
 import { MonitorHistoryChart } from '../../../components/monitors/monitor-history-chart';
 import { MonitorSnapshotTable } from '../../../components/monitors/monitor-snapshot-table';
 import { MonitorDetailSkeleton } from '../../../components/monitors/monitor-skeleton';
+import { MonitorWebhookDeliveries } from '../../../components/monitors/monitor-webhook-deliveries';
 import { InlineAlert, PageHeader, SurfacePanel, TabBar } from '../../../components/ui/patterns';
 
-type TabValue = 'events' | 'history' | 'snapshot';
+type TabValue = 'events' | 'history' | 'snapshot' | 'deliveries';
 
 const tabs: Array<{ value: TabValue; label: string }> = [
   { value: 'events', label: 'Events' },
   { value: 'history', label: 'History' },
   { value: 'snapshot', label: 'Current Snapshot' },
+  { value: 'deliveries', label: 'Webhook Log' },
 ];
 
-export default function MonitorDetailPage({
+export default function AlertDetailPage({
   params,
 }: Readonly<{
   params: Promise<{ id: string }> | { id: string };
 }>) {
   const resolvedParams = isThenable(params) ? use(params) : params;
-  const monitorId = resolvedParams.id;
-  const monitorIdNumber = Number(monitorId);
+  const alertId = resolvedParams.id;
+  const alertIdNumber = Number(alertId);
   const router = useRouter();
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<TabValue>('events');
   const [notice, setNotice] = useState('');
   const [runError, setRunError] = useState('');
 
-  const monitorQuery = useQuery({
-    queryKey: ['monitor', monitorId],
-    queryFn: () => monitorsApi.get(monitorId),
+  const alertQuery = useQuery({
+    queryKey: ['alert', alertId],
+    queryFn: () => alertsApi.get(alertId),
   });
 
+  const monitor = useMemo(
+    () => (alertQuery.data ? alertToMonitor(alertQuery.data) : null),
+    [alertQuery.data],
+  );
+
   const runMutation = useMutation({
-    mutationFn: () => monitorsApi.runNow(monitorId),
+    mutationFn: () => alertsApi.test(alertId),
     onSuccess: (response) => {
-      setNotice(`Run dispatched · run_id: ${response.run_id}`);
+      setNotice(`Poll completed · run_id: ${response.run_id}`);
       setRunError('');
-      queryClient.invalidateQueries({ queryKey: ['monitor', monitorId] });
+      queryClient.invalidateQueries({ queryKey: ['alert', alertId] });
     },
     onError: (error) => {
-      setRunError(error instanceof Error ? error.message : 'Run dispatch failed.');
+      setRunError(error instanceof Error ? error.message : 'Alert poll failed.');
     },
   });
 
   const statusMutation = useMutation({
-    mutationFn: (status: MonitorStatus) => monitorsApi.update(monitorId, { status }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['monitor', monitorId] }),
+    mutationFn: (status: MonitorStatus) => alertsApi.update(alertId, { status }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['alert', alertId] }),
   });
 
   const editMutation = useMutation({
-    mutationFn: (payload: MonitorUpdatePayload) => monitorsApi.update(monitorId, payload),
+    mutationFn: (payload: AlertUpdatePayload) => alertsApi.update(alertId, payload),
     onSuccess: () => {
-      setNotice('Monitor saved.');
-      queryClient.invalidateQueries({ queryKey: ['monitor', monitorId] });
+      setNotice('Alert saved.');
+      queryClient.invalidateQueries({ queryKey: ['alert', alertId] });
     },
   });
 
   const deleteMutation = useMutation({
-    mutationFn: () => monitorsApi.remove(monitorId),
+    mutationFn: () => alertsApi.remove(alertId),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['monitors'] });
-      router.push('/monitors');
+      await queryClient.invalidateQueries({ queryKey: ['alerts'] });
+      router.push('/alerts');
     },
   });
 
-  if (monitorQuery.isPending) {
+  if (alertQuery.isPending) {
     return <MonitorDetailSkeleton />;
   }
 
-  if (monitorQuery.error || !monitorQuery.data) {
+  if (alertQuery.error || !monitor) {
     return (
       <div className="page-stack">
-        <PageHeader title="Monitor" />
+        <PageHeader title="Product Alert" />
         <InlineAlert
           message={
-            monitorQuery.error instanceof Error ? monitorQuery.error.message : 'Monitor not found.'
+            alertQuery.error instanceof Error ? alertQuery.error.message : 'Alert not found.'
           }
         />
       </div>
     );
   }
 
-  const monitor = monitorQuery.data;
-
   return (
     <div className="page-stack">
       <PageHeader
-        title={monitor.name}
-        description="Monitor detail and change history."
+        title="Product Alert"
+        description="Alert configuration, deltas, and webhook delivery log."
       />
       {notice ? (
         <div className="alert-surface alert-success px-3 py-2 text-sm">{notice}</div>
@@ -109,7 +118,9 @@ export default function MonitorDetailPage({
         onRunNow={() => runMutation.mutate()}
         onUpdateStatus={(status) => statusMutation.mutateAsync(status).then(() => undefined)}
         onDelete={() => deleteMutation.mutateAsync().then(() => undefined)}
-        onSave={(payload) => editMutation.mutateAsync(payload).then(() => undefined)}
+        onSave={(payload) =>
+          editMutation.mutateAsync(payload as AlertUpdatePayload).then(() => undefined)
+        }
       />
       <SurfacePanel>
         <div className="border-divider border-b px-4 pt-2">
@@ -122,16 +133,45 @@ export default function MonitorDetailPage({
         </div>
         <div className="p-4">
           {tab === 'events' ? (
-            <MonitorEvents monitorId={monitorIdNumber} onRunNow={() => runMutation.mutate()} />
+            <MonitorEvents monitorId={alertIdNumber} onRunNow={() => runMutation.mutate()} />
           ) : null}
           {tab === 'history' ? <MonitorHistoryChart monitor={monitor} /> : null}
           {tab === 'snapshot' ? (
             <MonitorSnapshotTable monitor={monitor} onRunNow={() => runMutation.mutate()} />
           ) : null}
+          {tab === 'deliveries' ? <MonitorWebhookDeliveries monitorId={alertIdNumber} /> : null}
         </div>
       </SurfacePanel>
     </div>
   );
+}
+
+function alertToMonitor(alert: AlertJob): MonitorJob {
+  return {
+    id: alert.id,
+    name: alert.url,
+    urls: [alert.url],
+    domains: [alert.domain],
+    surface: alert.surface,
+    tracked_fields: alert.target_fields,
+    schedule_interval_hours: 1,
+    priority: 'background',
+    retention_days: 90,
+    status: alert.status,
+    settings: {},
+    condition: alert.condition,
+    webhook_url: alert.webhook_url,
+    poll_interval_seconds: alert.poll_interval_seconds,
+    last_known_values: alert.last_known_values,
+    last_checked_at: alert.last_checked_at,
+    last_error: alert.last_error,
+    last_crawl_method: alert.last_crawl_method,
+    last_run_at: null,
+    next_run_at: null,
+    created_at: alert.created_at,
+    updated_at: alert.updated_at,
+    change_count: 0,
+  };
 }
 
 function isThenable(value: unknown): value is Promise<{ id: string }> {

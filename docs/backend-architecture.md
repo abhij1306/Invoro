@@ -43,6 +43,8 @@ Routers registered in `backend/app/main.py`:
 - `/api/llm`
 - `/api/data-enrichment`
 - `/api/monitors`
+- `/api/alerts`
+- `/api/v1/alerts`
 - `/api/orchestration`
 - `/api/health`
 - `/api/metrics`
@@ -57,6 +59,8 @@ Important route groups:
 - `api/llm.py`: provider catalog, config CRUD, connection test, cost log
 - `api/data_enrichment.py`: on-demand ecommerce detail enrichment jobs and enriched product row lookup
 - `api/monitors.py`: monitor CRUD, run-now dispatch, event/history/current-snapshot lookup, and JSON/CSV exports
+- `api/alerts.py`: console-auth Agentic Delta Engine alert CRUD, immediate test poll, delta history, and webhook delivery log
+- `api/public_alerts.py`: API-key authenticated `/api/v1/alerts` envelope endpoints for agent callers
 - `api/orchestration.py`: project shells, static workflow templates, workflow launch/status, monitor promotion, and price-comparison views over normal crawl records
 
 Domain-recipe routes live under `api/crawl_domain.py`:
@@ -198,6 +202,7 @@ Current live behavior:
 - `pipeline/extraction_loop.py` stays the per-URL stage orchestrator; record extraction, acquisition-contract memory, retry families, direct-record LLM fallback, browser diagnostics merge, typed result objects, and public failure-state persistence live in dedicated pipeline helper modules
 - Data Enrichment is separate from the crawl pipeline: it reads persisted ecommerce detail `CrawlRecord` rows, writes `EnrichedProduct` rows, and only updates source-record enrichment status metadata.
 - Product Monitoring is a recurring crawl orchestration layer: `MonitorJob` rows store URL sets, schedule interval, priority, tracked fields, retention, and crawl settings; scheduler drivers call `MonitorSchedulerService.check_due_jobs()`; monitor runs are normal `CrawlRun` rows tagged with `settings.monitor_id`; `MonitorChangeDetectionService` diffs completed run records against the latest snapshot; `monitor_alert_service.py` creates in-app notifications for tracked field changes; retention purges monitor snapshots/events only.
+- Agentic Delta Engine alerts extend Product Monitoring instead of creating a second engine: single-URL ecommerce alerts are `MonitorJob` rows with `poll_interval_seconds`, `condition`, `webhook_url`, `last_known_values`, and delivery state; condition evaluation is sandboxed in `monitor_condition.py`; webhook attempts are stored in `MonitorWebhookDelivery`; the MCP stdio wrapper in `app/mcp/alert_server.py` is a thin client over `/api/v1/alerts`.
 - Orchestration is a use-case-first sequencing layer: `OrchestrationProject` groups business context, `OrchestrationWorkflowRun` stores resolved versioned template config, and `OrchestrationStepRun` links steps to normal `CrawlRun` rows. The MVP template is `competitive_pricing_snapshot`, which launches listing first, starts detail from completed listing record URLs, renders comparison rows from detail records, and promotes to normal `MonitorJob` rows. It does not implement extraction or mutate pipeline behavior.
 - Scheduler driver split is explicit: `SCHEDULER_DRIVER=dev` starts `AsyncSchedulerLoop` from FastAPI lifespan with no Celery Beat; `SCHEDULER_DRIVER=celery` registers Celery Beat tasks `monitor.check_due_jobs` and `monitor.purge_expired_snapshots`.
 
@@ -370,13 +375,13 @@ Important implemented features:
 - surface alias lookup now keeps normalized requested labels addressable as identity mappings as well as exact requested-field keys, so custom dynamic fields continue to flow through candidate collection even when they do not collapse to a built-in alias
 - requested custom ecommerce-detail fields now keep DOM completion active when matching section headings are present, so structured-data early exit does not hide fields such as `product_story` after detail expansion
 - DOM variant fallback now materializes concrete variant rows, keeps `variant_count` aligned with those rows, and avoids widening an already authoritative `selected_variant` choice with later DOM-only axis noise
-- Shopify detail extraction can expand bounded same-family linked PDP swatches through `/products/<handle>.js`, then merge the sibling rows upstream so split color/scent product URLs still emit flat public variants.
+- Shopify detail extraction can expand bounded same-family linked PDP salertes through `/products/<handle>.js`, then merge the sibling rows upstream so split color/scent product URLs still emit flat public variants.
 - selector-backed fields that survive into `record.data` now persist exact selector provenance under `record.source_trace.field_discovery[field_name].selector_trace`, including selector kind/value, selector source, source run id, sample value, page URL, and `survived_to_final_record`
 - ecommerce-detail long-text ranking now prefers explicit DOM sections over thinner structured blurbs when the page exposes a real description/spec-style accordion body, and `product_details` remains a separate field instead of being collapsed into `specifications`
 - long-text candidate intake now rejects low-signal placeholders such as single-word review/schema values or accordion index labels before they can win `description` / `specifications`, and selector-backed long-text fields must expose non-interactive prose rather than button/tab indexes
 - ecommerce-detail output no longer exposes platform slug fields such as `handle` by default; those values remain requestable explicitly, but the default user-facing detail schema stays limited to higher-signal commerce fields
 - DOM section intake now rejects very short non-prose tab/button label clusters before they can override a real product description or specifications body
-- ecommerce-detail JS-state product detection now requires real commerce cues instead of accepting arbitrary titled image blocks, and JS-state image harvesting filters payment, logo, bookmark, swatch, and video assets before they can outrank structured product media
+- ecommerce-detail JS-state product detection now requires real commerce cues instead of accepting arbitrary titled image blocks, and JS-state image harvesting filters payment, logo, bookmark, salert, and video assets before they can outrank structured product media
 - output schema validation now applies to listing surfaces as well as detail surfaces before persistence, so type mismatches on listing records are nullified instead of silently bypassing validation
 - persistence now applies a final public-record firewall before `CrawlRecord.data`: unknown/internal fields, empty fields, invalid scalar/list/object shapes, non-navigation URLs, API/event/tracking URLs, and overlong opaque URLs are rejected into `source_trace.extraction.rejected_public_fields` instead of public data
 - the final persisted-data firewall is owned by `public_record_firewall.py`, not `pipeline/persistence.py`; persistence calls it before writing `CrawlRecord.data`
@@ -496,6 +501,8 @@ Primary models:
 - `MonitorSnapshot`
 - `MonitorSnapshotRecord`
 - `MonitorURLState`
+- `MonitorWebhookDelivery`
+- `ApiKey`
 - `LLMConfig`
 - `LLMCostLog`
 - `DomainMemory`

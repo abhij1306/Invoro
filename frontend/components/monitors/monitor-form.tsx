@@ -1,7 +1,8 @@
 'use client';
 
-import { Bug, Globe2, Info, Shield } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { Globe2, Info, Shield } from 'lucide-react';
+import { cloneElement, useMemo, useState } from 'react';
+import type { ReactElement } from 'react';
 
 import type { CrawlSurface, MonitorCreatePayload, MonitorPriority } from '../../lib/api/types';
 import { cn } from '../../lib/utils';
@@ -163,7 +164,6 @@ export function MonitorForm({
       {error ? <InlineAlert message={error} /> : null}
 
       <div className={cn(layout === 'grid' ? 'grid gap-6 lg:grid-cols-2' : 'space-y-4')}>
-        {/* Primary Settings Column */}
         <div className="space-y-4">
           <Field label="Name">
             <Input value={name} maxLength={100} onChange={(event) => setName(event.target.value)} />
@@ -188,7 +188,7 @@ export function MonitorForm({
             </p>
           ) : null}
 
-          <div className="grid gap-4 grid-cols-2">
+          <div className="grid grid-cols-2 gap-4">
             <Field label="Surface">
               <Dropdown value={surface} onChange={handleSurfaceChange} options={surfaceOptions} />
             </Field>
@@ -232,10 +232,9 @@ export function MonitorForm({
           </div>
         </div>
 
-        {/* Dispatch & Advanced Settings Column */}
         <div className="flex flex-col justify-between space-y-4">
           <div className="space-y-4">
-            <div className="grid gap-4 grid-cols-[1fr_120px]">
+            <div className="grid grid-cols-[1fr_120px] gap-4">
               <Field
                 label="Schedule Interval"
                 hint={intervalHours < 1 ? 'Minimum is 1 hour.' : undefined}
@@ -261,7 +260,7 @@ export function MonitorForm({
 
             <div className="space-y-1.5">
               <div className="field-label">Priority</div>
-              <div className="border-border bg-background-alt p-0.5 rounded-[var(--radius-md)] border flex gap-1 w-max">
+              <div className="border-border bg-background-alt flex w-max gap-1 rounded-[var(--radius-md)] border p-0.5">
                 {priorityOptions.map((option) => (
                   <Tooltip key={option.value} content={option.hint}>
                     <button
@@ -270,7 +269,7 @@ export function MonitorForm({
                       className={cn(
                         'type-control cursor-pointer rounded-[var(--radius-sm)] px-3 py-1 text-xs font-semibold transition-colors',
                         priority === option.value
-                          ? 'border-border bg-panel text-foreground shadow-xs border'
+                          ? 'border-border bg-panel text-foreground border shadow-xs'
                           : 'text-secondary hover:text-foreground border border-transparent',
                       )}
                     >
@@ -289,34 +288,27 @@ export function MonitorForm({
                 checked={advancedOpen}
                 onChange={setAdvancedOpen}
               >
-                <div className="space-y-3.5">
-                  <SettingSection
+                <div className="space-y-2">
+                  <AdvancedToggleRow
                     label="Proxy"
                     description="Allow proxy settings to be passed with this monitor."
                     icon={<Shield />}
                     checked={proxyEnabled}
                     onChange={setProxyEnabled}
                   />
-                  <SettingSection
+                  <AdvancedToggleRow
                     label="JS rendering"
                     description="Prefer rendered DOM acquisition for monitor runs."
                     icon={<Globe2 />}
                     checked={jsRendering}
                     onChange={setJsRendering}
                   />
-                  <div className="border-border bg-panel flex items-center justify-between gap-3 rounded-[var(--radius-md)] border px-3 py-2">
-                    <div>
-                      <p className="type-body-sm m-0 font-medium">Skip HEAD pre-check</p>
-                      <p className="type-caption m-0">
-                        Ecommerce monitors recrawl on schedule instead of trusting CDN validators.
-                      </p>
-                    </div>
-                    <Toggle
-                      checked={skipHeadCheck}
-                      onChange={setSkipHeadCheck}
-                      ariaLabel="Skip HEAD pre-check"
-                    />
-                  </div>
+                  <AdvancedToggleRow
+                    label="Skip HEAD pre-check"
+                    description="Ecommerce monitors recrawl on schedule instead of trusting CDN validators."
+                    checked={skipHeadCheck}
+                    onChange={setSkipHeadCheck}
+                  />
                 </div>
               </SettingSection>
             </div>
@@ -337,6 +329,48 @@ export function MonitorForm({
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function AdvancedToggleRow({
+  label,
+  description,
+  icon,
+  checked,
+  onChange,
+}: Readonly<{
+  label: string;
+  description: string;
+  icon?: ReactElement<{ className?: string }>;
+  checked: boolean;
+  onChange: (value: boolean) => void;
+}>) {
+  const renderedIcon = icon
+    ? cloneElement(icon, {
+        className: cn(icon.props.className, 'size-4'),
+      })
+    : null;
+
+  return (
+    <div className="border-border bg-panel grid min-h-12 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-[var(--radius-md)] border px-3 py-2">
+      <div className="flex min-w-0 items-center gap-2.5">
+        {renderedIcon ? (
+          <div className="border-border bg-setting-icon-bg text-secondary flex size-8 shrink-0 items-center justify-center rounded-[var(--radius-md)] border">
+            {renderedIcon}
+          </div>
+        ) : null}
+        <div className="min-w-0">
+          <div className="flex min-w-0 items-center gap-1.5">
+            <p className="type-body-sm text-foreground m-0 truncate font-medium">{label}</p>
+            <Tooltip content={description}>
+              <Info className="text-muted hover:text-secondary size-3.5 shrink-0 cursor-help transition-colors" />
+            </Tooltip>
+          </div>
+          {!icon ? <p className="type-caption m-0 mt-0.5">{description}</p> : null}
+        </div>
+      </div>
+      <Toggle checked={checked} onChange={onChange} ariaLabel={label} />
     </div>
   );
 }

@@ -67,7 +67,12 @@ async def monitor_list(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid status")
     if priority and priority not in MONITOR_PRIORITIES:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid priority")
-    monitors = await list_monitors(session, status=status_filter, priority=priority)
+    monitors = await list_monitors(
+        session,
+        status=status_filter,
+        priority=priority,
+        monitors_only=True,
+    )
     counts = await batch_monitor_change_counts(
         session,
         [int(monitor.id) for monitor in monitors],
@@ -89,7 +94,7 @@ async def monitor_get(
     try:
         monitor = await get_monitor(session, monitor_id)
     except LookupError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Monitor is archived") from exc
     return await _monitor_response(session, monitor)
 
 
@@ -135,7 +140,7 @@ async def monitor_run_now(
     try:
         monitor = await get_monitor(session, monitor_id)
     except LookupError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Monitor is archived") from exc
     if monitor.status == MONITOR_STATUS_ARCHIVED:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Monitor is archived")
     if monitor.status == MONITOR_STATUS_PAUSED:

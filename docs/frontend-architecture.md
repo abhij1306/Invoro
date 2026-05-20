@@ -41,6 +41,9 @@ App routes under `frontend/app`:
 - `/monitors`
 - `/monitors/new`
 - `/monitors/[id]`
+- `/alerts`
+- `/alerts/new`
+- `/alerts/[id]`
 - `/jobs`
 - `/selectors`
 - `/selectors/manage`
@@ -161,7 +164,7 @@ Responsibilities:
 
 - dashboard metrics and recent runs
 - run history
-- monitor list, creation, detail, event, history, and snapshot inspection
+- monitor/alert list, creation, detail, event, history, current snapshot inspection, and webhook delivery log
 - active jobs view
 - selector picker/test/save workflow
 - domain-memory management across domains and surfaces
@@ -177,7 +180,7 @@ Primary files:
 - `components/ui/patterns.tsx` for shared operator-page patterns
 - `components/ui/table.module.css` for compact and commerce table styling
 - `app/product-intelligence/product-intelligence-components.tsx` for Product Intelligence local UI pieces
-- `components/monitors/*` for Monitor Management list/detail/form/event/history/snapshot components
+- `components/monitors/*` for Monitor and Alert Management list/detail/form/event/history/snapshot components
 - `app/ucp-audit/ucp-audit-components.tsx` for UCP audit report UI pieces
 
 Global CSS policy:
@@ -206,6 +209,7 @@ The frontend currently uses live backend routes for:
 - ucp audit: `/api/ucp-audit/jobs`, `/api/ucp-audit/jobs/{id}`, `/api/ucp-audit/jobs/{id}/export.json`, `/api/ucp-audit/jobs/{id}/export.md`
 - jobs: `/api/jobs/active`
 - monitors: `/api/monitors`, `/api/monitors/{id}`, `/api/monitors/{id}/run/now`, `/api/monitors/{id}/events`, `/api/monitors/{id}/history`, `/api/monitors/{id}/snapshot/current`
+- alerts: `/api/alerts`, `/api/alerts/{id}`, `/api/alerts/{id}/test`, `/api/alerts/{id}/history`, `/api/alerts/{id}/deliveries`
 - orchestration: `/api/orchestration/projects`, `/api/orchestration/templates`, `/api/orchestration/workflows`, `/api/orchestration/workflows/{id}/status`, `/api/orchestration/workflows/{id}/promote`, `/api/orchestration/workflows/{id}/results/price-comparison`
 - notifications: `/api/notifications`, `/api/notifications/unread-count`, `/api/notifications/{id}/read`, `/api/notifications/monitors/{id}/read`
 

@@ -1,5 +1,6 @@
 # ORM model exports.
 from app.core.database import Base
+from app.models.api_key import ApiKey
 from app.models.user import User
 from app.models.crawl_run import CrawlLog, CrawlRecord, CrawlRun
 from app.models.data_enrichment import DataEnrichmentJob, EnrichedProduct
@@ -17,6 +18,7 @@ from app.models.monitor import (
     MonitorSnapshot,
     MonitorSnapshotRecord,
     MonitorURLState,
+    MonitorWebhookDelivery,
 )
 from app.models.notification import InAppNotification
 from app.models.orchestration import (
@@ -35,6 +37,7 @@ from app.models.ucp_audit import UCPAuditJob, UCPAuditPageResult, UCPAuditReport
 
 __all__ = [
     "Base",
+    "ApiKey",
     "User",
     "CrawlRun",
     "CrawlRecord",
@@ -57,6 +60,7 @@ __all__ = [
     "MonitorSnapshot",
     "MonitorSnapshotRecord",
     "MonitorURLState",
+    "MonitorWebhookDelivery",
     "InAppNotification",
     "OrchestrationProject",
     "OrchestrationWorkflowRun",

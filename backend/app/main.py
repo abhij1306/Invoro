@@ -26,11 +26,13 @@ from app.api.monitors import router as monitors_router
 from app.api.notifications import router as notifications_router
 from app.api.orchestration import router as orchestration_router
 from app.api.product_intelligence import router as product_intelligence_router
+from app.api.public_alerts import router as public_alerts_router
 from app.api.records import router as records_router
 from app.api.review import router as review_router
 from app.api.selectors import router as selectors_router
 from app.api.users import router as users_router
 from app.api.ucp_audit import router as ucp_audit_router
+from app.api.alerts import router as alerts_router
 from app.core.config import get_frontend_origins, settings
 from app.core.dependencies import shutdown_run_dispatchers
 from app.core.metrics import (
@@ -370,6 +372,8 @@ for router in [
     product_intelligence_router,
     orchestration_router,
     monitors_router,
+    alerts_router,
+    public_alerts_router,
     notifications_router,
     ucp_audit_router,
 ]:
