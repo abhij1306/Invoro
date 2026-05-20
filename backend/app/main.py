@@ -9,7 +9,6 @@ from collections import OrderedDict, deque
 from collections.abc import Mapping
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from time import monotonic
 from time import perf_counter
 from typing import Any
 
@@ -40,7 +39,7 @@ from app.api.selectors import router as selectors_router
 from app.api.users import router as users_router
 from app.api.ucp_audit import router as ucp_audit_router
 from app.api.alerts import router as alerts_router
-from app.core.config import get_frontend_origins, settings
+from app.core.config import get_frontend_origins, runtime_app_env, settings
 from app.core.dependencies import get_db, shutdown_run_dispatchers
 from app.core.metrics import (
     check_browser_pool,
@@ -48,6 +47,7 @@ from app.core.metrics import (
     check_redis,
     render_prometheus_metrics,
 )
+from app.core.rate_limit import client_identifier_from_request, consume_sliding_window_limit
 from app.core.redis import close_redis
 from app.core.database import SessionLocal, dispose_engine
 from app.core.public_auth import authenticate_public_api_key
@@ -64,6 +64,17 @@ from app.services.acquisition import (
     validate_cookie_policy_config,
 )
 from app.services.auth_service import bootstrap_admin_user
+from app.services.config.auth_security import (
+    API_ALLOWED_CORS_METHODS,
+    SECURITY_HEADER_CONTENT_TYPE_OPTIONS,
+    SECURITY_HEADER_FRAME_OPTIONS,
+    SECURITY_HEADER_HSTS,
+    SECURITY_HEADER_PERMISSIONS_POLICY,
+    SECURITY_HEADER_REFERRER_POLICY,
+    cors_allowed_headers,
+    path_requires_no_store,
+    secure_transport_required,
+)
 from app.services.config.runtime_settings import crawler_runtime_settings
 from app.services.crawl.service import recover_stale_local_runs
 from app.services.llm.provider_client import close_llm_provider_clients
@@ -91,6 +102,10 @@ class CrawlerAppState:
         default_factory=OrderedDict
     )
     rate_limit_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+    auth_rate_limit_buckets: OrderedDict[str, deque[float]] = field(
+        default_factory=OrderedDict
+    )
+    auth_rate_limit_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
     monitor_scheduler_loop: AsyncSchedulerLoop | None = None
     trusted_proxy_cache_key: tuple[str, ...] = ()
     trusted_proxy_cache_set: frozenset[str] = frozenset()
@@ -145,8 +160,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=get_frontend_origins(),
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=list(API_ALLOWED_CORS_METHODS),
+    allow_headers=cors_allowed_headers(settings.request_id_header),
 )
 
 
@@ -256,6 +271,20 @@ def _sanitize_header_name(value: str) -> str:
 
 
 @app.middleware("http")
+async def security_headers_middleware(request: Request, call_next) -> Response:
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = SECURITY_HEADER_CONTENT_TYPE_OPTIONS
+    response.headers["X-Frame-Options"] = SECURITY_HEADER_FRAME_OPTIONS
+    response.headers["Referrer-Policy"] = SECURITY_HEADER_REFERRER_POLICY
+    response.headers["Permissions-Policy"] = SECURITY_HEADER_PERMISSIONS_POLICY
+    if path_requires_no_store(request.url.path):
+        response.headers["Cache-Control"] = "no-store"
+    if _should_emit_hsts(request):
+        response.headers["Strict-Transport-Security"] = SECURITY_HEADER_HSTS
+    return response
+
+
+@app.middleware("http")
 async def rate_limit_middleware(request: Request, call_next) -> Response:
     if not crawler_runtime_settings.api_rate_limit_enabled:
         return await call_next(request)
@@ -285,17 +314,10 @@ def _rate_limit_exempt_path(path: str) -> bool:
 
 
 def _client_rate_limit_key(request: Request) -> str:
-    peer_host = request.client.host if request.client and request.client.host else ""
-    forwarded_for = (
-        request.headers.get("x-forwarded-for") if _is_trusted_proxy(peer_host) else None
+    return client_identifier_from_request(
+        request,
+        trusted_proxies=tuple(_trusted_proxy_set()),
     )
-    if forwarded_for:
-        first = forwarded_for.split(",", maxsplit=1)[0].strip()
-        if first:
-            return first
-    if peer_host:
-        return peer_host
-    return "unknown"
 
 
 sanitize_header_value = _sanitize_header_value
@@ -362,31 +384,48 @@ async def _consume_rate_limit(
     state: CrawlerAppState | None = None,
 ) -> tuple[bool, int]:
     crawler_state = state or _crawler_app_state()
-    now = monotonic()
-    window_seconds = float(crawler_runtime_settings.api_rate_limit_window_seconds)
-    max_requests = int(crawler_runtime_settings.api_rate_limit_max_requests)
-    async with crawler_state.rate_limit_lock:
-        bucket = crawler_state.rate_limit_buckets.get(identifier)
-        if bucket is None:
-            bucket = deque()
-            crawler_state.rate_limit_buckets[identifier] = bucket
-        else:
-            crawler_state.rate_limit_buckets.move_to_end(identifier)
+    return await consume_sliding_window_limit(
+        crawler_state.rate_limit_buckets,
+        crawler_state.rate_limit_lock,
+        identifier=identifier,
+        window_seconds=float(crawler_runtime_settings.api_rate_limit_window_seconds),
+        max_requests=int(crawler_runtime_settings.api_rate_limit_max_requests),
+        max_clients=int(crawler_runtime_settings.api_rate_limit_max_clients),
+    )
 
-        cutoff = now - window_seconds
-        while bucket and bucket[0] <= cutoff:
-            bucket.popleft()
 
-        if len(bucket) >= max_requests:
-            retry_after = max(1, int(bucket[0] + window_seconds - now))
-            return False, retry_after
+def auth_rate_limit_buckets_snapshot() -> OrderedDict[str, deque[float]]:
+    buckets = _crawler_app_state().auth_rate_limit_buckets
+    return OrderedDict((key, deque(value)) for key, value in buckets.items())
 
-        bucket.append(now)
-        while len(crawler_state.rate_limit_buckets) > int(
-            crawler_runtime_settings.api_rate_limit_max_clients
-        ):
-            crawler_state.rate_limit_buckets.popitem(last=False)
-        return True, 0
+
+def clear_auth_rate_limit_buckets_for_testing() -> None:
+    _crawler_app_state().auth_rate_limit_buckets.clear()
+
+
+def restore_auth_rate_limit_buckets_for_testing(
+    buckets: OrderedDict[str, deque[float]],
+) -> None:
+    auth_rate_limit_buckets = _crawler_app_state().auth_rate_limit_buckets
+    auth_rate_limit_buckets.clear()
+    auth_rate_limit_buckets.update(
+        OrderedDict((key, deque(value)) for key, value in buckets.items())
+    )
+
+
+def _request_is_https(request: Request) -> bool:
+    if request.url.scheme == "https":
+        return True
+    peer_host = request.client.host if request.client and request.client.host else ""
+    if _is_trusted_proxy(peer_host):
+        forwarded_proto = request.headers.get("x-forwarded-proto", "")
+        if forwarded_proto.split(",", maxsplit=1)[0].strip().lower() == "https":
+            return True
+    return False
+
+
+def _should_emit_hsts(request: Request) -> bool:
+    return secure_transport_required(runtime_app_env()) and _request_is_https(request)
 
 
 @app.middleware("http")

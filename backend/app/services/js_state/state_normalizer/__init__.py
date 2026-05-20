@@ -7,6 +7,7 @@ from . import _variant_mapping as _variant_mapping_module
 from ._common import (
     PRODUCT_FIELD_SPEC,
     _VARIANT_FIELD_SPEC,
+    glom,
     map_configured_state_payload,
 )
 from ._facade import *
@@ -15,9 +16,6 @@ from ._payloads import *
 from ._product_mapping import *
 from ._variant_mapping import *
 from ._variant_rows import *
-
-glom = _common_module.glom
-
 
 def _sync_compat_hooks() -> None:
     _product_mapping_module.glom = glom

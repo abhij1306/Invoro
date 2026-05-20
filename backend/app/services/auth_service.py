@@ -1,26 +1,37 @@
 # Authentication and user lifecycle service.
 from __future__ import annotations
 
+import logging
+
 from app.core.config import (
     admin_password_strength_issues,
     load_admin_bootstrap_settings,
     settings,  # noqa: F401
 )
-from app.core.security import create_access_token, hash_password, verify_password
+from app.core.security import (
+    create_access_token,
+    hash_password,
+    password_needs_rehash,
+    verify_password,
+)
 from app.models.user import User
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, update
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from sqlalchemy.orm.attributes import set_committed_value
 
 DEFAULT_ADMIN_EMAIL = "DEFAULT_ADMIN_EMAIL"
 DEFAULT_ADMIN_PASSWORD = "DEFAULT_ADMIN_PASSWORD"  # nosec B105
 BOOTSTRAP_ADMIN_ONCE = "BOOTSTRAP_ADMIN_ONCE"
+logger = logging.getLogger("app.auth")
 
 
 def _validate_default_admin_password(password: str) -> None:
     issues = admin_password_strength_issues(password)
     if issues:
-        raise RuntimeError(
-            f"{DEFAULT_ADMIN_PASSWORD} must include " + ", ".join(issues) + "."
+        logger.warning(
+            "%s is weaker than the current recommendation: %s",
+            DEFAULT_ADMIN_PASSWORD,
+            ", ".join(issues),
         )
 
 
@@ -93,4 +104,29 @@ async def authenticate_user(
         or not verify_password(password, user.hashed_password)
     ):
         return None
+    if password_needs_rehash(user.hashed_password):
+        await _upgrade_password_hash(session, user, password)
+        logger.info("auth.password_hash_upgraded", extra={"user_id": str(user.id)})
     return create_access_token(str(user.id), token_version=user.token_version), user
+
+
+async def _upgrade_password_hash(
+    session: AsyncSession, user: User, password: str
+) -> None:
+    bind = session.bind
+    if bind is None:
+        raise RuntimeError("AsyncSession bind is required for password hash upgrades")
+    new_hash = hash_password(password)
+    isolated_session_factory = async_sessionmaker(
+        bind=bind,
+        expire_on_commit=False,
+        class_=AsyncSession,
+    )
+    async with isolated_session_factory() as isolated_session:
+        await isolated_session.execute(
+            update(User)
+            .where(User.id == user.id)
+            .values(hashed_password=new_hash)
+        )
+        await isolated_session.commit()
+    set_committed_value(user, "hashed_password", new_hash)

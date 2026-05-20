@@ -19,7 +19,7 @@ def _patch_secret_guard_settings(monkeypatch, **overrides) -> None:
         monkeypatch.setattr(config.settings, name, value)
 
 
-def test_secret_guard_uses_settings_app_env(monkeypatch) -> None:
+def test_secret_guard_uses_runtime_app_env_override(monkeypatch) -> None:
     monkeypatch.setenv("APP_ENV", "development")
     _patch_secret_guard_settings(
         monkeypatch,
@@ -27,8 +27,25 @@ def test_secret_guard_uses_settings_app_env(monkeypatch) -> None:
         jwt_secret_key="change-me",
     )
 
-    with pytest.raises(RuntimeError, match="jwt_secret_key"):
-        config._check_secret_defaults()
+    config._check_secret_defaults()
+
+
+def test_secret_guard_warns_for_legacy_admin_password_without_blocking(
+    monkeypatch,
+    caplog,
+) -> None:
+    caplog.set_level("WARNING", logger="app.core.config")
+    _patch_secret_guard_settings(
+        monkeypatch,
+        default_admin_password="OldPass123!",
+    )
+
+    config._check_secret_defaults()
+
+    assert any(
+        "weaker than the current recommendation" in record.message
+        for record in caplog.records
+    )
 
 
 def test_secret_guard_rejects_known_weak_admin_password(monkeypatch) -> None:

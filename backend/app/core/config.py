@@ -1,6 +1,7 @@
 # Centralized application settings.
 from __future__ import annotations
 
+import os
 from pathlib import Path
 import re
 from typing import Literal
@@ -38,7 +39,7 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("JWT_SECRET_KEY", "jwt_secret_key"),
     )
     jwt_algorithm: str = "HS256"
-    jwt_expire_hours: int = 24
+    jwt_expire_hours: int = 1
     encryption_key: str = Field(
         validation_alias=AliasChoices("ENCRYPTION_KEY", "encryption_key"),
     )
@@ -156,13 +157,20 @@ def admin_password_strength_issues(password: str) -> list[str]:
     return issues
 
 
+def runtime_app_env() -> str:
+    if os.getenv("APP_ENV") is not None or os.getenv("app_env") is not None:
+        return str(_load_settings().app_env or "development")
+    return str(settings.app_env or "development")
+
+
 def _check_secret_defaults() -> None:
     """Warn loudly (or crash outside dev/test) if default secrets are still set."""
     import logging
 
     logger = logging.getLogger("app.core.config")
-    env = str(settings.app_env or "development").lower()
+    env = runtime_app_env().lower()
     issues: list[str] = []
+    warnings: list[str] = []
     if settings.jwt_secret_key in _INSECURE_DEFAULTS:
         issues.append("jwt_secret_key is set to a default value")
     if settings.encryption_key in _INSECURE_DEFAULTS:
@@ -174,7 +182,7 @@ def _check_secret_defaults() -> None:
     if settings.bootstrap_admin_once and default_admin_password:
         password_issues = admin_password_strength_issues(default_admin_password)
         if password_issues:
-            issues.append(
+            warnings.append(
                 "default_admin_password must include "
                 + ", ".join(password_issues)
             )
@@ -187,6 +195,11 @@ def _check_secret_defaults() -> None:
         and default_admin_email in _INSECURE_ADMIN_EMAIL_DEFAULTS
     ):
         issues.append("bootstrap_admin_once requires a non-default default_admin_email")
+    if warnings:
+        logger.warning(
+            "SECURITY WARNING — admin bootstrap password is weaker than the current recommendation:\n  • "
+            + "\n  • ".join(warnings)
+        )
     if not issues:
         return
     msg = (

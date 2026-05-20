@@ -18,6 +18,9 @@ _STATIC_EXPORTS = {
     if not name.startswith("_")
 }
 
+for _name, _value in _STATIC_EXPORTS.items():
+    globals()[_name] = _value if _value is not None else ()
+
 COLOR_FIELD = "color"
 TITLE_FIELD = "title"
 SIZE_FIELD = "size"

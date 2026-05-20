@@ -772,6 +772,59 @@ async def test_process_run_continues_when_failure_log_persistence_fails(
 
 
 @pytest.mark.asyncio
+async def test_process_run_continues_when_failure_log_persistence_raises_non_sql_exception(
+    db_session: AsyncSession,
+    test_user,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run = await create_crawl_run(
+        db_session,
+        test_user.id,
+        {
+            "run_type": "batch",
+            "surface": "ecommerce_detail",
+            "settings": {
+                "urls": [
+                    "https://example.com/products/bad-widget",
+                    "https://example.com/products/widget-prime",
+                ],
+            },
+        },
+    )
+
+    async def _failing_process_single_url(*args, **kwargs):
+        del args
+        url = str(kwargs.get("url") or "")
+        if "bad-widget" in url:
+            raise RuntimeError("extractor failed")
+        return URLProcessingResult(
+            records=[],
+            verdict="success",
+            url_metrics={"record_count": 0},
+        )
+
+    async def _failing_failure_log(*args, **kwargs):
+        del args, kwargs
+        raise ValueError("unexpected recovery failure")
+
+    monkeypatch.setattr(
+        "app.services.crawl.batch_runtime.process_single_url",
+        _failing_process_single_url,
+    )
+    monkeypatch.setattr(
+        "app.services.crawl.batch_runtime._persist_url_failure_log",
+        _failing_failure_log,
+    )
+
+    await process_run(db_session, run.id)
+    await db_session.refresh(run)
+
+    assert run.status == "completed"
+    assert run.result_summary["extraction_verdict"] == "partial"
+    assert run.result_summary["url_verdicts"] == ["error", "success"]
+
+
+@pytest.mark.asyncio
 async def test_process_run_records_browser_exception_diagnostics_and_continues(
     db_session: AsyncSession,
     test_user,

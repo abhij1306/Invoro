@@ -112,6 +112,46 @@ async def test_health_and_metrics_skip_http_rate_limit(monkeypatch) -> None:
         restore_rate_limit_buckets_for_testing(previous_buckets)
 
 
+@pytest.mark.asyncio
+async def test_api_responses_include_security_headers() -> None:
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://testserver",
+    ) as client:
+        response = await client.get("/api/health")
+
+    assert response.status_code == 200
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["x-frame-options"] == "DENY"
+    assert response.headers["referrer-policy"] == "strict-origin-when-cross-origin"
+    assert response.headers["permissions-policy"] == "camera=(), microphone=(), geolocation=()"
+    assert "strict-transport-security" not in response.headers
+
+
+@pytest.mark.asyncio
+async def test_cors_preflight_uses_narrow_allowlists() -> None:
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://testserver",
+    ) as client:
+        response = await client.options(
+            "/api/auth/login",
+            headers={
+                "Origin": "http://127.0.0.1:3000",
+                "Access-Control-Request-Method": "POST",
+                "Access-Control-Request-Headers": "content-type,authorization,x-request-id",
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-methods"] == "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+    assert response.headers["access-control-allow-headers"] != "*"
+    allow_headers = response.headers["access-control-allow-headers"].lower()
+    assert "content-type" in allow_headers
+    assert "authorization" in allow_headers
+    assert "x-request-id" in allow_headers
+
+
 def test_client_rate_limit_key_ignores_forwarded_for_from_untrusted_peer(
     monkeypatch,
 ) -> None:

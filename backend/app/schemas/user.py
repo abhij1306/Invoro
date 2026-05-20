@@ -28,5 +28,4 @@ class UserResponse(BaseModel):
 
 
 class AuthResponse(BaseModel):
-    access_token: str
     user: UserResponse
