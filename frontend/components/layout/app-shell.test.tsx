@@ -92,6 +92,39 @@ describe('AppShell reset workspace', () => {
     ).toBeInTheDocument();
   });
 
+  it('closes on Escape and restores focus to the trigger', async () => {
+    apiMock.me.mockResolvedValue({
+      id: 1,
+      email: 'admin@example.com',
+      role: 'admin',
+      is_active: true,
+      created_at: new Date('2026-05-19T00:00:00Z').toISOString(),
+      updated_at: new Date('2026-05-19T00:00:00Z').toISOString(),
+    });
+
+    renderShell();
+
+    const trigger = await screen.findByRole('button', { name: /reset workspace/i });
+    trigger.focus();
+    fireEvent.click(trigger);
+
+    expect(
+      await screen.findByRole('dialog', { name: /reset workspace data/i }),
+    ).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /reset workspace data/i })).toHaveFocus();
+    });
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole('dialog', { name: /reset workspace data/i }),
+      ).not.toBeInTheDocument();
+      expect(trigger).toHaveFocus();
+    });
+  });
+
   it('hides workspace reset for non-admin users', async () => {
     apiMock.me.mockResolvedValue({
       id: 2,

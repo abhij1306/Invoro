@@ -60,7 +60,6 @@ from app.services.shared.field_coerce import (
     surface_fields,
     text_or_none,
 )
-from app.services.structured_sources import harvest_js_state_objects
 
 (
     _add_sourced_candidate,
@@ -226,7 +225,7 @@ def _prepare_detail_extraction(
         raw_soup=raw_soup,
         soup=soup,
     )
-    js_state_objects = harvest_js_state_objects(None, context.cleaned_html)
+    js_state_objects = context.js_state_objects
     js_state_record = map_js_state_to_fields(
         js_state_objects,
         surface=surface,

@@ -100,6 +100,7 @@ This layer is the frontend/backend contract chokepoint.
 Primary files:
 
 - `components/crawl/crawl-config-screen.tsx`
+- `components/crawl/use-crawl-config.ts`
 - `components/crawl/domain-surface-config.ts`
 - `components/crawl/crawl.module.css`
 - `components/crawl/shared.tsx`
@@ -108,6 +109,7 @@ Primary files:
 Responsibilities:
 
 - choose domain/surface tab/mode
+- own Crawl Studio form validation and manual field arrays through React Hook Form and Zod
 - derive surface from the domain/tab dispatch map
 - build dispatch payload
 - collect advanced settings and additional fields
@@ -131,16 +133,21 @@ Current UI settings behavior reflects the backend contract:
 Primary files:
 
 - `components/crawl/crawl-run-screen.tsx`
+- `components/crawl/use-run-workspace.ts`
 - `components/crawl/use-run-polling.ts`
+- `components/crawl/crawl-run-store.ts`
+- `components/crawl/alert-builder-drawer.tsx`
 - `components/crawl/shared.tsx`
 
 Responsibilities:
 
-- poll run state while active
+- poll run state while active through TanStack Query `refetchInterval`
 - show records, JSON, and logs
 - consume websocket logs when available
 - show quality/verdict/progress signals
 - expose pause/resume/kill and export actions
+- keep run workspace UI coordination in the crawl Zustand store, not in server-query state
+- build product alert rules from run records in the dedicated alert drawer
 
 Important live data features:
 

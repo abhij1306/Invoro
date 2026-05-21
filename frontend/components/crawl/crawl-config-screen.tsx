@@ -3,7 +3,7 @@
 import { Check, Globe, Info, Plus, Shield, SlidersHorizontal, Sparkles } from 'lucide-react';
 import type { Route } from 'next';
 import { useRouter } from 'next/navigation';
-import { FormEvent, startTransition, useEffect, useMemo, useRef, useState } from 'react';
+import { startTransition, useEffect, useMemo, useRef, useState } from 'react';
 
 import { cn } from '../../lib/utils';
 import { InlineAlert, PageHeader, SectionHeader, TabBar } from '../ui/patterns';
@@ -70,6 +70,7 @@ import {
   type TraversalDropdownValue,
 } from './crawl-config-logic';
 import { DOMAIN_OPTIONS, DOMAIN_TABS } from './domain-surface-config';
+import * as crawlConfigForm from './use-crawl-config';
 
 type CrawlConfigScreenProps = {
   requestedTab: CrawlTab | null;
@@ -100,24 +101,30 @@ export function CrawlConfigScreen({
     () => requestedCategoryMode ?? 'single',
   );
   const [pdpMode, setPdpMode] = useState<PdpMode>(() => requestedPdpMode ?? 'single');
-  const [targetUrl, setTargetUrl] = useState('');
-  const [bulkUrls, setBulkUrls] = useState('');
+  const {
+    handleSubmit,
+    setValue,
+    fieldRows,
+    setFieldRows,
+    targetUrl,
+    bulkUrls,
+    maxRecords,
+    proxyInput,
+    isSubmitting,
+  } = crawlConfigForm.useCrawlConfig();
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [smartExtraction, setSmartExtraction] = useState(false);
   const [studioMode, setStudioMode] = useState<StudioMode>('quick');
   const [runProfile, setRunProfile] = useState<DomainRunProfile>(() => defaultRunProfile());
-  const [maxRecords, setMaxRecords] = useState(String(CRAWL_DEFAULTS.MAX_RECORDS));
   const [respectRobotsTxt, setRespectRobotsTxt] = useState<boolean>(
     CRAWL_DEFAULTS.RESPECT_ROBOTS_TXT,
   );
   const [proxyEnabled, setProxyEnabled] = useState(false);
-  const [proxyInput, setProxyInput] = useState('');
   const [savedProfileDomain, setSavedProfileDomain] = useState('');
   const [savedProfileLoaded, setSavedProfileLoaded] = useState(false);
   const [savedProfileMessage, setSavedProfileMessage] = useState('');
   const [additionalDraft, setAdditionalDraft] = useState('');
   const [additionalFields, setAdditionalFields] = useState<string[]>([]);
-  const [fieldRows, setFieldRows] = useState<FieldRow[]>([]);
   const [generatingSelectors, setGeneratingSelectors] = useState(false);
   const [savingDomainMemory, setSavingDomainMemory] = useState(false);
   const [fieldConfigMessage, setFieldConfigMessage] = useState('');
@@ -127,7 +134,6 @@ export function CrawlConfigScreen({
   >({});
   const [activeFieldTestId, setActiveFieldTestId] = useState<string | null>(null);
   const [configError, setConfigError] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const bulkPrefillRouteSyncGuardRef = useRef(false);
   const profileLookupRequestRef = useRef(0);
   const domainMemoryLookupRequestRef = useRef(0);
@@ -221,7 +227,7 @@ export function CrawlConfigScreen({
         if (parsedDomain && DOMAIN_OPTIONS.some((option) => option.value === parsedDomain)) {
           setCrawlDomain(parsedDomain);
         }
-        setBulkUrls(parsed.urls.join('\n'));
+        setValue('bulkUrls', parsed.urls.join('\n'));
         if (Array.isArray(parsed.additional_fields)) {
           setAdditionalFields(uniqueRequestedFields(parsed.additional_fields));
         }
@@ -231,7 +237,7 @@ export function CrawlConfigScreen({
     } finally {
       window.sessionStorage.removeItem(STORAGE_KEYS.BULK_PREFILL);
     }
-  }, [router]);
+  }, [router, setValue]);
 
   useEffect(() => {
     if (lastProfileKeyRef.current !== profileLookupKey) {
@@ -332,7 +338,7 @@ export function CrawlConfigScreen({
       }
     }, UI_DELAYS.DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
-  }, [domainMemoryLookupKey, normalizedTargetDomain, surface]);
+  }, [domainMemoryLookupKey, normalizedTargetDomain, setFieldRows, surface]);
 
   const config = useMemo<CrawlConfig>(
     () => ({
@@ -411,14 +417,20 @@ export function CrawlConfigScreen({
     setRunProfile((current) => cloneRunProfile(updater(current)));
   }
 
-  async function startCrawl(event: FormEvent) {
-    event.preventDefault();
-    if (isSubmitting) {
-      return;
-    }
+  async function startCrawl() {
     setConfigError('');
-    setIsSubmitting(true);
     try {
+      const parsedConfig = crawlConfigForm.crawlConfigSchema.safeParse(
+        crawlConfigForm.transformFormToSubmission({
+          mode: config.mode,
+          targetUrl: config.target_url,
+          bulkUrls: config.bulk_urls,
+          maxRecords,
+        }),
+      );
+      if (!parsedConfig.success) {
+        throw new Error(parsedConfig.error.issues[0]?.message ?? 'Unable to launch crawl.');
+      }
       const dispatch = buildDispatch(config, fieldRows, {
         runProfile,
         studioMode,
@@ -469,8 +481,6 @@ export function CrawlConfigScreen({
         }),
       );
       setConfigError(message);
-    } finally {
-      setIsSubmitting(false);
     }
   }
 
@@ -478,7 +488,7 @@ export function CrawlConfigScreen({
     setFieldRows((current) => [
       ...current,
       {
-        id: `${Date.now()}-${current.length}`,
+        id: crawlConfigForm.createManualFieldRowId(),
         fieldName: '',
         cssSelector: '',
         xpath: '',
@@ -671,7 +681,7 @@ export function CrawlConfigScreen({
 
       <form
         className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_380px] xl:items-stretch"
-        onSubmit={(event) => void startCrawl(event)}
+        onSubmit={(event) => void handleSubmit(startCrawl)(event)}
       >
         <Card className="section-card overflow-hidden p-0">
           <header className="border-border flex h-10 items-center justify-between border-b bg-[color-mix(in_srgb,var(--bg-alt)_40%,var(--bg-panel))] px-6">
@@ -761,7 +771,7 @@ export function CrawlConfigScreen({
                 <div className="relative">
                   <Textarea
                     value={bulkUrls}
-                    onChange={(event) => setBulkUrls(event.target.value)}
+                    onChange={(event) => setValue('bulkUrls', event.target.value)}
                     placeholder={'https://example.com/page-1\nhttps://example.com/page-2'}
                     className="min-h-[420px] font-mono"
                     aria-label="Bulk URLs input"
@@ -803,7 +813,7 @@ export function CrawlConfigScreen({
                 <Input
                   key="target-url-input"
                   value={targetUrl}
-                  onChange={(event) => setTargetUrl(event.target.value)}
+                  onChange={(event) => setValue('targetUrl', event.target.value)}
                   className="font-mono"
                   placeholder={
                     crawlTab === 'category'
@@ -929,7 +939,7 @@ export function CrawlConfigScreen({
                     <Textarea
                       value={proxyInput}
                       onChange={(event) => {
-                        setProxyInput(event.target.value);
+                        setValue('proxyInput', event.target.value);
                       }}
                       placeholder={'http://host:port\nhttp://user:pass@host:port'}
                       className="min-h-[104px] font-mono leading-[var(--leading-relaxed)]"
@@ -941,7 +951,7 @@ export function CrawlConfigScreen({
                 {singleUrlMode && savedProfileLoaded ? (
                   <div className="text-secondary type-body leading-[var(--leading-relaxed)]">
                     Saved domain profile active:{' '}
-                    <span className="type-label-mono text-foreground">{savedProfileDomain}</span> Â·{' '}
+                    <span className="type-label-mono text-foreground">{savedProfileDomain}</span> ·{' '}
                     {surfaceLabel(surface)}
                   </div>
                 ) : null}
@@ -1277,8 +1287,8 @@ export function CrawlConfigScreen({
                     min={CRAWL_LIMITS.MIN_RECORDS}
                     max={CRAWL_LIMITS.MAX_RECORDS}
                     step={10}
-                    onChange={setMaxRecords}
-                    onReset={() => setMaxRecords(String(CRAWL_DEFAULTS.MAX_RECORDS))}
+                    onChange={(value) => setValue('maxRecords', value)}
+                    onReset={() => setValue('maxRecords', String(CRAWL_DEFAULTS.MAX_RECORDS))}
                   />
                   <div className={ADVANCED_CONTROL_ROW_CLASS}>
                     <div className="flex items-center gap-2">

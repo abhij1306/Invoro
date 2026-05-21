@@ -65,17 +65,16 @@
 
   /* ── Fonts
      Primary : Figtree (Google Fonts — premium sans-serif)
-     Mono    : Inconsolata */
+     Mono    : Consolas (local) */
   --font-primary-family:
     var(--font-primary-source, 'Figtree'), 'Figtree', system-ui, -apple-system, sans-serif;
-  --font-mono-family:
-    var(--font-inconsolata, 'Inconsolata'), 'Inconsolata', ui-monospace, monospace;
+  --font-mono-family: var(--font-consolas, 'Consolas'), 'Consolas', ui-monospace, monospace;
   --font-serif: Georgia, serif;
 
   /* ── Mono size tokens */
-  --font-mono-size: 0.875rem;       /* 14px → rem for scalability */
-  --font-mono-size-sm: 0.71875rem;  /* ~11.5px → rem */
-  --font-mono-line-height: 1.5;     /* bumped from 1.45 for readability */
+  --font-mono-size: 0.875rem; /* 14px → rem for scalability */
+  --font-mono-size-sm: 0.71875rem; /* ~11.5px → rem */
+  --font-mono-line-height: 1.5; /* bumped from 1.45 for readability */
 
   /* ── Surfaces — Premium Slate Off-white */
   --bg-base: #f8fafc;
@@ -101,10 +100,10 @@
   --text-muted: #64748b;
 
   /* ── JSON Syntax Highlighting */
-  --syntax-key: #4338ca;       /* darkened from #4f46e5 → 4.6:1 on white ✓ */
-  --syntax-string: #047857;    /* darkened from #059669 → 4.6:1 on white ✓ */
-  --syntax-number: #b45309;    /* darkened from #d97706 → 4.6:1 on white ✓ */
-  --syntax-boolean: #1d4ed8;   /* darkened from #2563eb → 4.6:1 on white ✓ */
+  --syntax-key: #4338ca; /* darkened from #4f46e5 → 4.6:1 on white ✓ */
+  --syntax-string: #047857; /* darkened from #059669 → 4.6:1 on white ✓ */
+  --syntax-number: #b45309; /* darkened from #d97706 → 4.6:1 on white ✓ */
+  --syntax-boolean: #1d4ed8; /* darkened from #2563eb → 4.6:1 on white ✓ */
   --syntax-null: #64748b;
   --syntax-punct: #475569;
 
@@ -118,7 +117,7 @@
   --accent-fg: #ffffff;
   --accent-subtle: rgba(76, 132, 200, 0.08);
   --accent-dim: rgba(76, 132, 200, 0.16);
-  --accent-text: #2d5a8e;       /* WCAG AA compliant for inline text */
+  --accent-text: #2d5a8e; /* WCAG AA compliant for inline text */
 
   /* ── Shellbar */
   --surface-header: #ffffff;
@@ -127,13 +126,13 @@
   --shell-border: var(--border);
 
   /* ── Semantic states */
-  --success: #059669;           /* darkened from #10b981 → 4.6:1 on white ✓ */
+  --success: #059669; /* darkened from #10b981 → 4.6:1 on white ✓ */
   --success-bg: #ecfdf5;
-  --warning: #d97706;           /* darkened from #f59e0b → 4.6:1 on white ✓ */
+  --warning: #d97706; /* darkened from #f59e0b → 4.6:1 on white ✓ */
   --warning-bg: #fffbeb;
-  --danger: #dc2626;            /* darkened from #ef4444 → 4.9:1 on white ✓ */
+  --danger: #dc2626; /* darkened from #ef4444 → 4.9:1 on white ✓ */
   --danger-bg: #fef2f2;
-  --info: #2563eb;              /* darkened from #3b82f6 → 4.6:1 on white ✓ */
+  --info: #2563eb; /* darkened from #3b82f6 → 4.6:1 on white ✓ */
   --info-bg: #eff6ff;
 
   --status-active-bg: var(--success-bg);
@@ -149,7 +148,8 @@
   --shadow-lg-value: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.03);
   --shadow-modal: 0 20px 25px -5px rgba(0, 0, 0, 0.09), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
   --shadow-card-value: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
-  --shadow-elevated-value: 0 20px 25px -5px rgba(0, 0, 0, 0.07), 0 10px 10px -5px rgba(0, 0, 0, 0.03);
+  --shadow-elevated-value:
+    0 20px 25px -5px rgba(0, 0, 0, 0.07), 0 10px 10px -5px rgba(0, 0, 0, 0.03);
 
   /* ── Surface — elegant gradient */
   --gradient-card: linear-gradient(to bottom, #ffffff 0%, #fcfdfd 100%);
@@ -166,7 +166,7 @@
   /* ── Interactive component tokens */
   --button-height: var(--control-height);
   --button-padding-x: 14px;
-  --button-font-size: 0.75rem;   /* 12px → rem */
+  --button-font-size: 0.75rem; /* 12px → rem */
   --button-action-bg: var(--accent);
   --button-action-hover-bg: var(--accent-hover);
   --button-action-border: var(--accent);
@@ -217,13 +217,13 @@
   /* ── Alert border/text tokens */
   --alert-success-bg: var(--success-bg);
   --alert-success-border: #6ee7b7;
-  --alert-success-text: #065f46;   /* darkened for AAA on success-bg */
+  --alert-success-text: #065f46; /* darkened for AAA on success-bg */
   --alert-warning-bg: var(--warning-bg);
   --alert-warning-border: #fde68a;
-  --alert-warning-text: #92400e;   /* darkened for AAA on warning-bg */
+  --alert-warning-text: #92400e; /* darkened for AAA on warning-bg */
   --alert-danger-bg: var(--danger-bg);
   --alert-danger-border: #fecaca;
-  --alert-danger-text: #991b1b;    /* darkened for AAA on danger-bg */
+  --alert-danger-text: #991b1b; /* darkened for AAA on danger-bg */
 
   /* ── Settings panel */
   --setting-surface-active-bg: var(--accent-subtle);
@@ -243,13 +243,13 @@
   /* ══ TYPE SCALE ══════════════════════════════════════════════════════════
      All in rem (16px browser default). Minimum body text ≥ 0.875rem (14px).
      ──────────────────────────────────────────────────────────────────────── */
-  --text-2xs: 0.6875rem;   /* 11px — use sparingly, only for non-critical meta */
-  --text-xs: 0.8125rem;    /* 13px */
-  --text-sm: 0.875rem;     /* 14px */
-  --text-base: 0.9375rem;  /* 15px */
-  --text-lg: 1.0625rem;    /* 17px */
-  --text-xl: 1.375rem;     /* 22px */
-  --text-2xl: 1.875rem;    /* 30px */
+  --text-2xs: 0.6875rem; /* 11px — use sparingly, only for non-critical meta */
+  --text-xs: 0.8125rem; /* 13px */
+  --text-sm: 0.875rem; /* 14px */
+  --text-base: 0.9375rem; /* 15px */
+  --text-lg: 1.0625rem; /* 17px */
+  --text-xl: 1.375rem; /* 22px */
+  --text-2xl: 1.875rem; /* 30px */
 
   /* ── Weights */
   --weight-light: 300;
@@ -348,7 +348,7 @@ html[data-theme='dark'] {
      Original #71717a on #09090b ≈ 4.4:1 — marginal; upgraded to safer value */
   --text-primary: #f4f4f5;
   --text-secondary: #a1a1aa;
-  --text-muted: #a1a1aa;   /* upgraded from #71717a for reliable AA compliance */
+  --text-muted: #a1a1aa; /* upgraded from #71717a for reliable AA compliance */
 
   /* ── Accent — same bright blue as light theme */
   --accent: #4c84c8;
@@ -369,13 +369,13 @@ html[data-theme='dark'] {
   --shell-border: #27272a;
 
   /* ── Semantic states — all verified ≥ 4.5:1 on their respective bg tokens */
-  --success: #34d399;      /* brightened for dark bg contrast */
+  --success: #34d399; /* brightened for dark bg contrast */
   --success-bg: rgba(52, 211, 153, 0.1);
-  --warning: #fbbf24;      /* brightened for dark bg contrast */
+  --warning: #fbbf24; /* brightened for dark bg contrast */
   --warning-bg: rgba(251, 191, 36, 0.1);
-  --danger: #f87171;       /* brightened for dark bg contrast */
+  --danger: #f87171; /* brightened for dark bg contrast */
   --danger-bg: rgba(248, 113, 113, 0.1);
-  --info: #60a5fa;         /* brightened for dark bg contrast */
+  --info: #60a5fa; /* brightened for dark bg contrast */
   --info-bg: rgba(96, 165, 250, 0.1);
 
   --status-active-bg: var(--success-bg);
@@ -526,7 +526,10 @@ body {
   font-size: var(--text-base);
   /* Paragraph text line-height bumped for readability (WCAG 1.4.12) */
   line-height: var(--leading-normal);
-  font-feature-settings: 'cv11' 1, 'ss01' 1, 'calt' 1;
+  font-feature-settings:
+    'cv11' 1,
+    'ss01' 1,
+    'calt' 1;
   font-optical-sizing: auto;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -587,7 +590,7 @@ a.no-underline:focus-visible {
 
 .link-accent {
   color: var(--accent-text, var(--accent));
-  text-decoration: underline;         /* always show underline — WCAG 1.4.1: don't rely on color alone */
+  text-decoration: underline; /* always show underline — WCAG 1.4.1: don't rely on color alone */
   text-underline-offset: 0.15em;
   text-decoration-thickness: 1px;
 }
@@ -595,7 +598,7 @@ a.no-underline:focus-visible {
 .link-accent:hover,
 .link-accent:focus-visible {
   color: var(--accent-hover);
-  text-decoration-thickness: 2px;    /* thicker on hover = clear affordance */
+  text-decoration-thickness: 2px; /* thicker on hover = clear affordance */
 }
 
 /* ── Mono utility */
@@ -647,7 +650,7 @@ button,
 button:active:not(:disabled),
 [role='button']:active:not([aria-disabled='true']) {
   opacity: 0.85;
-  transform: scale(0.99);   /* subtle press feedback */
+  transform: scale(0.99); /* subtle press feedback */
 }
 
 /* Disabled state — communicates non-interactivity (WCAG 1.4.3) */
@@ -687,7 +690,7 @@ select:focus-visible:not(.focus-ring) {
 /* ── Text selection */
 ::selection {
   background: color-mix(in srgb, var(--accent) 26%, transparent);
-  color: var(--text-primary);   /* explicit color ensures contrast in selection */
+  color: var(--text-primary); /* explicit color ensures contrast in selection */
 }
 
 /* ── Scrollbar */
@@ -798,7 +801,7 @@ select:focus-visible:not(.focus-ring) {
 .type-body {
   font-size: var(--text-base);
   font-weight: var(--weight-normal);
-  line-height: var(--leading-normal);   /* normalized to token from hardcoded 1.55 */
+  line-height: var(--leading-normal); /* normalized to token from hardcoded 1.55 */
   color: var(--text-secondary);
 }
 
@@ -917,11 +920,10 @@ select:focus-visible:not(.focus-ring) {
   margin-top: var(--space-1);
 }
 
-/* ── Required field indicator — accessible asterisk */
+/* ── Required field indicator — decorative asterisk; use aria-hidden in markup, not CSS */
 .field-label-required::after {
   content: ' *';
   color: var(--danger);
-  aria-hidden: true;   /* decorative; actual requirement communicated in HTML */
 }
 
 /* ── Error message */
@@ -1134,7 +1136,7 @@ a.ui-button.button-quiet-surface:hover {
 
 /* Button Size Overrides */
 .ui-button-sm {
-  --button-height: 28px !important;   /* slightly smaller than md for visual hierarchy */
+  --button-height: 28px !important; /* slightly smaller than md for visual hierarchy */
   --button-font-size: 0.75rem !important;
   --button-padding-x: 12px !important;
   border-radius: var(--radius-sm) !important;
@@ -1148,7 +1150,7 @@ a.ui-button.button-quiet-surface:hover {
 }
 
 .ui-button-lg {
-  --button-height: 38px !important;   /* bumped from 32px to differentiate from md */
+  --button-height: 38px !important; /* bumped from 32px to differentiate from md */
   --button-font-size: 0.8125rem !important;
   --button-padding-x: 20px !important;
 }
@@ -1240,8 +1242,7 @@ html:not([data-theme='dark']) .code-block {
   overflow-y: auto;
   max-height: 320px;
   box-shadow: var(--terminal-shadow);
-  /* Communicate scrollable region to assistive tech */
-  tab-index: 0;
+  /* Scrollable regions must opt into keyboard focus with tabIndex in JSX. */
 }
 
 .crawl-terminal-json {
@@ -1271,12 +1272,25 @@ html:not([data-theme='dark']) .code-block {
 }
 
 /* ── JSON Syntax Highlighting (Themed) ── */
-.syntax-key     { color: var(--syntax-key); }
-.syntax-string  { color: var(--syntax-string); }
-.syntax-number  { color: var(--syntax-number); }
-.syntax-boolean { color: var(--syntax-boolean); }
-.syntax-null    { color: var(--syntax-null); font-style: italic; }
-.syntax-punct   { color: var(--syntax-punct); }
+.syntax-key {
+  color: var(--syntax-key);
+}
+.syntax-string {
+  color: var(--syntax-string);
+}
+.syntax-number {
+  color: var(--syntax-number);
+}
+.syntax-boolean {
+  color: var(--syntax-boolean);
+}
+.syntax-null {
+  color: var(--syntax-null);
+  font-style: italic;
+}
+.syntax-punct {
+  color: var(--syntax-punct);
+}
 
 .crawl-activity-log {
   background: transparent;
@@ -1343,7 +1357,7 @@ html:not([data-theme='dark']) .code-block {
 .alert-surface {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  padding: var(--space-3) var(--space-4);  /* bumped from space-2/3 for breathing room */
+  padding: var(--space-3) var(--space-4); /* bumped from space-2/3 for breathing room */
   font-size: var(--text-sm);
   box-shadow: none;
 }
@@ -1367,7 +1381,7 @@ html:not([data-theme='dark']) .code-block {
 
 .slider-control::-webkit-slider-runnable-track {
   height: 4px;
-  border-radius: var(--radius-sm);   /* rounded track for softer look */
+  border-radius: var(--radius-sm); /* rounded track for softer look */
   background: color-mix(in srgb, var(--text-muted) 30%, transparent);
 }
 
@@ -1378,7 +1392,7 @@ html:not([data-theme='dark']) .code-block {
   height: 16px;
   margin-top: -6px;
   border: 2px solid var(--slider-thumb-border);
-  border-radius: 50%;   /* rounded thumb — more accessible touch target */
+  border-radius: 50%; /* rounded thumb — more accessible touch target */
   background: var(--accent);
 }
 
@@ -1409,7 +1423,7 @@ html:not([data-theme='dark']) .code-block {
 .filter-toolbar {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);   /* normalized to token from 0.5rem */
+  gap: var(--space-2); /* normalized to token from 0.5rem */
 }
 
 .filter-toolbar-field {
@@ -1497,10 +1511,18 @@ html:not([data-theme='dark']) .code-block {
 }
 
 /* Rounded outer corner container hooks */
-.compact-data-table thead tr:first-child th:first-child { border-top-left-radius: var(--radius-md); }
-.compact-data-table thead tr:first-child th:last-child  { border-top-right-radius: var(--radius-md); }
-.compact-data-table tbody tr:last-child td:first-child  { border-bottom-left-radius: var(--radius-md); }
-.compact-data-table tbody tr:last-child td:last-child   { border-bottom-right-radius: var(--radius-md); }
+.compact-data-table thead tr:first-child th:first-child {
+  border-top-left-radius: var(--radius-md);
+}
+.compact-data-table thead tr:first-child th:last-child {
+  border-top-right-radius: var(--radius-md);
+}
+.compact-data-table tbody tr:last-child td:first-child {
+  border-bottom-left-radius: var(--radius-md);
+}
+.compact-data-table tbody tr:last-child td:last-child {
+  border-bottom-right-radius: var(--radius-md);
+}
 
 /* Table with visible outer border in light mode */
 html:not([data-theme='dark']) .compact-data-table {
@@ -1702,17 +1724,27 @@ html:not([data-theme='dark']) .compact-data-table {
 }
 
 @keyframes pulse-ring {
-  0%   { opacity: 1; }
-  50%  { opacity: 0.4; }
-  100% { opacity: 1; }
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+  100% {
+    opacity: 1;
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    SKELETON LOADER
    ═══════════════════════════════════════════════════════════════════════════ */
 @keyframes shimmer {
-  0%   { background-position: -600px 0; }
-  100% { background-position: 600px 0; }
+  0% {
+    background-position: -600px 0;
+  }
+  100% {
+    background-position: 600px 0;
+  }
 }
 
 .skeleton {
@@ -1726,8 +1758,7 @@ html:not([data-theme='dark']) .compact-data-table {
   animation: shimmer 2.4s linear infinite;
   border-radius: var(--radius-sm);
   pointer-events: none;
-  /* Communicate loading state to assistive tech */
-  aria-busy: true;
+  /* Busy state belongs in markup via aria-busy, not CSS. */
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -1767,7 +1798,9 @@ html:not([data-theme='dark']) .compact-data-table {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .animate-fade-in {
@@ -1782,11 +1815,21 @@ html:not([data-theme='dark']) .compact-data-table {
   animation: fade-in 180ms ease-out both;
 }
 
-.stagger-children > *:nth-child(2) { animation-delay: 50ms; }
-.stagger-children > *:nth-child(3) { animation-delay: 100ms; }
-.stagger-children > *:nth-child(4) { animation-delay: 150ms; }
-.stagger-children > *:nth-child(5) { animation-delay: 200ms; }
-.stagger-children > *:nth-child(6) { animation-delay: 250ms; }
+.stagger-children > *:nth-child(2) {
+  animation-delay: 50ms;
+}
+.stagger-children > *:nth-child(3) {
+  animation-delay: 100ms;
+}
+.stagger-children > *:nth-child(4) {
+  animation-delay: 150ms;
+}
+.stagger-children > *:nth-child(5) {
+  animation-delay: 200ms;
+}
+.stagger-children > *:nth-child(6) {
+  animation-delay: 250ms;
+}
 
 /* ── Noise texture overlay */
 .noise-overlay {
@@ -1799,6 +1842,17 @@ html:not([data-theme='dark']) .compact-data-table {
    ─────────────────────────────────────────────────────────────────────────
    Fluid type scaling to maintain readability across viewport widths.
    ═══════════════════════════════════════════════════════════════════════════ */
+/* ── Toggle theme custom overrides to support token escape workaround ── */
+.bg-\[var\(--toggle-track-on\)\] {
+  background-color: var(--toggle-track-on);
+}
+.bg-\[var\(--toggle-track-off\)\] {
+  background-color: var(--toggle-track-off);
+}
+.bg-\[var\(--toggle-thumb\)\] {
+  background-color: var(--toggle-thumb);
+}
+
 @media (max-width: 480px) {
   :root {
     /* Slightly tighten type scale on very small screens */

@@ -1,5 +1,7 @@
-# Backend Architecture
-
+# Backend Architecture| `monitors.py` | Product monitor CRUD, run-now dispatch, history/events/snapshot, and exports |
+| `alerts.py` | Agentic Delta Engine alert CRUD, test poll, history, and webhook delivery log |
+| `public_alerts.py` | API-key authenticated `/api/v1/alerts` public alert surface |
+| `api_keys.py` | Dashboard API-key create/list/revoke endpoints; returns plaintext only on create |
 > Last updated: 2026-05-07
 >
 > Canonical detailed backend reference. This is the merged replacement for the older split architecture docs.
@@ -258,6 +260,7 @@ Current live behavior:
 - domain cookie memory is intentionally filtered acquisition memory, not a verbatim storage-state cache: challenge-only bot-defense state (for example PerimeterX `_px*`, `pxcts`, PX localStorage) is dropped on load/save, and blocked browser runs do not persist domain memory
 - blocked browser runs also do not rewrite per-run Playwright storage snapshots, so one challenged detail page does not poison later URLs in the same batch run
 - browser-to-HTTP handoff is guarded: only sanitized engine-scoped session state is exported, direct-lane reuse is allowed, proxy-scoped replay is skipped unless proxy affinity is explicit, and drift/challenge re-entry falls back to browser
+- shared HTTP acquisition is intentionally shallow: one `curl_cffi` attempt, one `httpx` fallback attempt when curl transport fails, then browser escalation; there is no hidden multi-attempt HTTP backoff loop inside `fetch_context.py`
 - successful acquisition paths can autosave an editable `DomainRunProfile.acquisition_contract`; future runs may reuse a proven browser engine, mark whether curl-cookie handoff is actually eligible, and record whether rendering, traversal, or network payloads were required. Host memory no longer owns the durable success path; it only biases short-lived protection/backoff choices.
 - browser diagnostics now persist explicit lane identity (`browser_engine`, `browser_profile`, launch mode, native-context flag, stealth-enabled flag) so metrics and audits can distinguish shaped Chromium from native real Chrome without inferring from free-form logs
 - traversal is explicit and separate from browser escalation; only explicit traversal modes are supported
@@ -310,6 +313,7 @@ Current live behavior:
 - platform/runtime policy no longer hardcodes vendor-owned domains just to force browser usage; escalation is driven by runtime policy, response/header evidence, and structured blocker signatures
 - host pacing is now enforced before both HTTP and browser attempts in `crawl_fetch_runtime.py`, and protection evidence can temporarily widen the per-host interval instead of hammering the same blocked edge
 - after browser navigation, blocked challenge pages now get one bounded recovery window: the runtime polls for clearance, checks Akamai-style `_abck` issuance when relevant, and only then performs a single paced reload before surfacing the failure
+- real-Chrome behavior realism is timeout bounded by `browser_behavior_realism_timeout_seconds`; the browser stage records timeout diagnostics and continues instead of letting mouse/scroll simulation consume the URL budget
 - the legacy `async def fetch_page` trampoline in `acquisition/runtime.py` has been removed; callers import `fetch_page` from `crawl_fetch_runtime` directly
 
 ### 6.4 Extraction
@@ -379,6 +383,8 @@ Important implemented features:
 - raw requested field labels are preserved through crawl creation, and ecommerce-detail DOM section matching now checks those exact requested labels before collapsing to broader canonical aliases; composite headings such as `Features & Benefits` therefore extract into `features_benefits` instead of being silently reduced to a generic alias like `benefits`
 - surface alias lookup now keeps normalized requested labels addressable as identity mappings as well as exact requested-field keys, so custom dynamic fields continue to flow through candidate collection even when they do not collapse to a built-in alias
 - requested custom ecommerce-detail fields now keep DOM completion active when matching section headings are present, so structured-data early exit does not hide fields such as `product_story` after detail expansion
+- ecommerce-detail DOM completion skips optional DOM variant probing when the record already has complete unrequested core detail fields, which avoids giant SoupSieve scans on large PDPs such as Amazon while keeping requested-field and true repair paths intact
+- ecommerce-detail extraction reuses per-context JS-state harvests and caches variant DOM scope/node probes per Soup object, avoiding repeated full-document scans during DOM fallback, variant repair, and final cleanup
 - DOM variant fallback now materializes concrete variant rows, keeps `variant_count` aligned with those rows, and avoids widening an already authoritative `selected_variant` choice with later DOM-only axis noise
 - Shopify detail extraction can expand bounded same-family linked PDP salertes through `/products/<handle>.js`, then merge the sibling rows upstream so split color/scent product URLs still emit flat public variants.
 - selector-backed fields that survive into `record.data` now persist exact selector provenance under `record.source_trace.field_discovery[field_name].selector_trace`, including selector kind/value, selector source, source run id, sample value, page URL, and `survived_to_final_record`

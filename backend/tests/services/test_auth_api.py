@@ -81,6 +81,8 @@ async def test_login_sets_secure_cookie_outside_dev_and_test(
     monkeypatch,
 ) -> None:
     await create_user(db_session, "prod@example.com", "password123")
+    monkeypatch.delenv("APP_ENV", raising=False)
+    monkeypatch.delenv("app_env", raising=False)
     monkeypatch.setattr(settings, "app_env", "production")
 
     response = await auth_client.post(

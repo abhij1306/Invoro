@@ -5,9 +5,11 @@ from collections import OrderedDict, deque
 import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy.exc import SQLAlchemyError
 from starlette.requests import Request
 
 import app.main as main_module
+from app.core import metrics as metrics_module
 from app.main import (
     CrawlerAppState,
     RATE_LIMIT_BUCKETS,
@@ -110,6 +112,45 @@ async def test_health_and_metrics_skip_http_rate_limit(monkeypatch) -> None:
             assert (await client.get("/api/metrics")).status_code == 200
     finally:
         restore_rate_limit_buckets_for_testing(previous_buckets)
+
+
+@pytest.mark.asyncio
+async def test_render_prometheus_metrics_raises_on_crawl_run_query_failure(
+    monkeypatch,
+) -> None:
+    if metrics_module._registry is None or metrics_module._prometheus_client is None:
+        pytest.skip("prometheus_client not installed")
+
+    class _FailingSession:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            del exc_type, exc, tb
+            return False
+
+        async def execute(self, *_args, **_kwargs):
+            raise SQLAlchemyError("db down")
+
+    class _Counter:
+        def __init__(self) -> None:
+            self.value = 0
+
+        def inc(self, amount: float = 1.0) -> None:
+            self.value += amount
+
+    failure_counter = _Counter()
+    monkeypatch.setattr(metrics_module, "SessionLocal", lambda: _FailingSession())
+    monkeypatch.setattr(
+        metrics_module,
+        "crawl_runs_query_failures_total",
+        failure_counter,
+    )
+
+    with pytest.raises(SQLAlchemyError, match="db down"):
+        await metrics_module.render_prometheus_metrics()
+
+    assert failure_counter.value == 1
 
 
 @pytest.mark.asyncio

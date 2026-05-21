@@ -23,6 +23,7 @@ from app.services.config.field_mappings import (
     DOM_HIGH_VALUE_FIELDS,
     DOM_OPTIONAL_CUE_FIELDS,
     IMAGE_URL_FIELD,
+    PRICE_FIELD,
     TITLE_FIELD,
     URL_FIELD,
     VARIANT_AXIS_FIELD_NAMES,
@@ -158,6 +159,26 @@ def _missing_requested_fields(
     return missing
 
 
+def _requested_variant_fields(requested_fields: list[str] | None) -> set[str]:
+    requested_variant_fields: set[str] = set()
+    for field_name in requested_fields or []:
+        normalized = exact_requested_field_key(str(field_name or ""))
+        if normalized and normalized in VARIANT_DOM_FIELD_NAMES:
+            requested_variant_fields.add(normalized)
+    return requested_variant_fields
+
+
+def _record_has_complete_unrequested_dom_variant_skip_fields(
+    record: dict[str, Any],
+) -> bool:
+    required_fields = {
+        PRICE_FIELD,
+        *_EARLY_PRICE_REPAIR_REQUIRED_FIELDS,
+        *set(DOM_HIGH_VALUE_FIELDS.get("ecommerce_detail") or ()),
+    }
+    return all(record.get(field_name) not in (None, "", [], {}) for field_name in required_fields)
+
+
 def _detail_long_text_value_looks_truncated(value: object) -> bool:
     text = clean_text(value).rstrip()
     if not text:
@@ -221,6 +242,7 @@ def _requires_dom_completion(
     normalized_surface = str(surface or "").strip().lower()
     raw_soup = breadcrumb_soup or soup
     requested_missing_fields = _missing_requested_fields(record, requested_fields)
+    requested_variant_fields = _requested_variant_fields(requested_fields)
     if normalized_surface == "ecommerce_detail":
         breadcrumb_category = breadcrumb_category_from_dom(
             raw_soup,
@@ -232,8 +254,22 @@ def _requires_dom_completion(
             return True
     if (
         normalized_surface == "ecommerce_detail"
+        and not requested_variant_fields
+        and not selector_rules
+        and _record_has_complete_unrequested_dom_variant_skip_fields(record)
+        and not _requires_dom_long_text_completion(
+            record,
+            extractable_fields=set(DOM_HIGH_VALUE_FIELDS.get(normalized_surface) or ()),
+        )
+    ):
+        return False
+    if (
+        normalized_surface == "ecommerce_detail"
         and not record_has_rich_existing_variants(record)
-        and (variant_dom_cues_present(soup) or variant_dom_cues_present(raw_soup))
+        and (
+            variant_dom_cues_present(soup)
+            or (raw_soup is not soup and variant_dom_cues_present(raw_soup))
+        )
     ):
         return True
     if (

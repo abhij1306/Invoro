@@ -34,6 +34,22 @@ const alertsApiMock = vi.hoisted(() => ({
   create: vi.fn(),
 }));
 
+class MockWebSocket {
+  static instances: MockWebSocket[] = [];
+
+  url: string;
+  onopen: (() => void) | null = null;
+  onclose: (() => void) | null = null;
+  onerror: (() => void) | null = null;
+  onmessage: ((event: { data: string }) => void) | null = null;
+  close = vi.fn();
+
+  constructor(url: string) {
+    this.url = url;
+    MockWebSocket.instances.push(this);
+  }
+}
+
 vi.mock('../../lib/api', () => ({
   api: apiMock,
   alertsApi: alertsApiMock,
@@ -262,11 +278,18 @@ function renderRunScreenWithClient(queryClient: QueryClient, runId = 101) {
 describe('CrawlRunScreen', () => {
   afterEach(() => {
     vi.useRealTimers();
+    vi.unstubAllGlobals();
   });
 
   beforeEach(() => {
     vi.clearAllMocks();
+    MockWebSocket.instances = [];
     window.sessionStorage.clear();
+    vi.stubGlobal('WebSocket', MockWebSocket as unknown as typeof WebSocket);
+    Object.defineProperty(window.navigator, 'userAgent', {
+      configurable: true,
+      value: 'Mozilla/5.0',
+    });
     apiMock.getCrawl.mockResolvedValue(terminalRun(101));
     apiMock.getRecords.mockImplementation(
       async (_runId: number, params?: { page?: number; limit?: number }) => {
@@ -825,6 +848,28 @@ describe('CrawlRunScreen', () => {
     expect(screen.queryByText(/source_trace/)).not.toBeInTheDocument();
     expect(screen.queryByText(/_confidence/)).not.toBeInTheDocument();
     expect(screen.queryByText(/_internal_metric/)).not.toBeInTheDocument();
+  });
+
+  it('does not reopen the log websocket when incoming messages advance the log cursor', async () => {
+    apiMock.getCrawlLogs.mockResolvedValue([makeLog(1, 'First log line')]);
+
+    renderRunScreen();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Logs' }));
+
+    await waitFor(() => {
+      expect(MockWebSocket.instances).toHaveLength(1);
+    });
+    expect(MockWebSocket.instances[0].url).toContain('after_id=1');
+
+    MockWebSocket.instances[0].onmessage?.({
+      data: JSON.stringify(makeLog(2, 'Second log line')),
+    });
+
+    expect(await screen.findByText('Second log line')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(MockWebSocket.instances).toHaveLength(1);
+    });
   });
 
   it('keeps final per-url duration from the latest persisted record timestamp', async () => {

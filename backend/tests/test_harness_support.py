@@ -80,9 +80,20 @@ def test_parse_test_sites_markdown_reads_urls_from_tail(tmp_path: Path) -> None:
     ]
 
 
-def test_parse_test_sites_markdown_reads_urls_from_markdown_tables() -> None:
-    fixture = Path(__file__).resolve().parents[2] / "TEST_SITES.md"
-    assert fixture.exists(), f"Missing TEST_SITES.md fixture at derived path: {fixture}"
+def test_parse_test_sites_markdown_reads_urls_from_markdown_tables(tmp_path: Path) -> None:
+    fixture = tmp_path / "TEST_SITES.md"
+    fixture.write_text(
+        "\n".join(
+            [
+                "| Name | URL | Type |",
+                "| --- | --- | --- |",
+                "| Listing | https://web-scraping.dev/products | Listing |",
+                "| Detail | https://web-scraping.dev/product/1 | Detail |",
+                "| Tool | https://practicesoftwaretesting.com/product/01HB | Detail |",
+            ]
+        ),
+        encoding="utf-8",
+    )
 
     rows = parse_test_sites_markdown(fixture, start_line=1)
 
@@ -857,6 +868,8 @@ def test_evaluate_quality_does_not_flag_job_account_slug_as_utility() -> None:
 
     quality = evaluate_quality(site, result)
 
+    assert quality["quality_verdict"] == "bad_output"
+    assert quality["observed_failure_mode"] == "bad_output"
     assert quality["quality_checks"]["listing_noise_ok"] is True
 
 

@@ -328,8 +328,10 @@ export function Toggle({
   onChange,
   ariaLabel,
 }: Readonly<{ checked: boolean; onChange: (v: boolean) => void; ariaLabel?: string }>) {
-  const trackClass = checked ? 'bg-' + '[var(--toggle-track-on)]' : 'bg-' + '[var(--toggle-track-off)]';
-  const thumbClass = 'bg-' + '[var(--toggle-thumb)]';
+  const trackClass = checked
+    ? 'bg-[var(--toggle-track-on)]'
+    : 'bg-[var(--toggle-track-off)]';
+  const thumbClass = 'bg-[var(--toggle-thumb)]';
   return (
     <button
       type="button"
@@ -355,7 +357,7 @@ export function Toggle({
 
 /* ─── Skeleton ───────────────────────────────────────────────────────────── */
 export function Skeleton({ className }: Readonly<{ className?: string }>) {
-  return <div className={cn('skeleton', className)} aria-hidden="true" />;
+  return <div className={cn('skeleton', className)} aria-busy="true" aria-hidden="true" />;
 }
 
 /* ─── Tooltip ────────────────────────────────────────────────────────────── */

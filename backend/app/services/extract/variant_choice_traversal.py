@@ -80,6 +80,19 @@ _variant_quantity_attr_tokens = frozenset(
     for token in tuple(VARIANT_QUANTITY_ATTR_TOKENS or ())
     if str(token).strip()
 )
+_VARIANT_CHOICE_CACHE_ATTR = "_crawler_variant_choice_cache"
+
+
+def _variant_choice_cache(soup: Any) -> dict[object, object]:
+    cache = getattr(soup, _VARIANT_CHOICE_CACHE_ATTR, None)
+    if isinstance(cache, dict):
+        return cache
+    cache = {}
+    try:
+        setattr(soup, _VARIANT_CHOICE_CACHE_ATTR, cache)
+    except Exception:
+        return {}
+    return cache
 
 
 def infer_variant_group_name(node: Any) -> str:
@@ -117,7 +130,13 @@ def infer_variant_group_name(node: Any) -> str:
 
 
 def variant_dom_cues_present(soup: Any) -> bool:
-    return bool(iter_variant_select_groups(soup) or iter_variant_choice_groups(soup))
+    cache = _variant_choice_cache(soup)
+    cache_key = "variant_dom_cues_present"
+    if cache_key in cache:
+        return bool(cache[cache_key])
+    result = bool(iter_variant_select_groups(soup) or iter_variant_choice_groups(soup))
+    cache[cache_key] = result
+    return result
 
 
 def _choice_option_text(node: Any, *, parent: Any | None = None) -> str:

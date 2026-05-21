@@ -198,4 +198,14 @@ describe('CrawlConfigScreen bulk prefill', () => {
       expect(refreshMock).toHaveBeenCalledTimes(1);
     });
   });
+
+  it('rejects an invalid target URL before dispatching a crawl', async () => {
+    renderConfigScreen();
+
+    enterTargetUrl('not-a-url');
+    fireEvent.click(screen.getByRole('button', { name: 'Start Crawl' }));
+
+    expect(await screen.findByText('Must be a valid URL.')).toBeInTheDocument();
+    expect(createCrawlMock).not.toHaveBeenCalled();
+  });
 });

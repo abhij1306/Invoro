@@ -3,7 +3,8 @@ import Script from 'next/script';
 import './globals.css';
 
 // Next.js App Router root layout; invoked by file-system routing.
-import { Inconsolata, Figtree } from 'next/font/google';
+import { Figtree } from 'next/font/google';
+import localFont from 'next/font/local';
 
 import { AppShell } from '../components/layout/app-shell';
 import { QueryProvider } from '../components/ui/query-provider';
@@ -16,9 +17,12 @@ const mainFont = Figtree({
   display: 'swap',
 });
 
-const monoFont = Inconsolata({
-  subsets: ['latin'],
-  variable: '--font-inconsolata',
+const monoFont = localFont({
+  src: [
+    { path: '../public/fonts/Consolas-Regular.ttf', weight: '400', style: 'normal' },
+    { path: '../public/fonts/Consolas-Bold.ttf',    weight: '700', style: 'normal' },
+  ],
+  variable: '--font-consolas',
   display: 'swap',
 });
 

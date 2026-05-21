@@ -32,6 +32,7 @@ class ExtractionContext:
     _soup: BeautifulSoup | None = None
     _original_soup: BeautifulSoup | None = None
     _original_dom_parser: LexborHTMLParser | None = None
+    _js_state_objects: dict[str, Any] | None = None
 
     @property
     def soup(self) -> BeautifulSoup:
@@ -55,6 +56,14 @@ class ExtractionContext:
         if current is None:
             current = LexborHTMLParser(self.original_html)
             object.__setattr__(self, "_original_dom_parser", current)
+        return current
+
+    @property
+    def js_state_objects(self) -> dict[str, Any]:
+        current = self._js_state_objects
+        if current is None:
+            current = harvest_js_state_objects(None, self.cleaned_html)
+            object.__setattr__(self, "_js_state_objects", current)
         return current
 
 
@@ -91,7 +100,7 @@ def collect_structured_source_payloads(
     skip_extruct_fallbacks = is_listing_surface and _json_ld_listing_confident(
         json_ld_payloads
     )
-    js_state_objects = harvest_js_state_objects(None, context.cleaned_html)
+    js_state_objects = context.js_state_objects
     js_state_payloads: list[dict[str, Any]] = []
     for payload in js_state_objects.values():
         if isinstance(payload, dict):
@@ -251,25 +260,24 @@ def _vtex_state_product_price(
     price_range_ref = product.get("priceRange")
     if isinstance(price_range_ref, dict):
         # Inline or resolved priceRange
-        selling = price_range_ref.get("sellingPrice")
+        selling = _resolve_vtex_state_ref(price_range_ref.get("sellingPrice"), state)
         if isinstance(selling, dict):
-            # Could be a reference {type: "id", id: "..."}
-            ref_id = selling.get("id") if selling.get("type") == "id" else None
-            if ref_id:
-                selling = state.get(ref_id, selling)
-            if isinstance(selling, dict):
-                low = selling.get("lowPrice") or selling.get("highPrice")
-                if isinstance(low, (int, float)) and low > 0:
-                    return float(low)
+            low = _coerce_positive_float(
+                selling.get("lowPrice") or selling.get("highPrice")
+            )
+            if low is not None:
+                return low
     # Try resolving via state key pattern: $Product:sp-XXX.priceRange.sellingPrice
     if product_id:
         for prefix in (f"$Product:sp-{product_id}", f"$Product:{product_id}"):
             selling_key = f"{prefix}.priceRange.sellingPrice"
-            selling_obj = state.get(selling_key)
+            selling_obj = _resolve_vtex_state_ref(state.get(selling_key), state)
             if isinstance(selling_obj, dict):
-                low = selling_obj.get("lowPrice") or selling_obj.get("highPrice")
-                if isinstance(low, (int, float)) and low > 0:
-                    return float(low)
+                low = _coerce_positive_float(
+                    selling_obj.get("lowPrice") or selling_obj.get("highPrice")
+                )
+                if low is not None:
+                    return low
     # Fallback: items[0].sellers[0].commertialOffer
     if product_id:
         offer_key = next(
@@ -277,11 +285,11 @@ def _vtex_state_product_price(
             None,
         )
         if offer_key:
-            offer = state.get(offer_key)
+            offer = _resolve_vtex_state_ref(state.get(offer_key), state)
             if isinstance(offer, dict):
-                price = offer.get("Price") or offer.get("price")
-                if isinstance(price, (int, float)) and price > 0:
-                    return float(price)
+                price = _coerce_positive_float(offer.get("Price") or offer.get("price"))
+                if price is not None:
+                    return price
     return None
 
 
@@ -294,16 +302,39 @@ def _vtex_state_product_image(
     if not isinstance(items_ref, list):
         return None
     for item_ref in items_ref:
-        item = item_ref if isinstance(item_ref, dict) else state.get(str(item_ref or ""))
+        item = _resolve_vtex_state_ref(item_ref, state)
         if not isinstance(item, dict):
             continue
         images = item.get("images")
         if not isinstance(images, list):
             continue
         for img_ref in images:
-            img = img_ref if isinstance(img_ref, dict) else state.get(str(img_ref or ""))
+            img = _resolve_vtex_state_ref(img_ref, state)
             if isinstance(img, dict):
                 url = img.get("imageUrl") or img.get("url")
                 if url and isinstance(url, str):
                     return url
+    return None
+
+
+def _resolve_vtex_state_ref(value: object, state: dict[str, Any]) -> object:
+    if isinstance(value, dict):
+        ref_id = value.get("id") if value.get("type") == "id" else None
+        if ref_id:
+            return state.get(str(ref_id), value)
+        return value
+    if value is None:
+        return None
+    return state.get(str(value), value)
+
+
+def _coerce_positive_float(value: object) -> float | None:
+    if isinstance(value, (int, float)):
+        return float(value) if value > 0 else None
+    if isinstance(value, str):
+        try:
+            parsed = float(value.strip())
+        except ValueError:
+            return None
+        return parsed if parsed > 0 else None
     return None

@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import dynamic from 'next/dynamic';
 import { use } from 'react';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -10,9 +11,9 @@ import type { MonitorStatus, MonitorUpdatePayload } from '../../../lib/api/types
 import { isThenable } from '../../../lib/params';
 import { MonitorEvents } from '../../../components/monitors/monitor-events';
 import { MonitorHeader } from '../../../components/monitors/monitor-header';
-import { MonitorHistoryChart } from '../../../components/monitors/monitor-history-chart';
 import { MonitorSnapshotTable } from '../../../components/monitors/monitor-snapshot-table';
 import { MonitorDetailSkeleton } from '../../../components/monitors/monitor-skeleton';
+import { Skeleton } from '../../../components/ui/primitives';
 import { InlineAlert, PageHeader, SurfacePanel, TabBar } from '../../../components/ui/patterns';
 
 type TabValue = 'events' | 'history' | 'snapshot';
@@ -22,6 +23,17 @@ const tabs: Array<{ value: TabValue; label: string }> = [
   { value: 'history', label: 'History' },
   { value: 'snapshot', label: 'Current Snapshot' },
 ];
+
+const MonitorHistoryChart = dynamic(
+  () =>
+    import('../../../components/monitors/monitor-history-chart').then(
+      (module) => module.MonitorHistoryChart,
+    ),
+  {
+    loading: () => <Skeleton className="h-80 w-full rounded-[var(--radius-lg)]" />,
+    ssr: false,
+  },
+);
 
 export default function MonitorDetailPage({
   params,

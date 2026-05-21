@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { use, useMemo, useState } from 'react';
 
@@ -10,9 +11,9 @@ import { isThenable } from '../../../lib/params';
 import { alertToMonitor } from '../alert-helpers';
 import { MonitorEvents } from '../../../components/monitors/monitor-events';
 import { MonitorHeader } from '../../../components/monitors/monitor-header';
-import { MonitorHistoryChart } from '../../../components/monitors/monitor-history-chart';
 import { MonitorSnapshotTable } from '../../../components/monitors/monitor-snapshot-table';
 import { MonitorDetailSkeleton } from '../../../components/monitors/monitor-skeleton';
+import { Skeleton } from '../../../components/ui/primitives';
 import { MonitorWebhookDeliveries } from '../../../components/monitors/monitor-webhook-deliveries';
 import { InlineAlert, PageHeader, SurfacePanel, TabBar } from '../../../components/ui/patterns';
 
@@ -24,6 +25,17 @@ const tabs: Array<{ value: TabValue; label: string }> = [
   { value: 'snapshot', label: 'Current Snapshot' },
   { value: 'deliveries', label: 'Webhook Log' },
 ];
+
+const MonitorHistoryChart = dynamic(
+  () =>
+    import('../../../components/monitors/monitor-history-chart').then(
+      (module) => module.MonitorHistoryChart,
+    ),
+  {
+    loading: () => <Skeleton className="h-80 w-full rounded-[var(--radius-lg)]" />,
+    ssr: false,
+  },
+);
 
 export default function AlertDetailPage({
   params,

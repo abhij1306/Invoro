@@ -274,6 +274,8 @@ def _find_pollution(record: dict[str, Any], issues: list[Issue]) -> None:
             noisy_samples: list[str] = []
             tiny_token_ratio_hits = 0
             for item in value:
+                if field == "variants" and isinstance(item, dict):
+                    continue
                 item_text = _safe_str(item)
                 if not item_text:
                     continue
@@ -478,8 +480,12 @@ def _find_variant_issues(record: dict[str, Any], issues: list[Issue]) -> None:
             issues.append(Issue("incorrect_variants", "medium", "variants.price", "variant price not numeric", v_price))
 
         for key, value in variant.items():
+            if key in {"url", "image_url"}:
+                continue
             text = _safe_str(value)
             if not text:
+                continue
+            if key in {"flavor", "scent"} and re.search(r"\bcookie\b", text, re.I):
                 continue
             if _is_noise_text(text):
                 noisy_variant_rows += 1

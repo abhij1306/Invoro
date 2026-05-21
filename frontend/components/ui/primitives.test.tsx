@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { Dropdown, Toggle } from './primitives';
+import { Dropdown, Skeleton, Toggle } from './primitives';
 
 describe('Dropdown', () => {
   it('sanitizes option IDs and correctly manages aria-activedescendant for accessibility', () => {
@@ -55,5 +55,15 @@ describe('Toggle', () => {
 
     expect(toggle).toHaveClass('bg-[var(--toggle-track-on)]');
     expect(toggle).not.toHaveClass('bg-accent');
+  });
+});
+
+describe('Skeleton', () => {
+  it('exposes busy state in markup while remaining decorative', () => {
+    render(<Skeleton className="h-4 w-12" />);
+
+    const skeleton = document.querySelector('.skeleton');
+    expect(skeleton).toHaveAttribute('aria-busy', 'true');
+    expect(skeleton).toHaveAttribute('aria-hidden', 'true');
   });
 });

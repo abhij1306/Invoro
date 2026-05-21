@@ -1,6 +1,5 @@
 'use client';
 
-import * as DialogPrimitive from '@radix-ui/react-dialog';
 import {
   ArrowLeft,
   MoreHorizontal,
@@ -12,7 +11,7 @@ import {
   X,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import type {
   MonitorJob,
@@ -21,11 +20,11 @@ import type {
   AlertCreatePayload,
   AlertUpdatePayload,
 } from '../../lib/api/types';
+import { trapFocus } from '../../lib/focus-trap';
 import { formatNextRun, formatRelativeTime } from '../../lib/format/date';
 import { formatSeconds } from '../../lib/format/time';
 import { cn } from '../../lib/utils';
-import { Button } from '../ui/primitives';
-import { ConfirmDialog } from '../ui/dialog';
+import { Button } from '../ui/button';
 import { KVTile } from '../ui/patterns';
 import { MonitorForm } from './monitor-form';
 import { MonitorPriorityBadge, MonitorStatusBadge } from './monitor-badges';
@@ -57,12 +56,50 @@ export function MonitorHeader({
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [statusPending, setStatusPending] = useState(false);
   const [deletePending, setDeletePending] = useState(false);
+  const menuTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const deleteDialogRef = useRef<HTMLDivElement | null>(null);
+  const deleteConfirmRef = useRef<HTMLButtonElement | null>(null);
+  const deletePreviousFocusRef = useRef<HTMLElement | null>(null);
+  const deletePendingRef = useRef(deletePending);
   const active = monitor.status === 'active';
   const isAlert = Boolean(monitor.poll_interval_seconds);
   const parentHref = isAlert ? '/alerts' : '/monitors';
   const parentLabel = isAlert ? 'Product Alerts' : 'Monitors';
   const visibleDomains = monitor.domains.slice(0, 3).join(', ');
   const hiddenDomains = Math.max(0, monitor.domains.length - 3);
+
+  useEffect(() => {
+    deletePendingRef.current = deletePending;
+  }, [deletePending]);
+
+  useEffect(() => {
+    if (!deleteOpen) {
+      return;
+    }
+    const menuTrigger = menuTriggerRef.current;
+    const frame = window.requestAnimationFrame(() => deleteConfirmRef.current?.focus());
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        if (deletePendingRef.current) {
+          return;
+        }
+        event.preventDefault();
+        setDeleteOpen(false);
+        return;
+      }
+      trapFocus(event, deleteDialogRef.current);
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      document.removeEventListener('keydown', handleKeyDown);
+      const restoreTarget = deletePreviousFocusRef.current?.isConnected
+        ? deletePreviousFocusRef.current
+        : menuTrigger;
+      restoreTarget?.focus();
+      deletePreviousFocusRef.current = null;
+    };
+  }, [deleteOpen]);
 
   async function updateStatus(status: MonitorStatus) {
     setStatusPending(true);
@@ -81,6 +118,22 @@ export function MonitorHeader({
     } finally {
       setDeletePending(false);
     }
+  }
+
+  function openEditDialog() {
+    setMenuOpen(false);
+    setDeleteOpen(false);
+    setEditOpen(true);
+  }
+
+  function openDeleteDialog() {
+    deletePreviousFocusRef.current =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : menuTriggerRef.current;
+    setMenuOpen(false);
+    setEditOpen(false);
+    setDeleteOpen(true);
   }
 
   return (
@@ -121,7 +174,7 @@ export function MonitorHeader({
             {active ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}
             {active ? 'Pause' : 'Resume'}
           </Button>
-          <Button type="button" variant="neutral" onClick={() => setEditOpen(true)}>
+          <Button type="button" variant="neutral" onClick={openEditDialog}>
             <Settings className="size-3.5" />
             Edit
           </Button>
@@ -131,6 +184,7 @@ export function MonitorHeader({
           </Button>
           <div className="relative">
             <Button
+              ref={menuTriggerRef}
               type="button"
               variant="quiet"
               size="icon"
@@ -143,10 +197,7 @@ export function MonitorHeader({
               <div className="border-border bg-background-elevated shadow-card absolute right-0 z-20 mt-1 w-36 rounded-[var(--radius-md)] border py-1">
                 <button
                   type="button"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    setDeleteOpen(true);
-                  }}
+                  onClick={openDeleteDialog}
                   className="text-danger hover:bg-danger-bg flex w-full items-center gap-2 px-3 py-2 text-sm"
                 >
                   <Trash2 className="size-3.5" />
@@ -170,19 +221,27 @@ export function MonitorHeader({
           value={isAlert ? monitor.condition || 'Any delta' : `${monitor.retention_days} days`}
         />
       </div>
-      <DialogPrimitive.Root open={editOpen} onOpenChange={setEditOpen}>
-        <DialogPrimitive.Portal>
-          <DialogPrimitive.Overlay className="fixed inset-0 z-[100] bg-[color-mix(in_srgb,var(--bg-base)_34%,black)]" />
-          <DialogPrimitive.Content className="border-border bg-background shadow-card fixed top-0 right-0 z-[101] h-dvh w-[min(560px,100vw)] overflow-y-auto border-l p-5">
+      {editOpen ? (
+        <div className="fixed inset-0 z-[100] bg-[color-mix(in_srgb,var(--bg-base)_34%,black)]">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="monitor-edit-title"
+            className="border-border bg-background shadow-card fixed top-0 right-0 z-[101] h-dvh w-[min(560px,100vw)] overflow-y-auto border-l p-5"
+          >
             <div className="mb-5 flex items-center justify-between gap-4">
-              <DialogPrimitive.Title className="type-heading-3">
+              <h2 id="monitor-edit-title" className="type-heading-3">
                 Edit {isAlert ? 'alert' : 'monitor'}
-              </DialogPrimitive.Title>
-              <DialogPrimitive.Close asChild>
-                <Button type="button" variant="quiet" size="icon" aria-label="Close">
-                  <X className="size-4" />
-                </Button>
-              </DialogPrimitive.Close>
+              </h2>
+              <Button
+                type="button"
+                variant="quiet"
+                size="icon"
+                aria-label="Close"
+                onClick={() => setEditOpen(false)}
+              >
+                <X className="size-4" />
+              </Button>
             </div>
             {isAlert ? (
               <AlertForm
@@ -205,19 +264,51 @@ export function MonitorHeader({
                 }}
               />
             )}
-          </DialogPrimitive.Content>
-        </DialogPrimitive.Portal>
-      </DialogPrimitive.Root>
-      <ConfirmDialog
-        open={deleteOpen}
-        onOpenChange={setDeleteOpen}
-        title={`Delete this ${isAlert ? 'alert' : 'monitor'}?`}
-        description={`This permanently deletes the ${isAlert ? 'alert' : 'monitor'}, its snapshots, events, URL state, and notifications.`}
-        confirmLabel={`Delete ${isAlert ? 'Alert' : 'Monitor'}`}
-        pending={deletePending}
-        danger
-        onConfirm={() => void remove()}
-      />
+          </div>
+        </div>
+      ) : null}
+      {deleteOpen ? (
+        <div className="fixed inset-0 z-[100] grid place-items-center bg-[color-mix(in_srgb,var(--bg-base)_34%,black)] p-4">
+          <div
+            ref={deleteDialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="monitor-delete-title"
+            tabIndex={-1}
+            className="border-border card-gradient w-[min(420px,100%)] rounded-[var(--radius-lg)] border p-5"
+          >
+            <h2
+              id="monitor-delete-title"
+              className="text-foreground m-0 text-base leading-snug font-semibold"
+            >
+              Delete this {isAlert ? 'alert' : 'monitor'}?
+            </h2>
+            <p className="text-secondary mt-2 text-sm leading-[var(--leading-relaxed)]">
+              This permanently deletes the {isAlert ? 'alert' : 'monitor'}, its snapshots, events,
+              URL state, and notifications.
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="quiet"
+                disabled={deletePending}
+                onClick={() => setDeleteOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                ref={deleteConfirmRef}
+                type="button"
+                variant="destructive"
+                disabled={deletePending}
+                onClick={() => void remove()}
+              >
+                {deletePending ? 'Working...' : `Delete ${isAlert ? 'Alert' : 'Monitor'}`}
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

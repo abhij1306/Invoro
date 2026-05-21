@@ -1150,7 +1150,11 @@ def _detail_redirect_identity_is_mismatched(
             candidate_title,
             record=record,
         ) and not (
-            has_matching_record_identity_code and has_matching_small_model_number
+            has_matching_record_identity_code
+            and (
+                has_matching_small_model_number
+                or record_matches_requested_identity
+            )
         ):
             return True
         has_strong_same_url_product_evidence = any(

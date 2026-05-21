@@ -6,6 +6,7 @@ from uuid import uuid4
 from types import SimpleNamespace
 
 import pytest
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.services.fetch import fetch_context as crawl_fetch_runtime
 
@@ -3091,7 +3092,14 @@ def test_browser_launch_args_keep_component_updates_disabled() -> None:
 @pytest.mark.asyncio
 async def test_persist_storage_state_for_domain_commits_owned_session(
     db_session,
+    monkeypatch,
 ) -> None:
+    session_factory = async_sessionmaker(
+        db_session.bind,
+        expire_on_commit=False,
+        class_=AsyncSession,
+    )
+    monkeypatch.setattr(cookie_store, "SessionLocal", session_factory)
     domain = f"owned-session-{uuid4().hex}.example.com"
     saved = await cookie_store.persist_storage_state_for_domain(
         f"https://{domain}/products/widget",

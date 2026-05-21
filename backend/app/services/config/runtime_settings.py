@@ -147,9 +147,6 @@ class CrawlerRuntimeSettings(BaseSettings):
     http_retry_status_codes: list[int] = Field(
         default_factory=lambda: [403, 429, 502, 503, 504]
     )
-    http_max_retries: int = 2
-    http_retry_backoff_base_ms: int = 400
-    http_retry_backoff_max_ms: int = 3000
     proxy_failure_cooldown_base_ms: int = 1000
     proxy_failure_cooldown_max_ms: int = 15000
     proxy_failure_backoff_max_exponent: int = 8
@@ -188,6 +185,7 @@ class CrawlerRuntimeSettings(BaseSettings):
     browser_behavior_scroll_max_px: int = 260
     browser_behavior_pause_min_ms: int = 80
     browser_behavior_pause_jitter_ms: int = 220
+    browser_behavior_realism_timeout_seconds: float = 3.0
     browser_behavior_typing_min_delay_ms: int = 35
     browser_behavior_typing_jitter_ms: int = 95
     surface_readiness_max_wait_ms: int | None = 6000
@@ -198,7 +196,6 @@ class CrawlerRuntimeSettings(BaseSettings):
     browser_error_retry_delay_ms: int = 1000
     browser_post_block_cooldown_ms: int = 500
     low_quality_browser_retry_methods: tuple[str, ...] = ("curl_cffi", "httpx")
-    post_extraction_detail_shell_real_chrome_retry_enabled: bool = False
     browser_navigation_networkidle_timeout_ms: int = 30000
     browser_navigation_networkidle_primary_budget_ratio: float = 0.4
     browser_navigation_load_timeout_ms: int = 15000
@@ -399,13 +396,6 @@ class CrawlerRuntimeSettings(BaseSettings):
         if self.max_url_process_timeout_seconds < self.url_process_timeout_seconds:
             raise ValueError(
                 "max_url_process_timeout_seconds must be >= url_process_timeout_seconds"
-            )
-        _require_non_negative(
-            "http_retry_backoff_base_ms", self.http_retry_backoff_base_ms
-        )
-        if self.http_retry_backoff_max_ms < self.http_retry_backoff_base_ms:
-            raise ValueError(
-                "http_retry_backoff_max_ms must be >= http_retry_backoff_base_ms"
             )
         _require_non_negative(
             "proxy_failure_cooldown_base_ms",

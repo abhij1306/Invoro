@@ -20,8 +20,6 @@ from app.services.acquisition.traversal import should_run_traversal
 from app.services.config.runtime_settings import crawler_runtime_settings, proxy_rotation_mode
 from app.services.platform_policy import resolve_platform_runtime_policy
 from app.services.fetch.browser_policy import browser_engine_attempts as _browser_engine_attempts_impl, browser_escalation_allowed as _browser_escalation_allowed, browser_escalation_lane as _browser_escalation_lane, browser_escalation_proxies as _browser_escalation_proxies, browser_first_decision as _browser_first_decision, browser_first_reason as _browser_first_reason, attach_browser_attempt_diagnostics as _attach_browser_attempt_diagnostics, attach_exception_browser_diagnostics as _attach_exception_browser_diagnostics, durable_vendor_block_engine_attempts as _durable_vendor_block_engine_attempts, extract_vendor_from_reason as _extract_vendor_from_reason, hard_browser_requirement as _hard_browser_requirement, host_policy_snapshot as _host_policy_snapshot, is_vendor_block_reason as _is_vendor_block_reason, normalize_fetch_mode as _normalize_fetch_mode, normalize_proxy_profile as _normalize_proxy_profile, resolve_browser_reason as _resolve_browser_reason, resolve_proxy_attempts as _resolve_proxy_attempts, vendor_confirmed_block as _vendor_confirmed_block
-from app.services.fetch.retry_policy import http_max_attempts as _http_max_attempts, retry_delay_ms as _retry_delay_ms, retryable_status_for_http_fetch as _retryable_status_for_http_fetch, sleep_retry_delay as _sleep_retry_delay
-
 logger = logging.getLogger(__name__)
 
 
@@ -88,6 +86,26 @@ def _ensure_scheme(url: str) -> str:
     if stripped.startswith(("/", "#", "javascript:")):
         return stripped
     return f"https://{stripped}"
+
+
+def _should_retry_patchright_with_real_chrome(
+    *,
+    context: "_FetchRuntimeContext",
+    exc: Exception,
+    browser_engine: str,
+    engine_attempts: list[str],
+) -> bool:
+    if str(context.forced_browser_engine or "").strip():
+        return False
+    if browser_engine != "patchright":
+        return False
+    if "real_chrome" in engine_attempts:
+        return False
+    if not bool(crawler_runtime_settings.browser_real_chrome_enabled):
+        return False
+    if not real_chrome_browser_available():
+        return False
+    return "ERR_HTTP2_PROTOCOL_ERROR" in str(exc or "").upper()
 
 
 async def _get_shared_http_client(*, proxy: str | None = None):
@@ -323,12 +341,12 @@ def _acquisition_strategy_message(
         return (
             "Acquisition strategy: http-first "
             f"(fetch_mode={context.fetch_mode}, timeout={_resolve_http_timeout(context):.1f}s, "
-            f"curl_attempts=1, httpx_fallback_max_attempts={_http_max_attempts()})"
+            "curl=primary, httpx_fallback=on_transport_failure)"
         )
     return (
         "Acquisition strategy: http-first "
         f"(fetch_mode={context.fetch_mode}, timeout={_resolve_http_timeout(context):.1f}s, "
-        f"max_attempts={_http_max_attempts()})"
+        "httpx=primary)"
     )
 
 
@@ -505,6 +523,22 @@ async def _run_browser_attempts(
                     browser_engine,
                     exc_info=True,
                 )
+                if _should_retry_patchright_with_real_chrome(
+                    context=context,
+                    exc=exc,
+                    browser_engine=browser_engine,
+                    engine_attempts=engine_attempts,
+                ):
+                    engine_attempts.append("real_chrome")
+                    await _emit_fetch_event(
+                        context.on_event,
+                        "info",
+                        (
+                            "Patchright navigation failed for "
+                            f"{context.url} with ERR_HTTP2_PROTOCOL_ERROR; retrying real Chrome"
+                        ),
+                    )
+                    continue
                 # When patchright times out on a vendor-block escalation,
                 # treat it like a blocked result for engine rotation purposes.
                 # This allows real_chrome to be tried within the same run
@@ -571,6 +605,14 @@ async def _run_http_fetch_chain(
         and not crawler_runtime_settings.force_httpx
         and context.last_error is not None
     ):
+        await _emit_fetch_event(
+            context.on_event,
+            "info",
+            (
+                "HTTP transport fallback via _http_fetch after curl_fetch failed: "
+                f"{type(context.last_error).__name__}"
+            ),
+        )
         logger.info(
             "curl_cffi transport failed for %s (%s); retrying via httpx",
             context.url,
@@ -731,39 +773,23 @@ async def _run_http_fetcher_attempts(
     fetcher,
     proxy: str | None,
 ) -> tuple[PageFetchResult | None, bool]:
-    max_attempts = (
-        1
-        if fetcher is _curl_fetch and not crawler_runtime_settings.force_httpx
-        else _http_max_attempts()
+    result = await _attempt_http_fetch(
+        context,
+        fetcher=fetcher,
+        proxy=proxy,
     )
-    for attempt in range(1, max_attempts + 1):
-        result = await _attempt_http_fetch(
-            context,
-            fetcher=fetcher,
-            proxy=proxy,
-            attempt=attempt,
-            max_attempts=max_attempts,
-        )
-        if not isinstance(result, PageFetchResult):
-            if attempt < max_attempts:
-                continue
-            break
-        handled_result, vendor_block_confirmed = await _handle_http_result(
-            context,
-            result=result,
-            proxy=proxy,
-            attempt=attempt,
-            max_attempts=max_attempts,
-        )
-        if handled_result is _retry_sentinel:
-            continue
-        if isinstance(handled_result, PageFetchResult):
-            return handled_result, vendor_block_confirmed
-        return None, vendor_block_confirmed
+    if not isinstance(result, PageFetchResult):
+        return None, False
+    handled_result, vendor_block_confirmed = await _handle_http_result(
+        context,
+        result=result,
+        proxy=proxy,
+    )
+    if isinstance(handled_result, PageFetchResult):
+        return handled_result, vendor_block_confirmed
     return None, False
 
 
-_retry_sentinel = object()
 _http_attempt_failed = object()
 
 
@@ -772,15 +798,13 @@ async def _attempt_http_fetch(
     *,
     fetcher,
     proxy: str | None,
-    attempt: int,
-    max_attempts: int,
 ) -> PageFetchResult | object:
     http_timeout = _resolve_http_timeout(context)
     await _emit_fetch_event(
         context.on_event,
         "info",
         (
-            f"HTTP attempt {attempt}/{max_attempts} via {fetcher.__name__} "
+            f"HTTP fetch via {fetcher.__name__} "
             f"(timeout={http_timeout:.1f}s, proxy={display_proxy(proxy)})"
         ),
     )
@@ -795,34 +819,17 @@ async def _attempt_http_fetch(
     except (httpx.HTTPError, OSError, TimeoutError) as exc:
         context.last_error = exc
         logger.debug(
-            "Retryable fetch failure for %s via %s (%s attempt=%s/%s)",
+            "Fetch failure for %s via %s (%s)",
             context.url,
             fetcher.__name__,
             proxy or "direct",
-            attempt,
-            max_attempts,
             exc_info=True,
         )
-        if attempt < max_attempts:
-            delay_ms = _retry_delay_ms(attempt)
-            await _emit_fetch_event(
-                context.on_event,
-                "info",
-                (
-                    f"HTTP attempt {attempt}/{max_attempts} failed via {fetcher.__name__}: "
-                    f"{type(exc).__name__}; retrying in {delay_ms}ms"
-                ),
-            )
-            await _sleep_retry_delay(delay_ms=delay_ms)
-        else:
-            await _emit_fetch_event(
-                context.on_event,
-                "warning",
-                (
-                    f"HTTP attempt {attempt}/{max_attempts} failed via {fetcher.__name__}: "
-                    f"{type(exc).__name__}"
-                ),
-            )
+        await _emit_fetch_event(
+            context.on_event,
+            "warning",
+            f"HTTP fetch failed via {fetcher.__name__}: {type(exc).__name__}",
+        )
         return _http_attempt_failed
     except RuntimeError as exc:
         context.last_error = exc
@@ -836,10 +843,7 @@ async def _attempt_http_fetch(
         await _emit_fetch_event(
             context.on_event,
             "warning",
-            (
-                f"HTTP attempt {attempt}/{max_attempts} failed via {fetcher.__name__}: "
-                f"{type(exc).__name__}"
-            ),
+            f"HTTP fetch failed via {fetcher.__name__}: {type(exc).__name__}",
         )
         return _http_attempt_failed
 
@@ -849,8 +853,6 @@ async def _handle_http_result(
     *,
     result: PageFetchResult,
     proxy: str | None,
-    attempt: int,
-    max_attempts: int,
 ) -> tuple[PageFetchResult | object | None, bool]:
     vendor = _vendor_confirmed_block(result)
     if vendor or bool(result.blocked):
@@ -885,24 +887,6 @@ async def _handle_http_result(
             result.final_url or result.url or context.url,
             ttl_seconds=context.host_memory_ttl_seconds,
         )
-    if (
-        context.fetch_mode == "http_only"
-        and _retryable_status_for_http_fetch(result.status_code)
-        and not vendor
-        and not browser_escalation_allowed
-        and attempt < max_attempts
-    ):
-        delay_ms = _retry_delay_ms(attempt)
-        await _emit_fetch_event(
-            context.on_event,
-            "info",
-            (
-                f"HTTP attempt {attempt}/{max_attempts} returned retryable status "
-                f"{result.status_code}; retrying in {delay_ms}ms"
-            ),
-        )
-        await _sleep_retry_delay(delay_ms=delay_ms)
-        return _retry_sentinel, False
     if browser_escalation_allowed:
         browser_reason = context.browser_reason or (
             f"vendor-block:{vendor}" if vendor else "http-escalation"

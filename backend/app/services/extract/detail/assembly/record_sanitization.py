@@ -314,12 +314,15 @@ def _clean_detail_category_path(
         cleaned_parts.pop(0)
 
     identity_values = [clean_text(title), clean_text(sku)]
-    while cleaned_parts and any(
-        _category_part_matches_identity(cleaned_parts[-1], identity)
-        for identity in identity_values
-        if identity
-    ):
-        cleaned_parts.pop()
+    cleaned_parts = [
+        part
+        for part in cleaned_parts
+        if not any(
+            _category_part_matches_identity(part, identity)
+            for identity in identity_values
+            if identity
+        )
+    ]
     return " > ".join(cleaned_parts)
 
 
@@ -330,6 +333,8 @@ def _category_part_matches_identity(part: object, identity: str) -> bool:
         return False
     if part_key == identity_key:
         return True
+    if len(identity_key) >= 5 and identity_key in part_key:
+        return part_key.startswith(("buy", "shop", "choose"))
     if min(len(part_key), len(identity_key)) < 8:
         return False
     return SequenceMatcher(None, part_key, identity_key).ratio() >= float(

@@ -63,9 +63,20 @@ DETAIL_ORIGINAL_PRICE_SELECTORS = (
 DETAIL_CURRENT_PRICE_SELECTORS = (
     *_static_export_tuple("DETAIL_CURRENT_PRICE_SELECTORS"),
     "button[aria-label*='$']",
+    "button[aria-label*='₹']",
+    "button[aria-label*='Rs' i]",
+    "button[class*='add' i][class*='bag' i]",
+    "button[class*='add' i][class*='cart' i]",
+    "button[name*='add' i]",
     "[role='button'][aria-label*='$']",
+    "[role='button'][aria-label*='₹']",
+    "[role='button'][aria-label*='Rs' i]",
     "[aria-label*='$'][class*='buy' i]",
+    "[aria-label*='₹'][class*='buy' i]",
+    "[aria-label*='Rs' i][class*='buy' i]",
     "[aria-label*='$'][data-testid*='buy' i]",
+    "[aria-label*='₹'][data-testid*='buy' i]",
+    "[aria-label*='Rs' i][data-testid*='buy' i]",
 )
 DETAIL_JSONLD_GRAPH_FIELDS = tuple(
     str(field).strip()
@@ -127,6 +138,12 @@ DETAIL_INSTALLMENT_PRICE_TEXT_TOKENS = (
     "payments of",
     "per month",
 )
+DETAIL_RELATED_PRICE_CONTEXT_TOKENS = (
+    "add-on",
+    "addon",
+    "product-set",
+    "sticky",
+)
 DETAIL_AUTHORITATIVE_PRICE_SOURCES = ("adapter", "json_ld", "network_payload")
 DETAIL_STRICT_PARENT_PRICE_SOURCES = ("network_payload",)
 DETAIL_LOW_SIGNAL_ZERO_PRICE_SOURCE_SET = frozenset(
@@ -184,5 +201,6 @@ __all__ = [
     "DETAIL_PRICE_JSONLD_RE",
     "DETAIL_PRICE_JSONLD_TYPE_RE",
     "DETAIL_PRICE_MAGNITUDE_EPSILON_DECIMAL",
+    "DETAIL_RELATED_PRICE_CONTEXT_TOKENS",
     "DETAIL_STRICT_PARENT_PRICE_SOURCE_SET",
 ]

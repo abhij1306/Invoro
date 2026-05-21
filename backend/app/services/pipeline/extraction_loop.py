@@ -59,7 +59,7 @@ from .retry import (
     retry_empty_extraction_with_browser as _retry_empty_extraction_with_browser,
     retry_listing_integrity_with_stronger_tier as _retry_listing_integrity_with_stronger_tier,
     retry_low_quality_extraction_with_browser as _retry_low_quality_extraction_with_browser,
-    retry_patchright_detail_shell_with_real_chrome as _retry_patchright_detail_shell_with_real_chrome,
+    retry_patchright_detail_rejection_with_real_chrome as _retry_patchright_detail_rejection_with_real_chrome,
 )
 from .persistence import persist_acquisition_artifacts, persist_extracted_records
 from .record_extraction_stage import (
@@ -388,12 +388,13 @@ async def _run_extraction_stage(
         fetched,
         rejection_reason=rejection_reason,
     )
-    if retry_stage is None:
-        retry_stage = await _retry_patchright_detail_shell_with_real_chrome(
-            context,
-            fetched,
-            rejection_reason=rejection_reason,
-        )
+    if retry_stage is not None:
+        return retry_stage
+    retry_stage = await _retry_patchright_detail_rejection_with_real_chrome(
+        context,
+        fetched,
+        rejection_reason=rejection_reason,
+    )
     if retry_stage is not None:
         return retry_stage
     await _log_extraction_outcome(context, acquisition_result, records)

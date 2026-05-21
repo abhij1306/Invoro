@@ -74,6 +74,14 @@ _IMAGE_PATH_DIMENSION_RE = re.compile(
     r"(?:[/?_=-])(?:w|wid|width|h|hei|height|sl|sx|sy|us)?[_=-]?(\d{2,4})(?:x(\d{2,4}))?",
     re.I,
 )
+_DEMANDWARE_IMAGE_PATH_RE = re.compile(
+    r"^/dw/image/v2/[^/]+/(on/demandware\.static/.+)$",
+    re.I,
+)
+_CANONICAL_IMAGE_EXTENSION_RE = re.compile(
+    r"\.(?:avif|gif|jpe?g|png|webp)$",
+    re.I,
+)
 _UNRESOLVED_TEMPLATE_URL_RE = re.compile(
     "|".join(
         re.escape(str(token))
@@ -139,10 +147,11 @@ def canonical_image_url(url: str) -> str:
         for key, value in parse_qsl(parsed.query, keep_blank_values=True)
         if not _is_cdn_image_query_key(str(key or "").strip())
     ]
-    normalized_path = _CDN_IMAGE_PATH_SUFFIX_RE.sub("", parsed.path or "")
+    normalized_path = _canonical_image_path(parsed.path or "")
     return urlunparse(
         parsed._replace(
             path=normalized_path,
+            params="",
             query=urlencode(filtered_query, doseq=True),
             fragment="",
         )
@@ -156,6 +165,15 @@ def image_candidate_score(url: str) -> tuple[int, int, int, int]:
         str(key or "").strip().lower(): str(value or "").strip()
         for key, value in parse_qsl(parsed.query, keep_blank_values=True)
     }
+    numeric_params.update(
+        {
+            str(key or "").strip().lower(): str(value or "").strip()
+            for key, value in parse_qsl(
+                str(parsed.params or "").replace(";", "&"),
+                keep_blank_values=True,
+            )
+        }
+    )
 
     def _int_param(*names: str) -> int:
         for name in names:
@@ -169,10 +187,18 @@ def image_candidate_score(url: str) -> tuple[int, int, int, int]:
         return 0
 
     width = _int_param(
-        *(p for p in ("width", "w", "wid") if p in _CDN_IMAGE_QUERY_PARAMS)
+        *(
+            p
+            for p in ("width", "w", "wid", "sw", "imwidth", "odnwidth", "maxwidth")
+            if p in _CDN_IMAGE_QUERY_PARAMS
+        )
     )
     height = _int_param(
-        *(p for p in ("height", "h", "hei") if p in _CDN_IMAGE_QUERY_PARAMS)
+        *(
+            p
+            for p in ("height", "h", "hei", "sh", "odnheight", "maxheight")
+            if p in _CDN_IMAGE_QUERY_PARAMS
+        )
     )
     if not width or not height:
         for match in _IMAGE_PATH_DIMENSION_RE.finditer(normalized_url):
@@ -216,6 +242,14 @@ def dedupe_image_urls(urls: list[str]) -> list[str]:
                 normalized_url if score > current_score else current_url,
             )
     return [best_by_key[key][2] for key in order]
+
+
+def _canonical_image_path(path: str) -> str:
+    normalized_path = _CDN_IMAGE_PATH_SUFFIX_RE.sub("", path or "")
+    demandware_match = _DEMANDWARE_IMAGE_PATH_RE.match(normalized_path)
+    if demandware_match is not None:
+        normalized_path = f"/{demandware_match.group(1)}"
+    return _CANONICAL_IMAGE_EXTENSION_RE.sub("", normalized_path)
 
 
 def upgrade_low_resolution_image_url(url: str) -> str:

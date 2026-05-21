@@ -9,8 +9,8 @@ remaining_url_budget_seconds = _stage._remaining_url_budget_seconds
 retry_detail_challenge_shell_with_real_chrome = (
     _stage._retry_detail_challenge_shell_with_real_chrome
 )
-retry_patchright_detail_shell_with_real_chrome = (
-    _stage._retry_patchright_detail_shell_with_real_chrome
+retry_patchright_detail_rejection_with_real_chrome = (
+    _stage._retry_patchright_detail_rejection_with_real_chrome
 )
 
 __all__ = [
@@ -19,5 +19,5 @@ __all__ = [
     "log_extraction_outcome",
     "remaining_url_budget_seconds",
     "retry_detail_challenge_shell_with_real_chrome",
-    "retry_patchright_detail_shell_with_real_chrome",
+    "retry_patchright_detail_rejection_with_real_chrome",
 ]

@@ -611,7 +611,7 @@ async def test_post_extraction_challenge_shell_retries_real_chrome(
 
 
 @pytest.mark.asyncio
-async def test_post_extraction_detail_shell_retries_real_chrome_when_enabled(
+async def test_post_extraction_detail_shell_escalates_real_chrome(
     db_session: AsyncSession,
     test_user,
     monkeypatch: pytest.MonkeyPatch,
@@ -627,7 +627,6 @@ async def test_post_extraction_detail_shell_retries_real_chrome_when_enabled(
         },
     )
     attempted_engines: list[str] = []
-    hard_blocks: list[dict[str, object]] = []
 
     async def _fake_acquire(request: AcquisitionRequest) -> AcquisitionResult:
         forced_engine = str(
@@ -646,59 +645,51 @@ async def test_post_extraction_detail_shell_retries_real_chrome_when_enabled(
             },
         )
 
-    def _fake_extract_records(html: str, *_args, **_kwargs):
+    def _fake_extract_records(
+        html: str,
+        *_args,
+        **_kwargs,
+    ) -> list[dict[str, object]]:
         if "real_chrome" not in html:
             return []
         return [
             {
                 "title": "Wayfair Widget",
-                "url": "https://www.wayfair.com/pdp/widget",
-                "price": "850.00",
-                "image_url": "https://assets.example.com/widget.jpg",
-                "description": "A" * 220,
+                "url": run.url,
+                "price": "$50",
             }
         ]
 
-    async def _fake_note_host_hard_block(value: str | None, **kwargs):
-        hard_blocks.append({"value": value, **kwargs})
-
-    monkeypatch.setattr(
-        crawler_runtime_settings,
-        "post_extraction_detail_shell_real_chrome_retry_enabled",
-        True,
-    )
     monkeypatch.setattr("app.services.pipeline.extraction_loop.acquire", _fake_acquire)
     monkeypatch.setattr(
-        "app.services.pipeline.extraction_loop.extract_records", _fake_extract_records
+        "app.services.pipeline.extraction_loop.extract_records",
+        _fake_extract_records,
     )
     monkeypatch.setattr(
         "app.services.pipeline.extraction_loop.real_chrome_browser_available",
         lambda: True,
     )
-    monkeypatch.setattr(
-        "app.services.pipeline.extraction_loop.note_host_hard_block",
-        _fake_note_host_hard_block,
-    )
     monkeypatch.setattr("app.services.pipeline.extraction_loop.run_adapter", _no_adapter)
     monkeypatch.setattr(
         "app.services.pipeline.extraction_loop.infer_detail_failure_reason",
-        lambda html, *_args, **_kwargs: (
-            "detail_shell" if "real_chrome" not in html else None
-        ),
+        lambda *_args, **_kwargs: "detail_shell",
     )
 
     result = await process_single_url(db_session, run, run.url)
-    rows, total = await get_run_records(db_session, run.id, 1, 20)
+    logs = await get_run_logs(db_session, run.id)
 
     assert attempted_engines == ["patchright", "real_chrome"]
-    assert hard_blocks == []
     assert result.verdict == "success"
-    assert total == 1
-    assert rows[0].data["title"] == "Wayfair Widget"
+    assert result.records[0]["title"] == "Wayfair Widget"
+    assert any(
+        "Patchright detail rejected as detail_shell; escalating real Chrome for https://www.wayfair.com/pdp/widget"
+        in log.message
+        for log in logs
+    )
 
 
 @pytest.mark.asyncio
-async def test_post_extraction_identity_mismatch_retries_real_chrome(
+async def test_post_extraction_identity_mismatch_escalates_real_chrome(
     db_session: AsyncSession,
     test_user,
     monkeypatch: pytest.MonkeyPatch,
@@ -720,14 +711,9 @@ async def test_post_extraction_identity_mismatch_retries_real_chrome(
             request.acquisition_profile.get("forced_browser_engine") or "patchright"
         )
         attempted_engines.append(forced_engine)
-        html = (
-            "<html><body>Women's Luxury Fashion & Designer Shopping</body></html>"
-            if forced_engine == "patchright"
-            else "<html><body>Valentino Garavani Loco Small Floral Linen Top Handle Bag</body></html>"
-        )
         return _fake_acquire_result(
             request,
-            html=html,
+            html=f"<html><body>{forced_engine}</body></html>",
             method="browser",
             blocked=False,
             browser_diagnostics={
@@ -737,21 +723,31 @@ async def test_post_extraction_identity_mismatch_retries_real_chrome(
             },
         )
 
-    def _fake_extract_records(html: str, *_args, **_kwargs):
-        if "Valentino Garavani" not in html:
+    def _fake_extract_records(
+        html: str,
+        *_args,
+        **_kwargs,
+    ) -> list[dict[str, object]]:
+        if "real_chrome" not in html:
             return []
         return [
             {
                 "title": "Valentino Garavani Loco Small Floral Linen Top Handle Bag",
                 "url": run.url,
-                "price": "2500",
-                "image_url": "https://assets.example.com/bag.jpg",
+                "source_url": run.url,
+                "brand": "Valentino Garavani",
+                "product_id": "p01155657",
+                "price": "1000.00",
+                "currency": "USD",
+                "image_url": "https://img.example/bag.jpg",
+                "description": "Valentino Garavani loco small floral linen top handle bag.",
             }
         ]
 
     monkeypatch.setattr("app.services.pipeline.extraction_loop.acquire", _fake_acquire)
     monkeypatch.setattr(
-        "app.services.pipeline.extraction_loop.extract_records", _fake_extract_records
+        "app.services.pipeline.extraction_loop.extract_records",
+        _fake_extract_records,
     )
     monkeypatch.setattr(
         "app.services.pipeline.extraction_loop.real_chrome_browser_available",
@@ -760,228 +756,21 @@ async def test_post_extraction_identity_mismatch_retries_real_chrome(
     monkeypatch.setattr("app.services.pipeline.extraction_loop.run_adapter", _no_adapter)
     monkeypatch.setattr(
         "app.services.pipeline.extraction_loop.infer_detail_failure_reason",
-        lambda html, *_args, **_kwargs: (
-            "detail_identity_mismatch" if "Valentino Garavani" not in html else None
-        ),
+        lambda *_args, **_kwargs: "detail_identity_mismatch",
     )
 
     result = await process_single_url(db_session, run, run.url)
-    rows, total = await get_run_records(db_session, run.id, 1, 20)
+    logs = await get_run_logs(db_session, run.id)
 
     assert attempted_engines == ["patchright", "real_chrome"]
     assert result.verdict == "success"
-    assert total == 1
-    assert rows[0].data["title"] == "Valentino Garavani Loco Small Floral Linen Top Handle Bag"
-
-
-@pytest.mark.asyncio
-async def test_post_extraction_detail_shell_skips_real_chrome_when_disabled(
-    db_session: AsyncSession,
-    test_user,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    run = await create_crawl_run(
-        db_session,
-        test_user.id,
-        {
-            "run_type": "crawl",
-            "url": "https://www.wayfair.com/pdp/widget",
-            "surface": "ecommerce_detail",
-            "settings": {"respect_robots_txt": False},
-        },
-    )
-    attempted_engines: list[str] = []
-
-    async def _fake_acquire(request: AcquisitionRequest) -> AcquisitionResult:
-        forced_engine = str(
-            request.acquisition_profile.get("forced_browser_engine") or "patchright"
-        )
-        attempted_engines.append(forced_engine)
-        return _fake_acquire_result(
-            request,
-            html=f"<html><body>{forced_engine}</body></html>",
-            method="browser",
-            blocked=False,
-            browser_diagnostics={
-                "browser_attempted": True,
-                "browser_engine": forced_engine,
-                "browser_outcome": "usable_content",
-            },
-        )
-
-    monkeypatch.setattr(
-        crawler_runtime_settings,
-        "post_extraction_detail_shell_real_chrome_retry_enabled",
-        False,
-    )
-    monkeypatch.setattr("app.services.pipeline.extraction_loop.acquire", _fake_acquire)
-    monkeypatch.setattr(
-        "app.services.pipeline.extraction_loop.extract_records",
-        lambda *_args, **_kwargs: [],
-    )
-    monkeypatch.setattr(
-        "app.services.pipeline.extraction_loop.real_chrome_browser_available",
-        lambda: True,
-    )
-    monkeypatch.setattr("app.services.pipeline.extraction_loop.run_adapter", _no_adapter)
-    monkeypatch.setattr(
-        "app.services.pipeline.extraction_loop.infer_detail_failure_reason",
-        lambda *_args, **_kwargs: "detail_shell",
-    )
-
-    result = await process_single_url(db_session, run, run.url)
-    logs = await get_run_logs(db_session, run.id)
-
-    assert attempted_engines == ["patchright"]
-    assert result.records == []
+    assert result.records[0]["title"].startswith("Valentino Garavani")
     assert any(
-        "Skipping detail_shell Chrome retry" in log.message
-        and "disabled by runtime setting" in log.message
+        "Patchright detail rejected as detail_identity_mismatch; escalating real Chrome for "
+        "https://www.mytheresa.com/int/en/women/valentino-garavani-loco-small-floral-linen-top-handle-bag-beige-p01155657"
+        in log.message
         for log in logs
     )
-
-
-@pytest.mark.asyncio
-async def test_post_extraction_detail_shell_skips_real_chrome_when_budget_below_browser_render_timeout(
-    db_session: AsyncSession,
-    test_user,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    run = await create_crawl_run(
-        db_session,
-        test_user.id,
-        {
-            "run_type": "crawl",
-            "url": "https://www.wayfair.com/pdp/widget",
-            "surface": "ecommerce_detail",
-            "settings": {"respect_robots_txt": False},
-        },
-    )
-    attempted_engines: list[str] = []
-    hard_blocks: list[dict[str, object]] = []
-
-    async def _fake_acquire(request: AcquisitionRequest) -> AcquisitionResult:
-        forced_engine = str(
-            request.acquisition_profile.get("forced_browser_engine") or "patchright"
-        )
-        attempted_engines.append(forced_engine)
-        return _fake_acquire_result(
-            request,
-            html=f"<html><body>{forced_engine}</body></html>",
-            method="browser",
-            blocked=False,
-            browser_diagnostics={
-                "browser_attempted": True,
-                "browser_engine": forced_engine,
-                "browser_outcome": "usable_content",
-            },
-        )
-
-    async def _fake_note_host_hard_block(value: str | None, **kwargs):
-        hard_blocks.append({"value": value, **kwargs})
-
-    monkeypatch.setattr(
-        crawler_runtime_settings,
-        "post_extraction_detail_shell_real_chrome_retry_enabled",
-        True,
-    )
-    monkeypatch.setattr("app.services.pipeline.extraction_loop.acquire", _fake_acquire)
-    monkeypatch.setattr(
-        "app.services.pipeline.extraction_loop.extract_records",
-        lambda *_args, **_kwargs: [],
-    )
-    monkeypatch.setattr(
-        "app.services.pipeline.extraction_loop.real_chrome_browser_available",
-        lambda: True,
-    )
-    monkeypatch.setattr(
-        "app.services.pipeline.extraction_loop.note_host_hard_block",
-        _fake_note_host_hard_block,
-    )
-    monkeypatch.setattr("app.services.pipeline.extraction_loop.run_adapter", _no_adapter)
-    monkeypatch.setattr(
-        "app.services.pipeline.extraction_loop.infer_detail_failure_reason",
-        lambda *_args, **_kwargs: "detail_shell",
-    )
-    monkeypatch.setattr(
-        "app.services.pipeline.extraction_loop._remaining_url_budget_seconds",
-        lambda _context: 25.0,
-    )
-
-    result = await process_single_url(db_session, run, run.url)
-    logs = await get_run_logs(db_session, run.id)
-
-    assert attempted_engines == ["patchright"]
-    assert hard_blocks == []
-    assert result.records == []
-    assert any("Skipping detail_shell Chrome retry" in log.message for log in logs)
-
-
-@pytest.mark.asyncio
-async def test_post_extraction_detail_shell_skips_real_chrome_when_budget_below_render_timeout_plus_buffer(
-    db_session: AsyncSession,
-    test_user,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    run = await create_crawl_run(
-        db_session,
-        test_user.id,
-        {
-            "run_type": "crawl",
-            "url": "https://www.wayfair.com/pdp/widget",
-            "surface": "ecommerce_detail",
-            "settings": {"respect_robots_txt": False},
-        },
-    )
-    attempted_engines: list[str] = []
-
-    async def _fake_acquire(request: AcquisitionRequest) -> AcquisitionResult:
-        forced_engine = str(
-            request.acquisition_profile.get("forced_browser_engine") or "patchright"
-        )
-        attempted_engines.append(forced_engine)
-        return _fake_acquire_result(
-            request,
-            html=f"<html><body>{forced_engine}</body></html>",
-            method="browser",
-            blocked=False,
-            browser_diagnostics={
-                "browser_attempted": True,
-                "browser_engine": forced_engine,
-                "browser_outcome": "usable_content",
-            },
-        )
-
-    monkeypatch.setattr(
-        crawler_runtime_settings,
-        "post_extraction_detail_shell_real_chrome_retry_enabled",
-        True,
-    )
-    monkeypatch.setattr("app.services.pipeline.extraction_loop.acquire", _fake_acquire)
-    monkeypatch.setattr(
-        "app.services.pipeline.extraction_loop.extract_records",
-        lambda *_args, **_kwargs: [],
-    )
-    monkeypatch.setattr(
-        "app.services.pipeline.extraction_loop.real_chrome_browser_available",
-        lambda: True,
-    )
-    monkeypatch.setattr("app.services.pipeline.extraction_loop.run_adapter", _no_adapter)
-    monkeypatch.setattr(
-        "app.services.pipeline.extraction_loop.infer_detail_failure_reason",
-        lambda *_args, **_kwargs: "detail_shell",
-    )
-    monkeypatch.setattr(
-        "app.services.pipeline.extraction_loop._remaining_url_budget_seconds",
-        lambda _context: 40.0,
-    )
-
-    result = await process_single_url(db_session, run, run.url)
-    logs = await get_run_logs(db_session, run.id)
-
-    assert attempted_engines == ["patchright"]
-    assert result.records == []
-    assert any("Skipping detail_shell Chrome retry" in log.message for log in logs)
 
 
 @pytest.mark.asyncio

@@ -12,7 +12,11 @@ from app.services.extract.detail.identity import (
     structured_pruning as detail_structured_pruning,
 )
 from app.services.config._export_data import load_export_data
-from app.services.extraction_context import prepare_extraction_context
+from app.services.extraction_context import (
+    ExtractionContext,
+    collect_structured_source_payloads,
+    prepare_extraction_context,
+)
 from app.services.pipeline.extract_records import extract_records
 from app.services.selector_self_heal import (
     validated_xpath_rules,
@@ -131,6 +135,61 @@ def test_requires_dom_completion_when_structured_category_conflicts_with_dom_bre
     )
 
 
+def test_requires_dom_completion_skips_unrequested_variant_probe_for_complete_record(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    soup = BeautifulSoup("<main><h1>Widget</h1></main>", "html.parser")
+    raw_soup = BeautifulSoup(
+        """
+        <main>
+          <form class="product-form">
+            <select name="size"><option>S</option><option>M</option></select>
+          </form>
+        </main>
+        """,
+        "html.parser",
+    )
+
+    def _unexpected_variant_probe(_soup: BeautifulSoup) -> bool:
+        raise AssertionError("variant DOM probe should be skipped for complete records")
+
+    monkeypatch.setattr(
+        detail_dom_completion,
+        "variant_dom_cues_present",
+        _unexpected_variant_probe,
+    )
+
+    assert not requires_dom_completion(
+        record={
+            "title": "Widget",
+            "price": "10.00",
+            "image_url": "https://example.com/widget.jpg",
+            "url": "https://example.com/products/widget",
+            "description": (
+                "This widget description is intentionally long enough to avoid thin-content "
+                "fallback and it explains the product materials, use cases, durability, "
+                "fit, setup expectations, support policy, and care guidance in plain language."
+            ),
+            "product_details": (
+                "Widget details include materials, dimensions, warranty coverage, "
+                "compatibility notes, and usage guidance for normal operation."
+            ),
+            "additional_images": ["https://example.com/widget-2.jpg"],
+            "specifications": "Material: Steel",
+            "_field_sources": {
+                "description": ["adapter"],
+                "product_details": ["adapter"],
+                "specifications": ["adapter"],
+            },
+        },
+        surface="ecommerce_detail",
+        requested_fields=None,
+        selector_rules=None,
+        soup=soup,
+        breadcrumb_soup=raw_soup,
+    )
+
+
 def test_prepare_extraction_context_caches_original_dom_objects() -> None:
     context = prepare_extraction_context(
         "<html><body><main><h1>Widget</h1></main></body></html>"
@@ -138,6 +197,110 @@ def test_prepare_extraction_context_caches_original_dom_objects() -> None:
 
     assert context.original_soup is context.original_soup
     assert context.original_dom_parser is context.original_dom_parser
+
+
+def test_collect_structured_source_payloads_extracts_vtex_string_price_from_id_ref() -> (
+    None
+):
+    html = "<html><body><main><h1>Widget</h1></main></body></html>"
+    state = {
+        "Product:sp-1": {
+            "productId": "1",
+            "productName": "Widget One",
+            "linkText": "widget-one",
+            "priceRange": {
+                "sellingPrice": {
+                    "type": "id",
+                    "id": "$Product:sp-1.priceRange.sellingPrice",
+                }
+            },
+            "items": [{"type": "id", "id": "sku-1"}],
+        },
+        "$Product:sp-1.priceRange.sellingPrice": {
+            "lowPrice": "21.00",
+        },
+        "sku-1": {
+            "images": [
+                {
+                    "imageUrl": "https://cdn.example.com/widget-one.jpg",
+                }
+            ]
+        },
+        "Product:sp-2": {
+            "productId": "2",
+            "productName": "Widget Two",
+            "linkText": "widget-two",
+            "priceRange": {
+                "sellingPrice": {
+                    "lowPrice": 33.0,
+                }
+            },
+            "items": [{"images": [{"imageUrl": "https://cdn.example.com/widget-two.jpg"}]}],
+        },
+    }
+    context = ExtractionContext(
+        original_html=html,
+        cleaned_html=html,
+        dom_parser=LexborHTMLParser(html),
+        _js_state_objects={"__STATE__": state},
+    )
+
+    payloads = collect_structured_source_payloads(
+        context,
+        page_url="https://store.example.com/collections/widgets",
+        surface="ecommerce_listing",
+    )
+
+    embedded_json = dict(payloads)["embedded_json"]
+    item_list = embedded_json[0]["itemListElement"]
+    first_item = item_list[0]["item"]
+
+    assert first_item["offers"]["price"] == 21.0
+    assert first_item["image"] == "https://cdn.example.com/widget-one.jpg"
+
+
+def test_collect_structured_source_payloads_extracts_vtex_string_price_from_fallbacks() -> (
+    None
+):
+    html = "<html><body><main><h1>Widget</h1></main></body></html>"
+    state = {
+        "Product:sp-1": {
+            "productId": "1",
+            "productName": "Widget One",
+            "linkText": "widget-one",
+            "items": [{"images": [{"imageUrl": "https://cdn.example.com/widget-one.jpg"}]}],
+        },
+        "$Product:sp-1.priceRange.sellingPrice": {
+            "highPrice": "41.50",
+        },
+        "Product:sp-2": {
+            "productId": "2",
+            "productName": "Widget Two",
+            "linkText": "widget-two",
+            "items": [{"images": [{"imageUrl": "https://cdn.example.com/widget-two.jpg"}]}],
+        },
+        "$Product:sp-2.items.0.sellers.0.commertialOffer": {
+            "Price": "55.25",
+        },
+    }
+    context = ExtractionContext(
+        original_html=html,
+        cleaned_html=html,
+        dom_parser=LexborHTMLParser(html),
+        _js_state_objects={"__STATE__": state},
+    )
+
+    payloads = collect_structured_source_payloads(
+        context,
+        page_url="https://store.example.com/collections/widgets",
+        surface="ecommerce_listing",
+    )
+
+    embedded_json = dict(payloads)["embedded_json"]
+    item_list = embedded_json[0]["itemListElement"]
+
+    assert item_list[0]["item"]["offers"]["price"] == 41.5
+    assert item_list[1]["item"]["offers"]["price"] == 55.25
 
 
 def test_apply_dom_fallbacks_limits_heading_section_targets_to_section_like_fields(

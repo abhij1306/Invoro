@@ -1055,6 +1055,7 @@ export const LogTerminal = memo(function LogTerminal({
         ref={ref}
         className="crawl-activity-log max-h-[78vh] min-h-[62vh] overflow-y-auto"
         role="log"
+        tabIndex={0}
         aria-live={live ? 'polite' : 'off'}
         aria-atomic="false"
       >
@@ -1355,7 +1356,10 @@ export const LogTerminal = memo(function LogTerminal({
                   </Button>
                 </div>
                 {peekedRecordJson ? (
-                  <pre className="crawl-terminal crawl-terminal-json h-full max-h-full overflow-auto">
+                  <pre
+                    className="crawl-terminal crawl-terminal-json h-full max-h-full overflow-auto"
+                    tabIndex={0}
+                  >
                     <span className="sr-only">{peekedRecordJson}</span>
                     <span
                       aria-hidden="true"
@@ -1363,7 +1367,10 @@ export const LogTerminal = memo(function LogTerminal({
                     />
                   </pre>
                 ) : (
-                  <pre className="crawl-terminal crawl-terminal-json h-full max-h-full overflow-auto">
+                  <pre
+                    className="crawl-terminal crawl-terminal-json h-full max-h-full overflow-auto"
+                    tabIndex={0}
+                  >
                     {TERMINAL_STRINGS.NO_PAYLOAD}
                   </pre>
                 )}

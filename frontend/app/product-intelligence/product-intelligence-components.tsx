@@ -74,6 +74,7 @@ export function JsonModal({
         <div className="flex-1 overflow-auto p-4">
           <pre
             className="crawl-terminal crawl-terminal-json text-xs leading-relaxed"
+            tabIndex={0}
             dangerouslySetInnerHTML={{ __html: syntaxHighlightJson(text) }}
           />
         </div>

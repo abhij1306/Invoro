@@ -616,6 +616,59 @@ def test_extract_ecommerce_detail_prefers_localized_jsonld_price_over_state_vari
     assert all(row.get("currency") in (None, "INR") for row in record["variants"])
 
 
+def test_build_detail_record_overrides_default_market_adapter_price_with_visible_local_price() -> None:
+    html = """
+    <html>
+      <head>
+        <script type="application/ld+json">
+        {
+          "@context": "https://schema.org",
+          "@type": "Product",
+          "name": "Balm Dotcom",
+          "offers": {
+            "@type": "Offer",
+            "price": "1400",
+            "priceCurrency": "INR"
+          }
+        }
+        </script>
+      </head>
+      <body>
+        <main>
+          <h1>Balm Dotcom</h1>
+          <button class="add-to-bag"><span>Add to bag</span><span>Rs. 1,900</span></button>
+          <div class="product-set__atc-price-compare">Rs. 5,500</div>
+          <div class="pv-price__original js-price-original">Rs. 1,900</div>
+        </main>
+      </body>
+    </html>
+    """
+
+    record = build_detail_record(
+        html,
+        "https://www.glossier.com/en-in/products/balm-dotcom",
+        "ecommerce_detail",
+        ["price", "currency", "variants"],
+        adapter_records=[
+            {
+                "title": "Balm Dotcom",
+                "price": "16",
+                "original_price": "5500",
+                "variants": [
+                    {"flavor": "Original", "price": "16"},
+                    {"flavor": "Mint", "price": "16"},
+                ],
+            }
+        ],
+    )
+
+    assert record["price"] == "1900.00"
+    assert record["currency"] == "INR"
+    assert "original_price" not in record
+    assert all("price" not in row for row in record["variants"])
+    assert all("currency" not in row for row in record["variants"])
+
+
 def test_extract_ecommerce_detail_keeps_page_url_when_opengraph_url_is_site_root() -> None:
     html = """
     <html>
@@ -4367,6 +4420,104 @@ def test_extract_ecommerce_detail_merges_deduped_additional_images_across_js_sta
     assert record["additional_images"] == [
         "https://cdn.example.com/products/trail-runner-2.jpg?width=1200",
         "https://cdn.example.com/products/trail-runner-3.jpg?width=1200",
+    ]
+
+
+def test_build_detail_record_collapses_responsive_cdn_image_duplicates() -> None:
+    record = build_detail_record(
+        "<html><body><main><h1>Aganice Aromatique Candle</h1></main></body></html>",
+        "https://www.aesop.com/home-fragrance/candles/aganice-aromatique-candle/HM03.html",
+        "ecommerce_detail",
+        None,
+        adapter_records=[
+            {
+                "title": "Aganice Aromatique Candle",
+                "image_url": (
+                    "https://www.aesop.com/on/demandware.static/-/Sites-aesop-us-master-catalog/"
+                    "default/dwdbcd8bbe/images/products/HM03/"
+                    "Aesop_Home_Aganice_Aromatique_Candle_Web_Front_2000x2000px.png"
+                ),
+                "additional_images": [
+                    (
+                        "https://www.aesop.com/dw/image/v2/AANG_PRD/on/demandware.static/"
+                        "-/Sites-aesop-us-master-catalog/default/dwdbcd8bbe/images/products/HM03/"
+                        "Aesop_Home_Aganice_Aromatique_Candle_Web_Front_2000x2000px.jpg"
+                        "?sw=430&sh=430&sm=cut&sfrm=png&q=70&bgcolor=fffef2"
+                    ),
+                    (
+                        "https://www.aesop.com/dw/image/v2/AANG_PRD/on/demandware.static/"
+                        "-/Sites-aesop-us-master-catalog/default/dwdbcd8bbe/images/products/HM03/"
+                        "Aesop_Home_Aganice_Aromatique_Candle_Web_Front_2000x2000px.jpg"
+                        "?sw=1536&sh=1536&sm=cut&sfrm=png&q=70&bgcolor=fffef2"
+                    ),
+                    (
+                        "https://www.aesop.com/dw/image/v2/AANG_PRD/on/demandware.static/"
+                        "-/Sites-aesop-us-master-catalog/default/dw00834621/images/products/HM03/"
+                        "Aesop_Home_Aganice_Aromatique_Candle_Vessel_&_Carton_Front_2000x2000px.jpg"
+                        "?sw=430&sh=430&sm=cut&sfrm=png&q=70&bgcolor=fffef2"
+                    ),
+                    (
+                        "https://www.aesop.com/dw/image/v2/AANG_PRD/on/demandware.static/"
+                        "-/Sites-aesop-us-master-catalog/default/dw00834621/images/products/HM03/"
+                        "Aesop_Home_Aganice_Aromatique_Candle_Vessel_&_Carton_Front_2000x2000px.jpg"
+                        "?sw=1536&sh=1536&sm=cut&sfrm=png&q=70&bgcolor=fffef2"
+                    ),
+                ],
+            }
+        ],
+    )
+
+    assert record["additional_images"] == [
+        (
+            "https://www.aesop.com/dw/image/v2/AANG_PRD/on/demandware.static/"
+            "-/Sites-aesop-us-master-catalog/default/dw00834621/images/products/HM03/"
+            "Aesop_Home_Aganice_Aromatique_Candle_Vessel_&_Carton_Front_2000x2000px.jpg"
+            "?sw=1536&sh=1536&sm=cut&sfrm=png&q=70&bgcolor=fffef2"
+        )
+    ]
+
+
+def test_build_detail_record_collapses_semicolon_image_resize_duplicates() -> None:
+    record = build_detail_record(
+        "<html><body><main><h1>AirPods Pro</h1></main></body></html>",
+        "https://www.bestbuy.com/product/apple-airpods-pro-2nd-generation-white/JJ8ZH6TPSW",
+        "ecommerce_detail",
+        None,
+        adapter_records=[
+            {
+                "title": "AirPods Pro",
+                "image_url": (
+                    "https://pisces.bbystatic.com/image2/BestBuy_US/images/products/"
+                    "4900/4900964_sd.jpg;maxHeight=128;maxWidth=64?format=webp"
+                ),
+                "additional_images": [
+                    (
+                        "https://pisces.bbystatic.com/image2/BestBuy_US/images/products/"
+                        "4900/4900964_sd.jpg;maxHeight=64;maxWidth=64?format=webp"
+                    ),
+                    (
+                        "https://pisces.bbystatic.com/image2/BestBuy_US/images/products/"
+                        "4900/4900964_sd.jpg;maxHeight=1080;maxWidth=900?format=webp"
+                    ),
+                    (
+                        "https://pisces.bbystatic.com/image2/BestBuy_US/images/products/"
+                        "4900/4900964_rd.jpg;maxHeight=1080;maxWidth=900?format=webp"
+                    ),
+                    (
+                        "https://pisces.bbystatic.com/image2/BestBuy_US/images/products/"
+                        "4900/4900964_rd.jpg;maxHeight=1920;maxWidth=900?format=webp"
+                    ),
+                ],
+            }
+        ],
+    )
+
+    assert record["image_url"].endswith("4900964_sd.jpg;maxHeight=1080;maxWidth=900?format=webp")
+    assert record["additional_images"] == [
+        (
+            "https://pisces.bbystatic.com/image2/BestBuy_US/images/products/"
+            "4900/4900964_rd.jpg;maxHeight=1920;maxWidth=900?format=webp"
+        )
     ]
 
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+import logging
 from types import ModuleType
 
 try:
@@ -13,11 +14,14 @@ if _prometheus_client is not None:
 else:
     CONTENT_TYPE_LATEST = "text/plain; version=0.0.4; charset=utf-8"
 from sqlalchemy import func, select, text
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.database import SessionLocal, engine
 from app.core.redis import get_redis, redis_failure_total, redis_is_enabled
 from app.models.crawl_run import CrawlRun
 from app.services.acquisition import browser_runtime_snapshot
+
+logger = logging.getLogger(__name__)
 
 
 class _NoopMetric:
@@ -105,6 +109,15 @@ llm_task_outcomes_total = (
     if _prometheus_client is not None
     else _NoopMetric()
 )
+crawl_runs_query_failures_total = (
+    _prometheus_client.Counter(
+        "crawl_runs_query_failures_total",
+        "Failed crawl run count queries for Prometheus metrics.",
+        registry=_registry,
+    )
+    if _prometheus_client is not None
+    else _NoopMetric()
+)
 
 
 def observe_llm_task_duration(
@@ -182,15 +195,24 @@ async def render_prometheus_metrics() -> tuple[bytes, str]:
         ]
         return ("\n".join(lines) + "\n").encode("utf-8"), CONTENT_TYPE_LATEST
 
-    async with SessionLocal() as session:
-        rows = await session.execute(
-            select(CrawlRun.status, func.count(CrawlRun.id)).group_by(CrawlRun.status)
-        )
-        crawl_runs_total.clear()
-        for status, count in rows.all():
-            crawl_runs_total.labels(status=str(status or "unknown")).set(
-                int(count or 0)
+    try:
+        async with SessionLocal() as session:
+            rows = await session.execute(
+                select(CrawlRun.status, func.count(CrawlRun.id)).group_by(CrawlRun.status)
             )
+            crawl_runs_total.clear()
+            for status, count in rows.all():
+                crawl_runs_total.labels(status=str(status or "unknown")).set(
+                    int(count or 0)
+                )
+    except SQLAlchemyError as exc:
+        logger.exception(
+            "crawl_runs_total DB query failed",
+            extra={"metric": "crawl_runs_total", "error": str(exc)},
+        )
+        crawl_runs_query_failures_total.inc()
+        crawl_runs_total.clear()
+        raise
 
     browser_pool_size.set(int(browser_runtime_snapshot()["size"]))
     database_connections_active.set(_database_connections_checked_out())

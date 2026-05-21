@@ -43,6 +43,19 @@ variant_context_noise_tokens = frozenset(
 )
 _variant_scope_selector = str(DETAIL_VARIANT_SCOPE_SELECTOR or "").strip()
 _variant_soft_scope_selector = str(DETAIL_VARIANT_SOFT_SCOPE_SELECTOR or "").strip()
+_VARIANT_DOM_CACHE_ATTR = "_crawler_variant_dom_cues_cache"
+
+
+def _variant_dom_cache(soup: Any) -> dict[object, object]:
+    cache = getattr(soup, _VARIANT_DOM_CACHE_ATTR, None)
+    if isinstance(cache, dict):
+        return cache
+    cache = {}
+    try:
+        setattr(soup, _VARIANT_DOM_CACHE_ATTR, cache)
+    except Exception:
+        return {}
+    return cache
 
 
 def _variant_scope_max_roots() -> int | None:
@@ -86,6 +99,11 @@ def variant_scope_roots(soup: Any) -> list[Any]:
     if not hasattr(soup, "select") or not _variant_scope_selector:
         return []
     max_roots = _variant_scope_max_roots()
+    cache = _variant_dom_cache(soup)
+    cache_key = ("variant_scope_roots", max_roots)
+    cached = cache.get(cache_key)
+    if isinstance(cached, tuple):
+        return list(cached)
     roots: list[Any] = []
     seen: set[int] = set()
     for node in soup.select(_variant_scope_selector):
@@ -102,10 +120,12 @@ def variant_scope_roots(soup: Any) -> list[Any]:
         if max_roots is not None and len(roots) >= max_roots:
             break
     if roots:
+        cache[cache_key] = tuple(roots)
         return roots
     soft_roots = _variant_soft_scope_roots(soup, max_roots=max_roots)
     if not soft_roots:
         increment_runtime_metric("variant_scope_miss")
+    cache[cache_key] = tuple(soft_roots)
     return soft_roots
 
 
@@ -155,6 +175,11 @@ def _node_has_soft_variant_signal(node: Any, *, min_radio_inputs: int) -> bool:
 
 
 def select_variant_nodes(soup: Any, selector: str) -> list[Any]:
+    cache = _variant_dom_cache(soup)
+    cache_key = ("select_variant_nodes", str(selector or ""))
+    cached = cache.get(cache_key)
+    if isinstance(cached, tuple):
+        return list(cached)
     nodes: list[Any] = []
     seen: set[int] = set()
     for root in variant_scope_roots(soup):
@@ -168,6 +193,7 @@ def select_variant_nodes(soup: Any, selector: str) -> list[Any]:
                 continue
             nodes.append(node)
             seen.add(id(node))
+    cache[cache_key] = tuple(nodes)
     return nodes
 
 

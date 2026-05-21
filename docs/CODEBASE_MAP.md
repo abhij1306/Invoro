@@ -30,8 +30,10 @@ If a file is not listed, assume it is a helper under a listed owner.
 | `data_enrichment.py` | On-demand ecommerce detail enrichment jobs and enriched product rows |
 | `ucp_audit.py` | UCP audit job creation, history, detail, and report exports |
 | `monitors.py` | Product monitor CRUD, run-now dispatch, history/events/snapshot, and exports |
-| `alerts.py` | Agentic Delta Engine alert CRUD, test poll, history, and webhook delivery log || `public_alerts.py` | API-key authenticated `/api/v1/alerts` public alert surface |
-| `api_keys.py` | Dashboard API-key create/list/revoke endpoints; returns plaintext only on create |
+| `monitors.py` | Product monitor CRUD, run-now dispatch, history/events/snapshot, and exports |
+| `alerts.py` | Agentic Delta Engine alert CRUD, test poll, history, and webhook delivery log |
+| `public_alerts.py` | API-key authenticated `/api/v1/alerts` public alert surface |
+| `api_keys.py` | Dashboard API-key create/list/revoke endpoints; returns plaintext only on create || `api_keys.py` | Dashboard API-key create/list/revoke endpoints; returns plaintext only on create |
 | `public/*` | Public API v1 envelope, rate-limit helpers, HTTP-only extraction, domain info, capabilities, and deferred batch routes |
 | `orchestration.py` | Project/workflow shell, template listing, workflow launch/status, monitor promotion, and comparison results |
 | `notifications.py` | In-app monitor notification listing, unread counts, and read state |
@@ -150,7 +152,6 @@ Flow:
 | `acquisition/cookie_store.py` | Temp storage state plus domain cookie memory helpers |
 | `fetch/fetch_context.py` | `fetch_page()` owner: HTTP/browser decision, escalation, block detection |
 | `fetch/browser_policy.py` | Proxy shaping, browser escalation policy, engine attempt selection, and diagnostics merge helpers |
-| `fetch/retry_policy.py` | HTTP retry status, attempt count, backoff, and jitter policy |
 | `robots_policy.py` | robots.txt policy |
 | `url_safety.py` | SSRF and public-target validation |
 
@@ -229,9 +230,9 @@ Canonical config owner:
 | `extract/detail/assembly/title_scorer.py` | Detail title promotion and shell-title scoring |
 | `extract/variant_axis.py` | Variant axis key/display normalization and semantic axis-label gates |
 | `extract/variant_option_value.py` | Variant option-value noise, UI-noise, color, and quantity-run gates |
-| `extract/variant_choice_traversal.py` | Variant DOM choice traversal and group-name inference |
+| `extract/variant_choice_traversal.py` | Variant DOM choice traversal, group-name inference, and per-Soup cue-result caching |
 | `extract/variant_identity_merge.py` | Variant axis splitting, identity, row richness, row merge, and size alias collapse |
-| `extract/variant_dom_cues.py` | Variant DOM cue and sibling-signal helpers |
+| `extract/variant_dom_cues.py` | Variant DOM cue, scoped node-selection, sibling-signal helpers, and per-Soup selector caches |
 | `extract/variant_dom_provenance.py` | DOM variant provenance capture for validator input |
 | `extract/variant_group_validator.py` | Evidence-based DOM variant group admission and rejection logging |
 | `extract/variant_normalization/*` | Stage-keyed variant record normalization, cleanup, backfill, and public flattening contract |

@@ -110,6 +110,65 @@ def test_detail_price_backfill_uses_visible_local_price_when_jsonld_currency_con
     assert record["currency"] == "INR"
 
 
+def test_detail_price_backfill_reads_local_price_from_add_to_bag_button() -> None:
+    record = {
+        "url": "https://www.glossier.com/en-in/products/balm-dotcom",
+        "price": "16.00",
+        "currency": "INR",
+        "original_price": "5500.00",
+        "_field_sources": {"price": ["js_state"], "original_price": ["js_state"]},
+    }
+    html = """
+    <html>
+      <head>
+        <script type="application/ld+json">
+        {"@type":"Product","offers":{"@type":"Offer","price":"16","priceCurrency":"USD"}}
+        </script>
+      </head>
+      <body>
+        <main>
+          <button class="add-to-bag"><span>Add to bag</span><span>Rs. 1,900</span></button>
+        </main>
+      </body>
+    </html>
+    """
+
+    backfill_detail_price_from_html(record, html=html)
+
+    assert record["price"] == "1900"
+    assert record["currency"] == "INR"
+    assert "original_price" not in record
+
+
+def test_detail_price_backfill_drops_unverified_localized_state_price() -> None:
+    record = {
+        "url": "https://www.glossier.com/en-in/products/balm-dotcom",
+        "price": "16.00",
+        "currency": "INR",
+        "original_price": "5500.00",
+        "variants": [{"price": "16.00", "currency": "INR", "flavor": "Original"}],
+        "_field_sources": {"price": ["js_state"], "original_price": ["js_state"]},
+    }
+    html = """
+    <html>
+      <head>
+        <script type="application/ld+json">
+        {"@type":"Product","offers":{"@type":"Offer","price":"16","priceCurrency":"USD"}}
+        </script>
+      </head>
+      <body><main><h1>Balm Dotcom</h1></main></body>
+    </html>
+    """
+
+    backfill_detail_price_from_html(record, html=html)
+
+    assert "price" not in record
+    assert "currency" not in record
+    assert "original_price" not in record
+    assert "price" not in record["variants"][0]
+    assert "currency" not in record["variants"][0]
+
+
 def test_detail_price_backfill_keeps_existing_parent_price_for_variants_when_host_currency_conflicts() -> None:
     record = {
         "url": "https://www.firstcry.com/p/balm-dotcom/12345/product-detail",
@@ -3868,6 +3927,70 @@ def test_detail_identity_rejects_wrong_explicit_variant_query_match() -> None:
         )
         == "detail_identity_mismatch"
     )
+
+
+def test_detail_identity_trusts_matching_product_id_when_slug_numbers_differ() -> None:
+    requested_url = (
+        "https://www.harrods.com/en-gb/p/"
+        "brinkhaus-emperor-100percent-arctic-duck-down-duvet-85-tog-000000000004579693"
+    )
+    record = {
+        "title": "Brinkhaus Emperor 100% Arctic Duck Down Duvet (8.5 Tog)",
+        "url": (
+            "https://www.harrods.com/en-gb/p/"
+            "brinkhaus-emperor-100percent-arctic-duck-down-duvet-85-tog-000000000004579694"
+        ),
+        "product_id": "000000000004579693",
+        "description": "Arctic duck down duvet with silk and Lyocell casing.",
+        "price": "5000.00",
+        "currency": "GBP",
+    }
+
+    assert (
+        detail_extractor.detail_record_rejection_reason(
+            record,
+            page_url=requested_url,
+            requested_page_url=requested_url,
+        )
+        is None
+    )
+
+
+def test_detail_category_sanitization_drops_embedded_title_segments() -> None:
+    html = """
+    <html><head>
+      <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "Product",
+        "name": "iPhone 16",
+        "url": "https://www.apple.com/shop/buy-iphone/iphone-16",
+        "offers": {"price": "699", "priceCurrency": "USD"}
+      }
+      </script>
+      <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {"@type": "ListItem", "position": 1, "name": "iPhone"},
+          {"@type": "ListItem", "position": 2, "name": "iPhone 16"},
+          {"@type": "ListItem", "position": 3, "name": "Buy iPhone 16 and iPhone 16 Plus"}
+        ]
+      }
+      </script>
+    </head><body><h1>iPhone 16</h1></body></html>
+    """
+
+    rows = extract_records(
+        html,
+        "https://www.apple.com/shop/buy-iphone/iphone-16",
+        "ecommerce_detail",
+        max_records=1,
+        requested_page_url="https://www.apple.com/shop/buy-iphone/iphone-16",
+    )
+
+    assert rows[0]["category"] == "iPhone"
 
 
 def test_detail_rejection_keeps_rich_pdp_without_strong_identity_fields() -> None:

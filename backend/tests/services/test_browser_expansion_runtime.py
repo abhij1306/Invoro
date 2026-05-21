@@ -4046,7 +4046,7 @@ def test_should_run_behavior_realism_skips_detail_shell_retry_for_real_chrome() 
     )
 
 
-def test_should_run_behavior_realism_skips_vendor_block_for_real_chrome() -> None:
+def test_should_run_behavior_realism_for_real_chrome_with_vendor_block() -> None:
     assert (
         browser_runtime._should_run_behavior_realism(
             "real_chrome",
@@ -4054,6 +4054,29 @@ def test_should_run_behavior_realism_skips_vendor_block_for_real_chrome() -> Non
         )
         is True
     )
+
+
+@pytest.mark.asyncio
+async def test_browser_behavior_realism_is_timeout_bounded(
+    patch_settings,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def _slow_behavior(_page):
+        await asyncio.sleep(1)
+        return {"enabled": True}
+
+    patch_settings(browser_behavior_realism_timeout_seconds=0.01)
+    monkeypatch.setattr(
+        browser_runtime,
+        "emit_browser_behavior_activity",
+        _slow_behavior,
+    )
+
+    diagnostics = await browser_runtime._emit_browser_behavior_activity_bounded(
+        object()
+    )
+
+    assert diagnostics["timed_out"] is True
 
 
 @pytest.mark.asyncio

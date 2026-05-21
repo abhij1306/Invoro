@@ -10,6 +10,7 @@ from unittest.mock import AsyncMock
 
 import httpx
 import pytest
+from patchright.async_api import Error as PlaywrightError
 
 from app.services.fetch import fetch_context as crawl_fetch_runtime
 from app.services.acquisition import (
@@ -2649,34 +2650,25 @@ async def test_fetch_page_emits_http_strategy_and_escalation_events(
     messages = [message for _level, message in events]
     assert any(message.startswith("Acquisition strategy: http-first") for message in messages)
     assert any(
-        "curl_attempts=1, httpx_fallback_max_attempts="
+        "curl=primary, httpx_fallback=on_transport_failure"
         in message
         for message in messages
     )
-    assert any("HTTP attempt 1/" in message for message in messages)
+    assert any("HTTP fetch via" in message for message in messages)
     assert any("Escalating to browser after HTTP result" in message for message in messages)
 
 
 @pytest.mark.asyncio
-async def test_fetch_page_http_only_retries_retryable_status_without_browser(
+async def test_fetch_page_http_only_returns_retryable_status_without_hidden_retry(
     monkeypatch: pytest.MonkeyPatch,
     patch_settings,
 ) -> None:
     await crawl_fetch_runtime.reset_fetch_runtime_state()
-    patch_settings(
-        force_httpx=True,
-        http_max_retries=2,
-        http_retry_backoff_base_ms=0,
-        http_retry_backoff_max_ms=0,
-    )
+    patch_settings(force_httpx=True)
     url = "https://example.com/products/widget"
-    events: list[tuple[str, str]] = []
     http_attempts: list[int] = []
 
-    async def _on_event(level: str, message: str) -> None:
-        events.append((level, message))
-
-    async def _http_retry_then_success(
+    async def _http_retryable_status(
         request_url: str,
         timeout: float,
         *,
@@ -2684,21 +2676,11 @@ async def test_fetch_page_http_only_retries_retryable_status_without_browser(
     ):
         del timeout, proxy
         http_attempts.append(1)
-        attempt_number = len(http_attempts)
-        if attempt_number == 1:
-            return PageFetchResult(
-                url=request_url,
-                final_url=request_url,
-                html="<html><body>retry me</body></html>",
-                status_code=503,
-                method="httpx",
-                blocked=False,
-            )
         return PageFetchResult(
             url=request_url,
             final_url=request_url,
-            html="<html><body>ok</body></html>",
-            status_code=200,
+            html="<html><body>retry me</body></html>",
+            status_code=503,
             method="httpx",
             blocked=False,
         )
@@ -2712,7 +2694,7 @@ async def test_fetch_page_http_only_retries_retryable_status_without_browser(
             f"browser should not run for http_only retry path: {request_url} {timeout} {kwargs}"
         )
 
-    monkeypatch.setattr(crawl_fetch_runtime, "_http_fetch", _http_retry_then_success)
+    monkeypatch.setattr(crawl_fetch_runtime, "_http_fetch", _http_retryable_status)
     monkeypatch.setattr(
         crawl_fetch_runtime,
         "_should_escalate_to_browser_async",
@@ -2725,16 +2707,72 @@ async def test_fetch_page_http_only_retries_retryable_status_without_browser(
             url,
             surface="ecommerce_detail",
             fetch_mode="http_only",
-            on_event=_on_event,
         )
     finally:
         await crawl_fetch_runtime.reset_fetch_runtime_state()
 
     assert result.method == "httpx"
-    assert result.status_code == 200
-    assert len(http_attempts) == 2
+    assert result.status_code == 503
+    assert len(http_attempts) == 1
+
+
+@pytest.mark.asyncio
+async def test_fetch_page_retries_patchright_http2_protocol_error_with_real_chrome(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    await crawl_fetch_runtime.reset_fetch_runtime_state()
+    url = "https://www.bestbuy.com/product/widget"
+    events: list[tuple[str, str]] = []
+    browser_engines: list[str] = []
+
+    async def _on_event(level: str, message: str) -> None:
+        events.append((level, message))
+
+    async def _failing_curl(request_url: str, timeout: float, *, proxy: str | None = None):
+        del request_url, timeout, proxy
+        raise httpx.ReadTimeout("curl timed out")
+
+    async def _failing_http(request_url: str, timeout: float, *, proxy: str | None = None):
+        del request_url, timeout, proxy
+        raise httpx.ReadTimeout("httpx timed out")
+
+    async def _browser_fetch(request_url, timeout, **kwargs):
+        del timeout
+        engine = str(kwargs.get("browser_engine") or "")
+        browser_engines.append(engine)
+        if engine == "patchright":
+            raise PlaywrightError(
+                f'Page.goto: net::ERR_HTTP2_PROTOCOL_ERROR at {request_url}'
+            )
+        return PageFetchResult(
+            url=request_url,
+            final_url=request_url,
+            html="<html><body><h1>BestBuy Widget</h1></body></html>",
+            status_code=200,
+            method="browser",
+            blocked=False,
+            browser_diagnostics={"browser_engine": engine},
+        )
+
+    monkeypatch.setattr(crawl_fetch_runtime, "_curl_fetch", _failing_curl)
+    monkeypatch.setattr(crawl_fetch_runtime, "_http_fetch", _failing_http)
+    monkeypatch.setattr(crawl_fetch_runtime, "_browser_fetch", _browser_fetch)
+    monkeypatch.setattr(crawl_fetch_runtime, "real_chrome_browser_available", lambda: True)
+
+    try:
+        result = await crawl_fetch_runtime.fetch_page(
+            url,
+            surface="ecommerce_detail",
+            on_event=_on_event,
+        )
+    finally:
+        await crawl_fetch_runtime.reset_fetch_runtime_state()
+
+    assert result.method == "browser"
+    assert result.browser_diagnostics["browser_engine"] == "real_chrome"
+    assert browser_engines == ["patchright", "real_chrome"]
     messages = [message for _level, message in events]
-    assert any("returned retryable status 503" in message for message in messages)
+    assert any("Patchright navigation failed" in message for message in messages)
 
 
 @pytest.mark.asyncio

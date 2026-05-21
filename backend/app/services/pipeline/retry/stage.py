@@ -125,129 +125,39 @@ async def _retry_detail_challenge_shell_with_real_chrome(
 ) -> _ExtractedURLStage | None:
     if rejection_reason != "challenge_shell":
         return None
-    if str(context.surface or "").strip().lower() != "ecommerce_detail":
-        return None
-    acquisition_result = fetched.acquisition_result
-    diagnostics = mapping_or_empty(
-        getattr(acquisition_result, "browser_diagnostics", {})
-    )
-    browser_engine = str(diagnostics.get("browser_engine") or "").strip().lower()
-    if (
-        getattr(acquisition_result, "method", "") != "browser"
-        or browser_engine != "patchright"
-    ):
-        return None
-    from app.services.pipeline import extraction_loop
-
-    real_chrome_available = getattr(
-        extraction_loop,
-        "real_chrome_browser_available",
-        real_chrome_browser_available,
-    )
-    if not real_chrome_available():
-        return None
-
-    remaining_budget_seconds = _remaining_url_budget_seconds(context)
-    min_remaining_seconds = _post_extraction_browser_retry_min_remaining_seconds()
-    if remaining_budget_seconds < min_remaining_seconds:
-        await _log_pipeline_event(
-            context,
-            "info",
-            "Skipping challenge_shell Chrome retry for "
-            f"{context.url}: remaining URL budget {remaining_budget_seconds:.1f}s"
-            f" < required {min_remaining_seconds:.1f}s",
-        )
-        return None
-
-    from app.services.pipeline import extraction_loop
-
-    note_hard_block = getattr(
-        extraction_loop,
-        "note_host_hard_block",
-        note_host_hard_block,
-    )
-    await note_hard_block(
-        acquisition_result.final_url or context.url,
-        method="browser:patchright",
-        vendor=None,
-        status_code=getattr(acquisition_result, "status_code", None),
-        proxy_used=False,
-    )
-    await _log_pipeline_event(
-        context,
-        "info",
-        f"Patchright detail rejected as challenge_shell; retrying real Chrome for {context.url}",
-    )
-
-    retry_result = await _acquire_browser_retry_result(
+    return await _retry_patchright_detail_rejection_with_real_chrome(
         context,
         fetched,
+        rejection_reason=rejection_reason,
         retry_reason="post_extraction_challenge_shell",
-        forced_browser_engine="real_chrome",
+        mark_patchright_hard_block=True,
     )
-    _merge_browser_diagnostics(
-        retry_result,
-        {"retry_reason": "post_extraction_challenge_shell"},
-    )
-    fetched.acquisition_result = retry_result
-    retry_records, retry_selector_rules = await _extract_records_for_acquisition(
-        context,
-        fetched,
-    )
-    retry_records, retry_selector_rules = await _apply_extraction_post_processing(
-        context,
-        acquisition_result=retry_result,
-        records=retry_records,
-        selector_rules=retry_selector_rules,
-    )
-    retry_records, retry_rejection_reason = _apply_detail_rejection_guard(
-        context,
-        fetched,
-        records=retry_records,
-        selector_rules=retry_selector_rules,
-    )
-    if retry_rejection_reason:
-        await _log_pipeline_event(
-            context,
-            "warning",
-            f"Rejected detail extraction for {context.url}: {retry_rejection_reason}",
-        )
-    else:
-        await _log_extraction_outcome(context, retry_result, retry_records)
-    return _ExtractedURLStage(fetched=fetched, records=retry_records)
 
-async def _retry_patchright_detail_shell_with_real_chrome(
+
+async def _retry_patchright_detail_rejection_with_real_chrome(
     context: _URLProcessingContext,
     fetched: _FetchedURLStage,
     *,
     rejection_reason: str | None,
+    retry_reason: str | None = None,
+    mark_patchright_hard_block: bool = False,
 ) -> _ExtractedURLStage | None:
-    if rejection_reason not in {"detail_shell", "detail_identity_mismatch"}:
+    if rejection_reason not in {
+        "challenge_shell",
+        "detail_shell",
+        "detail_identity_mismatch",
+    }:
         return None
     if str(context.surface or "").strip().lower() != "ecommerce_detail":
-        return None
-    if (
-        rejection_reason == "detail_shell"
-        and not bool(
-            crawler_runtime_settings.post_extraction_detail_shell_real_chrome_retry_enabled
-        )
-    ):
-        await _log_pipeline_event(
-            context,
-            "info",
-            f"Skipping detail_shell Chrome retry for {context.url}: disabled by runtime setting",
-        )
         return None
     acquisition_result = fetched.acquisition_result
     diagnostics = mapping_or_empty(
         getattr(acquisition_result, "browser_diagnostics", {})
     )
     browser_engine = str(diagnostics.get("browser_engine") or "").strip().lower()
-    browser_outcome = str(diagnostics.get("browser_outcome") or "").strip().lower()
     if (
         getattr(acquisition_result, "method", "") != "browser"
         or browser_engine != "patchright"
-        or browser_outcome != "usable_content"
     ):
         return None
     from app.services.pipeline import extraction_loop
@@ -266,26 +176,46 @@ async def _retry_patchright_detail_shell_with_real_chrome(
         await _log_pipeline_event(
             context,
             "info",
-            "Skipping detail_shell Chrome retry for "
+            f"Skipping {rejection_reason} Chrome escalation for "
             f"{context.url}: remaining URL budget {remaining_budget_seconds:.1f}s"
             f" < required {min_remaining_seconds:.1f}s",
         )
         return None
+
+    if mark_patchright_hard_block:
+        from app.services.pipeline import extraction_loop
+
+        note_hard_block_impl = getattr(
+            extraction_loop,
+            "note_host_hard_block",
+            note_host_hard_block,
+        )
+        await note_hard_block_impl(
+            acquisition_result.final_url or context.url,
+            method="browser:patchright",
+            vendor=None,
+            status_code=getattr(acquisition_result, "status_code", None),
+            proxy_used=False,
+        )
+    resolved_retry_reason = retry_reason or f"post_extraction_{rejection_reason}"
     await _log_pipeline_event(
         context,
         "info",
-        f"Patchright detail rejected as {rejection_reason}; retrying real Chrome for {context.url}",
+        (
+            f"Patchright detail rejected as {rejection_reason}; "
+            f"escalating real Chrome for {context.url}"
+        ),
     )
 
     retry_result = await _acquire_browser_retry_result(
         context,
         fetched,
-        retry_reason=f"post_extraction_{rejection_reason}",
+        retry_reason=resolved_retry_reason,
         forced_browser_engine="real_chrome",
     )
     _merge_browser_diagnostics(
         retry_result,
-        {"retry_reason": f"post_extraction_{rejection_reason}"},
+        {"retry_reason": resolved_retry_reason},
     )
     fetched.acquisition_result = retry_result
     retry_records, retry_selector_rules = await _extract_records_for_acquisition(

@@ -387,7 +387,6 @@ async def settle_browser_page_impl(
     implicit_networkidle_attempt = bool(
         not current_probe["is_ready"]
         and not explicit_require_networkidle
-        and not is_detail_surface
         and (is_listing_surface or not current_probe.get("structured_data_present"))
     )
     if not current_probe["is_ready"] and (
@@ -474,6 +473,39 @@ async def settle_browser_page_impl(
                 "status": "skipped",
                 "reason": "no_card_selectors",
             }
+    elif (
+        not current_probe["is_ready"]
+        and is_detail_surface
+        and readiness_override is None
+    ):
+        readiness_started_at = time.perf_counter()
+        max_wait_ms = max(
+            0,
+            int(crawler_runtime_settings.surface_readiness_max_wait_ms or 0),
+        )
+        if max_wait_ms > 0:
+            try:
+                await page.wait_for_function(
+                    """() => Boolean(
+                        document.querySelector('h1')
+                        || document.querySelector('[itemtype*="Product" i]')
+                        || document.querySelector('[data-testid*="product" i]')
+                        || document.querySelector('[class*="product" i]')
+                        || document.querySelector('script[type="application/ld+json"]')
+                    )""",
+                    timeout=min(int(timeout_seconds * 1000), max_wait_ms),
+                )
+            except PlaywrightTimeoutError:
+                pass
+        phase_timings_ms["readiness_wait"] = elapsed_ms(readiness_started_at)
+        current_probe = await _cached_probe(refresh_html=True)
+        append_readiness_probe(
+            readiness_probes, stage="after_generic_detail_readiness", probe=current_probe
+        )
+        readiness_diagnostics = {
+            "status": "ready" if current_probe["is_ready"] else "timeout",
+            "reason": "generic_detail_readiness",
+        }
     else:
         phase_timings_ms["readiness_wait"] = 0
         readiness_diagnostics = {

@@ -52,6 +52,8 @@ def test_secret_guard_warns_for_legacy_admin_password_without_blocking(
 
 def test_secret_guard_rejects_known_weak_admin_password(monkeypatch) -> None:
     monkeypatch.setattr(config, "_RUNTIME_APP_ENV", None)
+    monkeypatch.delenv("APP_ENV", raising=False)
+    monkeypatch.delenv("app_env", raising=False)
     _patch_secret_guard_settings(
         monkeypatch,
         default_admin_password="AdminPassword123!",

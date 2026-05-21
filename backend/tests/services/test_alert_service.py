@@ -1,10 +1,17 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
+from types import SimpleNamespace
+
 import pytest
+from pydantic import BaseModel
 
 from app.schemas.alert import AlertCreate, AlertUpdate
-from app.services.monitor_alert_rules import alert_rule_condition_met, alert_rule_tracked_values
-from app.services.alert_service import create_alert, update_alert
+from app.services.monitor_alert_rules import (
+    alert_rule_condition_met,
+    alert_rule_tracked_values,
+)
+from app.services.alert_service import alert_response, create_alert, update_alert
 from app.services.config.monitor_settings import MONITOR_STATUS_ARCHIVED
 
 
@@ -145,3 +152,41 @@ def test_variant_alert_rule_values_are_identity_stable() -> None:
     assert values["Small price below 900"] == "849.00"
     assert alert_rule_condition_met(rules[1], values["Small price below 900"]) is True
 
+
+def test_alert_response_preserves_model_backed_stored_rules() -> None:
+    class _StoredAlertRule(BaseModel):
+        path: str
+        label: str | None = None
+        operator: str = "changed"
+
+    timestamp = datetime.now(UTC)
+    monitor = SimpleNamespace(
+        id=1,
+        urls=["https://example.com/products/widget"],
+        surface="ecommerce_detail",
+        tracked_fields=["price"],
+        settings={
+            "alert_rules": [
+                _StoredAlertRule(
+                    path="price",
+                    label="Price changed",
+                )
+            ]
+        },
+        condition=None,
+        webhook_url=None,
+        poll_interval_seconds=300,
+        status="active",
+        last_checked_at=None,
+        last_known_values={},
+        last_error=None,
+        last_crawl_method=None,
+        created_at=timestamp,
+        updated_at=timestamp,
+    )
+
+    response = alert_response(monitor)
+
+    assert len(response.target_rules) == 1
+    assert response.target_rules[0].path == "price"
+    assert response.target_rules[0].label == "Price changed"

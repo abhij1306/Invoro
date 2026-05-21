@@ -175,6 +175,27 @@ def _should_run_behavior_realism(engine: str, *, browser_reason: str | None) -> 
         WARMUP_VENDOR_BLOCK_PREFIX
     )
 
+
+async def _emit_browser_behavior_activity_bounded(page: Any) -> dict[str, object]:
+    timeout_seconds = max(
+        0.0,
+        float(crawler_runtime_settings.browser_behavior_realism_timeout_seconds or 0),
+    )
+    if timeout_seconds <= 0:
+        return await emit_browser_behavior_activity(page)
+    try:
+        return await asyncio.wait_for(
+            emit_browser_behavior_activity(page),
+            timeout=timeout_seconds,
+        )
+    except TimeoutError:
+        return {
+            "enabled": True,
+            "timed_out": True,
+            "timeout_seconds": timeout_seconds,
+        }
+
+
 def detail_expansion_keywords(
     surface: str,
     *,
@@ -481,7 +502,9 @@ async def browser_fetch(
                     browser_reason=browser_reason,
                 ):
                     behavior_started_at = time.perf_counter()
-                    behavior_diagnostics = await emit_browser_behavior_activity(page)
+                    behavior_diagnostics = await _emit_browser_behavior_activity_bounded(
+                        page
+                    )
                     phase_timings_ms["behavior_realism"] = _elapsed_ms(
                         behavior_started_at
                     )

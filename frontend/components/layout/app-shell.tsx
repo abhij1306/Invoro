@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import type { Route } from 'next';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ComponentType, ReactNode } from 'react';
 import {
   BrainCircuit,
@@ -32,11 +32,11 @@ import {
 import { api, monitorsApi } from '../../lib/api';
 import { httpErrorStatus } from '../../lib/api/client';
 import { STORAGE_KEYS } from '../../lib/constants/storage-keys';
+import { trapFocus } from '../../lib/focus-trap';
 import { formatRelativeTime } from '../../lib/format/date';
 import { cn } from '../../lib/utils';
 import { getAuthSessionQueryOptions, isAuthRoute } from './auth-session-query';
-import { Button } from '../ui/primitives';
-import { ConfirmDialog } from '../ui/dialog';
+import { Button } from '../ui/button';
 import type { TopBarState } from './top-bar-context';
 import { TopBarProvider, useTopBarHeader } from './top-bar-context';
 import { ThemeToggle } from '../ui/theme-toggle';
@@ -373,6 +373,11 @@ function ShellContent({
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [resetError, setResetError] = useState('');
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const resetTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const resetDialogRef = useRef<HTMLDivElement | null>(null);
+  const resetConfirmRef = useRef<HTMLButtonElement | null>(null);
+  const resetPreviousFocusRef = useRef<HTMLElement | null>(null);
+  const resetPendingRef = useRef(resetPending);
   const notificationCountQuery = useQuery({
     queryKey: ['notifications-unread-count'],
     queryFn: api.notificationUnreadCount,
@@ -390,6 +395,39 @@ function ShellContent({
       queryClient.invalidateQueries({ queryKey: ['notifications-unread'] });
     },
   });
+
+  useEffect(() => {
+    resetPendingRef.current = resetPending;
+  }, [resetPending]);
+
+  useEffect(() => {
+    if (!resetDialogOpen) {
+      return;
+    }
+    const resetTrigger = resetTriggerRef.current;
+    const frame = window.requestAnimationFrame(() => resetConfirmRef.current?.focus());
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        if (resetPendingRef.current) {
+          return;
+        }
+        event.preventDefault();
+        setResetDialogOpen(false);
+        return;
+      }
+      trapFocus(event, resetDialogRef.current);
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      document.removeEventListener('keydown', handleKeyDown);
+      const restoreTarget = resetPreviousFocusRef.current?.isConnected
+        ? resetPreviousFocusRef.current
+        : resetTrigger;
+      restoreTarget?.focus();
+      resetPreviousFocusRef.current = null;
+    };
+  }, [resetDialogOpen]);
 
   async function executeReset() {
     if (!canResetWorkspace) return;
@@ -417,6 +455,10 @@ function ShellContent({
   function handleSelectedReset() {
     if (!canResetWorkspace) return;
     setResetError('');
+    resetPreviousFocusRef.current =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : resetTriggerRef.current;
     setResetDialogOpen(true);
   }
 
@@ -435,6 +477,7 @@ function ShellContent({
           {canResetWorkspace ? (
             <div className="flex items-center gap-2">
               <Button
+                ref={resetTriggerRef}
                 type="button"
                 onClick={handleSelectedReset}
                 disabled={resetPending}
@@ -516,18 +559,54 @@ function ShellContent({
       <main id="main-content" className="app-page-frame">
         <div className="app-page-inner">{children}</div>
       </main>
-      {canResetWorkspace ? (
-        <ConfirmDialog
-          open={resetDialogOpen}
-          onOpenChange={setResetDialogOpen}
-          title={resetDialogCopy.title}
-          description={resetDialogCopy.description}
-          confirmLabel={resetDialogCopy.confirmLabel}
-          pending={resetPending}
-          danger
-          error={resetError}
-          onConfirm={() => void executeReset()}
-        />
+      {canResetWorkspace && resetDialogOpen ? (
+        <div className="fixed inset-0 z-[100] grid place-items-center bg-[color-mix(in_srgb,var(--bg-base)_34%,black)] p-4">
+          <div
+            ref={resetDialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="reset-workspace-title"
+            tabIndex={-1}
+            className="border-border card-gradient w-[min(420px,100%)] rounded-[var(--radius-lg)] border p-5"
+          >
+            <h2
+              id="reset-workspace-title"
+              className="text-foreground m-0 text-base leading-snug font-semibold"
+            >
+              {resetDialogCopy.title}
+            </h2>
+            <p className="text-secondary mt-2 text-sm leading-[var(--leading-relaxed)]">
+              {resetDialogCopy.description}
+            </p>
+            {resetError ? (
+              <div
+                role="alert"
+                className="border-danger/20 bg-danger/10 text-danger mt-4 rounded-[var(--radius-md)] border px-3 py-2 text-sm leading-[var(--leading-normal)]"
+              >
+                {resetError}
+              </div>
+            ) : null}
+            <div className="mt-5 flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="quiet"
+                disabled={resetPending}
+                onClick={() => setResetDialogOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                ref={resetConfirmRef}
+                type="button"
+                variant="destructive"
+                disabled={resetPending}
+                onClick={() => void executeReset()}
+              >
+                {resetPending ? 'Working...' : resetDialogCopy.confirmLabel}
+              </Button>
+            </div>
+          </div>
+        </div>
       ) : null}
     </div>
   );

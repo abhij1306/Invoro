@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from pydantic import TypeAdapter, ValidationError
 from sqlalchemy import func, select
 from sqlalchemy.exc import SQLAlchemyError
@@ -12,6 +14,7 @@ from app.schemas.alert import (
     AlertCreate,
     AlertHistoryItem,
     AlertResponse,
+    AlertRule,
     AlertStatus,
     AlertUpdate,
 )
@@ -43,6 +46,7 @@ from app.services.monitor_service import (
 )
 
 _ALERT_STATUS_ADAPTER: TypeAdapter[AlertStatus] = TypeAdapter(AlertStatus)
+_ALERT_RULES_ADAPTER: TypeAdapter[list[AlertRule]] = TypeAdapter(list[AlertRule])
 
 
 async def create_alert(
@@ -71,7 +75,7 @@ async def create_alert(
     target_rules = _rules_payload(payload.target_rules)
     tracked_fields = _tracked_fields(payload.target_fields, target_rules)
     requested_fields = _requested_fields(tracked_fields, target_rules)
-    settings = {"skip_head_check": True}
+    settings: dict[str, Any] = {"skip_head_check": True}
     if target_rules:
         settings[ALERT_RULES_SETTING_KEY] = target_rules
     monitor = await create_monitor(
@@ -269,7 +273,7 @@ def alert_response(monitor: MonitorJob) -> AlertResponse:
         domain=normalize_domain(url),
         surface=monitor.surface,
         target_fields=list(monitor.tracked_fields or []),
-        target_rules=_rules_payload((monitor.settings or {}).get(ALERT_RULES_SETTING_KEY)),
+        target_rules=_response_rules((monitor.settings or {}).get(ALERT_RULES_SETTING_KEY)),
         condition=monitor.condition,
         webhook_url=monitor.webhook_url,
         poll_interval_seconds=int(monitor.poll_interval_seconds or 0),
@@ -288,25 +292,37 @@ def _alert_name(url: str) -> str:
     return f"Alert {domain}"[:100]
 
 
-def _rules_payload(rules) -> list[dict]:
-    if not rules:
+def _rules_payload(rules: object) -> list[dict[str, Any]]:
+    if not rules or not isinstance(rules, list | tuple):
         return []
-    output: list[dict] = []
+    output: list[dict[str, Any]] = []
     for rule in rules:
-        if hasattr(rule, "model_dump"):
+        if isinstance(rule, AlertRule):
             output.append(rule.model_dump(exclude_none=True))
+        elif callable(getattr(rule, "model_dump", None)):
+            output.append(
+                {
+                    str(key): value
+                    for key, value in rule.model_dump(exclude_none=True).items()
+                    if value is not None
+                }
+            )
         elif isinstance(rule, dict):
-            output.append({key: value for key, value in rule.items() if value is not None})
+            output.append({str(key): value for key, value in rule.items() if value is not None})
     return output
 
 
-def _tracked_fields(target_fields, target_rules: list[dict]) -> list[str]:
+def _response_rules(rules: object) -> list[AlertRule]:
+    return _ALERT_RULES_ADAPTER.validate_python(_rules_payload(rules))
+
+
+def _tracked_fields(target_fields: list[str] | None, target_rules: list[dict[str, Any]]) -> list[str]:
     if target_rules:
         return preserve_requested_fields(alert_rule_requested_fields(target_rules))
     return preserve_requested_fields(list(target_fields or []))
 
 
-def _requested_fields(target_fields: list[str], target_rules: list[dict]) -> list[str]:
+def _requested_fields(target_fields: list[str], target_rules: list[dict[str, Any]]) -> list[str]:
     return preserve_requested_fields([*target_fields, *alert_rule_requested_fields(target_rules)])
 
 

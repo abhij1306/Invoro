@@ -33,6 +33,7 @@ from app.services.config.extraction_rules import (
     DETAIL_PRICE_JSONLD_TYPE_RE,
     DETAIL_PRICE_MAGNITUDE_EPSILON_DECIMAL,
     DETAIL_PRICE_META_SELECTORS,
+    DETAIL_RELATED_PRICE_CONTEXT_TOKENS,
     DETAIL_STRICT_PARENT_PRICE_SOURCE_SET,
     PAGE_URL_CURRENCY_HINTS_RAW,
 )
@@ -72,6 +73,23 @@ def backfill_detail_price_from_html(
         expected_currency=expected_currency,
         page_url=record_url,
     )
+    unverified_localized_currency_conflict = bool(
+        not visible_price
+        and html_currency
+        and expected_currency
+        and html_currency != expected_currency
+        and text_or_none(record.get("currency")) in (None, expected_currency)
+    )
+    if unverified_localized_currency_conflict:
+        _drop_unverified_localized_money(record)
+        html_currency = None
+        jsonld_price_bundle = (None, None, None)
+    visible_currency_conflicts_with_html = bool(
+        visible_price
+        and html_currency
+        and expected_currency
+        and html_currency != expected_currency
+    )
     if html_currency_conflicts_with_host:
         # JSON-LD/meta may stay on default-market currency while the rendered
         # PDP shows localized price. Ignore conflicting structured price, but
@@ -103,6 +121,15 @@ def backfill_detail_price_from_html(
         jsonld_price=jsonld_price,
         visible_price=visible_price,
     )
+    localized_override_price = _localized_visible_or_structured_price_override(
+        record=record,
+        visible_price=visible_price,
+        jsonld_price=jsonld_price,
+        jsonld_currency=jsonld_currency,
+        expected_currency=expected_currency,
+    )
+    localized_override_applied = False
+    price_source = ""
     if current_price_backfill_blocked:
         _drop_unavailable_dom_backfilled_detail_price(record)
     else:
@@ -117,6 +144,10 @@ def backfill_detail_price_from_html(
             if price in (None, "", [], {}):
                 price = text_or_none(record.get("price"))
         price_source = "json_ld" if jsonld_price else "dom_text"
+        if localized_override_price:
+            price = localized_override_price
+            price_source = "dom_text" if visible_price == localized_override_price else "json_ld"
+            localized_override_applied = True
         if visible_price and (
             _detail_price_is_cent_magnitude_copy(price, visible_price)
             or _should_override_record_price_from_dom(
@@ -152,9 +183,9 @@ def backfill_detail_price_from_html(
                 record=record,
                 dom_price=price,
                 record_price_is_low_signal=record_price_is_low_signal,
-            ):
+            ) or localized_override_applied:
                 record["price"] = price
-                append_record_field_source(record, "price", "dom_text")
+                append_record_field_source(record, "price", price_source)
             if isinstance(selected_variant, dict) and (
                 selected_variant.get("price") in (None, "", [], {})
                 or _detail_price_value_is_low_signal(selected_variant.get("price"))
@@ -197,12 +228,31 @@ def backfill_detail_price_from_html(
                     variant["price"] = price
                     if currency and variant.get("currency") in (None, "", [], {}):
                         variant["currency"] = currency
+            if localized_override_applied:
+                _drop_unverified_variant_money(record)
 
-    original_price = jsonld_original_price or _detail_original_price_from_html(
+    visible_original_price = _detail_original_price_from_html(
         soup,
         currency=currency,
-        jsonld_price_bundle=jsonld_price_bundle,
+        jsonld_price_bundle=(None, None, None),
     )
+    original_price = jsonld_original_price or visible_original_price
+    if (
+        localized_override_applied
+        and price_source == "dom_text"
+        and (
+            visible_original_price in (None, "", [], {})
+            or detail_price_decimal(visible_original_price)
+            == detail_price_decimal(record.get("price"))
+        )
+    ):
+        _drop_existing_original_price(record)
+        original_price = None
+    if (html_currency_conflicts_with_host or visible_currency_conflicts_with_html) and (
+        original_price in (None, "", [], {})
+        or detail_price_decimal(original_price) == detail_price_decimal(record.get("price"))
+    ):
+        _drop_conflicting_non_authoritative_original_price(record)
     if original_price not in (None, "", [], {}) and record.get("original_price") in (
         None,
         "",
@@ -226,6 +276,84 @@ def backfill_detail_price_from_html(
     ):
         selected_variant["original_price"] = original_price
     _drop_unavailable_dom_backfilled_detail_price(record)
+
+
+def _localized_visible_or_structured_price_override(
+    *,
+    record: dict[str, Any],
+    visible_price: object,
+    jsonld_price: object,
+    jsonld_currency: str | None,
+    expected_currency: str | None,
+) -> str | None:
+    if not expected_currency:
+        return None
+    current_sources = record_field_sources(record, "price")
+    if not (current_sources & {"adapter", "js_state"}):
+        return None
+    if visible_price and _detail_price_is_visible_outlier(record.get("price"), visible_price):
+        return text_or_none(visible_price)
+    if (
+        jsonld_price
+        and jsonld_currency == expected_currency
+        and _detail_price_is_visible_outlier(record.get("price"), jsonld_price)
+    ):
+        return text_or_none(jsonld_price)
+    return None
+
+
+def _drop_unverified_variant_money(record: dict[str, Any]) -> None:
+    selected_variant = record.get("selected_variant")
+    if isinstance(selected_variant, dict):
+        for field_name in ("price", "sale_price", "original_price", "currency"):
+            selected_variant.pop(field_name, None)
+    variants = record.get("variants")
+    if not isinstance(variants, list):
+        return
+    for variant in variants:
+        if not isinstance(variant, dict):
+            continue
+        for field_name in ("price", "sale_price", "original_price", "currency"):
+            variant.pop(field_name, None)
+
+
+def _drop_existing_original_price(record: dict[str, Any]) -> None:
+    record.pop("original_price", None)
+    field_sources = record.get("_field_sources")
+    if isinstance(field_sources, dict):
+        field_sources.pop("original_price", None)
+
+
+def _drop_unverified_localized_money(record: dict[str, Any]) -> None:
+    for field_name in ("price", "sale_price", "original_price", "currency"):
+        record.pop(field_name, None)
+    field_sources = record.get("_field_sources")
+    if isinstance(field_sources, dict):
+        for field_name in ("price", "sale_price", "original_price", "currency"):
+            field_sources.pop(field_name, None)
+    selected_variant = record.get("selected_variant")
+    if isinstance(selected_variant, dict):
+        for field_name in ("price", "sale_price", "original_price", "currency"):
+            selected_variant.pop(field_name, None)
+    variants = record.get("variants")
+    if isinstance(variants, list):
+        for variant in variants:
+            if not isinstance(variant, dict):
+                continue
+            for field_name in ("price", "sale_price", "original_price", "currency"):
+                variant.pop(field_name, None)
+
+
+def _drop_conflicting_non_authoritative_original_price(record: dict[str, Any]) -> None:
+    if record.get("original_price") in (None, "", [], {}):
+        return
+    original_sources = record_field_sources(record, "original_price")
+    if original_sources & DETAIL_AUTHORITATIVE_PRICE_SOURCE_SET:
+        return
+    record.pop("original_price", None)
+    field_sources = record.get("_field_sources")
+    if isinstance(field_sources, dict):
+        field_sources.pop("original_price", None)
 
 
 def _unavailable_record_blocks_dom_price_backfill(
@@ -830,6 +958,7 @@ def _detail_original_price_from_html(
         soup,
         selectors=DETAIL_ORIGINAL_PRICE_SELECTORS,
         currency=currency,
+        skip_related_offer=True,
     )
 
 
@@ -838,10 +967,13 @@ def _detail_price_from_selector_text(
     *,
     selectors: tuple[str, ...],
     currency: str | None,
+    skip_related_offer: bool = True,
 ) -> str | None:
     for selector in selectors:
         for node in soup.select(selector):
             if _price_node_looks_like_installment(node):
+                continue
+            if skip_related_offer and _price_node_looks_like_related_offer(node):
                 continue
             raw_value = node.get("aria-label") if hasattr(node, "get") else None
             if raw_value in (None, "", [], {}):
@@ -867,6 +999,23 @@ def _price_node_looks_like_installment(node: object) -> bool:
                 text_parts.append(str(raw))
     lowered = " ".join(text_parts).lower()
     return any(token in lowered for token in DETAIL_INSTALLMENT_PRICE_TEXT_TOKENS_NORMALIZED)
+
+
+def _price_node_looks_like_related_offer(node: object) -> bool:
+    current = node
+    depth = 0
+    while current is not None and depth < 4:
+        attrs = getattr(current, "attrs", {}) or {}
+        context = " ".join(
+            str(value)
+            for key, value in attrs.items()
+            if key in {"class", "id", "data-testid", "data-test", "aria-label"}
+        ).lower()
+        if any(token in context for token in DETAIL_RELATED_PRICE_CONTEXT_TOKENS):
+            return True
+        current = current.find_parent() if hasattr(current, "find_parent") else None
+        depth += 1
+    return False
 
 
 def _detail_currency_from_html(
