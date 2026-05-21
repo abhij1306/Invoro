@@ -8,10 +8,12 @@ import { TopBarProvider } from '../layout/top-bar-context';
 import { CrawlRunScreen, storeProductIntelligencePrefill } from './crawl-run-screen';
 
 const replaceMock = vi.fn();
+const pushMock = vi.fn();
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/runs/42',
   useRouter: () => ({
+    push: pushMock,
     replace: replaceMock,
   }),
 }));
@@ -28,9 +30,13 @@ const apiMock = vi.hoisted(() => ({
   exportCsv: vi.fn(() => '/export.csv'),
   exportJson: vi.fn(() => '/export.json'),
 }));
+const alertsApiMock = vi.hoisted(() => ({
+  create: vi.fn(),
+}));
 
 vi.mock('../../lib/api', () => ({
   api: apiMock,
+  alertsApi: alertsApiMock,
 }));
 
 function terminalRun(runId: number): CrawlRun {
@@ -280,6 +286,7 @@ describe('CrawlRunScreen', () => {
     apiMock.promoteDomainRecipeSelectors.mockResolvedValue([]);
     apiMock.applyDomainRecipeFieldAction.mockResolvedValue({});
     apiMock.deleteSelector.mockResolvedValue(undefined);
+    alertsApiMock.create.mockResolvedValue({ id: 42 });
   });
 
   it('prefills Product Intelligence from selected listing records', async () => {
@@ -733,6 +740,53 @@ describe('CrawlRunScreen', () => {
     });
 
     expect(screen.queryByText(/%E0%B8%AA%E0%B8%B5%E0%B8%94%E0%B8%B3/)).not.toBeInTheDocument();
+  });
+
+  it('creates variant alert rules from the JSON result builder', async () => {
+    apiMock.getRecords.mockResolvedValue({
+      items: [
+        {
+          ...makeRecord(1),
+          source_url: 'https://example.com/products/shirt',
+          data: {
+            title: 'Variant Shirt',
+            url: 'https://example.com/products/shirt',
+            variants: [
+              { sku: 'shirt-s', size: 'S', availability: 'in_stock', price: '999.00' },
+              { sku: 'shirt-m', size: 'M', availability: 'out_of_stock', price: '1099.00' },
+            ],
+          },
+        },
+      ],
+      meta: { page: 1, limit: 400, total: 1 },
+    });
+
+    renderRunScreen();
+
+    const jsonButtons = await screen.findAllByRole('button', { name: 'JSON' });
+    fireEvent.click(jsonButtons.at(-1)!);
+    fireEvent.click(await screen.findByRole('button', { name: 'Alert' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Any Availability' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create Alert' }));
+
+    await waitFor(() => {
+      expect(alertsApiMock.create).toHaveBeenCalledWith({
+        url: 'https://example.com/products/shirt',
+        target_fields: ['variants'],
+        target_rules: [
+          {
+            path: 'variants[*].availability',
+            label: 'Any variant availability',
+            operator: 'changed',
+            value: undefined,
+          },
+        ],
+        condition: null,
+        webhook_url: null,
+        poll_interval_seconds: 300,
+      });
+    });
+    expect(pushMock).toHaveBeenCalledWith('/alerts/42');
   });
 
   it('keeps payload peek limited to the cleaned JSON record', async () => {

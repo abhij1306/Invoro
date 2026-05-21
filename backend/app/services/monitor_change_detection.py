@@ -16,6 +16,7 @@ from app.models.monitor import (
     MonitorSnapshotRecord,
 )
 from app.services.config.monitor_settings import (
+    ALERT_RULES_SETTING_KEY,
     MONITOR_EVENT_FIELD_CHANGED,
     MONITOR_EVENT_RECORD_NEW,
     MONITOR_EVENT_RECORD_REMOVED,
@@ -28,6 +29,11 @@ from app.services.config.monitor_settings import (
     ALERT_CONSECUTIVE_FAILURE_LIMIT,
 )
 from app.services.monitor_condition import condition_matches
+from app.services.monitor_alert_rules import (
+    alert_rule_condition_met,
+    alert_rule_key,
+    alert_rule_tracked_values,
+)
 from app.services.monitor_alert_service import create_monitor_change_notification
 from app.services.monitor_service import utcnow
 from app.services.monitor_webhook_service import dispatch_alert_webhooks
@@ -71,6 +77,7 @@ class MonitorChangeDetectionService:
             events: list[MonitorEvent] = []
             detected_at = utcnow()
             tracked_fields = [str(field) for field in monitor.tracked_fields or []]
+            alert_rules = _alert_rules(monitor)
 
             for key, record in current.items():
                 if key not in previous:
@@ -81,14 +88,14 @@ class MonitorChangeDetectionService:
                             source_url=record.source_url,
                             event_type=MONITOR_EVENT_RECORD_NEW,
                             detected_at=detected_at,
-                            new_value=_tracked_values(record, tracked_fields),
+                            new_value=_tracked_values(record, tracked_fields, alert_rules),
                         )
                     )
                     continue
                 previous_row = previous[key]
-                for field in tracked_fields:
+                for field in _tracked_value_names(tracked_fields, alert_rules):
                     old_raw = dict(previous_row.field_values or {}).get(field)
-                    new_raw = _get_field_value(dict(record.data or {}), field)
+                    new_raw = _tracked_values(record, tracked_fields, alert_rules).get(field)
 
                     old_value = _normalized_value(field, old_raw)
                     new_value = _normalized_value(field, new_raw)
@@ -125,6 +132,7 @@ class MonitorChangeDetectionService:
                 run_id=run.id,
                 snapshot_data={
                     "tracked_fields": tracked_fields,
+                    "alert_rules": alert_rules,
                     "run_id": run.id,
                 },
                 record_count=len(current),
@@ -139,7 +147,7 @@ class MonitorChangeDetectionService:
                         monitor_id=monitor.id,
                         source_url=record.source_url,
                         url_identity_key=key,
-                        field_values=_tracked_values(record, tracked_fields),
+                        field_values=_tracked_values(record, tracked_fields, alert_rules),
                     )
                 )
             for event in events:
@@ -148,7 +156,7 @@ class MonitorChangeDetectionService:
                 session.add(event)
             if current:
                 first_record = next(iter(current.values()))
-                monitor.last_known_values = _tracked_values(first_record, tracked_fields)
+                monitor.last_known_values = _tracked_values(first_record, tracked_fields, alert_rules)
                 monitor.last_checked_at = detected_at
                 monitor.last_crawl_method = _crawl_method(run, first_record)
                 monitor.consecutive_failure_count = 0
@@ -263,14 +271,33 @@ def _get_field_value(data: dict[str, Any], field: str) -> Any:
     return data.get(field)
 
 
-def _tracked_values(record: CrawlRecord, tracked_fields: list[str]) -> dict[str, Any]:
+def _tracked_values(
+    record: CrawlRecord,
+    tracked_fields: list[str],
+    alert_rules: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
     data = dict(record.data or {})
+    if alert_rules:
+        return alert_rule_tracked_values(data, alert_rules)
     return {field: _get_field_value(data, field) for field in tracked_fields}
+
+
+def _tracked_value_names(
+    tracked_fields: list[str],
+    alert_rules: list[dict[str, Any]] | None = None,
+) -> list[str]:
+    if alert_rules:
+        return [alert_rule_key(rule, index) for index, rule in enumerate(alert_rules)]
+    return tracked_fields
 
 
 def _normalized_value(field: str, value: Any) -> object:
     if value in (None, "", [], {}):
         return None
+    if isinstance(value, dict):
+        return {key: _normalized_value(field, item) for key, item in sorted(value.items())}
+    if isinstance(value, list):
+        return [_normalized_value(field, item) for item in value]
     if "price" in field.lower():
         return _price_value(value)
     if isinstance(value, str):
@@ -303,6 +330,11 @@ def _condition_met(monitor: MonitorJob, values: dict[str, Any], event: MonitorEv
         return False
     if event.field_name:
         values[event.field_name] = event.new_value
+    alert_rules = _alert_rules(monitor)
+    if not monitor.condition and alert_rules and event.field_name:
+        for index, rule in enumerate(alert_rules):
+            if alert_rule_key(rule, index) == event.field_name:
+                return alert_rule_condition_met(rule, event.new_value)
     try:
         return condition_matches(monitor.condition, values)
     except ValueError:
@@ -320,3 +352,11 @@ def _crawl_method(run: CrawlRun, record: CrawlRecord) -> str:
         return str(method)
     summary = run.result_summary if isinstance(run.result_summary, dict) else {}
     return str(summary.get("crawl_method") or "unknown")
+
+
+def _alert_rules(monitor: MonitorJob) -> list[dict[str, Any]]:
+    settings = monitor.settings if isinstance(monitor.settings, dict) else {}
+    rules = settings.get(ALERT_RULES_SETTING_KEY)
+    if not isinstance(rules, list):
+        return []
+    return [rule for rule in rules if isinstance(rule, dict)]

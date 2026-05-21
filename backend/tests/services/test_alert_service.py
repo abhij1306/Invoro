@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from app.schemas.alert import AlertCreate, AlertUpdate
+from app.services.monitor_alert_rules import alert_rule_condition_met, alert_rule_tracked_values
 from app.services.alert_service import create_alert, update_alert
 from app.services.config.monitor_settings import MONITOR_STATUS_ARCHIVED
 
@@ -73,4 +74,74 @@ async def test_update_alert_keeps_target_and_requested_fields_aligned(
             payload=AlertUpdate(status=MONITOR_STATUS_ARCHIVED),
         )
 
+
+@pytest.mark.asyncio
+async def test_create_alert_accepts_variant_target_rules(
+    db_session,
+    test_user,
+    monkeypatch,
+) -> None:
+    async def _poll(_session, *, monitor, suppress_webhooks, update_schedule):
+        return 91
+
+    monkeypatch.setattr("app.services.alert_service.run_alert_poll", _poll)
+
+    monitor, run_id = await create_alert(
+        db_session,
+        user=test_user,
+        payload=AlertCreate(
+            url="https://example.com/products/widget",
+            target_fields=["variants"],
+            target_rules=[
+                {
+                    "path": "variants[*].availability",
+                    "label": "Any variant availability",
+                    "operator": "changed",
+                }
+            ],
+        ),
+    )
+
+    assert run_id == 91
+    assert monitor.tracked_fields == ["variants"]
+    assert monitor.requested_fields == ["variants"]
+    assert monitor.settings["alert_rules"] == [
+        {
+            "path": "variants[*].availability",
+            "label": "Any variant availability",
+            "operator": "changed",
+        }
+    ]
+
+
+def test_variant_alert_rule_values_are_identity_stable() -> None:
+    rules = [
+        {
+            "path": "variants[*].availability",
+            "label": "Any variant availability",
+            "operator": "changed",
+        },
+        {
+            "path": "variants[*].price",
+            "label": "Small price below 900",
+            "operator": "less_than",
+            "value": "900",
+            "variant_match": {"size": "S"},
+        },
+    ]
+    data = {
+        "variants": [
+            {"sku": "sku-m", "size": "M", "availability": "in_stock", "price": "999.00"},
+            {"sku": "sku-s", "size": "S", "availability": "out_of_stock", "price": "849.00"},
+        ]
+    }
+
+    values = alert_rule_tracked_values(data, rules)
+
+    assert values["Any variant availability"] == {
+        "sku:sku-m": "in_stock",
+        "sku:sku-s": "out_of_stock",
+    }
+    assert values["Small price below 900"] == "849.00"
+    assert alert_rule_condition_met(rules[1], values["Small price below 900"]) is True
 

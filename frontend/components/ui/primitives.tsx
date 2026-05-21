@@ -81,6 +81,7 @@ export function Dropdown<T extends string>({
   disabled = false,
   align = 'left',
   size = 'md',
+  portal = true,
 }: Readonly<{
   value: T;
   onChange: (value: T) => void;
@@ -90,6 +91,7 @@ export function Dropdown<T extends string>({
   disabled?: boolean;
   align?: 'left' | 'center';
   size?: 'sm' | 'md';
+  portal?: boolean;
 }>) {
   const [open, setOpen] = React.useState(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
@@ -205,6 +207,63 @@ export function Dropdown<T extends string>({
 
   const selectedLabel = options[activeIndex]?.label ?? value;
 
+  const listboxElement = (
+    <div
+      ref={listboxRef}
+      id={listboxId}
+      role="listbox"
+      onMouseEnter={cancelClose}
+      onMouseLeave={scheduleClose}
+      className={cn(
+        'border-border bg-background-elevated z-[300] max-h-[320px] w-max overflow-y-auto rounded-[var(--radius-lg)] border py-1',
+        portal ? 'fixed' : 'absolute',
+        listboxPosition.side === 'bottom'
+          ? 'animate-[dropdown-in_150ms_cubic-bezier(0.16,1,0.3,1)]'
+          : 'animate-[dropdown-in-up_150ms_cubic-bezier(0.16,1,0.3,1)]',
+      )}
+      style={
+        portal
+          ? {
+              top: `${listboxPosition.top}px`,
+              left: `${listboxPosition.left}px`,
+              minWidth: `${listboxPosition.width}px`,
+            }
+          : {
+              minWidth: '100%',
+              top: listboxPosition.side === 'top' ? 'auto' : '100%',
+              bottom: listboxPosition.side === 'top' ? '100%' : 'auto',
+              transform: listboxPosition.side === 'top' ? 'translateY(-4px)' : 'translateY(4px)',
+            }
+      }
+    >
+      {options.map((option, index) => {
+        const optionId = `${dropdownId}-option-${index}-${sanitizeIdSegment(option.value)}`;
+        return (
+          <button
+            key={option.value}
+            id={optionId}
+            role="option"
+            aria-selected={option.value === value}
+            onClick={() => {
+              onChange(option.value);
+              setOpen(false);
+            }}
+            onMouseDown={(e) => e.preventDefault()}
+            className={cn(
+              'flex w-full items-center py-2 text-xs leading-[var(--leading-snug)] transition-colors',
+              align === 'center' ? 'justify-center px-8' : 'justify-start px-3',
+              option.value === value
+                ? 'bg-accent-subtle text-accent font-medium'
+                : 'text-foreground hover:bg-background-alt',
+            )}
+          >
+            {option.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+
   return (
     <div
       ref={containerRef}
@@ -255,53 +314,9 @@ export function Dropdown<T extends string>({
         </svg>
       </button>
       {open && typeof document !== 'undefined'
-        ? createPortal(
-            <div
-              ref={listboxRef}
-              id={listboxId}
-              role="listbox"
-              onMouseEnter={cancelClose}
-              onMouseLeave={scheduleClose}
-              className={cn(
-                'border-border bg-background-elevated fixed z-[300] max-h-[320px] w-max overflow-y-auto rounded-[var(--radius-lg)] border py-1',
-                listboxPosition.side === 'bottom'
-                  ? 'animate-[dropdown-in_150ms_cubic-bezier(0.16,1,0.3,1)]'
-                  : 'animate-[dropdown-in-up_150ms_cubic-bezier(0.16,1,0.3,1)]',
-              )}
-              style={{
-                top: `${listboxPosition.top}px`,
-                left: `${listboxPosition.left}px`,
-                minWidth: `${listboxPosition.width}px`,
-              }}
-            >
-              {options.map((option, index) => {
-                const optionId = `${dropdownId}-option-${index}-${sanitizeIdSegment(option.value)}`;
-                return (
-                  <button
-                    key={option.value}
-                    id={optionId}
-                    role="option"
-                    aria-selected={option.value === value}
-                    onClick={() => {
-                      onChange(option.value);
-                      setOpen(false);
-                    }}
-                    onMouseDown={(e) => e.preventDefault()}
-                    className={cn(
-                      'flex w-full items-center py-2 text-xs leading-[var(--leading-snug)] transition-colors',
-                      align === 'center' ? 'justify-center px-8' : 'justify-start px-3',
-                      option.value === value
-                        ? 'bg-accent-subtle text-accent font-medium'
-                        : 'text-foreground hover:bg-background-alt',
-                    )}
-                  >
-                    {option.label}
-                  </button>
-                );
-              })}
-            </div>,
-            document.body,
-          )
+        ? portal
+          ? createPortal(listboxElement, document.body)
+          : listboxElement
         : null}
     </div>
   );
@@ -313,6 +328,8 @@ export function Toggle({
   onChange,
   ariaLabel,
 }: Readonly<{ checked: boolean; onChange: (v: boolean) => void; ariaLabel?: string }>) {
+  const trackClass = checked ? 'bg-' + '[var(--toggle-track-on)]' : 'bg-' + '[var(--toggle-track-off)]';
+  const thumbClass = 'bg-' + '[var(--toggle-thumb)]';
   return (
     <button
       type="button"
@@ -322,13 +339,14 @@ export function Toggle({
       onClick={() => onChange(!checked)}
       className={cn(
         'focus-ring relative inline-flex h-[20px] w-[36px] shrink-0 cursor-pointer items-center rounded-full transition-[background-color]',
-        checked ? 'bg-[var(--toggle-track-on)]' : 'bg-[var(--toggle-track-off)]',
+        trackClass,
       )}
     >
       <span
         className={cn(
-          'inline-block h-[15px] w-[15px] rounded-full bg-[var(--toggle-thumb)] shadow-[0_1px_2px_rgba(0,0,0,0.28)] transition-transform',
+          'inline-block h-[15px] w-[15px] rounded-full shadow-[0_1px_2px_rgba(0,0,0,0.28)] transition-transform',
           checked ? 'translate-x-[19px]' : 'translate-x-[2px]',
+          thumbClass,
         )}
       />
     </button>

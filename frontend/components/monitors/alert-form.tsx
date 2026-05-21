@@ -13,7 +13,7 @@ interface AlertFormProps {
   submitLabel: string;
 }
 
-const fieldOptions = ['price', 'availability', 'sku'];
+const fieldOptions = ['price', 'availability', 'sku', 'title', 'brand', 'variants'];
 const intervalOptions = [
   { value: '60', label: '1 min' },
   { value: '300', label: '5 min' },
@@ -76,8 +76,11 @@ export function AlertForm({ initial, onSubmit, onCancel, submitLabel }: Readonly
     }
     setSubmitting(true);
     try {
+      const fieldsChanged =
+        JSON.stringify(targetFields) !== JSON.stringify(initial?.tracked_fields ?? initialFields);
       const payload = {
         target_fields: targetFields,
+        target_rules: !fieldsChanged && initial?.target_rules?.length ? initial.target_rules : undefined,
         condition: condition.trim() || null,
         webhook_url: cleanWebhook || null,
         poll_interval_seconds: Number.parseInt(pollInterval, 10),

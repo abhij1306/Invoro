@@ -17,6 +17,7 @@ export function alertToMonitor(alert: AlertJob): MonitorJob {
     retention_days: 90,
     status: alert.status,
     settings: {},
+    target_rules: alert.target_rules,
     condition: alert.condition,
     webhook_url: alert.webhook_url,
     poll_interval_seconds: alert.poll_interval_seconds,

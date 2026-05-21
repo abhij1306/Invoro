@@ -6,7 +6,11 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.services.config.monitor_settings import (
+    ALERT_RULE_OPERATOR_CHANGED,
+    ALERT_RULE_OPERATORS,
+    ALERT_VARIANT_WILDCARD_PATH_PREFIX,
     MAX_ALERT_TARGET_FIELDS,
+    MAX_ALERT_TARGET_RULES,
     MIN_ALERT_POLL_INTERVAL_SECONDS,
     ALERT_ALLOWED_FIELDS,
     ALERT_DEFAULT_TARGET_FIELDS,
@@ -46,9 +50,50 @@ def validate_webhook_url(value: str | None) -> str | None:
     return url
 
 
+class AlertRule(BaseModel):
+    path: str
+    label: str | None = None
+    operator: str = ALERT_RULE_OPERATOR_CHANGED
+    value: Any = None
+    variant_match: dict[str, Any] | None = None
+
+    @field_validator("path")
+    @classmethod
+    def _validate_path(cls, value: str) -> str:
+        path = str(value or "").strip()
+        if not path:
+            raise ValueError("alert rule path must not be empty")
+        if path.startswith(ALERT_VARIANT_WILDCARD_PATH_PREFIX):
+            field = path.removeprefix(ALERT_VARIANT_WILDCARD_PATH_PREFIX)
+            if field and field.replace("_", "").isalnum() and not field[0].isdigit():
+                return path
+        if "." not in path and path.replace("_", "").isalnum() and not path[0].isdigit():
+            return path
+        raise ValueError("unsupported alert rule path")
+
+    @field_validator("operator")
+    @classmethod
+    def _validate_operator(cls, value: str) -> str:
+        operator = str(value or "").strip() or ALERT_RULE_OPERATOR_CHANGED
+        if operator not in ALERT_RULE_OPERATORS:
+            raise ValueError("unsupported alert rule operator")
+        return operator
+
+
+def validate_target_rules(value: list[AlertRule] | None) -> list[AlertRule] | None:
+    if value is None:
+        return None
+    if not value:
+        raise ValueError("target_rules must not be empty")
+    if len(value) > MAX_ALERT_TARGET_RULES:
+        raise ValueError("too many target_rules")
+    return value
+
+
 class AlertCreate(BaseModel):
     url: str
     target_fields: list[str] = Field(default_factory=lambda: list(ALERT_DEFAULT_TARGET_FIELDS))
+    target_rules: list[AlertRule] | None = None
     condition: str | None = None
     webhook_url: str | None = None
     poll_interval_seconds: int = Field(default=300, ge=MIN_ALERT_POLL_INTERVAL_SECONDS)
@@ -66,6 +111,11 @@ class AlertCreate(BaseModel):
     def _validate_fields(cls, value: list[str]) -> list[str]:
         return list(validate_target_fields(value) or [])
 
+    @field_validator("target_rules")
+    @classmethod
+    def _validate_rules(cls, value: list[AlertRule] | None) -> list[AlertRule] | None:
+        return validate_target_rules(value)
+
     @field_validator("webhook_url")
     @classmethod
     def _validate_webhook(cls, value: str | None) -> str | None:
@@ -78,11 +128,17 @@ class AlertUpdate(BaseModel):
     poll_interval_seconds: int | None = Field(default=None, ge=MIN_ALERT_POLL_INTERVAL_SECONDS)
     status: AlertStatus | None = None
     target_fields: list[str] | None = None
+    target_rules: list[AlertRule] | None = None
 
     @field_validator("target_fields")
     @classmethod
     def _validate_fields(cls, value: list[str] | None) -> list[str] | None:
         return validate_target_fields(value)
+
+    @field_validator("target_rules")
+    @classmethod
+    def _validate_rules(cls, value: list[AlertRule] | None) -> list[AlertRule] | None:
+        return validate_target_rules(value)
 
     @field_validator("webhook_url")
     @classmethod
@@ -98,6 +154,7 @@ class AlertResponse(BaseModel):
     domain: str
     surface: str
     target_fields: list[str]
+    target_rules: list[AlertRule] = Field(default_factory=list)
     condition: str | None = None
     webhook_url: str | None = None
     poll_interval_seconds: int

@@ -16,6 +16,7 @@ from app.schemas.alert import (
     AlertUpdate,
 )
 from app.services.config.monitor_settings import (
+    ALERT_RULES_SETTING_KEY,
     MAX_ALERTS_PER_USER,
     MONITOR_ID_SETTING_KEY,
     MONITOR_STATUS_ACTIVE,
@@ -31,6 +32,7 @@ from app.services.crawl.batch_runtime import process_run
 from app.services.domain_utils import normalize_domain
 from app.services.field_policy import preserve_requested_fields
 from app.services.monitor_condition import validate_condition
+from app.services.monitor_alert_rules import alert_rule_requested_fields
 from app.services.monitor_service import (
     create_monitor,
     get_monitor,
@@ -66,6 +68,12 @@ async def create_alert(
     )
     if alert_count >= MAX_ALERTS_PER_USER:
         raise ValueError("Alert limit reached")
+    target_rules = _rules_payload(payload.target_rules)
+    tracked_fields = _tracked_fields(payload.target_fields, target_rules)
+    requested_fields = _requested_fields(tracked_fields, target_rules)
+    settings = {"skip_head_check": True}
+    if target_rules:
+        settings[ALERT_RULES_SETTING_KEY] = target_rules
     monitor = await create_monitor(
         session,
         user=user,
@@ -73,11 +81,11 @@ async def create_alert(
             "name": _alert_name(payload.url),
             "urls": [payload.url],
             "surface": ALERT_SURFACE,
-            "tracked_fields": payload.target_fields,
-            "requested_fields": preserve_requested_fields(payload.target_fields),
+            "tracked_fields": tracked_fields,
+            "requested_fields": requested_fields,
             "schedule_interval_hours": 1,
             "retention_days": 90,
-            "settings": {"skip_head_check": True},
+            "settings": settings,
             "condition": payload.condition,
             "webhook_url": payload.webhook_url,
             "poll_interval_seconds": payload.poll_interval_seconds,
@@ -130,10 +138,21 @@ async def update_alert(
     data = payload.model_dump(exclude_unset=True)
     if "condition" in data:
         validate_condition(data.get("condition"))
+    if data.get("target_rules") is not None:
+        target_rules = _rules_payload(data.pop("target_rules"))
+        target_fields = _tracked_fields(data.pop("target_fields", None), target_rules)
+        data["tracked_fields"] = target_fields
+        data["requested_fields"] = _requested_fields(target_fields, target_rules)
+        settings = dict(monitor.settings or {})
+        settings[ALERT_RULES_SETTING_KEY] = target_rules
+        data["settings"] = settings
     if data.get("target_fields") is not None:
         target_fields = data.pop("target_fields")
         data["tracked_fields"] = target_fields
         data["requested_fields"] = preserve_requested_fields(target_fields)
+        settings = dict(monitor.settings or {})
+        settings.pop(ALERT_RULES_SETTING_KEY, None)
+        data["settings"] = settings
     if data.get("status") == MONITOR_STATUS_ARCHIVED:
         raise ValueError("Use DELETE to archive an alert")
     if data.get("status") not in {
@@ -250,6 +269,7 @@ def alert_response(monitor: MonitorJob) -> AlertResponse:
         domain=normalize_domain(url),
         surface=monitor.surface,
         target_fields=list(monitor.tracked_fields or []),
+        target_rules=_rules_payload((monitor.settings or {}).get(ALERT_RULES_SETTING_KEY)),
         condition=monitor.condition,
         webhook_url=monitor.webhook_url,
         poll_interval_seconds=int(monitor.poll_interval_seconds or 0),
@@ -266,6 +286,28 @@ def alert_response(monitor: MonitorJob) -> AlertResponse:
 def _alert_name(url: str) -> str:
     domain = normalize_domain(url) or "alert"
     return f"Alert {domain}"[:100]
+
+
+def _rules_payload(rules) -> list[dict]:
+    if not rules:
+        return []
+    output: list[dict] = []
+    for rule in rules:
+        if hasattr(rule, "model_dump"):
+            output.append(rule.model_dump(exclude_none=True))
+        elif isinstance(rule, dict):
+            output.append({key: value for key, value in rule.items() if value is not None})
+    return output
+
+
+def _tracked_fields(target_fields, target_rules: list[dict]) -> list[str]:
+    if target_rules:
+        return preserve_requested_fields(alert_rule_requested_fields(target_rules))
+    return preserve_requested_fields(list(target_fields or []))
+
+
+def _requested_fields(target_fields: list[str], target_rules: list[dict]) -> list[str]:
+    return preserve_requested_fields([*target_fields, *alert_rule_requested_fields(target_rules)])
 
 
 async def _discard_failed_alert(session: AsyncSession, *, monitor_id: int) -> None:

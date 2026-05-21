@@ -753,6 +753,7 @@ export interface MonitorJob {
   retention_days: number;
   status: MonitorStatus;
   settings: Record<string, unknown>;
+  target_rules?: AlertTargetRule[];
   condition?: string | null;
   webhook_url?: string | null;
   poll_interval_seconds?: number | null;
@@ -831,6 +832,7 @@ export interface MonitorUpdatePayload {
 export interface AlertCreatePayload {
   url: string;
   target_fields: string[];
+  target_rules?: AlertTargetRule[];
   condition?: string | null;
   webhook_url?: string | null;
   poll_interval_seconds: number;
@@ -838,10 +840,19 @@ export interface AlertCreatePayload {
 
 export interface AlertUpdatePayload {
   target_fields?: string[];
+  target_rules?: AlertTargetRule[];
   condition?: string | null;
   webhook_url?: string | null;
   poll_interval_seconds?: number | null;
   status?: MonitorStatus;
+}
+
+export interface AlertTargetRule {
+  path: string;
+  label?: string | null;
+  operator?: string;
+  value?: unknown;
+  variant_match?: Record<string, unknown> | null;
 }
 
 export interface AlertJob {
@@ -850,6 +861,7 @@ export interface AlertJob {
   domain: string;
   surface: string;
   target_fields: string[];
+  target_rules?: AlertTargetRule[];
   condition?: string | null;
   webhook_url?: string | null;
   poll_interval_seconds: number;
