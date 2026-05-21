@@ -163,26 +163,30 @@ PRODUCT_INTELLIGENCE_LLM_TASK = "product_intelligence_enrichment"
 PRODUCT_INTELLIGENCE_BRAND_INFERENCE_LLM_TASK = "product_intelligence_brand_inference"
 
 SEARCH_PHRASE_BUY = "buy"
+BRAND_ALIAS_COLLECTION_BY_MICHAEL_STRAHAN = "collection by michael strahan"
+BRAND_ALIAS_LEVIS = "levi's"
+BRAND_ALIAS_RALPH_LAUREN = "ralph lauren"
+BRAND_ALIAS_TOMMY_BAHAMA = "tommy bahama"
 
 BRAND_ALIAS_MAP = {
-    "collection by michael strahan": "collection by michael strahan",
-    "collection by michael strahan tm": "collection by michael strahan",
+    BRAND_ALIAS_COLLECTION_BY_MICHAEL_STRAHAN: BRAND_ALIAS_COLLECTION_BY_MICHAEL_STRAHAN,
+    "collection by michael strahan tm": BRAND_ALIAS_COLLECTION_BY_MICHAEL_STRAHAN,
     "izod": "izod",
     "kenneth cole reaction": "kenneth cole",
-    "levi s": "levi's",
-    "levis": "levi's",
-    "levi's": "levi's",
+    "levi s": BRAND_ALIAS_LEVIS,
+    "levis": BRAND_ALIAS_LEVIS,
+    BRAND_ALIAS_LEVIS: BRAND_ALIAS_LEVIS,
     "lee": "lee",
-    "michael strahan": "collection by michael strahan",
-    "polo ralph lauren": "ralph lauren",
-    "ralph lauren childrenswear": "ralph lauren",
+    "michael strahan": BRAND_ALIAS_COLLECTION_BY_MICHAEL_STRAHAN,
+    "polo ralph lauren": BRAND_ALIAS_RALPH_LAUREN,
+    "ralph lauren childrenswear": BRAND_ALIAS_RALPH_LAUREN,
     "rare too": "rare editions",
     "skechers slip ins go walk": "skechers",
     "skechers men s slip ins": "skechers",
     "skechers men s max cushioning": "skechers",
     "skechers go run consistent": "skechers",
-    "tommy bahama": "tommy bahama",
-    "tommy bahama r": "tommy bahama",
+    BRAND_ALIAS_TOMMY_BAHAMA: BRAND_ALIAS_TOMMY_BAHAMA,
+    "tommy bahama r": BRAND_ALIAS_TOMMY_BAHAMA,
 }
 
 BRAND_DOMAIN_MAP = {
@@ -195,16 +199,16 @@ BRAND_DOMAIN_MAP = {
     "izod": "izod.com",
     "kenneth cole": "kennethcole.com",
     "lee": "lee.com",
-    "levi's": "levi.com",
+    BRAND_ALIAS_LEVIS: "levi.com",
     "michael kors": "michaelkors.com",
     "nautica": "nautica.com",
     "nike": "nike.com",
     "puma": "puma.com",
     "rare editions": "therareeditions.com",
-    "ralph lauren": "ralphlauren.com",
+    BRAND_ALIAS_RALPH_LAUREN: "ralphlauren.com",
     "reebok": "reebok.com",
     "skechers": "skechers.com",
-    "tommy bahama": "tommybahama.com",
+    BRAND_ALIAS_TOMMY_BAHAMA: "tommybahama.com",
     "tommy hilfiger": "tommy.com",
     "under armour": "underarmour.com",
 }

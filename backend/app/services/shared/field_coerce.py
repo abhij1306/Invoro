@@ -117,7 +117,7 @@ ALL_CANONICAL_FIELDS = sorted(
     {
         field_name
         for fields in CANONICAL_SCHEMAS.values()
-        for field_name in list(fields or [])
+        for field_name in fields or []
         if field_name
     }
 )
@@ -150,7 +150,7 @@ LISTING_UTILITY_TITLE_REGEXES = tuple(
 _AVAILABILITY_CANONICAL_ENUM = frozenset(
     str(v) for v in dict(AVAILABILITY_URL_MAP or {}).values() if v
 )
-_HTML_ENTITY_RE = re.compile(r"&(?:#[0-9]+|#x[0-9a-fA-F]+|[A-Za-z][A-Za-z0-9]+);")
+_HTML_ENTITY_RE = re.compile(r"&(?:#\d+|#x[0-9a-fA-F]+|[A-Za-z][A-Za-z0-9]+);")
 _product_type_noise_tokens = frozenset(
     str(token).casefold()
     for token in tuple(PUBLIC_RECORD_PRODUCT_TYPE_NOISE_TOKENS or ())
@@ -250,7 +250,7 @@ def surface_fields(
     allowed_fields = set(ALL_CANONICAL_FIELDS)
     if URL_FIELD not in fields:
         fields.append(URL_FIELD)
-    for field_name in list(requested_fields or []):
+    for field_name in requested_fields or []:
         exact_field = exact_requested_field_key(field_name)
         if (
             exact_field
@@ -258,7 +258,7 @@ def surface_fields(
             and exact_field not in fields
         ):
             fields.append(exact_field)
-    for field_name in expand_requested_fields(list(requested_fields or [])):
+    for field_name in expand_requested_fields(requested_fields or []):
         if (
             field_name
             and (allow_noncanonical_requested or field_name in allowed_fields)
@@ -276,7 +276,7 @@ def surface_alias_lookup(
     fields = surface_fields(surface, requested_fields)
     aliases = get_surface_field_aliases(surface)
     lookup: dict[str, str] = {}
-    for requested in list(requested_fields or []):
+    for requested in requested_fields or []:
         normalized_requested = normalize_field_key(requested)
         exact_field = exact_requested_field_key(requested)
         if normalized_requested:
@@ -325,7 +325,7 @@ def direct_record_to_surface_fields(
 def _split_multivalue_text_rows(value: str) -> list[str]:
     rows = [
         clean_text(part)
-        for part in re.split(r"(?:\r?\n|[•\u2022]+)", str(value or ""))
+        for part in re.split(r"(?:\r?\n|[•]+)", str(value or ""))
         if clean_text(part)
     ]
     return rows
@@ -441,7 +441,7 @@ def _sanitize_option_scalar(field_name: str, value: object) -> str | None:
             cleaned = clean_text(match.group(1))
         cleaned = re.split(r"\bstyle\s*:", cleaned, maxsplit=1, flags=re.I)[0]
         if ":" in cleaned:
-            prefix, suffix = cleaned.rsplit(":", 1)
+            _prefix, suffix = cleaned.rsplit(":", 1)
             if len(clean_text(suffix).split()) <= 4 and _COLOR_KEYWORD_RE.search(
                 suffix
             ):

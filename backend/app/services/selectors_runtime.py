@@ -45,11 +45,12 @@ from app.services.dom.xpath_service import (
 from app.services.url_safety import ensure_public_crawl_targets
 
 coerce_int = _coerce_int
+_HTML_PARSER = "html.parser"
 
 
 def infer_surface(*, url: str, expected_fields: Iterable[str] | None = None) -> str:
     normalized_fields = {
-        normalize_field_key(value) for value in list(expected_fields or []) if value
+        normalize_field_key(value) for value in expected_fields or [] if value
     }
     lowered_url = str(url or "").lower()
     if normalized_fields & JOB_FIELD_HINTS:
@@ -94,7 +95,7 @@ async def fetch_selector_document(url: str) -> dict[str, object]:
 
 
 def build_preview_html(*, source_url: str, html: str) -> str:
-    soup = BeautifulSoup(str(html or ""), "html.parser")
+    soup = BeautifulSoup(str(html or ""), _HTML_PARSER)
     head = soup.head or soup.new_tag("head")
     if soup.head is None:
         if soup.html is None:
@@ -156,11 +157,13 @@ def _selector_record_from_memory(
     domain: str | None = None,
     surface: str | None = None,
 ) -> dict[str, object]:
+    resolved_domain = domain if domain is not None else (memory.domain if memory else "")
+    resolved_surface = surface if surface is not None else (memory.surface if memory else "")
     return {
         **dict(row),
         "id": _coerce_int(row.get("id"), default=0),
-        "domain": domain if domain is not None else (memory.domain if memory else ""),
-        "surface": surface if surface is not None else (memory.surface if memory else ""),
+        "domain": resolved_domain,
+        "surface": resolved_surface,
         "source_run_id": row.get("source_run_id"),
         "created_at": memory.created_at if memory is not None else None,
         "updated_at": memory.updated_at if memory is not None else None,
@@ -192,7 +195,7 @@ async def list_selector_domain_summaries(
         query = query.limit(int(limit))
     result = await session.execute(query)
     summaries: list[dict[str, object]] = []
-    for memory in list(result.scalars().all()):
+    for memory in result.scalars().all():
         summaries.append(
             {
                 "domain": memory.domain,
@@ -412,7 +415,7 @@ async def suggest_selectors(
         if field_name and field_name in {normalize_field_key(item) for item in expected_columns}:
             suggestions[field_name].append(selector_suggestion_from_record(row))
 
-    soup = BeautifulSoup(html, "html.parser")
+    soup = BeautifulSoup(html, _HTML_PARSER)
     for field_name in expected_columns:
         normalized_field = normalize_field_key(field_name)
         for row in deterministic_suggestions(
@@ -528,7 +531,7 @@ async def _all_domain_memories(session: AsyncSession) -> list[Any]:
     from app.models.domain_memory import DomainMemory
 
     result = await session.execute(select(DomainMemory).order_by(DomainMemory.id.asc()))
-    return list(result.scalars().all())
+    return result.scalars().all()
 
 
 async def _next_selector_id(session: AsyncSession) -> int:
@@ -585,7 +588,7 @@ def _selector_rule_count(value: object) -> int:
 
 
 def _primary_iframe_candidate(page_url: str, html: str) -> str:
-    soup = BeautifulSoup(str(html or ""), "html.parser")
+    soup = BeautifulSoup(str(html or ""), _HTML_PARSER)
     page_text = html_to_text(html)
     if len(page_text) > int(SELECTOR_RUNTIME_PRIMARY_IFRAME_MAX_PAGE_TEXT):
         return ""

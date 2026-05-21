@@ -81,13 +81,22 @@ def _page_fetch_result(
     )
 
 
+def _as_async(fn):
+    async def _wrapped(*args, **kwargs):
+        await asyncio.sleep(0)
+        return fn(*args, **kwargs)
+
+    return _wrapped
+
+
 @pytest.mark.asyncio
 async def test_real_chrome_success_updates_host_memory(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     usable_fetches: list[dict[str, object]] = []
 
-    async def _fake_note_host_usable_fetch(value: str | None, **kwargs):
+    @_as_async
+    def _fake_note_host_usable_fetch(value: str | None, **kwargs):
         usable_fetches.append({"value": value, **kwargs})
 
     monkeypatch.setattr(
@@ -122,7 +131,8 @@ async def test_patchright_success_updates_host_memory(
 ) -> None:
     usable_fetches: list[dict[str, object]] = []
 
-    async def _fake_note_host_usable_fetch(value: str | None, **kwargs):
+    @_as_async
+    def _fake_note_host_usable_fetch(value: str | None, **kwargs):
         usable_fetches.append({"value": value, **kwargs})
 
     monkeypatch.setattr(
@@ -158,10 +168,12 @@ async def test_location_required_diagnostics_do_not_write_hard_block_memory(
     hard_blocks: list[dict[str, object]] = []
     usable_fetches: list[dict[str, object]] = []
 
-    async def _fake_note_host_hard_block(value: str | None, **kwargs):
+    @_as_async
+    def _fake_note_host_hard_block(value: str | None, **kwargs):
         hard_blocks.append({"value": value, **kwargs})
 
-    async def _fake_note_host_usable_fetch(value: str | None, **kwargs):
+    @_as_async
+    def _fake_note_host_usable_fetch(value: str | None, **kwargs):
         usable_fetches.append({"value": value, **kwargs})
 
     monkeypatch.setattr(
@@ -197,7 +209,8 @@ async def _reset_fetch_runtime_state_between_tests(
 ):
     await crawl_fetch_runtime.reset_fetch_runtime_state()
 
-    async def _default_load_policy(url: str, *, session=None, ttl_seconds=None):
+    @_as_async
+    def _default_load_policy(url: str, *, session=None, ttl_seconds=None):
         del url, session, ttl_seconds
         return HostProtectionPolicy(host="")
 
@@ -463,7 +476,8 @@ async def test_fetch_page_waits_for_host_slot_before_http_attempt(
 ) -> None:
     wait_calls: list[str] = []
 
-    async def _fake_wait_for_host_slot(
+    @_as_async
+    def _fake_wait_for_host_slot(
         url: str,
         *,
         ttl_seconds: int | None = None,
@@ -471,7 +485,8 @@ async def test_fetch_page_waits_for_host_slot_before_http_attempt(
         del ttl_seconds
         wait_calls.append(url)
 
-    async def _fake_curl(url: str, timeout_seconds: float, *, proxy: str | None = None):
+    @_as_async
+    def _fake_curl(url: str, timeout_seconds: float, *, proxy: str | None = None):
         del timeout_seconds, proxy
         return PageFetchResult(
             url=url,
@@ -651,11 +666,13 @@ async def test_real_chrome_cookie_contract_tries_curl_cffi_handoff_first(
     url = "https://example.com/products/widget"
     calls: list[dict[str, object]] = []
 
-    async def _export_cookie_header_for_domain(request_url, **kwargs):
+    @_as_async
+    def _export_cookie_header_for_domain(request_url, **kwargs):
         calls.append({"url": request_url, "engine": kwargs.get("browser_engine")})
         return "session=ok"
 
-    async def _curl_fetch(
+    @_as_async
+    def _curl_fetch(
         request_url, timeout_seconds, *, proxy=None, cookie_header=None
     ):
         return PageFetchResult(
@@ -667,7 +684,8 @@ async def test_real_chrome_cookie_contract_tries_curl_cffi_handoff_first(
             blocked=False,
         )
 
-    async def _browser_unexpected(*_args, **_kwargs):
+    @_as_async
+    def _browser_unexpected(*_args, **_kwargs):
         raise AssertionError("browser should not run when handoff succeeds")
 
     monkeypatch.setattr(
@@ -709,10 +727,12 @@ async def test_curl_handoff_failure_falls_back_to_real_chrome(
     url = "https://example.com/products/widget"
     engines: list[str] = []
 
-    async def _export_cookie_header_for_domain(*_args, **_kwargs):
+    @_as_async
+    def _export_cookie_header_for_domain(*_args, **_kwargs):
         return "session=bad"
 
-    async def _curl_fetch(
+    @_as_async
+    def _curl_fetch(
         request_url, timeout_seconds, *, proxy=None, cookie_header=None
     ):
         return PageFetchResult(
@@ -724,7 +744,8 @@ async def test_curl_handoff_failure_falls_back_to_real_chrome(
             blocked=True,
         )
 
-    async def _browser_fetch(request_url, timeout_seconds, **kwargs):
+    @_as_async
+    def _browser_fetch(request_url, timeout_seconds, **kwargs):
         engines.append(str(kwargs.get("browser_engine")))
         return PageFetchResult(
             url=request_url,
@@ -766,7 +787,8 @@ async def test_fetch_page_preserves_requested_fields_on_http_to_browser_escalati
 ) -> None:
     captured_requested_fields: list[str] | None = None
 
-    async def _fake_curl(url: str, timeout_seconds: float, *, proxy: str | None = None):
+    @_as_async
+    def _fake_curl(url: str, timeout_seconds: float, *, proxy: str | None = None):
         del timeout_seconds, proxy
         return PageFetchResult(
             url=url,
@@ -777,11 +799,13 @@ async def test_fetch_page_preserves_requested_fields_on_http_to_browser_escalati
             blocked=False,
         )
 
-    async def _fake_should_escalate(*args, **kwargs):
+    @_as_async
+    def _fake_should_escalate(*args, **kwargs):
         del args, kwargs
         return True
 
-    async def _fake_run_browser_attempts(
+    @_as_async
+    def _fake_run_browser_attempts(
         context,
         *,
         reason: str,
@@ -836,7 +860,8 @@ async def test_fetch_page_preserves_requested_fields_on_browser_first_path(
 ) -> None:
     captured_requested_fields: list[str] | None = None
 
-    async def _fake_run_browser_attempts(
+    @_as_async
+    def _fake_run_browser_attempts(
         context,
         *,
         reason: str,
@@ -884,14 +909,16 @@ async def test_fetch_page_preserves_requested_fields_on_browser_first_path(
 async def test_fetch_page_browser_only_skips_http_fetchers(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    async def _unexpected_curl(
+    @_as_async
+    def _unexpected_curl(
         url: str, timeout_seconds: float, *, proxy: str | None = None
     ):
         raise AssertionError(
             f"curl should not run for browser_only: {url} {timeout_seconds} {proxy}"
         )
 
-    async def _fake_browser(url, timeout, **kwargs):
+    @_as_async
+    def _fake_browser(url, timeout, **kwargs):
         del timeout, kwargs
         return PageFetchResult(
             url=url,
@@ -917,7 +944,8 @@ async def test_fetch_page_browser_only_skips_http_fetchers(
 async def test_fetch_page_http_only_disables_browser_escalation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    async def _fake_curl(url: str, timeout_seconds: float, *, proxy: str | None = None):
+    @_as_async
+    def _fake_curl(url: str, timeout_seconds: float, *, proxy: str | None = None):
         del timeout_seconds, proxy
         return PageFetchResult(
             url=url,
@@ -928,11 +956,13 @@ async def test_fetch_page_http_only_disables_browser_escalation(
             blocked=False,
         )
 
-    async def _fake_should_escalate(*args, **kwargs):
+    @_as_async
+    def _fake_should_escalate(*args, **kwargs):
         del args, kwargs
         return True
 
-    async def _unexpected_browser(url, timeout, **kwargs):
+    @_as_async
+    def _unexpected_browser(url, timeout, **kwargs):
         raise AssertionError(
             f"browser should not run for http_only: {url} {timeout} {kwargs}"
         )
@@ -957,7 +987,8 @@ async def test_fetch_page_http_only_disables_browser_escalation(
 async def test_fetch_page_http_then_browser_escalates_after_http_result(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    async def _fake_curl(url: str, timeout_seconds: float, *, proxy: str | None = None):
+    @_as_async
+    def _fake_curl(url: str, timeout_seconds: float, *, proxy: str | None = None):
         del timeout_seconds, proxy
         return PageFetchResult(
             url=url,
@@ -968,11 +999,13 @@ async def test_fetch_page_http_then_browser_escalates_after_http_result(
             blocked=False,
         )
 
-    async def _fake_should_escalate(*args, **kwargs):
+    @_as_async
+    def _fake_should_escalate(*args, **kwargs):
         del args, kwargs
         return True
 
-    async def _fake_browser(url, timeout, **kwargs):
+    @_as_async
+    def _fake_browser(url, timeout, **kwargs):
         del timeout, kwargs
         return PageFetchResult(
             url=url,
@@ -1001,18 +1034,21 @@ async def test_fetch_page_http_then_browser_escalates_after_http_result(
 async def test_fetch_page_prefers_browser_from_learned_host_memory(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    async def _unexpected_curl(
+    @_as_async
+    def _unexpected_curl(
         url: str, timeout_seconds: float, *, proxy: str | None = None
     ):
         raise AssertionError(
             f"http should be skipped for learned browser-first host: {url} {timeout_seconds} {proxy}"
         )
 
-    async def _fake_load_policy(url: str, *, session=None, ttl_seconds=None):
+    @_as_async
+    def _fake_load_policy(url: str, *, session=None, ttl_seconds=None):
         del session, ttl_seconds
         return HostProtectionPolicy(host="example.com", prefer_browser=True)
 
-    async def _fake_browser(url, timeout, **kwargs):
+    @_as_async
+    def _fake_browser(url, timeout, **kwargs):
         del timeout, kwargs
         return PageFetchResult(
             url=url,
@@ -1044,7 +1080,8 @@ async def test_fetch_page_preserves_proxy_list_on_browser_first_path(
 ) -> None:
     captured_proxies: list[str | None] | None = None
 
-    async def _fake_run_browser_attempts(
+    @_as_async
+    def _fake_run_browser_attempts(
         context,
         *,
         reason: str,
@@ -1151,7 +1188,8 @@ async def test_fetch_page_browser_only_retries_proxies_in_user_order_and_stamps_
 ) -> None:
     attempted_proxies: list[str | None] = []
 
-    async def _fake_browser_fetch(url: str, timeout: float, **kwargs):
+    @_as_async
+    def _fake_browser_fetch(url: str, timeout: float, **kwargs):
         del url, timeout
         proxy = kwargs.get("proxy")
         attempted_proxies.append(proxy)
@@ -1214,7 +1252,8 @@ async def test_run_browser_attempts_records_driver_closed_exception(
     class BrowserDriverError(Exception):
         pass
 
-    async def _failing_browser_fetch(url: str, timeout: float, **kwargs):
+    @_as_async
+    def _failing_browser_fetch(url: str, timeout: float, **kwargs):
         del url, timeout, kwargs
         raise BrowserDriverError(
             "Page.content: Connection closed while reading from the driver"
@@ -1249,7 +1288,8 @@ async def test_fetch_page_browser_only_escalates_to_real_chrome_after_patchright
 ) -> None:
     attempted_engines: list[str] = []
 
-    async def _fake_browser_fetch(url: str, timeout: float, **kwargs):
+    @_as_async
+    def _fake_browser_fetch(url: str, timeout: float, **kwargs):
         del url, timeout
         attempted_engines.append(str(kwargs.get("browser_engine")))
         return PageFetchResult(
@@ -1310,7 +1350,8 @@ async def test_fetch_page_browser_only_escalates_to_real_chrome_for_forum_detail
 ) -> None:
     attempted_engines: list[str] = []
 
-    async def _fake_browser_fetch(url: str, timeout: float, **kwargs):
+    @_as_async
+    def _fake_browser_fetch(url: str, timeout: float, **kwargs):
         del url, timeout
         attempted_engines.append(str(kwargs.get("browser_engine")))
         return PageFetchResult(
@@ -1389,7 +1430,8 @@ async def test_run_browser_attempts_replans_to_real_chrome_after_same_proxy_patc
         runtime_policy={},
     )
 
-    async def _fake_browser_fetch(url: str, timeout: float, **kwargs):
+    @_as_async
+    def _fake_browser_fetch(url: str, timeout: float, **kwargs):
         del url, timeout
         browser_engine = str(kwargs.get("browser_engine"))
         attempted_engines.append(browser_engine)
@@ -1503,7 +1545,8 @@ async def test_run_browser_attempts_lets_browser_runtime_own_stage_timeouts(
 async def test_fetch_page_browser_only_stamps_engine_and_lane_diagnostics(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    async def _fake_browser_fetch(url: str, timeout: float, **kwargs):
+    @_as_async
+    def _fake_browser_fetch(url: str, timeout: float, **kwargs):
         del url, timeout
         return PageFetchResult(
             url="https://example.com/products/widget",
@@ -1558,7 +1601,8 @@ async def test_fetch_page_forwards_proxy_profile_to_browser_fetch(
 ) -> None:
     captured_proxy_profile: dict[str, object] | None = None
 
-    async def _fake_browser_fetch(url: str, timeout: float, **kwargs):
+    @_as_async
+    def _fake_browser_fetch(url: str, timeout: float, **kwargs):
         del url, timeout
         nonlocal captured_proxy_profile
         captured_proxy_profile = dict(kwargs.get("proxy_profile") or {})
@@ -1611,7 +1655,8 @@ async def test_run_browser_attempts_treats_none_cooldown_as_zero(
         runtime_policy={},
     )
 
-    async def _fake_browser_fetch(url: str, timeout: float, **kwargs):
+    @_as_async
+    def _fake_browser_fetch(url: str, timeout: float, **kwargs):
         del url, timeout
         browser_engine = str(kwargs.get("browser_engine"))
         attempted_engines.append(browser_engine)
@@ -1741,7 +1786,8 @@ async def test_read_network_payload_body_maps_read_timeouts_to_timeout(
 ) -> None:
     response = FakeBodyResponse(b"x")
 
-    async def _fake_wait_for(awaitable, timeout: float):
+    @_as_async
+    def _fake_wait_for(awaitable, timeout: float):
         awaitable.close()
         del timeout
         raise asyncio.TimeoutError
@@ -1761,7 +1807,8 @@ async def test_should_escalate_to_browser_async_uses_thread_offload(
 ) -> None:
     calls: list[object] = []
 
-    async def _fake_to_thread(func, *args, **kwargs):
+    @_as_async
+    def _fake_to_thread(func, *args, **kwargs):
         calls.append(func.__name__)
         return func(*args, **kwargs)
 
@@ -1787,7 +1834,8 @@ async def test_should_escalate_to_browser_async_uses_thread_offload(
 @pytest.mark.asyncio
 async def test_http_fetch_populates_platform_family_from_response_url() -> None:
     class _FakeClient:
-        async def get(self, url: str, timeout: float) -> SimpleNamespace:
+        @_as_async
+        def get(self, url: str, timeout: float) -> SimpleNamespace:
             del url, timeout
             return SimpleNamespace(
                 text="<html><body>Jobs</body></html>",
@@ -1796,11 +1844,13 @@ async def test_http_fetch_populates_platform_family_from_response_url() -> None:
                 url="https://boards.greenhouse.io/acme",
             )
 
-    async def _fake_get_client(*, proxy: str | None = None):
+    @_as_async
+    def _fake_get_client(*, proxy: str | None = None):
         del proxy
         return _FakeClient()
 
-    async def _not_blocked(*_args, **_kwargs) -> bool:
+    @_as_async
+    def _not_blocked(*_args, **_kwargs) -> bool:
         return False
 
     result = await http_fetch(
@@ -1816,7 +1866,8 @@ async def test_http_fetch_populates_platform_family_from_response_url() -> None:
 @pytest.mark.asyncio
 async def test_http_fetch_accepts_legacy_client_builder_keyword() -> None:
     class _FakeClient:
-        async def get(self, url: str, timeout: float) -> SimpleNamespace:
+        @_as_async
+        def get(self, url: str, timeout: float) -> SimpleNamespace:
             del url, timeout
             return SimpleNamespace(
                 text="<html><body>ok</body></html>",
@@ -1825,11 +1876,13 @@ async def test_http_fetch_accepts_legacy_client_builder_keyword() -> None:
                 url="https://example.com/products/widget",
             )
 
-    async def _legacy_client_builder(*, proxy: str | None = None):
+    @_as_async
+    def _legacy_client_builder(*, proxy: str | None = None):
         assert proxy is None
         return _FakeClient()
 
-    async def _not_blocked(*_args, **_kwargs) -> bool:
+    @_as_async
+    def _not_blocked(*_args, **_kwargs) -> bool:
         return False
 
     result = await http_fetch(
@@ -2026,7 +2079,8 @@ async def test_js_disabled_placeholder_shell_escalates_to_browser() -> None:
 async def test_fetch_page_uses_browser_for_js_disabled_placeholder_shell(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    async def _fake_curl(url: str, timeout: float, *, proxy: str | None = None):
+    @_as_async
+    def _fake_curl(url: str, timeout: float, *, proxy: str | None = None):
         del timeout, proxy
         return PageFetchResult(
             url=url,
@@ -2041,14 +2095,16 @@ async def test_fetch_page_uses_browser_for_js_disabled_placeholder_shell(
             blocked=False,
         )
 
-    async def _unexpected_http(url: str, timeout: float, *, proxy: str | None = None):
+    @_as_async
+    def _unexpected_http(url: str, timeout: float, *, proxy: str | None = None):
         raise AssertionError(
             f"http fallback should not run when curl already returned a JS-disabled shell: {url} {timeout} {proxy}"
         )
 
     browser_calls: list[str] = []
 
-    async def _fake_browser(url, timeout, **kwargs):
+    @_as_async
+    def _fake_browser(url, timeout, **kwargs):
         del timeout, kwargs
         browser_calls.append(url)
         return PageFetchResult(
@@ -2079,13 +2135,15 @@ async def test_fetch_page_falls_back_to_httpx_after_curl_transport_errors(
 ) -> None:
     import httpx
 
-    async def _failing_curl(url: str, timeout: float, *, proxy: str | None = None):
+    @_as_async
+    def _failing_curl(url: str, timeout: float, *, proxy: str | None = None):
         del proxy
         raise httpx.TooManyRedirects("redirect loop")
 
     http_calls: list[str] = []
 
-    async def _http_success(url: str, timeout: float, *, proxy: str | None = None):
+    @_as_async
+    def _http_success(url: str, timeout: float, *, proxy: str | None = None):
         del timeout, proxy
         http_calls.append(url)
         return PageFetchResult(
@@ -2100,7 +2158,8 @@ async def test_fetch_page_falls_back_to_httpx_after_curl_transport_errors(
     monkeypatch.setattr(crawl_fetch_runtime, "_curl_fetch", _failing_curl)
     monkeypatch.setattr(crawl_fetch_runtime, "_http_fetch", _http_success)
 
-    async def _no_browser_escalation(*args, **kwargs):
+    @_as_async
+    def _no_browser_escalation(*args, **kwargs):
         del args, kwargs
         return False
 
@@ -2131,12 +2190,14 @@ async def test_fetch_page_attempts_curl_once_before_httpx_fallback(
     curl_calls: list[int] = []
     http_calls: list[str] = []
 
-    async def _failing_curl(url: str, timeout: float, *, proxy: str | None = None):
+    @_as_async
+    def _failing_curl(url: str, timeout: float, *, proxy: str | None = None):
         del url, timeout, proxy
         curl_calls.append(1)
         raise httpx.ConnectTimeout("timed out")
 
-    async def _http_success(url: str, timeout: float, *, proxy: str | None = None):
+    @_as_async
+    def _http_success(url: str, timeout: float, *, proxy: str | None = None):
         del timeout, proxy
         http_calls.append(url)
         return PageFetchResult(
@@ -2151,7 +2212,8 @@ async def test_fetch_page_attempts_curl_once_before_httpx_fallback(
     monkeypatch.setattr(crawl_fetch_runtime, "_curl_fetch", _failing_curl)
     monkeypatch.setattr(crawl_fetch_runtime, "_http_fetch", _http_success)
 
-    async def _no_browser_escalation(*args, **kwargs):
+    @_as_async
+    def _no_browser_escalation(*args, **kwargs):
         del args, kwargs
         return False
 
@@ -2176,17 +2238,20 @@ async def test_fetch_page_falls_back_to_browser_after_curl_and_httpx_transport_e
 ) -> None:
     import httpx
 
-    async def _failing_curl(url: str, timeout: float, *, proxy: str | None = None):
+    @_as_async
+    def _failing_curl(url: str, timeout: float, *, proxy: str | None = None):
         del url, timeout, proxy
         raise httpx.TooManyRedirects("redirect loop")
 
-    async def _failing_http(url: str, timeout: float, *, proxy: str | None = None):
+    @_as_async
+    def _failing_http(url: str, timeout: float, *, proxy: str | None = None):
         del url, timeout, proxy
         raise httpx.ConnectError("httpx failed")
 
     browser_calls: list[str] = []
 
-    async def _fake_browser(url, timeout, **kwargs):
+    @_as_async
+    def _fake_browser(url, timeout, **kwargs):
         del timeout, kwargs
         browser_calls.append(url)
         return PageFetchResult(
@@ -2215,7 +2280,8 @@ async def test_fetch_page_falls_back_to_browser_after_curl_and_httpx_transport_e
 async def test_fetch_page_returns_non_retryable_404_without_browser_fallback(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    async def _fake_curl(url: str, timeout: float, *, proxy: str | None = None):
+    @_as_async
+    def _fake_curl(url: str, timeout: float, *, proxy: str | None = None):
         del timeout, proxy
         return PageFetchResult(
             url=url,
@@ -2226,7 +2292,8 @@ async def test_fetch_page_returns_non_retryable_404_without_browser_fallback(
             blocked=False,
         )
 
-    async def _unexpected_browser(url, timeout, **kwargs):
+    @_as_async
+    def _unexpected_browser(url, timeout, **kwargs):
         raise AssertionError(
             f"browser fallback should not run for non-retryable status {url} {timeout} {kwargs}"
         )
@@ -2247,7 +2314,8 @@ async def test_fetch_page_returns_non_retryable_404_without_browser_fallback(
 async def test_fetch_page_escalates_404_shell_to_browser_before_return(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    async def _fake_curl(url: str, timeout: float, *, proxy: str | None = None):
+    @_as_async
+    def _fake_curl(url: str, timeout: float, *, proxy: str | None = None):
         del timeout, proxy
         return PageFetchResult(
             url=url,
@@ -2264,7 +2332,8 @@ async def test_fetch_page_escalates_404_shell_to_browser_before_return(
 
     browser_calls: list[str] = []
 
-    async def _fake_browser(url, timeout, **kwargs):
+    @_as_async
+    def _fake_browser(url, timeout, **kwargs):
         del timeout, kwargs
         browser_calls.append(url)
         return PageFetchResult(
@@ -2295,7 +2364,8 @@ async def test_fetch_page_stops_http_waterfall_after_vendor_confirmed_block(
     curl_proxies: list[str | None] = []
     browser_proxies: list[str | None] = []
 
-    async def _vendor_blocked_curl(
+    @_as_async
+    def _vendor_blocked_curl(
         url: str, timeout: float, *, proxy: str | None = None
     ):
         del timeout
@@ -2310,12 +2380,14 @@ async def test_fetch_page_stops_http_waterfall_after_vendor_confirmed_block(
             headers={"x-datadome": "blocked"},
         )
 
-    async def _unexpected_http(url: str, timeout: float, *, proxy: str | None = None):
+    @_as_async
+    def _unexpected_http(url: str, timeout: float, *, proxy: str | None = None):
         raise AssertionError(
             f"http fallback should not run after vendor-confirmed block: {url} {timeout} {proxy}"
         )
 
-    async def _failing_browser(url, timeout, **kwargs):
+    @_as_async
+    def _failing_browser(url, timeout, **kwargs):
         del timeout
         browser_proxies.append(kwargs.get("proxy"))
         raise RuntimeError(f"browser failed for {url}")
@@ -2365,7 +2437,8 @@ async def test_fetch_page_learns_browser_first_after_vendor_blocked_http_recover
     policy_loads: list[str] = []
     learned_policy = HostProtectionPolicy(host="wellfound.com")
 
-    async def _vendor_blocked_curl(
+    @_as_async
+    def _vendor_blocked_curl(
         request_url: str,
         timeout: float,
         *,
@@ -2383,7 +2456,8 @@ async def test_fetch_page_learns_browser_first_after_vendor_blocked_http_recover
             headers={"x-datadome": "blocked"},
         )
 
-    async def _browser_ok(request_url, timeout, **kwargs):
+    @_as_async
+    def _browser_ok(request_url, timeout, **kwargs):
         del timeout
         browser_reasons.append(kwargs.get("browser_reason"))
         return PageFetchResult(
@@ -2395,12 +2469,14 @@ async def test_fetch_page_learns_browser_first_after_vendor_blocked_http_recover
             blocked=False,
         )
 
-    async def _fake_load_policy(request_url: str, *, session=None, ttl_seconds=None):
+    @_as_async
+    def _fake_load_policy(request_url: str, *, session=None, ttl_seconds=None):
         del session, ttl_seconds
         policy_loads.append(request_url)
         return learned_policy
 
-    async def _fake_note_host_hard_block(value: str | None, **kwargs):
+    @_as_async
+    def _fake_note_host_hard_block(value: str | None, **kwargs):
         del value, kwargs
         nonlocal learned_policy
         learned_policy = HostProtectionPolicy(host="wellfound.com", prefer_browser=True)
@@ -2441,7 +2517,8 @@ async def test_fetch_page_learns_browser_first_after_rate_limit_http_recovery(
     browser_reasons: list[str | None] = []
     learned_policy = HostProtectionPolicy(host="example.com")
 
-    async def _rate_limited_curl(
+    @_as_async
+    def _rate_limited_curl(
         request_url: str,
         timeout: float,
         *,
@@ -2458,7 +2535,8 @@ async def test_fetch_page_learns_browser_first_after_rate_limit_http_recovery(
             blocked=True,
         )
 
-    async def _browser_ok(request_url, timeout, **kwargs):
+    @_as_async
+    def _browser_ok(request_url, timeout, **kwargs):
         del timeout
         browser_reasons.append(kwargs.get("browser_reason"))
         return PageFetchResult(
@@ -2471,11 +2549,13 @@ async def test_fetch_page_learns_browser_first_after_rate_limit_http_recovery(
             browser_diagnostics={"browser_engine": "real_chrome"},
         )
 
-    async def _fake_load_policy(url: str, *, session=None, ttl_seconds=None):
+    @_as_async
+    def _fake_load_policy(url: str, *, session=None, ttl_seconds=None):
         del url, session, ttl_seconds
         return learned_policy
 
-    async def _fake_note_host_hard_block(value: str | None, **kwargs):
+    @_as_async
+    def _fake_note_host_hard_block(value: str | None, **kwargs):
         del value, kwargs
         nonlocal learned_policy
         learned_policy = HostProtectionPolicy(host="example.com", prefer_browser=True)
@@ -2516,12 +2596,14 @@ async def test_fetch_page_uses_cookie_handoff_before_browser_first(
     url = "https://example.com/products/widget"
     curl_calls: list[dict[str, object]] = []
 
-    async def _fake_export_cookie_header_for_domain(request_url: str, **kwargs):
+    @_as_async
+    def _fake_export_cookie_header_for_domain(request_url: str, **kwargs):
         assert request_url == url
         assert kwargs["browser_engine"] == "real_chrome"
         return "session=ok"
 
-    async def _handoff_curl(
+    @_as_async
+    def _handoff_curl(
         request_url: str,
         timeout: float,
         *,
@@ -2549,7 +2631,8 @@ async def test_fetch_page_uses_cookie_handoff_before_browser_first(
             blocked=False,
         )
 
-    async def _unexpected_browser(*_args, **_kwargs):
+    @_as_async
+    def _unexpected_browser(*_args, **_kwargs):
         raise AssertionError("browser fallback should not run after handoff succeeds")
 
     monkeypatch.setattr(
@@ -2599,10 +2682,12 @@ async def test_fetch_page_emits_http_strategy_and_escalation_events(
     url = "https://example.com/products/widget"
     events: list[tuple[str, str]] = []
 
-    async def _on_event(level: str, message: str) -> None:
+    @_as_async
+    def _on_event(level: str, message: str) -> None:
         events.append((level, message))
 
-    async def _fake_curl(request_url: str, timeout: float, *, proxy: str | None = None):
+    @_as_async
+    def _fake_curl(request_url: str, timeout: float, *, proxy: str | None = None):
         del timeout, proxy
         return PageFetchResult(
             url=request_url,
@@ -2613,7 +2698,8 @@ async def test_fetch_page_emits_http_strategy_and_escalation_events(
             blocked=False,
         )
 
-    async def _fake_browser(request_url, timeout, **kwargs):
+    @_as_async
+    def _fake_browser(request_url, timeout, **kwargs):
         del timeout, kwargs
         return PageFetchResult(
             url=request_url,
@@ -2668,7 +2754,8 @@ async def test_fetch_page_http_only_returns_retryable_status_without_hidden_retr
     url = "https://example.com/products/widget"
     http_attempts: list[int] = []
 
-    async def _http_retryable_status(
+    @_as_async
+    def _http_retryable_status(
         request_url: str,
         timeout: float,
         *,
@@ -2685,11 +2772,13 @@ async def test_fetch_page_http_only_returns_retryable_status_without_hidden_retr
             blocked=False,
         )
 
-    async def _always_escalate(*args, **kwargs):
+    @_as_async
+    def _always_escalate(*args, **kwargs):
         del args, kwargs
         return True
 
-    async def _unexpected_browser(request_url, timeout, **kwargs):
+    @_as_async
+    def _unexpected_browser(request_url, timeout, **kwargs):
         raise AssertionError(
             f"browser should not run for http_only retry path: {request_url} {timeout} {kwargs}"
         )
@@ -2725,18 +2814,22 @@ async def test_fetch_page_retries_patchright_http2_protocol_error_with_real_chro
     events: list[tuple[str, str]] = []
     browser_engines: list[str] = []
 
-    async def _on_event(level: str, message: str) -> None:
+    @_as_async
+    def _on_event(level: str, message: str) -> None:
         events.append((level, message))
 
-    async def _failing_curl(request_url: str, timeout: float, *, proxy: str | None = None):
+    @_as_async
+    def _failing_curl(request_url: str, timeout: float, *, proxy: str | None = None):
         del request_url, timeout, proxy
         raise httpx.ReadTimeout("curl timed out")
 
-    async def _failing_http(request_url: str, timeout: float, *, proxy: str | None = None):
+    @_as_async
+    def _failing_http(request_url: str, timeout: float, *, proxy: str | None = None):
         del request_url, timeout, proxy
         raise httpx.ReadTimeout("httpx timed out")
 
-    async def _browser_fetch(request_url, timeout, **kwargs):
+    @_as_async
+    def _browser_fetch(request_url, timeout, **kwargs):
         del timeout
         engine = str(kwargs.get("browser_engine") or "")
         browser_engines.append(engine)
@@ -2783,10 +2876,12 @@ async def test_fetch_page_skips_cookie_handoff_when_proxy_identity_would_drift(
     url = "https://example.com/products/widget"
     browser_calls: list[str | None] = []
 
-    async def _unexpected_export(*_args, **_kwargs):
+    @_as_async
+    def _unexpected_export(*_args, **_kwargs):
         raise AssertionError("proxy handoff must not reuse unscoped domain cookies")
 
-    async def _browser_ok(request_url, timeout, **kwargs):
+    @_as_async
+    def _browser_ok(request_url, timeout, **kwargs):
         del request_url, timeout
         browser_calls.append(kwargs.get("proxy"))
         return PageFetchResult(
@@ -2844,7 +2939,8 @@ async def test_fetch_page_prefers_browser_after_hard_blocked_fetch(
     browser_reasons: list[str | None] = []
     learned_policy = HostProtectionPolicy(host="wellfound.com")
 
-    async def _vendor_blocked_curl(
+    @_as_async
+    def _vendor_blocked_curl(
         request_url: str,
         timeout: float,
         *,
@@ -2862,7 +2958,8 @@ async def test_fetch_page_prefers_browser_after_hard_blocked_fetch(
             headers={"x-datadome": "blocked"},
         )
 
-    async def _browser_blocked(request_url, timeout, **kwargs):
+    @_as_async
+    def _browser_blocked(request_url, timeout, **kwargs):
         del timeout
         browser_reasons.append(kwargs.get("browser_reason"))
         return PageFetchResult(
@@ -2874,11 +2971,13 @@ async def test_fetch_page_prefers_browser_after_hard_blocked_fetch(
             blocked=True,
         )
 
-    async def _fake_load_policy(url: str, *, session=None, ttl_seconds=None):
+    @_as_async
+    def _fake_load_policy(url: str, *, session=None, ttl_seconds=None):
         del url, session, ttl_seconds
         return learned_policy
 
-    async def _fake_note_host_hard_block(value: str | None, **kwargs):
+    @_as_async
+    def _fake_note_host_hard_block(value: str | None, **kwargs):
         del value, kwargs
         nonlocal learned_policy
         learned_policy = HostProtectionPolicy(host="wellfound.com", prefer_browser=True)
@@ -2920,11 +3019,13 @@ async def test_http_fetch_surfaces_dns_failure_without_hidden_ipv4_retry(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     class _SharedClient:
-        async def get(self, url: str, timeout: float):
+        @_as_async
+        def get(self, url: str, timeout: float):
             del url, timeout
             raise OSError(11001, "getaddrinfo failed")
 
-    async def _fake_get_shared_http_client(*, proxy: str | None = None):
+    @_as_async
+    def _fake_get_shared_http_client(*, proxy: str | None = None):
         del proxy
         return _SharedClient()
 
@@ -2946,15 +3047,18 @@ async def test_fetch_page_surfaces_browser_error_when_http_exhausts_and_browser_
     httpx_error = httpx.ReadTimeout("httpx fallback timed out")
     browser_error = RuntimeError("browser launch failed")
 
-    async def _failing_curl(url: str, timeout: float, *, proxy: str | None = None):
+    @_as_async
+    def _failing_curl(url: str, timeout: float, *, proxy: str | None = None):
         del proxy
         raise curl_error
 
-    async def _failing_http(url: str, timeout: float, *, proxy: str | None = None):
+    @_as_async
+    def _failing_http(url: str, timeout: float, *, proxy: str | None = None):
         del url, timeout, proxy
         raise httpx_error
 
-    async def _failing_browser(url, timeout, **kwargs):
+    @_as_async
+    def _failing_browser(url, timeout, **kwargs):
         raise browser_error
 
     monkeypatch.setattr(crawl_fetch_runtime, "_curl_fetch", _failing_curl)
@@ -2976,19 +3080,24 @@ async def test_reset_fetch_runtime_state_closes_adapter_and_runtime_http_clients
 ) -> None:
     calls: list[str] = []
 
-    async def _fake_shutdown_browser_runtime() -> None:
+    @_as_async
+    def _fake_shutdown_browser_runtime() -> None:
         calls.append("browser")
 
-    async def _fake_close_runtime_http_client() -> None:
+    @_as_async
+    def _fake_close_runtime_http_client() -> None:
         calls.append("runtime_http")
 
-    async def _fake_close_adapter_http_client() -> None:
+    @_as_async
+    def _fake_close_adapter_http_client() -> None:
         calls.append("adapter_http")
 
-    async def _fake_reset_pacing_state() -> None:
+    @_as_async
+    def _fake_reset_pacing_state() -> None:
         calls.append("pacing")
 
-    async def _fake_clear_cookie_store_cache() -> None:
+    @_as_async
+    def _fake_clear_cookie_store_cache() -> None:
         calls.append("cookie_store")
 
     monkeypatch.setattr(

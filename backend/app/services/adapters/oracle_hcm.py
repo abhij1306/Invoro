@@ -72,7 +72,7 @@ class OracleHCMAdapter(PublicEndpointAdapter):
                 )
                 if not isinstance(payload, (dict, list)):
                     break
-            except (OSError, RuntimeError, ValueError, TypeError, json.JSONDecodeError):
+            except (OSError, RuntimeError, ValueError, TypeError):
                 break
 
             items = payload.get("items") if isinstance(payload, dict) else payload
@@ -80,7 +80,6 @@ class OracleHCMAdapter(PublicEndpointAdapter):
                 break
 
             response_item_count = len(items)
-            batch_count = 0
             for item in items:
                 requisitions = (
                     item.get("requisitionList") if isinstance(item, dict) else None
@@ -105,7 +104,6 @@ class OracleHCMAdapter(PublicEndpointAdapter):
                     if job_id:
                         seen_job_ids.add(job_id)
                     records.append(normalized)
-                    batch_count += 1
                     if target_job_id and job_id == target_job_id:
                         return [normalized]
 
@@ -227,10 +225,10 @@ class OracleHCMAdapter(PublicEndpointAdapter):
         except (SyntaxError, ValueError):
             try:
                 parsed = json.loads(raw)
-            except json.JSONDecodeError:
+            except ValueError:
                 try:
                     parsed = json.loads(raw.replace("'", '"'))
-                except json.JSONDecodeError:
+                except ValueError:
                     return {}
         return parsed if isinstance(parsed, dict) else {}
 

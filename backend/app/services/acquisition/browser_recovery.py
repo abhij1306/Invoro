@@ -18,7 +18,7 @@ async def recover_browser_challenge(
     *,
     url: str,
     response: Any,
-    browser_engine: str | None = None,
+    _browser_engine: str | None = None,
     timeout_seconds: float,
     phase_timings_ms: dict[str, int],
     challenge_wait_max_seconds: float,
@@ -47,7 +47,7 @@ async def recover_browser_challenge(
 
     providers = {
         str(provider).strip().lower()
-        for provider in list(classification.provider_hits or [])
+        for provider in classification.provider_hits or []
         if str(provider).strip()
     }
     wait_started_at = time.perf_counter()
@@ -464,7 +464,7 @@ async def _page_has_cookie(page: Any, *, url: str, name: str) -> bool:
             cookies = await cookies_fn()
         except Exception:
             return False
-    for cookie in list(cookies or []):
+    for cookie in cookies or []:
         if str(cookie.get("name") or "").strip() == str(name).strip():
             return True
     return False

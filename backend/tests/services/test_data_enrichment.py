@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 from sqlalchemy import select
 from sqlalchemy.exc import PendingRollbackError
@@ -27,6 +29,14 @@ from app.services.data_enrichment.service import (
     list_data_enrichment_jobs,
 )
 from app.services.data_enrichment.deterministic import normalize_price
+
+
+def _as_async(fn):
+    async def _wrapped(*args, **kwargs):
+        await asyncio.sleep(0)
+        return fn(*args, **kwargs)
+
+    return _wrapped
 
 
 @pytest.mark.asyncio
@@ -366,12 +376,12 @@ async def test_data_enrichment_llm_disabled_makes_no_call(
     test_user,
     monkeypatch,
 ) -> None:
-    async def fail_run_prompt_task(*args, **kwargs):
+    def fail_run_prompt_task(*args, **kwargs):
         raise AssertionError("LLM must not run when llm_enabled is false")
 
     monkeypatch.setattr(
         "app.services.data_enrichment.service.run_prompt_task",
-        fail_run_prompt_task,
+        _as_async(fail_run_prompt_task),
     )
     run = await create_test_run(
         url="https://example.com/products/dress",
@@ -720,7 +730,7 @@ async def test_data_enrichment_rolls_back_after_sqlalchemy_product_failure(
         rollbacks += 1
         await original_rollback()
 
-    async def fake_enrich_product(session, *, job, product, record, llm_enabled):
+    def fake_enrich_product(session, *, job, product, record, llm_enabled):
         nonlocal calls
         del session, job, llm_enabled
         calls += 1
@@ -732,7 +742,7 @@ async def test_data_enrichment_rolls_back_after_sqlalchemy_product_failure(
     monkeypatch.setattr(db_session, "rollback", counted_rollback)
     monkeypatch.setattr(
         "app.services.data_enrichment.service._enrich_product",
-        fake_enrich_product,
+        _as_async(fake_enrich_product),
     )
 
     await run_job(db_session, job)
@@ -763,9 +773,10 @@ async def test_data_enrichment_llm_enabled_backfills_missing_fields_in_one_call(
 ) -> None:
     captured: dict[str, object] = {}
 
-    async def fake_run_prompt_task(
+    def fake_run_prompt_task(
         session, *, task_type, run_id, domain, variables, budget_scope, timeout_seconds
     ):
+        del session, run_id, domain
         captured["task_type"] = task_type
         captured["budget_scope"] = budget_scope
         captured["timeout_seconds"] = timeout_seconds
@@ -791,7 +802,7 @@ async def test_data_enrichment_llm_enabled_backfills_missing_fields_in_one_call(
 
     monkeypatch.setattr(
         "app.services.data_enrichment.service.run_prompt_task",
-        fake_run_prompt_task,
+        _as_async(fake_run_prompt_task),
     )
     run = await create_test_run(
         url="https://example.com/products/dress",
@@ -820,7 +831,7 @@ async def test_data_enrichment_llm_enabled_backfills_missing_fields_in_one_call(
 
     assert captured["task_type"] == "data_enrichment_semantic"
     assert captured["budget_scope"] == f"data_enrichment_semantic:{job.id}"
-    assert captured["timeout_seconds"] == 15.0
+    assert captured["timeout_seconds"] == pytest.approx(15.0)
     assert "product_json" in captured["variables"]
     prompt_product = captured["variables"]["product_json"]
     assert "intent_attributes" in prompt_product["missing_backfill_fields"]
@@ -845,9 +856,10 @@ async def test_data_enrichment_llm_does_not_overwrite_deterministic_fields(
     test_user,
     monkeypatch,
 ) -> None:
-    async def fake_run_prompt_task(
+    def fake_run_prompt_task(
         session, *, task_type, run_id, domain, variables, budget_scope, timeout_seconds
     ):
+        del session, task_type, run_id, domain, variables, budget_scope, timeout_seconds
         return LLMTaskResult(
             payload={
                 "category_path": "Apparel & Accessories > Clothing > Shirts",
@@ -866,7 +878,7 @@ async def test_data_enrichment_llm_does_not_overwrite_deterministic_fields(
 
     monkeypatch.setattr(
         "app.services.data_enrichment.service.run_prompt_task",
-        fake_run_prompt_task,
+        _as_async(fake_run_prompt_task),
     )
     run = await create_test_run(
         url="https://example.com/products/mystery",
@@ -919,11 +931,12 @@ async def test_data_enrichment_llm_audience_accepts_semantic_descriptors(
     test_user,
     monkeypatch,
 ) -> None:
-    async def fake_run_prompt_task(
+    def fake_run_prompt_task(
         session, *, task_type, run_id, domain, variables, budget_scope, timeout_seconds
     ):
+        del session, task_type, run_id, domain, variables, budget_scope, timeout_seconds
         return LLMTaskResult(
-        payload={
+            payload={
                 "gender_normalized": "unisex",
                 "audience": ["coastal home decorators", "guest room refreshers"],
             }
@@ -931,7 +944,7 @@ async def test_data_enrichment_llm_audience_accepts_semantic_descriptors(
 
     monkeypatch.setattr(
         "app.services.data_enrichment.service.run_prompt_task",
-        fake_run_prompt_task,
+        _as_async(fake_run_prompt_task),
     )
     run = await create_test_run(
         url="https://example.com/products/duvet-cover",
@@ -972,9 +985,10 @@ async def test_data_enrichment_llm_audience_preserves_semantic_target_tags(
     test_user,
     monkeypatch,
 ) -> None:
-    async def fake_run_prompt_task(
+    def fake_run_prompt_task(
         session, *, task_type, run_id, domain, variables, budget_scope, timeout_seconds
     ):
+        del session, task_type, run_id, domain, variables, budget_scope, timeout_seconds
         return LLMTaskResult(
             payload={
                 "category_path": "Media > Books",
@@ -984,7 +998,7 @@ async def test_data_enrichment_llm_audience_preserves_semantic_target_tags(
 
     monkeypatch.setattr(
         "app.services.data_enrichment.service.run_prompt_task",
-        fake_run_prompt_task,
+        _as_async(fake_run_prompt_task),
     )
     run = await create_test_run(
         url="https://example.com/products/book",
@@ -1026,9 +1040,10 @@ async def test_data_enrichment_llm_rejects_non_shopify_category_path(
     test_user,
     monkeypatch,
 ) -> None:
-    async def fake_run_prompt_task(
+    def fake_run_prompt_task(
         session, *, task_type, run_id, domain, variables, budget_scope, timeout_seconds
     ):
+        del session, task_type, run_id, domain, variables, budget_scope, timeout_seconds
         return LLMTaskResult(
             payload={
                 "category_path": "Hardware > Plinths",
@@ -1038,7 +1053,7 @@ async def test_data_enrichment_llm_rejects_non_shopify_category_path(
 
     monkeypatch.setattr(
         "app.services.data_enrichment.service.run_prompt_task",
-        fake_run_prompt_task,
+        _as_async(fake_run_prompt_task),
     )
     run = await create_test_run(
         url="https://example.com/products/mystery",
@@ -1077,14 +1092,15 @@ async def test_data_enrichment_llm_ignores_non_dict_payload(
     test_user,
     monkeypatch,
 ) -> None:
-    async def fake_run_prompt_task(
+    def fake_run_prompt_task(
         session, *, task_type, run_id, domain, variables, budget_scope, timeout_seconds
     ):
+        del session, task_type, run_id, domain, variables, budget_scope, timeout_seconds
         return LLMTaskResult(payload="bad-payload")
 
     monkeypatch.setattr(
         "app.services.data_enrichment.service.run_prompt_task",
-        fake_run_prompt_task,
+        _as_async(fake_run_prompt_task),
     )
     run = await create_test_run(
         url="https://example.com/products/dress",

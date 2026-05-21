@@ -21,7 +21,7 @@ class RemotiveAdapter(BaseAdapter):
         """Extract Remotive jobs from rendered HTML or a JSON body."""
         try:
             data = parse_json(str(html or "").strip())
-        except (json.JSONDecodeError, ValueError):
+        except ValueError:
             return []
 
         if isinstance(data, dict):

@@ -417,13 +417,12 @@ async def settle_browser_page_impl(
         )
     else:
         phase_timings_ms["networkidle_wait"] = 0
-        networkidle_skip_reason = (
-            "fast_path_ready"
-            if current_probe["is_ready"]
-            else "structured_data_present"
-            if current_probe.get("structured_data_present")
-            else "not_required"
-        )
+        if current_probe["is_ready"]:
+            networkidle_skip_reason = "fast_path_ready"
+        elif current_probe.get("structured_data_present"):
+            networkidle_skip_reason = "structured_data_present"
+        else:
+            networkidle_skip_reason = "not_required"
     if not current_probe["is_ready"] and readiness_override is not None:
         readiness_started_at = time.perf_counter()
         readiness_diagnostics = await wait_for_listing_readiness(
@@ -598,7 +597,7 @@ async def serialize_browser_page_content_impl(
     max_scrolls: int,
     max_records: int | None = None,
     prefetched_html: str | None = None,
-    prefetched_analysis: HtmlAnalysis | None = None,
+    _prefetched_analysis: HtmlAnalysis | None = None,
     phase_timings_ms: dict[str, int],
     execute_listing_traversal,
     recover_listing_page_content,

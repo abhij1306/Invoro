@@ -142,7 +142,7 @@ class ADPAdapter(BaseAdapter):
             record["posted_date"] = clean_text(posted_match.group(1))
 
         requisition_match = re.search(
-            r"Requisition\s+ID:\s*([A-Za-z0-9\-_]+)", body_text, flags=re.IGNORECASE
+            r"Requisition\s+ID:\s*([A-Za-z0-9_-]+)", body_text, flags=re.IGNORECASE
         )
         if requisition_match:
             record["requisition_id"] = requisition_match.group(1)

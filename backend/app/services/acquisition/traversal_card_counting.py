@@ -48,7 +48,7 @@ async def count_listing_cards(
     selector_group = "jobs" if str(surface or "").strip().lower().startswith("job_") else "ecommerce"
     selectors = CARD_SELECTORS.get(selector_group) if isinstance(CARD_SELECTORS, dict) else []
     normalized_selectors = [
-        str(selector).strip() for selector in list(selectors or []) if str(selector).strip()
+        str(selector).strip() for selector in selectors or [] if str(selector).strip()
     ]
     if not normalized_selectors:
         return await _heuristic_card_count(page, surface=surface) if allow_heuristic else 0

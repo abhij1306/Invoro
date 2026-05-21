@@ -30,7 +30,7 @@ def requested_content_extractability_impl(
 ) -> dict[str, object]:
     requested = {
         normalized
-        for value in list(requested_fields or [])
+        for value in requested_fields or []
         for normalized in (
             exact_requested_field_key(value),
             normalize_requested_field(value),
@@ -42,7 +42,7 @@ def requested_content_extractability_impl(
         [
             field_name
             for field_name in (
-                normalize_field_key(str(value or "")) for value in list(probe_fields or [])
+                normalize_field_key(str(value or "")) for value in probe_fields or []
             )
             if field_name
         ]
@@ -104,7 +104,7 @@ def dom_pattern_has_extractable_content(
     *,
     max_selector_matches: int,
 ) -> bool:
-    for node in list(nodes or [])[:max_selector_matches]:
+    for node in nodes[:max_selector_matches]:
         if clean_text(node.get_text(" ", strip=True)):
             return True
         attrs = getattr(node, "attrs", None)

@@ -90,6 +90,8 @@ describe('AppShell reset workspace', () => {
     expect(
       await screen.findByRole('dialog', { name: /reset workspace data/i }),
     ).toBeInTheDocument();
+    expect(document.body.style.overflow).toBe('hidden');
+    expect(document.body.style.touchAction).toBe('none');
   });
 
   it('closes on Escape and restores focus to the trigger', async () => {
@@ -123,6 +125,8 @@ describe('AppShell reset workspace', () => {
       ).not.toBeInTheDocument();
       expect(trigger).toHaveFocus();
     });
+    expect(document.body.style.overflow).toBe('');
+    expect(document.body.style.touchAction).toBe('');
   });
 
   it('hides workspace reset for non-admin users', async () => {

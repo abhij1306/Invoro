@@ -48,7 +48,7 @@ _ECOMMERCE_READY_PRICE_RE = re.compile(
     re.I,
 )
 _ECOMMERCE_READY_PRODUCT_ATTR_RE = re.compile(
-    r"product(?:card|[-_ ]?card|[-_ ]?item|[-_ ]?tile|[-_ ]?grid|pod|base)",
+    r"product(?:[-_ ]?(?:card|item|tile|grid)|pod|base)",
     re.I,
 )
 _ECOMMERCE_READY_DETAIL_PATH_RE = re.compile(

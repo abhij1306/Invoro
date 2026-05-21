@@ -181,14 +181,14 @@ def _next_data_product(html: str) -> dict[str, Any] | None:
 
 def _next_data_images(page_props: dict[str, Any], product: dict[str, Any]) -> list[str]:
     values: list[str] = []
-    for item in list(page_props.get("colorwayImages") or []):
+    for item in page_props.get("colorwayImages") or []:
         if not isinstance(item, dict):
             continue
         for field_name in ("portraitImg", "squarishImg"):
             image = text_or_none(item.get(field_name))
             if image:
                 values.append(image)
-    for item in list(product.get("contentImages") or []):
+    for item in product.get("contentImages") or []:
         if not isinstance(item, dict):
             continue
         properties = item.get("properties")
@@ -215,7 +215,7 @@ def _next_data_images(page_props: dict[str, Any], product: dict[str, Any]) -> li
 def _next_data_product_details(product_info: dict[str, Any]) -> str | None:
     parts: list[str] = []
     for field_name in ("featuresAndBenefits", "productDetails", "sizeFitSections"):
-        for item in list(product_info.get(field_name) or []):
+        for item in product_info.get(field_name) or []:
             if isinstance(item, dict):
                 text = text_or_none(item.get("body") or item.get("text") or item.get("header"))
             else:
@@ -227,7 +227,7 @@ def _next_data_product_details(product_info: dict[str, Any]) -> str | None:
 
 
 def _next_data_gtin(option: dict[str, Any]) -> str | None:
-    for item in list(option.get("gtins") or []):
+    for item in option.get("gtins") or []:
         if not isinstance(item, dict):
             continue
         gtin = text_or_none(item.get("gtin"))
@@ -303,7 +303,7 @@ def _color_name(product: dict[str, Any]) -> str | None:
 
 def _images(product: dict[str, Any]) -> list[str]:
     values: list[str] = []
-    for item in list(product.get("productMedia") or []):
+    for item in product.get("productMedia") or []:
         if not isinstance(item, dict):
             continue
         if str(item.get("mediaType") or "").strip().lower() != "image":
@@ -330,7 +330,7 @@ def _variants(product: dict[str, Any], *, page_url: str) -> list[dict[str, Any]]
     options = size_options.get("options") if isinstance(size_options, dict) else None
     color = _color_name(product)
     rows: list[dict[str, Any]] = []
-    for option in list(options or []):
+    for option in options or []:
         if not isinstance(option, dict):
             continue
         size = text_or_none(

@@ -1,17 +1,23 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+import logging
 from types import SimpleNamespace
 
 import pytest
 from pydantic import BaseModel
 
 from app.schemas.alert import AlertCreate, AlertUpdate
+from app.services.alert_service import (
+    _rules_payload,
+    alert_response,
+    create_alert,
+    update_alert,
+)
 from app.services.monitor_alert_rules import (
     alert_rule_condition_met,
     alert_rule_tracked_values,
 )
-from app.services.alert_service import alert_response, create_alert, update_alert
 from app.services.config.monitor_settings import MONITOR_STATUS_ARCHIVED
 
 
@@ -190,3 +196,28 @@ def test_alert_response_preserves_model_backed_stored_rules() -> None:
     assert len(response.target_rules) == 1
     assert response.target_rules[0].path == "price"
     assert response.target_rules[0].label == "Price changed"
+
+
+def test_rules_payload_normalizes_rule_shapes_and_warns_on_unexpected_types(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    class _ModelDumpRule:
+        def model_dump(self, *, exclude_none: bool) -> dict[object, object]:
+            assert exclude_none is True
+            return {1: "value", "details": None}
+
+    caplog.set_level(logging.WARNING)
+
+    payload = _rules_payload(
+        [
+            {"path": "price", "label": None},
+            _ModelDumpRule(),
+            object(),
+        ]
+    )
+
+    assert payload == [
+        {"path": "price"},
+        {"1": "value", "details": None},
+    ]
+    assert "Unsupported alert rule payload type" in caplog.text

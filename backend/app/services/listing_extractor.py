@@ -82,6 +82,11 @@ from app.services.dom.selector_engine import apply_selector_fallbacks
 
 logger = logging.getLogger(__name__)
 _LISTING_STRUCTURE_NEGATIVE_HINTS = frozenset(LISTING_STRUCTURE_NEGATIVE_HINTS)
+_alnum_word_pattern = re.compile(r"[a-z0-9]+", re.I)
+
+
+def _alnum_token_count(text: str) -> int:
+    return len(_alnum_word_pattern.findall(text))
 
 
 def _resolve_selector_trace(
@@ -116,7 +121,7 @@ def _is_title_only_candidate_allowed(
         not is_job
         and anchor_score >= 10
         and title_score >= 10
-        and len(re.findall(r"[a-z0-9]+", cleaned_title, flags=re.I)) >= 3
+        and _alnum_token_count(cleaned_title) >= 3
         and not listing_url_is_structural(cleaned_url, page_url)
         and not looks_like_utility_record(
             title=cleaned_title,
@@ -216,12 +221,12 @@ def _build_card_candidates(
                 for text in same_url_texts
                 if text != title
                 and len(text) >= 20
-                and len(re.findall(r"[a-z0-9]+", text, flags=re.I)) >= 3
+                and _alnum_token_count(text) >= 3
                 and not PRICE_RE.search(text)
                 and not is_title_noise(text)
                 and (
                     title_token_overlap(text, title) >= 2
-                    or len(re.findall(r"[a-z0-9]+", text, flags=re.I)) >= 5
+                    or _alnum_token_count(text) >= 5
                 )
             ),
             None,
@@ -244,7 +249,7 @@ def _build_card_candidates(
         if price_text:
             add_candidate(candidates, "price", price_text)
     if not is_job and not candidates.get("currency"):
-        for price_value in list(candidates.get("price") or []):
+        for price_value in candidates.get("price") or []:
             currency_code = extract_currency_code(price_value)
             if currency_code:
                 add_candidate(candidates, "currency", currency_code)
@@ -309,14 +314,14 @@ def _listing_record_from_card(
         (
             text
             for text in sorted(same_url_texts, key=len, reverse=True)
-            if len(re.findall(r"[a-z0-9]+", text, flags=re.I)) >= 3
+            if _alnum_token_count(text) >= 3
             and not PRICE_RE.search(text)
             and not is_title_noise(text)
         ),
         None,
     )
     if best_same_url_text and (
-        len(re.findall(r"[a-z0-9]+", title, flags=re.I)) < 3 or is_title_noise(title)
+        _alnum_token_count(title) < 3 or is_title_noise(title)
     ):
         title = best_same_url_text
     if should_replace_title_with_image_hint(title, image_title_hint):
@@ -335,12 +340,11 @@ def _listing_record_from_card(
         or image_urls
     )
     if not listing_detail_like_path(url, is_job=is_job):
-        if is_job and anchor_score < 8:
-            if not any(
-                token in card_text.lower()
-                for token in ("salary", "remote", "location", "apply")
-            ):
-                return None
+        if is_job and anchor_score < 8 and not any(
+            token in card_text.lower()
+            for token in ("salary", "remote", "location", "apply")
+        ):
+            return None
         if (
             not is_job
             and anchor_score < 8
@@ -405,9 +409,8 @@ def _listing_record_from_card(
                 is_job=surface.startswith("job_"),
             )
         ),
-    ):
-        if not allow_title_only_dom_candidate:
-            return None
+    ) and not allow_title_only_dom_candidate:
+        return None
     cleaned["_structural_signature"] = listing_fragment_structural_signature(
         card,
         url=cleaned_url,
@@ -478,12 +481,11 @@ def apply_listing_integrity_gate(
             records, page_url=page_url, surface=surface
         )
     except (KeyError, RuntimeError, TypeError, ValueError):
-        logger.error(
+        logger.exception(
             "evaluate_listing_integrity failed for page_url=%s surface=%s records=%d",
             page_url,
             surface,
             len(records),
-            exc_info=True,
         )
         decision = None
     _attach_gate_decision_to_artifacts(artifacts, decision)

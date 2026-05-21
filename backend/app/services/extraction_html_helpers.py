@@ -47,9 +47,9 @@ _HTML_TEXT_BLOCK_TAGS = {
 
 def html_to_text(value: str, *, preserve_block_breaks: bool = False) -> str:
     soup = BeautifulSoup(str(value or ""), "html.parser")
-    for node in list(soup.find_all(["script", "style"])):
+    for node in soup.find_all(["script", "style"]):
         node.decompose()
-    for tag in list(soup.find_all(_HTML_TEXT_BLOCK_TAGS)):
+    for tag in soup.find_all(_HTML_TEXT_BLOCK_TAGS):
         if tag.name == "br":
             tag.replace_with("\n")
             continue
@@ -76,9 +76,9 @@ def prune_html_tree(
 ) -> BeautifulSoup:
     allowed_attr_set = set(allowed_attrs or ())
     drop_tag_set = {str(tag).lower() for tag in drop_tags}
-    for node in list(soup.find_all(string=lambda value: isinstance(value, Comment))):
+    for node in soup.find_all(string=lambda value: isinstance(value, Comment)):
         node.extract()
-    for tag in list(soup.find_all(True)):
+    for tag in soup.find_all(True):
         tag_name = str(tag.name or "").lower()
         if tag_name in drop_tag_set and not (preserve_tag and preserve_tag(tag)):
             tag.decompose()
@@ -103,7 +103,7 @@ def prune_html_tree(
 def extract_job_sections(html: str) -> dict[str, str]:
     soup = BeautifulSoup(str(html or ""), "html.parser")
     mapped: dict[str, str] = {}
-    for heading in list(soup.find_all(["h2", "h3", "strong"])):
+    for heading in soup.find_all(["h2", "h3", "strong"]):
         heading_text = " ".join(heading.get_text(" ", strip=True).split()).strip()
         if not heading_text:
             continue

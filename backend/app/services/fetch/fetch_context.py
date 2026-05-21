@@ -76,6 +76,32 @@ class _FetchRuntimeContext:
     last_error: Exception | None = None
 
 
+@dataclass(slots=True)
+class _FetchPageCall:
+    url: str
+    run_id: int | None = None
+    timeout_seconds: float | None = None
+    proxy_list: list[str] | None = None
+    proxy_profile: dict[str, object] | None = None
+    locality_profile: dict[str, object] | None = None
+    fetch_mode: str = "auto"
+    prefer_browser: bool = False
+    browser_reason: str | None = None
+    surface: str | None = None
+    traversal_mode: str | None = None
+    requested_fields: list[str] | None = None
+    listing_recovery_mode: str | None = None
+    capture_screenshot: bool = False
+    host_memory_ttl_seconds: int | None = None
+    prefer_curl_handoff: bool = False
+    handoff_cookie_engine: str | None = None
+    forced_browser_engine: str | None = None
+    max_pages: int = 1
+    max_scrolls: int = 1
+    max_records: int | None = None
+    on_event: Any | None = None
+
+
 def _ensure_scheme(url: str) -> str:
     stripped = str(url or "").strip()
     if not stripped:
@@ -160,33 +186,15 @@ async def reset_fetch_runtime_state() -> None:
     await close_adapter_shared_http_client()
 
 
-async def fetch_page(
-    url: str,
-    *,
-    run_id: int | None = None,
-    timeout_seconds: float | None = None,
-    proxy_list: list[str] | None = None,
-    proxy_profile: dict[str, object] | None = None,
-    locality_profile: dict[str, object] | None = None,
-    fetch_mode: str = "auto",
-    prefer_browser: bool = False,
-    browser_reason: str | None = None,
-    surface: str | None = None,
-    traversal_mode: str | None = None,
-    requested_fields: list[str] | None = None,
-    listing_recovery_mode: str | None = None,
-    capture_screenshot: bool = False,
-    host_memory_ttl_seconds: int | None = None,
-    prefer_curl_handoff: bool = False,
-    handoff_cookie_engine: str | None = None,
-    forced_browser_engine: str | None = None,
-    max_pages: int = 1,
-    max_scrolls: int = 1,
-    max_records: int | None = None,
-    on_event=None,
-) -> PageFetchResult:
-    url = _ensure_scheme(url)
-    resolved_timeout_source = timeout_seconds
+def _build_fetch_page_call(url: str, kwargs: dict[str, Any]) -> _FetchPageCall:
+    try:
+        return _FetchPageCall(url=_ensure_scheme(url), **kwargs)
+    except TypeError as exc:
+        raise TypeError(f"Invalid fetch_page arguments for url={url!r}") from exc
+
+
+def _build_fetch_runtime_context(call: _FetchPageCall) -> _FetchRuntimeContext:
+    resolved_timeout_source = call.timeout_seconds
     if resolved_timeout_source is None:
         resolved_timeout_source = (
             crawler_runtime_settings.acquisition_attempt_timeout_seconds
@@ -196,47 +204,52 @@ async def fetch_page(
             "fetch_page requires timeout_seconds or "
             "crawler_runtime_settings.acquisition_attempt_timeout_seconds"
         )
-    context = _FetchRuntimeContext(
-        url=url,
+    return _FetchRuntimeContext(
+        url=call.url,
         resolved_timeout=float(resolved_timeout_source),
-        run_id=run_id,
-        surface=surface,
-        traversal_mode=traversal_mode,
-        max_pages=max_pages,
-        max_scrolls=max_scrolls,
-        max_records=max_records,
-        on_event=on_event,
-        browser_reason=browser_reason,
-        requested_fields=list(requested_fields or []),
-        listing_recovery_mode=str(listing_recovery_mode or "").strip() or None,
-        capture_screenshot=bool(capture_screenshot),
+        run_id=call.run_id,
+        surface=call.surface,
+        traversal_mode=call.traversal_mode,
+        max_pages=call.max_pages,
+        max_scrolls=call.max_scrolls,
+        max_records=call.max_records,
+        on_event=call.on_event,
+        browser_reason=call.browser_reason,
+        requested_fields=list(call.requested_fields or []),
+        listing_recovery_mode=str(call.listing_recovery_mode or "").strip() or None,
+        capture_screenshot=bool(call.capture_screenshot),
         host_memory_ttl_seconds=crawler_runtime_settings.coerce_host_memory_ttl_seconds(
-            host_memory_ttl_seconds
+            call.host_memory_ttl_seconds
         ),
-        prefer_curl_handoff=bool(prefer_curl_handoff),
-        handoff_cookie_engine=str(handoff_cookie_engine or "").strip().lower() or None,
+        prefer_curl_handoff=bool(call.prefer_curl_handoff),
+        handoff_cookie_engine=str(call.handoff_cookie_engine or "").strip().lower() or None,
         proxies=_resolve_proxy_attempts(
-            proxy_list,
-            run_id=run_id,
-            proxy_profile=proxy_profile,
+            call.proxy_list,
+            run_id=call.run_id,
+            proxy_profile=call.proxy_profile,
         ),
-        proxy_profile=_normalize_proxy_profile(proxy_profile),
-        locality_profile=dict(locality_profile or {})
-        if isinstance(locality_profile, dict)
+        proxy_profile=_normalize_proxy_profile(call.proxy_profile),
+        locality_profile=dict(call.locality_profile or {})
+        if isinstance(call.locality_profile, dict)
         else {},
-        traversal_required=should_run_traversal(surface, traversal_mode),
-        fetch_mode=_normalize_fetch_mode(fetch_mode),
-        runtime_policy=resolve_platform_runtime_policy(url, surface=surface),
-        forced_browser_engine=str(forced_browser_engine or "").strip().lower() or None,
+        traversal_required=should_run_traversal(call.surface, call.traversal_mode),
+        fetch_mode=_normalize_fetch_mode(call.fetch_mode),
+        runtime_policy=resolve_platform_runtime_policy(call.url, surface=call.surface),
+        forced_browser_engine=str(call.forced_browser_engine or "").strip().lower() or None,
     )
+
+
+async def fetch_page(url: str, **kwargs: Any) -> PageFetchResult:
+    call = _build_fetch_page_call(url, kwargs)
+    context = _build_fetch_runtime_context(call)
     context.host_policy = await _load_host_protection_policy_compat(
-        url,
+        call.url,
         ttl_seconds=context.host_memory_ttl_seconds,
     )
     host_preference_enabled = bool(context.host_policy.prefer_browser)
     browser_first = _browser_first_decision(
         context=context,
-        prefer_browser=prefer_browser,
+        prefer_browser=call.prefer_browser,
         host_preference_enabled=host_preference_enabled,
     )
     await _emit_fetch_event(
@@ -244,7 +257,7 @@ async def fetch_page(
         "info",
         _acquisition_strategy_message(
             context=context,
-            prefer_browser=prefer_browser,
+            prefer_browser=call.prefer_browser,
             host_preference_enabled=host_preference_enabled,
             browser_first=browser_first,
         ),
@@ -258,7 +271,7 @@ async def fetch_page(
             )
             return handoff_result
         resolved_browser_reason = _resolve_browser_reason(
-            browser_reason=browser_reason,
+            browser_reason=call.browser_reason,
             requires_browser=bool(context.runtime_policy.get("requires_browser")),
             traversal_required=context.traversal_required,
             host_preference_enabled=host_preference_enabled,
@@ -280,7 +293,7 @@ async def fetch_page(
         except Exception as exc:
             context.last_error = exc
             if (
-                prefer_browser
+                call.prefer_browser
                 or context.fetch_mode == "browser_only"
                 or _hard_browser_requirement(context=context)
             ):
@@ -301,6 +314,11 @@ async def fetch_page(
     if vendor_block_confirmed and context.last_error is not None:
         raise context.last_error
     if context.last_error is not None:
+        cause = (
+            context.last_error
+            if isinstance(context.last_error, BaseException)
+            else None
+        )
         logger.info(
             "HTTP fetchers exhausted for %s (%s); attempting browser fallback",
             context.url,
@@ -309,7 +327,7 @@ async def fetch_page(
         try:
             return await _run_browser_attempts(
                 context,
-                reason=browser_reason or "http-escalation",
+                reason=call.browser_reason or "http-escalation",
                 requested_fields=context.requested_fields,
                 listing_recovery_mode=context.listing_recovery_mode,
                 capture_screenshot=context.capture_screenshot,
@@ -320,8 +338,8 @@ async def fetch_page(
                 exc,
                 context.last_browser_attempt_diagnostics,
             )
-            raise exc from context.last_error
-    raise RuntimeError(f"Failed to fetch {url}")
+            raise exc from cause
+    raise RuntimeError(f"Failed to fetch {call.url}")
 
 
 def _acquisition_strategy_message(
@@ -691,7 +709,7 @@ async def _try_browser_http_handoff(
                     proxy=proxy,
                     cookie_header=cookie_header,
                 )
-            except (httpx.HTTPError, OSError, TimeoutError):
+            except (httpx.HTTPError, OSError):
                 logger.debug(
                     "Handoff curl_fetch failed for %s; skipping handoff",
                     context.url,
@@ -725,7 +743,7 @@ async def _try_browser_http_handoff(
 
 
 def _handoff_cookie_engines(
-    host_policy: HostProtectionPolicy,
+    _host_policy: HostProtectionPolicy,
     *,
     preferred_engine: str | None = None,
 ) -> tuple[str, ...]:
@@ -816,7 +834,7 @@ async def _attempt_http_fetch(
         if proxy is not None:
             return await fetcher(context.url, http_timeout, proxy=proxy)
         return await fetcher(context.url, http_timeout)
-    except (httpx.HTTPError, OSError, TimeoutError) as exc:
+    except (httpx.HTTPError, OSError) as exc:
         context.last_error = exc
         logger.debug(
             "Fetch failure for %s via %s (%s)",

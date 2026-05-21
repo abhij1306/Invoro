@@ -115,7 +115,7 @@ _LISTING_LOCALE_PATH_SEGMENT_RE = re.compile(
 )
 _LOWER_NON_ALNUM_RE = re.compile(r"[^a-z0-9]+")
 _MIXED_NON_ALNUM_RE = re.compile(r"[^A-Za-z0-9]+")
-_HTML_SUFFIX_RE = re.compile(r"\.(html?|htm)$", re.IGNORECASE)
+_HTML_SUFFIX_RE = re.compile(r"\.htm(?:l)?$", re.IGNORECASE)
 _SLUG_SEPARATOR_RE = re.compile(r"[-_]+")
 
 
@@ -861,11 +861,13 @@ def _detail_model_number_sets_compatible(
             if requested == candidate:
                 return True
             shorter, longer = sorted((requested, candidate), key=len)
-            if len(shorter) >= 5 and len(longer) - len(shorter) <= 2:
-                if longer.startswith(shorter) and any(
-                    char.isalpha() for char in shorter
-                ):
-                    return True
+            if (
+                len(shorter) >= 5
+                and len(longer) - len(shorter) <= 2
+                and longer.startswith(shorter)
+                and any(char.isalpha() for char in shorter)
+            ):
+                return True
     return False
 
 
@@ -907,6 +909,20 @@ def _detail_has_sku_evidence(
     return False
 
 
+def _record_has_strong_requested_identity_code(
+    record: dict[str, object],
+    *,
+    requested_codes: set[str],
+) -> bool:
+    if not requested_codes:
+        return False
+    for field_name in ("product_id", "variant_id", "part_number", "barcode"):
+        normalized = _normalized_detail_identity_code(record.get(field_name))
+        if normalized and detail_identity_codes_match(requested_codes, {normalized}):
+            return True
+    return False
+
+
 def _normalized_model_token(value: object) -> str:
     normalized = _MIXED_NON_ALNUM_RE.sub("", str(value or "")).lower()
     if not normalized:
@@ -944,7 +960,7 @@ def _detail_title_fallback_looks_like_code(value: object) -> bool:
     terminal = str(value or "").strip()
     if not terminal:
         return False
-    if re.search(r"[^A-Za-z0-9]", terminal):
+    if _MIXED_NON_ALNUM_RE.search(terminal):
         return False
     text = clean_text(value)
     if not text:
@@ -1136,6 +1152,10 @@ def _detail_redirect_identity_is_mismatched(
             requested_codes,
             record_field_codes,
         )
+        has_matching_strong_identity_code = _record_has_strong_requested_identity_code(
+            record,
+            requested_codes=requested_codes,
+        )
         requested_small_numbers = _detail_small_numeric_model_tokens(requested_title)
         candidate_small_numbers = _detail_small_numeric_model_tokens(candidate_title)
         has_matching_small_model_number = bool(
@@ -1150,11 +1170,8 @@ def _detail_redirect_identity_is_mismatched(
             candidate_title,
             record=record,
         ) and not (
-            has_matching_record_identity_code
-            and (
-                has_matching_small_model_number
-                or record_matches_requested_identity
-            )
+            has_matching_small_model_number
+            or (has_matching_record_identity_code and has_matching_strong_identity_code)
         ):
             return True
         has_strong_same_url_product_evidence = any(

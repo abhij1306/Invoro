@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-import json
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 import re
 from typing import Any
 from urllib.parse import urlparse
@@ -13,29 +12,25 @@ from app.services.config.extraction_rules import (
     DETAIL_CENT_BASED_PRICE_CURRENCY_SET,
     DETAIL_AUTHORITATIVE_PRICE_SOURCE_SET,
     DETAIL_CURRENT_PRICE_SELECTORS,
-    DETAIL_CURRENCY_JSONLD_RE,
-    DETAIL_CURRENCY_META_SELECTORS,
-    DETAIL_INSTALLMENT_PRICE_TEXT_TOKENS_NORMALIZED,
-    DETAIL_JSONLD_CURRENCY_FIELDS,
-    DETAIL_JSONLD_GRAPH_FIELDS,
-    DETAIL_JSONLD_OFFER_FIELDS,
-    DETAIL_JSONLD_ORIGINAL_PRICE_FIELDS,
-    DETAIL_JSONLD_PRICE_FIELDS,
-    DETAIL_JSONLD_PRICE_SPECIFICATION_FIELDS,
-    DETAIL_JSONLD_TYPE_FIELDS,
     DETAIL_LOW_SIGNAL_PRICE_VISIBLE_MIN_DELTA,
     DETAIL_LOW_SIGNAL_PRICE_VISIBLE_RATIO,
     DETAIL_LOW_SIGNAL_ZERO_PRICE_SOURCE_SET,
-    DETAIL_ORIGINAL_PRICE_SELECTORS,
     DETAIL_PARENT_VARIANT_PRICE_RATIO_MAX_DECIMAL,
-    DETAIL_PRICE_CENT_MAGNITUDE_RATIO_DECIMAL,
-    DETAIL_PRICE_JSONLD_RE,
-    DETAIL_PRICE_JSONLD_TYPE_RE,
-    DETAIL_PRICE_MAGNITUDE_EPSILON_DECIMAL,
-    DETAIL_PRICE_META_SELECTORS,
-    DETAIL_RELATED_PRICE_CONTEXT_TOKENS,
     DETAIL_STRICT_PARENT_PRICE_SOURCE_SET,
     PAGE_URL_CURRENCY_HINTS_RAW,
+)
+from app.services.extract.detail.price.parsing import (
+    decimal_is_cent_magnitude_copy,
+    detail_currency_from_html,
+    detail_jsonld_price_bundle,
+    detail_original_price_from_html,
+    detail_price_decimal,
+    detail_price_from_html,
+    detail_price_from_selector_text,
+    detail_price_is_cent_magnitude_copy,
+    format_detail_price_decimal,
+    format_price_decimal,
+    single_decimal_value,
 )
 from app.services.shared.field_coerce import (
     extract_currency_code,
@@ -55,15 +50,15 @@ def backfill_detail_price_from_html(
         return
 
     soup = BeautifulSoup(str(html or ""), "html.parser")
-    jsonld_price_bundle = _detail_jsonld_price_bundle(soup, currency=None)
-    html_currency = _detail_currency_from_html(
+    jsonld_price_bundle = detail_jsonld_price_bundle(soup, currency=None)
+    html_currency = detail_currency_from_html(
         soup,
         jsonld_price_bundle=jsonld_price_bundle,
     )
     record_url = text_or_none(record.get("url")) or ""
     expected_currency = text_or_none(currency_hint_from_page_url(record_url))
     preliminary_currency = text_or_none(record.get("currency")) or expected_currency or html_currency
-    visible_price = _detail_price_from_selector_text(
+    visible_price = detail_price_from_selector_text(
         soup,
         selectors=DETAIL_CURRENT_PRICE_SELECTORS,
         currency=preliminary_currency,
@@ -81,7 +76,12 @@ def backfill_detail_price_from_html(
         and text_or_none(record.get("currency")) in (None, expected_currency)
     )
     if unverified_localized_currency_conflict:
-        _drop_unverified_localized_money(record)
+        if not _should_preserve_existing_localized_money(
+            record,
+            expected_currency=expected_currency,
+            jsonld_price=jsonld_price_bundle[0],
+        ):
+            _drop_unverified_localized_money(record)
         html_currency = None
         jsonld_price_bundle = (None, None, None)
     visible_currency_conflicts_with_html = bool(
@@ -114,7 +114,7 @@ def backfill_detail_price_from_html(
         append_record_field_source(record, "currency", "dom_text")
 
     if not html_currency_conflicts_with_host and currency != jsonld_price_bundle[2]:
-        jsonld_price_bundle = _detail_jsonld_price_bundle(soup, currency=currency)
+        jsonld_price_bundle = detail_jsonld_price_bundle(soup, currency=currency)
     jsonld_price, jsonld_original_price, jsonld_currency = jsonld_price_bundle
     current_price_backfill_blocked = _unavailable_record_blocks_dom_price_backfill(
         record,
@@ -136,7 +136,7 @@ def backfill_detail_price_from_html(
         if html_currency_conflicts_with_host:
             price = visible_price or text_or_none(record.get("price"))
         else:
-            price = jsonld_price or _detail_price_from_html(
+            price = jsonld_price or detail_price_from_html(
                 soup,
                 currency=currency,
                 jsonld_price_bundle=jsonld_price_bundle,
@@ -149,7 +149,7 @@ def backfill_detail_price_from_html(
             price_source = "dom_text" if visible_price == localized_override_price else "json_ld"
             localized_override_applied = True
         if visible_price and (
-            _detail_price_is_cent_magnitude_copy(price, visible_price)
+            detail_price_is_cent_magnitude_copy(price, visible_price)
             or _should_override_record_price_from_dom(
                 record=record,
                 dom_price=visible_price,
@@ -189,7 +189,7 @@ def backfill_detail_price_from_html(
             if isinstance(selected_variant, dict) and (
                 selected_variant.get("price") in (None, "", [], {})
                 or _detail_price_value_is_low_signal(selected_variant.get("price"))
-                or _detail_price_is_cent_magnitude_copy(
+                or detail_price_is_cent_magnitude_copy(
                     selected_variant.get("price"), price
                 )
             ):
@@ -220,7 +220,7 @@ def backfill_detail_price_from_html(
                         and not _detail_price_value_is_low_signal(
                             variant.get("price")
                         )
-                        and not _detail_price_is_cent_magnitude_copy(
+                        and not detail_price_is_cent_magnitude_copy(
                             variant.get("price"), price
                         )
                     ):
@@ -231,7 +231,7 @@ def backfill_detail_price_from_html(
             if localized_override_applied:
                 _drop_unverified_variant_money(record)
 
-    visible_original_price = _detail_original_price_from_html(
+    visible_original_price = detail_original_price_from_html(
         soup,
         currency=currency,
         jsonld_price_bundle=(None, None, None),
@@ -322,6 +322,27 @@ def _drop_existing_original_price(record: dict[str, Any]) -> None:
     field_sources = record.get("_field_sources")
     if isinstance(field_sources, dict):
         field_sources.pop("original_price", None)
+
+
+def _should_preserve_existing_localized_money(
+    record: dict[str, Any],
+    *,
+    expected_currency: str | None,
+    jsonld_price: object,
+) -> bool:
+    if not expected_currency:
+        return False
+    if text_or_none(record.get("currency")) != expected_currency:
+        return False
+    current_price = record.get("price")
+    if current_price in (None, "", [], {}) or _detail_price_value_is_low_signal(
+        current_price
+    ):
+        return False
+    currency_sources = record_field_sources(record, "currency")
+    if "url_currency_hint" in currency_sources:
+        return True
+    return _detail_price_is_visible_outlier(jsonld_price, current_price)
 
 
 def _drop_unverified_localized_money(record: dict[str, Any]) -> None:
@@ -524,7 +545,7 @@ def reconcile_detail_currency_with_url(
 
 def _unanimous_variant_currency(record: dict[str, Any]) -> str:
     currencies: set[str] = set()
-    for row in list(record.get("variants") or []):
+    for row in record.get("variants") or []:
         if not isinstance(row, dict):
             continue
         currency = extract_currency_code(row.get("currency"))
@@ -549,16 +570,16 @@ def reconcile_detail_price_magnitudes(record: dict[str, Any]) -> None:
         row_price = detail_price_decimal(row.get("price"))
         if row_price is not None:
             variant_prices.append(row_price)
-    safe_variant_price = _single_decimal_value(variant_prices)
+    safe_variant_price = single_decimal_value(variant_prices)
     if (
         parent_price is not None
         and safe_variant_price is not None
-        and _decimal_is_cent_magnitude_copy(parent_price, safe_variant_price)
+        and decimal_is_cent_magnitude_copy(parent_price, safe_variant_price)
         and not (
             record_field_sources(record, "price") & DETAIL_STRICT_PARENT_PRICE_SOURCE_SET
         )
     ):
-        record["price"] = _format_price_decimal(safe_variant_price)
+        record["price"] = format_price_decimal(safe_variant_price)
         append_record_field_source(record, "price", "variant_price_magnitude")
         parent_price = safe_variant_price
     if parent_price is None:
@@ -567,8 +588,8 @@ def reconcile_detail_price_magnitudes(record: dict[str, Any]) -> None:
         row_price = detail_price_decimal(row.get("price"))
         if row_price is None:
             continue
-        if _decimal_is_cent_magnitude_copy(row_price, parent_price):
-            row["price"] = _format_price_decimal(parent_price)
+        if decimal_is_cent_magnitude_copy(row_price, parent_price):
+            row["price"] = format_price_decimal(parent_price)
             append_record_field_source(
                 record, f"{path}.price", "parent_price_magnitude"
             )
@@ -611,7 +632,7 @@ def reconcile_parent_price_against_variant_range(record: dict[str, Any]) -> None
         # At least one variant lacks a price; skip to avoid misjudging the
         # distribution.
         return
-    unanimous_variant_price = _single_decimal_value(variant_prices)
+    unanimous_variant_price = single_decimal_value(variant_prices)
     if unanimous_variant_price is None or unanimous_variant_price <= 0:
         return
     if parent_price == unanimous_variant_price:
@@ -627,7 +648,7 @@ def reconcile_parent_price_against_variant_range(record: dict[str, Any]) -> None
         return
     if record_field_sources(record, "price") & DETAIL_STRICT_PARENT_PRICE_SOURCE_SET:
         return
-    record["price"] = _format_price_decimal(unanimous_variant_price)
+    record["price"] = format_price_decimal(unanimous_variant_price)
     append_record_field_source(record, "price", "variant_price_range")
 
 
@@ -670,7 +691,7 @@ def _should_override_record_price_from_dom(
         return True
     if record_price_is_low_signal:
         return True
-    if _detail_price_is_cent_magnitude_copy(current_price, dom_price):
+    if detail_price_is_cent_magnitude_copy(current_price, dom_price):
         return True
     if not _detail_price_is_visible_outlier(current_price, dom_price):
         return False
@@ -812,69 +833,13 @@ def _detail_price_is_visible_outlier(value: object, visible_value: object) -> bo
     visible = detail_price_decimal(visible_value)
     if current is None or visible is None or current <= 0 or visible <= 0:
         return False
-    if _decimal_is_cent_magnitude_copy(current, visible):
+    if decimal_is_cent_magnitude_copy(current, visible):
         return True
     if visible <= current:
         return False
     if visible - current < Decimal(str(DETAIL_LOW_SIGNAL_PRICE_VISIBLE_MIN_DELTA)):
         return False
     return current <= visible * Decimal(str(DETAIL_LOW_SIGNAL_PRICE_VISIBLE_RATIO))
-
-
-def _normalized_price_value(value: object) -> str | None:
-    text = text_or_none(value)
-    if not text:
-        return None
-    if re.fullmatch(r"\d+(?:\.\d+)?", text):
-        return text
-    return normalize_decimal_price(text, interpret_integral_as_cents=False)
-
-
-def detail_price_decimal(value: object) -> Decimal | None:
-    normalized = _normalized_price_value(value)
-    if not normalized:
-        return None
-    try:
-        return Decimal(str(normalized))
-    except (InvalidOperation, ValueError):
-        return None
-
-
-def _format_price_decimal(value: Decimal) -> str:
-    return format(value.quantize(Decimal("0.01")), "f")
-
-
-def format_detail_price_decimal(value: object) -> str | None:
-    price = detail_price_decimal(value)
-    if price is None:
-        return None
-    return _format_price_decimal(price)
-
-
-def _detail_price_is_cent_magnitude_copy(value: object, reference: object) -> bool:
-    value_decimal = detail_price_decimal(value)
-    reference_decimal = detail_price_decimal(reference)
-    return bool(
-        value_decimal is not None
-        and reference_decimal is not None
-        and _decimal_is_cent_magnitude_copy(value_decimal, reference_decimal)
-    )
-
-
-def _decimal_is_cent_magnitude_copy(value: Decimal, reference: Decimal) -> bool:
-    if value <= 0 or reference <= 0:
-        return False
-    return (
-        abs(value - (reference * DETAIL_PRICE_CENT_MAGNITUDE_RATIO_DECIMAL))
-        <= DETAIL_PRICE_MAGNITUDE_EPSILON_DECIMAL
-    )
-
-
-def _single_decimal_value(values: list[Decimal]) -> Decimal | None:
-    unique = {_format_price_decimal(value) for value in values if value > 0}
-    if len(unique) != 1:
-        return None
-    return Decimal(next(iter(unique)))
 
 
 def _detail_record_has_positive_price_corroboration(record: dict[str, Any]) -> bool:
@@ -897,320 +862,6 @@ def _detail_record_has_positive_price_corroboration(record: dict[str, Any]) -> b
         )
         for variant in variants
     )
-
-
-def _detail_price_from_html(
-    soup: BeautifulSoup,
-    *,
-    currency: str | None,
-    jsonld_price_bundle: tuple[str | None, str | None, str | None],
-) -> str | None:
-    jsonld_price, _jsonld_original_price, _jsonld_currency = jsonld_price_bundle
-    # Defensive: callers typically gate on ``jsonld_price or _detail_price_from_html(...)``,
-    # but keep this fast-path so direct callers also short-circuit without re-scanning the DOM.
-    if jsonld_price:
-        return jsonld_price
-
-    for selector in DETAIL_PRICE_META_SELECTORS:
-        node = soup.select_one(selector)
-        if node is None:
-            continue
-        raw_value = node.get("content") if hasattr(node, "get") else None
-        if raw_value in (None, "", [], {}):
-            raw_value = node.get_text(" ", strip=True)
-        normalized = _normalize_detail_price_candidate(raw_value, currency=currency)
-        if normalized:
-            return normalized
-
-    for script in soup.find_all("script", attrs={"type": "application/ld+json"}):
-        script_text = str(script.string or script.get_text() or "").strip()
-        if not script_text or '"price"' not in script_text.lower():
-            continue
-        if DETAIL_PRICE_JSONLD_TYPE_RE.search(script_text) is None:
-            continue
-        match = DETAIL_PRICE_JSONLD_RE.search(script_text)
-        if match is None:
-            continue
-        normalized = _normalize_detail_price_candidate(
-            match.group("price"),
-            currency=currency,
-        )
-        if normalized:
-            return normalized
-
-    return _detail_price_from_selector_text(
-        soup,
-        selectors=DETAIL_CURRENT_PRICE_SELECTORS,
-        currency=currency,
-    )
-
-
-def _detail_original_price_from_html(
-    soup: BeautifulSoup,
-    *,
-    currency: str | None,
-    jsonld_price_bundle: tuple[str | None, str | None, str | None],
-) -> str | None:
-    _jsonld_price, jsonld_original_price, _jsonld_currency = jsonld_price_bundle
-    if jsonld_original_price:
-        return jsonld_original_price
-    return _detail_price_from_selector_text(
-        soup,
-        selectors=DETAIL_ORIGINAL_PRICE_SELECTORS,
-        currency=currency,
-        skip_related_offer=True,
-    )
-
-
-def _detail_price_from_selector_text(
-    soup: BeautifulSoup,
-    *,
-    selectors: tuple[str, ...],
-    currency: str | None,
-    skip_related_offer: bool = True,
-) -> str | None:
-    for selector in selectors:
-        for node in soup.select(selector):
-            if _price_node_looks_like_installment(node):
-                continue
-            if skip_related_offer and _price_node_looks_like_related_offer(node):
-                continue
-            raw_value = node.get("aria-label") if hasattr(node, "get") else None
-            if raw_value in (None, "", [], {}):
-                raw_value = node.get_text(" ", strip=True)
-            normalized = _normalize_detail_price_candidate(raw_value, currency=currency)
-            if normalized:
-                return normalized
-    return None
-
-
-def _price_node_looks_like_installment(node: object) -> bool:
-    text_parts: list[str] = []
-    if node is None:
-        return False
-    if hasattr(node, "get_text"):
-        text_parts.append(node.get_text(" ", strip=True))
-    if hasattr(node, "get"):
-        for attr_name in ("aria-label",):
-            raw = node.get(attr_name)
-            if isinstance(raw, list):
-                text_parts.extend(str(item) for item in raw)
-            elif raw not in (None, "", [], {}):
-                text_parts.append(str(raw))
-    lowered = " ".join(text_parts).lower()
-    return any(token in lowered for token in DETAIL_INSTALLMENT_PRICE_TEXT_TOKENS_NORMALIZED)
-
-
-def _price_node_looks_like_related_offer(node: object) -> bool:
-    current = node
-    depth = 0
-    while current is not None and depth < 4:
-        attrs = getattr(current, "attrs", {}) or {}
-        context = " ".join(
-            str(value)
-            for key, value in attrs.items()
-            if key in {"class", "id", "data-testid", "data-test", "aria-label"}
-        ).lower()
-        if any(token in context for token in DETAIL_RELATED_PRICE_CONTEXT_TOKENS):
-            return True
-        current = current.find_parent() if hasattr(current, "find_parent") else None
-        depth += 1
-    return False
-
-
-def _detail_currency_from_html(
-    soup: BeautifulSoup,
-    *,
-    jsonld_price_bundle: tuple[str | None, str | None, str | None],
-) -> str | None:
-    _jsonld_price, _jsonld_original_price, jsonld_currency = jsonld_price_bundle
-    if jsonld_currency:
-        return jsonld_currency
-
-    for selector in DETAIL_CURRENCY_META_SELECTORS:
-        node = soup.select_one(selector)
-        if node is None:
-            continue
-        currency = text_or_none(node.get("content") if hasattr(node, "get") else None)
-        if currency:
-            return currency
-
-    for script in soup.find_all("script", attrs={"type": "application/ld+json"}):
-        script_text = str(script.string or script.get_text() or "").strip()
-        if not script_text:
-            continue
-        match = DETAIL_CURRENCY_JSONLD_RE.search(script_text)
-        if match is not None:
-            return text_or_none(match.group("currency"))
-
-    for selector in (*DETAIL_CURRENT_PRICE_SELECTORS, *DETAIL_ORIGINAL_PRICE_SELECTORS):
-        for node in soup.select(selector):
-            raw_value = node.get("aria-label") if hasattr(node, "get") else None
-            if raw_value in (None, "", [], {}):
-                raw_value = node.get_text(" ", strip=True)
-            currency = extract_currency_code(raw_value)
-            if currency:
-                return currency
-    return None
-
-
-def _detail_jsonld_price_bundle(
-    soup: BeautifulSoup,
-    *,
-    currency: str | None,
-) -> tuple[str | None, str | None, str | None]:
-    saved_currency = text_or_none(currency)
-    for offer in _iter_jsonld_offers(soup):
-        offer_currency = _first_text(offer, DETAIL_JSONLD_CURRENCY_FIELDS) or currency
-        saved_currency = text_or_none(offer_currency) or saved_currency
-        price = _first_normalized_price(
-            offer,
-            DETAIL_JSONLD_PRICE_FIELDS,
-            currency=offer_currency,
-        )
-        original_price = _first_normalized_price(
-            offer,
-            DETAIL_JSONLD_ORIGINAL_PRICE_FIELDS,
-            currency=offer_currency,
-        )
-        spec_original = _price_from_jsonld_specifications(
-            offer,
-            currency=offer_currency,
-            current_price=price,
-        )
-        original_price = spec_original or original_price
-        if price:
-            price = format_detail_price_decimal(price) or price
-        if original_price:
-            original_price = (
-                format_detail_price_decimal(original_price) or original_price
-            )
-        if price or original_price:
-            return price, original_price, text_or_none(offer_currency)
-    return None, None, saved_currency
-
-
-def _iter_jsonld_offers(soup: BeautifulSoup) -> list[dict[str, Any]]:
-    offers: list[dict[str, Any]] = []
-    for payload in _iter_jsonld_payloads(soup):
-        offers.extend(_offers_from_jsonld_node(payload))
-    return offers
-
-
-def _iter_jsonld_payloads(soup: BeautifulSoup) -> list[Any]:
-    payloads: list[Any] = []
-    for script in soup.find_all("script", attrs={"type": "application/ld+json"}):
-        script_text = str(script.string or script.get_text() or "").strip()
-        if not script_text:
-            continue
-        try:
-            payloads.append(json.loads(script_text))
-        except json.JSONDecodeError:
-            continue
-    return payloads
-
-
-def _offers_from_jsonld_node(value: Any) -> list[dict[str, Any]]:
-    results: list[dict[str, Any]] = []
-    if isinstance(value, list):
-        for item in value:
-            results.extend(_offers_from_jsonld_node(item))
-        return results
-    if not isinstance(value, dict):
-        return []
-    for field_name in DETAIL_JSONLD_GRAPH_FIELDS:
-        results.extend(_offers_from_jsonld_node(value.get(field_name)))
-    node_type = _jsonld_type_text(value)
-    if node_type in {"offer", "aggregateoffer"}:
-        results.append(value)
-    for field_name in DETAIL_JSONLD_OFFER_FIELDS:
-        results.extend(_offers_from_jsonld_node(value.get(field_name)))
-    return results
-
-
-def _jsonld_type_text(value: dict[str, Any]) -> str:
-    for field_name in DETAIL_JSONLD_TYPE_FIELDS:
-        raw_type = value.get(field_name)
-        if isinstance(raw_type, list):
-            raw_type = next((item for item in raw_type if text_or_none(item)), None)
-        text = text_or_none(raw_type)
-        if text:
-            return text.rsplit("/", 1)[-1].lower()
-    return ""
-
-
-def _first_text(value: dict[str, Any], field_names: tuple[str, ...]) -> str | None:
-    for field_name in field_names:
-        text = text_or_none(value.get(field_name))
-        if text:
-            return text
-    return None
-
-
-def _first_normalized_price(
-    value: dict[str, Any],
-    field_names: tuple[str, ...],
-    *,
-    currency: str | None,
-) -> str | None:
-    for field_name in field_names:
-        normalized = _normalize_detail_price_candidate(
-            value.get(field_name),
-            currency=currency,
-        )
-        if normalized:
-            return normalized
-    return None
-
-
-def _price_from_jsonld_specifications(
-    offer: dict[str, Any],
-    *,
-    currency: str | None,
-    current_price: str | None,
-) -> str | None:
-    specs: list[Any] = []
-    for field_name in DETAIL_JSONLD_PRICE_SPECIFICATION_FIELDS:
-        raw_specs = offer.get(field_name)
-        if isinstance(raw_specs, list):
-            specs.extend(raw_specs)
-        elif raw_specs not in (None, "", [], {}):
-            specs.append(raw_specs)
-    current = detail_price_decimal(current_price)
-    candidates: list[Decimal] = []
-    for spec in specs:
-        if not isinstance(spec, dict):
-            continue
-        price = detail_price_decimal(
-            _first_normalized_price(spec, DETAIL_JSONLD_PRICE_FIELDS, currency=currency)
-        )
-        if price is None:
-            continue
-        if current is None or price > current:
-            candidates.append(price)
-    if not candidates:
-        return None
-    return _format_price_decimal(max(candidates))
-
-
-def _normalize_detail_price_candidate(
-    value: object,
-    *,
-    currency: str | None,
-) -> str | None:
-    text = text_or_none(value)
-    if not text:
-        return None
-    if (
-        currency
-        and re.fullmatch(r"\d+(?:\.\d+)?", text)
-        and "." not in text
-        and len(re.sub(r"\D+", "", text)) <= 3
-    ):
-        return text
-    return normalize_decimal_price(text, interpret_integral_as_cents=False)
-
-
 __all__ = [
     "append_record_field_source",
     "backfill_detail_price_from_html",

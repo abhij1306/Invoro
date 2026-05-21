@@ -374,7 +374,7 @@ async def build_domain_recipe_payload(
     )
     requested_fields = [
         str(value)
-        for value in list(run.requested_fields or [])
+        for value in run.requested_fields or []
         if str(value or "").strip()
     ]
     if not found_fields and requested_fields:
@@ -435,7 +435,7 @@ async def build_domain_recipe_payload(
             selector_value = str(selector_trace.get("selector_value") or "").strip()
             source_labels = [
                 str(value)
-                for value in list(payload_map.get("sources") or [])
+                for value in payload_map.get("sources") or []
                 if str(value or "").strip()
             ]
             if (
@@ -878,7 +878,7 @@ def _serialize_feedback_record(row: DomainFieldFeedback) -> dict[str, object]:
             parsed
             for parsed in (
                 _safe_int(value)
-                for value in list(payload.get("source_record_ids") or [])
+                for value in payload.get("source_record_ids") or []
             )
             if parsed is not None
         ],

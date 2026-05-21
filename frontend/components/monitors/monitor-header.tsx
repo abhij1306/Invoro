@@ -274,6 +274,7 @@ export function MonitorHeader({
             role="dialog"
             aria-modal="true"
             aria-labelledby="monitor-delete-title"
+            aria-describedby="monitor-delete-description"
             tabIndex={-1}
             className="border-border card-gradient w-[min(420px,100%)] rounded-[var(--radius-lg)] border p-5"
           >
@@ -283,7 +284,10 @@ export function MonitorHeader({
             >
               Delete this {isAlert ? 'alert' : 'monitor'}?
             </h2>
-            <p className="text-secondary mt-2 text-sm leading-[var(--leading-relaxed)]">
+            <p
+              id="monitor-delete-description"
+              className="text-secondary mt-2 text-sm leading-[var(--leading-relaxed)]"
+            >
               This permanently deletes the {isAlert ? 'alert' : 'monitor'}, its snapshots, events,
               URL state, and notifications.
             </p>

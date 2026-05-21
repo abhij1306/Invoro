@@ -132,22 +132,19 @@ def _viewport_from_screen(
     avail_width = int(getattr(screen, "availWidth", 0) or 0)
     avail_height = int(getattr(screen, "availHeight", 0) or 0)
     viewport_width = avail_width if 0 < avail_width <= screen_width else screen_width
-    viewport_height = (
-        avail_height
-        if 0 < avail_height < screen_height
-        else (
+    if 0 < avail_height < screen_height:
+        viewport_height = avail_height
+    elif is_mobile:
+        viewport_height = screen_height
+    else:
+        viewport_height = max(
+            1,
             screen_height
-            if is_mobile
-            else max(
-                1,
-                screen_height
-                - int(
-                    crawler_runtime_settings.browser_desktop_viewport_reserved_height_px
-                    or 0
-                ),
-            )
+            - int(
+                crawler_runtime_settings.browser_desktop_viewport_reserved_height_px
+                or 0
+            ),
         )
-    )
     return {
         "width": viewport_width,
         "height": viewport_height,

@@ -38,6 +38,10 @@ logger = logging.getLogger(__name__)
 HTML_PARSER = "html.parser"
 
 
+def _query_joiner(url: str) -> str:
+    return "&" if "?" in url else "?"
+
+
 class ICIMSAdapter(BaseAdapter):
     name = "icims"
     platform_family = "icims"
@@ -171,11 +175,12 @@ class ICIMSAdapter(BaseAdapter):
         page_url = (
             re.sub(r"offset=\d+", f"offset={offset}", endpoint)
             if "offset=" in endpoint
-            else f"{endpoint}{'&' if '?' in endpoint else '?'}offset={offset}"
+            else f"{endpoint}{_query_joiner(endpoint)}offset={offset}"
         )
         if "num_items=" not in page_url:
+            num_items_joiner = "&" if "?" in page_url else "?"
             page_url = (
-                f"{page_url}{'&' if '?' in page_url else '?'}"
+                f"{page_url}{num_items_joiner}"
                 f"num_items={adapter_runtime_settings.icims_page_size}"
             )
         return page_url

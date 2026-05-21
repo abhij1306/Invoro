@@ -46,7 +46,7 @@ _SHARED_HTTP_CLIENTS: dict[tuple[str | None, str], httpx.AsyncClient] = {}
 _SHARED_HTTP_CLIENT_LOCK = asyncio.Lock()
 _ECOMMERCE_DETAIL_READINESS_HINTS = tuple(
     str(item).strip().lower()
-    for item in list(
+    for item in (
         (
             BROWSER_DETAIL_READINESS_HINTS.get("ecommerce")
             if isinstance(BROWSER_DETAIL_READINESS_HINTS, Mapping)
@@ -260,33 +260,35 @@ def classify_blocked_page(
         *sorted(f"challenge_element:{marker}" for marker in challenge_element_hits),
     ]
 
-    blocked = forced_blocked
-    if forced_blocked:
-        blocked = True
-    elif len(hard_strong_hits) >= 2:
-        blocked = True
-    elif hard_strong_hits and (
-        provider_hits or active_provider_hits or challenge_element_hits or title_matches
-    ):
-        blocked = True
-    elif "access denied" in strong_hits:
-        blocked = True
-    elif "just a moment" in strong_hits and (
-        "cloudflare" in provider_hits
-        or "cf-challenge" in provider_hits
-        or "cf-browser-verification" in active_provider_hits
-    ):
-        blocked = True
-    elif challenge_element_hits and (provider_hits or active_provider_hits):
-        blocked = True
-    elif title_matches and challenge_element_hits:
-        blocked = True
-    elif hard_strong_hits and weak_hits and provider_hits:
-        blocked = True
-    elif "captcha" in strong_hits and provider_hits and not has_extractable_content:
-        blocked = True
-    elif "captcha" in strong_hits and provider_hits and title_matches:
-        blocked = True
+    blocked = forced_blocked or bool(
+        len(hard_strong_hits) >= 2
+        or (
+            hard_strong_hits
+            and (
+                provider_hits
+                or active_provider_hits
+                or challenge_element_hits
+                or title_matches
+            )
+        )
+        or "access denied" in strong_hits
+        or (
+            "just a moment" in strong_hits
+            and (
+                "cloudflare" in provider_hits
+                or "cf-challenge" in provider_hits
+                or "cf-browser-verification" in active_provider_hits
+            )
+        )
+        or (challenge_element_hits and (provider_hits or active_provider_hits))
+        or (title_matches and challenge_element_hits)
+        or (hard_strong_hits and weak_hits and provider_hits)
+        or (
+            "captcha" in strong_hits
+            and provider_hits
+            and (not has_extractable_content or bool(title_matches))
+        )
+    )
     if (
         blocked
         and has_extractable_content
@@ -298,11 +300,7 @@ def classify_blocked_page(
     return BlockPageClassification(
         blocked=blocked,
         outcome=(
-            forced_outcome
-            if blocked and forced_blocked
-            else "challenge_page"
-            if blocked
-            else "ok"
+            forced_outcome if blocked and forced_blocked else "challenge_page" if blocked else "ok"
         ),
         evidence=evidence,
         provider_hits=sorted(provider_hits),
@@ -810,7 +808,7 @@ def _challenge_element_hits(soup: BeautifulSoup, lowered_html: str) -> list[str]
     )
     html_markers = _marker_map_from_config(challenge_elements, "html_markers")
     hits: list[str] = []
-    for iframe in list(soup.find_all("iframe")):
+    for iframe in soup.find_all("iframe"):
         src = str(iframe.get("src") or "").strip().lower()
         title = str(iframe.get("title") or "").strip().lower()
         for marker, hit in iframe_src_markers.items():
@@ -819,7 +817,7 @@ def _challenge_element_hits(soup: BeautifulSoup, lowered_html: str) -> list[str]
         for marker, hit in iframe_title_markers.items():
             if marker in title:
                 hits.append(hit)
-    for script in list(soup.find_all("script")):
+    for script in soup.find_all("script"):
         src = str(script.get("src") or "").strip().lower()
         for marker, hit in script_src_markers.items():
             if marker in src:

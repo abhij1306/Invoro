@@ -33,7 +33,7 @@ from app.services.shared.field_coerce import coerce_int as _coerce_int
 from app.services.shared.coerce_primitives import string_list
 
 _DETAIL_EXPAND_KEYWORDS: dict[str, tuple[str, ...]] = {
-    str(key): tuple(str(item) for item in list(value or []))
+    str(key): tuple(str(item) for item in value or [])
     for key, value in dict(BROWSER_DETAIL_EXPAND_KEYWORDS or {}).items()
 }
 
@@ -237,7 +237,7 @@ async def expand_all_interactive_elements_impl(
     seen_candidates: set[tuple[str, str, str]] = set()
     selectors = [
         str(selector).strip()
-        for selector in list(detail_expand_selectors or [])
+        for selector in detail_expand_selectors or []
         if str(selector).strip()
     ]
     selectors = _ordered_detail_expand_selectors(
@@ -625,7 +625,7 @@ def accessibility_expand_candidates_impl(
 def requested_field_tokens(requested_fields: list[str] | None) -> tuple[str, ...]:
     tokens: list[str] = []
     seen: set[str] = set()
-    for field_name in list(requested_fields or []):
+    for field_name in requested_fields or []:
         exact_key = exact_requested_field_key(str(field_name or ""))
         for token in re.split(r"[_\W]+", exact_key):
             cleaned = str(token or "").strip().lower()

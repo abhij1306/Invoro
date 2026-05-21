@@ -212,7 +212,6 @@ async def render_prometheus_metrics() -> tuple[bytes, str]:
         )
         crawl_runs_query_failures_total.inc()
         crawl_runs_total.clear()
-        raise
 
     browser_pool_size.set(int(browser_runtime_snapshot()["size"]))
     database_connections_active.set(_database_connections_checked_out())

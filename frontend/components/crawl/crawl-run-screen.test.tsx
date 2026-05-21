@@ -276,12 +276,20 @@ function renderRunScreenWithClient(queryClient: QueryClient, runId = 101) {
 }
 
 describe('CrawlRunScreen', () => {
+  let originalUserAgentDescriptor: PropertyDescriptor | undefined;
+
   afterEach(() => {
+    if (originalUserAgentDescriptor) {
+      Object.defineProperty(window.navigator, 'userAgent', originalUserAgentDescriptor);
+    } else {
+      delete (window.navigator as Navigator & { userAgent?: string }).userAgent;
+    }
     vi.useRealTimers();
     vi.unstubAllGlobals();
   });
 
   beforeEach(() => {
+    originalUserAgentDescriptor = Object.getOwnPropertyDescriptor(window.navigator, 'userAgent');
     vi.clearAllMocks();
     MockWebSocket.instances = [];
     window.sessionStorage.clear();

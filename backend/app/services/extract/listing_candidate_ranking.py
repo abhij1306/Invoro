@@ -43,6 +43,8 @@ from app.services.config.runtime_settings import crawler_runtime_settings
 from app.services.extract.listing_card_fragments import listing_signature_url_shape
 from app.services.shared.field_coerce import LISTING_UTILITY_TITLE_REGEXES, clean_text
 
+_LOWER_NON_ALNUM_SPLIT_RE = re.compile(r"[^a-z0-9]+")
+
 
 def _metric_int(metrics: dict[str, object], key: str) -> int:
     value = metrics.get(key)
@@ -83,7 +85,7 @@ def _listing_url_path_tokens(url: str) -> set[str]:
         return set()
     return {
         token
-        for token in re.split(r"[^a-z0-9]+", str(parsed.path or "").lower())
+        for token in _LOWER_NON_ALNUM_SPLIT_RE.split(str(parsed.path or "").lower())
         if token
     }
 
@@ -97,6 +99,7 @@ def _listing_url_is_collection_like(url: str) -> bool:
 
 def _set_cohort_homogeneity(records: list[dict[str, Any]], *, page_url: str) -> float:
     """Return dominant_signature_count / len(records). Empty set returns 1.0."""
+    _ = page_url
     if not records:
         return 1.0
     signatures: list[str] = []
@@ -127,7 +130,7 @@ def best_listing_candidate_set(
     for set_name, records in candidate_sets:
         limited = [
             record
-            for record in list(records or [])
+            for record in records or []
             if isinstance(record, dict)
         ]
         prepared = _prepare_listing_candidate_set(

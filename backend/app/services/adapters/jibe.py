@@ -102,7 +102,7 @@ class JibeAdapter(PublicEndpointAdapter):
         for parser in (json.loads, ast.literal_eval):
             try:
                 parsed = parser(raw)
-            except (ValueError, SyntaxError, TypeError, json.JSONDecodeError):
+            except (ValueError, SyntaxError, TypeError):
                 continue
             return parsed if isinstance(parsed, dict) else {}
         return {}

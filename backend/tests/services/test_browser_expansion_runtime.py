@@ -4076,7 +4076,12 @@ async def test_browser_behavior_realism_is_timeout_bounded(
         object()
     )
 
+    assert isinstance(diagnostics, dict)
+    assert diagnostics["enabled"] is True
     assert diagnostics["timed_out"] is True
+    assert "timeout_seconds" in diagnostics
+    assert isinstance(diagnostics["timeout_seconds"], float)
+    assert diagnostics["timeout_seconds"] == pytest.approx(0.01)
 
 
 @pytest.mark.asyncio

@@ -30,11 +30,9 @@ If a file is not listed, assume it is a helper under a listed owner.
 | `data_enrichment.py` | On-demand ecommerce detail enrichment jobs and enriched product rows |
 | `ucp_audit.py` | UCP audit job creation, history, detail, and report exports |
 | `monitors.py` | Product monitor CRUD, run-now dispatch, history/events/snapshot, and exports |
-| `monitors.py` | Product monitor CRUD, run-now dispatch, history/events/snapshot, and exports |
 | `alerts.py` | Agentic Delta Engine alert CRUD, test poll, history, and webhook delivery log |
 | `public_alerts.py` | API-key authenticated `/api/v1/alerts` public alert surface |
-| `api_keys.py` | Dashboard API-key create/list/revoke endpoints; returns plaintext only on create || `api_keys.py` | Dashboard API-key create/list/revoke endpoints; returns plaintext only on create |
-| `public/*` | Public API v1 envelope, rate-limit helpers, HTTP-only extraction, domain info, capabilities, and deferred batch routes |
+| `api_keys.py` | Dashboard API-key create/list/revoke endpoints; returns plaintext only on create || `public/*` | Public API v1 envelope, rate-limit helpers, HTTP-only extraction, domain info, capabilities, and deferred batch routes |
 | `orchestration.py` | Project/workflow shell, template listing, workflow launch/status, monitor promotion, and comparison results |
 | `notifications.py` | In-app monitor notification listing, unread counts, and read state |
 | `auth.py` | Login, register, `/me` |

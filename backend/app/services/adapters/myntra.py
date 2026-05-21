@@ -139,7 +139,7 @@ def _listing_record_from_state_product(
     inventory = next(
         (
             row
-            for row in list(product.get("inventoryInfo") or [])
+            for row in product.get("inventoryInfo") or []
             if isinstance(row, dict)
         ),
         None,
@@ -299,10 +299,10 @@ def _myx_images(product: dict[str, Any]) -> list[str]:
     if not isinstance(media, dict):
         return []
     values: list[str] = []
-    for album in list(media.get("albums") or []):
+    for album in media.get("albums") or []:
         if not isinstance(album, dict):
             continue
-        for image in list(album.get("images") or []):
+        for image in album.get("images") or []:
             if not isinstance(image, dict):
                 continue
             for key in ("imageURL", "secureSrc", "src"):
@@ -328,7 +328,7 @@ def _myx_variants(
     color: str | None,
 ) -> list[dict[str, Any]]:
     variants: list[dict[str, Any]] = []
-    for item in list(product.get("sizes") or []):
+    for item in product.get("sizes") or []:
         if not isinstance(item, dict):
             continue
         seller = _dict_or_empty(item.get("selectedSeller"))

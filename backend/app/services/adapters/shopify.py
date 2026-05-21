@@ -679,15 +679,16 @@ class ShopifyAdapter(BaseAdapter):
             if (image_url := self._normalize_url(self._image_src(img), parsed.scheme))
         ]
         raw_tags = product.get("tags")
-        tags = (
-            [
+        if isinstance(raw_tags, str) and raw_tags.strip():
+            tags = [
                 token
                 for token in (item.strip() for item in raw_tags.strip().split(","))
                 if token
             ]
-            if isinstance(raw_tags, str) and raw_tags.strip()
-            else ([] if isinstance(raw_tags, str) else product.get("tags", []))
-        )
+        elif isinstance(raw_tags, str):
+            tags = []
+        else:
+            tags = product.get("tags", [])
         record = {
             "title": product.get("title"),
             "brand": product.get("vendor"),

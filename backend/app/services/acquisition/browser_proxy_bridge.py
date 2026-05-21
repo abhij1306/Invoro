@@ -326,5 +326,5 @@ def bridge_counters() -> dict[str, int]:
 
 
 def reset_bridge_counters() -> None:
-    for key in list(_BRIDGE_COUNTERS):
+    for key in _BRIDGE_COUNTERS:
         _BRIDGE_COUNTERS[key] = 0

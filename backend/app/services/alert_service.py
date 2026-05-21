@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from pydantic import TypeAdapter, ValidationError
@@ -45,6 +46,7 @@ from app.services.monitor_service import (
     utcnow,
 )
 
+logger = logging.getLogger(__name__)
 _ALERT_STATUS_ADAPTER: TypeAdapter[AlertStatus] = TypeAdapter(AlertStatus)
 _ALERT_RULES_ADAPTER: TypeAdapter[list[AlertRule]] = TypeAdapter(list[AlertRule])
 
@@ -298,17 +300,23 @@ def _rules_payload(rules: object) -> list[dict[str, Any]]:
     output: list[dict[str, Any]] = []
     for rule in rules:
         if isinstance(rule, AlertRule):
-            output.append(rule.model_dump(exclude_none=True))
+            output.append(
+                {str(key): value for key, value in rule.model_dump(exclude_none=True).items()}
+            )
         elif callable(getattr(rule, "model_dump", None)):
             output.append(
                 {
                     str(key): value
                     for key, value in rule.model_dump(exclude_none=True).items()
-                    if value is not None
                 }
             )
         elif isinstance(rule, dict):
             output.append({str(key): value for key, value in rule.items() if value is not None})
+        else:
+            logger.warning(
+                "Unsupported alert rule payload type",
+                extra={"rule_type": type(rule).__name__},
+            )
     return output
 
 

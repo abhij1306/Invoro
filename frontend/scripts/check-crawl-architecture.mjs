@@ -174,7 +174,7 @@ const runScreen = read('components/crawl/crawl-run-screen.tsx');
 const cleanedRunScreen = runScreen === null ? null : stripCommentsAndStrings(runScreen);
 if (
   cleanedRunScreen !== null &&
-  /\brefetchPanels\b|(?:\bwindow\.)?\bsetInterval\s*\(\s*\brefetch\b/.test(cleanedRunScreen)
+  /\brefetchPanels\b|(?:\bwindow\.)?\bsetInterval\s*\([\s\S]*?\brefetch\b/.test(cleanedRunScreen)
 ) {
   failures.push(
     'components/crawl/crawl-run-screen.tsx must use TanStack Query refetchInterval for server polling.',

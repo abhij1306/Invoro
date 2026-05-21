@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import copy
 from pathlib import Path
@@ -29,10 +30,17 @@ from app.services.pipeline.extraction_retry_decision import (
 )
 from app.services.pipeline.persistence import persist_acquisition_artifacts
 from app.services.pipeline.types import URLProcessingConfig
-from app.services.config.runtime_settings import crawler_runtime_settings
 from app.services.robots_policy import RobotsPolicyResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
+
+
+def _as_async(fn):
+    async def _wrapped(*args, **kwargs):
+        await asyncio.sleep(0)
+        return fn(*args, **kwargs)
+
+    return _wrapped
 
 def _detail_html() -> str:
     return "<html><body><h1>Widget Prime</h1></body></html>"
@@ -61,7 +69,8 @@ def _fake_acquire_result(
     )
 
 
-async def _no_adapter(*_args, **_kwargs):
+@_as_async
+def _no_adapter(*_args, **_kwargs):
     return None
 
 
@@ -90,11 +99,13 @@ async def test_direct_record_llm_fallback_does_not_replace_deterministic_records
         }
     ]
 
-    async def _unexpected_resolve_run_config(*args, **kwargs):
+    @_as_async
+    def _unexpected_resolve_run_config(*args, **kwargs):
         del args, kwargs
         raise AssertionError("direct LLM must not replace deterministic records")
 
-    async def _unexpected_extract_records(*args, **kwargs):
+    @_as_async
+    def _unexpected_extract_records(*args, **kwargs):
         del args, kwargs
         raise AssertionError("direct LLM must not run as primary extraction")
 
@@ -127,11 +138,13 @@ async def test_direct_record_llm_fallback_does_not_create_primary_records(
         },
     )
 
-    async def _unexpected_resolve_run_config(*args, **kwargs):
+    @_as_async
+    def _unexpected_resolve_run_config(*args, **kwargs):
         del args, kwargs
         raise AssertionError("direct LLM must not create primary records")
 
-    async def _unexpected_extract_records(*args, **kwargs):
+    @_as_async
+    def _unexpected_extract_records(*args, **kwargs):
         del args, kwargs
         raise AssertionError("direct LLM must not run as primary extraction")
 
@@ -166,11 +179,13 @@ async def test_direct_record_llm_fallback_backfills_missing_listing_fields(
     )
     records = [{"title": "Widget", "price": "19.99", "url": "https://example.com/p/1"}]
 
-    async def _resolve_run_config(*args, **kwargs):
+    @_as_async
+    def _resolve_run_config(*args, **kwargs):
         del args, kwargs
         return {"provider": "test"}
 
-    async def _extract_records(*args, **kwargs):
+    @_as_async
+    def _extract_records(*args, **kwargs):
         del args, kwargs
         return ([{"image_url": "https://example.com/widget.jpg"}], None)
 
@@ -409,7 +424,8 @@ async def test_process_single_url_skips_low_quality_browser_retry_when_budget_lo
     )
     acquire_calls: list[dict[str, object]] = []
 
-    async def _fake_acquire(request: AcquisitionRequest) -> AcquisitionResult:
+    @_as_async
+    def _fake_acquire(request: AcquisitionRequest) -> AcquisitionResult:
         acquire_calls.append(dict(request.acquisition_profile))
         return _fake_acquire_result(
             request,
@@ -427,7 +443,8 @@ async def test_process_single_url_skips_low_quality_browser_retry_when_budget_lo
             method="curl_cffi",
         )
 
-    async def _fake_run_adapter(*_args, **_kwargs):
+    @_as_async
+    def _fake_run_adapter(*_args, **_kwargs):
         return None
 
     def _fake_extract_records(*_args, **_kwargs):
@@ -468,7 +485,8 @@ async def test_process_single_url_blocks_before_acquire_when_robots_disallows(
         },
     )
 
-    async def _disallow(url: str, *, user_agent: str = "*") -> RobotsPolicyResult:
+    @_as_async
+    def _disallow(url: str, *, user_agent: str = "*") -> RobotsPolicyResult:
         del user_agent
         return RobotsPolicyResult(
             allowed=False,
@@ -476,7 +494,8 @@ async def test_process_single_url_blocks_before_acquire_when_robots_disallows(
             robots_url="https://example.com/robots.txt",
         )
 
-    async def _unexpected_acquire(request):
+    @_as_async
+    def _unexpected_acquire(request):
         raise AssertionError(f"acquire should not run for {request.url}")
 
     monkeypatch.setattr("app.services.pipeline.extraction_loop.check_url_crawlability", _disallow)
@@ -511,7 +530,8 @@ async def test_process_single_url_prefetch_only_returns_metrics_without_persisti
         },
     )
 
-    async def _fake_acquire(request):
+    @_as_async
+    def _fake_acquire(request):
         return _fake_acquire_result(request)
 
     monkeypatch.setattr("app.services.pipeline.extraction_loop.acquire", _fake_acquire)
@@ -550,7 +570,8 @@ async def test_post_extraction_challenge_shell_retries_real_chrome(
     attempted_engines: list[str] = []
     hard_blocks: list[dict[str, object]] = []
 
-    async def _fake_acquire(request: AcquisitionRequest) -> AcquisitionResult:
+    @_as_async
+    def _fake_acquire(request: AcquisitionRequest) -> AcquisitionResult:
         forced_engine = str(
             request.acquisition_profile.get("forced_browser_engine") or "patchright"
         )
@@ -583,7 +604,8 @@ async def test_post_extraction_challenge_shell_retries_real_chrome(
             }
         ]
 
-    async def _fake_note_host_hard_block(value: str | None, **kwargs):
+    @_as_async
+    def _fake_note_host_hard_block(value: str | None, **kwargs):
         hard_blocks.append({"value": value, **kwargs})
 
     monkeypatch.setattr("app.services.pipeline.extraction_loop.acquire", _fake_acquire)
@@ -628,7 +650,8 @@ async def test_post_extraction_detail_shell_escalates_real_chrome(
     )
     attempted_engines: list[str] = []
 
-    async def _fake_acquire(request: AcquisitionRequest) -> AcquisitionResult:
+    @_as_async
+    def _fake_acquire(request: AcquisitionRequest) -> AcquisitionResult:
         forced_engine = str(
             request.acquisition_profile.get("forced_browser_engine") or "patchright"
         )
@@ -706,7 +729,8 @@ async def test_post_extraction_identity_mismatch_escalates_real_chrome(
     )
     attempted_engines: list[str] = []
 
-    async def _fake_acquire(request: AcquisitionRequest) -> AcquisitionResult:
+    @_as_async
+    def _fake_acquire(request: AcquisitionRequest) -> AcquisitionResult:
         forced_engine = str(
             request.acquisition_profile.get("forced_browser_engine") or "patchright"
         )
@@ -791,7 +815,8 @@ async def test_usable_detail_with_active_provider_evidence_does_not_retry_real_c
     )
     attempted_engines: list[str] = []
 
-    async def _fake_acquire(request: AcquisitionRequest) -> AcquisitionResult:
+    @_as_async
+    def _fake_acquire(request: AcquisitionRequest) -> AcquisitionResult:
         forced_engine = str(
             request.acquisition_profile.get("forced_browser_engine") or "patchright"
         )
@@ -853,7 +878,8 @@ async def test_patchright_challenge_shell_updates_host_memory(
     )
     hard_blocks: list[dict[str, object]] = []
 
-    async def _fake_acquire(request: AcquisitionRequest) -> AcquisitionResult:
+    @_as_async
+    def _fake_acquire(request: AcquisitionRequest) -> AcquisitionResult:
         return _fake_acquire_result(
             request,
             html="<html><body>patchright</body></html>",
@@ -868,7 +894,8 @@ async def test_patchright_challenge_shell_updates_host_memory(
             },
         )
 
-    async def _fake_note_host_hard_block(value: str | None, **kwargs):
+    @_as_async
+    def _fake_note_host_hard_block(value: str | None, **kwargs):
         hard_blocks.append({"value": value, **kwargs})
 
     monkeypatch.setattr("app.services.pipeline.extraction_loop.acquire", _fake_acquire)
@@ -919,7 +946,8 @@ async def test_process_single_url_runs_adapter_against_browser_artifact_fragment
     </article>
     """
 
-    async def _fake_acquire(request):
+    @_as_async
+    def _fake_acquire(request):
         return _fake_acquire_result(
             request,
             html="<html><body><h1>Home</h1></body></html>",
@@ -927,7 +955,8 @@ async def test_process_single_url_runs_adapter_against_browser_artifact_fragment
             artifacts={"rendered_listing_fragments": [fragment]},
         )
 
-    async def _fake_run_adapter(url, html, surface):
+    @_as_async
+    def _fake_run_adapter(url, html, surface):
         if "product-tile" not in html:
             return None
         return AdapterResult(
@@ -944,14 +973,16 @@ async def test_process_single_url_runs_adapter_against_browser_artifact_fragment
             adapter_name="belk",
         )
 
-    async def _no_selector_rules(*args, **kwargs):
+    @_as_async
+    def _no_selector_rules(*args, **kwargs):
         del args, kwargs
         return []
 
     def _fake_extract_records(*args, **kwargs):
         return list(kwargs.get("adapter_records") or [])
 
-    async def _persist_artifacts(**kwargs):
+    @_as_async
+    def _persist_artifacts(**kwargs):
         del kwargs
         return "artifacts/belk.html"
 
@@ -991,7 +1022,8 @@ async def test_process_single_url_prefers_richer_adapter_artifact_rows(
         },
     )
 
-    async def _fake_acquire(request):
+    @_as_async
+    def _fake_acquire(request):
         return _fake_acquire_result(
             request,
             html="<html><body>partial product-tile</body></html>",
@@ -999,7 +1031,8 @@ async def test_process_single_url_prefers_richer_adapter_artifact_rows(
             artifacts={"rendered_listing_fragments": ["rich product-tile"]},
         )
 
-    async def _fake_run_adapter(url, html, surface):
+    @_as_async
+    def _fake_run_adapter(url, html, surface):
         del url, surface
         if "rich product-tile" in html:
             records = [
@@ -1024,14 +1057,16 @@ async def test_process_single_url_prefers_richer_adapter_artifact_rows(
             records=records, source_type="belk_adapter", adapter_name="belk"
         )
 
-    async def _no_selector_rules(*args, **kwargs):
+    @_as_async
+    def _no_selector_rules(*args, **kwargs):
         del args, kwargs
         return []
 
     def _fake_extract_records(*args, **kwargs):
         return list(kwargs.get("adapter_records") or [])
 
-    async def _persist_artifacts(**kwargs):
+    @_as_async
+    def _persist_artifacts(**kwargs):
         del kwargs
         return "artifacts/belk.html"
 
@@ -1138,7 +1173,8 @@ async def test_acquire_normalizes_retry_reason_aliases(
 ) -> None:
     captured: dict[str, object] = {}
 
-    async def _fake_fetch_page(url: str, **kwargs):
+    @_as_async
+    def _fake_fetch_page(url: str, **kwargs):
         captured["url"] = url
         captured.update(kwargs)
         return type(
@@ -1194,7 +1230,8 @@ async def test_process_single_url_marks_empty_listing_as_listing_detection_faile
         },
     )
 
-    async def _fake_acquire(request):
+    @_as_async
+    def _fake_acquire(request):
         return AcquisitionResult(
             request=request,
             final_url=request.url,
@@ -1205,7 +1242,8 @@ async def test_process_single_url_marks_empty_listing_as_listing_detection_faile
 
     monkeypatch.setattr("app.services.pipeline.extraction_loop.acquire", _fake_acquire)
 
-    async def _no_selector_rules(*args, **kwargs):
+    @_as_async
+    def _no_selector_rules(*args, **kwargs):
         del args, kwargs
         return []
 
@@ -1250,7 +1288,8 @@ async def test_process_single_url_preserves_proxy_list_for_detail_surface(
     )
     captured_proxy_lists: list[list[str]] = []
 
-    async def _fake_acquire(request):
+    @_as_async
+    def _fake_acquire(request):
         captured_proxy_lists.append(list(request.proxy_list))
         return AcquisitionResult(
             request=request,
@@ -1262,7 +1301,8 @@ async def test_process_single_url_preserves_proxy_list_for_detail_surface(
 
     monkeypatch.setattr("app.services.pipeline.extraction_loop.acquire", _fake_acquire)
 
-    async def _no_selector_rules(*args, **kwargs):
+    @_as_async
+    def _no_selector_rules(*args, **kwargs):
         del args, kwargs
         return []
 
@@ -1275,7 +1315,8 @@ async def test_process_single_url_preserves_proxy_list_for_detail_surface(
         lambda *args, **kwargs: [{"title": "Widget Prime"}],
     )
 
-    async def _persist_artifacts(**kwargs):
+    @_as_async
+    def _persist_artifacts(**kwargs):
         del kwargs
         return "artifacts/widget-prime.html"
 
@@ -1316,7 +1357,8 @@ async def test_process_single_url_repairs_missing_proxy_list_from_run_settings_w
     )
     captured_proxy_lists: list[list[str]] = []
 
-    async def _fake_acquire(request):
+    @_as_async
+    def _fake_acquire(request):
         captured_proxy_lists.append(list(request.proxy_list))
         return AcquisitionResult(
             request=request,
@@ -1328,7 +1370,8 @@ async def test_process_single_url_repairs_missing_proxy_list_from_run_settings_w
 
     monkeypatch.setattr("app.services.pipeline.extraction_loop.acquire", _fake_acquire)
 
-    async def _no_selector_rules(*args, **kwargs):
+    @_as_async
+    def _no_selector_rules(*args, **kwargs):
         del args, kwargs
         return []
 
@@ -1341,7 +1384,8 @@ async def test_process_single_url_repairs_missing_proxy_list_from_run_settings_w
         lambda *args, **kwargs: [{"title": "Widget Prime"}],
     )
 
-    async def _persist_artifacts(**kwargs):
+    @_as_async
+    def _persist_artifacts(**kwargs):
         del kwargs
         return "artifacts/widget-prime.html"
 
@@ -1400,7 +1444,8 @@ async def test_process_single_url_does_not_duplicate_block_warning_after_browser
             },
         )
 
-    async def _no_selector_rules(*args, **kwargs):
+    @_as_async
+    def _no_selector_rules(*args, **kwargs):
         del args, kwargs
         return []
 
@@ -1413,7 +1458,8 @@ async def test_process_single_url_does_not_duplicate_block_warning_after_browser
         "app.services.pipeline.extraction_loop.extract_records", lambda *args, **kwargs: []
     )
 
-    async def _persist_artifacts(**kwargs):
+    @_as_async
+    def _persist_artifacts(**kwargs):
         del kwargs
         return "artifacts/widgets.html"
 
@@ -1454,7 +1500,8 @@ async def test_process_single_url_persists_detail_records_after_self_heal_and_ll
         },
     )
 
-    async def _fake_acquire(request):
+    @_as_async
+    def _fake_acquire(request):
         return AcquisitionResult(
             request=request,
             final_url=request.url,
@@ -1463,14 +1510,16 @@ async def test_process_single_url_persists_detail_records_after_self_heal_and_ll
             status_code=200,
         )
 
-    async def _fake_self_heal(session, **kwargs):
+    @_as_async
+    def _fake_self_heal(session, **kwargs):
         del session
         record = dict(kwargs["records"][0])
         record["title"] = "Widget Prime (self-healed)"
         record["_self_heal"] = {"mode": "selector_synthesis", "triggered": True}
         return [record], list(kwargs["selector_rules"])
 
-    async def _fake_llm(session, *, records, **kwargs):
+    @_as_async
+    def _fake_llm(session, *, records, **kwargs):
         del session, kwargs
         record = dict(records[0])
         record["price"] = "19.99"
@@ -1478,7 +1527,8 @@ async def test_process_single_url_persists_detail_records_after_self_heal_and_ll
 
     monkeypatch.setattr("app.services.pipeline.extraction_loop.acquire", _fake_acquire)
 
-    async def _no_selector_rules(*args, **kwargs):
+    @_as_async
+    def _no_selector_rules(*args, **kwargs):
         del args, kwargs
         return []
 
@@ -1495,7 +1545,8 @@ async def test_process_single_url_persists_detail_records_after_self_heal_and_ll
     )
     monkeypatch.setattr("app.services.pipeline.extraction_loop.apply_llm_fallback", _fake_llm)
 
-    async def _persist_artifacts(**kwargs):
+    @_as_async
+    def _persist_artifacts(**kwargs):
         del kwargs
         return "artifacts/widget-prime.html"
 
@@ -1541,7 +1592,8 @@ async def test_process_single_url_retries_with_browser_after_empty_non_browser_e
     )
     acquire_calls: list[dict[str, object]] = []
 
-    async def _fake_acquire(request):
+    @_as_async
+    def _fake_acquire(request):
         acquire_calls.append(dict(request.acquisition_profile))
         if request.acquisition_profile.get("prefer_browser"):
             return AcquisitionResult(
@@ -1559,7 +1611,8 @@ async def test_process_single_url_retries_with_browser_after_empty_non_browser_e
             status_code=200,
         )
 
-    async def _no_selector_rules(*args, **kwargs):
+    @_as_async
+    def _no_selector_rules(*args, **kwargs):
         del args, kwargs
         return []
 
@@ -1581,7 +1634,8 @@ async def test_process_single_url_retries_with_browser_after_empty_non_browser_e
     )
     monkeypatch.setattr("app.services.pipeline.extraction_loop.extract_records", _extract_records)
 
-    async def _persist_artifacts(**kwargs):
+    @_as_async
+    def _persist_artifacts(**kwargs):
         del kwargs
         return "artifacts/widgets.html"
 
@@ -1619,7 +1673,8 @@ async def test_process_single_url_does_not_auto_scroll_after_empty_browser_listi
     )
     acquire_calls: list[tuple[dict[str, object], str | None]] = []
 
-    async def _fake_acquire(request):
+    @_as_async
+    def _fake_acquire(request):
         acquire_calls.append(
             (dict(request.acquisition_profile), request.plan.traversal_mode)
         )
@@ -1640,7 +1695,8 @@ async def test_process_single_url_does_not_auto_scroll_after_empty_browser_listi
             status_code=200,
         )
 
-    async def _no_selector_rules(*args, **kwargs):
+    @_as_async
+    def _no_selector_rules(*args, **kwargs):
         del args, kwargs
         return []
 
@@ -1655,7 +1711,8 @@ async def test_process_single_url_does_not_auto_scroll_after_empty_browser_listi
         lambda *args, **kwargs: [],
     )
 
-    async def _persist_artifacts(**kwargs):
+    @_as_async
+    def _persist_artifacts(**kwargs):
         del kwargs
         return "artifacts/widgets.html"
 
@@ -1689,7 +1746,8 @@ async def test_process_single_url_persists_listing_page_source_separately_from_r
         },
     )
 
-    async def _fake_acquire(request):
+    @_as_async
+    def _fake_acquire(request):
         return AcquisitionResult(
             request=request,
             final_url=request.url,
@@ -1699,7 +1757,8 @@ async def test_process_single_url_persists_listing_page_source_separately_from_r
             browser_diagnostics={"browser_attempted": True},
         )
 
-    async def _no_selector_rules(*args, **kwargs):
+    @_as_async
+    def _no_selector_rules(*args, **kwargs):
         del args, kwargs
         return []
 
@@ -1720,7 +1779,8 @@ async def test_process_single_url_persists_listing_page_source_separately_from_r
         ],
     )
 
-    async def _persist_artifacts(**kwargs):
+    @_as_async
+    def _persist_artifacts(**kwargs):
         del kwargs
         return "artifacts/widgets.html"
 
@@ -1756,7 +1816,8 @@ async def test_process_single_url_log_uses_generic_extraction_label_when_no_adap
         },
     )
 
-    async def _fake_acquire(request):
+    @_as_async
+    def _fake_acquire(request):
         return AcquisitionResult(
             request=request,
             final_url=request.url,
@@ -1766,7 +1827,8 @@ async def test_process_single_url_log_uses_generic_extraction_label_when_no_adap
             browser_diagnostics={"browser_attempted": True},
         )
 
-    async def _no_selector_rules(*args, **kwargs):
+    @_as_async
+    def _no_selector_rules(*args, **kwargs):
         del args, kwargs
         return []
 
@@ -1787,7 +1849,8 @@ async def test_process_single_url_log_uses_generic_extraction_label_when_no_adap
         ],
     )
 
-    async def _persist_artifacts(**kwargs):
+    @_as_async
+    def _persist_artifacts(**kwargs):
         del kwargs
         return "artifacts/widgets.html"
 
@@ -1822,7 +1885,8 @@ async def test_process_single_url_upserts_duplicate_run_identity_records(
         },
     )
 
-    async def _fake_acquire(request):
+    @_as_async
+    def _fake_acquire(request):
         return AcquisitionResult(
             request=request,
             final_url=request.url,
@@ -1832,7 +1896,8 @@ async def test_process_single_url_upserts_duplicate_run_identity_records(
             browser_diagnostics={"browser_attempted": True},
         )
 
-    async def _no_selector_rules(*args, **kwargs):
+    @_as_async
+    def _no_selector_rules(*args, **kwargs):
         del args, kwargs
         return []
 
@@ -1857,7 +1922,8 @@ async def test_process_single_url_upserts_duplicate_run_identity_records(
 
     monkeypatch.setattr("app.services.pipeline.extraction_loop.extract_records", _extract_records)
 
-    async def _persist_artifacts(**kwargs):
+    @_as_async
+    def _persist_artifacts(**kwargs):
         del kwargs
         return "artifacts/widget-prime.html"
 
@@ -1896,7 +1962,8 @@ async def test_process_single_url_offloads_extract_records_to_thread(
     )
     to_thread_calls: list[str] = []
 
-    async def _fake_acquire(request):
+    @_as_async
+    def _fake_acquire(request):
         return AcquisitionResult(
             request=request,
             final_url=request.url,
@@ -1905,11 +1972,13 @@ async def test_process_single_url_offloads_extract_records_to_thread(
             status_code=200,
         )
 
-    async def _no_selector_rules(*args, **kwargs):
+    @_as_async
+    def _no_selector_rules(*args, **kwargs):
         del args, kwargs
         return []
 
-    async def _fake_to_thread(func, *args, **kwargs):
+    @_as_async
+    def _fake_to_thread(func, *args, **kwargs):
         to_thread_calls.append(getattr(func, "__name__", type(func).__name__))
         return func(*args, **kwargs)
 
@@ -1943,7 +2012,8 @@ async def test_process_single_url_keeps_platform_family_separate_from_adapter_pr
         },
     )
 
-    async def _fake_acquire(request):
+    @_as_async
+    def _fake_acquire(request):
         return AcquisitionResult(
             request=request,
             final_url=request.url,
@@ -1952,11 +2022,13 @@ async def test_process_single_url_keeps_platform_family_separate_from_adapter_pr
             status_code=200,
         )
 
-    async def _no_selector_rules(*args, **kwargs):
+    @_as_async
+    def _no_selector_rules(*args, **kwargs):
         del args, kwargs
         return []
 
-    async def _persist_artifacts(**kwargs):
+    @_as_async
+    def _persist_artifacts(**kwargs):
         del kwargs
         return "artifacts/widget-prime.html"
 
@@ -2002,7 +2074,8 @@ async def test_apply_llm_fallback_re_normalizes_llm_values_before_return(
         },
     )
 
-    async def _fake_extract_missing_fields(*args, **kwargs):
+    @_as_async
+    def _fake_extract_missing_fields(*args, **kwargs):
         del args, kwargs
         return (
             {
@@ -2061,7 +2134,8 @@ async def test_apply_llm_fallback_skips_when_contract_fields_complete(
         },
     )
 
-    async def _unexpected_extract_missing_fields(*args, **kwargs):
+    @_as_async
+    def _unexpected_extract_missing_fields(*args, **kwargs):
         del args, kwargs
         raise AssertionError("LLM should not run when contract fields are complete")
 
@@ -2108,7 +2182,8 @@ async def test_process_single_url_applies_llm_fallback_when_confidence_score_is_
         },
     )
 
-    async def _fake_acquire(request):
+    @_as_async
+    def _fake_acquire(request):
         return AcquisitionResult(
             request=request,
             final_url=request.url,
@@ -2117,11 +2192,13 @@ async def test_process_single_url_applies_llm_fallback_when_confidence_score_is_
             status_code=200,
         )
 
-    async def _fake_extract_missing_fields(*args, **kwargs):
+    @_as_async
+    def _fake_extract_missing_fields(*args, **kwargs):
         del args, kwargs
         return {"price": "19.99"}, None
 
-    async def _no_selector_rules(*args, **kwargs):
+    @_as_async
+    def _no_selector_rules(*args, **kwargs):
         del args, kwargs
         return []
 
@@ -2146,7 +2223,8 @@ async def test_process_single_url_applies_llm_fallback_when_confidence_score_is_
         ],
     )
 
-    async def _persist_artifacts(**kwargs):
+    @_as_async
+    def _persist_artifacts(**kwargs):
         del kwargs
         return "artifacts/widget-prime.html"
 
@@ -2180,7 +2258,8 @@ async def test_process_single_url_strips_schema_type_mismatches_during_normaliza
         },
     )
 
-    async def _fake_acquire(request):
+    @_as_async
+    def _fake_acquire(request):
         return AcquisitionResult(
             request=request,
             final_url=request.url,
@@ -2189,11 +2268,13 @@ async def test_process_single_url_strips_schema_type_mismatches_during_normaliza
             status_code=200,
         )
 
-    async def _no_selector_rules(*args, **kwargs):
+    @_as_async
+    def _no_selector_rules(*args, **kwargs):
         del args, kwargs
         return []
 
-    async def _persist_artifacts(**kwargs):
+    @_as_async
+    def _persist_artifacts(**kwargs):
         del kwargs
         return "artifacts/widget-prime.html"
 
@@ -2253,7 +2334,8 @@ async def test_process_single_url_persists_browser_diagnostics_and_screenshot_ar
         "app.services.artifact_store.settings.artifacts_dir", artifacts_dir
     )
 
-    async def _fake_acquire(request):
+    @_as_async
+    def _fake_acquire(request):
         return AcquisitionResult(
             request=request,
             final_url=request.url,
@@ -2272,7 +2354,8 @@ async def test_process_single_url_persists_browser_diagnostics_and_screenshot_ar
             artifacts={"browser_screenshot_path": str(staged_screenshot)},
         )
 
-    async def _no_selector_rules(*args, **kwargs):
+    @_as_async
+    def _no_selector_rules(*args, **kwargs):
         del args, kwargs
         return []
 
@@ -2398,7 +2481,8 @@ async def test_process_single_url_does_not_retry_browser_after_empty_browser_acq
     )
     acquire_calls: list[dict[str, object]] = []
 
-    async def _fake_acquire(request):
+    @_as_async
+    def _fake_acquire(request):
         acquire_calls.append(dict(request.acquisition_profile))
         return AcquisitionResult(
             request=request,
@@ -2413,7 +2497,8 @@ async def test_process_single_url_does_not_retry_browser_after_empty_browser_acq
             },
         )
 
-    async def _no_selector_rules(*args, **kwargs):
+    @_as_async
+    def _no_selector_rules(*args, **kwargs):
         del args, kwargs
         return []
 
@@ -2426,7 +2511,8 @@ async def test_process_single_url_does_not_retry_browser_after_empty_browser_acq
         "app.services.pipeline.extraction_loop.extract_records", lambda *args, **kwargs: []
     )
 
-    async def _persist_artifacts(**kwargs):
+    @_as_async
+    def _persist_artifacts(**kwargs):
         del kwargs
         return "artifacts/widgets.html"
 
@@ -2460,7 +2546,8 @@ async def test_process_single_url_skips_llm_on_low_content_browser_listing(
         },
     )
 
-    async def _fake_acquire(request):
+    @_as_async
+    def _fake_acquire(request):
         return AcquisitionResult(
             request=request,
             final_url=request.url,
@@ -2474,17 +2561,20 @@ async def test_process_single_url_skips_llm_on_low_content_browser_listing(
             },
         )
 
-    async def _no_selector_rules(*args, **kwargs):
+    @_as_async
+    def _no_selector_rules(*args, **kwargs):
         del args, kwargs
         return []
 
-    async def _unexpected_direct_llm(*args, **kwargs):
+    @_as_async
+    def _unexpected_direct_llm(*args, **kwargs):
         del args, kwargs
         raise AssertionError(
             "low-content browser result must not run direct LLM fallback"
         )
 
-    async def _persist_artifacts(**kwargs):
+    @_as_async
+    def _persist_artifacts(**kwargs):
         del kwargs
         return "artifacts/widgets.html"
 
@@ -2531,7 +2621,8 @@ async def test_process_single_url_does_not_use_direct_llm_as_primary_listing_ext
         },
     )
 
-    async def _fake_acquire(request):
+    @_as_async
+    def _fake_acquire(request):
         return AcquisitionResult(
             request=request,
             final_url=request.url,
@@ -2545,15 +2636,18 @@ async def test_process_single_url_does_not_use_direct_llm_as_primary_listing_ext
             },
         )
 
-    async def _no_selector_rules(*args, **kwargs):
+    @_as_async
+    def _no_selector_rules(*args, **kwargs):
         del args, kwargs
         return []
 
-    async def _unexpected_resolve_run_config(*args, **kwargs):
+    @_as_async
+    def _unexpected_resolve_run_config(*args, **kwargs):
         del args, kwargs
         raise AssertionError("empty listing must not ask LLM to invent records")
 
-    async def _persist_artifacts(**kwargs):
+    @_as_async
+    def _persist_artifacts(**kwargs):
         del kwargs
         return "artifacts/widgets.html"
 
@@ -2599,7 +2693,8 @@ async def test_process_single_url_ignores_extracted_placeholder_records_from_low
         },
     )
 
-    async def _fake_acquire(request):
+    @_as_async
+    def _fake_acquire(request):
         return AcquisitionResult(
             request=request,
             final_url=request.url,
@@ -2613,7 +2708,8 @@ async def test_process_single_url_ignores_extracted_placeholder_records_from_low
             },
         )
 
-    async def _no_selector_rules(*args, **kwargs):
+    @_as_async
+    def _no_selector_rules(*args, **kwargs):
         del args, kwargs
         return []
 
@@ -2629,7 +2725,8 @@ async def test_process_single_url_ignores_extracted_placeholder_records_from_low
         ],
     )
 
-    async def _persist_artifacts(**kwargs):
+    @_as_async
+    def _persist_artifacts(**kwargs):
         del kwargs
         return "artifacts/mixer-truck.html"
 
@@ -2667,7 +2764,8 @@ async def test_process_single_url_does_not_retry_browser_after_prior_challenge_a
     )
     acquire_calls: list[dict[str, object]] = []
 
-    async def _fake_acquire(request):
+    @_as_async
+    def _fake_acquire(request):
         acquire_calls.append(dict(request.acquisition_profile))
         return AcquisitionResult(
             request=request,
@@ -2682,7 +2780,8 @@ async def test_process_single_url_does_not_retry_browser_after_prior_challenge_a
             },
         )
 
-    async def _no_selector_rules(*args, **kwargs):
+    @_as_async
+    def _no_selector_rules(*args, **kwargs):
         del args, kwargs
         return []
 
@@ -2695,7 +2794,8 @@ async def test_process_single_url_does_not_retry_browser_after_prior_challenge_a
         "app.services.pipeline.extraction_loop.extract_records", lambda *args, **kwargs: []
     )
 
-    async def _persist_artifacts(**kwargs):
+    @_as_async
+    def _persist_artifacts(**kwargs):
         del kwargs
         return "artifacts/widgets.html"
 
@@ -2731,7 +2831,8 @@ async def test_process_single_url_marks_low_content_listing_with_challenge_signa
         },
     )
 
-    async def _fake_acquire(request):
+    @_as_async
+    def _fake_acquire(request):
         return AcquisitionResult(
             request=request,
             final_url=request.url,
@@ -2748,7 +2849,8 @@ async def test_process_single_url_marks_low_content_listing_with_challenge_signa
             },
         )
 
-    async def _no_selector_rules(*args, **kwargs):
+    @_as_async
+    def _no_selector_rules(*args, **kwargs):
         del args, kwargs
         return []
 
@@ -2761,7 +2863,8 @@ async def test_process_single_url_marks_low_content_listing_with_challenge_signa
         "app.services.pipeline.extraction_loop.extract_records", lambda *args, **kwargs: []
     )
 
-    async def _persist_artifacts(**kwargs):
+    @_as_async
+    def _persist_artifacts(**kwargs):
         del kwargs
         return "artifacts/widgets.html"
 
@@ -2795,7 +2898,8 @@ async def test_process_single_url_rejects_detail_non_detail_seed_with_failure_re
         },
     )
 
-    async def _fake_acquire(request):
+    @_as_async
+    def _fake_acquire(request):
         return AcquisitionResult(
             request=request,
             final_url=request.url,
@@ -2810,7 +2914,8 @@ async def test_process_single_url_rejects_detail_non_detail_seed_with_failure_re
             },
         )
 
-    async def _no_selector_rules(*args, **kwargs):
+    @_as_async
+    def _no_selector_rules(*args, **kwargs):
         del args, kwargs
         return []
 
@@ -2830,7 +2935,8 @@ async def test_process_single_url_rejects_detail_non_detail_seed_with_failure_re
         lambda *args, **kwargs: "non_detail_seed",
     )
 
-    async def _persist_artifacts(**kwargs):
+    @_as_async
+    def _persist_artifacts(**kwargs):
         del kwargs
         return "artifacts/widgets.html"
 
@@ -2864,7 +2970,8 @@ async def test_process_single_url_rejects_detail_challenge_shell_and_marks_block
         },
     )
 
-    async def _fake_acquire(request):
+    @_as_async
+    def _fake_acquire(request):
         return AcquisitionResult(
             request=request,
             final_url=request.url,
@@ -2882,7 +2989,8 @@ async def test_process_single_url_rejects_detail_challenge_shell_and_marks_block
             },
         )
 
-    async def _no_selector_rules(*args, **kwargs):
+    @_as_async
+    def _no_selector_rules(*args, **kwargs):
         del args, kwargs
         return []
 
@@ -2901,7 +3009,8 @@ async def test_process_single_url_rejects_detail_challenge_shell_and_marks_block
         ],
     )
 
-    async def _persist_artifacts(**kwargs):
+    @_as_async
+    def _persist_artifacts(**kwargs):
         del kwargs
         return "artifacts/widgets.html"
 
@@ -2946,7 +3055,8 @@ async def test_process_single_url_raises_when_browser_retry_fails(
     )
     acquire_calls: list[dict[str, object]] = []
 
-    async def _fake_acquire(request):
+    @_as_async
+    def _fake_acquire(request):
         acquire_calls.append(dict(request.acquisition_profile))
         if request.acquisition_profile.get("prefer_browser"):
             raise TimeoutError("browser retry timed out")
@@ -2958,7 +3068,8 @@ async def test_process_single_url_raises_when_browser_retry_fails(
             status_code=200,
         )
 
-    async def _no_selector_rules(*args, **kwargs):
+    @_as_async
+    def _no_selector_rules(*args, **kwargs):
         del args, kwargs
         return []
 
@@ -3017,7 +3128,8 @@ async def test_process_single_url_persists_live_acquisition_events(
             browser_diagnostics={"browser_attempted": True},
         )
 
-    async def _no_selector_rules(*args, **kwargs):
+    @_as_async
+    def _no_selector_rules(*args, **kwargs):
         del args, kwargs
         return []
 
@@ -3036,7 +3148,8 @@ async def test_process_single_url_persists_live_acquisition_events(
         ],
     )
 
-    async def _persist_artifacts(**kwargs):
+    @_as_async
+    def _persist_artifacts(**kwargs):
         del kwargs
         return "artifacts/widgets.html"
 
@@ -3097,11 +3210,13 @@ async def test_extract_records_for_acquisition_recovers_from_zero_record_travers
         },
     )
 
-    async def _no_selector_rules(*args, **kwargs):
+    @_as_async
+    def _no_selector_rules(*args, **kwargs):
         del args, kwargs
         return []
 
-    async def _fake_acquire(request):
+    @_as_async
+    def _fake_acquire(request):
         del request
         return acquisition
 
@@ -3116,7 +3231,8 @@ async def test_extract_records_for_acquisition_recovers_from_zero_record_travers
             ]
         return []
 
-    async def _persist_artifacts(**kwargs):
+    @_as_async
+    def _persist_artifacts(**kwargs):
         del kwargs
         return "artifacts/widgets.html"
 

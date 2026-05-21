@@ -151,7 +151,7 @@ class GreenhouseAdapter(BaseAdapter):
                 api_url,
                 timeout_seconds=adapter_runtime_settings.ats_request_timeout_seconds,
             )
-        except (OSError, TimeoutError, ValueError, RuntimeError):
+        except (OSError, ValueError, RuntimeError):
             return None
         if not isinstance(data, dict):
             return None

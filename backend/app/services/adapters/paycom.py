@@ -11,7 +11,7 @@ from app.services.config.adapter_runtime_settings import adapter_runtime_setting
 from app.services.shared.field_coerce import clean_text
 
 
-_CONFIG_RE = re.compile(r"var configsFromHost = (\{.*?\});\s*var Mountable", re.DOTALL)
+_CONFIG_RE = re.compile(r"var configsFromHost = (\{[^}]*\});\s*var Mountable", re.DOTALL)
 _JOB_ID_RE = re.compile(r"/jobs/(\d+)", re.IGNORECASE)
 
 
@@ -117,7 +117,6 @@ class PaycomAdapter(PublicEndpointAdapter):
                 RuntimeError,
                 ValueError,
                 TypeError,
-                json.JSONDecodeError,
             ):
                 break
             previews = body.get("jobPostingPreviews")
@@ -163,7 +162,6 @@ class PaycomAdapter(PublicEndpointAdapter):
             RuntimeError,
             ValueError,
             TypeError,
-            json.JSONDecodeError,
         ):
             return None
         posting = body.get("jobPosting")
@@ -202,11 +200,12 @@ class PaycomAdapter(PublicEndpointAdapter):
             return {}
         lib_config_raw = payload.get("libConfig")
         try:
-            lib_config = (
-                json.loads(lib_config_raw)
-                if isinstance(lib_config_raw, str)
-                else (lib_config_raw if isinstance(lib_config_raw, dict) else {})
-            )
+            if isinstance(lib_config_raw, str):
+                lib_config = json.loads(lib_config_raw)
+            elif isinstance(lib_config_raw, dict):
+                lib_config = lib_config_raw
+            else:
+                lib_config = {}
         except json.JSONDecodeError:
             lib_config = {}
         return {

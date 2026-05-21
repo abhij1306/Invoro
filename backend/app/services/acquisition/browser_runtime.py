@@ -188,7 +188,7 @@ async def _emit_browser_behavior_activity_bounded(page: Any) -> dict[str, object
             emit_browser_behavior_activity(page),
             timeout=timeout_seconds,
         )
-    except TimeoutError:
+    except asyncio.TimeoutError:
         return {
             "enabled": True,
             "timed_out": True,
@@ -973,36 +973,24 @@ async def _close_unexpected_popup(page: Any, *, on_event=None) -> None:
             f"Closed unexpected popup page: {popup_url}",
         )
 
-
 __all__ = [
     "SharedBrowserRuntime",
-    "BROWSER_CAPTURE_MAX_NETWORK_PAYLOADS",
-    "BROWSER_CAPTURE_MAX_NETWORK_PAYLOAD_BYTES",
-    "BROWSER_CAPTURE_QUEUE_SIZE",
-    "BROWSER_CAPTURE_WORKERS",
-    "NetworkPayloadReadResult",
-    "browser_fetch",
+    "BROWSER_CAPTURE_MAX_NETWORK_PAYLOADS", "BROWSER_CAPTURE_MAX_NETWORK_PAYLOAD_BYTES",
+    "BROWSER_CAPTURE_QUEUE_SIZE", "BROWSER_CAPTURE_WORKERS",
+    "NetworkPayloadReadResult", "browser_fetch",
     "build_browser_diagnostics_contract",
     "browser_runtime_snapshot",
-    "block_unneeded_route",
-    "build_failed_browser_diagnostics",
-    "capture_browser_screenshot",
-    "classify_network_endpoint",
-    "classify_browser_outcome",
-    "detail_expansion_keywords",
+    "block_unneeded_route", "build_failed_browser_diagnostics",
+    "capture_browser_screenshot", "classify_network_endpoint",
+    "classify_browser_outcome", "detail_expansion_keywords",
     "expand_all_interactive_elements",
-    "expand_detail_content_if_needed",
-    "expand_interactive_elements_via_accessibility",
-    "interactive_candidate_snapshot",
-    "get_browser_runtime",
+    "expand_detail_content_if_needed", "expand_interactive_elements_via_accessibility",
+    "interactive_candidate_snapshot", "get_browser_runtime",
     "looks_like_low_content_shell",
     "patchright_browser_available",
-    "read_network_payload_body",
-    "real_chrome_browser_available",
-    "real_chrome_candidate_paths",
-    "real_chrome_executable_path",
+    "read_network_payload_body", "real_chrome_browser_available",
+    "real_chrome_candidate_paths", "real_chrome_executable_path",
     "should_capture_network_payload",
-    "shutdown_browser_runtime",
-    "shutdown_browser_runtime_sync",
+    "shutdown_browser_runtime", "shutdown_browser_runtime_sync",
     "temporary_browser_page",
 ]

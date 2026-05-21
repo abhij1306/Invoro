@@ -78,6 +78,15 @@ def _normalize_price_text(value: object) -> str | None:
     return re.sub(r"^([A-Z]{3})(?=\d)", r"\1 ", match.group(0), flags=re.I)
 
 
+def _amazon_image_src(image_el) -> str | None:
+    if image_el is None:
+        return None
+    return selectolax_node_attr(image_el, "src") or selectolax_node_attr(
+        image_el,
+        "data-old-hires",
+    )
+
+
 def _price_from_price_node(price_node: object) -> str | None:
     if price_node is None or not hasattr(price_node, "css_first"):
         return None
@@ -213,6 +222,7 @@ class AmazonAdapter(BaseAdapter):
         price_text = _detail_price_text(parser)
         currency = extract_currency_code(price_text)
         images = self._detail_images(parser)
+        primary_image = images[0] if images else _amazon_image_src(image_el)
         bullets = self._feature_bullets(parser)
         description = self._detail_description(parser)
         specifications = self._detail_specifications_text(detail_table)
@@ -224,16 +234,7 @@ class AmazonAdapter(BaseAdapter):
             "review_count": int(review_match.group(1).replace(",", ""))
             if review_match
             else None,
-            "image_url": (
-                images[0]
-                if images
-                else (
-                    selectolax_node_attr(image_el, "src")
-                    or selectolax_node_attr(image_el, "data-old-hires")
-                    if image_el
-                    else None
-                )
-            ),
+            "image_url": primary_image,
             "additional_images": images[1:] if len(images) > 1 else None,
             "description": description
             or (desc_el.text(separator=" ", strip=True) if desc_el else None),

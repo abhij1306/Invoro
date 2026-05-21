@@ -137,6 +137,7 @@ def _format_traversal_progress_message(
     current_count: int,
     max_records: int | None,
 ) -> str:
+    _ = step_limit
     target_suffix = f", target_records={int(max_records)}" if max_records is not None else ""
     return (
         f"{label} {step} - "
@@ -165,6 +166,7 @@ def _set_stop_reason(
 
 
 def should_run_traversal(surface: str | None, traversal_mode: str | None) -> bool:
+    _ = surface
     normalized_mode = str(traversal_mode or "").strip().lower()
     return normalized_mode in {"scroll", "load_more", "paginate"}
 
@@ -370,6 +372,7 @@ async def _run_load_more_traversal(
     deadline_at: float | None,
     on_event,
 ) -> None:
+    _ = max_clicks
     max_iterations = int(crawler_runtime_settings.traversal_max_iterations_cap)
     best_card_gain = 0
     marginal_gain_streak = 0
@@ -548,6 +551,7 @@ async def _run_paginate_traversal(
     deadline_at: float | None,
     on_event,
 ) -> None:
+    _ = max_pages
     previous = await _page_snapshot(page, surface=surface)
     best_card_gain = 0
     marginal_gain_streak = 0
@@ -741,7 +745,7 @@ async def _settle_thin_initial_listing(
 
 async def _find_actionable_locator(page, selector_group: str):
     selectors = PAGINATION_SELECTORS.get(selector_group) if isinstance(PAGINATION_SELECTORS, dict) else []
-    for selector in list(selectors or []):
+    for selector in selectors or []:
         locator = page.locator(str(selector)).first
         try:
             if await locator.count() == 0:

@@ -22,7 +22,7 @@ class RemoteOkAdapter(BaseAdapter):
         """Extract RemoteOK jobs from rendered HTML or a JSON body."""
         try:
             data = parse_json(str(html or "").strip())
-        except (json.JSONDecodeError, ValueError):
+        except ValueError:
             return []
 
         if not isinstance(data, list):

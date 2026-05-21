@@ -28,10 +28,10 @@ def score_record_confidence(
     normalized_surface = str(surface or "").strip().lower()
     weights = dict(SURFACE_WEIGHTS.get(normalized_surface) or {})
     if not weights:
-        weights = {
-            key: 1.0
-            for key in ("title", "description", "image_url", "price", "company", "location")
-        }
+        weights = dict.fromkeys(
+            ("title", "description", "image_url", "price", "company", "location"),
+            1.0,
+        )
 
     total_weight = sum(weights.values()) or 1.0
     score = 0.0
@@ -67,7 +67,7 @@ def score_record_confidence(
 
     raw_requested = [
         " ".join(str(field_name or "").split()).strip()
-        for field_name in list(requested_fields or [])
+        for field_name in requested_fields or []
         if " ".join(str(field_name or "").split()).strip()
     ]
     requested = repair_target_fields_for_surface(normalized_surface, raw_requested)
@@ -179,7 +179,7 @@ def _resolve_requested_field_match(
         normalize_field_key(field_name),
         *[
             normalize_field_key(alias)
-            for alias in list(alias_map.get(normalize_field_key(field_name)) or [])
+            for alias in alias_map.get(normalize_field_key(field_name)) or []
         ],
     ]
     seen: set[str] = set()
@@ -241,7 +241,7 @@ def _field_penalties(
     penalties: list[dict[str, Any]] = []
     text = _text_value(value)
     lowered = text.lower()
-    normalized_sources = {str(source or "").strip() for source in list(sources or [])}
+    normalized_sources = {str(source or "").strip() for source in sources or []}
 
     if field_name == "title":
         if _GENERIC_TITLE_RE.match(text):

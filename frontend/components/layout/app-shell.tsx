@@ -405,6 +405,10 @@ function ShellContent({
       return;
     }
     const resetTrigger = resetTriggerRef.current;
+    const previousOverflow = document.body.style.overflow;
+    const previousTouchAction = document.body.style.touchAction;
+    document.body.style.overflow = 'hidden';
+    document.body.style.touchAction = 'none';
     const frame = window.requestAnimationFrame(() => resetConfirmRef.current?.focus());
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -421,6 +425,8 @@ function ShellContent({
     return () => {
       window.cancelAnimationFrame(frame);
       document.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = previousOverflow;
+      document.body.style.touchAction = previousTouchAction;
       const restoreTarget = resetPreviousFocusRef.current?.isConnected
         ? resetPreviousFocusRef.current
         : resetTrigger;
@@ -566,6 +572,7 @@ function ShellContent({
             role="dialog"
             aria-modal="true"
             aria-labelledby="reset-workspace-title"
+            aria-describedby="reset-workspace-description"
             tabIndex={-1}
             className="border-border card-gradient w-[min(420px,100%)] rounded-[var(--radius-lg)] border p-5"
           >
@@ -575,7 +582,7 @@ function ShellContent({
             >
               {resetDialogCopy.title}
             </h2>
-            <p className="text-secondary mt-2 text-sm leading-[var(--leading-relaxed)]">
+            <p id="reset-workspace-description" className="text-secondary mt-2 text-sm leading-[var(--leading-relaxed)]">
               {resetDialogCopy.description}
             </p>
             {resetError ? (

@@ -115,7 +115,7 @@ async def test_health_and_metrics_skip_http_rate_limit(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_render_prometheus_metrics_raises_on_crawl_run_query_failure(
+async def test_render_prometheus_metrics_continues_on_crawl_run_query_failure(
     monkeypatch,
 ) -> None:
     if metrics_module._registry is None or metrics_module._prometheus_client is None:
@@ -139,18 +139,69 @@ async def test_render_prometheus_metrics_raises_on_crawl_run_query_failure(
         def inc(self, amount: float = 1.0) -> None:
             self.value += amount
 
+    class _Gauge:
+        def __init__(self) -> None:
+            self.values: list[object] = []
+            self.clear_calls = 0
+
+        def labels(self, **_kwargs):
+            return self
+
+        def set(self, value: object) -> None:
+            self.values.append(value)
+
+        def clear(self) -> None:
+            self.clear_calls += 1
+
     failure_counter = _Counter()
+    crawl_runs_total = _Gauge()
+    browser_pool_size = _Gauge()
+    database_connections_active = _Gauge()
+    redis_failures_total_metric = _Gauge()
     monkeypatch.setattr(metrics_module, "SessionLocal", lambda: _FailingSession())
     monkeypatch.setattr(
         metrics_module,
         "crawl_runs_query_failures_total",
         failure_counter,
     )
+    monkeypatch.setattr(metrics_module, "crawl_runs_total", crawl_runs_total)
+    monkeypatch.setattr(metrics_module, "browser_pool_size", browser_pool_size)
+    monkeypatch.setattr(
+        metrics_module,
+        "database_connections_active",
+        database_connections_active,
+    )
+    monkeypatch.setattr(
+        metrics_module,
+        "redis_failures_total_metric",
+        redis_failures_total_metric,
+    )
+    monkeypatch.setattr(
+        metrics_module,
+        "browser_runtime_snapshot",
+        lambda: {"size": 3, "max_size": 10},
+    )
+    monkeypatch.setattr(metrics_module, "_database_connections_checked_out", lambda: 4)
+    monkeypatch.setattr(metrics_module, "redis_failure_total", lambda: 5)
+    monkeypatch.setattr(
+        metrics_module,
+        "_prometheus_client",
+        type(
+            "_PrometheusClient",
+            (),
+            {"generate_latest": staticmethod(lambda _registry: b"ok\n")},
+        )(),
+    )
 
-    with pytest.raises(SQLAlchemyError, match="db down"):
-        await metrics_module.render_prometheus_metrics()
+    payload, content_type = await metrics_module.render_prometheus_metrics()
 
     assert failure_counter.value == 1
+    assert crawl_runs_total.clear_calls == 1
+    assert browser_pool_size.values == [3]
+    assert database_connections_active.values == [4]
+    assert redis_failures_total_metric.values == [5]
+    assert payload == b"ok\n"
+    assert content_type == metrics_module.CONTENT_TYPE_LATEST
 
 
 @pytest.mark.asyncio

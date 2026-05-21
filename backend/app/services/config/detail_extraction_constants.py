@@ -34,7 +34,7 @@ DETAIL_BASE_PLACEHOLDER_TITLE_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"^your\s+ai-generated\s+outfit$", re.I),
     re.compile(r"^oops,?\s+something\s+went\s+wrong\.?$", re.I),
     re.compile(
-        r"^oops!? the page you(?:'|’)re looking for can(?:'|’)t be found\.?$", re.I
+        r"^oops!? the page you['’]re looking for can['’]t be found\.?$", re.I
     ),
     re.compile(r"^page not found$", re.I),
     re.compile(r"^not found$", re.I),

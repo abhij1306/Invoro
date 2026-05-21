@@ -6,7 +6,12 @@ export function getFocusableElements(container: HTMLElement | null): HTMLElement
     container.querySelectorAll<HTMLElement>(
       'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
     ),
-  ).filter((element) => !element.hidden && element.getAttribute('aria-hidden') !== 'true');
+  ).filter(
+    (element) =>
+      !element.hidden &&
+      element.getAttribute('aria-hidden') !== 'true' &&
+      (element.offsetParent !== null || getComputedStyle(element).position === 'fixed'),
+  );
 }
 
 export function trapFocus(event: KeyboardEvent, container: HTMLElement | null) {
@@ -29,7 +34,7 @@ export function trapFocus(event: KeyboardEvent, container: HTMLElement | null) {
     }
     return;
   }
-  if (activeElement === last) {
+  if (activeElement === last || !container?.contains(activeElement)) {
     event.preventDefault();
     first.focus();
   }

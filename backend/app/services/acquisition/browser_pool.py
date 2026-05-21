@@ -280,7 +280,7 @@ class SharedBrowserRuntime:
         self,
         *,
         context_options: dict[str, Any],
-        context_spec: PlaywrightContextSpec,
+        _context_spec: PlaywrightContextSpec,
     ) -> tuple[BrowserContext, Any]:
         last_error: Exception | None = None
         for attempt in range(2):
@@ -683,15 +683,15 @@ async def _evict_idle_browser_runtimes_locked() -> None:
         remaining.sort(key=lambda item: (item[2].eviction_key()[0], item[3]))
         candidates.append(remaining[0])
     for pool_name, key, runtime, candidate_last_used in candidates:
-        current_runtime = (
-            _BROWSER_POOL.direct.get(str(key))
-            if pool_name == "direct"
-            else (
-                _BROWSER_POOL.proxied.get(key)
-                if isinstance(key, tuple) and len(key) == 2
+        if pool_name == "direct":
+            current_runtime = _BROWSER_POOL.direct.get(str(key))
+        else:
+            proxied_key = key if isinstance(key, tuple) and len(key) == 2 else None
+            current_runtime = (
+                _BROWSER_POOL.proxied.get(proxied_key)
+                if proxied_key is not None
                 else None
             )
-        )
         if current_runtime is not runtime:
             continue
         active_and_queued, last_used = runtime.eviction_key()
@@ -879,6 +879,7 @@ async def _close_browser_context_safely(context: Any) -> None:
         )
     except asyncio.CancelledError:
         logger.warning("Browser context close was cancelled")
+        raise
     except Exception:
         logger.debug("Failed to close browser context", exc_info=True)
 
