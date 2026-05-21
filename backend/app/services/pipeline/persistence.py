@@ -162,7 +162,7 @@ async def _persist_browser_artifacts(
                 run_id=run_id,
                 source_url=acquisition_result.final_url,
                 suffix="browser",
-                content=screenshot_bytes,
+                content=bytes(screenshot_bytes),
             )
 
     diagnostics_payload = dict(diagnostics)

@@ -191,7 +191,9 @@ def _host_total_memory_bytes() -> int | None:
 
             status = _MemoryStatusEx()
             status.dwLength = _ctypes.sizeof(_MemoryStatusEx)
-            if _ctypes.windll.kernel32.GlobalMemoryStatusEx(_ctypes.byref(status)):
+            windll = getattr(_ctypes, "windll", None)
+            kernel32 = getattr(windll, "kernel32", None)
+            if kernel32 and kernel32.GlobalMemoryStatusEx(_ctypes.byref(status)):
                 return int(status.ullTotalPhys)
         except Exception:
             return None
