@@ -17,9 +17,12 @@ _STATIC_EXPORTS = {
     for name, value in load_export_data(str(_EXPORTS_PATH)).items()
     if not name.startswith("_")
 }
-
-for _name, _value in _STATIC_EXPORTS.items():
-    globals()[_name] = _value if _value is not None else ()
+locals().update(
+    {
+        name: value if value is not None else ()
+        for name, value in _STATIC_EXPORTS.items()
+    }
+)
 
 COLOR_FIELD = "color"
 TITLE_FIELD = "title"

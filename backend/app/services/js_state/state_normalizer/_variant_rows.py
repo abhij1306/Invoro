@@ -4,13 +4,12 @@ from __future__ import annotations
 from typing import Any
 
 from ._common import *
-from ._common import _as_list
 from ._variant_mapping import _option_names, _variant_axis_raw_value
 
 def _product_variant_rows(product: dict[str, Any]) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for key in JS_STATE_PRODUCT_VARIANT_LIST_KEYS:
-        raw_rows = _as_list(product.get(key))
+        raw_rows = as_list(product.get(key))
         if not raw_rows:
             continue
         for item in raw_rows:
@@ -59,7 +58,7 @@ def _mapped_size_variant_rows(product: dict[str, Any]) -> list[dict[str, Any]]:
 def _option_group_variant_rows(product: dict[str, Any]) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for group_key in JS_STATE_PRODUCT_OPTION_GROUP_KEYS:
-        for group in _as_list(product.get(group_key)):
+        for group in as_list(product.get(group_key)):
             if not isinstance(group, dict):
                 continue
             axis_name = text_or_none(
@@ -72,7 +71,7 @@ def _option_group_variant_rows(product: dict[str, Any]) -> list[dict[str, Any]]:
             if not axis_name:
                 continue
             for value_key in JS_STATE_OPTION_GROUP_VALUE_KEYS:
-                values = _as_list(group.get(value_key))
+                values = as_list(group.get(value_key))
                 if values:
                     break
             else:
@@ -102,10 +101,10 @@ def _option_group_variant_rows(product: dict[str, Any]) -> list[dict[str, Any]]:
 
 def _nested_choice_item_variant_rows(product: dict[str, Any]) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
-    for core_product in _as_list(product.get("coreProducts")):
+    for core_product in as_list(product.get("coreProducts")):
         if not isinstance(core_product, dict):
             continue
-        for choice in _as_list(core_product.get("coreChoices")):
+        for choice in as_list(core_product.get("coreChoices")):
             if not isinstance(choice, dict):
                 continue
             color_family = choice.get("colorFamily")
@@ -118,7 +117,7 @@ def _nested_choice_item_variant_rows(product: dict[str, Any]) -> list[dict[str, 
                 )
             )
             image_url = _choice_primary_image(choice)
-            for item in _as_list(choice.get("items")):
+            for item in as_list(choice.get("items")):
                 if not isinstance(item, dict):
                     continue
                 row = dict(item)
@@ -133,7 +132,7 @@ def _nested_choice_item_variant_rows(product: dict[str, Any]) -> list[dict[str, 
     return rows
 
 def _choice_primary_image(choice: dict[str, Any]) -> str | None:
-    for shot in _as_list(choice.get("orderedShots")):
+    for shot in as_list(choice.get("orderedShots")):
         if not isinstance(shot, dict):
             continue
         image_url = text_or_none(shot.get("imageUrl"))

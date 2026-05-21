@@ -646,7 +646,7 @@ export function MetricPulseItem({
     <div className="metric-pulse-item group/metric">
       <div className="metric-pulse-accent" aria-hidden="true" />
       <div className="metric-pulse-label">
-        {Icon && <Icon className="size-3.5" aria-hidden="true" />}
+        {Icon && <Icon className="size-3.5" />}
         {label}
         {pulse && <div className="pulse-dot ml-auto" aria-hidden="true" />}
       </div>

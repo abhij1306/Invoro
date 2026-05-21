@@ -66,9 +66,11 @@ logger = logging.getLogger(__name__)
 PRODUCT_FIELD_SPEC = JS_STATE_PRODUCT_FIELD_SPEC
 _VARIANT_FIELD_SPEC = JS_STATE_VARIANT_FIELD_SPEC
 map_configured_state_payload = _job_mapper.map_configured_state_payload
-
+map_job_detail_state = _job_mapper.map_job_detail_state
+path_value = _job_mapper.path_value
 def _as_list(value: object) -> list[Any]:
     return value if isinstance(value, list) else []
+as_list = _as_list
 
 __all__ = [
     "DETAIL_ARTIFACT_PRODUCT_TYPE_PATTERNS",
@@ -94,17 +96,20 @@ __all__ = [
     "extract_urls",
     "html_to_text",
     "map_configured_state_payload",
+    "map_job_detail_state",
     "merge_variant_rows",
     "normalize_field_key",
     "normalize_price",
     "normalized_variant_axis_key",
     "option_value_labels",
     "platform_js_state_extractors",
+    "path_value",
     "resolve_variants",
     "select_variant",
     "stock_quantity",
     "surface_alias_lookup",
     "text_or_none",
+    "as_list",
     "variant_attribute",
     "variant_axes",
     "variant_axis_value",

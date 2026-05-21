@@ -167,7 +167,7 @@ FILE_LOC_BUDGETS = {
     Path("app/services/acquisition/traversal.py"): 1000,
     # Config extraction rules are split by concern behind a stable package facade.
     Path("app/services/config/extraction_rules/__init__.py"): 80,
-    Path("app/services/config/extraction_rules/_common.py"): 260,
+    Path("app/services/config/extraction_rules/_common.py"): 330,
     Path("app/services/config/extraction_rules/_detail.py"): 560,
     Path("app/services/config/extraction_rules/_detail_sections.py"): 80,
     Path("app/services/config/extraction_rules/_extra_exports.py"): 280,

@@ -95,8 +95,7 @@ Current live behavior:
 - `locality_profile`
 - `diagnostics_profile`
 - `advanced_enabled` / `advanced_mode` as UI-mode compatibility fields
-- resolved traversal mode derived from explicit `fetch_profile.traversal_mode`; legacy `auto` traversal is rejected/normalized away
-- `max_records` as a traversal stop target, not a persisted-row hard cap
+- resolved traversal mode derived from explicit `fetch_profile.traversal_mode`; legacy `auto` traversal is normalized to a default explicit mode- `max_records` as a traversal stop target, not a persisted-row hard cap
 - `sleep_ms`
 - `respect_robots_txt`
 - `url_batch_concurrency`
@@ -272,8 +271,12 @@ Current live behavior:
 - acquisition timeout budget is staged: HTTP/curl attempts are capped at `http_timeout_seconds` (10s) per attempt, leaving the rest of the `acquisition_attempt_timeout_seconds` (90s) budget for browser launch, navigation, and settling. `browser_only` mode skips the HTTP tier and allocates the full budget to the browser path. The outer URL-processing timeout (`url_timeout_seconds` + buffer, default 105s) enforces the ceiling across all acquisition tiers
 - shared browser runtimes now recycle once when the driver disconnects during `new_context` / page bootstrap, so a dead browser process does not poison later URLs in the same run
 - browser rendering probes extractability at `domcontentloaded`, caps primary `networkidle` navigation to a configured budget slice, uses a short-circuit readiness wait instead of fixed optimistic sleep, reuses settled HTML/analysis for serialization, and limits detail expansion with bounded DOM-first then accessibility-assisted fallback
-- listing readiness no longer fast-paths from thin shell text alone; listing surfaces now require actual listing evidence before browser acquisition is considered ready
-- detail expansion now skips plain navigation anchors with real `href`s (for example footer/about/careers/returns links) unless they behave like true in-page expanders, which prevents Souled Store-style utility-page navigations during PDP acquisition
+- browser rendering behavior:
+  - checks extractability at `domcontentloaded`
+  - caps primary `networkidle` navigation to a configured budget slice
+  - uses a short-circuit readiness wait instead of fixed optimistic sleep
+  - reuses settled HTML/analysis for serialization
+  - limits detail expansion with bounded DOM-first then accessibility-assisted fallback- detail expansion now skips plain navigation anchors with real `href`s (for example footer/about/careers/returns links) unless they behave like true in-page expanders, which prevents Souled Store-style utility-page navigations during PDP acquisition
 - detail expansion also skips header/nav/footer controls outside main content, preventing Lowe's-style pivots from a requested PDP into site chrome or marketing pages
 - blocked-page detection is evidence-based: anti-bot vendor markers alone do not block a page, but challenge-specific signals such as CAPTCHA-delivery elements and corroborating blocker text do
 - browser outcomes now distinguish challenge pages, low-content terminal shells, and explicit navigation/page-closed failures instead of collapsing them into generic browser HTML

@@ -14,9 +14,12 @@ _STATIC_EXPORTS = {
     for name, value in load_export_data(str(_EXPORTS_PATH)).items()
     if not name.startswith("_")
 }
-
-for _name, _value in _STATIC_EXPORTS.items():
-    globals()[_name] = _value if _value is not None else ()
+locals().update(
+    {
+        name: value if value is not None else ()
+        for name, value in _STATIC_EXPORTS.items()
+    }
+)
 
 SELECTOR_SELF_HEAL_TARGET_LIMIT = 6
 SELECTOR_SELF_HEAL_DEFAULT_MIN_CONFIDENCE = 0.55

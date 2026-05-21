@@ -5,7 +5,6 @@ import logging
 from typing import Any
 
 from ._common import *
-from ._common import _job_mapper
 from ._identity import (
     _mapped_product_family_matches,
     _mapped_product_identity_matches,
@@ -32,7 +31,7 @@ def map_js_state_to_fields(
     if not js_state_objects:
         return {}
     if normalized_surface == "job_detail":
-        return _job_mapper.map_job_detail_state(js_state_objects)
+        return map_job_detail_state(js_state_objects)
     if normalized_surface == "ecommerce_detail":
         return _map_ecommerce_detail_state(js_state_objects, page_url=page_url)
     logger.warning(
@@ -106,7 +105,7 @@ def _extract_product_payloads_from_normalized(
         state_key=state_key,
     ):
         for root_path in extractor.root_paths.get(state_key, []):
-            candidate = _job_mapper.path_value(normalized_payload, root_path)
+            candidate = path_value(normalized_payload, root_path)
             if _looks_like_product_payload(candidate):
                 products.append((dict(candidate), extractor))
     products.extend(

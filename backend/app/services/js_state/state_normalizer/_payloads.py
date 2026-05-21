@@ -5,7 +5,6 @@ import re
 from typing import Any
 
 from ._common import *
-from ._common import _as_list
 from ._variant_rows import _product_variant_rows
 
 def _normalized_state_payload(state_key: str, payload: Any) -> Any:
@@ -151,9 +150,9 @@ def _find_product_payloads(
 
 def _product_payload_score(product: dict[str, Any]) -> tuple[int, ...]:
     raw_variants = _product_variant_rows(product)
-    raw_options = _as_list(product.get("options"))
-    raw_colors = _as_list(product.get("colors"))
-    raw_sizes = _as_list(product.get("sizes"))
+    raw_options = as_list(product.get("options"))
+    raw_colors = as_list(product.get("colors"))
+    raw_sizes = as_list(product.get("sizes"))
     product_keys = set(product)
     strong_product_keys = {
         "variants",

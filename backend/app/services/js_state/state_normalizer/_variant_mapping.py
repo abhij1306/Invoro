@@ -8,7 +8,6 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from glom import GlomError, glom  # type: ignore[import-untyped]
 
 from ._common import *
-from ._common import _as_list
 
 logger = logging.getLogger(__name__)
 
@@ -182,7 +181,7 @@ def _nested_variant_stock_quantity(variant: dict[str, Any]) -> int | None:
 
 def _nested_variant_price(variant: dict[str, Any], price_key: str) -> Any:
     for proposition in _nested_variant_propositions(variant):
-        for pricing in _as_list(proposition.get("pricings")):
+        for pricing in as_list(proposition.get("pricings")):
             if not isinstance(pricing, dict):
                 continue
             price = pricing.get(price_key)
@@ -196,7 +195,7 @@ def _nested_variant_propositions(variant: dict[str, Any]) -> list[dict[str, Any]
         return []
     return [
         proposition
-        for proposition in _as_list(sku.get("propositions"))
+        for proposition in as_list(sku.get("propositions"))
         if isinstance(proposition, dict)
     ]
 

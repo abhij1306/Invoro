@@ -516,6 +516,8 @@ def _detail_title_from_url(page_url: str) -> str | None:
     for index in range(len(path_segments) - 1, -1, -1):
         segment = path_segments[index]
         terminal = _HTML_SUFFIX_RE.sub("", segment)
+        if _detail_segment_is_shop_merchant_namespace(path_segments, index):
+            continue
         if _detail_terminal_is_ignored(
             terminal,
             generic_terminal_tokens=generic_terminal_tokens,
@@ -591,6 +593,17 @@ def _detail_terminal_parent_is_collection(
 ) -> bool:
     parent_segment = str(path_segments[index - 1]).strip().lower() if index > 0 else ""
     return parent_segment in {"product", "products", "item", "items"}
+
+
+def _detail_segment_is_shop_merchant_namespace(
+    path_segments: list[str],
+    index: int,
+) -> bool:
+    if index <= 0 or index + 1 >= len(path_segments):
+        return False
+    previous_segment = str(path_segments[index - 1]).strip().lower()
+    next_segment = str(path_segments[index + 1]).strip().lower()
+    return previous_segment == "shop" and next_segment in {"p", "product", "products"}
 
 
 def _detail_url_candidate_is_low_signal(
@@ -785,7 +798,11 @@ def _detail_requested_identity_text(page_url: object) -> str:
     if title:
         return title
     generic_terminal_tokens = set(DETAIL_GENERIC_TERMINAL_TOKENS)
-    for segment in reversed(_detail_url_path_segments(raw_url)):
+    path_segments = _detail_url_path_segments(raw_url)
+    for index in range(len(path_segments) - 1, -1, -1):
+        if _detail_segment_is_shop_merchant_namespace(path_segments, index):
+            continue
+        segment = path_segments[index]
         terminal = _HTML_SUFFIX_RE.sub("", segment)
         if not terminal or terminal.isdigit():
             continue
@@ -901,7 +918,11 @@ def _normalized_model_token(value: object) -> str:
 
 def _detail_slug_title_fallback_from_url(identity_url: str) -> str | None:
     generic_terminal_tokens = set(DETAIL_GENERIC_TERMINAL_TOKENS)
-    for segment in reversed(_detail_url_path_segments(identity_url)):
+    path_segments = _detail_url_path_segments(identity_url)
+    for index in range(len(path_segments) - 1, -1, -1):
+        if _detail_segment_is_shop_merchant_namespace(path_segments, index):
+            continue
+        segment = path_segments[index]
         terminal = _HTML_SUFFIX_RE.sub("", segment)
         if not terminal:
             continue
@@ -1109,10 +1130,27 @@ def _detail_redirect_identity_is_mismatched(
         requested_tokens = _detail_identity_tokens(requested_title)
         candidate_title = record.get("title")
         candidate_tokens = _detail_identity_tokens(record.get("title"))
+        requested_codes = _detail_identity_codes_from_url(requested)
+        record_field_codes = _detail_identity_codes_from_record_fields(record)
+        has_matching_record_identity_code = detail_identity_codes_match(
+            requested_codes,
+            record_field_codes,
+        )
+        requested_small_numbers = _detail_small_numeric_model_tokens(requested_title)
+        candidate_small_numbers = _detail_small_numeric_model_tokens(candidate_title)
+        has_matching_small_model_number = bool(
+            requested_small_numbers & candidate_small_numbers
+        )
+        record_matches_requested_identity = _record_matches_requested_detail_identity(
+            record,
+            requested_page_url=requested,
+        )
         if _detail_model_numbers_conflict(
             requested_title,
             candidate_title,
             record=record,
+        ) and not (
+            has_matching_record_identity_code and has_matching_small_model_number
         ):
             return True
         has_strong_same_url_product_evidence = any(
@@ -1151,10 +1189,7 @@ def _detail_redirect_identity_is_mismatched(
             and len(requested_tokens) >= 2
             and len(candidate_tokens) >= 2
             and len(requested_tokens & candidate_tokens) < min(2, len(requested_tokens))
-            and not _record_matches_requested_detail_identity(
-                record,
-                requested_page_url=requested,
-            )
+            and not record_matches_requested_identity
         ):
             return True
         return False

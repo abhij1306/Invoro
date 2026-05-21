@@ -6017,6 +6017,33 @@ def test_extract_detail_rejects_same_url_model_number_title_mismatch() -> None:
     assert rows == []
 
 
+def test_extract_detail_accepts_same_url_model_code_when_record_identity_matches() -> None:
+    requested_url = (
+        "https://www.kitchenaid.com/countertop-appliances/food-processors/"
+        "processors/p.13-cup-food-processor.KFP1318CU.html"
+    )
+
+    rows = extract_detail_records(
+        "<html><body><main><h1>13-Cup Food Processor</h1></main></body></html>",
+        requested_url,
+        "ecommerce_detail",
+        None,
+        adapter_records=[
+            {
+                "title": "13-Cup Food Processor",
+                "url": requested_url,
+                "price": "229.99",
+                "currency": "USD",
+                "sku": "KFP1318CU",
+                "brand": "KitchenAid",
+            }
+        ],
+    )
+
+    assert len(rows) == 1
+    assert rows[0]["sku"] == "KFP1318CU"
+
+
 def test_extract_detail_accepts_same_url_bare_size_number_difference() -> None:
     rows = extract_detail_records(
         "<html><body><main><h1>Cloud Runner Size 12</h1></main></body></html>",

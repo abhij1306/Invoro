@@ -10,7 +10,6 @@ from bs4 import BeautifulSoup
 from glom import GlomError, glom  # type: ignore[import-untyped]
 
 from ._common import *
-from ._common import _as_list
 from ._variant_rows import _product_variant_rows
 from ._variant_mapping import (
     _connection_nodes,
