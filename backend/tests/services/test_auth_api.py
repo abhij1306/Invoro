@@ -6,6 +6,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from passlib.hash import pbkdf2_sha256
 
+from app.core import config
 from app.core.config import settings
 from app.core.dependencies import get_db
 from app.main import (
@@ -34,6 +35,11 @@ async def auth_client(db_session):
     ) as client:
         yield client
     app.dependency_overrides.clear()
+
+
+@pytest.fixture(autouse=True)
+def reset_runtime_app_env(monkeypatch):
+    monkeypatch.setattr(config, "_RUNTIME_APP_ENV", None)
 
 
 @pytest.mark.asyncio

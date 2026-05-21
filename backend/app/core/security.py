@@ -9,11 +9,22 @@ from argon2 import PasswordHasher
 from argon2 import exceptions as argon2_exceptions
 from app.core.config import settings
 from cryptography.fernet import Fernet, InvalidToken
-from jose import jwt
+from joserfc import jwt
+from joserfc.errors import JoseError
+from joserfc.jwk import OctKey
+from joserfc.jwt import JWTClaimsRegistry
 from passlib.hash import pbkdf2_sha256
 
 _PASSWORD_HASHER = PasswordHasher()
 _ARGON2_PREFIXES = ("$argon2id$", "$argon2i$", "$argon2d$")
+
+
+class TokenDecodeError(ValueError):
+    """Raised when a JWT cannot be decoded or validated."""
+
+
+def _jwt_key() -> OctKey:
+    return OctKey.import_key(settings.jwt_secret_key)
 
 
 def hash_password(password: str) -> str:
@@ -46,14 +57,24 @@ def create_access_token(subject: str, *, token_version: int = 0) -> str:
     expires_at = datetime.now(UTC) + timedelta(hours=settings.jwt_expire_hours)
     payload = {"sub": subject, "exp": expires_at, "ver": token_version}
     return jwt.encode(
-        payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm
+        {"alg": settings.jwt_algorithm},
+        payload,
+        _jwt_key(),
+        algorithms=[settings.jwt_algorithm],
     )
 
 
-def decode_access_token(token: str) -> dict[str, str]:
-    return jwt.decode(
-        token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm]
-    )
+def decode_access_token(token: str) -> dict[str, str | int]:
+    try:
+        decoded = jwt.decode(
+            token,
+            _jwt_key(),
+            algorithms=[settings.jwt_algorithm],
+        )
+        JWTClaimsRegistry().validate(decoded.claims)
+    except JoseError as exc:
+        raise TokenDecodeError("Invalid token") from exc
+    return dict(decoded.claims)
 
 
 def _fernet() -> Fernet:

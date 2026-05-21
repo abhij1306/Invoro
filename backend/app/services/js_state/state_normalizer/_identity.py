@@ -1,6 +1,10 @@
 from __future__ import annotations
 # ruff: noqa: F401,F403,F405
 
+import re
+from typing import Any
+from urllib.parse import urlsplit
+
 from ._common import *
 
 def _merge_same_product_record(

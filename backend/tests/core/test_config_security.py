@@ -20,6 +20,7 @@ def _patch_secret_guard_settings(monkeypatch, **overrides) -> None:
 
 
 def test_secret_guard_uses_runtime_app_env_override(monkeypatch) -> None:
+    monkeypatch.setattr(config, "_RUNTIME_APP_ENV", None)
     monkeypatch.setenv("APP_ENV", "development")
     _patch_secret_guard_settings(
         monkeypatch,
@@ -34,6 +35,7 @@ def test_secret_guard_warns_for_legacy_admin_password_without_blocking(
     monkeypatch,
     caplog,
 ) -> None:
+    monkeypatch.setattr(config, "_RUNTIME_APP_ENV", None)
     caplog.set_level("WARNING", logger="app.core.config")
     _patch_secret_guard_settings(
         monkeypatch,
@@ -49,6 +51,7 @@ def test_secret_guard_warns_for_legacy_admin_password_without_blocking(
 
 
 def test_secret_guard_rejects_known_weak_admin_password(monkeypatch) -> None:
+    monkeypatch.setattr(config, "_RUNTIME_APP_ENV", None)
     _patch_secret_guard_settings(
         monkeypatch,
         default_admin_password="AdminPassword123!",

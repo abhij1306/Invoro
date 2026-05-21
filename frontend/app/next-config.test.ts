@@ -27,8 +27,12 @@ describe('next security headers', () => {
     );
     expect(productionHeaders).toContainEqual({
       key: 'Strict-Transport-Security',
-      value: 'max-age=31536000; includeSubDomains',
+      value: 'max-age=31536000; includeSubDomains; preload',
     });
-    expect(productionHeaders.some((header) => header.key === 'Content-Security-Policy')).toBe(false);
+    expect(productionHeaders).toContainEqual({
+      key: 'Content-Security-Policy',
+      value:
+        "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; base-uri 'self'; frame-ancestors 'none'; object-src 'none'",
+    });
   });
 });

@@ -14,6 +14,7 @@ Harden authentication, session transport, security headers, CORS, and dependency
 - [x] Login sets a secure cookie outside dev/test, uses explicit path/max-age, and no longer returns the JWT in JSON.
 - [x] Auth-specific throttling and structured auth logging are in place.
 - [x] Password hashing uses a stronger modern hash for new passwords while legacy PBKDF2 hashes still verify and upgrade on login.
+- [x] JWT expiry reduced to improve session security by shortening the token TTL.
 - [x] Backend and frontend emit the planned security headers; backend CORS is narrowed.
 - [x] CI includes dependency vulnerability scanning and Dependabot config exists.
 - [x] Relevant backend and frontend tests pass.

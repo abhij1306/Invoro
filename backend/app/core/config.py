@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 import re
+from threading import Lock
 from typing import Literal
 
 from pydantic import AliasChoices, Field, field_validator
@@ -121,6 +122,8 @@ def _load_settings() -> Settings:
 
 
 settings = _load_settings()
+_RUNTIME_APP_ENV: str | None = None
+_RUNTIME_APP_ENV_LOCK = Lock()
 
 
 # ---------------------------------------------------------------------------
@@ -158,9 +161,17 @@ def admin_password_strength_issues(password: str) -> list[str]:
 
 
 def runtime_app_env() -> str:
-    if os.getenv("APP_ENV") is not None or os.getenv("app_env") is not None:
-        return str(_load_settings().app_env or "development")
-    return str(settings.app_env or "development")
+    global _RUNTIME_APP_ENV
+    if _RUNTIME_APP_ENV is not None:
+        return _RUNTIME_APP_ENV
+    with _RUNTIME_APP_ENV_LOCK:
+        if _RUNTIME_APP_ENV is not None:
+            return _RUNTIME_APP_ENV
+        if os.getenv("APP_ENV") is not None or os.getenv("app_env") is not None:
+            _RUNTIME_APP_ENV = str(_load_settings().app_env or "development")
+            return _RUNTIME_APP_ENV
+        _RUNTIME_APP_ENV = str(settings.app_env or "development")
+        return _RUNTIME_APP_ENV
 
 
 def _check_secret_defaults() -> None:

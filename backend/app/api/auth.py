@@ -55,12 +55,12 @@ async def _enforce_auth_rate_limit(request: Request, route_group: str) -> Respon
     )
 
 
-@router.post("/register")
+@router.post("/register", response_model=UserResponse)
 async def register(
     payload: UserCreate,
     request: Request,
     session: Annotated[AsyncSession, Depends(get_db)],
-) -> UserResponse:
+) -> UserResponse | Response:
     limited = await _enforce_auth_rate_limit(request, "register")
     if limited is not None:
         return limited
@@ -80,13 +80,13 @@ async def register(
     return UserResponse.model_validate(user, from_attributes=True)
 
 
-@router.post("/login")
+@router.post("/login", response_model=AuthResponse)
 async def login(
     payload: UserCreate,
     request: Request,
     response: Response,
     session: Annotated[AsyncSession, Depends(get_db)],
-) -> AuthResponse:
+) -> AuthResponse | Response:
     limited = await _enforce_auth_rate_limit(request, "login")
     if limited is not None:
         return limited

@@ -41,10 +41,10 @@ jobs:
         working-directory: frontend
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: npm
@@ -55,13 +55,12 @@ jobs:
 
       - name: Dependency vulnerability scan
         run: npm audit --audit-level=high
-        continue-on-error: true
 
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -76,7 +75,7 @@ jobs:
       - name: Apply backend migrations
         working-directory: backend
         run: |
-          python -m alembic upgrade head
+          python -m alembic -c alembic.ini upgrade head
 
       - name: Start backend API server
         working-directory: backend

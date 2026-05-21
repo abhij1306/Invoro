@@ -1,7 +1,11 @@
 from __future__ import annotations
 # ruff: noqa: F401,F403,F405
 
+import logging
+from typing import Any
+
 from ._common import *
+from ._common import _job_mapper
 from ._identity import (
     _mapped_product_family_matches,
     _mapped_product_identity_matches,
@@ -15,6 +19,8 @@ from ._payloads import (
     _normalized_state_payload,
 )
 from ._product_mapping import _map_product_payload
+
+logger = logging.getLogger(__name__)
 
 def map_js_state_to_fields(
     js_state_objects: dict[str, Any],

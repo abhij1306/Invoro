@@ -1,7 +1,11 @@
 from __future__ import annotations
 # ruff: noqa: F401,F403,F405
 
+import re
+from typing import Any
+
 from ._common import *
+from ._common import _as_list
 from ._variant_rows import _product_variant_rows
 
 def _normalized_state_payload(state_key: str, payload: Any) -> Any:

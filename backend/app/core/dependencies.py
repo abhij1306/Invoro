@@ -7,13 +7,12 @@ import threading
 
 from app.core.config import settings
 from app.core.database import get_session
-from app.core.security import decode_access_token
+from app.core.security import TokenDecodeError, decode_access_token
 from app.models.user import User
 from app.services.dispatch.base import RunDispatcher
 from app.services.dispatch.celery_dispatcher import CeleryRunDispatcher
 from app.services.dispatch.local_dispatcher import LocalRunDispatcher
 from fastapi import Cookie, Depends, Header, HTTPException, status
-from jose import JWTError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -47,7 +46,7 @@ async def get_current_user(
         payload = decode_access_token(token)
         user_id = int(payload["sub"])
         token_version = int(payload.get("ver", 0))
-    except (JWTError, KeyError, ValueError) as exc:
+    except (TokenDecodeError, KeyError, ValueError) as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
         ) from exc

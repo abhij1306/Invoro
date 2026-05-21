@@ -16,7 +16,7 @@ _STATIC_EXPORTS = {
 }
 
 for _name, _value in _STATIC_EXPORTS.items():
-    globals()[_name] = _value
+    globals()[_name] = _value if _value is not None else ()
 
 SELECTOR_SELF_HEAL_TARGET_LIMIT = 6
 SELECTOR_SELF_HEAL_DEFAULT_MIN_CONFIDENCE = 0.55
@@ -152,9 +152,10 @@ LISTING_FIELD_SELECTORS: dict[str, list[str]] = {
 
 def __getattr__(name: str) -> Any:
     try:
-        return _STATIC_EXPORTS[name]
+        value = _STATIC_EXPORTS[name]
     except KeyError as exc:
         raise AttributeError(name) from exc
+    return value if value is not None else ()
 
 
 __all__ = sorted(

@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 from app.core.database import SessionLocal
-from app.core.security import decode_access_token
+from app.core.security import TokenDecodeError, decode_access_token
 from app.models.crawl_run import CrawlLog, CrawlRun
 from app.models.user import User
 from app.services.crawl.access_service import require_accessible_run
 from app.services.crawl.crud import get_run_and_logs
-from jose import JWTError
 
 
 async def resolve_log_stream_user(token: str | None) -> User | None:
@@ -16,7 +15,7 @@ async def resolve_log_stream_user(token: str | None) -> User | None:
         payload = decode_access_token(token)
         user_id = int(payload["sub"])
         token_version = int(payload.get("ver", 0))
-    except (JWTError, KeyError, ValueError):
+    except (TokenDecodeError, KeyError, ValueError):
         return None
 
     async with SessionLocal() as session:

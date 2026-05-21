@@ -1,7 +1,10 @@
 from __future__ import annotations
 # ruff: noqa: F401,F403,F405
 
+from typing import Any
+
 from ._common import *
+from ._common import _as_list
 from ._variant_mapping import _option_names, _variant_axis_raw_value
 
 def _product_variant_rows(product: dict[str, Any]) -> list[dict[str, Any]]:

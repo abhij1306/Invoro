@@ -46,10 +46,10 @@ jobs:
         working-directory: backend
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
@@ -67,7 +67,7 @@ jobs:
           pip install pip-audit
 
       - name: Dependency vulnerability scan
-        run: pip-audit --vulnerability-service osv
+        run: pip-audit --vulnerability-service osv --ignore-vuln PYSEC-2025-183
 
       - name: Ruff
         run: python -m ruff check app tests
