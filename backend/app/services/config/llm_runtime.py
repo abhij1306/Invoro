@@ -15,7 +15,7 @@ from pydantic_settings import BaseSettings
 
 from app.services.config.runtime_settings import settings_config
 
-SUPPORTED_LLM_PROVIDERS = frozenset({"groq", "anthropic", "nvidia", "aws"})
+SUPPORTED_LLM_PROVIDERS = frozenset({"groq", "anthropic", "nvidia", "openrouter"})
 PARSE_PROVIDER_JSON_ERROR = (
     "Error: Provider response could not be parsed as structured JSON."
 )
@@ -23,8 +23,7 @@ DEFAULT_LLM_TOKEN_PRICING_PER_MILLION_USD = {
     "groq/llama-3.3-70b-versatile": [0.59, 0.79],
     "anthropic/claude-3-5-haiku-latest": [0.8, 4.0],
     "nvidia/meta/llama-3.1-70b-instruct": [0.35, 0.4],
-    "aws/amazon.nova-lite-v1:0": [0.06, 0.24],
-    "aws/amazon.nova-pro-v1:0": [0.8, 3.2],
+    "openrouter/openrouter/free": [0.0, 0.0],
 }
 
 
@@ -106,10 +105,11 @@ class LLMRuntimeSettings(BaseSettings):
     )
     nvidia_max_tokens: int = 1200
     nvidia_temperature: float = 0.1
-    aws_max_tokens: int = 4096
-    aws_temperature: float = 0.1
-    # AWS Bedrock calls go through the local LiteLLM-compatible proxy.
-    aws_proxy_url: str = "http://localhost:4000/v1/chat/completions"
+    openrouter_chat_completions_url: str = (
+        "https://openrouter.ai/api/v1/chat/completions"
+    )
+    openrouter_max_tokens: int = 1200
+    openrouter_temperature: float = 0.1
     token_pricing_json: str = Field(
         default=json.dumps(DEFAULT_LLM_TOKEN_PRICING_PER_MILLION_USD),
         description=(

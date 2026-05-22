@@ -1,7 +1,7 @@
 'use client';
 
 // Next.js App Router entrypoint for `/admin/llm`; invoked by file-system routing.
-import { useEffect, useState } from 'react';
+import { startTransition, useEffect, useState } from 'react';
 import { CheckCircle2, PlugZap, Plus, Trash2 } from 'lucide-react';
 
 import { Button, Dropdown, Field, Input } from '../../../components/ui/primitives';
@@ -57,29 +57,16 @@ export default function AdminLlmPage() {
     is_active: true,
   });
 
-  useEffect(() => {
-    void loadAll();
-  }, []);
-
-  async function loadAll() {
-    setError('');
+  async function refreshRuntimeState() {
     try {
-      const [nextProviders, nextConfigs, nextCostLog] = await Promise.all([
-        api.listLlmProviders(),
+      const [nextConfigs, nextCostLog] = await Promise.all([
         api.listLlmConfigs(),
         api.listLlmCostLog(),
       ]);
-      setProviders(nextProviders);
-      setConfigs(nextConfigs);
-      setCostLog(nextCostLog);
-      const recommendedModel = nextProviders[0]?.recommended_models?.[0];
-      if (recommendedModel) {
-        setForm((current) => ({
-          ...current,
-          provider: nextProviders[0].provider,
-          model: current.model || recommendedModel,
-        }));
-      }
+      startTransition(() => {
+        setConfigs(nextConfigs);
+        setCostLog(nextCostLog);
+      });
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : 'Unable to load LLM settings.');
     }
@@ -93,7 +80,7 @@ export default function AdminLlmPage() {
       await api.createLlmConfig(form);
       setMessage('LLM config saved.');
       setForm((current) => ({ ...current, api_key: '' }));
-      await loadAll();
+      await refreshRuntimeState();
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : 'Unable to save LLM config.');
     } finally {
@@ -125,11 +112,59 @@ export default function AdminLlmPage() {
     try {
       await api.deleteLlmConfig(configId);
       setMessage('LLM config removed.');
-      await loadAll();
+      await refreshRuntimeState();
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : 'Unable to delete LLM config.');
     }
   }
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function run() {
+      try {
+        const [nextProviders, nextConfigs, nextCostLog] = await Promise.all([
+          api.listLlmProviders(),
+          api.listLlmConfigs(),
+          api.listLlmCostLog(),
+        ]);
+        if (cancelled) return;
+        startTransition(() => {
+          setProviders(nextProviders);
+          setConfigs(nextConfigs);
+          setCostLog(nextCostLog);
+          const fallbackProvider = nextProviders[0];
+          setForm((current) => {
+            const matchingProvider = nextProviders.find(
+              (provider) => provider.provider === current.provider,
+            );
+            if (matchingProvider) {
+              const matchingModel = matchingProvider.recommended_models.includes(current.model);
+              return matchingModel
+                ? current
+                : {
+                    ...current,
+                    model: matchingProvider.recommended_models[0] ?? current.model,
+                  };
+            }
+            return {
+              ...current,
+              provider: fallbackProvider?.provider ?? current.provider,
+              model: fallbackProvider?.recommended_models[0] ?? current.model,
+            };
+          });
+        });
+      } catch (nextError) {
+        if (cancelled) return;
+        setError(nextError instanceof Error ? nextError.message : 'Unable to load LLM settings.');
+      }
+    }
+
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const recommendedModels =
     providers.find((provider) => provider.provider === form.provider)?.recommended_models ?? [];
@@ -179,18 +214,14 @@ export default function AdminLlmPage() {
               </Field>
 
               <Field label="Model" className="md:col-span-2">
-                <Input
+                <Dropdown<string>
                   value={form.model}
-                  onChange={(event) =>
-                    setForm((current) => ({ ...current, model: event.target.value }))
-                  }
-                  list="llm-model-suggestions"
+                  onChange={(model) => setForm((current) => ({ ...current, model }))}
+                  options={recommendedModels.map((model) => ({
+                    value: model,
+                    label: model,
+                  }))}
                 />
-                <datalist id="llm-model-suggestions">
-                  {recommendedModels.map((model) => (
-                    <option key={model} value={model} />
-                  ))}
-                </datalist>
               </Field>
 
               <Field label="API Key" className="md:col-span-2">
@@ -226,8 +257,10 @@ export default function AdminLlmPage() {
               </Button>
             </div>
 
-            {message ? <InlineAlert message={message} tone="neutral" /> : null}
-            {error ? <InlineAlert message={error} tone="danger" /> : null}
+            <div className="min-h-[52px]">
+              {message ? <InlineAlert message={message} tone="neutral" /> : null}
+              {error ? <InlineAlert message={error} tone="danger" /> : null}
+            </div>
           </SectionCard>
 
           <SectionCard

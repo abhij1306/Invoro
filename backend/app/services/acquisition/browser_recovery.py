@@ -18,7 +18,7 @@ async def recover_browser_challenge(
     *,
     url: str,
     response: Any,
-    _browser_engine: str | None = None,
+    browser_engine: str | None = None,
     timeout_seconds: float,
     phase_timings_ms: dict[str, int],
     challenge_wait_max_seconds: float,
@@ -29,6 +29,7 @@ async def recover_browser_challenge(
     get_page_html,
     looks_like_low_content_shell=None,
 ):
+    del browser_engine
     phase_timings_ms.setdefault("challenge_wait", 0)
     phase_timings_ms.setdefault("challenge_retry", 0)
     max_wait_seconds = max(0.0, float(challenge_wait_max_seconds or 0))

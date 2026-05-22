@@ -126,7 +126,7 @@ export function TabBar({
   className?: string;
   variant?: 'pill' | 'underline';
 }>) {
-  const padX = compact ? 'px-3' : 'px-4';
+  const padX = compact ? 'px-2.5' : 'px-3';
 
   if (variant === 'underline') {
     return (
@@ -167,7 +167,7 @@ export function TabBar({
   return (
     <div
       className={cn(
-        'inline-flex h-9 items-center gap-1.5 rounded-full border border-[color-mix(in_srgb,var(--border)_45%,transparent_55%)] bg-[color-mix(in_srgb,var(--bg-alt)_95%,var(--text-primary)_5%)] p-0.75 shadow-[inset_0_1px_1px_rgba(0,0,0,0.02)] transition-all',
+        'border-border bg-background-alt inline-flex h-[var(--control-height)] items-center gap-0.5 rounded-[var(--radius-md)] border p-0.5 shadow-none transition-all',
         className,
       )}
     >
@@ -178,11 +178,11 @@ export function TabBar({
           aria-pressed={value === option.value}
           onClick={() => onChange(option.value)}
           className={cn(
-            'type-control relative z-10 inline-flex h-full min-w-[72px] shrink-0 items-center justify-center rounded-full text-sm font-semibold whitespace-nowrap transition-all duration-200 ease-out select-none',
+            'type-control relative z-10 inline-flex h-full min-w-[72px] shrink-0 items-center justify-center rounded-[var(--radius-sm)] text-sm whitespace-nowrap transition-[background-color,color,border-color,box-shadow] duration-150 ease-out select-none',
             padX,
             value === option.value
               ? 'border-border bg-panel text-foreground border shadow-xs'
-              : 'text-secondary hover:text-foreground border border-transparent bg-transparent opacity-95 hover:opacity-100',
+              : 'text-muted hover:text-foreground border border-transparent bg-transparent',
           )}
         >
           {option.icon ? (
@@ -231,7 +231,7 @@ export function EmptyPanel({
   description,
 }: Readonly<{ title: string; description: string }>) {
   return (
-    <div className="border-border-strong bg-subtle-panel grid min-h-32 place-items-center rounded-[var(--radius-lg)] border border-dashed px-6 py-8 text-center">
+    <div className="border-border-strong bg-subtle-panel grid min-h-32 place-items-center rounded-[var(--radius-lg)] border border-dashed px-[var(--space-6)] py-[var(--space-8)] text-center">
       <div className="space-y-1">
         <p className="type-subheading m-0">{title}</p>
         <p className="type-body m-0">{description}</p>
@@ -282,10 +282,10 @@ export function SurfaceSection({
 }>) {
   return (
     <SurfacePanel className={className}>
-      <div className="border-divider border-b px-4 py-3">
+      <div className="border-divider border-b px-[var(--space-5)] py-[var(--space-4)]">
         <SectionHeader title={title} description={description} icon={Icon} action={action} />
       </div>
-      <div className={cn('p-4', bodyClassName)}>{children}</div>
+      <div className={cn('p-[var(--space-5)]', bodyClassName)}>{children}</div>
     </SurfacePanel>
   );
 }
@@ -303,7 +303,7 @@ export function MutedPanelMessage({
   return (
     <div
       className={cn(
-        'surface-muted rounded-[var(--radius-lg)] border border-dashed px-4 py-6',
+        'surface-muted rounded-[var(--radius-lg)] border border-dashed px-[var(--space-5)] py-[var(--space-6)]',
         className,
       )}
     >
@@ -330,7 +330,7 @@ export function SkeletonRows({
 /* ─── MetricSkeleton ─────────────────────────────────────────────────────── */
 export function MetricSkeleton() {
   return (
-    <div className="border-border card-gradient relative space-y-2 overflow-hidden rounded-[var(--radius-lg)] border p-4">
+    <div className="border-border card-gradient relative space-y-2 overflow-hidden rounded-[var(--radius-lg)] border p-[var(--space-4)]">
       <Skeleton className="h-3 w-20" />
       <Skeleton className="mt-2 h-9 w-28" />
       <Skeleton className="h-3 w-16" />
@@ -391,7 +391,7 @@ export function RunWorkspaceShell({
 }>) {
   return (
     <div className="page-stack">
-      <div className="border-border card-gradient shadow-card flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-xl)] border px-6 py-3">
+      <div className="border-border card-gradient flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-lg)] border px-[var(--space-6)] py-[var(--space-4)]">
         <div className="min-w-0 flex-1">{header}</div>
         {actions ? (
           <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>
@@ -465,7 +465,7 @@ export function RunSummaryChips({
         return (
           <div
             key={chip.key}
-            className="border-border inline-flex items-center gap-1.5 rounded-[var(--radius-md)] border px-2.5 py-1"
+            className="border-border bg-background-alt inline-flex items-center gap-1.5 rounded-[var(--radius-md)] border px-2.5 py-1"
           >
             <Icon className={cn('size-3.5 shrink-0', chip.tone)} aria-hidden="true" />
             <span className={cn('type-body-sm tabular-nums', chip.tone)}>{chip.value}</span>
@@ -499,7 +499,7 @@ export function DataRegionLoading({
   className,
 }: Readonly<{ count?: number; className?: string }>) {
   return (
-    <div className={cn('p-4', className)}>
+    <div className={cn('p-[var(--space-5)]', className)}>
       <SkeletonRows count={count} />
     </div>
   );
@@ -511,7 +511,7 @@ export function DataRegionEmpty({
   className,
 }: Readonly<{ title: string; description: string; className?: string }>) {
   return (
-    <div className={cn('p-4', className)}>
+    <div className={cn('p-[var(--space-5)]', className)}>
       <EmptyPanel title={title} description={description} />
     </div>
   );
@@ -522,7 +522,7 @@ export function DataRegionError({
   className,
 }: Readonly<{ message: string; className?: string }>) {
   return (
-    <div className={cn('p-4', className)}>
+    <div className={cn('p-[var(--space-5)]', className)}>
       <InlineAlert message={message} />
     </div>
   );
@@ -593,7 +593,7 @@ export function DetailRow({
   return (
     <div
       className={cn(
-        'border-border bg-background rounded-[var(--radius-lg)] border px-6 py-3',
+        'border-border bg-background rounded-[var(--radius-lg)] border px-[var(--space-6)] py-[var(--space-4)]',
         className,
       )}
     >

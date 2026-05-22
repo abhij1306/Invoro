@@ -16,11 +16,11 @@ const toneText = {
 
 const toneBox = {
   neutral: 'border-border bg-background-alt',
-  success: 'border-success/20 bg-success-bg',
-  warning: 'border-warning/25 bg-warning-bg',
-  danger: 'border-danger/20 bg-danger-bg',
-  accent: 'border-accent/20 bg-accent-subtle',
-  info: 'border-info/20 bg-info-bg',
+  success: 'border-success-border bg-success-bg',
+  warning: 'border-warning-border bg-warning-bg',
+  danger: 'border-danger-border bg-danger-bg',
+  accent: 'border-accent-border bg-accent-soft',
+  info: 'border-info-border bg-info-bg',
 } as const;
 
 export type BadgeProps = {
@@ -31,7 +31,7 @@ export type BadgeProps = {
 } & React.HTMLAttributes<HTMLSpanElement>;
 
 export const badgeVariants = cva(
-  'inline-flex min-h-[22px] items-center gap-1.5 whitespace-nowrap text-xs leading-[1.35] font-bold tracking-[var(--tracking-wider)]',
+  'inline-flex min-h-[20px] items-center gap-1.5 whitespace-nowrap text-[length:var(--text-2xs)] leading-[1.4] font-semibold tracking-[var(--tracking-wide)] uppercase',
 );
 
 export function Badge({

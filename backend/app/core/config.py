@@ -66,6 +66,7 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     groq_api_key: str = ""
     nvidia_api_key: str = ""
+    openrouter_api_key: str = ""
     request_id_header: str = "X-Request-ID"
     crawl_log_db_min_level: str = "info"
     crawl_log_db_url_progress_sample_rate: int = 4

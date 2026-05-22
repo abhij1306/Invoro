@@ -80,7 +80,8 @@ export function AlertForm({ initial, onSubmit, onCancel, submitLabel }: Readonly
         JSON.stringify(targetFields) !== JSON.stringify(initial?.tracked_fields ?? initialFields);
       const payload = {
         target_fields: targetFields,
-        target_rules: !fieldsChanged && initial?.target_rules?.length ? initial.target_rules : undefined,
+        target_rules:
+          !fieldsChanged && initial?.target_rules?.length ? initial.target_rules : undefined,
         condition: condition.trim() || null,
         webhook_url: cleanWebhook || null,
         poll_interval_seconds: Number.parseInt(pollInterval, 10),

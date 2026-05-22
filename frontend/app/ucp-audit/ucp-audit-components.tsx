@@ -275,7 +275,7 @@ export function UcpScoreSummary({
         <div className="border-divider bg-background/30 relative flex flex-col items-center justify-center border-b p-6 lg:border-r lg:border-b-0">
           <div className="absolute inset-x-0 top-3 flex items-center justify-center gap-1.5">
             <Sparkles className="text-accent size-3 animate-pulse" />
-            <span className="text-muted font-sans text-[10px] font-normal tracking-widest uppercase">
+            <span className="text-muted font-sans text-[10px] font-medium tracking-widest uppercase">
               COMPLIANCE INDEX
             </span>
           </div>
@@ -293,7 +293,7 @@ export function UcpScoreSummary({
 
           <div className="mt-4 flex w-full flex-col gap-2.5 px-2">
             <div className="border-border/40 flex items-center justify-between border-b pb-1.5">
-              <span className="text-muted font-mono text-[9px] font-normal uppercase">
+              <span className="text-muted font-sans text-[9px] font-medium tracking-wider uppercase">
                 CRITICAL GAPS
               </span>
               <span className="text-danger bg-danger/10 rounded px-1.5 py-0.5 font-mono text-xs leading-none font-normal">
@@ -301,7 +301,7 @@ export function UcpScoreSummary({
               </span>
             </div>
             <div className="border-border/40 flex items-center justify-between border-b pb-1.5">
-              <span className="text-muted font-mono text-[9px] font-normal uppercase">
+              <span className="text-muted font-sans text-[9px] font-medium tracking-wider uppercase">
                 ADVISORIES
               </span>
               <span className="text-warning bg-warning/10 rounded px-1.5 py-0.5 font-mono text-xs leading-none font-normal">
@@ -309,12 +309,12 @@ export function UcpScoreSummary({
               </span>
             </div>
             <div className="flex items-center justify-between pt-0.5">
-              <span className="text-muted font-mono text-[9px] font-normal uppercase">
+              <span className="text-muted font-sans text-[9px] font-medium tracking-wider uppercase">
                 RUN STATUS
               </span>
               <span
                 className={cn(
-                  'border-border/60 bg-background-alt rounded border px-2 py-0.5 font-mono text-[10px] leading-none font-normal uppercase shadow-sm',
+                  'border-border/60 bg-background-alt rounded border px-2 py-0.5 font-sans text-[10px] leading-none font-medium uppercase shadow-sm',
                   toneClass(statusTone(job?.status)),
                 )}
               >

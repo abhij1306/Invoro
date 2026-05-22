@@ -39,7 +39,9 @@ async def llm_configs(
     _: Annotated[object, Depends(require_admin)],
 ) -> list[LLMConfigResponse]:
     result = await session.execute(
-        select(LLMConfig).order_by(LLMConfig.task_type.asc(), LLMConfig.created_at.desc())
+        select(LLMConfig)
+        .where(LLMConfig.provider.in_(tuple(SUPPORTED_LLM_PROVIDERS)))
+        .order_by(LLMConfig.task_type.asc(), LLMConfig.created_at.desc())
     )
     return [_serialize_llm_config(row) for row in result.scalars().all()]
 

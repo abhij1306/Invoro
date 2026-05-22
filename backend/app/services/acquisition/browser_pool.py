@@ -280,8 +280,9 @@ class SharedBrowserRuntime:
         self,
         *,
         context_options: dict[str, Any],
-        _context_spec: PlaywrightContextSpec,
+        context_spec: PlaywrightContextSpec,
     ) -> tuple[BrowserContext, Any]:
+        del context_spec
         last_error: Exception | None = None
         for attempt in range(2):
             if self._browser is None:

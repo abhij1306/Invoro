@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from collections.abc import Iterable
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
@@ -17,12 +17,9 @@ from app.services.config.extraction_rules import (
 )
 from app.services.config.runtime_settings import crawler_runtime_settings
 from app.services.domain_memory_service import (
-    load_domain_memory,
-    save_domain_memory,
-    selector_payload_from_rules,
-    selector_rules_from_memory,
+    load_domain_memory, save_domain_memory,
+    selector_payload_from_rules, selector_rules_from_memory,
 )
-
 if TYPE_CHECKING:
     from app.models.domain_memory import DomainMemory
 from app.services.extraction_html_helpers import html_to_text
@@ -43,7 +40,6 @@ from app.services.dom.xpath_service import (
     validate_or_convert_xpath,
 )
 from app.services.url_safety import ensure_public_crawl_targets
-
 coerce_int = _coerce_int
 _HTML_PARSER = "html.parser"
 
@@ -134,7 +130,7 @@ async def list_selector_records(
             for row in selector_rules_from_memory(memory):
                 domain_records.append(_selector_record_from_memory(row, memory=memory))
         return domain_records
-    memory = await load_domain_memory(
+    loaded_memory = await load_domain_memory(
         session,
         domain=normalized_domain,
         surface=normalized_surface,
@@ -142,11 +138,11 @@ async def list_selector_records(
     return [
         _selector_record_from_memory(
             row,
-            memory=memory,
+            memory=loaded_memory,
             domain=normalized_domain,
             surface=normalized_surface,
         )
-        for row in selector_rules_from_memory(memory)
+        for row in selector_rules_from_memory(loaded_memory)
     ]
 
 
@@ -525,13 +521,13 @@ async def test_selector(
     }
 
 
-async def _all_domain_memories(session: AsyncSession) -> list[Any]:
+async def _all_domain_memories(session: AsyncSession) -> list[DomainMemory]:
     from sqlalchemy import select
 
     from app.models.domain_memory import DomainMemory
 
     result = await session.execute(select(DomainMemory).order_by(DomainMemory.id.asc()))
-    return result.scalars().all()
+    return list(result.scalars().all())
 
 
 async def _next_selector_id(session: AsyncSession) -> int:

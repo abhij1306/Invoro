@@ -5,6 +5,7 @@ import pytest
 from app.core.security import encrypt_secret
 from app.models.llm import LLMConfig
 from app.services.llm.config_service import (
+    llm_provider_catalog,
     resolve_active_config,
     resolve_provider_api_key,
     serialize_config_snapshot,
@@ -72,3 +73,24 @@ def test_serialize_config_snapshot_keeps_encrypted_key() -> None:
         "api_key_encrypted": "encrypted",
         "task_type": "general",
     }
+
+
+def test_llm_provider_catalog_exposes_expanded_groq_and_nvidia_models() -> None:
+    catalog = {item["provider"]: item for item in llm_provider_catalog()}
+
+    assert catalog["groq"]["recommended_models"] == [
+        "llama-3.3-70b-versatile",
+        "llama-3.1-8b-instant",
+        "openai/gpt-oss-20b",
+        "openai/gpt-oss-120b",
+    ]
+    assert catalog["nvidia"]["recommended_models"] == [
+        "meta/llama-3.3-70b-instruct",
+        "meta/llama-3.1-70b-instruct",
+        "meta/llama-3.1-8b-instruct",
+        "nvidia/llama-3.3-nemotron-super-49b-v1.5",
+        "nvidia/nemotron-3-nano-30b-a3b",
+    ]
+    assert catalog["openrouter"]["recommended_models"] == [
+        "openrouter/free",
+    ]

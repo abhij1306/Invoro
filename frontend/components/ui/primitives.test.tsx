@@ -48,12 +48,12 @@ describe('Toggle', () => {
     );
 
     const toggle = screen.getByRole('switch', { name: 'Proxy' });
-    expect(toggle).toHaveClass('bg-[var(--toggle-track-off)]');
+    expect(toggle).toHaveClass('toggle-track-off');
     expect(toggle).not.toHaveClass('bg-accent');
 
     rerender(<Toggle checked={true} onChange={handleChange} ariaLabel="Proxy" />);
 
-    expect(toggle).toHaveClass('bg-[var(--toggle-track-on)]');
+    expect(toggle).toHaveClass('toggle-track-on');
     expect(toggle).not.toHaveClass('bg-accent');
   });
 });

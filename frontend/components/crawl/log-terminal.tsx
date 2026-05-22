@@ -221,19 +221,15 @@ function StageChip({ stage }: { stage: LogStage }) {
   if (stage === 'persistence') Icon = HardDrive;
 
   return (
-    <div
+    <span
       className={cn(
-        'inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-xs font-semibold tracking-wide uppercase shadow-sm',
-        stage === 'acquisition' && 'border-blue-500/20 bg-blue-500/10 text-blue-500',
-        stage === 'extraction' && 'border-indigo-500/20 bg-indigo-500/10 text-indigo-500',
-        stage === 'normalize' && 'border-amber-500/20 bg-amber-500/10 text-amber-500',
-        stage === 'persistence' && 'border-emerald-500/20 bg-emerald-500/10 text-emerald-500',
-        stage === 'system' && 'border-slate-500/20 bg-slate-500/10 text-slate-500',
+        'inline-flex items-center gap-1 text-xs tracking-wide uppercase',
+        config.textOnlyClass,
       )}
     >
       <Icon className="size-3" />
       <span>{config.label}</span>
-    </div>
+    </span>
   );
 }
 
@@ -979,7 +975,7 @@ export const LogTerminal = memo(function LogTerminal({
 
   return (
     <div
-      className="group/terminal relative flex flex-col overflow-hidden rounded-none border"
+      className="crawl-terminal-shell group/terminal relative flex flex-col overflow-hidden rounded-none border"
       style={{
         borderColor: 'var(--terminal-border)',
         backgroundColor: 'var(--terminal-bg)',

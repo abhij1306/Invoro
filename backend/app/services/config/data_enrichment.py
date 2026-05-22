@@ -286,7 +286,7 @@ class DataEnrichmentSettings:
     max_seo_keywords: int = 20
     llm_description_excerpt_chars: int = 300
     llm_taxonomy_hint_count: int = 5
-    llm_call_timeout_seconds: float = 15.0
+    llm_call_timeout_seconds: float = 20.0
 
 
 data_enrichment_settings = DataEnrichmentSettings()

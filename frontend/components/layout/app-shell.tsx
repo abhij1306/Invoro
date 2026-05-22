@@ -127,7 +127,7 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
             </div>
             <div className="app-sidebar-nav">
               {Array.from({ length: navItemCount }, (_, index) => (
-                <div key={index} className="skeleton h-8 w-full rounded-[7px]" />
+                <div key={index} className="skeleton h-8 w-full rounded-[var(--radius-md)]" />
               ))}
             </div>
           </aside>
@@ -148,7 +148,7 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
                     </div>
                   ))}
                 </div>
-                <div className="skeleton h-72 w-full rounded-[10px]" />
+                <div className="skeleton h-72 w-full rounded-[var(--radius-lg)]" />
               </div>
             </main>
           </div>
@@ -566,7 +566,7 @@ function ShellContent({
         <div className="app-page-inner">{children}</div>
       </main>
       {canResetWorkspace && resetDialogOpen ? (
-        <div className="fixed inset-0 z-[100] grid place-items-center bg-[color-mix(in_srgb,var(--bg-base)_34%,black)] p-4">
+        <div className="overlay-scrim fixed inset-0 z-[100] grid place-items-center p-4">
           <div
             ref={resetDialogRef}
             role="dialog"
@@ -582,7 +582,10 @@ function ShellContent({
             >
               {resetDialogCopy.title}
             </h2>
-            <p id="reset-workspace-description" className="text-secondary mt-2 text-sm leading-[var(--leading-relaxed)]">
+            <p
+              id="reset-workspace-description"
+              className="text-secondary mt-2 text-sm leading-[var(--leading-relaxed)]"
+            >
               {resetDialogCopy.description}
             </p>
             {resetError ? (

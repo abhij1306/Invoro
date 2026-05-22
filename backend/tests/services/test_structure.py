@@ -73,6 +73,7 @@ ALLOWED_PRIVATE_SERVICE_IMPORTS = {
     "pipeline/extraction_loop.py -> .record_extraction_stage:_update_acquisition_contract_memory",
 }
 ALLOWED_PRIVATE_TEST_IMPORTS: set[str] = {
+    "tests/services/test_alert_service.py -> app.services.alert_service:_rules_payload",
     "tests/services/test_listing_identity_regressions.py -> app.services.extract.detail.identity.core:_detail_model_number_sets_compatible",
     "tests/services/test_public_api_auth.py -> app.main:_public_auth_session",
     "tests/services/test_public_api_rate_limit.py -> app.api.public.rate_limit:_retry_after",

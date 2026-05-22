@@ -17,7 +17,7 @@ import {
   Search,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import { useDeferredValue, useMemo, useRef, useState } from 'react';
 
 import { HistoryDrawer, type HistoryItem } from '../ui/history-drawer';
 
@@ -75,7 +75,7 @@ import {
 } from './shared';
 import { AlertBuilderDrawer } from './alert-builder-drawer';
 import { useCrawlRunStore } from './crawl-run-store';
-import { useTerminalSync } from './use-run-polling';
+import { useLiveClock, useTerminalRecordSync, useTerminalSync } from './use-run-polling';
 import { useRunWorkspace } from './use-run-workspace';
 
 type CrawlRunScreenProps = {
@@ -233,11 +233,9 @@ export function CrawlRunScreen({ runId }: Readonly<CrawlRunScreenProps>) {
   const logViewportRef = useRef<HTMLDivElement | null>(null);
   const logCursorRef = useRef<number | undefined>(undefined);
   const [sessionStartMs] = useState(() => Date.now());
-  const [localNow, setLocalNow] = useState(() => Date.now());
   const pollErrorEventKeysRef = useRef<Set<string>>(new Set());
-  const terminalRecordsRetryAttemptsRef = useRef(0);
-
   const { runQuery, run, live, terminal } = useRunWorkspace(runId);
+  const localNow = useLiveClock(live);
   const { refetch: refetchRunQuery } = runQuery;
   const runCreatedMs = run?.created_at ? parseApiDate(run.created_at).getTime() : null;
   const effectiveStartMs = runCreatedMs ?? sessionStartMs;
@@ -260,12 +258,6 @@ export function CrawlRunScreen({ runId }: Readonly<CrawlRunScreenProps>) {
   const shouldFetchTableRecords = Boolean(run) && effectiveOutputTab === 'table';
   const shouldFetchJsonRecords = Boolean(run) && effectiveOutputTab === 'json';
   const shouldFetchLogs = Boolean(run) && (live || effectiveOutputTab === 'logs');
-
-  useEffect(() => {
-    if (!live) return;
-    const interval = setInterval(() => setLocalNow(Date.now()), 1000);
-    return () => clearInterval(interval);
-  }, [live]);
 
   const tableRecordsLimit = CRAWL_DEFAULTS.TABLE_PAGE_SIZE * 4 * tablePage;
   const tableRecordsQuery = useQuery({
@@ -666,24 +658,18 @@ export function CrawlRunScreen({ runId }: Readonly<CrawlRunScreenProps>) {
     terminal && (summaryRecordsFromRun > 0 || verdict === 'success' || verdict === 'partial');
   const terminalRecordsNeedSync =
     terminalRecordsExpected && knownTableRecordsTotal < Math.max(1, summaryRecordsFromRun);
-
-  useEffect(() => {
-    if (!terminalRecordsNeedSync) {
-      terminalRecordsRetryAttemptsRef.current = 0;
-      return;
-    }
-
-    const intervalId = window.setInterval(() => {
-      if (terminalRecordsRetryAttemptsRef.current >= RETRY_LIMITS.TERMINAL_RECORDS_RETRY_LIMIT) {
-        window.clearInterval(intervalId);
-        return;
-      }
-      terminalRecordsRetryAttemptsRef.current += 1;
-      void Promise.allSettled([refetchTableRecords(), refetchJsonRecords()]);
-    }, POLLING_INTERVALS.RECORDS_MS);
-
-    return () => window.clearInterval(intervalId);
-  }, [refetchJsonRecords, refetchTableRecords, terminalRecordsNeedSync]);
+  useTerminalRecordSync({
+    enabled: terminalRecordsNeedSync,
+    intervalMs: POLLING_INTERVALS.RECORDS_MS,
+    retryLimit: RETRY_LIMITS.TERMINAL_RECORDS_RETRY_LIMIT,
+    runId,
+    summaryRecordsFromRun,
+    recordsFetchLimit,
+    tableRecordsLimit,
+    updatedAt: run?.updated_at ?? null,
+    refetchJsonRecords,
+    refetchTableRecords,
+  });
 
   function downloadExport(kind: 'csv' | 'json') {
     setRunActionError('');

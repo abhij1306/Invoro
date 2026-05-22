@@ -24,6 +24,8 @@ _LLM_PROVIDER_DEFINITIONS = (
         "recommended_models": [
             "llama-3.3-70b-versatile",
             "llama-3.1-8b-instant",
+            "openai/gpt-oss-20b",
+            "openai/gpt-oss-120b",
         ],
     },
     {
@@ -31,8 +33,19 @@ _LLM_PROVIDER_DEFINITIONS = (
         "label": "NVIDIA",
         "settings_attr": "nvidia_api_key",
         "recommended_models": [
+            "meta/llama-3.3-70b-instruct",
             "meta/llama-3.1-70b-instruct",
             "meta/llama-3.1-8b-instruct",
+            "nvidia/llama-3.3-nemotron-super-49b-v1.5",
+            "nvidia/nemotron-3-nano-30b-a3b",
+        ],
+    },
+    {
+        "provider": "openrouter",
+        "label": "OpenRouter Free",
+        "settings_attr": "openrouter_api_key",
+        "recommended_models": [
+            "openrouter/free",
         ],
     },
     {
@@ -42,16 +55,6 @@ _LLM_PROVIDER_DEFINITIONS = (
         "recommended_models": [
             "claude-3-5-haiku-latest",
             "claude-sonnet-4-20250514",
-        ],
-    },
-    {
-        "provider": "aws",
-        "label": "AWS Bedrock",
-        "settings_attr": None,
-        "uses_ambient_auth": True,
-        "recommended_models": [
-            "amazon.nova-lite-v1:0",
-            "amazon.nova-pro-v1:0",
         ],
     },
 )
@@ -153,8 +156,6 @@ def provider_env_key(provider: str) -> str:
         settings_attr = definition.get("settings_attr")
         if settings_attr:
             return str(getattr(settings, str(settings_attr), "") or "")
-        if definition.get("uses_ambient_auth"):
-            return "ambient"
     return ""
 
 
@@ -182,6 +183,4 @@ def _provider_catalog_entry(definition: dict[str, Any]) -> dict[str, Any]:
         ),
         "recommended_models": list(definition["recommended_models"]),
     }
-    if definition.get("uses_ambient_auth"):
-        entry["uses_ambient_auth"] = True
     return entry

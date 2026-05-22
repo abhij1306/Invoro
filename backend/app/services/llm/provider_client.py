@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 from decimal import Decimal
 from typing import Any
-from urllib.parse import urlparse
 
 import httpx
 import logging
@@ -26,9 +25,9 @@ _anthropic_client_lock = asyncio.Lock()
 _nvidia_client: httpx.AsyncClient | None = None
 _nvidia_client_timeout: float | None = None
 _nvidia_client_lock = asyncio.Lock()
-_aws_client: httpx.AsyncClient | None = None
-_aws_client_timeout: float | None = None
-_aws_client_lock = asyncio.Lock()
+_openrouter_client: httpx.AsyncClient | None = None
+_openrouter_client_timeout: float | None = None
+_openrouter_client_lock = asyncio.Lock()
 
 
 async def close_llm_provider_clients() -> None:
@@ -36,7 +35,7 @@ async def close_llm_provider_clients() -> None:
     global _groq_client, _groq_client_timeout
     global _anthropic_client, _anthropic_client_timeout
     global _nvidia_client, _nvidia_client_timeout
-    global _aws_client, _aws_client_timeout
+    global _openrouter_client, _openrouter_client_timeout
     async with _groq_client_lock:
         await _close_provider_client("groq", _groq_client)
         _groq_client = None
@@ -49,10 +48,10 @@ async def close_llm_provider_clients() -> None:
         await _close_provider_client("nvidia", _nvidia_client)
         _nvidia_client = None
         _nvidia_client_timeout = None
-    async with _aws_client_lock:
-        await _close_provider_client("aws", _aws_client)
-        _aws_client = None
-        _aws_client_timeout = None
+    async with _openrouter_client_lock:
+        await _close_provider_client("openrouter", _openrouter_client)
+        _openrouter_client = None
+        _openrouter_client_timeout = None
 
 
 async def _close_provider_client(
@@ -113,14 +112,14 @@ async def _shared_nvidia_client() -> httpx.AsyncClient:
         return _nvidia_client
 
 
-async def _shared_aws_client() -> httpx.AsyncClient:
-    global _aws_client, _aws_client_timeout
-    async with _aws_client_lock:
-        _aws_client, _aws_client_timeout = await _refresh_shared_client(
-            _aws_client,
-            _aws_client_timeout,
+async def _shared_openrouter_client() -> httpx.AsyncClient:
+    global _openrouter_client, _openrouter_client_timeout
+    async with _openrouter_client_lock:
+        _openrouter_client, _openrouter_client_timeout = await _refresh_shared_client(
+            _openrouter_client,
+            _openrouter_client_timeout,
         )
-        return _aws_client
+        return _openrouter_client
 
 
 async def call_provider(
@@ -132,7 +131,7 @@ async def call_provider(
     user_prompt: str,
 ) -> tuple[str, int, int]:
     normalized_provider = str(provider or "").strip().lower()
-    if normalized_provider != "aws" and not api_key:
+    if not api_key:
         return f"{ERROR_PREFIX} Missing API key", 0, 0
     if normalized_provider not in SUPPORTED_LLM_PROVIDERS:
         return f"{ERROR_PREFIX} Unsupported provider: {provider}", 0, 0
@@ -352,40 +351,30 @@ async def _call_nvidia(
     )
 
 
-async def _call_aws(
-    _api_key: str,
+async def _call_openrouter(
+    api_key: str,
     model: str,
     system_prompt: str,
     user_prompt: str,
 ) -> tuple[str, int, int]:
-    proxy_url = str(llm_runtime_settings.aws_proxy_url or "").strip()
-    parsed_proxy_url = urlparse(proxy_url)
-    if parsed_proxy_url.scheme not in {"http", "https"} or not parsed_proxy_url.netloc:
-        return f"{ERROR_PREFIX} Invalid AWS proxy URL", 0, 0
-    client = await _shared_aws_client()
-    response = await client.post(
-        proxy_url,
-        headers={"Content-Type": JSON_CONTENT_TYPE},
-        json={
-            "model": model,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            "max_tokens": llm_runtime_settings.aws_max_tokens,
-            "temperature": llm_runtime_settings.aws_temperature,
-        },
+    client = await _shared_openrouter_client()
+    return await _call_chat_completions_endpoint(
+        client,
+        url=llm_runtime_settings.openrouter_chat_completions_url,
+        api_key=api_key,
+        model=model,
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+        max_tokens=llm_runtime_settings.openrouter_max_tokens,
+        temperature=llm_runtime_settings.openrouter_temperature,
     )
-    if response.status_code != 200:
-        return _http_error(response), 0, 0
-    return _extract_chat_completion_payload(_safe_json_response(response))
 
 
 _PROVIDER_DISPATCH = {
     "groq": _call_groq,
     "anthropic": _call_anthropic,
     "nvidia": _call_nvidia,
-    "aws": _call_aws,
+    "openrouter": _call_openrouter,
 }
 
 if frozenset(_PROVIDER_DISPATCH) != SUPPORTED_LLM_PROVIDERS:

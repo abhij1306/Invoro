@@ -3,26 +3,22 @@ import Script from 'next/script';
 import './globals.css';
 
 // Next.js App Router root layout; invoked by file-system routing.
-import { Figtree } from 'next/font/google';
-import localFont from 'next/font/local';
+import { Inter, JetBrains_Mono } from 'next/font/google';
 
 import { AppShell } from '../components/layout/app-shell';
 import { QueryProvider } from '../components/ui/query-provider';
 
-// Primary UI font — Figtree for premium SaaS aesthetic
-const mainFont = Figtree({
+const mainFont = Inter({
   subsets: ['latin'],
   weight: ['300', '400', '500', '600', '700', '800'],
   variable: '--font-primary-source',
   display: 'swap',
 });
 
-const monoFont = localFont({
-  src: [
-    { path: '../public/fonts/Consolas-Regular.ttf', weight: '400', style: 'normal' },
-    { path: '../public/fonts/Consolas-Bold.ttf',    weight: '700', style: 'normal' },
-  ],
-  variable: '--font-consolas',
+const monoFont = JetBrains_Mono({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-mono-source',
   display: 'swap',
 });
 

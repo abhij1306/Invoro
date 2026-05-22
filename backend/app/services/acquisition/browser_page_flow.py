@@ -597,13 +597,14 @@ async def serialize_browser_page_content_impl(
     max_scrolls: int,
     max_records: int | None = None,
     prefetched_html: str | None = None,
-    _prefetched_analysis: HtmlAnalysis | None = None,
+    prefetched_analysis: HtmlAnalysis | None = None,
     phase_timings_ms: dict[str, int],
     execute_listing_traversal,
     recover_listing_page_content,
     elapsed_ms,
     on_event=None,
 ):
+    del prefetched_analysis
     should_flatten_shadow = "listing" not in str(surface or "").strip().lower()
     traversal_result = None
     traversal_html = ""

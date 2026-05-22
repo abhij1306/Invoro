@@ -1,7 +1,5 @@
 # Remotive JSON/HTML adapter.
 from __future__ import annotations
-
-import json
 from json import loads as parse_json
 
 from app.services.adapters.base import AdapterResult, BaseAdapter
