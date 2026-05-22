@@ -12,6 +12,7 @@ from app.models.crawl_run import CrawlRecord
 from app.schemas.data_enrichment import DataEnrichmentJobDetailResponse
 from app.services.llm.types import LLMTaskResult
 from app.services.config.data_enrichment import (
+    DATA_ENRICHMENT_LLM_TASK,
     DATA_ENRICHMENT_STATUS_DEGRADED,
     DATA_ENRICHMENT_STATUS_ENRICHED,
     DATA_ENRICHMENT_STATUS_FAILED,
@@ -288,6 +289,112 @@ async def test_data_enrichment_deterministic_job_populates_enriched_fields(
     assert "image_link" in product.diagnostics["product_attributes"]["null_attributes"]
     assert "linen" in product.seo_keywords
     assert product.intent_attributes is None
+
+
+@pytest.mark.asyncio
+async def test_data_enrichment_uses_job_llm_snapshot_over_source_run_snapshot(
+    db_session: AsyncSession,
+    create_test_run,
+    test_user,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def _stale_run_snapshot(_session):
+        return {
+            "general": {
+                "provider": "nvidia",
+                "model": "stale-run-model",
+                "task_type": "general",
+                "id": 3,
+                "api_key_encrypted": "enc-stale",
+            }
+        }
+
+    monkeypatch.setattr(
+        "app.services.crawl.crud.snapshot_active_configs",
+        _stale_run_snapshot,
+    )
+    run = await create_test_run(
+        url="https://example.com/products/navy-linen-dress",
+        surface="ecommerce_detail",
+    )
+
+    async def _job_snapshot(_session, task_types=None):
+        assert task_types == [DATA_ENRICHMENT_LLM_TASK]
+        return {
+            DATA_ENRICHMENT_LLM_TASK: {
+                "provider": "groq",
+                "model": "live-enrichment-model",
+                "task_type": DATA_ENRICHMENT_LLM_TASK,
+                "id": 7,
+                "api_key_encrypted": "enc-live",
+            }
+        }
+
+    monkeypatch.setattr(
+        "app.services.data_enrichment.service.snapshot_active_configs",
+        _job_snapshot,
+    )
+
+    record = CrawlRecord(
+        run_id=run.id,
+        source_url="https://example.com/products/navy-linen-dress",
+        data={
+            "title": "Navy Linen Midi Dress",
+            "price": "$49.99",
+            "currency": "USD",
+            "category": "Dresses",
+            "description": "Elegant linen dress for events.",
+        },
+    )
+    db_session.add(record)
+    await db_session.commit()
+    await db_session.refresh(record)
+
+    job = await create_data_enrichment_job(
+        db_session,
+        user=test_user,
+        payload={"source_record_ids": [record.id], "options": {"llm_enabled": True}},
+    )
+
+    async def fake_run_prompt_task(
+        session,
+        *,
+        task_type,
+        run_id,
+        domain,
+        variables,
+        budget_scope,
+        timeout_seconds,
+        config_snapshot,
+    ):
+        del session, domain, variables, budget_scope, timeout_seconds
+        assert task_type == DATA_ENRICHMENT_LLM_TASK
+        assert run_id == run.id
+        assert isinstance(config_snapshot, dict)
+        config = config_snapshot[DATA_ENRICHMENT_LLM_TASK]
+        assert config["provider"] == "groq"
+        assert config["model"] == "live-enrichment-model"
+        return LLMTaskResult(
+            payload={"audience": ["occasion"]},
+            provider="groq",
+            model="live-enrichment-model",
+        )
+
+    monkeypatch.setattr(
+        "app.services.data_enrichment.service.run_prompt_task",
+        fake_run_prompt_task,
+    )
+
+    await run_job(db_session, job)
+    product = (
+        await db_session.scalars(
+            select(EnrichedProduct).where(EnrichedProduct.job_id == job.id)
+        )
+    ).one()
+
+    assert job.options["llm_config_snapshot"][DATA_ENRICHMENT_LLM_TASK]["provider"] == "groq"
+    assert product.diagnostics["llm"]["provider"] == "groq"
+    assert product.diagnostics["llm"]["model"] == "live-enrichment-model"
 
 
 @pytest.mark.asyncio
@@ -775,9 +882,17 @@ async def test_data_enrichment_llm_enabled_backfills_missing_fields_in_one_call(
     captured: dict[str, object] = {}
 
     def fake_run_prompt_task(
-        session, *, task_type, run_id, domain, variables, budget_scope, timeout_seconds
+        session,
+        *,
+        task_type,
+        run_id,
+        domain,
+        variables,
+        budget_scope,
+        timeout_seconds,
+        config_snapshot=None,
     ):
-        del session, run_id, domain
+        del session, run_id, domain, config_snapshot
         captured["task_type"] = task_type
         captured["budget_scope"] = budget_scope
         captured["timeout_seconds"] = timeout_seconds
@@ -860,9 +975,26 @@ async def test_data_enrichment_llm_does_not_overwrite_deterministic_fields(
     monkeypatch,
 ) -> None:
     def fake_run_prompt_task(
-        session, *, task_type, run_id, domain, variables, budget_scope, timeout_seconds
+        session,
+        *,
+        task_type,
+        run_id,
+        domain,
+        variables,
+        budget_scope,
+        timeout_seconds,
+        config_snapshot=None,
     ):
-        del session, task_type, run_id, domain, variables, budget_scope, timeout_seconds
+        del (
+            session,
+            task_type,
+            run_id,
+            domain,
+            variables,
+            budget_scope,
+            timeout_seconds,
+            config_snapshot,
+        )
         return LLMTaskResult(
             payload={
                 "category_path": "Apparel & Accessories > Clothing > Shirts",
@@ -935,9 +1067,26 @@ async def test_data_enrichment_llm_audience_accepts_semantic_descriptors(
     monkeypatch,
 ) -> None:
     def fake_run_prompt_task(
-        session, *, task_type, run_id, domain, variables, budget_scope, timeout_seconds
+        session,
+        *,
+        task_type,
+        run_id,
+        domain,
+        variables,
+        budget_scope,
+        timeout_seconds,
+        config_snapshot=None,
     ):
-        del session, task_type, run_id, domain, variables, budget_scope, timeout_seconds
+        del (
+            session,
+            task_type,
+            run_id,
+            domain,
+            variables,
+            budget_scope,
+            timeout_seconds,
+            config_snapshot,
+        )
         return LLMTaskResult(
             payload={
                 "gender_normalized": "unisex",
@@ -989,9 +1138,26 @@ async def test_data_enrichment_llm_audience_preserves_semantic_target_tags(
     monkeypatch,
 ) -> None:
     def fake_run_prompt_task(
-        session, *, task_type, run_id, domain, variables, budget_scope, timeout_seconds
+        session,
+        *,
+        task_type,
+        run_id,
+        domain,
+        variables,
+        budget_scope,
+        timeout_seconds,
+        config_snapshot=None,
     ):
-        del session, task_type, run_id, domain, variables, budget_scope, timeout_seconds
+        del (
+            session,
+            task_type,
+            run_id,
+            domain,
+            variables,
+            budget_scope,
+            timeout_seconds,
+            config_snapshot,
+        )
         return LLMTaskResult(
             payload={
                 "category_path": "Media > Books",
@@ -1044,9 +1210,26 @@ async def test_data_enrichment_llm_rejects_non_shopify_category_path(
     monkeypatch,
 ) -> None:
     def fake_run_prompt_task(
-        session, *, task_type, run_id, domain, variables, budget_scope, timeout_seconds
+        session,
+        *,
+        task_type,
+        run_id,
+        domain,
+        variables,
+        budget_scope,
+        timeout_seconds,
+        config_snapshot=None,
     ):
-        del session, task_type, run_id, domain, variables, budget_scope, timeout_seconds
+        del (
+            session,
+            task_type,
+            run_id,
+            domain,
+            variables,
+            budget_scope,
+            timeout_seconds,
+            config_snapshot,
+        )
         return LLMTaskResult(
             payload={
                 "category_path": "Hardware > Plinths",
@@ -1096,9 +1279,26 @@ async def test_data_enrichment_llm_ignores_non_dict_payload(
     monkeypatch,
 ) -> None:
     def fake_run_prompt_task(
-        session, *, task_type, run_id, domain, variables, budget_scope, timeout_seconds
+        session,
+        *,
+        task_type,
+        run_id,
+        domain,
+        variables,
+        budget_scope,
+        timeout_seconds,
+        config_snapshot=None,
     ):
-        del session, task_type, run_id, domain, variables, budget_scope, timeout_seconds
+        del (
+            session,
+            task_type,
+            run_id,
+            domain,
+            variables,
+            budget_scope,
+            timeout_seconds,
+            config_snapshot,
+        )
         return LLMTaskResult(payload="bad-payload")
 
     monkeypatch.setattr(

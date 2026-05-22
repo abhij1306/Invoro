@@ -50,6 +50,7 @@ from app.services.shared.field_coerce import (
     text_or_none,
 )
 from app.services.llm.runtime import run_prompt_task
+from app.services.llm.config_service import snapshot_active_configs
 from app.services.product_intelligence.matching import source_domain
 
 logger = logging.getLogger(__name__)
@@ -61,6 +62,10 @@ async def create_data_enrichment_job(
     payload: dict[str, object],
 ) -> DataEnrichmentJob:
     options = _normalized_options(payload.get("options"))
+    llm_config_snapshot = await snapshot_active_configs(
+        session,
+        task_types=[DATA_ENRICHMENT_LLM_TASK],
+    )
     source_run_id = _as_int(payload.get("source_run_id"))
     source_records = await _load_source_records(
         session, user=user, payload=payload, options=options
@@ -95,6 +100,7 @@ async def create_data_enrichment_job(
         status=DATA_ENRICHMENT_STATUS_PENDING,
         options={
             **options,
+            "llm_config_snapshot": llm_config_snapshot,
             "source_record_ids": [record.id for record in accepted_records],
         },
         summary={
@@ -330,6 +336,7 @@ async def _run_llm_enrichment(
         domain=source_domain(record.source_url),
         budget_scope=f"{DATA_ENRICHMENT_LLM_TASK}:{job.id}",
         timeout_seconds=data_enrichment_settings.llm_call_timeout_seconds,
+        config_snapshot=_llm_config_snapshot(job),
         variables={
             "product_json": prompt_context,
             "taxonomy_hint": _taxonomy_hint(
@@ -362,6 +369,11 @@ async def _run_llm_enrichment(
         "provider": result.provider or "",
         "model": result.model or "",
     }
+
+
+def _llm_config_snapshot(job: DataEnrichmentJob) -> dict[str, object] | None:
+    snapshot = (job.options or {}).get("llm_config_snapshot")
+    return snapshot if isinstance(snapshot, dict) else None
 
 
 def _apply_llm_payload(

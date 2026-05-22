@@ -48,6 +48,7 @@ async def run_prompt_task(
     variables: dict[str, Any],
     budget_scope: str | None = None,
     timeout_seconds: float | None = None,
+    config_snapshot: dict[str, Any] | None = None,
 ) -> LLMTaskResult:
     started_at = time.monotonic()
 
@@ -68,7 +69,12 @@ async def run_prompt_task(
         )
         return result
 
-    config = await resolve_run_config(session, run_id=run_id, task_type=task_type)
+    config = await resolve_run_config(
+        session,
+        run_id=run_id,
+        task_type=task_type,
+        config_snapshot=config_snapshot,
+    )
     task = get_prompt_task(task_type)
     if config is None:
         return _finish(

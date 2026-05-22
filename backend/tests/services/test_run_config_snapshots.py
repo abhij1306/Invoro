@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from app.models.llm import LLMConfig
+from app.services.config.data_enrichment import DATA_ENRICHMENT_LLM_TASK
 from app.services.crawl.batch_runtime import process_run
 from app.services.acquisition.acquirer import AcquisitionResult
 from app.services.crawl.crud import get_run_records
@@ -97,6 +98,53 @@ async def test_resolve_run_config_prefers_stamped_snapshot(
 
     assert resolved is not None
     assert resolved["model"] == "snapshot-model"
+
+
+@pytest.mark.asyncio
+async def test_resolve_run_config_prefers_explicit_snapshot_over_run_snapshot(
+    db_session,
+    test_user,
+    monkeypatch: pytest.MonkeyPatch,
+    create_test_run,
+) -> None:
+    async def _snapshot_configs(_session):
+        return {
+            "general": {
+                "provider": "nvidia",
+                "model": "stale-run-model",
+                "task_type": "general",
+                "id": 5,
+                "api_key_encrypted": "enc-stale",
+            }
+        }
+
+    monkeypatch.setattr(
+        "app.services.crawl.crud.snapshot_active_configs",
+        _snapshot_configs,
+    )
+    run = await create_test_run(
+        url="https://example.com/products/snapshot-widget",
+        surface="ecommerce_detail",
+    )
+
+    resolved = await resolve_run_config(
+        db_session,
+        run_id=run.id,
+        task_type=DATA_ENRICHMENT_LLM_TASK,
+        config_snapshot={
+            DATA_ENRICHMENT_LLM_TASK: {
+                "provider": "groq",
+                "model": "live-enrichment-model",
+                "task_type": DATA_ENRICHMENT_LLM_TASK,
+                "id": 12,
+                "api_key_encrypted": "enc-live",
+            }
+        },
+    )
+
+    assert resolved is not None
+    assert resolved["provider"] == "groq"
+    assert resolved["model"] == "live-enrichment-model"
 
 
 @pytest.mark.asyncio

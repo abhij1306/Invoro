@@ -17,7 +17,7 @@ import {
   Search,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useDeferredValue, useMemo, useRef, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 
 import { HistoryDrawer, type HistoryItem } from '../ui/history-drawer';
 

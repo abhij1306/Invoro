@@ -133,7 +133,13 @@ async def resolve_run_config(
     *,
     run_id: int | None,
     task_type: str,
+    config_snapshot: dict[str, Any] | None = None,
 ) -> dict[str, Any] | None:
+    if isinstance(config_snapshot, dict):
+        for candidate in [task_type, "general"]:
+            config_value = config_snapshot.get(candidate)
+            if isinstance(config_value, dict):
+                return config_value
     if run_id is not None:
         run = await session.get(CrawlRun, run_id)
         if run is not None:
