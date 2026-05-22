@@ -947,9 +947,7 @@ async def test_data_enrichment_llm_enabled_backfills_missing_fields_in_one_call(
 
     assert captured["task_type"] == "data_enrichment_semantic"
     assert captured["budget_scope"] == f"data_enrichment_semantic:{job.id}"
-    assert captured["timeout_seconds"] == pytest.approx(
-        data_enrichment_settings.llm_call_timeout_seconds
-    )
+    assert captured["timeout_seconds"] == pytest.approx(20.0)
     assert "product_json" in captured["variables"]
     prompt_product = captured["variables"]["product_json"]
     assert "intent_attributes" in prompt_product["missing_backfill_fields"]

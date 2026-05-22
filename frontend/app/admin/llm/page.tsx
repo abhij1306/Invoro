@@ -29,6 +29,7 @@ import type {
   LlmProviderCatalogItem,
 } from '../../../lib/api/types';
 
+const CUSTOM_MODEL_OPTION = '__custom__';
 const TASK_TYPES = [
   'general',
   'xpath_discovery',
@@ -43,6 +44,7 @@ export default function AdminLlmPage() {
   const [providers, setProviders] = useState<LlmProviderCatalogItem[]>([]);
   const [configs, setConfigs] = useState<LlmConfigRecord[]>([]);
   const [costLog, setCostLog] = useState<LlmCostLogRecord[]>([]);
+  const [customModelSelected, setCustomModelSelected] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [saving, setSaving] = useState(false);
@@ -60,7 +62,7 @@ export default function AdminLlmPage() {
   async function refreshRuntimeState() {
     try {
       const [nextConfigs, nextCostLog] = await Promise.all([
-        api.listLlmConfigs(),
+        api.listLlmConfigs({ include_unsupported: true }),
         api.listLlmCostLog(),
       ]);
       startTransition(() => {
@@ -125,7 +127,7 @@ export default function AdminLlmPage() {
       try {
         const [nextProviders, nextConfigs, nextCostLog] = await Promise.all([
           api.listLlmProviders(),
-          api.listLlmConfigs(),
+          api.listLlmConfigs({ include_unsupported: true }),
           api.listLlmCostLog(),
         ]);
         if (cancelled) return;
@@ -139,13 +141,13 @@ export default function AdminLlmPage() {
               (provider) => provider.provider === current.provider,
             );
             if (matchingProvider) {
-              const matchingModel = matchingProvider.recommended_models.includes(current.model);
-              return matchingModel
-                ? current
-                : {
-                    ...current,
-                    model: matchingProvider.recommended_models[0] ?? current.model,
-                  };
+              if (current.model.trim()) {
+                return current;
+              }
+              return {
+                ...current,
+                model: matchingProvider.recommended_models[0] ?? current.model,
+              };
             }
             return {
               ...current,
@@ -153,6 +155,7 @@ export default function AdminLlmPage() {
               model: fallbackProvider?.recommended_models[0] ?? current.model,
             };
           });
+          setCustomModelSelected(false);
         });
       } catch (nextError) {
         if (cancelled) return;
@@ -168,6 +171,15 @@ export default function AdminLlmPage() {
 
   const recommendedModels =
     providers.find((provider) => provider.provider === form.provider)?.recommended_models ?? [];
+  const modelDropdownValue = customModelSelected ? CUSTOM_MODEL_OPTION : form.model;
+  const modelOptions = [
+    ...recommendedModels.map((model) => ({
+      value: model,
+      label: model,
+    })),
+    { value: CUSTOM_MODEL_OPTION, label: 'Custom...' },
+  ];
+  const modelSuggestionsId = 'llm-model-suggestions';
 
   return (
     <div className="page-stack">
@@ -192,6 +204,7 @@ export default function AdminLlmPage() {
                     const nextModel =
                       providers.find((row) => row.provider === provider)?.recommended_models?.[0] ??
                       '';
+                    setCustomModelSelected(false);
                     setForm((current) => ({
                       ...current,
                       provider,
@@ -214,14 +227,37 @@ export default function AdminLlmPage() {
               </Field>
 
               <Field label="Model" className="md:col-span-2">
-                <Dropdown<string>
-                  value={form.model}
-                  onChange={(model) => setForm((current) => ({ ...current, model }))}
-                  options={recommendedModels.map((model) => ({
-                    value: model,
-                    label: model,
-                  }))}
-                />
+                <div className="grid gap-2">
+                  <Dropdown<string>
+                    value={modelDropdownValue}
+                    onChange={(model) => {
+                      if (model === CUSTOM_MODEL_OPTION) {
+                        setCustomModelSelected(true);
+                        return;
+                      }
+                      setCustomModelSelected(false);
+                      setForm((current) => ({ ...current, model }));
+                    }}
+                    options={modelOptions}
+                  />
+                  {customModelSelected ? (
+                    <>
+                      <Input
+                        value={form.model}
+                        list={modelSuggestionsId}
+                        onChange={(event) =>
+                          setForm((current) => ({ ...current, model: event.target.value }))
+                        }
+                        placeholder="Enter custom model id"
+                      />
+                      <datalist id={modelSuggestionsId}>
+                        {recommendedModels.map((model) => (
+                          <option key={model} value={model} />
+                        ))}
+                      </datalist>
+                    </>
+                  ) : null}
+                </div>
               </Field>
 
               <Field label="API Key" className="md:col-span-2">

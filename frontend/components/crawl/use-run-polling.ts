@@ -104,7 +104,7 @@ export function useTerminalRecordSync({
     enabled: retryEnabled,
     refetchInterval: retryEnabled ? intervalMs : false,
     refetchIntervalInBackground: false,
-    refetchOnMount: 'always',
+    refetchOnMount: true,
     staleTime: 0,
     gcTime: 0,
   });

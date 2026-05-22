@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Annotated
 
 from app.core.dependencies import get_db, require_admin
@@ -16,11 +17,12 @@ from app.schemas.llm import (
 )
 from app.services.llm.runtime import llm_provider_catalog, test_provider_connection
 from app.services.llm.config_service import SUPPORTED_LLM_PROVIDERS
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/api/llm", tags=["llm"])
+logger = logging.getLogger(__name__)
 
 
 @router.get("/providers")
@@ -37,12 +39,26 @@ async def llm_providers(
 async def llm_configs(
     session: Annotated[AsyncSession, Depends(get_db)],
     _: Annotated[object, Depends(require_admin)],
+    include_unsupported: Annotated[bool, Query()] = False,
 ) -> list[LLMConfigResponse]:
-    result = await session.execute(
-        select(LLMConfig)
-        .where(LLMConfig.provider.in_(tuple(SUPPORTED_LLM_PROVIDERS)))
-        .order_by(LLMConfig.task_type.asc(), LLMConfig.created_at.desc())
-    )
+    normalized_provider = func.lower(LLMConfig.provider)
+    statement = select(LLMConfig).order_by(LLMConfig.task_type.asc(), LLMConfig.created_at.desc())
+    if not include_unsupported:
+        unsupported_count = int(
+            await session.scalar(
+                select(func.count())
+                .select_from(LLMConfig)
+                .where(~normalized_provider.in_(tuple(SUPPORTED_LLM_PROVIDERS)))
+            )
+            or 0
+        )
+        if unsupported_count:
+            logger.warning(
+                "LLM config listing excluded %d unsupported provider records",
+                unsupported_count,
+            )
+        statement = statement.where(normalized_provider.in_(tuple(SUPPORTED_LLM_PROVIDERS)))
+    result = await session.execute(statement)
     return [_serialize_llm_config(row) for row in result.scalars().all()]
 
 

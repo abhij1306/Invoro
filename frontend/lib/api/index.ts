@@ -307,7 +307,13 @@ export const api = {
   selectorPreviewHtml: (url: string) =>
     `${getApiBaseUrl()}/api/selectors/preview-html?url=${encodeURIComponent(url)}`,
   listLlmProviders: () => apiClient.get<LlmProviderCatalogItem[]>('/api/llm/providers'),
-  listLlmConfigs: () => apiClient.get<LlmConfigRecord[]>('/api/llm/configs'),
+  listLlmConfigs: (params?: { include_unsupported?: boolean }) => {
+    const query = new URLSearchParams();
+    if (params?.include_unsupported !== undefined) {
+      query.set('include_unsupported', String(params.include_unsupported));
+    }
+    return apiClient.get<LlmConfigRecord[]>(withQuery('/api/llm/configs', query));
+  },
   createLlmConfig: (payload: LlmConfigCreatePayload) =>
     apiClient.post<LlmConfigRecord>('/api/llm/configs', payload),
   updateLlmConfig: (configId: number, payload: LlmConfigUpdatePayload) =>

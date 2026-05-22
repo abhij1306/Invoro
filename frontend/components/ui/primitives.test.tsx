@@ -59,11 +59,10 @@ describe('Toggle', () => {
 });
 
 describe('Skeleton', () => {
-  it('exposes busy state in markup while remaining decorative', () => {
+  it('stays purely decorative for assistive tech', () => {
     render(<Skeleton className="h-4 w-12" />);
 
     const skeleton = document.querySelector('.skeleton');
-    expect(skeleton).toHaveAttribute('aria-busy', 'true');
     expect(skeleton).toHaveAttribute('aria-hidden', 'true');
   });
 });

@@ -22,6 +22,14 @@ const intervalOptions = [
   { value: '3600', label: '1 hour' },
 ];
 
+function sameFieldSet(left: readonly string[], right: readonly string[]) {
+  if (left.length !== right.length) {
+    return false;
+  }
+  const rightSet = new Set(right);
+  return left.every((value) => rightSet.has(value));
+}
+
 export function AlertForm({ initial, onSubmit, onCancel, submitLabel }: Readonly<AlertFormProps>) {
   const initialUrl = initial?.urls?.[0] ?? '';
   const initialFields = (() => {
@@ -76,8 +84,10 @@ export function AlertForm({ initial, onSubmit, onCancel, submitLabel }: Readonly
     }
     setSubmitting(true);
     try {
-      const fieldsChanged =
-        JSON.stringify(targetFields) !== JSON.stringify(initial?.tracked_fields ?? initialFields);
+      const initialTrackedFields = Array.isArray(initial?.tracked_fields)
+        ? initial.tracked_fields
+        : initialFields;
+      const fieldsChanged = !sameFieldSet(targetFields, initialTrackedFields);
       const payload = {
         target_fields: targetFields,
         target_rules:

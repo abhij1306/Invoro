@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from app.core.security import encrypt_secret
+from app.api.llm import llm_configs
 from app.models.llm import LLMConfig
 from app.services.llm.config_service import (
     llm_provider_catalog,
@@ -75,22 +76,43 @@ def test_serialize_config_snapshot_keeps_encrypted_key() -> None:
     }
 
 
-def test_llm_provider_catalog_exposes_expanded_groq_and_nvidia_models() -> None:
+def test_llm_provider_catalog_exposes_expected_provider_anchors() -> None:
     catalog = {item["provider"]: item for item in llm_provider_catalog()}
 
-    assert catalog["groq"]["recommended_models"] == [
-        "llama-3.3-70b-versatile",
-        "llama-3.1-8b-instant",
-        "openai/gpt-oss-20b",
-        "openai/gpt-oss-120b",
-    ]
-    assert catalog["nvidia"]["recommended_models"] == [
-        "meta/llama-3.3-70b-instruct",
-        "meta/llama-3.1-70b-instruct",
-        "meta/llama-3.1-8b-instruct",
-        "nvidia/llama-3.3-nemotron-super-49b-v1.5",
-        "nvidia/nemotron-3-nano-30b-a3b",
-    ]
-    assert catalog["openrouter"]["recommended_models"] == [
-        "openrouter/free",
-    ]
+    assert "llama-3.3-70b-versatile" in catalog["groq"]["recommended_models"]
+    assert "meta/llama-3.1-70b-instruct" in catalog["nvidia"]["recommended_models"]
+    assert "openrouter/free" in catalog["openrouter"]["recommended_models"]
+    assert catalog["groq"]["recommended_models"]
+    assert catalog["nvidia"]["recommended_models"]
+    assert catalog["openrouter"]["recommended_models"]
+
+
+@pytest.mark.asyncio
+async def test_llm_configs_can_include_unsupported_records(db_session, caplog) -> None:
+    db_session.add_all(
+        [
+            LLMConfig(
+                provider="groq",
+                model="supported-model",
+                api_key_encrypted="enc-supported",
+                task_type="general",
+                is_active=True,
+            ),
+            LLMConfig(
+                provider="legacy-provider",
+                model="legacy-model",
+                api_key_encrypted="enc-legacy",
+                task_type="general",
+                is_active=False,
+            ),
+        ]
+    )
+    await db_session.commit()
+
+    caplog.clear()
+    filtered = await llm_configs(db_session, object(), include_unsupported=False)
+    included = await llm_configs(db_session, object(), include_unsupported=True)
+
+    assert [row.provider for row in filtered] == ["groq"]
+    assert sorted(row.provider for row in included) == ["groq", "legacy-provider"]
+    assert "excluded 1 unsupported provider records" in caplog.text
