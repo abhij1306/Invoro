@@ -336,56 +336,11 @@ async def _promote_review_bucket_fields(
             )
 
 
-async def build_domain_recipe_payload(
-    session: AsyncSession,
+def _derive_acquisition_info(
+    records: list[CrawlRecord],
     *,
     run: CrawlRun,
 ) -> dict[str, object]:
-    records_result = await session.execute(
-        select(CrawlRecord)
-        .where(CrawlRecord.run_id == run.id)
-        .order_by(CrawlRecord.id.asc())
-    )
-    records = list(records_result.scalars().all())
-    domain = normalize_domain(run.url)
-    saved_selectors = await list_selector_records(
-        session,
-        domain=domain,
-        surface=run.surface,
-    )
-    saved_selector_index = {
-        _saved_selector_signature(row): row for row in saved_selectors
-    }
-    found_fields = sorted(
-        {
-            str(field_name)
-            for record in records
-            for field_name, value in mapping_or_empty(record.data).items()
-            if value not in (None, "", [], {})
-        }
-        | {
-            str(field_name)
-            for record in records
-            for field_name, payload in mapping_or_empty(
-                mapping_or_empty(record.source_trace).get("field_discovery")
-            ).items()
-            if isinstance(payload, dict) and payload.get("status") == "found"
-        }
-    )
-    requested_fields = [
-        str(value)
-        for value in run.requested_fields or []
-        if str(value or "").strip()
-    ]
-    if not found_fields and requested_fields:
-        dom_patterns = mapping_or_empty(EXTRACTION_RULES.get("dom_patterns"))
-        found_fields = sorted(
-            field_name
-            for field_name in requested_fields
-            if str(dom_patterns.get(field_name) or "").strip()
-        )
-    selector_candidates: dict[str, dict[str, object]] = {}
-    field_learning: dict[tuple[str, str, str], dict[str, object]] = {}
     browser_required = False
     actual_fetch_method: str | None = None
     browser_reason: str | None = None
@@ -397,11 +352,6 @@ async def build_domain_recipe_payload(
         "iframe_promotion": None,
         "browser_required": False,
     }
-    feedback_index = await _latest_field_feedback_index(
-        session,
-        domain=domain,
-        surface=run.surface,
-    )
     for record in records:
         source_trace = mapping_or_empty(record.source_trace)
         acquisition = mapping_or_empty(source_trace.get("acquisition"))
@@ -427,6 +377,39 @@ async def build_domain_recipe_payload(
             acquisition=acquisition,
             browser_diagnostics=browser_diagnostics,
         )
+    acquisition_summary = mapping_or_empty(
+        mapping_or_empty(run.result_summary).get("acquisition_summary")
+    )
+    if actual_fetch_method is None and mapping_or_empty(
+        acquisition_summary.get("methods")
+    ).get("browser"):
+        actual_fetch_method = "browser"
+    if browser_reason is None and actual_fetch_method == "browser":
+        browser_reason = "http-escalation"
+    affordance_candidates["browser_required"] = browser_required
+    return {
+        "actual_fetch_method": actual_fetch_method,
+        "browser_required": browser_required,
+        "browser_reason": browser_reason,
+        "acquisition_summary": acquisition_summary,
+        "affordance_candidates": affordance_candidates,
+    }
+
+
+def _collect_selector_candidates(
+    records: list[CrawlRecord],
+    *,
+    saved_selectors: list[dict[str, object]],
+    run: CrawlRun,
+    feedback_index: dict[tuple[str, str, str], DomainFieldFeedback],
+) -> tuple[dict[str, dict[str, object]], dict[tuple[str, str, str], dict[str, object]]]:
+    saved_selector_index = {
+        _saved_selector_signature(row): row for row in saved_selectors
+    }
+    selector_candidates: dict[str, dict[str, object]] = {}
+    field_learning: dict[tuple[str, str, str], dict[str, object]] = {}
+    for record in records:
+        source_trace = mapping_or_empty(record.source_trace)
         field_discovery = mapping_or_empty(source_trace.get("field_discovery"))
         for field_name, payload in field_discovery.items():
             payload_map = payload if isinstance(payload, dict) else {}
@@ -519,53 +502,106 @@ async def build_domain_recipe_payload(
                     if (parsed := _safe_int(value)) is not None
                 }
             )
-    acquisition_summary = mapping_or_empty(
-        mapping_or_empty(run.result_summary).get("acquisition_summary")
-    )
-    if actual_fetch_method is None and mapping_or_empty(
-        acquisition_summary.get("methods")
-    ).get("browser"):
-        actual_fetch_method = "browser"
-    if browser_reason is None and actual_fetch_method == "browser":
-        browser_reason = "http-escalation"
-    if not selector_candidates:
-        fallback_rows = [*saved_selectors, *run.settings_view.extraction_contract()]
-        for row in fallback_rows:
-            field_name = str(row.get("field_name") or "").strip().lower()
-            selector_value = str(row.get("css_selector") or "").strip()
-            if not field_name or not selector_value:
-                continue
-            candidate_key = f"{field_name}|css_selector|{selector_value}"
-            saved_selector = saved_selector_index.get(
-                _selector_signature(
-                    field_name=field_name,
-                    selector_kind="css_selector",
-                    selector_value=selector_value,
-                )
+    if selector_candidates:
+        return selector_candidates, field_learning
+
+    fallback_rows = [*saved_selectors, *run.settings_view.extraction_contract()]
+    for row in fallback_rows:
+        field_name = str(row.get("field_name") or "").strip().lower()
+        selector_value = str(row.get("css_selector") or "").strip()
+        if not field_name or not selector_value:
+            continue
+        candidate_key = f"{field_name}|css_selector|{selector_value}"
+        saved_selector = saved_selector_index.get(
+            _selector_signature(
+                field_name=field_name,
+                selector_kind="css_selector",
+                selector_value=selector_value,
             )
-            selector_candidates[candidate_key] = {
-                "candidate_key": candidate_key,
-                "field_name": field_name,
-                "selector_kind": "css_selector",
-                "selector_value": selector_value,
-                "selector_source": str(row.get("source") or "run_contract"),
-                "sample_value": row.get("sample_value"),
-                "source_record_ids": [],
-                "source_run_id": row.get("source_run_id") or run.id,
-                "saved_selector_id": saved_selector.get("id")
-                if isinstance(saved_selector, dict)
-                else None,
-                "already_saved": isinstance(saved_selector, dict),
-                "final_field_source": None,
-            }
+        )
+        selector_candidates[candidate_key] = {
+            "candidate_key": candidate_key,
+            "field_name": field_name,
+            "selector_kind": "css_selector",
+            "selector_value": selector_value,
+            "selector_source": str(row.get("source") or "run_contract"),
+            "sample_value": row.get("sample_value"),
+            "source_record_ids": [],
+            "source_run_id": row.get("source_run_id") or run.id,
+            "saved_selector_id": saved_selector.get("id")
+            if isinstance(saved_selector, dict)
+            else None,
+            "already_saved": isinstance(saved_selector, dict),
+            "final_field_source": None,
+        }
+    return selector_candidates, field_learning
+
+
+async def build_domain_recipe_payload(
+    session: AsyncSession,
+    *,
+    run: CrawlRun,
+) -> dict[str, object]:
+    records_result = await session.execute(
+        select(CrawlRecord)
+        .where(CrawlRecord.run_id == run.id)
+        .order_by(CrawlRecord.id.asc())
+    )
+    records = list(records_result.scalars().all())
+    domain = normalize_domain(run.url)
+    saved_selectors = await list_selector_records(
+        session,
+        domain=domain,
+        surface=run.surface,
+    )
+    found_fields = sorted(
+        {
+            str(field_name)
+            for record in records
+            for field_name, value in mapping_or_empty(record.data).items()
+            if value not in (None, "", [], {})
+        }
+        | {
+            str(field_name)
+            for record in records
+            for field_name, payload in mapping_or_empty(
+                mapping_or_empty(record.source_trace).get("field_discovery")
+            ).items()
+            if isinstance(payload, dict) and payload.get("status") == "found"
+        }
+    )
+    requested_fields = [
+        str(value) for value in run.requested_fields or [] if str(value or "").strip()
+    ]
+    if not found_fields and requested_fields:
+        dom_patterns = mapping_or_empty(EXTRACTION_RULES.get("dom_patterns"))
+        found_fields = sorted(
+            field_name
+            for field_name in requested_fields
+            if str(dom_patterns.get(field_name) or "").strip()
+        )
+    feedback_index = await _latest_field_feedback_index(
+        session,
+        domain=domain,
+        surface=run.surface,
+    )
+    selector_candidates, field_learning = _collect_selector_candidates(
+        records,
+        saved_selectors=saved_selectors,
+        run=run,
+        feedback_index=feedback_index,
+    )
+    acquisition_info = _derive_acquisition_info(records, run=run)
+    actual_fetch_method = acquisition_info["actual_fetch_method"]
+    browser_reason = acquisition_info["browser_reason"]
+    acquisition_summary = acquisition_info["acquisition_summary"]
+    affordance_candidates = acquisition_info["affordance_candidates"]
     saved_profile_record = await load_domain_run_profile(
         session,
         domain=domain,
         surface=run.surface,
     )
     cookie_memory_exists = await _domain_cookie_memory_exists(session, domain=domain)
-    browser_required = browser_required or actual_fetch_method == "browser"
-    affordance_candidates["browser_required"] = browser_required
     return {
         "run_id": run.id,
         "domain": domain,
@@ -581,10 +617,7 @@ async def build_domain_recipe_payload(
             "actual_fetch_method": actual_fetch_method,
             "browser_used": actual_fetch_method == "browser",
             "browser_reason": browser_reason,
-            "acquisition_summary": mapping_or_empty(run.result_summary).get(
-                "acquisition_summary"
-            )
-            or {},
+            "acquisition_summary": acquisition_summary,
             "cookie_memory_available": cookie_memory_exists,
         },
         "field_learning": sorted(
@@ -877,8 +910,7 @@ def _serialize_feedback_record(row: DomainFieldFeedback) -> dict[str, object]:
         "source_record_ids": [
             parsed
             for parsed in (
-                _safe_int(value)
-                for value in payload.get("source_record_ids") or []
+                _safe_int(value) for value in payload.get("source_record_ids") or []
             )
             if parsed is not None
         ],

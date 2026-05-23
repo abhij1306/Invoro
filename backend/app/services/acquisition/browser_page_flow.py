@@ -22,7 +22,9 @@ from app.services.acquisition.browser_page_helpers import (
     page_might_have_location_interstitial,
     select_primary_browser_html as _select_primary_browser_html,
 )
-from app.services.acquisition.browser_page_helpers import requested_content_extractability
+from app.services.acquisition.browser_page_helpers import (
+    requested_content_extractability,
+)
 from app.services.acquisition.browser_page_helpers import BeautifulSoup
 from app.services.acquisition.dom_runtime import get_page_html
 from app.services.acquisition.browser_recovery import (
@@ -92,19 +94,11 @@ def _generic_card_selectors_for_surface(surface: str | None) -> list[str]:
     return selectors
 
 
-
-
-
-
-
-
 def remaining_timeout_factory(deadline: float):
     def _remaining() -> float:
         return max(2.0, deadline - time.perf_counter())
 
     return _remaining
-
-
 
 
 def _is_navigation_interrupted_error(exc: Exception) -> bool:
@@ -499,7 +493,9 @@ async def settle_browser_page_impl(
         phase_timings_ms["readiness_wait"] = elapsed_ms(readiness_started_at)
         current_probe = await _cached_probe(refresh_html=True)
         append_readiness_probe(
-            readiness_probes, stage="after_generic_detail_readiness", probe=current_probe
+            readiness_probes,
+            stage="after_generic_detail_readiness",
+            probe=current_probe,
         )
         readiness_diagnostics = {
             "status": "ready" if current_probe["is_ready"] else "timeout",
@@ -604,7 +600,6 @@ async def serialize_browser_page_content_impl(
     elapsed_ms,
     on_event=None,
 ):
-    del prefetched_analysis
     should_flatten_shadow = "listing" not in str(surface or "").strip().lower()
     traversal_result = None
     traversal_html = ""
@@ -666,6 +661,8 @@ async def serialize_browser_page_content_impl(
     serialization_started_at = time.perf_counter()
     if traversal_result is None:
         html = str(prefetched_html or "")
+        if not html.strip() and prefetched_analysis is not None:
+            html = prefetched_analysis.html
         if not html.strip():
             html = await get_page_html(
                 page,
@@ -696,36 +693,6 @@ def resolve_browser_fetch_policy(
     )
     readiness_override = readiness_policy.get("listing_override")
     return traversal_active, readiness_policy, readiness_override
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 _ready_probe_supports_fast_finalize = (

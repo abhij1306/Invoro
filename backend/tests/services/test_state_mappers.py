@@ -7,6 +7,7 @@ from app.services.js_state.state_normalizer import (
 )
 from app.services.network_payload_mapper import map_network_payloads_to_fields
 
+
 def test_map_js_state_to_fields_recovers_next_data_shopify_product_fields() -> None:
     js_state_objects = {
         "__NEXT_DATA__": {
@@ -319,6 +320,7 @@ def test_map_js_state_to_fields_merges_same_family_sibling_product_urls() -> Non
         ),
     }
 
+
 def test_map_js_state_to_fields_reads_variant_attributes_axes() -> None:
     mapped = map_js_state_to_fields(
         {
@@ -524,7 +526,9 @@ def test_map_js_state_to_fields_uses_variation_attribute_display_names() -> None
     assert mapped["size"] == "S"
 
 
-def test_map_js_state_to_fields_does_not_pick_arbitrary_parent_size_without_explicit_selection() -> None:
+def test_map_js_state_to_fields_does_not_pick_arbitrary_parent_size_without_explicit_selection() -> (
+    None
+):
     mapped = map_js_state_to_fields(
         {
             "__NEXT_DATA__": {

@@ -6,20 +6,31 @@ from collections.abc import Iterable
 from app.services.config.field_mappings import (
     CANONICAL_SCHEMAS,
     FIELD_ALIASES,
+    HTML_SECTION_FIELDS,
     INTERNAL_ONLY_FIELDS,
+    REQUESTED_FIELD_ALIAS_BASES,
+    REQUESTED_FIELD_ALIAS_EXTRAS,
+    REQUESTED_FIELD_PREFIXES,
     SURFACE_BROWSER_RETRY_TARGETS,
     SURFACE_FIELD_REPAIR_TARGETS,
 )
 
+__all__ = [
+    "HTML_SECTION_FIELDS",
+    "canonical_fields_for_surface",
+    "excluded_fields_for_surface",
+    "field_allowed_for_surface",
+    "get_surface_field_aliases",
+    "normalize_field_key",
+    "normalize_requested_field",
+    "normalize_review_target",
+    "browser_retry_target_fields_for_surface",
+    "repair_target_fields_for_surface",
+]
+
 _NON_FIELD_RE = re.compile(r"[^a-z0-9.]+")
-_REQUESTED_FIELD_PREFIXES = ("product_", "item_", "job_")
 _ALL_CANONICAL_FIELDS = frozenset(
-    field_name
-    for fields in CANONICAL_SCHEMAS.values()
-    for field_name in fields
-)
-HTML_SECTION_FIELDS = frozenset(
-    {"responsibilities", "qualifications", "benefits", "skills"}
+    field_name for fields in CANONICAL_SCHEMAS.values() for field_name in fields
 )
 _FIELD_ALIASES = FIELD_ALIASES
 
@@ -72,7 +83,13 @@ def get_surface_field_aliases(surface: str) -> dict[str, list[str]]:
             canonical: list(values) for canonical, values in aliases.items()
         }
         for field_name, field_aliases in {
-            "capacity": ("capacity_l", "capacity_liter", "capacity_litre", "capacity_liters", "capacity_litres"),
+            "capacity": (
+                "capacity_l",
+                "capacity_liter",
+                "capacity_litre",
+                "capacity_liters",
+                "capacity_litres",
+            ),
             "energy_rating": ("energy_rating", "energy_star_rating", "star_rating"),
         }.items():
             bucket = ecommerce_aliases.setdefault(field_name, [])
@@ -91,9 +108,7 @@ def get_surface_field_aliases(surface: str) -> dict[str, list[str]]:
                     ecommerce_aliases["category"].append(alias)
         return ecommerce_aliases
     if normalized.startswith("job_"):
-        job_aliases = {
-            canonical: list(values) for canonical, values in aliases.items()
-        }
+        job_aliases = {canonical: list(values) for canonical, values in aliases.items()}
         if "job_type" in job_aliases:
             for alias in ("type", "employment_type", "commitment", "work_type"):
                 if alias not in job_aliases["job_type"]:
@@ -133,84 +148,12 @@ def _dedupe_aliases(*groups: object) -> list[str]:
     return deduped
 
 
-_REQUESTED_FIELD_ALIAS_BASES = {
-    "responsibilities": _FIELD_ALIASES.get("responsibilities", []),
-    "qualifications": _FIELD_ALIASES.get("qualifications", []),
-    "benefits": _FIELD_ALIASES.get("benefits", []),
-    "skills": _FIELD_ALIASES.get("skills", []),
-    "summary": _FIELD_ALIASES.get("summary", []),
-    "specifications": _FIELD_ALIASES.get("specifications", []),
-    "product_details": _FIELD_ALIASES.get("product_details", []),
-    "features": _FIELD_ALIASES.get("features", []),
-    "materials": _FIELD_ALIASES.get("materials", []),
-    "material": _FIELD_ALIASES.get("materials", []),
-    "care": _FIELD_ALIASES.get("care", []),
-    "dimensions": _FIELD_ALIASES.get("dimensions", []),
-    "remote": _FIELD_ALIASES.get("remote", []),
-    "requirements": _FIELD_ALIASES.get("requirements", []),
-    "country_of_origin": [
-        "country of origin",
-        "country_of_origin",
-        "origin",
-        "made in",
-        "manufactured in",
-        "importer",
-        "importer_info",
-        "importer name and address",
-    ],
-    "color_variants": _FIELD_ALIASES.get("color_variants", []),
-    "gender": _FIELD_ALIASES.get("gender", []),
-}
-_REQUESTED_FIELD_ALIAS_EXTRAS = {
-    "responsibilities": (
-        "job responsibilities",
-        "key responsibilities",
-        "job duties",
-        "what you'll do",
-        "what_you_ll_do",
-        "what_you_will_do",
-        "role responsibilities",
-    ),
-    "qualifications": (
-        "job qualifications",
-        "job_qualification",
-        "should have",
-        "you should have",
-        "minimum requirements",
-        "minimum_requirements",
-        "preferred qualifications",
-        "preferred_qualifications",
-        "who you are",
-        "what we're looking for",
-    ),
-    "benefits": (
-        "job benefits",
-        "perks",
-        "why you'll love this job",
-        "life at stripe",
-        "what we offer",
-    ),
-    "skills": ("job skills", "job_skills", "experience", "what you'll bring"),
-    "summary": ("description", "our opportunity", "about the role", "about the team"),
-    "specifications": (
-        "specs",
-        "spec",
-        "technical details",
-        "tech specs",
-        "the details",
-    ),
-    "product_details": ("product detail",),
-    "features": ("key features",),
-    "materials": ("fabrics", "material composition"),
-    "material": ("fabrics", "material composition"),
-    "care": ("care instructions", "washing instructions"),
-}
 REQUESTED_FIELD_ALIASES = {
     canonical: _dedupe_aliases(
-        _REQUESTED_FIELD_ALIAS_BASES[canonical],
-        _REQUESTED_FIELD_ALIAS_EXTRAS.get(canonical, ()),
+        REQUESTED_FIELD_ALIAS_BASES[canonical],
+        REQUESTED_FIELD_ALIAS_EXTRAS.get(canonical, ()),
     )
-    for canonical in _REQUESTED_FIELD_ALIAS_BASES
+    for canonical in REQUESTED_FIELD_ALIAS_BASES
 }
 _ALIAS_TO_CANONICAL: dict[str, str] = {}
 NORMALIZED_REQUESTED_FIELD_ALIASES: dict[str, list[str]] = {}
@@ -275,7 +218,7 @@ def _requested_field_exact_match(text: str) -> tuple[str, str]:
 
 def _requested_field_candidates(text: str) -> list[str]:
     candidates = [text]
-    for prefix in _REQUESTED_FIELD_PREFIXES:
+    for prefix in REQUESTED_FIELD_PREFIXES:
         if text.startswith(prefix):
             stripped = text[len(prefix) :]
             if stripped and stripped not in candidates:

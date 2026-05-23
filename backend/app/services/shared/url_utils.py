@@ -112,7 +112,9 @@ def suffix_after_prefix(tokens: list[str], prefix: list[str]) -> list[str]:
 
 
 def clean_color_tokens(tokens: list[str]) -> list[str]:
-    cleaned = [token for token in tokens if not token.isdigit() and token not in {"html"}]
+    cleaned = [
+        token for token in tokens if not token.isdigit() and token not in {"html"}
+    ]
     while cleaned and cleaned[0] in {"in", "color", "colour"}:
         cleaned = cleaned[1:]
     return cleaned
@@ -121,7 +123,7 @@ def clean_color_tokens(tokens: list[str]) -> list[str]:
 def identity_token(value: str) -> str:
     if value in {"mens", "womens", "kids"}:
         return value[:-1]
-    if len(value) > 4 and value.endswith("s"):
+    if len(value) > 4 and value.endswith("s") and not value.endswith("ss"):
         return value[:-1]
     return value
 

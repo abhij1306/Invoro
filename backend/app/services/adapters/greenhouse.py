@@ -31,7 +31,9 @@ class GreenhouseAdapter(BaseAdapter):
     async def can_handle(self, url: str, html: str) -> bool:
         return self._matches_platform_family(url, html)
 
-    async def extract(self, url: str, html: str, surface: str, proxy: str | None = None) -> AdapterResult:
+    async def extract(
+        self, url: str, html: str, surface: str, proxy: str | None = None
+    ) -> AdapterResult:
         if self._is_detail_surface(surface):
             detail_record = await self._try_detail_api(url, html)
             return self._result([detail_record] if detail_record else [])
@@ -151,6 +153,8 @@ class GreenhouseAdapter(BaseAdapter):
                 api_url,
                 timeout_seconds=adapter_runtime_settings.ats_request_timeout_seconds,
             )
+        except TimeoutError:
+            raise
         except (OSError, ValueError, RuntimeError):
             return None
         if not isinstance(data, dict):

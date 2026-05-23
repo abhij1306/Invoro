@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import pytest
+from selectolax.lexbor import LexborHTMLParser
 
+from app.services.adapters import amazon
 from app.services.adapters.adp import ADPAdapter
 from app.services.adapters.amazon import AmazonAdapter
 from app.services.adapters.belk import BelkAdapter
@@ -97,7 +99,9 @@ def test_listing_extractor_preserves_css_card_field_output() -> None:
     assert rows[0]["review_count"] == 128
 
 
-def test_listing_extractor_prefers_row_detail_link_and_name_over_breadcrumb_links() -> None:
+def test_listing_extractor_prefers_row_detail_link_and_name_over_breadcrumb_links() -> (
+    None
+):
     html = """
     <html>
       <body>
@@ -337,7 +341,9 @@ def test_listing_extractor_does_not_emit_additional_images() -> None:
     ]
 
 
-def test_listing_extractor_prefers_explicit_price_node_over_description_mentions_and_keeps_currency() -> None:
+def test_listing_extractor_prefers_explicit_price_node_over_description_mentions_and_keeps_currency() -> (
+    None
+):
     html = """
     <html>
       <body>
@@ -411,7 +417,9 @@ def test_listing_extractor_avoids_numeric_title_nodes_when_real_title_exists() -
     ]
 
 
-def test_listing_extractor_filters_category_cloud_links_when_supported_product_tiles_exist() -> None:
+def test_listing_extractor_filters_category_cloud_links_when_supported_product_tiles_exist() -> (
+    None
+):
     product_rows = "\n".join(
         f"""
         <li class="product-grid-product">
@@ -663,7 +671,9 @@ def test_detail_extractor_ignores_js_state_inside_removed_noise_containers() -> 
     assert record["_source"] != "js_state"
 
 
-def test_listing_extractor_ignores_structured_payloads_inside_removed_noise_containers() -> None:
+def test_listing_extractor_ignores_structured_payloads_inside_removed_noise_containers() -> (
+    None
+):
     html = """
     <html>
       <body>
@@ -762,7 +772,9 @@ def test_detail_extractor_reads_category_from_dom_breadcrumbs() -> None:
     assert record["gender"] == "women"
 
 
-def test_detail_extractor_prefers_visible_breadcrumb_category_over_structured_category() -> None:
+def test_detail_extractor_prefers_visible_breadcrumb_category_over_structured_category() -> (
+    None
+):
     record = build_detail_record(
         """
         <html>
@@ -801,7 +813,9 @@ def test_detail_extractor_prefers_visible_breadcrumb_category_over_structured_ca
     assert record["gender"] == "women"
 
 
-def test_listing_extractor_prefers_structured_name_over_item_position_for_title() -> None:
+def test_listing_extractor_prefers_structured_name_over_item_position_for_title() -> (
+    None
+):
     html = """
     <html>
       <head>
@@ -960,7 +974,9 @@ def test_xpath_selector_extraction_applies_regex_to_xpath_result() -> None:
 def test_xpath_regex_invalid_timeout_falls_back_without_timeout(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(crawler_runtime_settings, "selector_regex_timeout_seconds", "bad")
+    monkeypatch.setattr(
+        crawler_runtime_settings, "selector_regex_timeout_seconds", "bad"
+    )
     html = '<span class="rating">star-rating Three</span>'
 
     with pytest.raises(ValueError, match="selector_regex_timeout_seconds"):
@@ -1048,7 +1064,9 @@ async def test_amazon_adapter_combines_visible_whole_and_fraction_price() -> Non
 
 
 @pytest.mark.asyncio
-async def test_amazon_adapter_uses_currency_decimal_places_for_zero_decimal_markets() -> None:
+async def test_amazon_adapter_uses_currency_decimal_places_for_zero_decimal_markets() -> (
+    None
+):
     result = await AmazonAdapter().extract(
         "https://www.amazon.co.jp/dp/example",
         """
@@ -1057,7 +1075,7 @@ async def test_amazon_adapter_uses_currency_decimal_places_for_zero_decimal_mark
             <span id="productTitle">Desk Lamp</span>
             <span class="a-price">
               <span class="a-price-symbol">JPY</span>
-              <span class="a-price-whole">1,359</span>
+              <span class="a-price-whole">1,359.</span>
               <span class="a-price-fraction">96</span>
             </span>
           </body>
@@ -1070,6 +1088,35 @@ async def test_amazon_adapter_uses_currency_decimal_places_for_zero_decimal_mark
     record = result.records[0]
     assert record["price"] == "JPY 1,359"
     assert record["currency"] == "JPY"
+
+
+@pytest.mark.asyncio
+async def test_amazon_adapter_preserves_configured_three_decimal_price(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setitem(amazon.CURRENCY_DECIMAL_PLACES, "BHD", 3)
+
+    result = await AmazonAdapter().extract(
+        "https://www.amazon.com/dp/example",
+        """
+        <html>
+          <body>
+            <span id="productTitle">Desk Lamp</span>
+            <span class="a-price">
+              <span class="a-price-symbol">BHD</span>
+              <span class="a-price-whole">1,359</span>
+              <span class="a-price-fraction">968</span>
+            </span>
+          </body>
+        </html>
+        """,
+        "ecommerce_detail",
+    )
+
+    assert len(result.records) == 1
+    record = result.records[0]
+    assert record["price"] == "BHD 1,359.968"
+    assert record["currency"] == "BHD"
 
 
 @pytest.mark.asyncio
@@ -1237,7 +1284,9 @@ async def test_amazon_adapter_infers_twister_dimension_order_from_valid_rows() -
         "White",
         "White + Brush Head Case",
     ]
-    assert all(variant["size"] == "1 Count (Pack of 1)" for variant in record["variants"])
+    assert all(
+        variant["size"] == "1 Count (Pack of 1)" for variant in record["variants"]
+    )
 
     detail_record = build_detail_record(
         html,
@@ -1342,6 +1391,17 @@ async def test_amazon_adapter_extracts_detail_completeness_fields() -> None:
     assert record["additional_images"] is None
 
 
+def test_amazon_image_src_fallback_normalizes_low_resolution_url() -> None:
+    parser = LexborHTMLParser(
+        "<img id='landingImage' src='https://m.media-amazon.com/images/I/51DRLHAa2AS._AC_US40_.jpg'>"
+    )
+
+    assert (
+        amazon._amazon_image_src(parser.css_first("#landingImage"))
+        == "https://m.media-amazon.com/images/I/51DRLHAa2AS.jpg"
+    )
+
+
 @pytest.mark.asyncio
 async def test_belk_adapter_extracts_nested_state_brand_price_and_currency() -> None:
     result = await BelkAdapter().extract(
@@ -1384,7 +1444,9 @@ async def test_belk_adapter_extracts_nested_state_brand_price_and_currency() -> 
 
 
 @pytest.mark.asyncio
-async def test_belk_adapter_prefers_real_currency_fields_over_scalar_price_text() -> None:
+async def test_belk_adapter_prefers_real_currency_fields_over_scalar_price_text() -> (
+    None
+):
     result = await BelkAdapter().extract(
         "https://www.belk.com/home/",
         """
@@ -1944,7 +2006,9 @@ async def test_adp_adapter_preserves_css_listing_output() -> None:
 
 
 @pytest.mark.asyncio
-async def test_job_listing_pipeline_preserves_adp_adapter_rows_with_query_job_ids() -> None:
+async def test_job_listing_pipeline_preserves_adp_adapter_rows_with_query_job_ids() -> (
+    None
+):
     url = "https://workforcenow.adp.com/mascsr/default/mdf/recruitment/recruitment.html?cid=tenant&selectedMenuKey=CurrentOpenings"
     html = """
     <html>
@@ -1977,8 +2041,12 @@ async def test_job_listing_pipeline_preserves_adp_adapter_rows_with_query_job_id
     assert [("jobId=9202786030399_1" in row["url"]) for row in rows] == [False, True]
 
 
-def test_job_listing_pipeline_prefers_icims_adapter_rows_over_career_nav_chrome() -> None:
-    url = "https://ehccareers-emory.icims.com/jobs/search?pr=0&searchRelation=keyword_all"
+def test_job_listing_pipeline_prefers_icims_adapter_rows_over_career_nav_chrome() -> (
+    None
+):
+    url = (
+        "https://ehccareers-emory.icims.com/jobs/search?pr=0&searchRelation=keyword_all"
+    )
     html = """
     <html>
       <body>

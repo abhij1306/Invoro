@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from app.services.shared.url_utils import (
     ensure_scheme,
+    identity_token,
     is_placeholder_image_url,
     absolute_url,
     extract_urls,
@@ -51,3 +52,9 @@ def test_same_host_and_extract_urls_trim_malformed_candidates() -> None:
 def test_placeholder_images_are_rejected() -> None:
     assert is_placeholder_image_url("https://via.placeholder.com/100")
     assert extract_urls("https://via.placeholder.com/100", "https://example.com") == []
+
+
+def test_identity_token_does_not_singularize_double_s_words() -> None:
+    assert identity_token("dress") == "dress"
+    assert identity_token("glass") == "glass"
+    assert identity_token("shoes") == "shoe"

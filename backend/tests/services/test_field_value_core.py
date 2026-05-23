@@ -25,10 +25,13 @@ from app.services.public_record_firewall import public_record_data_for_surface
 
 
 def test_absolute_url_promotes_bare_host_candidates_to_https() -> None:
-    assert absolute_url(
-        "https://www.asos.com/us/prd/210817202",
-        "images.asos-media.com/products/widget/image-1.jpg",
-    ) == "https://images.asos-media.com/products/widget/image-1.jpg"
+    assert (
+        absolute_url(
+            "https://www.asos.com/us/prd/210817202",
+            "images.asos-media.com/products/widget/image-1.jpg",
+        )
+        == "https://images.asos-media.com/products/widget/image-1.jpg"
+    )
 
 
 def test_absolute_url_does_not_promote_hosts_with_edge_hyphen_labels() -> None:
@@ -75,15 +78,22 @@ def test_coerce_title_supports_structured_values_key() -> None:
 
 
 def test_coerce_brand_keeps_non_url_scheme_text_but_rejects_full_bare_host() -> None:
-    assert coerce_field_value("brand", "foo:bar", "https://example.com/p/x") == "foo:bar"
-    assert coerce_field_value("brand", "shop.example.com", "https://example.com/p/x") is None
+    assert (
+        coerce_field_value("brand", "foo:bar", "https://example.com/p/x") == "foo:bar"
+    )
+    assert (
+        coerce_field_value("brand", "shop.example.com", "https://example.com/p/x")
+        is None
+    )
 
 
 def test_frequently_bought_together_is_title_noise() -> None:
     assert is_title_noise("Frequently Bought Together") is True
 
 
-def test_validate_record_for_surface_drops_unknown_fields_but_keeps_canonical_fields() -> None:
+def test_validate_record_for_surface_drops_unknown_fields_but_keeps_canonical_fields() -> (
+    None
+):
     cleaned, errors = validate_record_for_surface(
         {
             "title": "Widget Prime",
@@ -387,7 +397,9 @@ def test_public_record_firewall_preserves_type_switches_fit_and_length_axes() ->
     assert rejected == {}
 
 
-def test_public_record_firewall_drops_parent_shared_variant_fields_but_keeps_price_currency() -> None:
+def test_public_record_firewall_drops_parent_shared_variant_fields_but_keeps_price_currency() -> (
+    None
+):
     data, rejected = public_record_data_for_surface(
         {
             "title": "Widget",
@@ -495,7 +507,9 @@ def test_persistence_schema_firewall_drops_default_ecommerce_schema_pollution() 
     }
 
 
-def test_persistence_schema_firewall_keeps_explicitly_requested_pollution_field() -> None:
+def test_persistence_schema_firewall_keeps_explicitly_requested_pollution_field() -> (
+    None
+):
     data, rejected = public_record_data_for_surface(
         {
             "title": "Widget Prime",
@@ -614,7 +628,9 @@ def test_llm_outputs_pass_same_schema_firewall() -> None:
     }
 
 
-def test_strip_tracking_query_params_removes_etsy_style_click_tracking_but_keeps_functional_values() -> None:
+def test_strip_tracking_query_params_removes_etsy_style_click_tracking_but_keeps_functional_values() -> (
+    None
+):
     cleaned = strip_tracking_query_params(
         "https://example.com/products/widget-prime"
         "?click_key=opaque"
@@ -633,20 +649,26 @@ def test_strip_tracking_query_params_removes_etsy_style_click_tracking_but_keeps
     assert cleaned == "https://example.com/products/widget-prime?variant=blue"
 
 
-def test_strip_tracking_query_params_keeps_short_flags_without_detail_context_tracking() -> None:
+def test_strip_tracking_query_params_keeps_short_flags_without_detail_context_tracking() -> (
+    None
+):
     cleaned = strip_tracking_query_params(
-        "https://example.com/products/widget-prime"
-        "?gclid=opaque"
-        "&ls=r"
-        "&variant=blue"
+        "https://example.com/products/widget-prime?gclid=opaque&ls=r&variant=blue"
     )
 
     assert cleaned == "https://example.com/products/widget-prime?ls=r&variant=blue"
 
 
-def test_same_site_preserves_ipv4_hosts() -> None:
+def test_registrable_host_returns_ipv4_address() -> None:
     assert registrable_host("http://192.168.1.1/product") == "192.168.1.1"
+
+
+def test_same_site_ipv4_same_host_is_true() -> None:
     assert same_site("http://192.168.1.1/product", "http://192.168.1.1/cart")
+
+
+def test_same_site_ipv4_different_host_is_false() -> None:
+    assert not same_site("http://192.168.1.1/product", "http://192.168.1.2/cart")
 
 
 def test_extract_currency_code_supports_rs_price_prefixes() -> None:
@@ -659,11 +681,14 @@ def test_extract_currency_code_ignores_non_currency_uppercase_acronyms() -> None
 
 
 def test_literal_list_text_uses_readable_delimiters() -> None:
-    assert coerce_field_value(
-        "description",
-        "['Digital max resolution', 'Real boost clock: 1800 MHz']",
-        "https://example.com/p/card",
-    ) == "Digital max resolution; Real boost clock: 1800 MHz"
+    assert (
+        coerce_field_value(
+            "description",
+            "['Digital max resolution', 'Real boost clock: 1800 MHz']",
+            "https://example.com/p/card",
+        )
+        == "Digital max resolution; Real boost clock: 1800 MHz"
+    )
 
 
 def test_price_dict_prefers_formatted_money_over_low_signal_scalar() -> None:
@@ -715,46 +740,61 @@ def test_price_dict_handles_missing_currency() -> None:
 
 
 def test_option_scalars_coerce_dict_like_labels_and_reject_null_tokens() -> None:
-    assert coerce_field_value(
-        "color",
-        "{'id': 'black-onyx', 'title': 'black onyx'}",
-        "https://example.com/p/socks",
-    ) == "black onyx"
+    assert (
+        coerce_field_value(
+            "color",
+            "{'id': 'black-onyx', 'title': 'black onyx'}",
+            "https://example.com/p/socks",
+        )
+        == "black onyx"
+    )
     assert coerce_field_value("color", "None", "https://example.com/p/wash") is None
     assert coerce_field_value("size", "- / null", "https://example.com/p/bag") is None
-    assert coerce_field_value(
-        "size",
-        "Please select US EU",
-        "https://example.com/p/sandal",
-    ) is None
+    assert (
+        coerce_field_value(
+            "size",
+            "Please select US EU",
+            "https://example.com/p/sandal",
+        )
+        is None
+    )
 
 
 def test_title_coerces_nested_dict_like_label_instead_of_stringifying_object() -> None:
-    assert coerce_field_value(
-        "title",
-        (
-            # coerce_field_value ignores the top-level UI/display label ("Name")
-            # and prefers values.label when this dict-like shape carries the title.
-            "{'id': 20005, 'key': 'name', 'label': 'Name', 'type': '', "
-            "'multiSelect': False, 'values': {'id': 20005, "
-            "'label': 'Emperor 100% Arctic Duck Down Duvet (8.5 Tog)', "
-            "'value': 'name'}}"
-        ),
-        "https://www.harrods.com/en-gb/p/brinkhaus-emperor-duvet",
-    ) == "Emperor 100% Arctic Duck Down Duvet (8.5 Tog)"
+    assert (
+        coerce_field_value(
+            "title",
+            (
+                # coerce_field_value ignores the top-level UI/display label ("Name")
+                # and prefers values.label when this dict-like shape carries the title.
+                "{'id': 20005, 'key': 'name', 'label': 'Name', 'type': '', "
+                "'multiSelect': False, 'values': {'id': 20005, "
+                "'label': 'Emperor 100% Arctic Duck Down Duvet (8.5 Tog)', "
+                "'value': 'name'}}"
+            ),
+            "https://www.harrods.com/en-gb/p/brinkhaus-emperor-duvet",
+        )
+        == "Emperor 100% Arctic Duck Down Duvet (8.5 Tog)"
+    )
 
 
 def test_color_scalar_extracts_value_from_prefixed_product_copy() -> None:
-    assert coerce_field_value(
-        "color",
-        "for Sony WH-1000XM5 Wireless Noise-canceling Headphones - Black: Black",
-        "https://example.com/p/headphones",
-    ) == "Black"
-    assert coerce_field_value(
-        "color",
-        "Black/Red Style: HJ0139-045",
-        "https://example.com/p/shirt",
-    ) == "Black/Red"
+    assert (
+        coerce_field_value(
+            "color",
+            "for Sony WH-1000XM5 Wireless Noise-canceling Headphones - Black: Black",
+            "https://example.com/p/headphones",
+        )
+        == "Black"
+    )
+    assert (
+        coerce_field_value(
+            "color",
+            "Black/Red Style: HJ0139-045",
+            "https://example.com/p/shirt",
+        )
+        == "Black/Red"
+    )
 
 
 def test_clean_text_strips_leading_css_in_js_noise() -> None:
@@ -806,21 +846,29 @@ def test_extract_urls_preserves_balanced_parentheses_and_brackets() -> None:
 
 
 def test_extract_urls_rejects_malformed_relative_image_fragments() -> None:
-    assert extract_urls(
-        "g_auto/69721f2e7c934d909168a80e00818569_9366/Stan_Smith_Shoes_White_M20324_01_standard.jpg",
-        "https://www.adidas.com/us/stan-smith-shoes/M20324.html",
-    ) == []
-    assert extract_urls(
-        "R0lGODlhAQABAIAAAP/wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==",
-        "https://www.adidas.com/us/stan-smith-shoes/M20324.html",
-    ) == []
+    assert (
+        extract_urls(
+            "g_auto/69721f2e7c934d909168a80e00818569_9366/Stan_Smith_Shoes_White_M20324_01_standard.jpg",
+            "https://www.adidas.com/us/stan-smith-shoes/M20324.html",
+        )
+        == []
+    )
+    assert (
+        extract_urls(
+            "R0lGODlhAQABAIAAAP/wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==",
+            "https://www.adidas.com/us/stan-smith-shoes/M20324.html",
+        )
+        == []
+    )
 
 
 def test_infer_brand_from_title_marker_keeps_leading_trademark_brand_token() -> None:
     assert infer_brand_from_title_marker("®Nike Court Vision Low") == "®Nike"
 
 
-def test_infer_brand_from_product_url_skips_overlong_slug_and_keeps_valid_match() -> None:
+def test_infer_brand_from_product_url_skips_overlong_slug_and_keeps_valid_match() -> (
+    None
+):
     assert (
         infer_brand_from_product_url(
             url=(
@@ -853,8 +901,13 @@ def test_coerce_color_rejects_single_digit_from_quantity_input() -> None:
 
 
 def test_coerce_color_keeps_valid_color_names() -> None:
-    assert coerce_field_value("color", "Black Onyx", "https://example.com/p") == "Black Onyx"
-    assert coerce_field_value("color", "Navy Blue", "https://example.com/p") == "Navy Blue"
+    assert (
+        coerce_field_value("color", "Black Onyx", "https://example.com/p")
+        == "Black Onyx"
+    )
+    assert (
+        coerce_field_value("color", "Navy Blue", "https://example.com/p") == "Navy Blue"
+    )
 
 
 def test_coerce_color_rejects_tracking_pixel_classes() -> None:
@@ -877,19 +930,22 @@ def test_coerce_size_keeps_valid_sizes() -> None:
 
 
 def test_extract_urls_filters_placeholder_images() -> None:
-    assert extract_urls(
-        "https://via.placeholder.com/600", "https://example.com/p"
-    ) == []
-    assert extract_urls(
-        "https://cdn.example.com/pixel.gif", "https://example.com/p"
-    ) == []
+    assert (
+        extract_urls("https://via.placeholder.com/600", "https://example.com/p") == []
+    )
+    assert (
+        extract_urls("https://cdn.example.com/pixel.gif", "https://example.com/p") == []
+    )
 
 
 def test_extract_urls_filters_concatenated_urls() -> None:
-    assert extract_urls(
-        "https://www.selfridges.com/p/123/https:/www.mytheresa.com/p/456",
-        "https://example.com/p",
-    ) == []
+    assert (
+        extract_urls(
+            "https://www.selfridges.com/p/123/https:/www.mytheresa.com/p/456",
+            "https://example.com/p",
+        )
+        == []
+    )
 
 
 def test_extract_urls_keeps_normal_urls() -> None:
@@ -913,8 +969,12 @@ def test_public_firewall_rejects_concatenated_url() -> None:
 
 
 def test_integer_fields_reject_embedded_numeric_junk() -> None:
-    assert coerce_field_value("stock_quantity", "abc123", "https://example.com/p") is None
-    assert coerce_field_value("stock_quantity", "1,234", "https://example.com/p") == 1234
+    assert (
+        coerce_field_value("stock_quantity", "abc123", "https://example.com/p") is None
+    )
+    assert (
+        coerce_field_value("stock_quantity", "1,234", "https://example.com/p") == 1234
+    )
 
 
 def test_public_firewall_does_not_route_invalid_barcode_to_sku() -> None:

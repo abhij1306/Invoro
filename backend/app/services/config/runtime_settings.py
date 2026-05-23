@@ -73,6 +73,11 @@ def _require_unit_interval(name: str, value: object) -> None:
         raise ValueError(f"{name} must be between 0 and 1")
 
 
+def _require_open_unit_interval(name: str, value: object) -> None:
+    if not 0.0 < _coerce_float(value) < 1.0:
+        raise ValueError(f"{name} must be > 0 and < 1")
+
+
 class CrawlerRuntimeSettings(BaseSettings):
     """Typed env-backed runtime settings for acquisition, browser, and crawl flow."""
 
@@ -514,12 +519,15 @@ class CrawlerRuntimeSettings(BaseSettings):
             raise ValueError(
                 "run_health_failed_error_rate must be >= run_health_degraded_error_rate"
             )
+        for field_name in ("selector_self_heal_min_confidence",):
+            _require_unit_interval(field_name, getattr(self, field_name))
         for field_name in (
-            "selector_self_heal_min_confidence",
             "browser_navigation_networkidle_primary_budget_ratio",
             "origin_warmup_max_budget_ratio",
         ):
-            _require_unit_interval(field_name, getattr(self, field_name))
+            _require_open_unit_interval(field_name, getattr(self, field_name))
+        if not str(self.host_memory_ttl_seconds_key or "").strip():
+            raise ValueError("host_memory_ttl_seconds_key must not be blank")
         _require_positive("detail_max_variant_axes", self.detail_max_variant_axes)
         _require_non_negative(
             "detail_max_variant_matrix_cells",

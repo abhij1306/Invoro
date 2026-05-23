@@ -34,7 +34,9 @@ from app.services.extract.variant_normalization.contract import (
 from app.services.shared.field_coerce import (
     extract_currency_code,
 )
-from app.services.extract.variant_axis import normalized_variant_axis_key as _normalized_variant_axis_key
+from app.services.extract.variant_axis import (
+    normalized_variant_axis_key as _normalized_variant_axis_key,
+)
 
 
 def _clean_brand(value: str) -> str:
@@ -51,7 +53,9 @@ def _axis_key(value: object) -> str:
         return "color"
     if normalized.startswith("size"):
         return "size"
-    return _normalized_variant_axis_key(normalized) or re.sub(r"[^a-z0-9]+", "_", normalized).strip("_")
+    return _normalized_variant_axis_key(normalized) or re.sub(
+        r"[^a-z0-9]+", "_", normalized
+    ).strip("_")
 
 
 def _availability(value: object) -> str | None:
@@ -68,8 +72,12 @@ def _normalize_price_text(value: object) -> str | None:
     if not text:
         return None
     text = re.sub(r"\s+", " ", text)
+    max_decimal_places = max(
+        int(DEFAULT_DECIMAL_PLACES),
+        *(int(value) for value in CURRENCY_DECIMAL_PLACES.values()),
+    )
     match = re.search(
-        r"(?:(?:[$€£₹]|[A-Z]{3})\s*)?\d[\d,]*(?:\.\d{1,2})?(?:\s*(?:[$€£₹]|[A-Z]{3}))?",
+        rf"(?:(?:[$€£₹]|[A-Z]{{3}})\s*)?\d[\d,]*(?:\.\d{{1,{max_decimal_places}}})?(?:\s*(?:[$€£₹]|[A-Z]{{3}}))?",
         text,
         re.I,
     )
@@ -81,10 +89,11 @@ def _normalize_price_text(value: object) -> str | None:
 def _amazon_image_src(image_el) -> str | None:
     if image_el is None:
         return None
-    return selectolax_node_attr(image_el, "src") or selectolax_node_attr(
+    candidate = selectolax_node_attr(image_el, "src") or selectolax_node_attr(
         image_el,
         "data-old-hires",
     )
+    return upgrade_low_resolution_image_url(candidate) if candidate else None
 
 
 def _price_from_price_node(price_node: object) -> str | None:

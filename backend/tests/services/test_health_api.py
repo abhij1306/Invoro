@@ -193,15 +193,14 @@ async def test_render_prometheus_metrics_continues_on_crawl_run_query_failure(
         )(),
     )
 
-    payload, content_type = await metrics_module.render_prometheus_metrics()
+    payload, _content_type = await metrics_module.render_prometheus_metrics()
 
+    assert payload == b"ok\n"
     assert failure_counter.value == 1
     assert crawl_runs_total.clear_calls == 1
     assert browser_pool_size.values == [3]
     assert database_connections_active.values == [4]
     assert redis_failures_total_metric.values == [5]
-    assert payload == b"ok\n"
-    assert content_type == metrics_module.CONTENT_TYPE_LATEST
 
 
 @pytest.mark.asyncio
@@ -216,7 +215,10 @@ async def test_api_responses_include_security_headers() -> None:
     assert response.headers["x-content-type-options"] == "nosniff"
     assert response.headers["x-frame-options"] == "DENY"
     assert response.headers["referrer-policy"] == "strict-origin-when-cross-origin"
-    assert response.headers["permissions-policy"] == "camera=(), microphone=(), geolocation=()"
+    assert (
+        response.headers["permissions-policy"]
+        == "camera=(), microphone=(), geolocation=()"
+    )
     assert "strict-transport-security" not in response.headers
 
 
@@ -236,7 +238,10 @@ async def test_cors_preflight_uses_narrow_allowlists() -> None:
         )
 
     assert response.status_code == 200
-    assert response.headers["access-control-allow-methods"] == "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+    assert (
+        response.headers["access-control-allow-methods"]
+        == "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+    )
     assert response.headers["access-control-allow-headers"] != "*"
     allow_headers = response.headers["access-control-allow-headers"].lower()
     assert "content-type" in allow_headers

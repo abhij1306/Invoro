@@ -19,12 +19,16 @@ from app.services.config.variant_migration_rules import (
     VARIANT_SCOPE_SOURCE_TRUSTED,
 )
 from app.services.config.variant_policy import PUBLIC_VARIANT_AXIS_FIELDS
-from app.services.extract.variant_dom_cues import variant_context_noise_tokens
+from app.services.config.variant_migration_rules import VARIANT_CONTEXT_NOISE_TOKENS
 from app.services.extract.variant_value_guards import variant_url_is_product_like
 from app.services.shared.field_coerce import clean_text
 
 logger = logging.getLogger(__name__)
-_PUBLIC_AXES = frozenset(str(axis).strip().lower() for axis in PUBLIC_VARIANT_AXIS_FIELDS if str(axis).strip())
+_PUBLIC_AXES = frozenset(
+    str(axis).strip().lower()
+    for axis in PUBLIC_VARIANT_AXIS_FIELDS
+    if str(axis).strip()
+)
 
 
 @dataclass
@@ -73,8 +77,10 @@ class VariantGroupValidator:
             score += 0.1
         if group.extractor_path in {"select", "choice_radio"}:
             score += 0.05
-        combined = " ".join([*group.container_classes, *group.ancestor_class_tokens]).lower()
-        if any(token in combined for token in variant_context_noise_tokens):
+        combined = " ".join(
+            [*group.container_classes, *group.ancestor_class_tokens]
+        ).lower()
+        if any(token in combined for token in VARIANT_CONTEXT_NOISE_TOKENS):
             score -= 0.5
             reasons.append("noise_context")
         if len(urls) == 1 and not variant_url_is_product_like(next(iter(urls))):
@@ -83,7 +89,9 @@ class VariantGroupValidator:
         if group.container_tag in VARIANT_CONTAINER_CHROME_TAGS:
             score -= 0.4
             reasons.append(f"chrome_container:{group.container_tag}")
-        product_url_set = len(urls) >= 2 and all(variant_url_is_product_like(url) for url in urls)
+        product_url_set = len(urls) >= 2 and all(
+            variant_url_is_product_like(url) for url in urls
+        )
         if set(group.option_node_types) == {"a"} and not product_url_set:
             score -= 0.3
             reasons.append("all_options_are_anchors")
@@ -127,5 +135,7 @@ def _container_has_variant_semantics(group: VariantCandidateGroup) -> bool:
 
 
 def _name_has_compound_public_axis(value: object) -> bool:
-    tokens = {token for token in clean_text(value).lower().replace("&", " ").split() if token}
+    tokens = {
+        token for token in clean_text(value).lower().replace("&", " ").split() if token
+    }
     return bool(tokens & _PUBLIC_AXES) and len(tokens) >= 2

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import threading
 from dataclasses import dataclass
 from urllib.parse import unquote, urlparse
 
@@ -25,6 +26,12 @@ _BRIDGE_COUNTERS = {
     "closed": 0,
     "failures": 0,
 }
+_BRIDGE_COUNTERS_LOCK = threading.Lock()
+
+
+def _increment_bridge_counter(name: str) -> None:
+    with _BRIDGE_COUNTERS_LOCK:
+        _BRIDGE_COUNTERS[name] += 1
 
 
 class _ClientNotifiedSocksError(ValueError):
@@ -84,12 +91,12 @@ class Socks5AuthBridge:
             if not sockets:
                 server.close()
                 await server.wait_closed()
-                _BRIDGE_COUNTERS["failures"] += 1
+                _increment_bridge_counter("failures")
                 raise RuntimeError("SOCKS5 auth bridge failed to bind a local socket")
             port = int(sockets[0].getsockname()[1])
             self._server = server
             self._server_url = f"socks5://127.0.0.1:{port}"
-            _BRIDGE_COUNTERS["opened"] += 1
+            _increment_bridge_counter("opened")
             return self._server_url
 
     async def close(self) -> None:
@@ -99,7 +106,7 @@ class Socks5AuthBridge:
         if server is not None:
             server.close()
             await server.wait_closed()
-            _BRIDGE_COUNTERS["closed"] += 1
+            _increment_bridge_counter("closed")
         tasks = list(self._tasks)
         for task in tasks:
             task.cancel()
@@ -162,10 +169,10 @@ class Socks5AuthBridge:
         except asyncio.CancelledError:
             raise
         except _ClientNotifiedSocksError:
-            _BRIDGE_COUNTERS["failures"] += 1
+            _increment_bridge_counter("failures")
             logger.debug("SOCKS5 auth bridge rejected client request", exc_info=True)
         except Exception:
-            _BRIDGE_COUNTERS["failures"] += 1
+            _increment_bridge_counter("failures")
             logger.debug("SOCKS5 auth bridge request failed", exc_info=True)
             with contextlib.suppress(Exception):
                 writer.write(_failure_response(_SOCKS_REPLY_GENERAL_FAILURE))
@@ -204,7 +211,9 @@ async def _read_client_request(
     if _SOCKS_AUTH_NONE not in methods:
         writer.write(bytes([_SOCKS_VERSION, _SOCKS_AUTH_NO_ACCEPTABLE]))
         await writer.drain()
-        raise _ClientNotifiedSocksError("Browser SOCKS client did not offer no-auth method")
+        raise _ClientNotifiedSocksError(
+            "Browser SOCKS client did not offer no-auth method"
+        )
     writer.write(bytes([_SOCKS_VERSION, _SOCKS_AUTH_NONE]))
     await writer.drain()
     request_header = await reader.readexactly(4)
@@ -250,10 +259,7 @@ async def _authenticate_upstream(
     if len(username) > 255 or len(password) > 255:
         raise ValueError("SOCKS5 proxy username/password too long")
     writer.write(
-        bytes([1, len(username)])
-        + username
-        + bytes([len(password)])
-        + password
+        bytes([1, len(username)]) + username + bytes([len(password)]) + password
     )
     await writer.drain()
     auth_response = await reader.readexactly(2)
@@ -322,9 +328,11 @@ def _failure_response(reply_code: int) -> bytes:
 
 
 def bridge_counters() -> dict[str, int]:
-    return dict(_BRIDGE_COUNTERS)
+    with _BRIDGE_COUNTERS_LOCK:
+        return dict(_BRIDGE_COUNTERS)
 
 
 def reset_bridge_counters() -> None:
-    for key in _BRIDGE_COUNTERS:
-        _BRIDGE_COUNTERS[key] = 0
+    with _BRIDGE_COUNTERS_LOCK:
+        for key in _BRIDGE_COUNTERS:
+            _BRIDGE_COUNTERS[key] = 0

@@ -49,6 +49,33 @@ async def test_crawls_logs_query_params_are_validated(
 
 
 @pytest.mark.asyncio
+async def test_domain_recipe_does_not_mark_browser_required_from_summary_usage_only(
+    crawls_api_client: AsyncClient,
+    db_session,
+    test_user,
+) -> None:
+    run = await create_crawl_run(
+        db_session,
+        test_user.id,
+        {
+            "run_type": "crawl",
+            "url": "https://domain-recipe.example.invalid/products/summary-only-widget",
+            "surface": "ecommerce_detail",
+        },
+    )
+    run.result_summary = {"acquisition_summary": {"methods": {"browser": 1}}}
+    await db_session.commit()
+
+    response = await crawls_api_client.get(f"/api/crawls/{run.id}/domain-recipe")
+
+    assert response.status_code == 200
+    recipe = response.json()
+    assert recipe["acquisition_evidence"]["actual_fetch_method"] == "browser"
+    assert recipe["acquisition_evidence"]["browser_used"] is True
+    assert recipe["affordance_candidates"]["browser_required"] is False
+
+
+@pytest.mark.asyncio
 async def test_crawls_domain_recipe_routes_round_trip(
     crawls_api_client: AsyncClient,
     db_session,
@@ -200,7 +227,10 @@ async def test_crawls_domain_recipe_routes_round_trip(
     assert save_profile_response.status_code == 200
     saved_profile = save_profile_response.json()
     assert saved_profile["fetch_profile"]["fetch_mode"] == "http_then_browser"
-    assert saved_profile["acquisition_contract"]["preferred_browser_engine"] == "real_chrome"
+    assert (
+        saved_profile["acquisition_contract"]["preferred_browser_engine"]
+        == "real_chrome"
+    )
     assert saved_profile["acquisition_contract"]["handoff_eligible"] is True
     assert saved_profile["locality_profile"]["geo_country"] == "IN"
     assert saved_profile["source_run_id"] == run.id
@@ -214,7 +244,10 @@ async def test_crawls_domain_recipe_routes_round_trip(
         },
     )
     assert lookup_after_save.status_code == 200
-    assert lookup_after_save.json()["saved_run_profile"]["fetch_profile"]["fetch_mode"] == "http_then_browser"
+    assert (
+        lookup_after_save.json()["saved_run_profile"]["fetch_profile"]["fetch_mode"]
+        == "http_then_browser"
+    )
     assert "proxy_profile" not in lookup_after_save.json()["saved_run_profile"]
 
     list_profiles_response = await crawls_api_client.get(
@@ -224,7 +257,10 @@ async def test_crawls_domain_recipe_routes_round_trip(
     assert list_profiles_response.status_code == 200
     assert list_profiles_response.json()[0]["domain"] == "domain-recipe.example.invalid"
     assert list_profiles_response.json()[0]["surface"] == "ecommerce_detail"
-    assert list_profiles_response.json()[0]["profile"]["fetch_profile"]["fetch_mode"] == "http_then_browser"
+    assert (
+        list_profiles_response.json()[0]["profile"]["fetch_profile"]["fetch_mode"]
+        == "http_then_browser"
+    )
 
     normalized_profiles_response = await crawls_api_client.get(
         "/api/crawls/domain-memory/run-profiles",
@@ -257,14 +293,21 @@ async def test_crawls_domain_recipe_routes_round_trip(
     assert promoted[0]["source"] == "domain_recipe"
     assert promoted[0]["source_run_id"] == run.id
 
-    recipe_after_save = await crawls_api_client.get(f"/api/crawls/{run.id}/domain-recipe")
+    recipe_after_save = await crawls_api_client.get(
+        f"/api/crawls/{run.id}/domain-recipe"
+    )
     assert recipe_after_save.status_code == 200
     saved_recipe = recipe_after_save.json()
-    assert saved_recipe["saved_run_profile"]["fetch_profile"]["fetch_mode"] == "http_then_browser"
+    assert (
+        saved_recipe["saved_run_profile"]["fetch_profile"]["fetch_mode"]
+        == "http_then_browser"
+    )
     assert "proxy_profile" not in saved_recipe["saved_run_profile"]
     assert any(row["field_name"] == "price" for row in saved_recipe["saved_selectors"])
     promoted_candidate = next(
-        row for row in saved_recipe["selector_candidates"] if row["field_name"] == "price"
+        row
+        for row in saved_recipe["selector_candidates"]
+        if row["field_name"] == "price"
     )
     assert promoted_candidate["already_saved"] is True
     assert promoted_candidate["saved_selector_id"] == promoted[0]["id"]
@@ -282,9 +325,7 @@ async def test_crawls_domain_recipe_routes_round_trip(
     assert field_action_response.status_code == 200
     assert field_action_response.json()["action"] == "reject"
     feedback_rows = list(
-        (
-            await db_session.execute(select(DomainFieldFeedback))
-        ).scalars().all()
+        (await db_session.execute(select(DomainFieldFeedback))).scalars().all()
     )
     assert len(feedback_rows) == 1
 
@@ -313,7 +354,10 @@ async def test_crawls_domain_recipe_routes_round_trip(
 
     feedback_response = await crawls_api_client.get(
         "/api/crawls/domain-memory/field-feedback",
-        params={"domain": "domain-recipe.example.invalid", "surface": "ecommerce_detail"},
+        params={
+            "domain": "domain-recipe.example.invalid",
+            "surface": "ecommerce_detail",
+        },
     )
     assert feedback_response.status_code == 200
     feedback_payload = feedback_response.json()

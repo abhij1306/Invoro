@@ -100,11 +100,11 @@ def requested_content_extractability_impl(
 
 
 def dom_pattern_has_extractable_content(
-    nodes: list[Tag],
+    nodes: list[Tag] | None,
     *,
     max_selector_matches: int,
 ) -> bool:
-    for node in nodes[:max_selector_matches]:
+    for node in list(nodes or [])[:max_selector_matches]:
         if clean_text(node.get_text(" ", strip=True)):
             return True
         attrs = getattr(node, "attrs", None)

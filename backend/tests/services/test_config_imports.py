@@ -219,6 +219,26 @@ def test_runtime_settings_reject_invalid_run_health_thresholds() -> None:
         )
 
 
+def test_runtime_settings_reject_blank_host_memory_ttl_key() -> None:
+    with pytest.raises(
+        ValueError, match="host_memory_ttl_seconds_key must not be blank"
+    ):
+        CrawlerRuntimeSettings(host_memory_ttl_seconds_key=" ")
+
+
+@pytest.mark.parametrize("ratio", [0, 1])
+def test_runtime_settings_reject_closed_networkidle_budget_ratio(
+    ratio: float,
+) -> None:
+    with pytest.raises(
+        ValueError,
+        match="browser_navigation_networkidle_primary_budget_ratio must be > 0 and < 1",
+    ):
+        CrawlerRuntimeSettings(
+            browser_navigation_networkidle_primary_budget_ratio=ratio,
+        )
+
+
 def test_selectors_export_does_not_drive_keep_worthy_tags() -> None:
     selectors = importlib.import_module("app.services.config.selectors")
     exports = load_export_data(
@@ -522,9 +542,7 @@ def test_crawl_run_settings_infers_sticky_rotation_from_sessionized_proxy_userna
         {
             "proxy_profile": {
                 "enabled": True,
-                "proxy_list": [
-                    _authenticated_proxy_url()
-                ],
+                "proxy_list": [_authenticated_proxy_url()],
             }
         }
     )
@@ -539,9 +557,7 @@ def test_crawl_run_settings_does_not_store_inferred_proxy_rotation() -> None:
         {
             "proxy_profile": {
                 "enabled": True,
-                "proxy_list": [
-                    _authenticated_proxy_url()
-                ],
+                "proxy_list": [_authenticated_proxy_url()],
             }
         }
     )

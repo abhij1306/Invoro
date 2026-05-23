@@ -59,9 +59,12 @@ from app.services.extract.listing_card_fragments import (
     listing_node_text,
 )
 from app.services.extract.listing_visual import visual_listing_records
-from app.services.extract.content_listing_handler import has_table_row_intent, table_row_records
-from app.services.extract.detail.price.core import currency_hint_from_page_url
+from app.services.extract.content_listing_handler import (
+    has_table_row_intent,
+    table_row_records,
+)
 from app.services.field_policy import normalize_requested_field
+from app.services.shared.currency_hints import currency_hint_from_page_url
 from app.services.shared.field_coerce import (
     PRICE_RE,
     RATING_RE,
@@ -100,7 +103,9 @@ def _resolve_selector_trace(
             continue
         if trace.get("_candidate_value") == finalized_value:
             return {
-                key: value for key, value in trace.items() if not str(key).startswith("_")
+                key: value
+                for key, value in trace.items()
+                if not str(key).startswith("_")
             }
     trace = next((row for row in traces if isinstance(row, dict)), {})
     if not isinstance(trace, dict):
@@ -320,9 +325,7 @@ def _listing_record_from_card(
         ),
         None,
     )
-    if best_same_url_text and (
-        _alnum_token_count(title) < 3 or is_title_noise(title)
-    ):
+    if best_same_url_text and (_alnum_token_count(title) < 3 or is_title_noise(title)):
         title = best_same_url_text
     if should_replace_title_with_image_hint(title, image_title_hint):
         title = clean_text(image_title_hint)
@@ -340,9 +343,13 @@ def _listing_record_from_card(
         or image_urls
     )
     if not listing_detail_like_path(url, is_job=is_job):
-        if is_job and anchor_score < 8 and not any(
-            token in card_text.lower()
-            for token in ("salary", "remote", "location", "apply")
+        if (
+            is_job
+            and anchor_score < 8
+            and not any(
+                token in card_text.lower()
+                for token in ("salary", "remote", "location", "apply")
+            )
         ):
             return None
         if (
@@ -397,19 +404,22 @@ def _listing_record_from_card(
         cleaned_url=cleaned_url,
         page_url=page_url,
     )
-    if not listing_record_supported(
-        cleaned,
-        page_url=page_url,
-        surface=surface,
-        title_is_noise=is_title_noise,
-        url_is_structural=listing_url_is_structural,
-        detail_like_url=(
-            lambda url: listing_detail_like_path(
-                url,
-                is_job=surface.startswith("job_"),
-            )
-        ),
-    ) and not allow_title_only_dom_candidate:
+    if (
+        not listing_record_supported(
+            cleaned,
+            page_url=page_url,
+            surface=surface,
+            title_is_noise=is_title_noise,
+            url_is_structural=listing_url_is_structural,
+            detail_like_url=(
+                lambda url: listing_detail_like_path(
+                    url,
+                    is_job=surface.startswith("job_"),
+                )
+            ),
+        )
+        and not allow_title_only_dom_candidate
+    ):
         return None
     cleaned["_structural_signature"] = listing_fragment_structural_signature(
         card,
@@ -518,13 +528,12 @@ def _structured_listing_stage(
     ):
         if source_name == "js_state":
             continue
-        payload_list = [payload for payload in source_payloads if isinstance(payload, dict)]
-        if (
-            source_name == "embedded_json"
-            and not allow_embedded_json_listing_payloads(
-                payload_list,
-                listing_min_items=listing_min_items,
-            )
+        payload_list = [
+            payload for payload in source_payloads if isinstance(payload, dict)
+        ]
+        if source_name == "embedded_json" and not allow_embedded_json_listing_payloads(
+            payload_list,
+            listing_min_items=listing_min_items,
         ):
             continue
         payloads.extend(payload_list)

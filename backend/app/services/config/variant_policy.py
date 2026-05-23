@@ -43,9 +43,15 @@ VARIANT_AXIS_CANONICAL_MAPPING: dict[frozenset[str], str] = {
         }
     ): COLOR_FIELD,
     frozenset({SIZE_FIELD, "sizes", "frame size", "frame_size"}): SIZE_FIELD,
-    frozenset({"resolution", "resolutions", "display resolution", "display_resolution"}): "resolution",
-    frozenset({"screen size", "screen_size", "display size", "display_size"}): "screen_size",
-    frozenset({"upholstery color", "upholstery_color"}): "upholstery_color",
+    frozenset(
+        {"resolution", "resolutions", "display resolution", "display_resolution"}
+    ): "resolution",
+    frozenset(
+        {"screen size", "screen_size", "display size", "display_size"}
+    ): "screen_size",
+    frozenset(
+        {"upholstery color", "upholstery colour", "upholstery_color"}
+    ): "upholstery_color",
     frozenset({"type", "types"}): "type",
     frozenset({"switch", "switches", "switch type", "switch_type"}): "switches",
     frozenset({"fit", "fits"}): "fit",
@@ -163,6 +169,7 @@ VARIANT_TRANSPORT_FIELDS: tuple[str, ...] = (
     PRICE_FIELD,
     CURRENCY_FIELD,
 )
+SCENT_DOMINANT_URL_TOKENS = frozenset({"body-mist"})
 DETAIL_VARIANT_SIZE_MIN_FOR_NUMERIC_PARENT_DROP = 2
 VARIANT_PARENT_SHARED_FIELDS: tuple[str, ...] = (
     PRICE_FIELD,

@@ -41,7 +41,9 @@ class _NoopMetric:
         return None
 
 
-_registry = _prometheus_client.CollectorRegistry() if _prometheus_client is not None else None
+_registry = (
+    _prometheus_client.CollectorRegistry() if _prometheus_client is not None else None
+)
 
 crawl_runs_total = (
     _prometheus_client.Gauge(
@@ -198,7 +200,9 @@ async def render_prometheus_metrics() -> tuple[bytes, str]:
     try:
         async with SessionLocal() as session:
             rows = await session.execute(
-                select(CrawlRun.status, func.count(CrawlRun.id)).group_by(CrawlRun.status)
+                select(CrawlRun.status, func.count(CrawlRun.id)).group_by(
+                    CrawlRun.status
+                )
             )
             crawl_runs_total.clear()
             for status, count in rows.all():

@@ -15,6 +15,8 @@ from app.services.adapters.algolia_jobs import AlgoliaJobsAdapter
 from app.services.adapters.firestore_jobs import FirestoreJobsAdapter
 from app.services.adapters.jibe import JibeAdapter
 from app.services.adapters.oracle_hcm import OracleHCMAdapter
+from app.services.adapters import remoteok as remoteok_module
+from app.services.adapters.remoteok import RemoteOkAdapter
 from app.services.adapters.registry import registered_adapters, run_adapter
 from app.services.adapters.saashr import SaaSHRAdapter
 from app.services.adapters.shopify import ShopifyAdapter
@@ -34,6 +36,62 @@ from app.services.listing_extractor import (
     extract_listing_records,
 )
 from app.services.shared.text_coerce import is_title_noise
+
+
+def test_remoteok_adapter_swallows_json_decode_errors() -> None:
+    assert RemoteOkAdapter()._extract_remoteok_from_html("<html>not json</html>") == []
+
+
+def test_remoteok_adapter_does_not_swallow_unrelated_value_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def raise_value_error(_value: object) -> object:
+        raise ValueError("parser bug")
+
+    monkeypatch.setattr(remoteok_module.json, "loads", raise_value_error)
+
+    with pytest.raises(ValueError, match="parser bug"):
+        RemoteOkAdapter()._extract_remoteok_from_html("[]")
+
+
+@pytest.mark.asyncio
+async def test_oracle_hcm_adapter_does_not_swallow_runtime_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    adapter = OracleHCMAdapter()
+
+    async def raise_runtime_error(*_args: object, **_kwargs: object) -> object:
+        raise RuntimeError("adapter bug")
+
+    monkeypatch.setattr(adapter, "_request_json", raise_runtime_error)
+    monkeypatch.setattr(adapter, "_extract_site_number", lambda *_args, **_kwargs: "42")
+
+    with pytest.raises(RuntimeError, match="adapter bug"):
+        await adapter.try_public_endpoint(
+            "https://eeho.fa.us2.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1/jobs",
+            "",
+            "job_listing",
+        )
+
+
+@pytest.mark.asyncio
+async def test_oracle_hcm_adapter_does_not_swallow_parser_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    adapter = OracleHCMAdapter()
+
+    async def raise_value_error(*_args: object, **_kwargs: object) -> object:
+        raise ValueError("parser bug")
+
+    monkeypatch.setattr(adapter, "_request_json", raise_value_error)
+    monkeypatch.setattr(adapter, "_extract_site_number", lambda *_args, **_kwargs: "42")
+
+    with pytest.raises(ValueError, match="parser bug"):
+        await adapter.try_public_endpoint(
+            "https://eeho.fa.us2.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1/jobs",
+            "",
+            "job_listing",
+        )
 
 
 class _DummyAdapter(BaseAdapter):
@@ -1009,7 +1067,10 @@ async def test_algolia_jobs_adapter_extracts_public_job_index(
         "posted_date": "1 day ago",
         "description": "Shape AI policy.",
     }
-    assert calls[0][0] == "https://APPID-dsn.algolia.net/1/indexes/jobs_prod_super_ranked/query"
+    assert (
+        calls[0][0]
+        == "https://APPID-dsn.algolia.net/1/indexes/jobs_prod_super_ranked/query"
+    )
     assert calls[0][1]["headers"]["X-Algolia-Application-Id"] == "APPID"
 
 
@@ -1166,7 +1227,10 @@ async def test_jibe_adapter_matches_detail_records_by_slug_like_job_id(
 def test_jibe_extract_search_config_rejects_non_mapping_json() -> None:
     adapter = JibeAdapter()
 
-    assert adapter._extract_search_config('<script>window.searchConfig = [];</script>') == {}
+    assert (
+        adapter._extract_search_config("<script>window.searchConfig = [];</script>")
+        == {}
+    )
 
 
 def test_jibe_normalize_query_value_preserves_falsy_scalars() -> None:
@@ -1368,7 +1432,9 @@ def test_job_listing_filters_remote_category_hub_links() -> None:
     """
 
     assert job_listing_title_is_hub("Remote Marketing Jobs")
-    assert job_listing_url_is_hub("https://euremotejobs.com/jobs/remote-marketing-jobs/")
+    assert job_listing_url_is_hub(
+        "https://euremotejobs.com/jobs/remote-marketing-jobs/"
+    )
     assert extract_listing_records(html, page_url, "job_listing", max_records=10) == []
 
 

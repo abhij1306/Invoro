@@ -9,11 +9,6 @@ export function buildSecurityHeaders(isProduction: boolean) {
   ];
   if (isProduction) {
     headers.push({
-      key: 'Content-Security-Policy',
-      value:
-        "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; base-uri 'self'; frame-ancestors 'none'; object-src 'none'",
-    });
-    headers.push({
       key: 'Strict-Transport-Security',
       value: 'max-age=31536000; includeSubDomains; preload',
     });

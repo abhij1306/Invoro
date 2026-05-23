@@ -324,7 +324,10 @@ async def test_fast_finalize_keeps_location_clear_when_precheck_found_no_signal(
             }
         ],
         networkidle_skip_reason="fast_path_ready",
-        interstitial_diagnostics={"status": "not_found", "reason": "no_location_signal"},
+        interstitial_diagnostics={
+            "status": "not_found",
+            "reason": "no_location_signal",
+        },
     )
 
     result = await browser_page_flow.finalize_browser_fetch(
@@ -474,15 +477,21 @@ async def test_location_interstitial_dismissal_skips_when_no_signal_present() ->
         url = "https://example.com/products/widget"
 
         def locator(self, _selector: str):
-            raise AssertionError("locator probe should be skipped when no signal exists")
+            raise AssertionError(
+                "locator probe should be skipped when no signal exists"
+            )
 
         async def evaluate(self, script: str, payload: dict[str, object]):
             if "selectors" in payload:
                 return False
-            raise AssertionError("dismiss-by-text should be skipped when no signal exists")
+            raise AssertionError(
+                "dismiss-by-text should be skipped when no signal exists"
+            )
 
         async def wait_for_timeout(self, *_args, **_kwargs) -> None:
-            raise AssertionError("wait_for_timeout should be skipped when no signal exists")
+            raise AssertionError(
+                "wait_for_timeout should be skipped when no signal exists"
+            )
 
         async def content(self) -> str:
             raise AssertionError("content should be skipped when no signal exists")
@@ -506,25 +515,28 @@ async def test_serialize_browser_page_content_reuses_prefetched_html_without_pag
         raise AssertionError("analyze_html should not run for prefetched analysis")
 
     monkeypatch.setattr(browser_page_flow, "analyze_html", _unexpected_analyze_html)
-    html, traversal_result, rendered_html, listing_recovery_diagnostics = (
-        await browser_page_flow.serialize_browser_page_content_impl(
-            page,
-            surface="ecommerce_detail",
-            traversal_mode=None,
-            listing_recovery_mode=None,
-            traversal_active=False,
-            timeout_seconds=5,
-            max_pages=1,
-            max_scrolls=1,
-            max_records=1,
-            prefetched_html=html,
-            prefetched_analysis=prefetched_analysis,
-            phase_timings_ms={},
-            execute_listing_traversal=None,
-            recover_listing_page_content=None,
-            elapsed_ms=lambda _started_at: 0,
-            on_event=None,
-        )
+    (
+        html,
+        traversal_result,
+        rendered_html,
+        listing_recovery_diagnostics,
+    ) = await browser_page_flow.serialize_browser_page_content_impl(
+        page,
+        surface="ecommerce_detail",
+        traversal_mode=None,
+        listing_recovery_mode=None,
+        traversal_active=False,
+        timeout_seconds=5,
+        max_pages=1,
+        max_scrolls=1,
+        max_records=1,
+        prefetched_html=None,
+        prefetched_analysis=prefetched_analysis,
+        phase_timings_ms={},
+        execute_listing_traversal=None,
+        recover_listing_page_content=None,
+        elapsed_ms=lambda _started_at: 0,
+        on_event=None,
     )
 
     assert page.content_calls == 0
@@ -534,7 +546,9 @@ async def test_serialize_browser_page_content_reuses_prefetched_html_without_pag
 
 
 @pytest.mark.asyncio
-async def test_settle_browser_page_skips_platform_selector_when_probe_is_ready() -> None:
+async def test_settle_browser_page_skips_platform_selector_when_probe_is_ready() -> (
+    None
+):
     calls = {"probe": 0, "wait": 0}
 
     async def get_page_html_impl(_page):
@@ -612,7 +626,9 @@ def test_detail_expansion_extractability_limits_probe_fields_to_requested(
     def _fake_extractability(*_args, **kwargs):
         nonlocal seen_probe_fields
         raw_probe_fields = kwargs.get("probe_fields")
-        seen_probe_fields = list(raw_probe_fields) if isinstance(raw_probe_fields, list) else None
+        seen_probe_fields = (
+            list(raw_probe_fields) if isinstance(raw_probe_fields, list) else None
+        )
         return {
             "verified": True,
             "matched_requested_fields": ["materials"],
@@ -643,7 +659,9 @@ def test_detail_expansion_extractability_uses_default_dom_probe_fields_without_r
     def _fake_extractability(*_args, **kwargs):
         nonlocal seen_probe_fields
         raw_probe_fields = kwargs.get("probe_fields")
-        seen_probe_fields = list(raw_probe_fields) if isinstance(raw_probe_fields, list) else None
+        seen_probe_fields = (
+            list(raw_probe_fields) if isinstance(raw_probe_fields, list) else None
+        )
         return {
             "verified": False,
             "matched_requested_fields": [],
@@ -1573,6 +1591,27 @@ async def test_probe_browser_readiness_does_not_fast_path_ecommerce_category_car
 
     assert probe["listing_card_count"] == 0
     assert probe["is_ready"] is False
+
+
+def test_ecommerce_ready_card_count_rejects_repeated_product_attribute_tokens() -> None:
+    soup = BeautifulSoup(
+        """
+        <html><body>
+          <div class="product-card-card">
+            <a href="/collections/run"><img src="/run.jpg" alt="Run"></a>
+          </div>
+          <div class="product-card-card">
+            <a href="/collections/hike"><img src="/hike.jpg" alt="Hike"></a>
+          </div>
+          <div class="product-card-card">
+            <a href="/collections/climb"><img src="/climb.jpg" alt="Climb"></a>
+          </div>
+        </body></html>
+        """,
+        "html.parser",
+    )
+
+    assert browser_readiness._ecommerce_ready_card_count(soup) == 0
 
 
 @pytest.mark.asyncio
@@ -4224,7 +4263,9 @@ async def test_recover_browser_challenge_runs_for_real_chrome() -> None:
 
 @pytest.mark.asyncio
 async def test_recover_browser_challenge_waits_on_provider_low_content_shell() -> None:
-    original_response = SimpleNamespace(status=200, headers={"content-type": "text/html"})
+    original_response = SimpleNamespace(
+        status=200, headers={"content-type": "text/html"}
+    )
 
     class _Page:
         def __init__(self) -> None:

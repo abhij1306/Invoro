@@ -58,7 +58,9 @@ CURRENCY_RE = re.compile(r"^[A-Z]{3}$")
 PRICE_RE = re.compile(r"^\d+(?:\.\d{1,2})?$")
 URL_RE = re.compile(r"^https?://", re.I)
 NOISE_RES = [re.compile(pattern, re.I) for pattern in NOISE_PATTERNS]
-APPAREL_VARIANT_HINT_RES = [re.compile(pattern, re.I) for pattern in APPAREL_VARIANT_HINT_PATTERNS]
+APPAREL_VARIANT_HINT_RES = [
+    re.compile(pattern, re.I) for pattern in APPAREL_VARIANT_HINT_PATTERNS
+]
 
 
 @dataclass(slots=True)
@@ -127,7 +129,20 @@ def _price_number(value: Any) -> float | None:
 
 
 def _variant_signature(variant: dict[str, Any]) -> tuple[tuple[str, str], ...]:
-    keys = [k for k in variant.keys() if k not in {"url", "image_url", "price", "currency", "availability", "sku", "barcode"}]
+    keys = [
+        k
+        for k in variant.keys()
+        if k
+        not in {
+            "url",
+            "image_url",
+            "price",
+            "currency",
+            "availability",
+            "sku",
+            "barcode",
+        }
+    ]
     parts = []
     for key in sorted(keys):
         parts.append((key, _safe_str(variant.get(key))))
@@ -153,7 +168,9 @@ def _find_missing_fields(record: dict[str, Any], issues: list[Issue]) -> None:
     for field in DEFAULT_REQUIRED_FIELDS:
         value = record.get(field)
         if value in (None, "", [], {}):
-            issues.append(Issue("missing_fields", "high", field, f"missing or empty `{field}`"))
+            issues.append(
+                Issue("missing_fields", "high", field, f"missing or empty `{field}`")
+            )
     if not any(_safe_str(record.get(key)) for key in ("sku", "barcode", "part_number")):
         issues.append(
             Issue(
@@ -172,11 +189,21 @@ def _find_incorrect_fields(record: dict[str, Any], issues: list[Issue]) -> None:
 
     price = record.get("price")
     if price not in (None, "") and not _looks_price(price):
-        issues.append(Issue("incorrect_data", "high", "price", "price not numeric string", price))
+        issues.append(
+            Issue("incorrect_data", "high", "price", "price not numeric string", price)
+        )
 
     currency = record.get("currency")
     if currency not in (None, "") and not _looks_currency(currency):
-        issues.append(Issue("incorrect_data", "medium", "currency", "currency not 3-letter ISO", currency))
+        issues.append(
+            Issue(
+                "incorrect_data",
+                "medium",
+                "currency",
+                "currency not 3-letter ISO",
+                currency,
+            )
+        )
 
     availability = _safe_str(record.get("availability")).lower()
     if availability and availability not in AVAILABILITY_ALLOWED:
@@ -199,7 +226,12 @@ def _find_incorrect_fields(record: dict[str, Any], issues: list[Issue]) -> None:
             issues.append(Issue("logical_errors", "high", key, "negative price", value))
 
     brand = _safe_str(record.get("brand"))
-    if brand and re.search(r"[a-z]", brand) and brand == brand.lower() and len(brand) >= 4:
+    if (
+        brand
+        and re.search(r"[a-z]", brand)
+        and brand == brand.lower()
+        and len(brand) >= 4
+    ):
         issues.append(
             Issue(
                 "incorrect_data",
@@ -223,7 +255,11 @@ def _find_incorrect_fields(record: dict[str, Any], issues: list[Issue]) -> None:
         )
 
     size = _safe_str(record.get("size"))
-    if size and re.fullmatch(r"\d(?:\.\d+)?", size) and len(_safe_list(record.get("variants"))) > 0:
+    if (
+        size
+        and re.fullmatch(r"\d(?:\.\d+)?", size)
+        and len(_safe_list(record.get("variants"))) > 0
+    ):
         issues.append(
             Issue(
                 "incorrect_data",
@@ -243,7 +279,15 @@ def _find_pollution(record: dict[str, Any], issues: list[Issue]) -> None:
             if not text:
                 continue
             if _is_noise_text(text):
-                issues.append(Issue("polluted_data", "medium", field, "UI/control noise pattern in text", text[:200]))
+                issues.append(
+                    Issue(
+                        "polluted_data",
+                        "medium",
+                        field,
+                        "UI/control noise pattern in text",
+                        text[:200],
+                    )
+                )
             if field == "description":
                 trailing = re.search(r"((?:\b\d{1,2}(?:\.5)?\b\s*){8,})$", text)
                 if trailing:
@@ -256,7 +300,9 @@ def _find_pollution(record: dict[str, Any], issues: list[Issue]) -> None:
                             trailing.group(1).strip()[:200],
                         )
                     )
-                if re.search(r"read reviews and buy .* at target\. choose from", text, re.I):
+                if re.search(
+                    r"read reviews and buy .* at target\. choose from", text, re.I
+                ):
                     issues.append(
                         Issue(
                             "polluted_data",
@@ -281,7 +327,10 @@ def _find_pollution(record: dict[str, Any], issues: list[Issue]) -> None:
                     continue
                 if _is_noise_text(item_text):
                     noisy_samples.append(item_text[:160])
-                if field in {"features", "description"} and _text_token_count(item_text) <= 2:
+                if (
+                    field in {"features", "description"}
+                    and _text_token_count(item_text) <= 2
+                ):
                     tiny_token_ratio_hits += 1
             if noisy_samples:
                 issues.append(
@@ -293,7 +342,11 @@ def _find_pollution(record: dict[str, Any], issues: list[Issue]) -> None:
                         noisy_samples[:5],
                     )
                 )
-            if field == "features" and len(value) >= 8 and tiny_token_ratio_hits >= max(4, len(value) // 2):
+            if (
+                field == "features"
+                and len(value) >= 8
+                and tiny_token_ratio_hits >= max(4, len(value) // 2)
+            ):
                 issues.append(
                     Issue(
                         "polluted_data",
@@ -340,7 +393,9 @@ def _find_pollution(record: dict[str, Any], issues: list[Issue]) -> None:
                 url_like_tags = [
                     _safe_str(item)
                     for item in value
-                    if re.search(r"(?:^/shop/product/|https?://)", _safe_str(item), re.I)
+                    if re.search(
+                        r"(?:^/shop/product/|https?://)", _safe_str(item), re.I
+                    )
                 ]
                 if len(url_like_tags) >= 3:
                     issues.append(
@@ -364,7 +419,11 @@ def _normalized_image_key(url: str) -> str:
 
 def _find_image_issues(record: dict[str, Any], issues: list[Issue]) -> None:
     image_url = _safe_str(record.get("image_url"))
-    additional = [_safe_str(item) for item in _safe_list(record.get("additional_images")) if _safe_str(item)]
+    additional = [
+        _safe_str(item)
+        for item in _safe_list(record.get("additional_images"))
+        if _safe_str(item)
+    ]
     all_images = [item for item in [image_url, *additional] if item]
     if not all_images:
         return
@@ -382,7 +441,11 @@ def _find_image_issues(record: dict[str, Any], issues: list[Issue]) -> None:
         )
 
     if len(additional) >= 8:
-        norm = [_normalized_image_key(url) for url in additional if _normalized_image_key(url)]
+        norm = [
+            _normalized_image_key(url)
+            for url in additional
+            if _normalized_image_key(url)
+        ]
         if norm:
             unique = len(set(norm))
             duplicate_ratio = 1 - (unique / max(1, len(norm)))
@@ -399,7 +462,8 @@ def _find_image_issues(record: dict[str, Any], issues: list[Issue]) -> None:
 
 
 def _looks_like_variant_expected(record: dict[str, Any]) -> bool:
-    host = _host_from_url(_safe_str(record.get("url")))
+    url = _safe_str(record.get("url"))
+    host = _host_from_url(url)
     if "discogs.com" in host:
         return False
     text = " ".join(
@@ -411,10 +475,8 @@ def _looks_like_variant_expected(record: dict[str, Any]) -> bool:
     )
     if any(rx.search(text) for rx in APPAREL_VARIANT_HINT_RES):
         return True
-    url = _safe_str(record.get("url")).lower()
-    if re.search(r"/(sneaker|shoe|footwear|apparel|clothing)/", url):
+    if re.search(r"/(sneaker|shoe|footwear|apparel|clothing)/", url.lower()):
         return True
-    host = _host_from_url(url)
     if host in {"www.goat.com", "stockx.com", "www.size.co.uk", "www.endclothing.com"}:
         return True
     desc = _safe_str(record.get("description"))
@@ -445,7 +507,15 @@ def _find_variant_issues(record: dict[str, Any], issues: list[Issue]) -> None:
                     )
                 )
         except ValueError:
-            issues.append(Issue("incorrect_data", "medium", "variant_count", "variant_count not int", variant_count))
+            issues.append(
+                Issue(
+                    "incorrect_data",
+                    "medium",
+                    "variant_count",
+                    "variant_count not int",
+                    variant_count,
+                )
+            )
 
     if not variants:
         if _looks_like_variant_expected(record):
@@ -460,7 +530,15 @@ def _find_variant_issues(record: dict[str, Any], issues: list[Issue]) -> None:
         return
 
     if len(variants) >= 80:
-        issues.append(Issue("incorrect_variants", "high", "variants", "suspiciously high variant volume", len(variants)))
+        issues.append(
+            Issue(
+                "incorrect_variants",
+                "high",
+                "variants",
+                "suspiciously high variant volume",
+                len(variants),
+            )
+        )
 
     noisy_variant_rows = 0
     duplicate_signatures = 0
@@ -468,16 +546,40 @@ def _find_variant_issues(record: dict[str, Any], issues: list[Issue]) -> None:
 
     for idx, variant in enumerate(variants):
         if not isinstance(variant, dict):
-            issues.append(Issue("incorrect_variants", "high", "variants", f"variant index {idx} not object", variant))
+            issues.append(
+                Issue(
+                    "incorrect_variants",
+                    "high",
+                    "variants",
+                    f"variant index {idx} not object",
+                    variant,
+                )
+            )
             continue
 
         variant_url = _safe_str(variant.get("url"))
         if variant_url and not URL_RE.match(variant_url):
-            issues.append(Issue("incorrect_variants", "medium", "variants.url", "variant url not http/https", variant_url))
+            issues.append(
+                Issue(
+                    "incorrect_variants",
+                    "medium",
+                    "variants.url",
+                    "variant url not http/https",
+                    variant_url,
+                )
+            )
 
         v_price = variant.get("price")
         if v_price not in (None, "") and not _looks_price(v_price):
-            issues.append(Issue("incorrect_variants", "medium", "variants.price", "variant price not numeric", v_price))
+            issues.append(
+                Issue(
+                    "incorrect_variants",
+                    "medium",
+                    "variants.price",
+                    "variant price not numeric",
+                    v_price,
+                )
+            )
 
         for key, value in variant.items():
             if key in {"url", "image_url"}:
@@ -515,7 +617,10 @@ def _find_variant_issues(record: dict[str, Any], issues: list[Issue]) -> None:
                 "medium",
                 "variants",
                 "many duplicate variant attribute signatures",
-                {"duplicate_signatures": duplicate_signatures, "total_variants": len(variants)},
+                {
+                    "duplicate_signatures": duplicate_signatures,
+                    "total_variants": len(variants),
+                },
             )
         )
 
@@ -556,9 +661,17 @@ def _find_logical_errors(record: dict[str, Any], issues: list[Issue]) -> None:
     title = _safe_str(record.get("title"))
     description = _safe_str(record.get("description"))
     if title and description and title.lower() == description.lower():
-        issues.append(Issue("logical_errors", "low", "description", "description identical to title"))
+        issues.append(
+            Issue(
+                "logical_errors", "low", "description", "description identical to title"
+            )
+        )
     product_details = _safe_str(record.get("product_details"))
-    if description and product_details and description[:200].lower() == product_details[:200].lower():
+    if (
+        description
+        and product_details
+        and description[:200].lower() == product_details[:200].lower()
+    ):
         issues.append(
             Issue(
                 "logical_errors",
@@ -574,7 +687,11 @@ def _find_logical_errors(record: dict[str, Any], issues: list[Issue]) -> None:
         discogs_noise = [
             token
             for token in tags
-            if re.search(r"(labelrelationship|phonographic_copyright|published_by|distributed_by)", token, re.I)
+            if re.search(
+                r"(labelrelationship|phonographic_copyright|published_by|distributed_by)",
+                token,
+                re.I,
+            )
         ]
         if discogs_noise:
             issues.append(
@@ -633,7 +750,9 @@ def _to_records(payload: Any) -> list[dict[str, Any]]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Audit crawler JSON output and emit agent-ready issue report.")
+    parser = argparse.ArgumentParser(
+        description="Audit crawler JSON output and emit agent-ready issue report."
+    )
     parser.add_argument("--input", required=True, help="Path to JSON file.")
     parser.add_argument(
         "--output-dir",
@@ -680,7 +799,9 @@ def main() -> int:
         "generated_at_utc": generated_iso,
         "record_count": len(audited),
         "records_with_issues": sum(1 for row in audited if row["issue_count"] > 0),
-        "severity_counts": dict(sorted(Counter(row["max_severity"] for row in audited).items())),
+        "severity_counts": dict(
+            sorted(Counter(row["max_severity"] for row in audited).items())
+        ),
         "category_counts": dict(sorted(weighted_category_counts.items())),
     }
 

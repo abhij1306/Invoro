@@ -1,6 +1,7 @@
 # RemoteOK JSON/HTML adapter.
 from __future__ import annotations
-from json import loads as parse_json
+
+import json
 
 from app.services.adapters.base import AdapterResult, BaseAdapter
 from app.services.shared.field_coerce import safe_int as _safe_int
@@ -13,14 +14,16 @@ class RemoteOkAdapter(BaseAdapter):
     async def can_handle(self, url: str, html: str) -> bool:
         return self._matches_platform_family(url, html)
 
-    async def extract(self, url: str, html: str, surface: str, proxy: str | None = None) -> AdapterResult:
+    async def extract(
+        self, url: str, html: str, surface: str, proxy: str | None = None
+    ) -> AdapterResult:
         return self._result(self._extract_remoteok_from_html(html))
 
     def _extract_remoteok_from_html(self, html: str) -> list[dict]:
         """Extract RemoteOK jobs from rendered HTML or a JSON body."""
         try:
-            data = parse_json(str(html or "").strip())
-        except ValueError:
+            data = json.loads(str(html or "").strip())
+        except json.JSONDecodeError:
             return []
 
         if not isinstance(data, list):

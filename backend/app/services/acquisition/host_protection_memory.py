@@ -56,7 +56,9 @@ def _suppress_all():
     except MemoryError:
         raise
     except Exception:
-        logger.warning("Suppressed host protection memory cleanup failure", exc_info=True)
+        logger.warning(
+            "Suppressed host protection memory cleanup failure", exc_info=True
+        )
 
 
 def _now() -> datetime:
@@ -312,7 +314,7 @@ async def note_host_hard_block(
     row.last_block_method = _coerce_method(method) or None
     row.last_blocked_at = now
     threshold = max(1, int(crawler_runtime_settings.browser_first_host_block_threshold))
-    if row.last_block_vendor or row.last_block_status_code in {403, 429} or row.hard_block_count >= threshold:
+    if row.hard_block_count >= threshold:
         row.browser_first_until = now + _ttl_delta(ttl_seconds)
     await session.flush()
     return await load_host_protection_policy(
@@ -401,7 +403,9 @@ async def _load_row(
         result = await session.execute(
             select(HostProtectionMemory)
             .where(HostProtectionMemory.host == host)
-            .order_by(HostProtectionMemory.updated_at.desc(), HostProtectionMemory.id.desc())
+            .order_by(
+                HostProtectionMemory.updated_at.desc(), HostProtectionMemory.id.desc()
+            )
             .limit(1)
         )
     except (IntegrityError, OperationalError, ProgrammingError) as exc:

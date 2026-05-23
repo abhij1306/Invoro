@@ -62,8 +62,10 @@ async def test_run_prompt_task_returns_validated_payload(
     db_session: AsyncSession,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    async def fake_resolve_run_config(session, *, run_id, task_type):
-        del session, run_id, task_type
+    async def fake_resolve_run_config(
+        session, *, run_id, task_type, config_snapshot=None
+    ):
+        del session, run_id, task_type, config_snapshot
         return {"provider": "groq", "model": "llama", "api_key_encrypted": ""}
 
     def fake_get_prompt_task(task_type: str):
@@ -135,8 +137,10 @@ async def test_run_prompt_task_returns_typed_provider_failure(
     db_session: AsyncSession,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    async def fake_resolve_run_config(session, *, run_id, task_type):
-        del session, run_id, task_type
+    async def fake_resolve_run_config(
+        session, *, run_id, task_type, config_snapshot=None
+    ):
+        del session, run_id, task_type, config_snapshot
         return {"provider": "groq", "model": "llama", "api_key_encrypted": ""}
 
     def fake_get_prompt_task(task_type: str):
@@ -213,8 +217,10 @@ async def test_run_prompt_task_blocks_uncached_provider_calls_over_run_cap(
         surface="ecommerce_detail",
     )
 
-    async def fake_resolve_run_config(session, *, run_id, task_type):
-        del session, run_id, task_type
+    async def fake_resolve_run_config(
+        session, *, run_id, task_type, config_snapshot=None
+    ):
+        del session, run_id, task_type, config_snapshot
         return {"provider": "groq", "model": "llama", "api_key_encrypted": ""}
 
     def fake_get_prompt_task(_task_type: str):
@@ -290,8 +296,10 @@ async def test_run_prompt_task_budget_scope_is_independent_from_run_cap(
         surface="ecommerce_detail",
     )
 
-    async def fake_resolve_run_config(session, *, run_id, task_type):
-        del session, run_id, task_type
+    async def fake_resolve_run_config(
+        session, *, run_id, task_type, config_snapshot=None
+    ):
+        del session, run_id, task_type, config_snapshot
         return {"provider": "groq", "model": "llama", "api_key_encrypted": ""}
 
     def fake_get_prompt_task(_task_type: str):
@@ -372,8 +380,10 @@ async def test_run_prompt_task_returns_timeout_when_provider_exceeds_call_timeou
     db_session: AsyncSession,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    async def fake_resolve_run_config(session, *, run_id, task_type):
-        del session, run_id, task_type
+    async def fake_resolve_run_config(
+        session, *, run_id, task_type, config_snapshot=None
+    ):
+        del session, run_id, task_type, config_snapshot
         return {"provider": "groq", "model": "llama", "api_key_encrypted": ""}
 
     def fake_get_prompt_task(_task_type: str):
@@ -434,8 +444,10 @@ async def test_run_prompt_task_validates_direct_record_extraction_array_payload(
     db_session: AsyncSession,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    async def fake_resolve_run_config(session, *, run_id, task_type):
-        del session, run_id, task_type
+    async def fake_resolve_run_config(
+        session, *, run_id, task_type, config_snapshot=None
+    ):
+        del session, run_id, task_type, config_snapshot
         return {"provider": "groq", "model": "llama", "api_key_encrypted": ""}
 
     def fake_get_prompt_task(task_type: str):
@@ -500,8 +512,10 @@ async def test_run_prompt_task_rejects_invalid_product_intelligence_enrichment(
     db_session: AsyncSession,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    async def fake_resolve_run_config(session, *, run_id, task_type):
-        del session, run_id, task_type
+    async def fake_resolve_run_config(
+        session, *, run_id, task_type, config_snapshot=None
+    ):
+        del session, run_id, task_type, config_snapshot
         return {"provider": "groq", "model": "llama", "api_key_encrypted": ""}
 
     def fake_get_prompt_task(task_type: str):
@@ -565,8 +579,10 @@ async def test_run_prompt_task_rejects_unknown_product_intelligence_reason_keys(
     db_session: AsyncSession,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    async def fake_resolve_run_config(session, *, run_id, task_type):
-        del session, run_id, task_type
+    async def fake_resolve_run_config(
+        session, *, run_id, task_type, config_snapshot=None
+    ):
+        del session, run_id, task_type, config_snapshot
         return {"provider": "groq", "model": "llama", "api_key_encrypted": ""}
 
     def fake_get_prompt_task(_task_type: str):

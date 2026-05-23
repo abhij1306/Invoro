@@ -293,14 +293,17 @@ def classify_blocked_page(
         blocked
         and has_extractable_content
         and not title_matches
-        and "captcha" not in strong_hits
         and (not hard_strong_hits or hard_strong_hits <= {"captcha"})
     ):
         blocked = False
     return BlockPageClassification(
         blocked=blocked,
         outcome=(
-            forced_outcome if blocked and forced_blocked else "challenge_page" if blocked else "ok"
+            forced_outcome
+            if blocked and forced_blocked
+            else "challenge_page"
+            if blocked
+            else "ok"
         ),
         evidence=evidence,
         provider_hits=sorted(provider_hits),

@@ -11,6 +11,7 @@ from app.services.config.public_record_policy import (
 from app.services.config.variant_policy import (
     FLAT_VARIANT_KEYS,
     PUBLIC_VARIANT_AXIS_FIELDS,
+    SCENT_DOMINANT_URL_TOKENS,
     VARIANT_PARENT_SHARED_FIELDS,
     VARIANT_TRANSPORT_FIELDS,
 )
@@ -73,9 +74,10 @@ def _coerce_variant_transport_value(
     raw_variant: dict[str, Any],
     page_url: str,
 ) -> object | None:
-    if field_name in {PRICE_FIELD, "original_price"} and _variant_row_looks_like_shopify_raw(
-        raw_variant
-    ):
+    if field_name in {
+        PRICE_FIELD,
+        "original_price",
+    } and _variant_row_looks_like_shopify_raw(raw_variant):
         normalized = normalize_decimal_price(value, interpret_integral_as_cents=True)
         if normalized not in (None, ""):
             return normalized
@@ -144,7 +146,10 @@ def flatten_variants_for_public_output(
                 continue
             merged[axis_key] = value_text
             has_option_axis = True
-        if text_or_none(merged.get("scent")) and "body-mist" in str(page_url or "").casefold():
+        if text_or_none(merged.get("scent")) and any(
+            token in str(page_url or "").casefold()
+            for token in SCENT_DOMINANT_URL_TOKENS
+        ):
             merged.pop("color", None)
         if merged and (
             has_option_axis

@@ -6,6 +6,7 @@ Usage:
     set PYTHONPATH=.
     .venv\Scripts\python.exe run_google_native_search_smoke.py "nike air max buy"
 """
+
 from __future__ import annotations
 
 import argparse
@@ -92,7 +93,8 @@ async def _run(query: str, *, limit: int, min_results: int, screenshot: bool) ->
                 GOOGLE_NATIVE_SEARCH_INPUT_SELECTOR,
                 query,
             )
-            if int(typed.get("typed_chars", 0) or 0) > 0:
+            typed_chars = typed.get("typed_chars", 0)
+            if isinstance(typed_chars, int) and typed_chars > 0:
                 keyboard = getattr(page, "keyboard", None)
                 press = getattr(keyboard, "press", None)
                 if callable(press):
@@ -109,7 +111,9 @@ async def _run(query: str, *, limit: int, min_results: int, screenshot: bool) ->
                     wait_until="domcontentloaded",
                     timeout=int(GOOGLE_NATIVE_NAVIGATION_TIMEOUT_MS),
                 )
-                page_status = int(getattr(response, "status", page_status) or page_status)
+                page_status = int(
+                    getattr(response, "status", page_status) or page_status
+                )
                 await page.wait_for_timeout(int(GOOGLE_NATIVE_RESULT_WAIT_MS))
             html = await get_page_html(page)
             html_path.write_text(html, encoding="utf-8")
@@ -138,7 +142,9 @@ async def _run(query: str, *, limit: int, min_results: int, screenshot: bool) ->
                 "blocked": bool(classification.blocked),
                 "block_outcome": str(classification.outcome or ""),
                 "challenge_provider_hits": list(classification.provider_hits or []),
-                "challenge_element_hits": list(classification.challenge_element_hits or []),
+                "challenge_element_hits": list(
+                    classification.challenge_element_hits or []
+                ),
                 "challenge_evidence": list(classification.evidence or [])[:10],
                 "behavior": behavior,
                 "typed": typed,
@@ -148,7 +154,9 @@ async def _run(query: str, *, limit: int, min_results: int, screenshot: bool) ->
                 "artifacts": {
                     "report": str(report_path),
                     "html": str(html_path),
-                    "screenshot": str(screenshot_path) if screenshot_path.exists() else "",
+                    "screenshot": str(screenshot_path)
+                    if screenshot_path.exists()
+                    else "",
                 },
             }
             report_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")

@@ -19,6 +19,7 @@ async def recover_browser_challenge(
     url: str,
     response: Any,
     browser_engine: str | None = None,
+    _browser_engine: str | None = None,
     timeout_seconds: float,
     phase_timings_ms: dict[str, int],
     challenge_wait_max_seconds: float,
@@ -29,7 +30,8 @@ async def recover_browser_challenge(
     get_page_html,
     looks_like_low_content_shell=None,
 ):
-    del browser_engine
+    _browser_engine = _browser_engine or browser_engine
+    del _browser_engine
     phase_timings_ms.setdefault("challenge_wait", 0)
     phase_timings_ms.setdefault("challenge_retry", 0)
     max_wait_seconds = max(0.0, float(challenge_wait_max_seconds or 0))
@@ -56,7 +58,9 @@ async def recover_browser_challenge(
     deadline = wait_started_at + max_wait_seconds
     while time.perf_counter() < deadline:
         await _emit_challenge_activity(page)
-        if "akamai" in providers and await _page_has_cookie(page, url=url, name="_abck"):
+        if "akamai" in providers and await _page_has_cookie(
+            page, url=url, name="_abck"
+        ):
             html = await get_page_html(page)
             classification = await classify_blocked_page(
                 html,
@@ -100,7 +104,9 @@ async def recover_browser_challenge(
         phase_timings_ms["challenge_retry"] = elapsed_ms(retry_started_at)
         return response
     phase_timings_ms["challenge_retry"] = elapsed_ms(retry_started_at)
-    retry_status_code = int(getattr(retried_response, "status", status_code) or status_code)
+    retry_status_code = int(
+        getattr(retried_response, "status", status_code) or status_code
+    )
     try:
         retry_html = await get_page_html(page)
         retry_classification = await classify_blocked_page(
@@ -236,12 +242,16 @@ async def _emit_challenge_activity(page: Any) -> None:
             _mark_mouse_move(mouse)
             for _ in range(jitter_moves):
                 target_x = _clamp_mouse_coordinate(
-                    current_x + secrets.randbelow(jitter_delta_px * 2) - jitter_delta_px,
+                    current_x
+                    + secrets.randbelow(jitter_delta_px * 2)
+                    - jitter_delta_px,
                     width,
                     edge_padding,
                 )
                 target_y = _clamp_mouse_coordinate(
-                    current_y + secrets.randbelow(jitter_delta_px * 2) - jitter_delta_px,
+                    current_y
+                    + secrets.randbelow(jitter_delta_px * 2)
+                    - jitter_delta_px,
                     height,
                     edge_padding,
                 )
@@ -302,7 +312,9 @@ async def emit_browser_behavior_activity(page: Any) -> dict[str, object]:
     }
 
 
-async def type_text_like_human(page: Any, selector: str, text: str) -> dict[str, object]:
+async def type_text_like_human(
+    page: Any, selector: str, text: str
+) -> dict[str, object]:
     target_selector = str(selector or "").strip()
     target_text = str(text or "")
     if not target_selector or not target_text:
@@ -316,7 +328,9 @@ async def type_text_like_human(page: Any, selector: str, text: str) -> dict[str,
         locator = locator_factory(target_selector)
         click = getattr(locator, "click", None)
         if callable(click):
-            await click(timeout=int(crawler_runtime_settings.traversal_click_timeout_ms))
+            await click(
+                timeout=int(crawler_runtime_settings.traversal_click_timeout_ms)
+            )
         for character in target_text:
             type_fn = getattr(keyboard, "type", None)
             if not callable(type_fn):
@@ -339,7 +353,9 @@ async def _emit_scroll_physics(page: Any) -> int:
         return 0
     steps = max(0, int(crawler_runtime_settings.browser_behavior_scroll_steps or 0))
     min_px = max(0, int(crawler_runtime_settings.browser_behavior_scroll_min_px or 0))
-    max_px = max(min_px, int(crawler_runtime_settings.browser_behavior_scroll_max_px or 0))
+    max_px = max(
+        min_px, int(crawler_runtime_settings.browser_behavior_scroll_max_px or 0)
+    )
     if steps <= 0 or max_px <= 0:
         return 0
     emitted = 0
@@ -359,15 +375,21 @@ async def _emit_scroll_physics(page: Any) -> int:
 
 def _behavior_pause_ms() -> int:
     pause_ms = max(0, int(crawler_runtime_settings.browser_behavior_pause_min_ms or 0))
-    jitter_ms = max(0, int(crawler_runtime_settings.browser_behavior_pause_jitter_ms or 0))
+    jitter_ms = max(
+        0, int(crawler_runtime_settings.browser_behavior_pause_jitter_ms or 0)
+    )
     if jitter_ms:
         pause_ms += secrets.randbelow(jitter_ms)
     return pause_ms
 
 
 def _typing_delay_ms() -> int:
-    delay_ms = max(0, int(crawler_runtime_settings.browser_behavior_typing_min_delay_ms or 0))
-    jitter_ms = max(0, int(crawler_runtime_settings.browser_behavior_typing_jitter_ms or 0))
+    delay_ms = max(
+        0, int(crawler_runtime_settings.browser_behavior_typing_min_delay_ms or 0)
+    )
+    jitter_ms = max(
+        0, int(crawler_runtime_settings.browser_behavior_typing_jitter_ms or 0)
+    )
     if jitter_ms:
         delay_ms += secrets.randbelow(jitter_ms)
     return delay_ms
@@ -447,10 +469,10 @@ async def capture_rendered_listing_fragments(
     if not isinstance(snapshot, list):
         return []
     return [
-        str(item).strip()
-        for item in snapshot[: int(limit)]
-        if str(item or "").strip()
+        str(item).strip() for item in snapshot[: int(limit)] if str(item or "").strip()
     ]
+
+
 async def _page_has_cookie(page: Any, *, url: str, name: str) -> bool:
     context = getattr(page, "context", None)
     cookies_fn = getattr(context, "cookies", None)

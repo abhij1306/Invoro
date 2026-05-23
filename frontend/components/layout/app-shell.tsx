@@ -201,7 +201,7 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
         </a>
         <div className="app-shell-grid">
           <Sidebar pathname={pathname} />
-          <ShellContent pathname={pathname} canResetWorkspace={authQuery.data.role === 'admin'}>
+          <ShellContent pathname={pathname} canResetWorkspace={authQuery.data?.role === 'admin'}>
             {children}
           </ShellContent>
         </div>

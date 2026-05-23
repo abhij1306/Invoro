@@ -48,7 +48,7 @@ _ECOMMERCE_READY_PRICE_RE = re.compile(
     re.I,
 )
 _ECOMMERCE_READY_PRODUCT_ATTR_RE = re.compile(
-    r"product(?:[-_ ]?(?:card|item|tile|grid)|pod|base)",
+    r"\bproduct[-_ ]?(?:cards?|items?|tiles?|grid|pod|base)(?=$|[^A-Za-z0-9_-])",
     re.I,
 )
 _ECOMMERCE_READY_DETAIL_PATH_RE = re.compile(
@@ -99,7 +99,9 @@ async def wait_for_listing_readiness_impl(
     if not override:
         return {}
     raw_selectors = override.get("selectors")
-    if not isinstance(raw_selectors, Iterable) or isinstance(raw_selectors, (str, bytes)):
+    if not isinstance(raw_selectors, Iterable) or isinstance(
+        raw_selectors, (str, bytes)
+    ):
         return {}
     selectors = [
         str(selector or "").strip()
@@ -214,8 +216,10 @@ async def probe_browser_readiness_impl(
             structured_data_present
             or (
                 detail_like
-                and detail_hints >= int(crawler_runtime_settings.detail_field_signal_min_count)
-                and visible_text_length >= int(crawler_runtime_settings.browser_readiness_visible_text_min)
+                and detail_hints
+                >= int(crawler_runtime_settings.detail_field_signal_min_count)
+                and visible_text_length
+                >= int(crawler_runtime_settings.browser_readiness_visible_text_min)
             )
         )
     elif is_listing:
@@ -276,7 +280,9 @@ def _ecommerce_ready_card_count(soup: BeautifulSoup) -> int:
 
 def _ecommerce_node_has_product_evidence(node: Any) -> bool:
     attrs = getattr(node, "attrs", {}) or {}
-    text = clean_text(node.get_text(" ", strip=True) if hasattr(node, "get_text") else "")
+    text = clean_text(
+        node.get_text(" ", strip=True) if hasattr(node, "get_text") else ""
+    )
     signature = " ".join(
         str(attrs.get(key) or "")
         for key in (
@@ -297,14 +303,19 @@ def _ecommerce_node_has_product_evidence(node: Any) -> bool:
     )
     itemtype = str(attrs.get("itemtype") or "")
     has_product_itemtype = "product" in itemtype.lower() or bool(
-        hasattr(node, "select_one") and node.select_one("[itemscope][itemtype*='Product']")
+        hasattr(node, "select_one")
+        and node.select_one("[itemscope][itemtype*='Product']")
     )
     has_price = bool(_ECOMMERCE_READY_PRICE_RE.search(text))
-    has_media = bool(hasattr(node, "select_one") and node.select_one("img, picture, source"))
+    has_media = bool(
+        hasattr(node, "select_one") and node.select_one("img, picture, source")
+    )
     links = node.select("a[href]")[:8] if hasattr(node, "select") else []
     hrefs = [str(link.get("href") or "").strip() for link in links]
     has_link = any(href and not href.startswith(("#", "javascript:")) for href in hrefs)
-    has_detail_link = any(_ECOMMERCE_READY_DETAIL_PATH_RE.search(href) for href in hrefs)
+    has_detail_link = any(
+        _ECOMMERCE_READY_DETAIL_PATH_RE.search(href) for href in hrefs
+    )
     if has_product_id or has_product_itemtype:
         return True
     if has_price and (has_link or has_media):
@@ -346,7 +357,9 @@ def classify_browser_outcome_impl(
     if block_classification.blocked or blocked:
         return "challenge_page"
     low_content_shell = looks_like_low_content_shell(html, html_bytes=html_bytes)
-    if traversal_result is not None and bool(getattr(traversal_result, "activated", False)):
+    if traversal_result is not None and bool(
+        getattr(traversal_result, "activated", False)
+    ):
         progress_events = int(getattr(traversal_result, "progress_events", 0) or 0)
         card_count = int(getattr(traversal_result, "card_count", 0) or 0)
         stop_reason = str(getattr(traversal_result, "stop_reason", "") or "").strip()
@@ -373,7 +386,13 @@ def classify_low_content_reason_impl(html: str, *, html_bytes: int) -> str | Non
         return None
     if any(
         token in analysis.lowered_html
-        for token in ("product", "jobposting", "__next_data__", "__nuxt__", "application/ld+json")
+        for token in (
+            "product",
+            "jobposting",
+            "__next_data__",
+            "__nuxt__",
+            "application/ld+json",
+        )
     ):
         return None
     lowered_text = analysis.normalized_text.lower()
@@ -389,14 +408,15 @@ def visible_text_from_soup(soup: BeautifulSoup) -> str:
     for node in soup.find_all(string=True):
         if isinstance(node, Comment):
             continue
-        parent_name = str(getattr(getattr(node, "parent", None), "name", "") or "").lower()
+        parent_name = str(
+            getattr(getattr(node, "parent", None), "name", "") or ""
+        ).lower()
         if parent_name in {"script", "style", "noscript"}:
             continue
         text = clean_text(str(node))
         if text:
             pieces.append(text)
     return clean_text(" ".join(pieces))
-
 
 
 async def wait_for_listing_readiness(

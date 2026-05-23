@@ -1,8 +1,27 @@
 from __future__ import annotations
 
+from app.services.config.extraction_rules import DETAIL_VARIANT_CONTEXT_NOISE_TOKENS
+
 DETAIL_VARIANT_CONTEXT_NOISE_TOKENS_EXTRA = (
-    "tabs", "tab-list", "tablist", "tab-nav", "reviews", "review-section",
-    "ratings", "social", "share-bar", "protection", "warranty",
+    "tabs",
+    "tab-list",
+    "tablist",
+    "tab-nav",
+    "reviews",
+    "review-section",
+    "ratings",
+    "social",
+    "share-bar",
+    "protection",
+    "warranty",
+)
+VARIANT_CONTEXT_NOISE_TOKENS = frozenset(
+    str(token).strip().lower()
+    for token in (
+        *tuple(DETAIL_VARIANT_CONTEXT_NOISE_TOKENS or ()),
+        *tuple(DETAIL_VARIANT_CONTEXT_NOISE_TOKENS_EXTRA or ()),
+    )
+    if str(token).strip()
 )
 DETAIL_VARIANT_SOFT_SCOPE_SELECTOR = (
     "[class*='variant' i], [class*='option' i], [class*='selector' i], "
@@ -72,25 +91,66 @@ VARIANT_PRODUCT_DETAIL_PATH_MARKERS = (
     "/c/product/",
     "/catalog/product/",
 )
-VARIANT_URL_BLOCKED_PATH_SUFFIXES = frozenset({
-    "/reviews", "/review", "/print", "/share", "/overview", "/specifications",
-    "/specs", "/wishlist", "/cart", "/returns-policy", "/credit", "/payment",
-    "/help",
-})
-VARIANT_URL_BLOCKED_PATH_PREFIXES = frozenset({
-    "/pl/", "/c/", "/collections/", "/category/", "/browse/", "/search/", "/l/",
-})
+VARIANT_URL_BLOCKED_PATH_SUFFIXES = frozenset(
+    {
+        "/reviews",
+        "/review",
+        "/print",
+        "/share",
+        "/overview",
+        "/specifications",
+        "/specs",
+        "/wishlist",
+        "/cart",
+        "/returns-policy",
+        "/credit",
+        "/payment",
+        "/help",
+    }
+)
+VARIANT_URL_BLOCKED_PATH_PREFIXES = frozenset(
+    {
+        "/pl/",
+        "/c/",
+        "/collections/",
+        "/category/",
+        "/browse/",
+        "/search/",
+        "/l/",
+    }
+)
 VARIANT_OPTION_VALUE_UI_NOISE_PHRASES_EXTRA = (
-    "view more", "view all", "view all images", "view all photos", "overview",
-    "specifications", "description", "features", "share", "print", "save",
-    "bookmark", "show more", "more details", "see details", "return policy",
-    "returns policy", "payment options", "shop the collection", "shop all",
-    "year protection plan", "protection plan", "extended warranty",
-    "increment or decrement number", "increment or decrement",
+    "view more",
+    "view all",
+    "view all images",
+    "view all photos",
+    "overview",
+    "specifications",
+    "description",
+    "features",
+    "share",
+    "print",
+    "save",
+    "bookmark",
+    "show more",
+    "more details",
+    "see details",
+    "return policy",
+    "returns policy",
+    "payment options",
+    "shop the collection",
+    "shop all",
+    "year protection plan",
+    "protection plan",
+    "extended warranty",
+    "increment or decrement number",
+    "increment or decrement",
 )
 VARIANT_OPTION_VALUE_NOISE_FULLMATCH_PATTERNS_EXTRA = (
-    r"\d+\+?\s+reviews?", r"\d+\+?\s+ratings?",
-    r"(\b\w+\b)(?:\s+\1)+", r"shop\s+\w+(?:\s+\w+){0,2}",
+    r"\d+\+?\s+reviews?",
+    r"\d+\+?\s+ratings?",
+    r"(\b\w+\b)(?:\s+\1)+",
+    r"shop\s+\w+(?:\s+\w+){0,2}",
 )
 VARIANT_STRONG_OPTION_SELECTOR = (
     "[role='radio'], [role='option'], input[type='radio'], input[type='checkbox'], "
@@ -99,7 +159,6 @@ VARIANT_STRONG_OPTION_SELECTOR = (
     "button[data-variant], [data-testid='swatch' i], [data-testid*='swatch-option' i]"
 )
 VARIANT_WEAK_OPTION_SELECTOR = (
-    "button:not([data-dismiss]):not([type='submit']):not([type='reset']), "
-    "a[href]"
+    "button:not([data-dismiss]):not([type='submit']):not([type='reset']), a[href]"
 )
 VARIANT_GROUP_MIN_CONFIDENCE = 0.35

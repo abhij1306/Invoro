@@ -21,6 +21,7 @@ from ._product_mapping import _map_product_payload
 
 logger = logging.getLogger(__name__)
 
+
 def map_js_state_to_fields(
     js_state_objects: dict[str, Any],
     *,
@@ -40,6 +41,7 @@ def map_js_state_to_fields(
         page_url,
     )
     return {}
+
 
 def _map_ecommerce_detail_state(
     js_state_objects: dict[str, Any],
@@ -81,7 +83,9 @@ def _map_ecommerce_detail_state(
                         for field_name in VARIANT_AXIS_KEYS:
                             if mapped.get(field_name) in (None, "", [], {}):
                                 base_record.pop(field_name, None)
-                elif _mapped_product_identity_matches(base_record, mapped, page_url=page_url):
+                elif _mapped_product_identity_matches(
+                    base_record, mapped, page_url=page_url
+                ):
                     base_record = _merge_same_product_record(
                         base_record,
                         mapped,
@@ -95,10 +99,11 @@ def _map_ecommerce_detail_state(
                     base_record = _merge_variant_fields(base_record, mapped)
     return base_record
 
+
 def _extract_product_payloads_from_normalized(
     state_key: str,
     normalized_payload: Any,
-    ) -> list[tuple[dict[str, Any], JSStateExtractorConfig | None]]:
+) -> list[tuple[dict[str, Any], JSStateExtractorConfig | None]]:
     products: list[tuple[dict[str, Any], JSStateExtractorConfig | None]] = []
     for extractor in platform_js_state_extractors(
         surface="ecommerce_detail",
@@ -108,14 +113,21 @@ def _extract_product_payloads_from_normalized(
             candidate = path_value(normalized_payload, root_path)
             if _looks_like_product_payload(candidate):
                 products.append((dict(candidate), extractor))
+    try:
+        marketplace_choice_products = extract_marketplace_choice_products(
+            normalized_payload
+        )
+    except (AttributeError, TypeError, ValueError):
+        logger.debug("Marketplace choice extraction failed", exc_info=True)
+        marketplace_choice_products = []
+    products.extend((product, None) for product in marketplace_choice_products)
     products.extend(
-        (product, None)
-        for product in extract_marketplace_choice_products(normalized_payload)
+        (product, None) for product in _find_product_payloads(normalized_payload)
     )
-    products.extend((product, None) for product in _find_product_payloads(normalized_payload))
     if products:
         return _dedupe_product_payloads(products)
     return []
+
 
 def _dedupe_product_payloads(
     products: list[tuple[dict[str, Any], JSStateExtractorConfig | None]],

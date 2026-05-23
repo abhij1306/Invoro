@@ -12,7 +12,6 @@ from typing import Any
 from soupsieve import match as selector_matches
 
 from app.services.config.extraction_rules import (
-    DETAIL_VARIANT_CONTEXT_NOISE_TOKENS,
     DETAIL_VARIANT_SCOPE_SELECTOR,
     VARIANT_CHOICE_GROUP_SELECTOR,
     VARIANT_CONTEXT_NOISE_ANCESTOR_DEPTH,
@@ -22,8 +21,8 @@ from app.services.config.extraction_rules import (
     VARIANT_SELECT_GROUP_SELECTOR,
 )
 from app.services.config.variant_migration_rules import (
-    DETAIL_VARIANT_CONTEXT_NOISE_TOKENS_EXTRA,
     DETAIL_VARIANT_SOFT_SCOPE_SELECTOR,
+    VARIANT_CONTEXT_NOISE_TOKENS,
     VARIANT_SOFT_SCOPE_FIELDSET_SIGNAL_SELECTOR,
     VARIANT_SOFT_SCOPE_MIN_RADIO_INPUTS,
     VARIANT_SOFT_SCOPE_MIN_RADIO_INPUTS_FALLBACK,
@@ -33,14 +32,7 @@ from app.services.config.variant_migration_rules import (
 from app.services.shared.field_coerce import clean_text
 from app.services.runtime_metrics import incr as increment_runtime_metric
 
-variant_context_noise_tokens = frozenset(
-    str(token).strip().lower()
-    for token in (
-        *tuple(DETAIL_VARIANT_CONTEXT_NOISE_TOKENS or ()),
-        *tuple(DETAIL_VARIANT_CONTEXT_NOISE_TOKENS_EXTRA or ()),
-    )
-    if str(token).strip()
-)
+variant_context_noise_tokens = VARIANT_CONTEXT_NOISE_TOKENS
 _variant_scope_selector = str(DETAIL_VARIANT_SCOPE_SELECTOR or "").strip()
 _variant_soft_scope_selector = str(DETAIL_VARIANT_SOFT_SCOPE_SELECTOR or "").strip()
 _VARIANT_DOM_CACHE_ATTR = "_crawler_variant_dom_cues_cache"
@@ -159,9 +151,11 @@ def _node_has_soft_variant_signal(node: Any, *, min_radio_inputs: int) -> bool:
     if tag_name == "fieldset":
         return bool(node.select(VARIANT_SOFT_SCOPE_FIELDSET_SIGNAL_SELECTOR))
     role = str(node.get("role") or "").strip().lower() if hasattr(node, "get") else ""
-    if role in {"radiogroup", "group"} and len(
-        node.select(VARIANT_SOFT_SCOPE_ROLE_OPTION_SELECTOR)
-    ) >= min_radio_inputs:
+    if (
+        role in {"radiogroup", "group"}
+        and len(node.select(VARIANT_SOFT_SCOPE_ROLE_OPTION_SELECTOR))
+        >= min_radio_inputs
+    ):
         return True
     strong_nodes = node.select(VARIANT_SOFT_SCOPE_STRONG_NODE_SELECTOR)
     clean_nodes = [
@@ -185,7 +179,9 @@ def select_variant_nodes(soup: Any, selector: str) -> list[Any]:
     for root in variant_scope_roots(soup):
         if not hasattr(root, "select"):
             continue
-        if _node_matches_selector(root, selector) and not variant_node_in_noise_context(root):
+        if _node_matches_selector(root, selector) and not variant_node_in_noise_context(
+            root
+        ):
             nodes.append(root)
             seen.add(id(root))
         for node in root.select(selector):

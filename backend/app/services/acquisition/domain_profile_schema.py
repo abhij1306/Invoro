@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Any, Literal
 
@@ -45,6 +46,7 @@ class FetchProfile(BaseModel):
     max_pages: int = Field(default=1, ge=1)
     max_scrolls: int = Field(default=1, ge=1)
     host_memory_ttl_seconds: int | None = Field(default=None, ge=0)
+
 
 class SelectorRule(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -95,7 +97,9 @@ class DomainProfileV2(BaseModel):
     profile_stale_after_days: int = Field(default=SELECTOR_RULE_STALE_AFTER_DAYS, ge=1)
     selector_rules: list[SelectorRule] = Field(default_factory=list)
     fetch_profile: FetchProfile = Field(default_factory=FetchProfile)
-    acquisition_contract: AcquisitionContract = Field(default_factory=AcquisitionContract)
+    acquisition_contract: AcquisitionContract = Field(
+        default_factory=AcquisitionContract
+    )
 
     @field_validator("domain", "surface")
     @classmethod
@@ -106,5 +110,6 @@ class DomainProfileV2(BaseModel):
 def parse_domain_profile_v2(value: object) -> DomainProfileV2:
     if isinstance(value, DomainProfileV2):
         return value
-    payload = value if isinstance(value, dict) else {}
-    return DomainProfileV2.model_validate(payload)
+    if not isinstance(value, Mapping):
+        return DomainProfileV2()
+    return DomainProfileV2.model_validate(value)

@@ -6,6 +6,7 @@ Usage:
     .\.venv\Scripts\python.exe run_alert_smoke.py --limit 1
     .\.venv\Scripts\python.exe run_alert_smoke.py --url https://web-scraping.dev/product/1
 """
+
 from __future__ import annotations
 
 import argparse
@@ -15,12 +16,12 @@ import sys
 import time
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from app.core.database import SessionLocal
 from app.core.security import hash_password
 from app.models.user import User
-from app.schemas.alert import AlertCreate, AlertUpdate
+from app.schemas.alert import AlertCreate, AlertStatus, AlertUpdate
 from app.services.alert_service import (
     alert_history,
     alert_response,
@@ -30,8 +31,13 @@ from app.services.alert_service import (
     test_alert,
     update_alert,
 )
-from app.services.config.monitor_settings import MONITOR_STATUS_ACTIVE, MONITOR_STATUS_PAUSED
-from app.services.monitor_change_detection import ensure_monitor_change_detection_registered
+from app.services.config.monitor_settings import (
+    MONITOR_STATUS_ACTIVE,
+    MONITOR_STATUS_PAUSED,
+)
+from app.services.monitor_change_detection import (
+    ensure_monitor_change_detection_registered,
+)
 
 DEFAULT_ALERT_SITES: list[dict[str, Any]] = [
     {
@@ -93,7 +99,10 @@ async def _run_one(site: dict[str, Any]) -> dict[str, Any]:
                 session,
                 alert_id=monitor_id,
                 user_id=int(user.id),
-                payload=AlertUpdate(status=MONITOR_STATUS_PAUSED, poll_interval_seconds=60),
+                payload=AlertUpdate(
+                    status=cast(AlertStatus, MONITOR_STATUS_PAUSED),
+                    poll_interval_seconds=60,
+                ),
             )
             paused_status = str(paused.status)
             resumed = await update_alert(
@@ -101,14 +110,16 @@ async def _run_one(site: dict[str, Any]) -> dict[str, Any]:
                 alert_id=monitor_id,
                 user_id=int(user.id),
                 payload=AlertUpdate(
-                    status=MONITOR_STATUS_ACTIVE,
+                    status=cast(AlertStatus, MONITOR_STATUS_ACTIVE),
                     target_fields=list(site["target_fields"]),
                     condition=site.get("condition"),
                     webhook_url=None,
                 ),
             )
             resumed_status = str(resumed.status)
-            tested, test_run_id = await test_alert(session, alert_id=monitor_id, user_id=int(user.id))
+            tested, test_run_id = await test_alert(
+                session, alert_id=monitor_id, user_id=int(user.id)
+            )
             history_items, history_total = await alert_history(
                 session,
                 alert_id=monitor_id,
@@ -142,7 +153,9 @@ async def _run_one(site: dict[str, Any]) -> dict[str, Any]:
             result["error"] = f"{type(exc).__name__}: {exc}"
             if monitor_id is not None:
                 try:
-                    await delete_alert(session, alert_id=monitor_id, user_id=int(user.id))
+                    await delete_alert(
+                        session, alert_id=monitor_id, user_id=int(user.id)
+                    )
                 except Exception:  # pylint: disable=broad-exception-caught
                     pass
         finally:
@@ -170,7 +183,9 @@ def _write_report(results: list[dict[str, Any]]) -> Path:
 async def main(argv: list[str]) -> int:
     ensure_monitor_change_detection_registered()
     parser = argparse.ArgumentParser(description="Run live alert smoke checks.")
-    parser.add_argument("--url", action="append", default=[], help="Explicit product detail URL.")
+    parser.add_argument(
+        "--url", action="append", default=[], help="Explicit product detail URL."
+    )
     parser.add_argument("--limit", type=int, default=None, help="Optional site limit.")
     args = parser.parse_args(argv)
 

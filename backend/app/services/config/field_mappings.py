@@ -23,6 +23,10 @@ locals().update(
         for name, value in _STATIC_EXPORTS.items()
     }
 )
+FIELD_ALIASES: dict[str, list[str]] = {
+    str(name): list(values)
+    for name, values in dict(_STATIC_EXPORTS.get("FIELD_ALIASES") or {}).items()
+}
 
 COLOR_FIELD = "color"
 TITLE_FIELD = "title"
@@ -95,6 +99,82 @@ VARIANT_AXIS_FIELD_NAMES = (
     "length",
     WIDTH_FIELD,
 )
+REQUESTED_FIELD_PREFIXES = ("product_", "item_", "job_")
+HTML_SECTION_FIELDS = frozenset(
+    {"responsibilities", "qualifications", "benefits", "skills"}
+)
+REQUESTED_FIELD_ALIAS_BASES = {
+    "responsibilities": FIELD_ALIASES.get("responsibilities", []),
+    "qualifications": FIELD_ALIASES.get("qualifications", []),
+    "benefits": FIELD_ALIASES.get("benefits", []),
+    "skills": FIELD_ALIASES.get("skills", []),
+    "summary": FIELD_ALIASES.get("summary", []),
+    "specifications": FIELD_ALIASES.get("specifications", []),
+    "product_details": FIELD_ALIASES.get("product_details", []),
+    "features": FIELD_ALIASES.get("features", []),
+    "materials": FIELD_ALIASES.get("materials", []),
+    "material": FIELD_ALIASES.get("materials", []),
+    "care": FIELD_ALIASES.get("care", []),
+    "dimensions": FIELD_ALIASES.get("dimensions", []),
+    "remote": FIELD_ALIASES.get("remote", []),
+    "requirements": FIELD_ALIASES.get("requirements", []),
+    "country_of_origin": [
+        "country of origin",
+        "country_of_origin",
+        "origin",
+        "made in",
+        "manufactured in",
+        "importer",
+        "importer_info",
+        "importer name and address",
+    ],
+    "color_variants": FIELD_ALIASES.get("color_variants", []),
+    "gender": FIELD_ALIASES.get("gender", []),
+}
+REQUESTED_FIELD_ALIAS_EXTRAS = {
+    "responsibilities": (
+        "job responsibilities",
+        "key responsibilities",
+        "job duties",
+        "what you'll do",
+        "what_you_ll_do",
+        "what_you_will_do",
+        "role responsibilities",
+    ),
+    "qualifications": (
+        "job qualifications",
+        "job_qualification",
+        "should have",
+        "you should have",
+        "minimum requirements",
+        "minimum_requirements",
+        "preferred qualifications",
+        "preferred_qualifications",
+        "who you are",
+        "what we're looking for",
+    ),
+    "benefits": (
+        "job benefits",
+        "perks",
+        "why you'll love this job",
+        "life at stripe",
+        "what we offer",
+    ),
+    "skills": ("job skills", "job_skills", "experience", "what you'll bring"),
+    "summary": ("description", "our opportunity", "about the role", "about the team"),
+    "specifications": (
+        "specs",
+        "spec",
+        "technical details",
+        "tech specs",
+        "the details",
+    ),
+    "product_details": ("product detail",),
+    "features": ("key features",),
+    "materials": ("fabrics", "material composition"),
+    "material": ("fabrics", "material composition"),
+    "care": ("care instructions", "washing instructions"),
+}
 _EXTRA_EXPORTS = [
     "AVAILABLE_SIZES_FIELD",
     "APPLY_URL_FIELD",
@@ -110,6 +190,10 @@ _EXTRA_EXPORTS = [
     "PRICE_FIELD",
     "PRICE_DICT_PREFERRED_KEYS",
     "PRODUCT_ID_FIELD",
+    "HTML_SECTION_FIELDS",
+    "REQUESTED_FIELD_ALIAS_BASES",
+    "REQUESTED_FIELD_ALIAS_EXTRAS",
+    "REQUESTED_FIELD_PREFIXES",
     "ROUTE_BARCODE_TO_SKU",
     "SELECTED_VARIANT_FIELD",
     "SIZE_FIELD",

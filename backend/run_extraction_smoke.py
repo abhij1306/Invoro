@@ -7,6 +7,7 @@ Usage:
     .venv\Scripts\python.exe run_extraction_smoke.py
     .venv\Scripts\python.exe run_extraction_smoke.py --groups controls --limit 2
 """
+
 from __future__ import annotations
 
 import argparse
@@ -24,11 +25,15 @@ from app.services.adapters.registry import run_adapter
 from app.services.pipeline.extract_records import extract_records
 from app.services.platform_policy import detect_platform_family
 
-from harness_support import infer_surface
+from harness.support import infer_surface, parse_test_sites_markdown
 
 DEFAULT_CORPUS_PATH = (
     Path(__file__).resolve().parent / "corpora" / "acceptance_corpus.json"
 )
+DEFAULT_TEST_SITES_PATH = Path(__file__).resolve().parent.parent / "TEST_SITES.md"
+DEFAULT_TEST_SITES_START_LINE = 253
+DEFAULT_TEST_SITES_LIMIT = 10
+DEFAULT_TEST_SITES_GROUP = "test_sites_smoke"
 DEFAULT_REPORT_DIR = Path("artifacts/extraction_smoke")
 
 
@@ -49,7 +54,8 @@ def _listing_field_coverage(
         return {field: 0.0 for field in required_fields}
     return {
         field: round(
-            sum(1 for record in sample if _value_present(record.get(field))) / len(sample),
+            sum(1 for record in sample if _value_present(record.get(field)))
+            / len(sample),
             3,
         )
         for field in required_fields
@@ -70,6 +76,14 @@ def _load_corpus(path: Path) -> dict[str, list[dict]]:
         for group_name, sites in payload.items()
         if isinstance(sites, list)
     }
+
+
+def _load_default_test_sites_corpus() -> dict[str, list[dict]]:
+    sites = parse_test_sites_markdown(
+        DEFAULT_TEST_SITES_PATH,
+        start_line=DEFAULT_TEST_SITES_START_LINE,
+    )[:DEFAULT_TEST_SITES_LIMIT]
+    return {DEFAULT_TEST_SITES_GROUP: [dict(site) for site in sites]}
 
 
 def _select_sites(
@@ -177,7 +191,8 @@ async def _run_one(site: dict, run_id: int, timeout_seconds: int) -> dict:
                     url=url,
                     plan=AcquisitionPlan(
                         surface=surface,
-                        traversal_mode=str(site.get("traversal_mode") or "").strip() or None,
+                        traversal_mode=str(site.get("traversal_mode") or "").strip()
+                        or None,
                         max_pages=5,
                         max_scrolls=5,
                     ),
@@ -220,14 +235,19 @@ async def _run_one(site: dict, run_id: int, timeout_seconds: int) -> dict:
             url,
             surface,
             max_records=int(site.get("max_records") or 50),
-            requested_fields=[str(field) for field in site.get("expect_fields") or []] or None,
-            adapter_records=list(adapter_result.records or []) if adapter_result else None,
+            requested_fields=[str(field) for field in site.get("expect_fields") or []]
+            or None,
+            adapter_records=list(adapter_result.records or [])
+            if adapter_result
+            else None,
             network_payloads=acquisition.network_payloads or [],
             selector_rules=None,
         )
 
         if "listing" in surface:
-            required_fields = [str(field) for field in site.get("required_record_fields") or []]
+            required_fields = [
+                str(field) for field in site.get("required_record_fields") or []
+            ]
             coverage = _listing_field_coverage(
                 records,
                 required_fields,
@@ -235,7 +255,9 @@ async def _run_one(site: dict, run_id: int, timeout_seconds: int) -> dict:
             )
             thresholds = {
                 str(field): float(threshold)
-                for field, threshold in (site.get("required_record_field_coverage") or {}).items()
+                for field, threshold in (
+                    site.get("required_record_field_coverage") or {}
+                ).items()
             }
             failing_fields = [
                 field
@@ -260,17 +282,25 @@ async def _run_one(site: dict, run_id: int, timeout_seconds: int) -> dict:
             min_records = int(site.get("expect_min_records") or 0)
             result["ok"] = len(records) >= min_records and not failing_fields
             if len(records) < min_records:
-                result["issue"] = f"Expected >= {min_records} records, got {len(records)}"
+                result["issue"] = (
+                    f"Expected >= {min_records} records, got {len(records)}"
+                )
             elif failing_fields:
-                result["issue"] = f"Coverage below threshold for: {sorted(failing_fields)}"
+                result["issue"] = (
+                    f"Coverage below threshold for: {sorted(failing_fields)}"
+                )
         else:
             expected_fields = [str(field) for field in site.get("expect_fields") or []]
             found_fields = [
                 field
                 for field in expected_fields
-                if records and field in records[0] and _value_present(records[0].get(field))
+                if records
+                and field in records[0]
+                and _value_present(records[0].get(field))
             ]
-            missing_fields = [field for field in expected_fields if field not in found_fields]
+            missing_fields = [
+                field for field in expected_fields if field not in found_fields
+            ]
             result.update(
                 {
                     "candidate_fields": sorted(records[0].keys()) if records else [],
@@ -320,28 +350,33 @@ async def main(argv: list[str]) -> int:
     args = parser.parse_args(argv)
 
     corpus_path = Path(args.corpus)
+    effective_limit = args.limit
     if not corpus_path.exists():
         if corpus_path == DEFAULT_CORPUS_PATH:
-            print(
-                "Acceptance corpus missing; skipping extraction smoke. "
-                "Provide --corpus PATH to run this check."
+            corpus = _load_default_test_sites_corpus()
+            selected_groups = args.groups or [DEFAULT_TEST_SITES_GROUP]
+            effective_limit = (
+                args.limit if args.limit is not None else DEFAULT_TEST_SITES_LIMIT
             )
-            return 0
-        print(f"Acceptance corpus not found: {corpus_path}", file=sys.stderr)
-        return 2
-    corpus = _load_corpus(corpus_path)
-    selected_groups = args.groups or list(corpus)
-    sites = _select_sites(corpus, selected_groups, args.limit)
+            print(
+                "Acceptance corpus missing; using TEST_SITES.md smoke corpus "
+                f"from line {DEFAULT_TEST_SITES_START_LINE} "
+                f"(max {DEFAULT_TEST_SITES_LIMIT} sites)."
+            )
+        else:
+            print(f"Acceptance corpus not found: {corpus_path}", file=sys.stderr)
+            return 2
+    else:
+        corpus = _load_corpus(corpus_path)
+        selected_groups = args.groups or list(corpus)
+    sites = _select_sites(corpus, selected_groups, effective_limit)
     print(f"Running acceptance corpus for {len(sites)} sites...")
     print("=" * 70)
 
     results: list[dict] = []
     for offset, site in enumerate(sites, start=1):
         run_id = 50000 + offset - 1
-        print(
-            f"\n[{offset}/{len(sites)}] {site.get('name')} "
-            f"[{site.get('_group')}]"
-        )
+        print(f"\n[{offset}/{len(sites)}] {site.get('name')} [{site.get('_group')}]")
         print(f"  URL: {site.get('url')}")
         result = await _run_one(site, run_id, args.timeout)
         results.append(result)

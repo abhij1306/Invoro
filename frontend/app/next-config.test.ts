@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import nextConfig, { buildSecurityHeaders } from '../next.config';
+import { buildContentSecurityPolicy } from '../proxy';
 
 describe('next security headers', () => {
   it('includes the baseline security headers for all routes', async () => {
@@ -29,10 +30,37 @@ describe('next security headers', () => {
       key: 'Strict-Transport-Security',
       value: 'max-age=31536000; includeSubDomains; preload',
     });
-    expect(productionHeaders).toContainEqual({
-      key: 'Content-Security-Policy',
-      value:
-        "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; base-uri 'self'; frame-ancestors 'none'; object-src 'none'",
-    });
+    expect(productionHeaders.find((header) => header.key === 'Content-Security-Policy')).toBe(
+      undefined,
+    );
+  });
+
+  it('builds CSP with a nonce and app runtime allowances', () => {
+    const policy = buildContentSecurityPolicy('test-nonce');
+
+    expect(policy).toContain("script-src 'self' 'nonce-test-nonce'");
+    expect(policy).toContain("style-src 'self' 'nonce-test-nonce' 'unsafe-inline'");
+    expect(policy).toContain('img-src ');
+    expect(policy).toContain('https:');
+    expect(policy).toContain('http:');
+  });
+
+  it('includes configured API origins in CSP connect-src', () => {
+    const originalApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+    process.env.NEXT_PUBLIC_API_BASE_URL = 'https://api.example.com:8443/';
+
+    try {
+      const policy = buildContentSecurityPolicy('test-nonce');
+
+      expect(policy).toContain(
+        "connect-src 'self' https://api.example.com:8443 wss://api.example.com:8443",
+      );
+    } finally {
+      if (originalApiBaseUrl) {
+        process.env.NEXT_PUBLIC_API_BASE_URL = originalApiBaseUrl;
+      } else {
+        delete process.env.NEXT_PUBLIC_API_BASE_URL;
+      }
+    }
   });
 });

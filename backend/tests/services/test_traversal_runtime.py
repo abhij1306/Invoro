@@ -16,7 +16,10 @@ from app.services.acquisition.traversal import (
     execute_listing_traversal,
 )
 from app.services.config.selectors import CARD_SELECTORS, PAGINATION_SELECTORS
-from app.services.extract.listing_card_fragments import listing_selector_is_weak
+from app.services.extract.listing_card_fragments import (
+    listing_node_html,
+    listing_selector_is_weak,
+)
 
 
 @dataclass
@@ -32,6 +35,16 @@ class _State:
     next_control_state: dict[str, Any] | None = None
 
 
+def test_listing_node_html_suppresses_unexpected_parser_errors(caplog) -> None:
+    class _BrokenNode:
+        @property
+        def html(self) -> str:
+            raise RuntimeError("parser failed")
+
+    assert listing_node_html(_BrokenNode()) == ""
+    assert "Failed to read listing node HTML fragment" in caplog.text
+
+
 class _FakeLocator:
     def __init__(self, page: "_FakePage", selector: str) -> None:
         self._page = page
@@ -44,7 +57,9 @@ class _FakeLocator:
     async def count(self) -> int:
         if self._selector in _card_selectors(self._page.surface):
             return int(self._page.state.card_count)
-        return int(_selector_group(self._selector) in (self._page.state.controls or set()))
+        return int(
+            _selector_group(self._selector) in (self._page.state.controls or set())
+        )
 
     async def is_visible(self, timeout: int | None = None) -> bool:
         del timeout
@@ -61,14 +76,18 @@ class _FakeLocator:
         group = _selector_group(self._selector)
         if group == "load_more":
             self._page.load_more_clicks += 1
-            self._page.state = self._page.load_more_states[min(self._page.load_more_clicks, len(self._page.load_more_states) - 1)]
+            self._page.state = self._page.load_more_states[
+                min(self._page.load_more_clicks, len(self._page.load_more_states) - 1)
+            ]
             return
         if group == "next_page":
             next_href = str(self._page.state.next_href or "").strip().lower()
             if next_href and not next_href.startswith(("#", "javascript:")):
                 await self._page.goto(self._page.state.next_href or self._page.url)
                 return
-            self._page.page_index = min(self._page.page_index + 1, len(self._page.paginated_states) - 1)
+            self._page.page_index = min(
+                self._page.page_index + 1, len(self._page.paginated_states) - 1
+            )
             self._page.state = self._page.paginated_states[self._page.page_index]
 
     async def get_attribute(self, name: str) -> str | None:
@@ -165,7 +184,9 @@ class _FakePage:
     def locator(self, selector: str) -> _FakeLocator:
         return _FakeLocator(self, selector)
 
-    def get_by_role(self, role: str, name: object = None) -> _EmptyRoleLocator | _RoleLocator:
+    def get_by_role(
+        self, role: str, name: object = None
+    ) -> _EmptyRoleLocator | _RoleLocator:
         matches: list[dict[str, Any]] = []
         for control in list(self.state.role_controls or []):
             if str(control.get("role") or "") != role:
@@ -212,7 +233,9 @@ class _FakePage:
     async def content(self) -> str:
         return self.state.html
 
-    async def goto(self, url: str, wait_until: str | None = None, timeout: int | None = None) -> None:
+    async def goto(
+        self, url: str, wait_until: str | None = None, timeout: int | None = None
+    ) -> None:
         del wait_until, timeout
         self.goto_calls.append(url)
         self.url = url
@@ -308,7 +331,9 @@ async def test_paginate_traversal_collects_multiple_pages() -> None:
 
 
 @pytest.mark.asyncio
-async def test_paginate_traversal_does_not_append_duplicate_html_without_progress() -> None:
+async def test_paginate_traversal_does_not_append_duplicate_html_without_progress() -> (
+    None
+):
     page = _FakePage(
         surface="ecommerce_listing",
         initial_state=_State(
@@ -582,7 +607,10 @@ async def test_paginate_traversal_handles_spa_next_button() -> None:
     assert result.selected_mode == "paginate"
     assert result.pages_advanced == 1
     assert result.progress_events == 1
-    assert [f for f, _ in result.html_fragments] == ["<div>page-1</div>", "<div>page-2</div>"]
+    assert [f for f, _ in result.html_fragments] == [
+        "<div>page-1</div>",
+        "<div>page-2</div>",
+    ]
 
 
 @pytest.mark.asyncio
@@ -650,7 +678,9 @@ async def test_paginate_traversal_handles_numeric_arrow_button() -> None:
 
 
 @pytest.mark.asyncio
-async def testlooks_like_paginate_control_rejects_plain_href_without_pagination_signals() -> None:
+async def testlooks_like_paginate_control_rejects_plain_href_without_pagination_signals() -> (
+    None
+):
     page = _FakePage(
         surface="ecommerce_listing",
         initial_state=_State(
@@ -739,8 +769,18 @@ async def test_load_more_traversal_runs_when_button_present() -> None:
             controls={"load_more"},
         ),
         load_more_states=[
-            _State(html="<div>before</div>", card_count=2, scroll_height=900, controls={"load_more"}),
-            _State(html="<div>after</div>", card_count=5, scroll_height=1200, controls=set()),
+            _State(
+                html="<div>before</div>",
+                card_count=2,
+                scroll_height=900,
+                controls={"load_more"},
+            ),
+            _State(
+                html="<div>after</div>",
+                card_count=5,
+                scroll_height=1200,
+                controls=set(),
+            ),
         ],
     )
 
@@ -756,7 +796,10 @@ async def test_load_more_traversal_runs_when_button_present() -> None:
     assert result.load_more_clicks == 1
     assert result.progress_events == 1
     assert result.card_count == 5
-    assert [f for f, _ in result.html_fragments] == ["<div>before</div>", "<div>after</div>"]
+    assert [f for f, _ in result.html_fragments] == [
+        "<div>before</div>",
+        "<div>after</div>",
+    ]
     assert "networkidle" in page.load_state_calls
 
 
@@ -771,9 +814,24 @@ async def test_load_more_traversal_stops_at_user_max_records() -> None:
             controls={"load_more"},
         ),
         load_more_states=[
-            _State(html="<div>before</div>", card_count=2, scroll_height=900, controls={"load_more"}),
-            _State(html="<div>after</div>", card_count=5, scroll_height=1200, controls={"load_more"}),
-            _State(html="<div>too-far</div>", card_count=9, scroll_height=1500, controls=set()),
+            _State(
+                html="<div>before</div>",
+                card_count=2,
+                scroll_height=900,
+                controls={"load_more"},
+            ),
+            _State(
+                html="<div>after</div>",
+                card_count=5,
+                scroll_height=1200,
+                controls={"load_more"},
+            ),
+            _State(
+                html="<div>too-far</div>",
+                card_count=9,
+                scroll_height=1500,
+                controls=set(),
+            ),
         ],
     )
 
@@ -789,11 +847,16 @@ async def test_load_more_traversal_stops_at_user_max_records() -> None:
     assert result.stop_reason == "target_records_reached"
     assert result.load_more_clicks == 1
     assert result.card_count == 5
-    assert [f for f, _ in result.html_fragments] == ["<div>before</div>", "<div>after</div>"]
+    assert [f for f, _ in result.html_fragments] == [
+        "<div>before</div>",
+        "<div>after</div>",
+    ]
 
 
 @pytest.mark.asyncio
-async def test_load_more_target_uses_unique_card_identities_not_repeated_snapshots() -> None:
+async def test_load_more_target_uses_unique_card_identities_not_repeated_snapshots() -> (
+    None
+):
     first_html = (
         "<main>"
         "<article class='product-card'><a href='/products/widget-1'>Widget 1</a><span>$10</span></article>"
@@ -817,8 +880,12 @@ async def test_load_more_target_uses_unique_card_identities_not_repeated_snapsho
             controls={"load_more"},
         ),
         load_more_states=[
-            _State(html=first_html, card_count=4, scroll_height=900, controls={"load_more"}),
-            _State(html=repeated_html, card_count=8, scroll_height=1200, controls=set()),
+            _State(
+                html=first_html, card_count=4, scroll_height=900, controls={"load_more"}
+            ),
+            _State(
+                html=repeated_html, card_count=8, scroll_height=1200, controls=set()
+            ),
         ],
     )
 
@@ -908,9 +975,27 @@ async def test_scroll_traversal_runs_when_explicitly_requested() -> None:
             controls=set(),
         ),
         scroll_states=[
-            _State(html="<div>jobs</div>", card_count=2, scroll_height=2500, client_height=600, controls=set()),
-            _State(html="<div>jobs more</div>", card_count=6, scroll_height=3400, client_height=600, controls=set()),
-            _State(html="<div>jobs done</div>", card_count=6, scroll_height=3400, client_height=600, controls=set()),
+            _State(
+                html="<div>jobs</div>",
+                card_count=2,
+                scroll_height=2500,
+                client_height=600,
+                controls=set(),
+            ),
+            _State(
+                html="<div>jobs more</div>",
+                card_count=6,
+                scroll_height=3400,
+                client_height=600,
+                controls=set(),
+            ),
+            _State(
+                html="<div>jobs done</div>",
+                card_count=6,
+                scroll_height=3400,
+                client_height=600,
+                controls=set(),
+            ),
         ],
     )
 
@@ -944,9 +1029,27 @@ async def test_scroll_traversal_stops_at_user_max_records() -> None:
             controls=set(),
         ),
         scroll_states=[
-            _State(html="<div>jobs</div>", card_count=2, scroll_height=2500, client_height=600, controls=set()),
-            _State(html="<div>jobs more</div>", card_count=6, scroll_height=3400, client_height=600, controls=set()),
-            _State(html="<div>jobs too-far</div>", card_count=9, scroll_height=4200, client_height=600, controls=set()),
+            _State(
+                html="<div>jobs</div>",
+                card_count=2,
+                scroll_height=2500,
+                client_height=600,
+                controls=set(),
+            ),
+            _State(
+                html="<div>jobs more</div>",
+                card_count=6,
+                scroll_height=3400,
+                client_height=600,
+                controls=set(),
+            ),
+            _State(
+                html="<div>jobs too-far</div>",
+                card_count=9,
+                scroll_height=4200,
+                client_height=600,
+                controls=set(),
+            ),
         ],
     )
 
@@ -980,9 +1083,27 @@ async def test_scroll_traversal_respects_max_scrolls_cap() -> None:
             controls=set(),
         ),
         scroll_states=[
-            _State(html="<div>jobs</div>", card_count=2, scroll_height=2500, client_height=600, controls=set()),
-            _State(html="<div>jobs more</div>", card_count=6, scroll_height=3400, client_height=600, controls=set()),
-            _State(html="<div>jobs too-far</div>", card_count=9, scroll_height=4200, client_height=600, controls=set()),
+            _State(
+                html="<div>jobs</div>",
+                card_count=2,
+                scroll_height=2500,
+                client_height=600,
+                controls=set(),
+            ),
+            _State(
+                html="<div>jobs more</div>",
+                card_count=6,
+                scroll_height=3400,
+                client_height=600,
+                controls=set(),
+            ),
+            _State(
+                html="<div>jobs too-far</div>",
+                card_count=9,
+                scroll_height=4200,
+                client_height=600,
+                controls=set(),
+            ),
         ],
     )
 
@@ -1015,8 +1136,20 @@ async def test_execute_listing_traversal_ignores_invalid_timeout_value() -> None
             controls=set(),
         ),
         scroll_states=[
-            _State(html="<div>jobs</div>", card_count=2, scroll_height=2500, client_height=600, controls=set()),
-            _State(html="<div>jobs more</div>", card_count=6, scroll_height=3400, client_height=600, controls=set()),
+            _State(
+                html="<div>jobs</div>",
+                card_count=2,
+                scroll_height=2500,
+                client_height=600,
+                controls=set(),
+            ),
+            _State(
+                html="<div>jobs more</div>",
+                card_count=6,
+                scroll_height=3400,
+                client_height=600,
+                controls=set(),
+            ),
         ],
     )
 
@@ -1046,8 +1179,20 @@ async def test_execute_listing_traversal_rejects_unsupported_mode() -> None:
             controls=set(),
         ),
         scroll_states=[
-            _State(html="<div>jobs</div>", card_count=2, scroll_height=2500, client_height=600, controls=set()),
-            _State(html="<div>jobs more</div>", card_count=6, scroll_height=3400, client_height=600, controls=set()),
+            _State(
+                html="<div>jobs</div>",
+                card_count=2,
+                scroll_height=2500,
+                client_height=600,
+                controls=set(),
+            ),
+            _State(
+                html="<div>jobs more</div>",
+                card_count=6,
+                scroll_height=3400,
+                client_height=600,
+                controls=set(),
+            ),
         ],
     )
 
@@ -1120,7 +1265,9 @@ async def test_paginate_click_transition_uses_networkidle_settle_timeout(
         settle_timeouts.append(timeout_ms)
         return {"observed": True}
 
-    monkeypatch.setattr(traversal_module, "wait_for_dom_mutation_settle", _capture_settle)
+    monkeypatch.setattr(
+        traversal_module, "wait_for_dom_mutation_settle", _capture_settle
+    )
 
     result = await execute_listing_traversal(
         page,
@@ -1150,9 +1297,27 @@ async def test_scroll_traversal_emits_live_events() -> None:
             controls=set(),
         ),
         scroll_states=[
-            _State(html="<div>jobs</div>", card_count=2, scroll_height=2500, client_height=600, controls=set()),
-            _State(html="<div>jobs more</div>", card_count=6, scroll_height=3400, client_height=600, controls=set()),
-            _State(html="<div>jobs done</div>", card_count=6, scroll_height=3400, client_height=600, controls=set()),
+            _State(
+                html="<div>jobs</div>",
+                card_count=2,
+                scroll_height=2500,
+                client_height=600,
+                controls=set(),
+            ),
+            _State(
+                html="<div>jobs more</div>",
+                card_count=6,
+                scroll_height=3400,
+                client_height=600,
+                controls=set(),
+            ),
+            _State(
+                html="<div>jobs done</div>",
+                card_count=6,
+                scroll_height=3400,
+                client_height=600,
+                controls=set(),
+            ),
         ],
     )
 
@@ -1209,9 +1374,11 @@ async def test_paginate_traversal_detects_cycle_on_redirect_loop() -> None:
     # state ends up identical to page-1.  Override url after goto to
     # simulate server-side redirect back to page-1.
     original_goto = page.goto
+
     async def _redirect_goto(url, **kw):
         await original_goto(url, **kw)
         page.url = "https://example.com/listing"  # redirected back
+
     page.goto = _redirect_goto
 
     result = await execute_listing_traversal(
@@ -1270,7 +1437,9 @@ async def testis_same_origin_allows_same_tenant_different_pages() -> None:
 
 
 @pytest.mark.asyncio
-async def testis_same_origin_allows_same_host_path_changes_outside_tenant_hosts() -> None:
+async def testis_same_origin_allows_same_host_path_changes_outside_tenant_hosts() -> (
+    None
+):
     from app.services.acquisition.traversal import is_same_origin
 
     assert is_same_origin(
@@ -1405,11 +1574,7 @@ async def test_count_listing_cards_ignores_weak_product_selector_chrome() -> Non
         async def evaluate(self, script: str, arg: Any | None = None) -> dict[str, int]:
             assert "querySelectorAll(selector).length" in script
             return {
-                selector: (
-                    2
-                    if listing_selector_is_weak(str(selector))
-                    else 0
-                )
+                selector: (2 if listing_selector_is_weak(str(selector)) else 0)
                 for selector in list(arg or [])
             }
 
@@ -1438,7 +1603,9 @@ async def test_count_listing_cards_ignores_weak_product_selector_chrome() -> Non
 
 
 @pytest.mark.asyncio
-async def test_count_listing_cards_prefers_product_anchor_count_over_productcard_substring() -> None:
+async def test_count_listing_cards_prefers_product_anchor_count_over_productcard_substring() -> (
+    None
+):
     class _DesertcartCountPage:
         async def evaluate(self, script: str, arg: Any | None = None) -> dict[str, int]:
             assert "querySelectorAll(selector).length" in script
@@ -1474,9 +1641,7 @@ async def test_load_more_wait_keeps_best_delayed_card_gain() -> None:
             if "querySelectorAll(selector).length" in script:
                 count = 236 if self.elapsed_ms >= 3000 else 144
                 return {
-                    selector: (
-                        count if str(selector) == "a[href*='/products/']" else 0
-                    )
+                    selector: (count if str(selector) == "a[href*='/products/']" else 0)
                     for selector in list(arg or [])
                 }
             return {

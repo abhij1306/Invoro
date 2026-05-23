@@ -11,7 +11,13 @@ def _group(**overrides: object) -> VariantCandidateGroup:
     entries = list(
         overrides.pop(
             "entries",
-            [{"value": value, "url": f"https://example.com/products/item-{value.lower()}"} for value in values],
+            [
+                {
+                    "value": value,
+                    "url": f"https://example.com/products/item-{value.lower()}",
+                }
+                for value in values
+            ],
         )
     )
     defaults = {
@@ -35,7 +41,12 @@ def _group(**overrides: object) -> VariantCandidateGroup:
 def test_variant_group_validator_accepts_structural_product_group() -> None:
     group = _group()
 
-    assert VariantGroupValidator().validate(group, page_url="https://example.com/products/item") is True
+    assert (
+        VariantGroupValidator().validate(
+            group, page_url="https://example.com/products/item"
+        )
+        is True
+    )
     assert group.confidence >= 0.35
 
 
@@ -49,7 +60,12 @@ def test_variant_group_validator_rejects_navigation_context() -> None:
         scope_source="soft_scope",
     )
 
-    assert VariantGroupValidator().validate(group, page_url="https://example.com/products/item") is False
+    assert (
+        VariantGroupValidator().validate(
+            group, page_url="https://example.com/products/item"
+        )
+        is False
+    )
     assert "chrome_container:nav" in group.rejection_reasons
 
 
@@ -63,7 +79,12 @@ def test_variant_group_validator_rejects_identical_listing_urls() -> None:
         scope_source="soft_scope",
     )
 
-    assert VariantGroupValidator().validate(group, page_url="https://www.lowes.com/pd/light/123") is False
+    assert (
+        VariantGroupValidator().validate(
+            group, page_url="https://www.lowes.com/pd/light/123"
+        )
+        is False
+    )
     assert "all_urls_identical_non_product" in group.rejection_reasons
 
 
@@ -90,3 +111,4 @@ def test_variant_group_validator_accepts_collection_scoped_product_urls() -> Non
         )
         is True
     )
+    assert group.confidence >= 0.35

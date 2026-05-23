@@ -9,7 +9,7 @@ from app.services.adapters.base import AdapterResult, BaseAdapter
 from app.services.extract.variant_normalization.contract import (
     flatten_variants_for_public_output,
 )
-from app.services.extract.detail.price.core import currency_hint_from_page_url
+from app.services.shared.currency_hints import currency_hint_from_page_url
 from app.services.shared.field_coerce import (
     absolute_url,
     clean_text,
@@ -39,7 +39,9 @@ class MyntraAdapter(BaseAdapter):
         host = (urlparse(str(url or "")).hostname or "").lower()
         return host.endswith("myntra.com") or "window.__myx" in str(html or "")
 
-    async def extract(self, url: str, html: str, surface: str, proxy: str | None = None) -> AdapterResult:
+    async def extract(
+        self, url: str, html: str, surface: str, proxy: str | None = None
+    ) -> AdapterResult:
         normalized_surface = str(surface or "").strip().lower()
         records: list[dict[str, Any]] = []
         if normalized_surface == "ecommerce_detail":
@@ -115,9 +117,9 @@ def _extract_listing_records(page_url: str, html: str) -> list[dict[str, Any]]:
 def _myntra_listing_state_index(page_url: str, html: str) -> dict[str, dict[str, Any]]:
     state_objects = harvest_js_state_objects(None, html)
     myx = state_objects.get("__myx")
-    products = (
-        ((myx or {}).get("searchData") or {}).get("results") or {}
-    ).get("products")
+    products = (((myx or {}).get("searchData") or {}).get("results") or {}).get(
+        "products"
+    )
     if not isinstance(products, list):
         return {}
     index: dict[str, dict[str, Any]] = {}
@@ -137,21 +139,20 @@ def _listing_record_from_state_product(
     page_url: str,
 ) -> dict[str, Any]:
     inventory = next(
-        (
-            row
-            for row in product.get("inventoryInfo") or []
-            if isinstance(row, dict)
-        ),
+        (row for row in product.get("inventoryInfo") or [] if isinstance(row, dict)),
         None,
     )
     original_price = normalize_price(
         product.get("mrp"),
         interpret_integral_as_cents=False,
     )
-    price = normalize_price(
-        product.get("price"),
-        interpret_integral_as_cents=False,
-    ) or original_price
+    price = (
+        normalize_price(
+            product.get("price"),
+            interpret_integral_as_cents=False,
+        )
+        or original_price
+    )
     return compact_dict(
         {
             "title": product.get("productName") or product.get("product"),
@@ -196,7 +197,9 @@ def _listing_record_from_card(
         {
             "title": product_name,
             "brand": brand,
-            "price": normalize_price(discounted_text, interpret_integral_as_cents=False),
+            "price": normalize_price(
+                discounted_text, interpret_integral_as_cents=False
+            ),
             "original_price": normalize_price(
                 strike_text,
                 interpret_integral_as_cents=False,
@@ -229,7 +232,9 @@ def looks_like_myx_product_payload(product: dict[str, Any]) -> bool:
     )
 
 
-def map_myx_product_payload(product: dict[str, Any], *, page_url: str) -> dict[str, Any]:
+def map_myx_product_payload(
+    product: dict[str, Any], *, page_url: str
+) -> dict[str, Any]:
     images = _myx_images(product)
     base_color = text_or_none(product.get("baseColour"))
     variants = _myx_variants(product, page_url=page_url, color=base_color)
@@ -286,9 +291,13 @@ def _myx_price(product: dict[str, Any], *, price_key: str) -> str | None:
         else price_payload.get("mrp")
     )
     if value in (None, "", [], {}):
-        value = common_price.get("discountedPrice" if price_key == "discountedPrice" else "mrp")
+        value = common_price.get(
+            "discountedPrice" if price_key == "discountedPrice" else "mrp"
+        )
     if value in (None, "", [], {}):
-        value = price_payload.get("discountedPrice" if price_key == "discountedPrice" else "mrp")
+        value = price_payload.get(
+            "discountedPrice" if price_key == "discountedPrice" else "mrp"
+        )
     if value in (None, "", [], {}):
         value = product.get("mrp" if price_key == "mrp" else "discountedPrice")
     return normalize_price(value, interpret_integral_as_cents=False)
@@ -347,11 +356,15 @@ def _myx_variants(
                     seller.get("mrp") or product.get("mrp"),
                     interpret_integral_as_cents=False,
                 ),
-                "availability": "in_stock" if bool(item.get("available")) else "out_of_stock",
+                "availability": "in_stock"
+                if bool(item.get("available"))
+                else "out_of_stock",
                 "stock_quantity": seller.get("availableCount"),
                 "url": _myx_variant_url(page_url, item),
                 "image_url": None,
-                "option_values": compact_dict({"size": text_or_none(item.get("label")), "color": color}),
+                "option_values": compact_dict(
+                    {"size": text_or_none(item.get("label")), "color": color}
+                ),
             }
         )
         if discount.get("discountPercent") not in (None, "", [], {}):

@@ -414,6 +414,11 @@ _DOWNGRADE_TABLES: tuple[str, ...] = (
     "domain_memory",
     "domain_cookie_memory",
 )
+_DOWNGRADE_INDEXES: tuple[str, ...] = tuple(
+    statement.split()[2]
+    for statement in _UPGRADE_SQL
+    if statement.startswith("CREATE INDEX ")
+)
 
 
 def upgrade() -> None:
@@ -422,5 +427,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    for index_name in reversed(_DOWNGRADE_INDEXES):
+        op.execute(f"DROP INDEX IF EXISTS {index_name}")
     for table_name in _DOWNGRADE_TABLES:
-        op.execute(f"DROP TABLE IF EXISTS {table_name} CASCADE")
+        op.drop_table(table_name)

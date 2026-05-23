@@ -3,7 +3,6 @@ from __future__ import annotations
 from decimal import Decimal
 import re
 from typing import Any
-from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup
 
@@ -17,7 +16,6 @@ from app.services.config.extraction_rules import (
     DETAIL_LOW_SIGNAL_ZERO_PRICE_SOURCE_SET,
     DETAIL_PARENT_VARIANT_PRICE_RATIO_MAX_DECIMAL,
     DETAIL_STRICT_PARENT_PRICE_SOURCE_SET,
-    PAGE_URL_CURRENCY_HINTS_RAW,
 )
 from app.services.extract.detail.price.parsing import (
     decimal_is_cent_magnitude_copy,
@@ -35,6 +33,10 @@ from app.services.extract.detail.price.parsing import (
 from app.services.shared.field_coerce import (
     extract_currency_code,
     text_or_none,
+)
+from app.services.shared.currency_hints import (
+    currency_hint_from_page_url,
+    detail_currency_hint_is_host_level,
 )
 from app.services.normalizers import normalize_decimal_price
 
@@ -57,7 +59,9 @@ def backfill_detail_price_from_html(
     )
     record_url = text_or_none(record.get("url")) or ""
     expected_currency = text_or_none(currency_hint_from_page_url(record_url))
-    preliminary_currency = text_or_none(record.get("currency")) or expected_currency or html_currency
+    preliminary_currency = (
+        text_or_none(record.get("currency")) or expected_currency or html_currency
+    )
     visible_price = detail_price_from_selector_text(
         soup,
         selectors=DETAIL_CURRENT_PRICE_SELECTORS,
@@ -146,7 +150,9 @@ def backfill_detail_price_from_html(
         price_source = "json_ld" if jsonld_price else "dom_text"
         if localized_override_price:
             price = localized_override_price
-            price_source = "dom_text" if visible_price == localized_override_price else "json_ld"
+            price_source = (
+                "dom_text" if visible_price == localized_override_price else "json_ld"
+            )
             localized_override_applied = True
         if visible_price and (
             detail_price_is_cent_magnitude_copy(price, visible_price)
@@ -179,11 +185,14 @@ def backfill_detail_price_from_html(
             ):
                 record["price"] = price
                 append_record_field_source(record, "price", "json_ld")
-            if _should_override_record_price_from_dom(
-                record=record,
-                dom_price=price,
-                record_price_is_low_signal=record_price_is_low_signal,
-            ) or localized_override_applied:
+            if (
+                _should_override_record_price_from_dom(
+                    record=record,
+                    dom_price=price,
+                    record_price_is_low_signal=record_price_is_low_signal,
+                )
+                or localized_override_applied
+            ):
                 record["price"] = price
                 append_record_field_source(record, "price", price_source)
             if isinstance(selected_variant, dict) and (
@@ -217,9 +226,7 @@ def backfill_detail_price_from_html(
                         continue
                     if (
                         variant.get("price") not in (None, "", [], {})
-                        and not _detail_price_value_is_low_signal(
-                            variant.get("price")
-                        )
+                        and not _detail_price_value_is_low_signal(variant.get("price"))
                         and not detail_price_is_cent_magnitude_copy(
                             variant.get("price"), price
                         )
@@ -250,7 +257,8 @@ def backfill_detail_price_from_html(
         original_price = None
     if (html_currency_conflicts_with_host or visible_currency_conflicts_with_html) and (
         original_price in (None, "", [], {})
-        or detail_price_decimal(original_price) == detail_price_decimal(record.get("price"))
+        or detail_price_decimal(original_price)
+        == detail_price_decimal(record.get("price"))
     ):
         _drop_conflicting_non_authoritative_original_price(record)
     if original_price not in (None, "", [], {}) and record.get("original_price") in (
@@ -291,7 +299,9 @@ def _localized_visible_or_structured_price_override(
     current_sources = record_field_sources(record, "price")
     if not (current_sources & {"adapter", "js_state"}):
         return None
-    if visible_price and _detail_price_is_visible_outlier(record.get("price"), visible_price):
+    if visible_price and _detail_price_is_visible_outlier(
+        record.get("price"), visible_price
+    ):
         return text_or_none(visible_price)
     if (
         jsonld_price
@@ -341,6 +351,8 @@ def _should_preserve_existing_localized_money(
         return False
     currency_sources = record_field_sources(record, "currency")
     if "url_currency_hint" in currency_sources:
+        return True
+    if jsonld_price in (None, "", [], {}):
         return True
     return _detail_price_is_visible_outlier(jsonld_price, current_price)
 
@@ -402,9 +414,8 @@ def _drop_unavailable_dom_backfilled_detail_price(record: dict[str, Any]) -> Non
     if isinstance(field_sources, dict):
         field_sources.pop("price", None)
     currency_sources = record_field_sources(record, "currency")
-    if (
-        record.get("original_price") in (None, "", [], {})
-        and not (currency_sources & DETAIL_AUTHORITATIVE_PRICE_SOURCE_SET)
+    if record.get("original_price") in (None, "", [], {}) and not (
+        currency_sources & DETAIL_AUTHORITATIVE_PRICE_SOURCE_SET
     ):
         record.pop("currency", None)
         if isinstance(field_sources, dict):
@@ -413,7 +424,9 @@ def _drop_unavailable_dom_backfilled_detail_price(record: dict[str, Any]) -> Non
 
 def _price_sources_are_non_authoritative(record: dict[str, Any]) -> bool:
     price_sources = record_field_sources(record, "price")
-    return bool(price_sources) and not (price_sources & DETAIL_AUTHORITATIVE_PRICE_SOURCE_SET)
+    return bool(price_sources) and not (
+        price_sources & DETAIL_AUTHORITATIVE_PRICE_SOURCE_SET
+    )
 
 
 def drop_low_signal_zero_detail_price(record: dict[str, Any]) -> None:
@@ -466,7 +479,9 @@ def _zero_detail_price_is_low_signal(
 ) -> bool:
     if text_or_none(record.get("availability")) == AVAILABILITY_OUT_OF_STOCK:
         return True
-    return bool(price_sources) and price_sources <= DETAIL_LOW_SIGNAL_ZERO_PRICE_SOURCE_SET
+    return (
+        bool(price_sources) and price_sources <= DETAIL_LOW_SIGNAL_ZERO_PRICE_SOURCE_SET
+    )
 
 
 def reconcile_detail_currency_with_url(
@@ -576,7 +591,8 @@ def reconcile_detail_price_magnitudes(record: dict[str, Any]) -> None:
         and safe_variant_price is not None
         and decimal_is_cent_magnitude_copy(parent_price, safe_variant_price)
         and not (
-            record_field_sources(record, "price") & DETAIL_STRICT_PARENT_PRICE_SOURCE_SET
+            record_field_sources(record, "price")
+            & DETAIL_STRICT_PARENT_PRICE_SOURCE_SET
         )
     ):
         record["price"] = format_price_decimal(safe_variant_price)
@@ -643,7 +659,8 @@ def reconcile_parent_price_against_variant_range(record: dict[str, Any]) -> None
     # scrape.
     if (
         parent_price > unanimous_variant_price
-        and (parent_price / unanimous_variant_price) > DETAIL_PARENT_VARIANT_PRICE_RATIO_MAX_DECIMAL
+        and (parent_price / unanimous_variant_price)
+        > DETAIL_PARENT_VARIANT_PRICE_RATIO_MAX_DECIMAL
     ):
         return
     if record_field_sources(record, "price") & DETAIL_STRICT_PARENT_PRICE_SOURCE_SET:
@@ -699,56 +716,6 @@ def _should_override_record_price_from_dom(
     return not bool(current_sources & DETAIL_AUTHORITATIVE_PRICE_SOURCE_SET)
 
 
-def currency_hint_from_page_url(page_url: object) -> str | None:
-    code, _is_host_level = _currency_hint_from_page_url(page_url)
-    return code
-
-
-def _currency_hint_from_page_url(page_url: object) -> tuple[str | None, bool]:
-    parsed = urlparse(str(page_url or "").strip())
-    hostname = str(parsed.hostname or "").strip().lower()
-    path_segments = {
-        segment.strip().lower()
-        for segment in str(parsed.path or "").split("/")
-        if segment.strip()
-    }
-    if not hostname and not path_segments:
-        return None, False
-    for token, code in dict(PAGE_URL_CURRENCY_HINTS_RAW or {}).items():
-        normalized_token = str(token).strip().lower()
-        if not normalized_token:
-            continue
-        if normalized_token.startswith("/"):
-            token_path_segments = {
-                segment.strip().lower()
-                for segment in normalized_token.split("/")
-                if segment.strip()
-            }
-            if token_path_segments and token_path_segments <= path_segments:
-                return str(code), False
-            continue
-        host_token, _, raw_path = normalized_token.partition("/")
-        token_path_segments = {
-            segment.strip().lower()
-            for segment in raw_path.split("/")
-            if segment.strip()
-        }
-        host_matches = hostname == host_token or hostname.endswith(f".{host_token}")
-        path_matches = not token_path_segments or token_path_segments <= path_segments
-        if host_matches and path_matches:
-            return str(code), True
-    return None, False
-
-
-def detail_currency_hint_is_host_level(
-    page_url: str,
-    *,
-    expected_currency: str,
-) -> bool:
-    code, is_host_level = _currency_hint_from_page_url(page_url)
-    return code == expected_currency and is_host_level
-
-
 def normalize_mismatched_host_currency_price(
     value: object,
     *,
@@ -762,7 +729,8 @@ def normalize_mismatched_host_currency_price(
         return None
     normalized = normalize_decimal_price(
         text,
-        interpret_integral_as_cents=expected_currency in DETAIL_CENT_BASED_PRICE_CURRENCY_SET,
+        interpret_integral_as_cents=expected_currency
+        in DETAIL_CENT_BASED_PRICE_CURRENCY_SET,
     )
     if normalized and "." not in normalized:
         return f"{normalized}.00"
@@ -862,6 +830,8 @@ def _detail_record_has_positive_price_corroboration(record: dict[str, Any]) -> b
         )
         for variant in variants
     )
+
+
 __all__ = [
     "append_record_field_source",
     "backfill_detail_price_from_html",

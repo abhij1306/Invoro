@@ -11,9 +11,9 @@ from app.services.extract.detail.assembly.record_assembly import (
 )
 from app.services.extract.detail.price.core import (
     backfill_detail_price_from_html,
-    currency_hint_from_page_url,
     drop_low_signal_zero_detail_price,
 )
+from app.services.shared.currency_hints import currency_hint_from_page_url
 
 __all__ = (
     "backfill_detail_price_from_html",
@@ -25,4 +25,3 @@ __all__ = (
     "infer_detail_failure_reason",
     "repair_ecommerce_detail_record_quality",
 )
-

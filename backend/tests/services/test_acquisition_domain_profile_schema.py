@@ -55,3 +55,11 @@ def test_invalid_profile_data_has_explicit_validation_errors() -> None:
     assert "field_name" in text
     assert "selector" in text
     assert "hit_count" in text
+
+
+def test_parse_profile_falls_back_for_non_mapping_payload() -> None:
+    profile = parse_domain_profile_v2("not a profile")
+
+    assert profile.domain == ""
+    assert profile.surface == DomainProfileV2().surface
+    assert profile.selector_rules == []

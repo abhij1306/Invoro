@@ -4,12 +4,17 @@ import pytest
 from bs4 import BeautifulSoup
 
 from app.services.dom import section_extraction, selector_engine
+from app.services.dom.content_extractability import dom_pattern_has_extractable_content
 from app.services.dom.selector_engine import (
     extract_heading_sections,
     extract_page_images,
     extract_selector_values,
     requested_content_extractability,
 )
+
+
+def test_dom_pattern_has_extractable_content_handles_missing_nodes() -> None:
+    assert dom_pattern_has_extractable_content(None, max_selector_matches=3) is False
 
 
 def test_extract_page_images_excludes_linked_job_detail_images_by_surface() -> None:
@@ -62,7 +67,9 @@ def test_extract_page_images_excludes_linked_product_detail_images_by_surface() 
     assert images == ["https://example.com/images/gallery.jpg"]
 
 
-def test_extract_page_images_keeps_main_gallery_carousel_images_on_detail_pages() -> None:
+def test_extract_page_images_keeps_main_gallery_carousel_images_on_detail_pages() -> (
+    None
+):
     soup = BeautifulSoup(
         """
         <html>
@@ -107,7 +114,9 @@ def test_extract_page_images_reads_lazy_image_attributes() -> None:
     assert images == ["https://example.com/images/gallery-lazy.jpg"]
 
 
-def test_extract_page_images_dedupes_cdn_resized_variants_and_keeps_highest_resolution() -> None:
+def test_extract_page_images_dedupes_cdn_resized_variants_and_keeps_highest_resolution() -> (
+    None
+):
     soup = BeautifulSoup(
         """
         <html>
@@ -151,7 +160,9 @@ def test_extract_page_images_preserves_non_resize_query_params_when_deduping() -
     ]
 
 
-def test_extract_page_images_prefers_gallery_media_and_filters_tracking_assets() -> None:
+def test_extract_page_images_prefers_gallery_media_and_filters_tracking_assets() -> (
+    None
+):
     soup = BeautifulSoup(
         """
         <html>
@@ -241,7 +252,9 @@ def test_extract_heading_sections_reads_details_summary_content() -> None:
 
     sections = extract_heading_sections(soup)
 
-    assert sections == {"Description": "Built for long mileage and wet-weather traction."}
+    assert sections == {
+        "Description": "Built for long mileage and wet-weather traction."
+    }
 
 
 def test_extract_heading_sections_reads_nested_wrapped_accordion_content() -> None:
@@ -265,12 +278,12 @@ def test_extract_heading_sections_reads_nested_wrapped_accordion_content() -> No
 
     sections = extract_heading_sections(soup)
 
-    assert sections == {
-        "Specifications": "Rubber outsole with a reinforced toe cap."
-    }
+    assert sections == {"Specifications": "Rubber outsole with a reinforced toe cap."}
 
 
-def test_extract_heading_sections_keeps_adjacent_heading_sections_bound_to_their_own_content() -> None:
+def test_extract_heading_sections_keeps_adjacent_heading_sections_bound_to_their_own_content() -> (
+    None
+):
     soup = BeautifulSoup(
         """
         <html>
@@ -312,11 +325,16 @@ def test_extract_heading_sections_keeps_adjacent_heading_sections_bound_to_their
 
     sections = extract_heading_sections(soup)
 
-    assert sections["Product Specifications"] == "Storage Dry Place Grade Medicine Grade"
+    assert (
+        sections["Product Specifications"] == "Storage Dry Place Grade Medicine Grade"
+    )
     assert sections["Company Details"].startswith(
         "Lyotex Lifesciences Private Limited manufactures botanical extracts."
     )
-    assert "Business Type Manufacturer, Supplier, Trading Company" in sections["Company Details"]
+    assert (
+        "Business Type Manufacturer, Supplier, Trading Company"
+        in sections["Company Details"]
+    )
     assert "GST NO 27AAECL9071B1ZK" in sections["Company Details"]
 
 
@@ -378,7 +396,10 @@ def test_extract_heading_sections_resolves_anchor_hash_accordion_panels() -> Non
     sections = extract_heading_sections(soup)
 
     assert sections["Product Details"] == "Material & Care: Premium Heavy Gauge Fabric"
-    assert sections["Product Description"] == "Official Licensed Superman Oversized T-Shirt."
+    assert (
+        sections["Product Description"]
+        == "Official Licensed Superman Oversized T-Shirt."
+    )
     assert sections["Artist's Details"] == "Suit up with Justice League merchandise."
 
 
@@ -437,7 +458,9 @@ def test_requested_content_extractability_ignores_arbitrary_heading_labels() -> 
     assert extractability["section_fields"] == ["description"]
 
 
-def test_requested_content_extractability_keeps_explicit_requested_section_labels() -> None:
+def test_requested_content_extractability_keeps_explicit_requested_section_labels() -> (
+    None
+):
     soup = BeautifulSoup(
         """
         <html>
@@ -606,7 +629,9 @@ def test_extract_heading_sections_does_not_map_action_labels_to_product_title() 
     }
 
 
-def test_extract_heading_sections_skips_non_material_fallback_text_in_composition_container() -> None:
+def test_extract_heading_sections_skips_non_material_fallback_text_in_composition_container() -> (
+    None
+):
     soup = BeautifulSoup(
         """
         <html>

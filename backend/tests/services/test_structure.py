@@ -153,7 +153,11 @@ def test_variant_normalization_common_keeps_compatibility_reexports() -> None:
         flatten_variants_for_public_output,
     )
 
-    assert common.flatten_variants_for_public_output is flatten_variants_for_public_output
+    assert (
+        common.flatten_variants_for_public_output is flatten_variants_for_public_output
+    )
+
+
 # Keep explicit budgets for coherent large owners. Budgets are set to roughly the
 # current LOC plus 10% so growth requires a conscious update instead of a blanket
 # threshold increase.
@@ -212,8 +216,8 @@ FILE_LOC_BUDGETS = {
     Path("app/services/extract/detail_dom_completion.py"): 360,
     Path("app/services/extract/detail_image_materialize.py"): 130,
     Path("app/services/extract/detail_record_assembly.py"): 495,
-    # Ratcheted for host-policy TTL compatibility and handoff failure isolation.
-    Path("app/services/fetch/fetch_context.py"): 1010,
+    # Ratcheted for explicit typed fetch_page API compatibility.
+    Path("app/services/fetch/fetch_context.py"): 1130,
     Path("app/services/js_state/state_normalizer/__init__.py"): 80,
     Path("app/services/js_state/state_normalizer/_common.py"): 120,
     Path("app/services/js_state/state_normalizer/_facade.py"): 180,
@@ -236,7 +240,8 @@ FILE_LOC_BUDGETS = {
     # LLM task runtime now only orchestrates task execution. Prompt rendering,
     # payload validation, provider calls, budget/cache, and cost logging have
     # separate owners.
-    Path("app/services/llm/tasks.py"): 455,
+    # Ratcheted for config_snapshot-aware LLM task runtime.
+    Path("app/services/llm/tasks.py"): 460,
     # Product Intelligence service owns job + discovery orchestration with brand and enrichment LLM helpers.
     Path("app/services/product_intelligence/service.py"): 1105,
 }
@@ -477,7 +482,8 @@ def test_root_binary_assets_are_not_committed_without_context() -> None:
     forbidden = [
         path.name
         for path in REPO_ROOT.iterdir()
-        if path.is_file() and path.suffix.lower() in {".png", ".jpg", ".jpeg", ".gif", ".webp"}
+        if path.is_file()
+        and path.suffix.lower() in {".png", ".jpg", ".jpeg", ".gif", ".webp"}
     ]
     assert forbidden == []
     assert (REPO_ROOT / "docs" / "assets" / "crawlerai-logo.png").exists()

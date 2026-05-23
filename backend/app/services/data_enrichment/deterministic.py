@@ -30,7 +30,7 @@ from app.services.data_enrichment.shopify_catalog import (
     term_dict,
     top_taxonomy_candidates as shopify_top_taxonomy_candidates,
 )
-from app.services.extract.detail.price.core import currency_hint_from_page_url
+from app.services.shared.currency_hints import currency_hint_from_page_url
 from app.services.normalizers import normalize_decimal_price
 from app.services.shared.field_coerce import (
     clean_text,

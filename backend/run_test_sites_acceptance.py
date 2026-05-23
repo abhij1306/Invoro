@@ -1,4 +1,5 @@
 r"""Run the `TEST_SITES.md` tail through the current production owners."""
+
 from __future__ import annotations
 
 import argparse
@@ -10,7 +11,7 @@ from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path
 
-from harness_support import (
+from harness.support import (
     HARNESS_MODE_ACQUISITION_ONLY,
     HARNESS_MODE_FULL_PIPELINE,
     DEFAULT_SITE_SET_PATH,
@@ -66,22 +67,26 @@ async def _run_one(site: dict[str, object], mode: str) -> dict[str, object]:
     result.update(evaluate_quality(site, result))
     result["expectation_met"] = _expectation_met(site, result)
     hard_gate = str(site.get("gate") or "").strip().lower() == "hard"
-    result["tracked_issue"] = (
-        not bool(result["expectation_met"])
-        and (
-            str(site.get("bucket") or "").strip().lower() not in {"must_pass", "known_blocked"}
-            or not hard_gate
-        )
+    result["tracked_issue"] = not bool(result["expectation_met"]) and (
+        str(site.get("bucket") or "").strip().lower()
+        not in {"must_pass", "known_blocked"}
+        or not hard_gate
     )
     result["ok"] = bool(result["expectation_met"]) or not hard_gate
     return result
 
 
 def _build_summary(results: list[dict[str, object]]) -> dict[str, object]:
-    failure_counts = Counter(str(row.get("failure_mode") or "unknown") for row in results)
+    failure_counts = Counter(
+        str(row.get("failure_mode") or "unknown") for row in results
+    )
     bucket_counts = Counter(str(row.get("bucket") or "unbucketed") for row in results)
-    quality_verdict_counts = Counter(str(row.get("quality_verdict") or "unknown") for row in results)
-    observed_failure_counts = Counter(str(row.get("observed_failure_mode") or "unknown") for row in results)
+    quality_verdict_counts = Counter(
+        str(row.get("quality_verdict") or "unknown") for row in results
+    )
+    observed_failure_counts = Counter(
+        str(row.get("observed_failure_mode") or "unknown") for row in results
+    )
     return {
         "ok": sum(1 for row in results if row.get("ok")),
         "failed": sum(1 for row in results if not row.get("ok")),
@@ -96,7 +101,9 @@ def _build_summary(results: list[dict[str, object]]) -> dict[str, object]:
     }
 
 
-def _write_report(results: list[dict[str, object]], *, start_line: int, source_path: Path, mode: str) -> Path:
+def _write_report(
+    results: list[dict[str, object]], *, start_line: int, source_path: Path, mode: str
+) -> Path:
     DEFAULT_REPORT_DIR.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     path = DEFAULT_REPORT_DIR / f"{stamp}__{mode}__test_sites_tail.json"
@@ -161,12 +168,16 @@ def _expected_contract_met(
             return False
     min_variant_count = _safe_int(expected.get("min_variant_count"))
     if min_variant_count > 0:
-        variant_count = _safe_int(_object_dict(result.get("sample_semantics")).get("variant_count"))
+        variant_count = _safe_int(
+            _object_dict(result.get("sample_semantics")).get("variant_count")
+        )
         if variant_count < min_variant_count:
             return False
     if bool(expected.get("price_must_be_numeric")):
         listing_contract = _object_dict(result.get("listing_contract"))
-        surface = str((site.get("surface") or result.get("surface") or "")).strip().lower()
+        surface = (
+            str((site.get("surface") or result.get("surface") or "")).strip().lower()
+        )
         if surface.endswith("_listing"):
             if _safe_int(listing_contract.get("price_numeric_count")) <= 0:
                 return False
@@ -175,7 +186,9 @@ def _expected_contract_met(
             if not _looks_numeric_price(price_value):
                 return False
     if bool(expected.get("detail_urls_must_be_present")):
-        if not bool(_object_dict(result.get("listing_contract")).get("detail_urls_present")):
+        if not bool(
+            _object_dict(result.get("listing_contract")).get("detail_urls_present")
+        ):
             return False
     return True
 
@@ -209,32 +222,75 @@ def _console_safe(value: object) -> str:
 
 
 async def main(argv: list[str]) -> int:
-    parser = argparse.ArgumentParser(description="Run TEST_SITES.md tail against production harness owners.")
-    parser.add_argument("--path", default=str(DEFAULT_TEST_SITES_PATH), help="Path to TEST_SITES.md")
-    parser.add_argument("--start-line", type=int, default=156, help="1-based start line")
+    parser = argparse.ArgumentParser(
+        description="Run TEST_SITES.md tail against production harness owners."
+    )
+    parser.add_argument(
+        "--path", default=str(DEFAULT_TEST_SITES_PATH), help="Path to TEST_SITES.md"
+    )
+    parser.add_argument(
+        "--start-line", type=int, default=156, help="1-based start line"
+    )
     parser.add_argument("--limit", type=int, default=None, help="Optional site limit")
-    parser.add_argument("--mode", choices=[HARNESS_MODE_FULL_PIPELINE, HARNESS_MODE_ACQUISITION_ONLY], default=HARNESS_MODE_FULL_PIPELINE, help="Run the full persisted pipeline or acquisition-only prefetch path.")
-    parser.add_argument("--url", action="append", default=[], help="Explicit URL to smoke-test. Repeat to bypass TEST_SITES.md selection.")
-    parser.add_argument("--surface", action="append", default=[], help="Explicit surface paired by position with each --url.")
-    parser.add_argument("--site-set", default="", help="Curated site set name to load from the site-set manifest.")
-    parser.add_argument("--site-set-path", default=str(DEFAULT_SITE_SET_PATH), help="Path to curated site-set manifest JSON.")
-    parser.add_argument("--prefer-artifacts", action="store_true", help="Reuse artifact-backed run_ids from the curated site-set when present.")
+    parser.add_argument(
+        "--mode",
+        choices=[HARNESS_MODE_FULL_PIPELINE, HARNESS_MODE_ACQUISITION_ONLY],
+        default=HARNESS_MODE_FULL_PIPELINE,
+        help="Run the full persisted pipeline or acquisition-only prefetch path.",
+    )
+    parser.add_argument(
+        "--url",
+        action="append",
+        default=[],
+        help="Explicit URL to smoke-test. Repeat to bypass TEST_SITES.md selection.",
+    )
+    parser.add_argument(
+        "--surface",
+        action="append",
+        default=[],
+        help="Explicit surface paired by position with each --url.",
+    )
+    parser.add_argument(
+        "--site-set",
+        default="",
+        help="Curated site set name to load from the site-set manifest.",
+    )
+    parser.add_argument(
+        "--site-set-path",
+        default=str(DEFAULT_SITE_SET_PATH),
+        help="Path to curated site-set manifest JSON.",
+    )
+    parser.add_argument(
+        "--prefer-artifacts",
+        action="store_true",
+        help="Reuse artifact-backed run_ids from the curated site-set when present.",
+    )
     args = parser.parse_args(argv)
 
     source_path = Path(args.path)
-    explicit_urls = [str(value or "").strip() for value in args.url if str(value or "").strip()]
-    explicit_surfaces = [str(value or "").strip() for value in args.surface if str(value or "").strip()]
+    explicit_urls = [
+        str(value or "").strip() for value in args.url if str(value or "").strip()
+    ]
+    explicit_surfaces = [
+        str(value or "").strip() for value in args.surface if str(value or "").strip()
+    ]
     if explicit_urls:
         sites: list[dict[str, object]] = [
             _as_object_row(site)
-            for site in build_explicit_sites(explicit_urls, explicit_surfaces=explicit_surfaces)
+            for site in build_explicit_sites(
+                explicit_urls, explicit_surfaces=explicit_surfaces
+            )
         ]
     elif str(args.site_set or "").strip():
-        sites = load_site_set(Path(args.site_set_path), site_set_name=str(args.site_set).strip())
+        sites = load_site_set(
+            Path(args.site_set_path), site_set_name=str(args.site_set).strip()
+        )
     else:
         sites = [
             _as_object_row(site)
-            for site in parse_test_sites_markdown(source_path, start_line=args.start_line)
+            for site in parse_test_sites_markdown(
+                source_path, start_line=args.start_line
+            )
         ]
     if args.prefer_artifacts:
         sites = [{**site, "prefer_artifact": True} for site in sites]
@@ -247,7 +303,9 @@ async def main(argv: list[str]) -> int:
         lead = f"Running {len(sites)} curated site-set entries from {args.site_set}"
     else:
         lead = f"Running {len(sites)} TEST_SITES entries from line {args.start_line}"
-    print(f"{lead} in mode={args.mode} (timeout_owner={timeout_owner_for_mode(args.mode)})...")
+    print(
+        f"{lead} in mode={args.mode} (timeout_owner={timeout_owner_for_mode(args.mode)})..."
+    )
     print("=" * 70)
 
     results: list[dict[str, object]] = []
@@ -256,9 +314,15 @@ async def main(argv: list[str]) -> int:
         row = await _run_one(site, args.mode)
         results.append(row)
         print(f"  Status: {status_for_result(row)}")
-        print(f"  Mode: {row.get('mode')}  Surface: {row.get('surface')}  Platform: {row.get('platform_family')}  Bucket: {row.get('bucket')}")
-        print(f"  Verdict: {row.get('verdict')}  Failure mode: {row.get('failure_mode')}")
-        print(f"  Quality: {row.get('quality_verdict')}  Observed: {row.get('observed_failure_mode')}  Source: {row.get('run_source')}")
+        print(
+            f"  Mode: {row.get('mode')}  Surface: {row.get('surface')}  Platform: {row.get('platform_family')}  Bucket: {row.get('bucket')}"
+        )
+        print(
+            f"  Verdict: {row.get('verdict')}  Failure mode: {row.get('failure_mode')}"
+        )
+        print(
+            f"  Quality: {row.get('quality_verdict')}  Observed: {row.get('observed_failure_mode')}  Source: {row.get('run_source')}"
+        )
         if row.get("records") is not None:
             print(f"  Records: {row.get('records')}")
         if row.get("sample_title"):
@@ -274,7 +338,9 @@ async def main(argv: list[str]) -> int:
             provider_text = provider or "unknown"
             print(f"  Challenge: provider={provider_text}")
             if evidence:
-                print(f"  Challenge evidence: {', '.join(str(item) for item in evidence[:3])}")
+                print(
+                    f"  Challenge evidence: {', '.join(str(item) for item in evidence[:3])}"
+                )
         failed_quality_checks = [
             name
             for name, value in _object_dict(row.get("quality_checks")).items()
@@ -289,7 +355,9 @@ async def main(argv: list[str]) -> int:
     summary = _build_summary(results)
     print("\n" + "=" * 70)
     print(json.dumps(summary, indent=2))
-    report_path = _write_report(results, start_line=args.start_line, source_path=source_path, mode=args.mode)
+    report_path = _write_report(
+        results, start_line=args.start_line, source_path=source_path, mode=args.mode
+    )
     print(f"Report: {report_path}")
     return 0 if summary["failed"] == 0 else 1
 

@@ -207,7 +207,10 @@ async def test_split_reset_crawl_data_and_domain_memory_preserve_the_other_scope
     db_session.add(
         DomainCookieMemory(
             domain="example.com",
-            storage_state={"cookies": [{"name": "session", "value": "1"}], "origins": []},
+            storage_state={
+                "cookies": [{"name": "session", "value": "1"}],
+                "origins": [],
+            },
             state_fingerprint="abc",
         )
     )
@@ -350,7 +353,9 @@ async def test_reset_application_data_clears_ucp_audit_rows(
     monkeypatch.setattr(dashboard_service.settings, "artifacts_dir", artifacts_dir)
     monkeypatch.setattr(dashboard_service.settings, "cookie_store_dir", cookies_dir)
 
-    job = UCPAuditJob(user_id=test_user.id, domain="example.com", options={}, summary={})
+    job = UCPAuditJob(
+        user_id=test_user.id, domain="example.com", options={}, summary={}
+    )
     db_session.add(job)
     await db_session.flush()
     db_session.add(
@@ -430,7 +435,9 @@ async def test_reset_product_intelligence_preserves_crawl_and_domain_memory(
             "surface": "ecommerce_detail",
         },
     )
-    db_session.add(DomainMemory(domain="example.com", surface="ecommerce_detail", selectors={}))
+    db_session.add(
+        DomainMemory(domain="example.com", surface="ecommerce_detail", selectors={})
+    )
     job = ProductIntelligenceJob(user_id=test_user.id, options={}, summary={})
     db_session.add(job)
     await db_session.flush()
@@ -516,6 +523,13 @@ async def test_host_protection_policy_persists_success_state_across_sessions(
         proxy_used=False,
         session=db_session,
     )
+    await note_host_hard_block(
+        "https://example.com/products/widget",
+        method="browser:chromium",
+        vendor="akamai",
+        proxy_used=False,
+        session=db_session,
+    )
     await db_session.commit()
 
     async with session_factory() as verification_session:
@@ -545,3 +559,26 @@ async def test_host_protection_policy_persists_success_state_across_sessions(
     assert recovered_policy.prefer_browser is True
     assert recovered_policy.chromium_blocked is False
     assert recovered_policy.real_chrome_success is True
+
+
+@pytest.mark.asyncio
+async def test_host_protection_repeated_hard_blocks_force_browser_first(
+    db_session: AsyncSession,
+) -> None:
+    await note_host_hard_block(
+        "https://example.net/products/widget",
+        method="http",
+        status_code=500,
+        proxy_used=False,
+        session=db_session,
+    )
+    policy = await note_host_hard_block(
+        "https://example.net/products/widget",
+        method="http",
+        status_code=500,
+        proxy_used=False,
+        session=db_session,
+    )
+
+    assert policy.hard_block_count == 2
+    assert policy.prefer_browser is True

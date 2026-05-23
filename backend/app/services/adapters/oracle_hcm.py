@@ -72,7 +72,7 @@ class OracleHCMAdapter(PublicEndpointAdapter):
                 )
                 if not isinstance(payload, (dict, list)):
                     break
-            except (OSError, RuntimeError, ValueError, TypeError):
+            except (OSError, TimeoutError):
                 break
 
             items = payload.get("items") if isinstance(payload, dict) else payload

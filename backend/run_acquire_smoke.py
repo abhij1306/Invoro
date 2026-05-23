@@ -7,6 +7,7 @@ Usage:
     .venv\Scripts\python.exe run_acquire_smoke.py
     .venv\Scripts\python.exe run_acquire_smoke.py api commerce jobs
 """
+
 from __future__ import annotations
 
 import argparse
@@ -26,12 +27,15 @@ from app.services.acquisition.runtime import is_blocked_html
 from app.services.acquisition_plan import AcquisitionPlan
 from app.services.platform_policy import detect_platform_family
 
-from harness_support import infer_surface
+from harness.support import infer_surface
 
 BATCHES: dict[str, list[tuple[str, str]]] = {
     "api": [
         ("Allbirds products.json", "https://www.allbirds.com/products.json"),
-        ("OpenFoodFacts sodas.json", "https://world.openfoodfacts.org/category/sodas.json"),
+        (
+            "OpenFoodFacts sodas.json",
+            "https://world.openfoodfacts.org/category/sodas.json",
+        ),
         ("Remotive API", "https://remotive.com/api/remote-jobs"),
         ("RemoteOK API", "https://remoteok.com/api"),
     ],
@@ -51,22 +55,40 @@ BATCHES: dict[str, list[tuple[str, str]]] = {
         ("Himalayas detail", "https://himalayas.app/jobs/product-designer/runway"),
     ],
     "hard": [
-        ("Footlocker mens shoes", "https://www.footlocker.com/category/mens/shoes.html"),
-        ("John Lewis electricals", "https://www.johnlewis.com/browse/electricals/c6000014"),
+        (
+            "Footlocker mens shoes",
+            "https://www.footlocker.com/category/mens/shoes.html",
+        ),
+        (
+            "John Lewis electricals",
+            "https://www.johnlewis.com/browse/electricals/c6000014",
+        ),
         ("Nike mens shoes", "https://www.nike.com/w/mens-shoes-nik1zy7ok"),
         ("Dyson air treatment", "https://www.dyson.in/air-treatment"),
     ],
     "ats": [
-        ("Greenhouse Doordash", "https://boards.greenhouse.io/embed/job_board?for=doordash"),
-        ("Greenhouse Notion", "https://boards.greenhouse.io/embed/job_board?for=notion"),
+        (
+            "Greenhouse Doordash",
+            "https://boards.greenhouse.io/embed/job_board?for=doordash",
+        ),
+        (
+            "Greenhouse Notion",
+            "https://boards.greenhouse.io/embed/job_board?for=notion",
+        ),
         ("Lever Figma", "https://jobs.lever.co/figma"),
         ("Lever Linear", "https://jobs.lever.co/linear"),
     ],
     "specialist": [
         ("Adafruit PDP", "https://www.adafruit.com/product/5700"),
         ("SparkFun PDP", "https://www.sparkfun.com/products/19030"),
-        ("McMaster listing", "https://www.mcmaster.com/pipe-fittings/high-pressure-stainless-steel-threaded-pipe-fittings/"),
-        ("B&H Sony PDP", "https://www.bhphotovideo.com/c/product/1730114-REG/sony_ilce_7rm5_b_alpha_a7r_v_mirrorless.html"),
+        (
+            "McMaster listing",
+            "https://www.mcmaster.com/pipe-fittings/high-pressure-stainless-steel-threaded-pipe-fittings/",
+        ),
+        (
+            "B&H Sony PDP",
+            "https://www.bhphotovideo.com/c/product/1730114-REG/sony_ilce_7rm5_b_alpha_a7r_v_mirrorless.html",
+        ),
     ],
 }
 
@@ -121,10 +143,14 @@ async def _run_one(run_id: int, name: str, url: str, timeout_seconds: int) -> di
         }
 
 
-async def _run_batch(batch_name: str, timeout_seconds: int, *, start_run_id: int) -> list[dict]:
+async def _run_batch(
+    batch_name: str, timeout_seconds: int, *, start_run_id: int
+) -> list[dict]:
     results: list[dict] = []
     for offset, (name, url) in enumerate(BATCHES[batch_name], start=1):
-        results.append(await _run_one(start_run_id + offset - 1, name, url, timeout_seconds))
+        results.append(
+            await _run_one(start_run_id + offset - 1, name, url, timeout_seconds)
+        )
     return results
 
 
@@ -140,7 +166,9 @@ def _build_summary(overall: dict[str, list[dict]]) -> dict[str, dict[str, int]]:
     return summary
 
 
-def _write_report(overall: dict[str, list[dict]], selected: list[str], timeout_seconds: int) -> Path:
+def _write_report(
+    overall: dict[str, list[dict]], selected: list[str], timeout_seconds: int
+) -> Path:
     report_dir = _report_dir()
     report_dir.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
@@ -158,16 +186,24 @@ def _write_report(overall: dict[str, list[dict]], selected: list[str], timeout_s
 
 
 async def main(argv: list[str]) -> int:
-    parser = argparse.ArgumentParser(description="Run small acquire-only smoke batches.")
-    parser.add_argument("batches", nargs="*", choices=sorted(BATCHES), help="Batch names to run")
-    parser.add_argument("--timeout", type=int, default=75, help="Per-site timeout in seconds")
+    parser = argparse.ArgumentParser(
+        description="Run small acquire-only smoke batches."
+    )
+    parser.add_argument(
+        "batches", nargs="*", choices=sorted(BATCHES), help="Batch names to run"
+    )
+    parser.add_argument(
+        "--timeout", type=int, default=75, help="Per-site timeout in seconds"
+    )
     args = parser.parse_args(argv)
 
     selected = args.batches or ["api", "commerce"]
     overall: dict[str, list[dict]] = {}
     run_id_base = 40000
     for batch_name in selected:
-        overall[batch_name] = await _run_batch(batch_name, args.timeout, start_run_id=run_id_base)
+        overall[batch_name] = await _run_batch(
+            batch_name, args.timeout, start_run_id=run_id_base
+        )
         run_id_base += len(BATCHES[batch_name])
 
     report_path = _write_report(overall, selected, args.timeout)

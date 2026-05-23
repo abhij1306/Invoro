@@ -76,7 +76,10 @@ def listing_node_attr(node, name: str) -> str:
 def listing_node_html(node) -> str:
     try:
         return str(getattr(node, "html", "") or "").strip()
+    except (AttributeError, TypeError, ValueError, SelectolaxError):
+        return ""
     except Exception:
+        logger.exception("Failed to read listing node HTML fragment")
         return ""
 
 
@@ -388,7 +391,9 @@ def _scored_listing_fragment_nodes(
     seen: set[str] = set()
     scored: list[tuple[int, int, object]] = []
     order = 0
-    fragment_limit = max(1, int(crawler_runtime_settings.listing_fallback_fragment_limit))
+    fragment_limit = max(
+        1, int(crawler_runtime_settings.listing_fallback_fragment_limit)
+    )
     selectors = list(CARD_SELECTORS.get(listing_selector_group(surface)) or [])
     for selector in selectors:
         matches = listing_node_css(parser, selector)
@@ -424,6 +429,7 @@ _PRICE_HINT_RE = re.compile(
     r"(?:rs\.?|inr|\$|£|€)\s*\d|\b\d[\d,]{2,}\b",
     re.I,
 )
+
 
 def listing_selector_is_weak(selector: str) -> bool:
     normalized = " ".join(str(selector or "").strip().lower().split())
@@ -556,11 +562,7 @@ def _listing_href_is_structural(href: str) -> bool:
     if not segments:
         return False
     tokenized = [
-        {
-            token
-            for token in re.split(r"[\-\.]+", segment)
-            if token
-        }
+        {token for token in re.split(r"[\-\.]+", segment) if token}
         for segment in segments
     ]
     if tokenized[-1] & set(LISTING_NON_LISTING_PATH_TOKENS):

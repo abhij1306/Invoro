@@ -40,7 +40,10 @@ async def test_greenhouse_adapter_extracts_detail_from_public_api(
     assert record["title"] == "Manager, Engineering"
     assert record["company"] == "Greenhouse"
     assert record["location"] == "Ontario"
-    assert record["apply_url"] == "https://job-boards.greenhouse.io/greenhouse/jobs/7704699?gh_jid=7704699"
+    assert (
+        record["apply_url"]
+        == "https://job-boards.greenhouse.io/greenhouse/jobs/7704699?gh_jid=7704699"
+    )
     assert "Lead and mentor engineers." in record["responsibilities"]
     assert "5+ years of engineering experience." in record["qualifications"]
 
@@ -81,3 +84,21 @@ def test_greenhouse_adapter_extracts_company_slug_from_subdomain_board_hosts() -
     )
 
     assert slug == "greenhouse"
+
+
+@pytest.mark.asyncio
+async def test_greenhouse_detail_api_timeout_propagates(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    adapter = GreenhouseAdapter()
+
+    async def fake_request_json(*_args: object, **_kwargs: object) -> object:
+        raise TimeoutError("timed out")
+
+    monkeypatch.setattr(adapter, "_request_json", fake_request_json)
+
+    with pytest.raises(TimeoutError, match="timed out"):
+        await adapter._try_detail_api(
+            "https://job-boards.greenhouse.io/greenhouse/jobs/7704699",
+            "<html></html>",
+        )

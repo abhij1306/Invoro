@@ -9,17 +9,77 @@ from urllib.parse import urlparse
 from typing import Any
 import httpx
 
-from app.services.acquisition.browser_runtime import SharedBrowserRuntime, build_failed_browser_diagnostics, browser_fetch, browser_runtime_snapshot, classify_network_endpoint, expand_all_interactive_elements, get_browser_runtime, read_network_payload_body, real_chrome_browser_available, should_capture_network_payload, shutdown_browser_runtime, temporary_browser_page
+from app.services.acquisition.browser_runtime import (
+    SharedBrowserRuntime,
+    build_failed_browser_diagnostics,
+    browser_fetch,
+    browser_runtime_snapshot,
+    classify_network_endpoint,
+    expand_all_interactive_elements,
+    get_browser_runtime,
+    read_network_payload_body,
+    real_chrome_browser_available,
+    should_capture_network_payload,
+    shutdown_browser_runtime,
+    temporary_browser_page,
+)
 from app.services.acquisition.browser_proxy_config import display_proxy, proxy_scheme
-from app.services.acquisition.host_protection_memory import HostProtectionPolicy, load_host_protection_policy, note_host_hard_block, note_host_usable_fetch
-from app.services.acquisition.cookie_store import clear_cookie_store_cache, export_cookie_header_for_domain
-from app.services.acquisition.http_client import close_shared_http_client as close_adapter_shared_http_client
-from app.services.acquisition.pacing import apply_protected_host_backoff, reset_pacing_state, wait_for_host_slot
-from app.services.acquisition.runtime import PageFetchResult, close_shared_http_client, curl_fetch, get_shared_http_client, http_fetch, is_blocked_html, is_blocked_html_async, is_non_retryable_http_status, should_escalate_to_browser
+from app.services.acquisition.host_protection_memory import (
+    HostProtectionPolicy,
+    load_host_protection_policy,
+    note_host_hard_block,
+    note_host_usable_fetch,
+)
+from app.services.acquisition.cookie_store import (
+    clear_cookie_store_cache,
+    export_cookie_header_for_domain,
+)
+from app.services.acquisition.http_client import (
+    close_shared_http_client as close_adapter_shared_http_client,
+)
+from app.services.acquisition.pacing import (
+    apply_protected_host_backoff,
+    reset_pacing_state,
+    wait_for_host_slot,
+)
+from app.services.acquisition.runtime import (
+    PageFetchResult,
+    close_shared_http_client,
+    curl_fetch,
+    get_shared_http_client,
+    http_fetch,
+    is_blocked_html,
+    is_blocked_html_async,
+    is_non_retryable_http_status,
+    should_escalate_to_browser,
+)
 from app.services.acquisition.traversal import should_run_traversal
-from app.services.config.runtime_settings import crawler_runtime_settings, proxy_rotation_mode
+from app.services.config.runtime_settings import (
+    crawler_runtime_settings,
+    proxy_rotation_mode,
+)
 from app.services.platform_policy import resolve_platform_runtime_policy
-from app.services.fetch.browser_policy import browser_engine_attempts as _browser_engine_attempts_impl, browser_escalation_allowed as _browser_escalation_allowed, browser_escalation_lane as _browser_escalation_lane, browser_escalation_proxies as _browser_escalation_proxies, browser_first_decision as _browser_first_decision, browser_first_reason as _browser_first_reason, attach_browser_attempt_diagnostics as _attach_browser_attempt_diagnostics, attach_exception_browser_diagnostics as _attach_exception_browser_diagnostics, durable_vendor_block_engine_attempts as _durable_vendor_block_engine_attempts, extract_vendor_from_reason as _extract_vendor_from_reason, hard_browser_requirement as _hard_browser_requirement, host_policy_snapshot as _host_policy_snapshot, is_vendor_block_reason as _is_vendor_block_reason, normalize_fetch_mode as _normalize_fetch_mode, normalize_proxy_profile as _normalize_proxy_profile, resolve_browser_reason as _resolve_browser_reason, resolve_proxy_attempts as _resolve_proxy_attempts, vendor_confirmed_block as _vendor_confirmed_block
+from app.services.fetch.browser_policy import (
+    browser_engine_attempts as _browser_engine_attempts_impl,
+    browser_escalation_allowed as _browser_escalation_allowed,
+    browser_escalation_lane as _browser_escalation_lane,
+    browser_escalation_proxies as _browser_escalation_proxies,
+    browser_first_decision as _browser_first_decision,
+    browser_first_reason as _browser_first_reason,
+    attach_browser_attempt_diagnostics as _attach_browser_attempt_diagnostics,
+    attach_exception_browser_diagnostics as _attach_exception_browser_diagnostics,
+    durable_vendor_block_engine_attempts as _durable_vendor_block_engine_attempts,
+    extract_vendor_from_reason as _extract_vendor_from_reason,
+    hard_browser_requirement as _hard_browser_requirement,
+    host_policy_snapshot as _host_policy_snapshot,
+    is_vendor_block_reason as _is_vendor_block_reason,
+    normalize_fetch_mode as _normalize_fetch_mode,
+    normalize_proxy_profile as _normalize_proxy_profile,
+    resolve_browser_reason as _resolve_browser_reason,
+    resolve_proxy_attempts as _resolve_proxy_attempts,
+    vendor_confirmed_block as _vendor_confirmed_block,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -178,19 +238,13 @@ _should_capture_network_payload = should_capture_network_payload
 _classify_network_endpoint = classify_network_endpoint
 _read_network_payload_body = read_network_payload_body
 
+
 async def reset_fetch_runtime_state() -> None:
     await shutdown_browser_runtime()
     await clear_cookie_store_cache()
     await reset_pacing_state()
     await close_shared_http_client()
     await close_adapter_shared_http_client()
-
-
-def _build_fetch_page_call(url: str, kwargs: dict[str, Any]) -> _FetchPageCall:
-    try:
-        return _FetchPageCall(url=_ensure_scheme(url), **kwargs)
-    except TypeError as exc:
-        raise TypeError(f"Invalid fetch_page arguments for url={url!r}") from exc
 
 
 def _build_fetch_runtime_context(call: _FetchPageCall) -> _FetchRuntimeContext:
@@ -222,7 +276,8 @@ def _build_fetch_runtime_context(call: _FetchPageCall) -> _FetchRuntimeContext:
             call.host_memory_ttl_seconds
         ),
         prefer_curl_handoff=bool(call.prefer_curl_handoff),
-        handoff_cookie_engine=str(call.handoff_cookie_engine or "").strip().lower() or None,
+        handoff_cookie_engine=str(call.handoff_cookie_engine or "").strip().lower()
+        or None,
         proxies=_resolve_proxy_attempts(
             call.proxy_list,
             run_id=call.run_id,
@@ -235,12 +290,60 @@ def _build_fetch_runtime_context(call: _FetchPageCall) -> _FetchRuntimeContext:
         traversal_required=should_run_traversal(call.surface, call.traversal_mode),
         fetch_mode=_normalize_fetch_mode(call.fetch_mode),
         runtime_policy=resolve_platform_runtime_policy(call.url, surface=call.surface),
-        forced_browser_engine=str(call.forced_browser_engine or "").strip().lower() or None,
+        forced_browser_engine=str(call.forced_browser_engine or "").strip().lower()
+        or None,
     )
 
 
-async def fetch_page(url: str, **kwargs: Any) -> PageFetchResult:
-    call = _build_fetch_page_call(url, kwargs)
+async def fetch_page(
+    url: str,
+    *,
+    run_id: int | None = None,
+    timeout_seconds: float | None = None,
+    proxy_list: list[str] | None = None,
+    proxy_profile: dict[str, object] | None = None,
+    locality_profile: dict[str, object] | None = None,
+    fetch_mode: str = "auto",
+    prefer_browser: bool = False,
+    browser_reason: str | None = None,
+    surface: str | None = None,
+    traversal_mode: str | None = None,
+    requested_fields: list[str] | None = None,
+    listing_recovery_mode: str | None = None,
+    capture_screenshot: bool = False,
+    host_memory_ttl_seconds: int | None = None,
+    prefer_curl_handoff: bool = False,
+    handoff_cookie_engine: str | None = None,
+    forced_browser_engine: str | None = None,
+    max_pages: int = 1,
+    max_scrolls: int = 1,
+    max_records: int | None = None,
+    on_event: Any | None = None,
+) -> PageFetchResult:
+    call = _FetchPageCall(
+        url=_ensure_scheme(url),
+        run_id=run_id,
+        timeout_seconds=timeout_seconds,
+        proxy_list=proxy_list,
+        proxy_profile=proxy_profile,
+        locality_profile=locality_profile,
+        fetch_mode=fetch_mode,
+        prefer_browser=prefer_browser,
+        browser_reason=browser_reason,
+        surface=surface,
+        traversal_mode=traversal_mode,
+        requested_fields=requested_fields,
+        listing_recovery_mode=listing_recovery_mode,
+        capture_screenshot=capture_screenshot,
+        host_memory_ttl_seconds=host_memory_ttl_seconds,
+        prefer_curl_handoff=prefer_curl_handoff,
+        handoff_cookie_engine=handoff_cookie_engine,
+        forced_browser_engine=forced_browser_engine,
+        max_pages=max_pages,
+        max_scrolls=max_scrolls,
+        max_records=max_records,
+        on_event=on_event,
+    )
     context = _build_fetch_runtime_context(call)
     context.host_policy = await _load_host_protection_policy_compat(
         call.url,
@@ -370,11 +473,14 @@ def _acquisition_strategy_message(
 
 def _attach_proxy_run_session(proxy_url: str, *, run_id: int | None) -> str:
     from app.services.fetch.browser_policy import attach_proxy_run_session
+
     return attach_proxy_run_session(proxy_url, run_id=run_id)
 
 
 def _browser_engine_attempts(
-    *, context: _FetchRuntimeContext, host_policy: HostProtectionPolicy,
+    *,
+    context: _FetchRuntimeContext,
+    host_policy: HostProtectionPolicy,
 ) -> list[str]:
     return _browser_engine_attempts_impl(
         context=context,
@@ -384,8 +490,11 @@ def _browser_engine_attempts(
 
 
 def _extend_browser_engine_attempts_after_block(
-    *, engine_attempts: list[str], attempted_engine: str,
-    context: _FetchRuntimeContext, host_policy: HostProtectionPolicy,
+    *,
+    engine_attempts: list[str],
+    attempted_engine: str,
+    context: _FetchRuntimeContext,
+    host_policy: HostProtectionPolicy,
 ) -> list[str]:
     refreshed_attempts = _browser_engine_attempts(
         context=context,
@@ -397,6 +506,7 @@ def _extend_browser_engine_attempts_after_block(
             continue
         appended.append(engine)
     return appended
+
 
 async def _run_browser_attempts(
     context: _FetchRuntimeContext,
@@ -888,9 +998,12 @@ async def _handle_http_result(
         surface=context.surface,
         runtime_policy=result_runtime_policy,
     )
-    browser_escalation_allowed = should_browser_escalate and _browser_escalation_allowed(
-        context=context,
-        runtime_policy=result_runtime_policy,
+    browser_escalation_allowed = (
+        should_browser_escalate
+        and _browser_escalation_allowed(
+            context=context,
+            runtime_policy=result_runtime_policy,
+        )
     )
     if should_browser_escalate and (vendor or bool(result.blocked)):
         await note_host_hard_block(

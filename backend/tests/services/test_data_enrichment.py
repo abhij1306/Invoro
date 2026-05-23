@@ -19,7 +19,6 @@ from app.services.config.data_enrichment import (
     DATA_ENRICHMENT_STATUS_PENDING,
     DATA_ENRICHMENT_STATUS_RUNNING,
     DATA_ENRICHMENT_TAXONOMY_VERSION,
-    data_enrichment_settings,
 )
 from app.services.data_enrichment.service import (
     run_job,
@@ -145,7 +144,9 @@ async def test_data_enrichment_skips_active_records(
     await db_session.commit()
     await db_session.refresh(record)
 
-    with pytest.raises(ValueError, match="No eligible ecommerce detail records selected"):
+    with pytest.raises(
+        ValueError, match="No eligible ecommerce detail records selected"
+    ):
         await create_data_enrichment_job(
             db_session,
             user=test_user,
@@ -392,7 +393,10 @@ async def test_data_enrichment_uses_job_llm_snapshot_over_source_run_snapshot(
         )
     ).one()
 
-    assert job.options["llm_config_snapshot"][DATA_ENRICHMENT_LLM_TASK]["provider"] == "groq"
+    assert (
+        job.options["llm_config_snapshot"][DATA_ENRICHMENT_LLM_TASK]["provider"]
+        == "groq"
+    )
     assert product.diagnostics["llm"]["provider"] == "groq"
     assert product.diagnostics["llm"]["model"] == "live-enrichment-model"
 
@@ -590,7 +594,9 @@ def test_normalize_price_range_rejects_trailing_noise() -> None:
     assert noisy == {"amount": 10.0, "currency": "USD"}
 
 
-def test_data_enrichment_variant_dict_values_do_not_pollute_sizes_or_availability() -> None:
+def test_data_enrichment_variant_dict_values_do_not_pollute_sizes_or_availability() -> (
+    None
+):
     enrichment = build_deterministic_enrichment(
         {
             "title": "Cotton Shirt",
