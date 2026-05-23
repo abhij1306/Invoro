@@ -72,7 +72,7 @@
 
   /* ── Fonts: keep existing app font family tokens. */
   --font-primary-family:
-    var(--font-primary-source, 'Inter'), 'Inter', system-ui, -apple-system, sans-serif;
+    var(--font-primary-source, 'Bricolage Grotesque'), 'Bricolage Grotesque', system-ui, -apple-system, sans-serif;
   --font-mono-family:
     var(--font-mono-source, 'JetBrains Mono'), 'JetBrains Mono', ui-monospace, monospace;
   --font-serif: Georgia, serif;
@@ -307,8 +307,8 @@
   --card-padding: 18px;
 
   --control-height: 32px;
-  --control-height-sm: 26px;
-  --control-height-lg: 36px;
+  --control-height-sm: 32px;
+  --control-height-lg: 32px;
   --interactive-border-width: 1px;
 
   /* ── Border radius */

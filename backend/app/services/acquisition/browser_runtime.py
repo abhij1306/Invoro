@@ -788,9 +788,11 @@ async def _maybe_warm_origin_before_navigation(
     ):
         return
     host_policy = dict(host_policy_snapshot or {})
-    if bool(host_policy.get("prefer_browser")) and str(
-        host_policy.get("last_block_vendor") or ""
-    ).strip():
+    if (
+        _normalize_browser_engine(browser_engine) != _REAL_CHROME_BROWSER_ENGINE
+        and bool(host_policy.get("prefer_browser"))
+        and str(host_policy.get("last_block_vendor") or "").strip()
+    ):
         return
     warm_pause_ms = max(0, int(crawler_runtime_settings.origin_warm_pause_ms or 0))
     if warm_pause_ms <= 0:

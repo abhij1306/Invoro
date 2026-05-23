@@ -4,12 +4,12 @@ import Script from 'next/script';
 import './globals.css';
 
 // Next.js App Router root layout; invoked by file-system routing.
-import { Inter, JetBrains_Mono } from 'next/font/google';
+import { Bricolage_Grotesque, JetBrains_Mono } from 'next/font/google';
 
 import { AppShell } from '../components/layout/app-shell';
 import { QueryProvider } from '../components/ui/query-provider';
 
-const mainFont = Inter({
+const mainFont = Bricolage_Grotesque({
   subsets: ['latin'],
   weight: ['300', '400', '500', '600', '700', '800'],
   variable: '--font-primary-source',

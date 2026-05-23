@@ -4,6 +4,7 @@ import asyncio
 from functools import partial
 from inspect import signature
 import logging
+import time
 from dataclasses import dataclass, field
 from urllib.parse import urlparse
 from typing import Any
@@ -110,6 +111,7 @@ async def _emit_fetch_event(on_event: Any | None, level: str, message: str) -> N
 class _FetchRuntimeContext:
     url: str
     resolved_timeout: float
+    deadline_monotonic: float
     run_id: int | None
     surface: str | None
     traversal_mode: str | None
@@ -261,6 +263,7 @@ def _build_fetch_runtime_context(call: _FetchPageCall) -> _FetchRuntimeContext:
     return _FetchRuntimeContext(
         url=call.url,
         resolved_timeout=float(resolved_timeout_source),
+        deadline_monotonic=time.perf_counter() + float(resolved_timeout_source),
         run_id=call.run_id,
         surface=call.surface,
         traversal_mode=call.traversal_mode,
@@ -293,6 +296,32 @@ def _build_fetch_runtime_context(call: _FetchPageCall) -> _FetchRuntimeContext:
         forced_browser_engine=str(call.forced_browser_engine or "").strip().lower()
         or None,
     )
+
+
+def _remaining_browser_timeout_seconds(context: _FetchRuntimeContext) -> float:
+    return context.deadline_monotonic - time.perf_counter()
+
+
+def _browser_attempt_timeout_seconds(
+    context: _FetchRuntimeContext,
+    *,
+    reason: str,
+    browser_engine: str,
+    engine_index: int,
+    engine_attempts: list[str],
+) -> float:
+    remaining_timeout = _remaining_browser_timeout_seconds(context)
+    if (
+        browser_engine == "patchright"
+        and _is_vendor_block_reason(reason)
+        and not str(context.forced_browser_engine or "").strip()
+        and engine_index < len(engine_attempts)
+    ):
+        return min(
+            remaining_timeout,
+            float(crawler_runtime_settings.browser_vendor_block_probe_timeout_seconds),
+        )
+    return remaining_timeout
 
 
 async def fetch_page(
@@ -560,14 +589,38 @@ async def _run_browser_attempts(
             browser_engine = engine_attempts[engine_index]
             engine_index += 1
             host_policy_snapshot = _host_policy_snapshot(active_host_policy)
+            remaining_timeout = _browser_attempt_timeout_seconds(
+                context,
+                reason=reason,
+                browser_engine=browser_engine,
+                engine_index=engine_index,
+                engine_attempts=engine_attempts,
+            )
+            if remaining_timeout <= 0:
+                raise TimeoutError(
+                    "Acquisition browser retry budget exhausted before "
+                    f"{browser_engine} could start"
+                )
             try:
                 await wait_for_host_slot(
                     context.url,
                     ttl_seconds=context.host_memory_ttl_seconds,
                 )
+                remaining_timeout = _browser_attempt_timeout_seconds(
+                    context,
+                    reason=reason,
+                    browser_engine=browser_engine,
+                    engine_index=engine_index,
+                    engine_attempts=engine_attempts,
+                )
+                if remaining_timeout <= 0:
+                    raise TimeoutError(
+                        "Acquisition browser retry budget exhausted before "
+                        f"{browser_engine} could run"
+                    )
                 result = await _browser_fetch(
                     context.url,
-                    context.resolved_timeout,
+                    remaining_timeout,
                     run_id=context.run_id,
                     proxy=proxy,
                     browser_engine=browser_engine,

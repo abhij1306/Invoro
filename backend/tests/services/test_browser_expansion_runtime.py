@@ -4881,6 +4881,25 @@ async def test_origin_warmup_skips_for_known_vendor_block_memory() -> None:
 
 
 @pytest.mark.asyncio
+async def test_origin_warmup_runs_for_real_chrome_despite_vendor_block_memory() -> None:
+    page = _FakeExpansionPage(base_html="<html><body><h1>Widget</h1></body></html>")
+
+    await browser_runtime._maybe_warm_origin_before_navigation(
+        page,
+        url="https://example.com/products/widget",
+        surface="ecommerce_detail",
+        browser_engine="real_chrome",
+        browser_reason="vendor-block:datadome",
+        host_policy_snapshot={"prefer_browser": True, "last_block_vendor": "datadome"},
+        proxy_profile=None,
+        timeout_seconds=5,
+        phase_timings_ms={},
+    )
+
+    assert len(page.spawned_pages) == 1
+
+
+@pytest.mark.asyncio
 async def test_browser_fetch_skips_real_chrome_warmup_when_domain_cookies_exist(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

@@ -209,6 +209,7 @@ class CrawlerRuntimeSettings(BaseSettings):
     browser_spa_implicit_networkidle_timeout_ms: int = 6000
     browser_navigation_min_commit_wait_ms: int = 8000
     browser_navigation_min_final_commit_timeout_ms: int = 15000
+    browser_vendor_block_probe_timeout_seconds: float = 12.0
     browser_capture_max_network_payloads: int = 25
     browser_capture_max_network_payload_bytes: int = 3000000
     browser_capture_total_network_payload_bytes: int = 12000000
@@ -419,6 +420,7 @@ class CrawlerRuntimeSettings(BaseSettings):
             "max_url_process_timeout_seconds",
             "job_max_wall_seconds",
             "browser_render_timeout_seconds",
+            "browser_vendor_block_probe_timeout_seconds",
             "browser_capture_max_network_payloads",
             "browser_capture_max_network_payload_bytes",
             "browser_capture_total_network_payload_bytes",

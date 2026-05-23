@@ -344,13 +344,13 @@ export function UcpScoreSummary({
                 blocked={gateApplied && dimension.dimension_id !== 'D-UCP1'}
               />
             )) ?? (
-              <div className="col-span-full py-8">
-                <DataRegionEmpty
-                  title="Awaiting Analytics Execution"
-                  description="Supply a target domain and launch a compliance audit to run semantic scoring."
-                />
-              </div>
-            )}
+                <div className="col-span-full py-8">
+                  <DataRegionEmpty
+                    title="Awaiting Analytics Execution"
+                    description="Supply a target domain and launch a compliance audit to run semantic scoring."
+                  />
+                </div>
+              )}
           </div>
         </div>
       </div>
@@ -1398,8 +1398,8 @@ function normalizeFinding(finding: Record<string, unknown>, index: number): Norm
       : [],
     evidence: Array.isArray(finding.evidence)
       ? finding.evidence.filter(
-          (item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object',
-        )
+        (item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object',
+      )
       : [],
   };
 }
