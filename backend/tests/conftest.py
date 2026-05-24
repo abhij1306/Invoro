@@ -277,3 +277,19 @@ def create_test_run(db_session: AsyncSession, test_user: User):
         return await create_crawl_run(db_session, test_user.id, payload)
 
     return _create_test_run
+
+
+class ExistingSessionLocal:
+    def __init__(self, session):
+        self._session = session
+
+    async def __aenter__(self):
+        return self._session
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return False
+
+
+@pytest.fixture
+def existing_session_local_factory():
+    return ExistingSessionLocal
