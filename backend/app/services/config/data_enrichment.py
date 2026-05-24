@@ -83,12 +83,9 @@ DATA_ENRICHMENT_TAXONOMY_CONTEXT_ONLY_TOKENS = frozenset(
         "girl",
         "kid",
         "men",
-        "s",
-        "single",
         "toddler",
         "unisex",
         "women",
-        "star",
     }
 )
 DATA_ENRICHMENT_TAXONOMY_ACCESSORY_PATH_TERMS = (
@@ -225,7 +222,7 @@ DATA_ENRICHMENT_PRICE_ORIGINAL_FIELDS = (
 )
 DATA_ENRICHMENT_COLOR_FAMILY_ALIASES = {
     "black": ("black",),
-    "blue": ("blue", "navy", "cobalt", "royal blue", "sky blue", "teal", "turquoise"),
+    "blue": ("blue", "navy", "cobalt", "royal blue", "sky blue"),
     "brown": ("beige", "brown", "tan", "camel", "chocolate", "taupe", "khaki"),
     "gold": ("gold", "bronze", "champagne", "rose gold"),
     "gray": ("gray", "grey", "silver", "charcoal", "slate"),
@@ -487,8 +484,7 @@ class DataEnrichmentSettings:
     llm_taxonomy_hint_count: int = 5
     llm_semantic_list_item_chars: int = 80
     llm_call_timeout_seconds: float = 20.0
-    llm_rate_limit_retries: int = 1
-    llm_rate_limit_retry_delay_seconds: float = 6.0
+    taxonomy_phrase_source_max_chars: int = 300
 
 
 data_enrichment_settings = DataEnrichmentSettings()

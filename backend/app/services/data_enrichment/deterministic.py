@@ -457,18 +457,15 @@ def category_match_values(data: dict[str, object]) -> list[object]:
         "category",
         "product_type",
         "title",
-        "description",
-        "tags",
-        "materials",
-        "material",
-        "product_attributes",
-        "specifications",
         "url_category_context",
     ):
         value = first_present(data, key)
         if value in (None, "", [], {}):
             continue
         values.append(value)
+    description = clean_text(first_present(data, "description"))
+    if description and len(description) <= data_enrichment_settings.taxonomy_phrase_source_max_chars:
+        values.append(description)
     return values
 
 

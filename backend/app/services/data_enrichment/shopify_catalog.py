@@ -40,6 +40,7 @@ class TaxonomyIndex:
     categories: tuple[dict[str, object], ...]
     exact_lookup: dict[str, dict[str, object]]
     leaf_lookup: dict[str, tuple[dict[str, object], ...]]
+    path_phrase_lookup: dict[str, tuple[dict[str, object], ...]]
     id_lookup: dict[str, dict[str, object]]
 
 
@@ -55,7 +56,7 @@ def tokenize_text(value: object) -> list[str]:
     return [
         normalized
         for token in _token_re.findall(clean_text(strip_html_tags(value)).casefold())
-        if (normalized := normalize_taxonomy_token(token))
+        if token != "s" and (normalized := normalize_taxonomy_token(token))
     ]
 
 
@@ -329,29 +330,16 @@ def phrase_path_category_match(
     phrase_tokens = set(tokenize_text(phrase))
     if len(phrase_tokens) < 2:
         return None
-    matches: list[dict[str, object]] = []
-    for item in taxonomy_index.categories:
-        first_path_part = clean_text(str(item.get("category_path") or "").split(">")[0])
-        leaf_part = clean_text(str(item.get("category_path") or "").split(">")[-1])
-        first_part_tokens = set(tokenize_text(first_path_part))
-        leaf_tokens = set(tokenize_text(leaf_part))
-        if first_part_tokens and not (phrase_tokens & first_part_tokens):
-            continue
-        category_tokens = set(
-            string_iterable(item.get("path_match_tokens"))
-            or tokenize_text(item.get("category_path"))
-        )
-        if not phrase_tokens <= category_tokens:
-            continue
-        if phrase not in str(item.get("normalized_path") or "") and not root_leaf_phrase_match(
-            phrase_tokens,
-            first_part_tokens,
-            leaf_tokens,
-        ):
-            continue
-        if taxonomy_candidate_conflicts(source_tokens, item.get("category_path")):
-            continue
-        matches.append(item)
+    if phrase_tokens <= DATA_ENRICHMENT_TAXONOMY_CONTEXT_ONLY_TOKENS:
+        return None
+    accessory_terms = normalized_token_set(DATA_ENRICHMENT_TAXONOMY_ACCESSORY_PATH_TERMS)
+    if phrase_tokens & accessory_terms:
+        return None
+    matches = [
+        item
+        for item in taxonomy_index.path_phrase_lookup.get(phrase, ())
+        if not taxonomy_candidate_conflicts(source_tokens, item.get("category_path"))
+    ]
     if not matches:
         return None
     matches.sort(
@@ -414,19 +402,6 @@ def leaf_token_category_match(
         return None
     candidates.sort(key=lambda item: (-item[0], item[1]))
     return category_match_payload(candidates[0][2], score=0.84, source="leaf_token")
-
-
-def root_leaf_phrase_match(
-    phrase_tokens: set[str],
-    first_part_tokens: set[str],
-    leaf_tokens: set[str],
-) -> bool:
-    if len(phrase_tokens) != 2:
-        return False
-    if not phrase_tokens & first_part_tokens or not phrase_tokens & leaf_tokens:
-        return False
-    leaf_extra = leaf_tokens - phrase_tokens - DATA_ENRICHMENT_TAXONOMY_CONTEXT_ONLY_TOKENS
-    return len(leaf_extra) <= 1
 
 
 def score_float(value: object) -> float:
@@ -525,7 +500,10 @@ def special_token_conflict(source_tokens: set[str], path_tokens: set[str]) -> bo
     if "ball" in source_tokens and "ball" not in path_tokens:
         return True
     lego_terms = {"lego", "minifigure"}
-    return bool(lego_terms & source_tokens and {"mature", "weapon"} & path_tokens)
+    return bool(
+        lego_terms & source_tokens
+        and {"mature", "weapon", "star", "planet"} & path_tokens
+    )
 
 
 def taxonomy_accessory_path(path_text: str) -> bool:
@@ -632,6 +610,7 @@ def load_taxonomy_index(path: Path) -> TaxonomyIndex:
     rows: list[dict[str, object]] = []
     exact_lookup: dict[str, dict[str, object]] = {}
     leaf_lookup: dict[str, list[dict[str, object]]] = {}
+    path_phrase_lookup: dict[str, list[dict[str, object]]] = {}
     id_lookup: dict[str, dict[str, object]] = {}
     for vertical in object_list(raw.get("verticals")):
         if not isinstance(vertical, dict):
@@ -662,14 +641,35 @@ def load_taxonomy_index(path: Path) -> TaxonomyIndex:
             exact_lookup[normalized_path] = row
             if leaf:
                 leaf_lookup.setdefault(leaf, []).append(row)
+            for phrase in taxonomy_path_lookup_phrases(row):
+                path_phrase_lookup.setdefault(phrase, []).append(row)
             id_lookup[category_id] = row
     return TaxonomyIndex(
         version=str(raw.get("version") or ""),
         categories=tuple(rows),
         exact_lookup=exact_lookup,
         leaf_lookup={key: tuple(value) for key, value in leaf_lookup.items()},
+        path_phrase_lookup={key: tuple(value) for key, value in path_phrase_lookup.items()},
         id_lookup=id_lookup,
     )
+
+
+def taxonomy_path_lookup_phrases(item: dict[str, object]) -> list[str]:
+    phrases = taxonomy_phrases(tokenize_text(item.get("normalized_path")))
+    parts = [part for part in clean_text(item.get("category_path")).split(">") if part.strip()]
+    if len(parts) < 2:
+        return phrases
+    root_tokens = tokenize_text(parts[0])
+    leaf_tokens = tokenize_text(parts[-1])
+    for root_token in root_tokens:
+        if root_token in DATA_ENRICHMENT_TAXONOMY_CONTEXT_ONLY_TOKENS:
+            continue
+        for leaf_token in leaf_tokens:
+            if leaf_token in DATA_ENRICHMENT_TAXONOMY_CONTEXT_ONLY_TOKENS:
+                continue
+            phrases.append(f"{leaf_token} {root_token}")
+            phrases.append(f"{root_token} {leaf_token}")
+    return list(dict.fromkeys(phrases))
 
 
 def attribute_by_name(

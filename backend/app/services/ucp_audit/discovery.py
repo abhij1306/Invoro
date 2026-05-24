@@ -18,18 +18,22 @@ from app.services.ucp_audit.types import UCPManifestResult
 logger = logging.getLogger(__name__)
 
 _VERSION_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_JWK_REQUIRED_FIELDS = frozenset({"kid", "kty", "use", "alg"})
 
 
 async def discover_ucp_manifest(domain: str) -> UCPManifestResult:
     target_url = manifest_url(domain)
     result = await _fetch_manifest_page(target_url)
+    discovery_source = "well-known"
     if _should_try_link_fallback(result):
-        fallback_url = await _discover_link_manifest_url(domain)
+        fallback_url = await _discover_link_manifest_url(
+            str(getattr(result, "final_url", "") or domain)
+        )
         if fallback_url:
             fallback_result = await _fetch_manifest_page(fallback_url)
             if fallback_result is not None and not _page_error(fallback_result):
                 result = fallback_result
-                _set_result_attr(result, "discovery_source", "link-header")
+                discovery_source = "link-header"
     if result is None:
         return UCPManifestResult(
             manifest_found=False,
@@ -39,7 +43,6 @@ async def discover_ucp_manifest(domain: str) -> UCPManifestResult:
             missing_required_services=list(config.UCP_REQUIRED_SERVICE_NAMES),
             errors=[f"{config.UCP_MANIFEST_PATH} fetch failed"],
         )
-    discovery_source = str(getattr(result, "discovery_source", "well-known") or "well-known")
     fetch_error = _page_error(result)
     if fetch_error:
         return UCPManifestResult(
@@ -47,6 +50,7 @@ async def discover_ucp_manifest(domain: str) -> UCPManifestResult:
             target_version=config.UCP_TARGET_VERSION,
             discovery_source=discovery_source,
             content_type=str(getattr(result, "content_type", "") or ""),
+            response_headers=dict(getattr(result, "headers", {}) or {}),
             final_url=str(getattr(result, "final_url", target_url) or target_url),
             redirect_chain=list(getattr(result, "redirect_chain", []) or []),
             missing_required_capabilities=list(config.UCP_REQUIRED_CAPABILITIES),
@@ -59,6 +63,7 @@ async def discover_ucp_manifest(domain: str) -> UCPManifestResult:
             target_version=config.UCP_TARGET_VERSION,
             discovery_source=discovery_source,
             content_type=str(getattr(result, "content_type", "") or ""),
+            response_headers=dict(getattr(result, "headers", {}) or {}),
             final_url=str(getattr(result, "final_url", target_url) or target_url),
             redirect_chain=list(getattr(result, "redirect_chain", []) or []),
             missing_required_capabilities=list(config.UCP_REQUIRED_CAPABILITIES),
@@ -70,6 +75,7 @@ async def discover_ucp_manifest(domain: str) -> UCPManifestResult:
         "target_version": config.UCP_TARGET_VERSION,
         "discovery_source": discovery_source,
         "content_type": str(getattr(result, "content_type", "") or ""),
+        "response_headers": dict(getattr(result, "headers", {}) or {}),
         "final_url": str(getattr(result, "final_url", target_url) or target_url),
         "redirect_chain": list(getattr(result, "redirect_chain", []) or []),
     }
@@ -97,7 +103,7 @@ async def discover_ucp_manifest(domain: str) -> UCPManifestResult:
     missing_capabilities = [
         item for item in config.UCP_REQUIRED_CAPABILITIES if item not in capability_names
     ]
-    shape_errors = _validate_manifest_shape(payload)
+    shape_errors, signing_keys_errors = _validate_manifest_shape(payload)
     if not _is_json_content_type(metadata["content_type"]):
         shape_errors.append(
             "Response Content-Type is not application/json or an application/*+json type"
@@ -134,7 +140,8 @@ async def discover_ucp_manifest(domain: str) -> UCPManifestResult:
         ),
         payment_handlers=sorted({item["name"] for item in _payment_handler_entries(payload)}),
         raw_manifest=payload,
-        errors=shape_errors + entry_errors,
+        errors=shape_errors + signing_keys_errors + entry_errors,
+        signing_keys_errors=signing_keys_errors,
         **metadata,
     )
 
@@ -156,6 +163,7 @@ async def _selected_manifest_payload(result: object) -> tuple[object, dict | Non
     version_url = ""
     if isinstance(supported, dict):
         version_url = str(supported.get(config.UCP_TARGET_VERSION) or "").strip()
+    target_declared = _supported_versions_declares_target(supported)
     if version_url:
         fetched = await _fetch_manifest_page(version_url)
         if fetched is None or _page_error(fetched):
@@ -171,10 +179,22 @@ async def _selected_manifest_payload(result: object) -> tuple[object, dict | Non
             return fetched, None, [type(supported_payload).__name__]
         _set_result_attr(fetched, "version_source", "supported_versions")
         return fetched, supported_payload, []
+    if target_declared:
+        _set_result_attr(result, "version_source", "supported_versions")
+        return result, payload, []
     _set_result_attr(result, "version_source", "unsupported")
     return result, payload, [
         f"UCP target version {config.UCP_TARGET_VERSION} is not declared"
     ]
+
+
+def _supported_versions_declares_target(value: object) -> bool:
+    target = config.UCP_TARGET_VERSION
+    if isinstance(value, dict):
+        return target in value
+    if isinstance(value, list):
+        return any(str(item).strip() == target for item in value)
+    return False
 
 
 async def _fetch_manifest_page(url: str):
@@ -222,7 +242,7 @@ async def _discover_link_manifest_url(domain: str) -> str:
             )
     except (httpx.HTTPError, OSError, TimeoutError, asyncio.TimeoutError):
         return ""
-    return _link_header_ucp_url(response.headers.get("link", ""), str(response.url))
+    return link_header_ucp_url(response.headers.get("link", ""), str(response.url))
 
 
 def manifest_url(value: str) -> str:
@@ -322,24 +342,39 @@ def _schema_urls(base_url: str, *entry_sets: list[dict]) -> list[str]:
     return sorted(urls)
 
 
-def _validate_manifest_shape(payload: dict) -> list[str]:
-    errors: list[str] = []
+def _validate_manifest_shape(payload: dict) -> tuple[list[str], list[str]]:
+    structural_errors: list[str] = []
+    security_errors: list[str] = []
     if not isinstance(payload.get("ucp"), dict):
-        errors.append("Missing required object: ucp")
-        return errors
+        structural_errors.append("Missing required object: ucp")
+        return structural_errors, security_errors
     root = _profile_root(payload)
     version = str(root.get("version") or "")
     if not version:
-        errors.append("Missing required field: ucp.version")
+        structural_errors.append("Missing required field: ucp.version")
     elif not _VERSION_RE.match(version):
-        errors.append("ucp.version must be a YYYY-MM-DD date")
+        structural_errors.append("ucp.version must be a YYYY-MM-DD date")
     for field in ("services", "capabilities"):
         if not isinstance(root.get(field), dict):
-            errors.append(f"Missing required object: ucp.{field}")
+            structural_errors.append(f"Missing required object: ucp.{field}")
     signing_keys = payload.get("signing_keys")
-    if not isinstance(signing_keys, list):
-        errors.append("Missing required array: signing_keys")
-    return errors
+    if not isinstance(signing_keys, list) or not signing_keys:
+        security_errors.append("Missing required array: signing_keys")
+    if isinstance(signing_keys, list):
+        for i, key in enumerate(signing_keys):
+            if not isinstance(key, dict):
+                security_errors.append(f"signing_keys[{i}] is not an object")
+                continue
+            missing_jwk = _JWK_REQUIRED_FIELDS - set(key.keys())
+            if missing_jwk:
+                security_errors.append(
+                    f"signing_keys[{i}] missing required JWK fields: {sorted(missing_jwk)}"
+                )
+            if str(key.get("use") or "") != "sig":
+                security_errors.append(
+                    f"signing_keys[{i}].use must be 'sig', got: {key.get('use')!r}"
+                )
+    return structural_errors, security_errors
 
 
 def _validate_entry_versions(entries: list[dict], kind: str) -> None:
@@ -350,10 +385,47 @@ def _validate_entry_versions(entries: list[dict], kind: str) -> None:
             errors.append(f"Missing {kind} version for {entry.get('name')}")
         elif not _VERSION_RE.match(version):
             errors.append(f"Invalid {kind} version for {entry.get('name')}: {version}")
+        if not str(entry.get("spec") or "").strip():
+            errors.append(f"Missing spec URL for {kind} {entry.get('name')!r}")
         if kind == "service" and not str(entry.get("transport") or "").strip():
             errors.append(f"Missing service transport for {entry.get('name')}")
         if errors:
             entry["_errors"] = errors
+
+
+def check_manifest_cache_headers(headers: dict) -> list[str]:
+    cc = str(headers.get("cache-control") or headers.get("Cache-Control") or "").lower()
+    if not cc:
+        return ["Missing Cache-Control header (spec requires public, max-age >= 60)"]
+    errors: list[str] = []
+    if "public" not in cc:
+        errors.append("Cache-Control header missing 'public' directive")
+    m = re.search(r"max-age=(\d+)", cc)
+    if not m or int(m.group(1)) < 60:
+        errors.append("Cache-Control max-age must be >= 60 seconds per UCP spec")
+    return errors
+
+
+def check_version_alignment(
+    service_entries: list[dict],
+    capability_entries: list[dict],
+    required_service: str,
+) -> list[str]:
+    service_version = next(
+        (str(e.get("version") or "") for e in service_entries if e.get("name") == required_service),
+        "",
+    )
+    if not service_version:
+        return []
+    mismatches = []
+    for cap in capability_entries:
+        cap_version = str(cap.get("version") or "")
+        if cap_version and cap_version != service_version:
+            mismatches.append(
+                f"{cap['name']} declares version {cap_version!r} but service is "
+                f"{service_version!r} - may fail capability intersection"
+            )
+    return mismatches
 
 
 def _entry_errors(entries: list[dict], kind: str) -> list[str]:
@@ -387,7 +459,7 @@ def _root_url(value: str) -> str:
     return urlunparse((parsed.scheme, parsed.netloc, "", "", "", ""))
 
 
-def _link_header_ucp_url(value: str, base_url: str) -> str:
+def link_header_ucp_url(value: str, base_url: str) -> str:
     for part in str(value or "").split(","):
         url_part, *params = part.split(";")
         rel_values = [item for item in params if "rel=" in item.lower()]

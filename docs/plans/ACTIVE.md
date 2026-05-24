@@ -1,7 +1,7 @@
 # Active Plan
 
 **Current:** UCP Audit Compliance Upgrade → `docs/plans/ucp-audit-compliance-plan.md`
-**Status:** IN PROGRESS
+**Status:** DONE
 **Started:** 2026-05-24
 **Last slice completed:** Slice 5 - Frontend Evidence Display
 

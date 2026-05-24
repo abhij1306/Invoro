@@ -15,12 +15,14 @@ from app.schemas.data_enrichment import DataEnrichmentJobDetailResponse
 from app.services.llm.types import LLMTaskResult
 from app.services.llm.errors import LLMErrorCategory
 from app.services.config.data_enrichment import (
+    DATA_ENRICHMENT_COLOR_FAMILY_ALIASES,
     DATA_ENRICHMENT_LLM_TASK,
     DATA_ENRICHMENT_STATUS_DEGRADED,
     DATA_ENRICHMENT_STATUS_ENRICHED,
     DATA_ENRICHMENT_STATUS_FAILED,
     DATA_ENRICHMENT_STATUS_PENDING,
     DATA_ENRICHMENT_STATUS_RUNNING,
+    DATA_ENRICHMENT_TAXONOMY_CONTEXT_ONLY_TOKENS,
     DATA_ENRICHMENT_TAXONOMY_VERSION,
 )
 from app.services.data_enrichment.service import (
@@ -34,8 +36,10 @@ from app.services.data_enrichment.service import (
     list_data_enrichment_jobs,
 )
 from app.services.data_enrichment import service as enrichment_service
+from app.services.data_enrichment import shopify_catalog
 from app.services.data_enrichment.deterministic import normalize_price
 from app.services.data_enrichment.deterministic import (
+    category_match_values,
     category_url_context,
     percentage_material_parse,
     plausible_size_value,
@@ -289,6 +293,86 @@ async def test_data_enrichment_job_defers_running_commit_until_complete(
 
     assert visible_job is not None
     assert visible_job.status == DATA_ENRICHMENT_STATUS_RUNNING
+
+
+@pytest.mark.asyncio
+async def test_data_enrichment_commits_product_progress_between_records(
+    db_session: AsyncSession,
+    create_test_run,
+    test_user,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run = await create_test_run(
+        url="https://example.com/products/navy-linen-dress",
+        surface="ecommerce_detail",
+    )
+    records = [
+        CrawlRecord(
+            run_id=run.id,
+            source_url=f"https://example.com/products/{index}",
+            data={"title": f"Navy Linen Dress {index}", "category": "Dresses"},
+        )
+        for index in range(2)
+    ]
+    db_session.add_all(records)
+    await db_session.commit()
+    for record in records:
+        await db_session.refresh(record)
+    job = await create_data_enrichment_job(
+        db_session,
+        user=test_user,
+        payload={
+            "source_record_ids": [record.id for record in records],
+            "options": {"llm_enabled": False},
+        },
+    )
+    first_done = asyncio.Event()
+    second_started = asyncio.Event()
+    release = asyncio.Event()
+    calls = 0
+
+    async def _blocking_second_product(*args, **kwargs):
+        nonlocal calls
+        del args, kwargs
+        calls += 1
+        if calls == 1:
+            first_done.set()
+            return
+        second_started.set()
+        await release.wait()
+
+    monkeypatch.setattr(
+        "app.services.data_enrichment.service._enrich_product",
+        _blocking_second_product,
+    )
+
+    task = asyncio.create_task(run_job(db_session, job))
+    await asyncio.wait_for(first_done.wait(), timeout=2)
+    await asyncio.wait_for(second_started.wait(), timeout=2)
+    session_factory = async_sessionmaker(
+        db_session.bind,
+        expire_on_commit=False,
+        class_=AsyncSession,
+    )
+    async with session_factory() as check_session:
+        visible_products = list(
+            (
+                await check_session.scalars(
+                    select(EnrichedProduct)
+                    .where(EnrichedProduct.job_id == job.id)
+                    .order_by(EnrichedProduct.id)
+                )
+            ).all()
+        )
+
+    release.set()
+    await task
+
+    assert visible_products[0].status == DATA_ENRICHMENT_STATUS_ENRICHED
+    assert visible_products[1].status in {
+        DATA_ENRICHMENT_STATUS_PENDING,
+        DATA_ENRICHMENT_STATUS_RUNNING,
+    }
 
 
 @pytest.mark.asyncio
@@ -894,6 +978,51 @@ def test_data_enrichment_scored_match_maps_category_phrase_to_shopify_path() -> 
     assert enrichment["_taxonomy_match"]["source"] == "scored_match"
 
 
+def test_data_enrichment_phrase_match_inputs_exclude_bulky_evidence_fields() -> None:
+    values = category_match_values(
+        {
+            "title": "leather disco biker jacket",
+            "category": "Men > Clothing > Leather Jackets",
+            "description": " ".join(f"description-token-{index}" for index in range(200)),
+            "materials": "Lamb Skin/glass/Polyester/Spandex/Elastane/Polyester",
+            "specifications": {"fit": "regular", "care": "professional clean only"},
+        }
+    )
+
+    flattened = " ".join(str(value) for value in values)
+
+    assert "leather disco biker jacket" in flattened
+    assert "Men > Clothing > Leather Jackets" in flattened
+    assert "description-token" not in flattened
+    assert "Lamb Skin" not in flattened
+    assert "professional clean only" not in flattened
+
+
+def test_data_enrichment_taxonomy_path_phrase_uses_index_lookup() -> None:
+    row = {
+        "category_id": "gid://shopify/TaxonomyCategory/aa-1-10-2",
+        "category_path": "Apparel & Accessories > Clothing > Outerwear > Coats & Jackets",
+        "attribute_handles": [],
+    }
+    taxonomy_index = shopify_catalog.TaxonomyIndex(
+        version=DATA_ENRICHMENT_TAXONOMY_VERSION,
+        categories=(),
+        exact_lookup={},
+        leaf_lookup={},
+        path_phrase_lookup={"coats jackets": (row,)},
+        id_lookup={},
+    )
+
+    match = shopify_catalog.phrase_path_category_match(
+        "coats jackets",
+        taxonomy_index,
+        source_tokens={"leather", "coats", "jackets"},
+    )
+
+    assert match is not None
+    assert match["category_path"] == row["category_path"]
+
+
 def test_data_enrichment_taxonomy_keeps_apparel_shorts_out_of_lingerie() -> None:
     enrichment = build_deterministic_enrichment(
         {
@@ -1163,6 +1292,16 @@ def test_data_enrichment_color_aliases_cover_common_retail_names() -> None:
     )
 
     assert enrichment["color_family"] == "pink"
+
+
+def test_data_enrichment_context_only_tokens_exclude_product_terms() -> None:
+    assert not {"s", "single", "star"} & set(DATA_ENRICHMENT_TAXONOMY_CONTEXT_ONLY_TOKENS)
+
+
+def test_data_enrichment_color_aliases_do_not_mix_blue_green_intermediates() -> None:
+    assert "teal" not in DATA_ENRICHMENT_COLOR_FAMILY_ALIASES["blue"]
+    assert "turquoise" not in DATA_ENRICHMENT_COLOR_FAMILY_ALIASES["blue"]
+    assert "teal" not in DATA_ENRICHMENT_COLOR_FAMILY_ALIASES["green"]
 
 
 def test_data_enrichment_size_split_handles_semicolon_and_middle_dot() -> None:
@@ -1831,6 +1970,86 @@ async def test_data_enrichment_llm_filters_ai_discovery_tags_to_allowed_evidence
     assert "cosmic-made-up-tag" in caplog.text
 
 
+@pytest.mark.asyncio
+async def test_data_enrichment_llm_filters_ai_tags_against_prompt_allowed_set(
+    db_session: AsyncSession,
+    create_test_run,
+    test_user,
+    monkeypatch,
+) -> None:
+    allowed_calls = 0
+
+    def fake_allowed_tags(_product: EnrichedProduct) -> list[str]:
+        nonlocal allowed_calls
+        allowed_calls += 1
+        return ["valid-at-prompt"] if allowed_calls == 1 else ["valid-after-mutation"]
+
+    def fake_run_prompt_task(
+        session,
+        *,
+        task_type,
+        run_id,
+        domain,
+        variables,
+        budget_scope,
+        timeout_seconds,
+        config_snapshot=None,
+    ):
+        del (
+            session,
+            task_type,
+            run_id,
+            domain,
+            budget_scope,
+            timeout_seconds,
+            config_snapshot,
+        )
+        assert variables["product_json"]["ai_discovery_allowed_tags"] == [
+            "valid-at-prompt"
+        ]
+        return LLMTaskResult(
+            payload={
+                "category_path": "Apparel & Accessories > Clothing > Dresses",
+                "ai_discovery_tags": ["valid-at-prompt"],
+            }
+        )
+
+    monkeypatch.setattr(
+        "app.services.data_enrichment.service.ai_discovery_allowed_tags_for_product",
+        fake_allowed_tags,
+    )
+    monkeypatch.setattr(
+        "app.services.data_enrichment.service.run_prompt_task",
+        _as_async(fake_run_prompt_task),
+    )
+    run = await create_test_run(
+        url="https://example.com/products/linen-dress",
+        surface="ecommerce_detail",
+    )
+    record = CrawlRecord(
+        run_id=run.id,
+        source_url="https://example.com/products/linen-dress",
+        data={"title": "Linen Dress"},
+    )
+    db_session.add(record)
+    await db_session.commit()
+    await db_session.refresh(record)
+    job = await create_data_enrichment_job(
+        db_session,
+        user=test_user,
+        payload={"source_record_ids": [record.id], "options": {"llm_enabled": True}},
+    )
+
+    await run_job(db_session, job)
+    product = (
+        await db_session.scalars(
+            select(EnrichedProduct).where(EnrichedProduct.job_id == job.id)
+        )
+    ).one()
+
+    assert product.ai_discovery_tags == ["valid-at-prompt"]
+
+
 def test_ai_discovery_allowed_tags_prioritizes_source_importance() -> None:
     product = EnrichedProduct(
         seo_keywords=[f"seo-{index}" for index in range(55)],
@@ -1849,23 +2068,13 @@ def test_ai_discovery_allowed_tags_prioritizes_source_importance() -> None:
 
 
 @pytest.mark.asyncio
-async def test_data_enrichment_llm_uses_exponential_rate_limit_retry_delay(
+async def test_data_enrichment_llm_does_not_retry_rate_limited_calls(
     db_session: AsyncSession,
     create_test_run,
     test_user,
     monkeypatch,
 ) -> None:
     calls = 0
-    sleeps: list[float] = []
-    monkeypatch.setattr(
-        enrichment_service,
-        "data_enrichment_settings",
-        replace(
-            enrichment_service.data_enrichment_settings,
-            llm_rate_limit_retries=2,
-            llm_rate_limit_retry_delay_seconds=3.0,
-        ),
-    )
 
     def fake_run_prompt_task(
         session,
@@ -1890,24 +2099,16 @@ async def test_data_enrichment_llm_uses_exponential_rate_limit_retry_delay(
         )
         nonlocal calls
         calls += 1
-        if calls < 3:
-            return LLMTaskResult(
-                payload=None,
-                error_message="HTTP 429: rate limited",
-                error_category=LLMErrorCategory.RATE_LIMITED,
-            )
-        return LLMTaskResult(payload={"intent_attributes": ["travel"]})
-
-    async def fake_sleep(_delay: float) -> None:
-        if _delay:
-            sleeps.append(_delay)
-        return None
+        return LLMTaskResult(
+            payload=None,
+            error_message="HTTP 429: rate limited",
+            error_category=LLMErrorCategory.RATE_LIMITED,
+        )
 
     monkeypatch.setattr(
         "app.services.data_enrichment.service.run_prompt_task",
         _as_async(fake_run_prompt_task),
     )
-    monkeypatch.setattr("app.services.data_enrichment.service.asyncio.sleep", fake_sleep)
     run = await create_test_run(
         url="https://example.com/products/luggage",
         surface="ecommerce_detail",
@@ -1933,10 +2134,10 @@ async def test_data_enrichment_llm_uses_exponential_rate_limit_retry_delay(
         )
     ).one()
 
-    assert calls == 3
-    assert sleeps == [3.0, 6.0]
-    assert product.intent_attributes == ["travel"]
-    assert product.diagnostics["llm"]["applied"] is True
+    assert calls == 1
+    assert product.intent_attributes is None
+    assert product.diagnostics["llm"]["applied"] is False
+    assert product.diagnostics["llm"]["error_category"] == "rate_limited"
 
 
 @pytest.mark.asyncio

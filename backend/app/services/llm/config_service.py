@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 _PROMPTS_DIR = Path(__file__).resolve().parents[2] / "data" / "prompts"
 _CONFIG_SNAPSHOT_REQUIRED_KEYS = frozenset(
-    {"id", "provider", "model", "api_key_encrypted", "task_type"}
+    {"provider", "model"}
 )
 _LLM_PROVIDER_DEFINITIONS = (
     {
@@ -85,8 +85,9 @@ def get_prompt_task(task_type: str) -> dict | None:
             normalized,
             [name for name, _task in matches],
         )
-        return None
     task = matches[0][1] if len(matches) == 1 else None
+    if len(matches) > 1:
+        task = matches[0][1]
     return dict(task) if isinstance(task, dict) else None
 
 

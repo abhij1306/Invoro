@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -34,6 +35,8 @@ from app.services.ucp_audit.types import (
     UCPTransportProbe,
 )
 
+BACKEND_ROOT = Path(__file__).resolve().parents[3]
+
 
 def _sample_report(audit_id: str = "audit-1") -> UCPComplianceReport:
     return UCPComplianceReport(
@@ -54,6 +57,20 @@ def _sample_report(audit_id: str = "audit-1") -> UCPComplianceReport:
         ucp_contract={"services": ["dev.ucp.shopping"]},
         repair_roadmap=[],
     )
+
+
+def test_ucp_schema_analysis_system_prompt_anchors_response_shape() -> None:
+    prompt = (
+        BACKEND_ROOT
+        / "app"
+        / "data"
+        / "prompts"
+        / "ucp_schema_analysis.system.txt"
+    ).read_text(encoding="utf-8")
+
+    assert '"summary"' in prompt
+    assert '"recommended_changes"' in prompt
+    assert '"risk_notes"' in prompt
 
 
 @pytest.mark.asyncio

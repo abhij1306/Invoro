@@ -1,7 +1,5 @@
 from __future__ import annotations
-import asyncio
 import logging
-import re
 from datetime import UTC, datetime
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
@@ -39,6 +37,10 @@ from app.services.data_enrichment.deterministic import (
     object_list,
     string_list,
     without_empty,
+)
+from app.services.data_enrichment.discovery_tags import (
+    ai_discovery_allowed_tags_for_product,
+    discovery_tag_slug,
 )
 from app.services.data_enrichment.llm_diagnostics import build_llm_diagnostics
 from app.services.data_enrichment.shopify_catalog import (
@@ -182,19 +184,16 @@ async def _run_job(session: AsyncSession, job: DataEnrichmentJob) -> None:
     job_id = int(job.id)
     job.status = DATA_ENRICHMENT_STATUS_RUNNING
     job.summary = {**dict(job.summary or {}), "started_at": now.isoformat()}
-    products = list(
-        (
-            await session.scalars(
-                select(EnrichedProduct)
+    product_refs = [
+        (int(product_id), int(source_record_id))
+        for product_id, source_record_id in (
+            await session.execute(
+                select(EnrichedProduct.id, EnrichedProduct.source_record_id)
                 .where(EnrichedProduct.job_id == job_id)
                 .order_by(EnrichedProduct.id)
             )
         ).all()
-    )
-    product_refs = [
-        (int(product.id), int(product.source_record_id))
-        for product in products
-        if product.id is not None and product.source_record_id is not None
+        if product_id is not None and source_record_id is not None
     ]
     await session.commit()
 
@@ -214,6 +213,9 @@ async def _run_job(session: AsyncSession, job: DataEnrichmentJob) -> None:
             continue
         record_id = record.id
         try:
+            product.status = DATA_ENRICHMENT_STATUS_RUNNING
+            record.enrichment_status = DATA_ENRICHMENT_STATUS_RUNNING
+            await session.commit()
             await _enrich_product(
                 session,
                 job=job,
@@ -240,11 +242,13 @@ async def _run_job(session: AsyncSession, job: DataEnrichmentJob) -> None:
             product.diagnostics = {"error": str(exc)}
             record.enrichment_status = DATA_ENRICHMENT_STATUS_FAILED
             failed_count += 1
+            await session.commit()
         else:
             product.status = DATA_ENRICHMENT_STATUS_ENRICHED
             record.enrichment_status = DATA_ENRICHMENT_STATUS_ENRICHED
             record.enriched_at = datetime.now(UTC)
             enriched_count += 1
+            await session.commit()
 
     completed_at = datetime.now(UTC)
     job.completed_at = completed_at
@@ -339,7 +343,7 @@ async def _run_llm_enrichment(
             missing_fields=_missing_llm_backfill_fields(product),
         ),
     }
-    result = await _run_prompt_task_with_rate_limit_retry(
+    result = await _run_prompt_task(
         session,
         job=job,
         record=record,
@@ -359,7 +363,12 @@ async def _run_llm_enrichment(
             payload = dict(model_dump(exclude_none=True))
         else:
             payload = {}
-    applied_fields = _apply_llm_payload(product, payload)
+    allowed_tags = string_list(
+        prompt_context.get("ai_discovery_allowed_tags"),
+        max_items=50,
+        max_chars=60,
+    )
+    applied_fields = _apply_llm_payload(product, payload, allowed_tags=allowed_tags)
     return {
         "applied": bool(applied_fields),
         "category_applied": "category_path" in applied_fields,
@@ -370,35 +379,23 @@ async def _run_llm_enrichment(
     }
 
 
-async def _run_prompt_task_with_rate_limit_retry(
+async def _run_prompt_task(
     session: AsyncSession,
     *,
     job: DataEnrichmentJob,
     record: CrawlRecord,
     variables: dict[str, object],
 ):
-    attempts = data_enrichment_settings.llm_rate_limit_retries + 1
-    result = None
-    for attempt in range(attempts):
-        result = await run_prompt_task(
-            session,
-            task_type=DATA_ENRICHMENT_LLM_TASK,
-            run_id=record.run_id,
-            domain=source_domain(record.source_url),
-            budget_scope=f"{DATA_ENRICHMENT_LLM_TASK}:{job.id}",
-            timeout_seconds=data_enrichment_settings.llm_call_timeout_seconds,
-            config_snapshot=_llm_config_snapshot(job),
-            variables=variables,
-        )
-        if str(result.error_category or "") != "rate_limited":
-            return result
-        if attempt + 1 < attempts:
-            delay = (
-                data_enrichment_settings.llm_rate_limit_retry_delay_seconds
-                * (2**attempt)
-            )
-            await asyncio.sleep(delay)
-    return result
+    return await run_prompt_task(
+        session,
+        task_type=DATA_ENRICHMENT_LLM_TASK,
+        run_id=record.run_id,
+        domain=source_domain(record.source_url),
+        budget_scope=f"{DATA_ENRICHMENT_LLM_TASK}:{job.id}",
+        timeout_seconds=data_enrichment_settings.llm_call_timeout_seconds,
+        config_snapshot=_llm_config_snapshot(job),
+        variables=variables,
+    )
 
 
 def _llm_config_snapshot(job: DataEnrichmentJob) -> dict[str, object] | None:
@@ -407,7 +404,10 @@ def _llm_config_snapshot(job: DataEnrichmentJob) -> dict[str, object] | None:
 
 
 def _apply_llm_payload(
-    product: EnrichedProduct, payload: dict[str, object]
+    product: EnrichedProduct,
+    payload: dict[str, object],
+    *,
+    allowed_tags: list[str] | None = None,
 ) -> list[str]:
     applied: list[str] = []
     repository = load_attribute_repository()
@@ -499,7 +499,7 @@ def _apply_llm_payload(
         )
         values = string_list(payload.get(field_name), max_items=10, max_chars=max_chars)
         if field_name == "ai_discovery_tags":
-            allowed = set(ai_discovery_allowed_tags_for_product(product))
+            allowed = set(allowed_tags or ai_discovery_allowed_tags_for_product(product))
             kept: list[str] = []
             discarded: list[dict[str, str]] = []
             for value in values:
@@ -666,55 +666,6 @@ def _taxonomy_candidate_context(candidate: dict[str, object]) -> dict[str, objec
             "attribute_handles": object_list(taxonomy_reference.get("attribute_handles")),
         }
     )
-
-
-def ai_discovery_allowed_tags_for_product(product: EnrichedProduct) -> list[str]:
-    seo_keywords = product.seo_keywords if isinstance(product.seo_keywords, list) else []
-    materials = (
-        product.materials_normalized
-        if isinstance(product.materials_normalized, list)
-        else []
-    )
-    sizes = product.size_normalized if isinstance(product.size_normalized, list) else []
-    prioritized_values: list[tuple[int, object]] = [
-        *((100, value) for value in seo_keywords),
-        (90, product.category_path),
-        *((85, value) for value in category_attribute_handles(product.category_path) if product.category_path),
-        (70, product.color_family),
-        (70, product.gender_normalized),
-        *((50, value) for value in materials),
-        *((50, value) for value in sizes),
-    ]
-    scored: dict[str, tuple[int, int]] = {}
-    for index, (priority, value) in enumerate(prioritized_values):
-        for tag in discovery_tag_candidates(value):
-            current = scored.get(tag)
-            if current is None or priority > current[0]:
-                scored[tag] = (priority, index)
-    return [
-        tag
-        for tag, _score in sorted(
-            scored.items(),
-            key=lambda item: (-item[1][0], item[1][1], item[0]),
-        )[:50]
-    ]
-
-
-def discovery_tag_candidates(value: object) -> list[str]:
-    text = clean_text(value).casefold()
-    if not text:
-        return []
-    parts = [text]
-    if ">" in text:
-        parts.extend(clean_text(part).casefold() for part in text.split(">"))
-    return [tag for part in parts if (tag := discovery_tag_slug(part))]
-
-
-def discovery_tag_slug(value: object) -> str:
-    text = clean_text(value).casefold()
-    text = re.sub(r"[^a-z0-9]+", "-", text).strip("-")
-    text = re.sub(r"-{2,}", "-", text)
-    return text
 
 
 def _taxonomy_hint(

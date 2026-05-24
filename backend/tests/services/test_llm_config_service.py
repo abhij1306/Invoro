@@ -6,11 +6,15 @@ from app.core.security import encrypt_secret
 from app.api.llm import llm_configs
 from app.models.llm import LLMConfig
 from app.services.llm.config_service import (
+    get_prompt_task,
     llm_provider_catalog,
     resolve_active_config,
     resolve_provider_api_key,
+    resolve_run_config,
     serialize_config_snapshot,
 )
+from app.services.config.data_enrichment import DATA_ENRICHMENT_PROMPT_REGISTRY
+from app.services.config.field_mappings import PROMPT_REGISTRY
 
 
 @pytest.mark.asyncio
@@ -73,6 +77,47 @@ def test_serialize_config_snapshot_keeps_encrypted_key() -> None:
         "model": "llama",
         "api_key_encrypted": "encrypted",
         "task_type": "general",
+    }
+
+
+def test_get_prompt_task_prefers_specific_registry_on_duplicate(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    task = {
+        "response_type": "object",
+        "system_file": "data_enrichment_semantic.system.txt",
+        "user_file": "data_enrichment_semantic.user.txt",
+    }
+    monkeypatch.setitem(DATA_ENRICHMENT_PROMPT_REGISTRY, "collision_task", task)
+    monkeypatch.setitem(PROMPT_REGISTRY, "collision_task", {"system_file": "other.txt"})
+
+    with caplog.at_level("WARNING"):
+        resolved = get_prompt_task("collision_task")
+
+    assert resolved == task
+    assert "multiple registries" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_resolve_run_config_accepts_snapshot_without_stored_key(
+    db_session,
+) -> None:
+    resolved = await resolve_run_config(
+        db_session,
+        run_id=None,
+        task_type="data_enrichment_semantic",
+        config_snapshot={
+            "data_enrichment_semantic": {
+                "provider": "groq",
+                "model": "llama-3.3-70b-versatile",
+            }
+        },
+    )
+
+    assert resolved == {
+        "provider": "groq",
+        "model": "llama-3.3-70b-versatile",
     }
 
 

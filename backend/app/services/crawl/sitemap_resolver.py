@@ -32,7 +32,7 @@ async def resolve_category_urls_from_sitemap(
     max_urls: int = SITEMAP_DEFAULT_MAX_URLS,
 ) -> list[str]:
     root_url = _normalize_sitemap_url(domain)
-    keyword = str(filter_keyword or SITEMAP_DEFAULT_FILTER_KEYWORD).strip().lower()
+    keyword = str(filter_keyword if filter_keyword is not None else SITEMAP_DEFAULT_FILTER_KEYWORD).strip().lower()
     limit = max(1, int(max_urls or SITEMAP_DEFAULT_MAX_URLS))
 
     async with httpx.AsyncClient(
@@ -48,17 +48,17 @@ async def resolve_category_urls_from_sitemap(
             for sitemap in root_xml.findall(f"{{{SITEMAP_NS}}}sitemap")
             if (loc := sitemap.find(f"{{{SITEMAP_NS}}}loc")) is not None
             and loc.text
-            and keyword in loc.text.lower()
         ]
         if not child_urls:
-            raise ValueError(
-                f"No child sitemaps matched filter '{keyword}' in {root_url}. "
-                "Available sitemaps did not contain this keyword."
-            )
-        return await _resolve_child_sitemap_urls(child_urls, limit)
+            raise ValueError(f"No child sitemaps found in {root_url}.")
+        urls = await _resolve_child_sitemap_urls(child_urls, limit if not keyword else None)
+        filtered = _filter_urls(urls, keyword)
+        if not filtered:
+            raise ValueError(f"No URLs matched filter '{keyword}' in {root_url}.")
+        return filtered[:limit]
 
     if root_tag == "urlset":
-        urls = [url for url in await _safe_locs(root_xml) if keyword in url.lower()]
+        urls = _filter_urls(await _safe_locs(root_xml), keyword)
         if not urls:
             raise ValueError(f"No URLs matched filter '{keyword}' in {root_url}.")
         return urls[:limit]
@@ -66,7 +66,7 @@ async def resolve_category_urls_from_sitemap(
     raise ValueError(f"Unrecognised sitemap root tag: {root_tag}")
 
 
-async def _resolve_child_sitemap_urls(child_urls: list[str], max_urls: int) -> list[str]:
+async def _resolve_child_sitemap_urls(child_urls: list[str], max_urls: int | None) -> list[str]:
     all_urls: list[str] = []
     async with httpx.AsyncClient(
         follow_redirects=True,
@@ -75,9 +75,15 @@ async def _resolve_child_sitemap_urls(child_urls: list[str], max_urls: int) -> l
         for child_url in child_urls:
             child_xml = await _fetch_xml(client, child_url)
             all_urls.extend(await _safe_locs(child_xml))
-            if len(all_urls) >= max_urls:
+            if max_urls is not None and len(all_urls) >= max_urls:
                 break
-    return all_urls[:max_urls]
+    return all_urls[:max_urls] if max_urls is not None else all_urls
+
+
+def _filter_urls(urls: list[str], keyword: str) -> list[str]:
+    if not keyword:
+        return urls
+    return [url for url in urls if keyword in url.lower()]
 
 
 async def _fetch_xml(client: httpx.AsyncClient, url: str) -> ElementTree.Element:

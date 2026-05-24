@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from app.services.ucp_audit.discovery import _link_header_ucp_url, discover_ucp_manifest
+from app.services.ucp_audit.discovery import discover_ucp_manifest, link_header_ucp_url
 
 
 @dataclass(slots=True)
@@ -155,6 +155,38 @@ async def test_supported_version_profile_can_declare_supported_versions(
 
 
 @pytest.mark.asyncio
+async def test_supported_version_can_be_declared_without_profile_url(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payload = {
+        "ucp": {
+            "version": "2025-01-01",
+            "supported_versions": ["2026-04-08"],
+            "services": {
+                "dev.ucp.shopping": {"version": "2026-04-08", "transport": "mcp"}
+            },
+            "capabilities": {},
+        },
+        "signing_keys": [],
+    }
+
+    async def fake_fetch_page(*args, **kwargs):
+        del args, kwargs
+        return DummyPage(status_code=200, html=json.dumps(payload))
+
+    monkeypatch.setattr(
+        "app.services.ucp_audit.discovery._fetch_manifest_page",
+        fake_fetch_page,
+    )
+
+    result = await discover_ucp_manifest("https://example.com")
+
+    assert result.manifest_found is True
+    assert result.version_source == "supported_versions"
+    assert result.raw_manifest == payload
+
+
+@pytest.mark.asyncio
 async def test_unsupported_version_is_not_target_manifest_found(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -178,12 +210,62 @@ async def test_unsupported_version_is_not_target_manifest_found(
 
 def test_link_header_ucp_url_rejects_cross_origin_manifest() -> None:
     assert (
-        _link_header_ucp_url(
+        link_header_ucp_url(
             '<https://evil.example/.well-known/ucp>; rel="ucp"',
             "https://example.com/",
         )
         == ""
     )
+
+
+@pytest.mark.asyncio
+async def test_link_header_fallback_uses_well_known_final_origin(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payload = {
+        "ucp": {
+            "version": "2026-04-08",
+            "services": {
+                "dev.ucp.shopping": {"version": "2026-04-08", "transport": "mcp"}
+            },
+            "capabilities": {},
+        },
+        "signing_keys": [],
+    }
+    fetched: list[str] = []
+
+    async def fake_fetch_page(url: str, *args, **kwargs):
+        del args, kwargs
+        fetched.append(url)
+        if url == "https://shop.example/.well-known/ucp":
+            return DummyPage(
+                status_code=404,
+                html="",
+                final_url="https://www.shop.example/.well-known/ucp",
+            )
+        return DummyPage(status_code=200, html=json.dumps(payload), final_url=url)
+
+    async def fake_discover_link_manifest_url(value: str) -> str:
+        assert value == "https://www.shop.example/.well-known/ucp"
+        return "https://www.shop.example/ucp.json"
+
+    monkeypatch.setattr(
+        "app.services.ucp_audit.discovery._fetch_manifest_page",
+        fake_fetch_page,
+    )
+    monkeypatch.setattr(
+        "app.services.ucp_audit.discovery._discover_link_manifest_url",
+        fake_discover_link_manifest_url,
+    )
+
+    result = await discover_ucp_manifest("https://shop.example")
+
+    assert result.manifest_found is True
+    assert result.discovery_source == "link-header"
+    assert fetched == [
+        "https://shop.example/.well-known/ucp",
+        "https://www.shop.example/ucp.json",
+    ]
 
 
 @pytest.mark.asyncio

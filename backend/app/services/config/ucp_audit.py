@@ -8,6 +8,7 @@ UCP_DISCOVERY_TIMEOUT_SECONDS = 5.0
 UCP_SCHEMA_TIMEOUT_SECONDS = 5.0
 UCP_TRANSPORT_TIMEOUT_SECONDS = 5.0
 UCP_SCHEMA_LLM_TIMEOUT_SECONDS = 20.0
+UCP_AUDIT_PLATFORM_PROFILE_URL = "https://your-audit-platform.example.com/.well-known/ucp"
 
 UCP_AUDIT_JOB_STATUS_QUEUED = "queued"
 UCP_AUDIT_JOB_STATUS_RUNNING = "running"
@@ -47,9 +48,9 @@ UCP_REQUIRED_ORDER_POLICY_CAPABILITIES = (
     "dev.ucp.shopping.discount",
 )
 UCP_REQUIRED_SCHEMA_KEYWORDS = {
-    "catalog": ("catalog_search", "catalog_lookup"),
-    "cart_checkout": ("cart", "checkout"),
-    "order_policy": ("order", "fulfillment", "discount"),
+    "catalog": ("catalog", "product", "search", "lookup", "shopping"),
+    "cart_checkout": ("cart", "checkout", "shopping"),
+    "order_policy": ("order", "fulfillment", "discount", "policy", "return", "shopping"),
 }
 UCP_REQUIRED_SCHEMA_FIELDS = {
     "catalog": ("product_id", "title", "price", "currency", "availability"),
@@ -94,10 +95,13 @@ FINDING_MANIFEST_MISSING = "manifest_missing"
 FINDING_MANIFEST_INVALID = "manifest_invalid"
 FINDING_MANIFEST_CONTENT_TYPE_INVALID = "manifest_content_type_invalid"
 FINDING_MANIFEST_REDIRECTED = "manifest_redirected"
+FINDING_SIGNING_KEYS_MISSING = "signing_keys_missing"
+FINDING_CACHE_CONTROL_MISSING = "cache_control_missing"
 FINDING_SERVICE_MISSING = "service_missing"
 FINDING_SERVICE_INVALID = "service_invalid"
 FINDING_CAPABILITY_MISSING = "capability_missing"
 FINDING_CAPABILITY_INVALID = "capability_invalid"
+FINDING_CAPABILITY_VERSION_MISMATCH = "capability_version_mismatch"
 FINDING_TRANSPORT_MISSING = "transport_missing"
 FINDING_TRANSPORT_UNREACHABLE = "transport_unreachable"
 FINDING_TRANSPORT_NEGOTIATION_INCOMPLETE = "transport_negotiation_incomplete"

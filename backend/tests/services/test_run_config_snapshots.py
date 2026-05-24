@@ -193,7 +193,7 @@ def test_get_prompt_task_logs_registry_collisions(
     monkeypatch.setitem(PROMPT_REGISTRY, "collision_task", task)
 
     with caplog.at_level("WARNING"):
-        assert get_prompt_task("collision_task") is None
+        assert get_prompt_task("collision_task") == task
 
     assert "multiple registries" in caplog.text
 

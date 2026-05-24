@@ -26,6 +26,8 @@ class UCPManifestResult:
     payment_handlers: list[str] = field(default_factory=list)
     raw_manifest: dict[str, Any] | None = None
     errors: list[str] = field(default_factory=list)
+    signing_keys_errors: list[str] = field(default_factory=list)
+    response_headers: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(slots=True)
