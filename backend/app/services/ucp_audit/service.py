@@ -13,6 +13,8 @@ from app.models.ucp_audit import UCPAuditJob, UCPAuditPageResult, UCPAuditReport
 from app.models.user import User
 from app.services.config import ucp_audit as config
 from app.services.domain_utils import normalize_domain
+from app.services.llm.config_service import snapshot_active_configs
+from app.services.llm.runtime import run_prompt_task
 from app.services.ucp_audit.discovery import discover_ucp_manifest, manifest_url
 from app.services.ucp_audit.protocol_checks import (
     build_contract_payload,
@@ -35,6 +37,10 @@ async def create_ucp_audit_job(
 ) -> UCPAuditJob:
     domain = _normalized_domain(payload.get("domain"))
     options = _normalized_options(payload.get("options"))
+    options["llm_config_snapshot"] = await snapshot_active_configs(
+        session,
+        task_types=[config.UCP_SCHEMA_ANALYSIS_LLM_TASK],
+    )
     job = UCPAuditJob(
         user_id=user.id,
         domain=domain,
@@ -84,6 +90,7 @@ async def run_job(session: AsyncSession, job: UCPAuditJob) -> None:
         job.domain,
         audit_id,
         dict(job.options or {}),
+        session=session,
     )
     payload = build_report_payload(report)
     markdown = build_markdown_report(report)
@@ -123,11 +130,20 @@ async def build_ucp_report_for_domain(
     domain: str,
     audit_id: str,
     options: dict[str, object],
+    *,
+    session: AsyncSession | None = None,
 ) -> UCPComplianceReport:
-    del options
     manifest = await discover_ucp_manifest(domain)
     transport_probes = await probe_transports(manifest)
     schema_probes = await probe_schemas(manifest.schema_urls)
+    if bool(options.get("llm_enabled")) and session is not None:
+        await _apply_schema_llm_analysis(
+            session,
+            domain=domain,
+            audit_id=audit_id,
+            options=options,
+            schema_probes=schema_probes,
+        )
     contract = build_contract_payload(manifest, transport_probes, schema_probes)
     dimensions = build_protocol_dimensions(manifest, transport_probes, schema_probes)
     return build_compliance_report(
@@ -212,6 +228,78 @@ def _normalized_options(value: object) -> dict[str, object]:
         "report_formats": _string_list(formats)
         or list(config.UCP_AUDIT_DEFAULT_REPORT_FORMATS),
     }
+
+
+async def _apply_schema_llm_analysis(
+    session: AsyncSession,
+    *,
+    domain: str,
+    audit_id: str,
+    options: dict[str, object],
+    schema_probes: list,
+) -> None:
+    for probe in schema_probes:
+        missing = _schema_probe_missing_fields(probe)
+        if not missing:
+            continue
+        result = await run_prompt_task(
+            session,
+            task_type=config.UCP_SCHEMA_ANALYSIS_LLM_TASK,
+            run_id=None,
+            domain=domain,
+            budget_scope=f"{config.UCP_SCHEMA_ANALYSIS_LLM_TASK}:{audit_id}",
+            timeout_seconds=config.UCP_SCHEMA_LLM_TIMEOUT_SECONDS,
+            config_snapshot=_llm_config_snapshot(options),
+            variables={
+                "schema_url": getattr(probe, "url", ""),
+                "schema_title": getattr(probe, "title", ""),
+                "missing_fields": missing,
+                "field_results": getattr(probe, "field_results", {}),
+            },
+        )
+        if result.error_message:
+            probe.llm_analysis = {
+                "applied": False,
+                "error": result.error_message,
+                "error_category": str(result.error_category or ""),
+            }
+            continue
+        payload = result.payload if isinstance(result.payload, dict) else {}
+        probe.llm_analysis = {
+            "applied": bool(payload),
+            "provider": result.provider or "",
+            "model": result.model or "",
+            **payload,
+        }
+
+
+def _schema_probe_missing_fields(probe: object) -> dict[str, list[str]]:
+    field_results = getattr(probe, "field_results", {})
+    if not isinstance(field_results, dict):
+        return {}
+    groups = [
+        str(item)
+        for item in list(getattr(probe, "groups", []) or [])
+        if str(item) in field_results
+    ] or list(field_results.keys())
+    missing: dict[str, list[str]] = {}
+    for group in groups:
+        results = field_results.get(group)
+        if not isinstance(results, dict):
+            continue
+        group_missing = [
+            str(field)
+            for field, present in results.items()
+            if not bool(present)
+        ]
+        if group_missing:
+            missing[str(group)] = group_missing
+    return missing
+
+
+def _llm_config_snapshot(options: dict[str, object]) -> dict[str, object] | None:
+    snapshot = options.get("llm_config_snapshot")
+    return snapshot if isinstance(snapshot, dict) else None
 
 
 def _bounded_int(value: object, *, default: int, upper: int) -> int:

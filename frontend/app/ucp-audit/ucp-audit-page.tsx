@@ -125,7 +125,11 @@ export default function UcpAuditPage() {
       {/* Full-Width Analytical Workspace Dashboard */}
       <div className="page-stack w-full gap-5">
         {/* Overall Score & Dimension metrics */}
-        <UcpScoreSummary report={controller.report} job={controller.activeJob} />
+        <UcpScoreSummary
+          report={controller.report}
+          job={controller.activeJob}
+          loading={controller.detailQuery.isLoading || controller.isRunning}
+        />
 
         {/* Workspace tab selectors */}
         <div className="border-border bg-panel flex w-full flex-wrap gap-1 rounded-[var(--radius-lg)] border p-1">
@@ -138,7 +142,7 @@ export default function UcpAuditPage() {
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
                 className={cn(
-                  'flex min-w-[120px] flex-1 cursor-pointer items-center justify-center gap-2 rounded-[var(--radius-md)] px-3 py-2 text-xs font-normal transition-all',
+                  'type-control flex min-w-[120px] flex-1 cursor-pointer items-center justify-center gap-2 rounded-[var(--radius-md)] px-3 py-2 transition-all',
                   isActive
                     ? 'bg-accent text-accent-fg shadow-sm'
                     : 'text-muted hover:bg-background-alt hover:text-foreground',

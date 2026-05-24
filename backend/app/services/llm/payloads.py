@@ -148,6 +148,14 @@ class _DataEnrichmentSemanticPayload(BaseModel):
     suggested_bundles: list[str] | None = None
 
 
+class _UCPSchemaAnalysisPayload(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    summary: str = ""
+    recommended_changes: list[str] = Field(default_factory=list)
+    risk_notes: list[str] = Field(default_factory=list)
+
+
 _PAYLOAD_ADAPTERS: dict[str, TypeAdapter[Any]] = {
     "direct_record_extraction": TypeAdapter(list[dict[_FieldKey, Any]]),
     "xpath_discovery": TypeAdapter(list[_XPathSelector]),
@@ -162,6 +170,7 @@ _PAYLOAD_ADAPTERS: dict[str, TypeAdapter[Any]] = {
         _ProductIntelligenceBrandInferencePayload
     ),
     "data_enrichment_semantic": TypeAdapter(_DataEnrichmentSemanticPayload),
+    "ucp_schema_analysis": TypeAdapter(_UCPSchemaAnalysisPayload),
 }
 SUPPORTED_TASK_TYPES = tuple(_PAYLOAD_ADAPTERS.keys())
 

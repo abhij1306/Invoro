@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -11,11 +12,17 @@ from app.services.config.field_mappings import PROMPT_REGISTRY
 from app.services.config.llm_runtime import SUPPORTED_LLM_PROVIDERS
 from app.services.config.data_enrichment import DATA_ENRICHMENT_PROMPT_REGISTRY
 from app.services.config.product_intelligence import PRODUCT_INTELLIGENCE_PROMPT_REGISTRY
+from app.services.config.ucp_audit import UCP_AUDIT_PROMPT_REGISTRY
 from app.services.llm.payloads import SUPPORTED_TASK_TYPES
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+logger = logging.getLogger(__name__)
+
 _PROMPTS_DIR = Path(__file__).resolve().parents[2] / "data" / "prompts"
+_CONFIG_SNAPSHOT_REQUIRED_KEYS = frozenset(
+    {"id", "provider", "model", "api_key_encrypted", "task_type"}
+)
 _LLM_PROVIDER_DEFINITIONS = (
     {
         "provider": "groq",
@@ -62,11 +69,24 @@ _LLM_PROVIDER_DEFINITIONS = (
 
 def get_prompt_task(task_type: str) -> dict | None:
     normalized = str(task_type or "").strip()
-    task = (
-        DATA_ENRICHMENT_PROMPT_REGISTRY.get(normalized)
-        or PRODUCT_INTELLIGENCE_PROMPT_REGISTRY.get(normalized)
-        or PROMPT_REGISTRY.get(normalized)
-    )
+    matches = [
+        (name, registry.get(normalized))
+        for name, registry in (
+            ("DATA_ENRICHMENT_PROMPT_REGISTRY", DATA_ENRICHMENT_PROMPT_REGISTRY),
+            ("PRODUCT_INTELLIGENCE_PROMPT_REGISTRY", PRODUCT_INTELLIGENCE_PROMPT_REGISTRY),
+            ("UCP_AUDIT_PROMPT_REGISTRY", UCP_AUDIT_PROMPT_REGISTRY),
+            ("PROMPT_REGISTRY", PROMPT_REGISTRY),
+        )
+        if normalized in registry
+    ]
+    if len(matches) > 1:
+        logger.warning(
+            "Prompt task %s exists in multiple registries: %s",
+            normalized,
+            [name for name, _task in matches],
+        )
+        return None
+    task = matches[0][1] if len(matches) == 1 else None
     return dict(task) if isinstance(task, dict) else None
 
 
@@ -94,6 +114,10 @@ def serialize_config_snapshot(config: LLMConfig) -> dict[str, Any]:
         "api_key_encrypted": config.api_key_encrypted,
         "task_type": config.task_type,
     }
+
+
+def validate_config_snapshot(value: dict[str, Any]) -> bool:
+    return _CONFIG_SNAPSHOT_REQUIRED_KEYS <= set(value)
 
 
 async def resolve_active_config(
@@ -138,16 +162,20 @@ async def resolve_run_config(
     if isinstance(config_snapshot, dict):
         for candidate in [task_type, "general"]:
             config_value = config_snapshot.get(candidate)
-            if isinstance(config_value, dict):
+            if isinstance(config_value, dict) and validate_config_snapshot(config_value):
                 return config_value
+            if isinstance(config_value, dict):
+                logger.warning("Ignoring malformed LLM config snapshot for %s", candidate)
     if run_id is not None:
         run = await session.get(CrawlRun, run_id)
         if run is not None:
             snapshot = run.settings_view.llm_config_snapshot()
             for candidate in [task_type, "general"]:
                 config_snapshot = snapshot.get(candidate)
-                if isinstance(config_snapshot, dict):
+                if isinstance(config_snapshot, dict) and validate_config_snapshot(config_snapshot):
                     return config_snapshot
+                if isinstance(config_snapshot, dict):
+                    logger.warning("Ignoring malformed run LLM config snapshot for %s", candidate)
     config = await resolve_active_config(session, task_type)
     if config is None:
         return None

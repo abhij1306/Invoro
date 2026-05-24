@@ -66,3 +66,42 @@ def test_d_ucp1_pass_uses_weighted_average() -> None:
     )
     assert report.overall_score == expected
     assert report.d_ucp1_gate_applied is False
+
+
+def test_d_ucp3_zero_caps_overall_score() -> None:
+    report = build_compliance_report(
+        domain="example.com",
+        audit_id="audit-1",
+        dimension_scores=[
+            dimension(D_UCP1_ID, 100),
+            dimension(D_UCP2_ID, 90),
+            dimension(D_UCP3_ID, 0),
+            dimension(D_UCP4_ID, 90),
+            dimension(D_UCP5_ID, 90),
+            dimension(D_UCP6_ID, 90),
+        ],
+        ucp_contract={},
+    )
+
+    assert report.overall_score <= 45
+    assert report.d_ucp3_gate_applied is True
+
+
+def test_missing_d_ucp3_dimension_does_not_block_report_generation() -> None:
+    report = build_compliance_report(
+        domain="example.com",
+        audit_id="audit-1",
+        dimension_scores=[
+            dimension(D_UCP1_ID, 100),
+            dimension(D_UCP2_ID, 90),
+            dimension(D_UCP4_ID, 90),
+            dimension(D_UCP5_ID, 90),
+            dimension(D_UCP6_ID, 90),
+        ],
+        ucp_contract={},
+    )
+
+    assert report.overall_score == int(
+        sum(item.score * DIMENSION_WEIGHTS[item.dimension_id] for item in report.dimension_scores)
+    )
+    assert report.d_ucp3_gate_applied is False

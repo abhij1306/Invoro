@@ -14,7 +14,8 @@ def build_compliance_report(
 ) -> UCPComplianceReport:
     weighted = sum(item.score * item.weight for item in dimension_scores)
     overall = int(weighted)
-    gate_applied = False
+    d_ucp1_gate_applied = False
+    d_ucp3_gate_applied = False
     discovery = next(
         (item for item in dimension_scores if item.dimension_id == config.D_UCP1_ID),
         None,
@@ -23,7 +24,14 @@ def build_compliance_report(
         raise ValueError(f"Missing required dimension score: {config.D_UCP1_ID}")
     if discovery.score == 0:
         overall = min(overall, config.D_UCP1_GATE_MAX_SCORE)
-        gate_applied = True
+        d_ucp1_gate_applied = True
+    transport = next(
+        (item for item in dimension_scores if item.dimension_id == config.D_UCP3_ID),
+        None,
+    )
+    if transport is not None and transport.score == 0:
+        overall = min(overall, config.D_UCP3_GATE_MAX_SCORE)
+        d_ucp3_gate_applied = True
     findings = [
         finding
         for dimension in dimension_scores
@@ -35,7 +43,8 @@ def build_compliance_report(
         overall_score=overall,
         dimension_scores=dimension_scores,
         all_findings=findings,
-        d_ucp1_gate_applied=gate_applied,
+        d_ucp1_gate_applied=d_ucp1_gate_applied,
+        d_ucp3_gate_applied=d_ucp3_gate_applied,
         ucp_contract=ucp_contract,
-        repair_roadmap=build_repair_roadmap(findings),
+        repair_roadmap=build_repair_roadmap(findings, domain=domain),
     )

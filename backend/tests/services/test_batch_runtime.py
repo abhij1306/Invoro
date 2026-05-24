@@ -5,6 +5,7 @@ import asyncio
 import pytest
 
 from app.services.crawl.batch_runtime import process_run
+from app.services.config.sitemap import SITEMAP_DEFAULT_MAX_URLS
 from app.services.acquisition.acquirer import AcquisitionResult
 from app.services.crawl.crud import create_crawl_run, get_run_records
 from app.models.crawl_run import CrawlRecord
@@ -656,6 +657,121 @@ async def test_process_batch_run_preserves_exact_requested_section_labels_for_ev
         ["Features & Benefits"],
         ["Features & Benefits"],
     ]
+
+
+@pytest.mark.asyncio
+async def test_process_batch_run_resolves_urls_from_sitemap_settings(
+    db_session: AsyncSession,
+    test_user,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run = await create_crawl_run(
+        db_session,
+        test_user.id,
+        {
+            "run_type": "batch",
+            "surface": "ecommerce_listing",
+            "url": "https://example.com",
+            "settings": {
+                "sitemap_domain": "example.com",
+                "sitemap_filter_keyword": "collections",
+                "sitemap_max_urls": 2,
+            },
+        },
+    )
+    resolved_inputs: list[tuple[str, str, int]] = []
+    processed_urls: list[str] = []
+
+    async def _fake_resolve_category_urls_from_sitemap(
+        domain: str,
+        filter_keyword: str,
+        max_urls: int,
+    ) -> list[str]:
+        resolved_inputs.append((domain, filter_keyword, max_urls))
+        return [
+            "https://example.com/collections/a",
+            "https://example.com/collections/b",
+        ]
+
+    async def _fake_process_single_url(*args, **kwargs):
+        del args
+        url = str(kwargs.get("url") or "")
+        processed_urls.append(url)
+        return URLProcessingResult(
+            records=[],
+            verdict="success",
+            url_metrics={"record_count": 0},
+        )
+
+    monkeypatch.setattr(
+        "app.services.crawl.batch_runtime.resolve_category_urls_from_sitemap",
+        _fake_resolve_category_urls_from_sitemap,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        "app.services.crawl.batch_runtime.process_single_url",
+        _fake_process_single_url,
+    )
+
+    await process_run(db_session, run.id)
+    await db_session.refresh(run)
+
+    assert resolved_inputs == [("example.com", "collections", 2)]
+    assert processed_urls == [
+        "https://example.com/collections/a",
+        "https://example.com/collections/b",
+    ]
+    assert run.result_summary["url_count"] == 2
+    assert run.result_summary["resolved_url_list"] == processed_urls
+
+
+@pytest.mark.asyncio
+async def test_process_batch_run_defaults_bad_sitemap_max_urls(
+    db_session: AsyncSession,
+    test_user,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run = await create_crawl_run(
+        db_session,
+        test_user.id,
+        {
+            "run_type": "batch",
+            "surface": "ecommerce_listing",
+            "url": "https://example.com",
+            "settings": {
+                "sitemap_domain": "example.com",
+                "sitemap_max_urls": "not-a-number",
+            },
+        },
+    )
+    resolved_inputs: list[int] = []
+
+    async def _fake_resolve_category_urls_from_sitemap(
+        domain: str,
+        filter_keyword: str,
+        max_urls: int,
+    ) -> list[str]:
+        del domain, filter_keyword
+        resolved_inputs.append(max_urls)
+        return ["https://example.com/collections/a"]
+
+    async def _fake_process_single_url(*args, **kwargs):
+        del args, kwargs
+        return URLProcessingResult(records=[], verdict="success")
+
+    monkeypatch.setattr(
+        "app.services.crawl.batch_runtime.resolve_category_urls_from_sitemap",
+        _fake_resolve_category_urls_from_sitemap,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        "app.services.crawl.batch_runtime.process_single_url",
+        _fake_process_single_url,
+    )
+
+    await process_run(db_session, run.id)
+
+    assert resolved_inputs == [SITEMAP_DEFAULT_MAX_URLS]
 
 
 @pytest.mark.asyncio

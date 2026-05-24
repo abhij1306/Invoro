@@ -7,6 +7,8 @@ from dataclasses import asdict
 from typing import Any
 
 import httpx
+from jsonschema.exceptions import SchemaError
+from jsonschema.validators import validator_for
 
 from app.services.config import ucp_audit as config
 from app.services.network_resolution import build_async_http_client
@@ -27,17 +29,22 @@ async def probe_transports(manifest: UCPManifestResult) -> list[UCPTransportProb
         transport = str(entry.get("transport") or "").lower()
         endpoint = str(entry.get("endpoint") or "")
         service = str(entry.get("service") or "")
+        schema_url = str(entry.get("schema") or "")
         if transport == "mcp" and endpoint:
             probes.append(await _probe_mcp(service=service, endpoint=endpoint))
+            continue
+        if transport == "rest" and endpoint:
+            probes.append(await _probe_rest(service=service, endpoint=endpoint))
             continue
         probes.append(
             UCPTransportProbe(
                 service=service,
                 transport=transport,
                 endpoint=endpoint,
-                reachable=bool(entry.get("schema")),
+                schema_url=schema_url,
+                reachable=False,
                 negotiated=False,
-                error="" if entry.get("schema") else "missing schema or endpoint",
+                error="" if schema_url else "missing schema or endpoint",
             )
         )
     return probes
@@ -50,13 +57,29 @@ async def probe_schemas(schema_urls: list[str]) -> list[UCPSchemaProbe]:
                 follow_redirects=True,
                 timeout=config.UCP_SCHEMA_TIMEOUT_SECONDS,
             ) as client:
-                response = await client.get(url)
+                response = await client.get(
+                    url,
+                    headers={"Accept": config.UCP_ACCEPT_HEADER},
+                )
             payload = response.json()
+            valid_json = isinstance(payload, dict)
+            schema_error = _schema_error(payload) if valid_json else "schema is not an object"
+            field_results = (
+                _schema_field_results(payload) if valid_json and not schema_error else {}
+            )
             return UCPSchemaProbe(
                 url=url,
                 reachable=response.status_code < 400,
-                valid_json=isinstance(payload, dict),
-                title=str(payload.get("title") or payload.get("$id") or ""),
+                valid_json=valid_json,
+                schema_valid=valid_json and not schema_error,
+                status_code=response.status_code,
+                content_type=response.headers.get("content-type", ""),
+                title=str(payload.get("title") or payload.get("$id") or "")
+                if isinstance(payload, dict)
+                else "",
+                error=schema_error,
+                groups=_schema_groups(url, payload if isinstance(payload, dict) else {}),
+                field_results=field_results,
             )
         except (json.JSONDecodeError, ValueError) as exc:
             return UCPSchemaProbe(url=url, reachable=True, valid_json=False, error=str(exc))
@@ -78,6 +101,13 @@ def build_contract_payload(
             "valid": manifest.manifest_valid,
             "errors": manifest.errors,
             "supported_versions": _supported_versions(manifest.raw_manifest or {}),
+            "target_version": manifest.target_version,
+            "selected_version": manifest.selected_version,
+            "version_source": manifest.version_source,
+            "content_type": manifest.content_type,
+            "final_url": manifest.final_url,
+            "redirect_chain": manifest.redirect_chain,
+            "discovery_source": manifest.discovery_source,
         },
         "services": manifest.services_declared,
         "capabilities": manifest.capabilities_declared,
@@ -98,7 +128,7 @@ def build_protocol_dimensions(
     return [
         _discovery_dimension(manifest),
         _services_dimension(manifest),
-        _transport_dimension(manifest, transport_probes),
+        _transport_dimension(manifest, transport_probes, schema_probes),
         _catalog_dimension(manifest, schema_probes),
         _cart_checkout_dimension(manifest, schema_probes),
         _order_policy_dimension(manifest, schema_probes),
@@ -117,22 +147,27 @@ async def _probe_mcp(*, service: str, endpoint: str) -> UCPTransportProbe:
             follow_redirects=True,
             timeout=config.UCP_TRANSPORT_TIMEOUT_SECONDS,
         ) as client:
-            response = await client.post(endpoint, json=body)
+            response = await client.post(
+                endpoint,
+                json=body,
+                headers={"Accept": config.UCP_ACCEPT_HEADER},
+            )
         payload = _safe_json(response)
+        errors = _mcp_conformance_errors(payload, expected_id=str(body["id"]))
         error_text = json.dumps(payload.get("error", payload))[:500].lower()
-        profile_required = "profile" in error_text and (
-            "missing" in error_text or "invalid" in error_text or "required" in error_text
-        )
+        profile_required = _profile_required(payload)
         tools = _tool_entries(payload)
         return UCPTransportProbe(
             service=service,
             transport="mcp",
             endpoint=endpoint,
             reachable=response.status_code < 500,
-            negotiated=response.status_code < 400 and not payload.get("error"),
+            negotiated=response.status_code < 400 and not payload.get("error") and not errors,
             profile_required=profile_required,
             status_code=response.status_code,
-            error="" if response.status_code < 400 else error_text[:240],
+            error="; ".join(errors)[:240]
+            if errors
+            else ("" if response.status_code < 400 else error_text[:240]),
             tool_names=[str(item.get("name") or "") for item in tools if item.get("name")],
             tool_schemas=tools,
             response_preview=_preview(payload),
@@ -142,6 +177,38 @@ async def _probe_mcp(*, service: str, endpoint: str) -> UCPTransportProbe:
         return UCPTransportProbe(
             service=service,
             transport="mcp",
+            endpoint=endpoint,
+            error=str(exc),
+        )
+
+
+async def _probe_rest(*, service: str, endpoint: str) -> UCPTransportProbe:
+    try:
+        async with build_async_http_client(
+            follow_redirects=True,
+            timeout=config.UCP_TRANSPORT_TIMEOUT_SECONDS,
+        ) as client:
+            response = await client.options(
+                endpoint,
+                headers={"Accept": config.UCP_ACCEPT_HEADER},
+            )
+        allow = response.headers.get("allow", "")
+        negotiated = response.status_code < 400 and bool(allow or response.headers)
+        return UCPTransportProbe(
+            service=service,
+            transport="rest",
+            endpoint=endpoint,
+            reachable=response.status_code < 500,
+            negotiated=negotiated,
+            status_code=response.status_code,
+            error="" if response.status_code < 400 else response.text[:240],
+            response_preview={"allow": allow} if allow else {},
+        )
+    except (httpx.HTTPError, OSError, TimeoutError, asyncio.TimeoutError) as exc:
+        logger.debug("UCP REST probe failed for %s: %s", endpoint, exc, exc_info=True)
+        return UCPTransportProbe(
+            service=service,
+            transport="rest",
             endpoint=endpoint,
             error=str(exc),
         )
@@ -169,17 +236,34 @@ def _discovery_dimension(manifest: UCPManifestResult) -> UCPDimensionScore:
                 evidence=[{"errors": manifest.errors}],
             )
         )
+    if not manifest.final_url.endswith(config.UCP_MANIFEST_PATH) and manifest.final_url:
+        findings.append(
+            UCPFinding(
+                code=config.FINDING_MANIFEST_REDIRECTED,
+                dimension_id=config.D_UCP1_ID,
+                severity=config.UCP_FINDING_WARNING,
+                message="UCP discovery profile did not resolve at the canonical well-known path.",
+                evidence=[
+                    {
+                        "final_url": manifest.final_url,
+                        "redirect_chain": manifest.redirect_chain,
+                    }
+                ],
+            )
+        )
     return _dimension(config.D_UCP1_ID, 60 if findings else 100, findings)
 
 
 def _services_dimension(manifest: UCPManifestResult) -> UCPDimensionScore:
-    service_score = 40 if not manifest.missing_required_services else 0
+    service_score = 60 if not manifest.missing_required_services else 0
     capability_score = _coverage_score(
         config.UCP_REQUIRED_CAPABILITIES,
         manifest.capabilities_declared,
-        maximum=60,
+        maximum=40,
     )
     findings: list[UCPFinding] = []
+    service_errors = _entry_validation_errors(manifest.service_entries)
+    capability_errors = _entry_validation_errors(manifest.capability_entries)
     if manifest.missing_required_services:
         findings.append(
             _missing_finding(
@@ -187,6 +271,18 @@ def _services_dimension(manifest: UCPManifestResult) -> UCPDimensionScore:
                 config.D_UCP2_ID,
                 manifest.missing_required_services,
                 "Required UCP shopping service is not declared.",
+            )
+        )
+    if service_errors:
+        findings.append(
+            UCPFinding(
+                code=config.FINDING_SERVICE_INVALID,
+                dimension_id=config.D_UCP2_ID,
+                severity=config.UCP_FINDING_WARNING,
+                message="One or more UCP service entries are malformed.",
+                affected_count=len(service_errors),
+                count_kind="services",
+                evidence=service_errors,
             )
         )
     if manifest.missing_required_capabilities:
@@ -198,12 +294,25 @@ def _services_dimension(manifest: UCPManifestResult) -> UCPDimensionScore:
                 "Required UCP shopping capabilities are not declared.",
             )
         )
+    if capability_errors:
+        findings.append(
+            UCPFinding(
+                code=config.FINDING_CAPABILITY_INVALID,
+                dimension_id=config.D_UCP2_ID,
+                severity=config.UCP_FINDING_WARNING,
+                message="One or more UCP capability entries are malformed.",
+                affected_count=len(capability_errors),
+                count_kind="capabilities",
+                evidence=capability_errors,
+            )
+        )
     return _dimension(config.D_UCP2_ID, service_score + capability_score, findings)
 
 
 def _transport_dimension(
     manifest: UCPManifestResult,
     transport_probes: list[UCPTransportProbe],
+    schema_probes: list[UCPSchemaProbe],
 ) -> UCPDimensionScore:
     if not manifest.transport_entries:
         return _dimension(
@@ -218,8 +327,20 @@ def _transport_dimension(
                 )
             ],
         )
-    scores = [_transport_probe_score(item) for item in transport_probes]
-    findings = [
+    scores = [_transport_probe_score(item, schema_probes) for item in transport_probes]
+    findings: list[UCPFinding] = []
+    if not any(_transport_reachable(item, schema_probes) for item in transport_probes):
+        findings.append(
+            UCPFinding(
+                code=config.FINDING_TRANSPORT_UNREACHABLE,
+                dimension_id=config.D_UCP3_ID,
+                severity=config.UCP_FINDING_BLOCKING,
+                message="No declared UCP transport is reachable.",
+                evidence=[asdict(item) for item in transport_probes],
+            )
+        )
+    if any(not item.negotiated for item in transport_probes):
+        findings.append(
         UCPFinding(
             code=config.FINDING_TRANSPORT_NEGOTIATION_INCOMPLETE,
             dimension_id=config.D_UCP3_ID,
@@ -227,7 +348,7 @@ def _transport_dimension(
             message="At least one transport is reachable but did not complete full negotiation.",
             evidence=[asdict(item) for item in transport_probes if not item.negotiated],
         )
-    ] if any(not item.negotiated for item in transport_probes) else []
+    )
     return _dimension(config.D_UCP3_ID, _average(scores), findings)
 
 
@@ -240,7 +361,8 @@ def _catalog_dimension(
         manifest.capabilities_declared,
         maximum=60,
     )
-    schema_score = _schema_keyword_score(schema_probes, "catalog", maximum=40)
+    schema_score = _schema_field_score(schema_probes, "catalog", maximum=40)
+    missing_fields = _missing_schema_fields(schema_probes, "catalog")
     missing = [
         item
         for item in config.UCP_REQUIRED_CATALOG_CAPABILITIES
@@ -254,6 +376,13 @@ def _catalog_dimension(
             "Catalog search and lookup payload contracts are incomplete.",
         )
     ] if missing or schema_score < 40 else []
+    _append_missing_schema_evidence(
+        findings,
+        config.FINDING_CATALOG_CONTRACT_MISSING,
+        config.D_UCP4_ID,
+        missing_fields,
+        "Catalog search and lookup payload contracts are incomplete.",
+    )
     return _dimension(config.D_UCP4_ID, caps_score + schema_score, findings)
 
 
@@ -266,7 +395,8 @@ def _cart_checkout_dimension(
         manifest.capabilities_declared,
         maximum=60,
     )
-    schema_score = _schema_keyword_score(schema_probes, "cart_checkout", maximum=40)
+    schema_score = _schema_field_score(schema_probes, "cart_checkout", maximum=40)
+    missing_fields = _missing_schema_fields(schema_probes, "cart_checkout")
     missing = [
         item
         for item in config.UCP_REQUIRED_CART_CHECKOUT_CAPABILITIES
@@ -280,6 +410,13 @@ def _cart_checkout_dimension(
             "Cart and checkout payload contracts are incomplete.",
         )
     ] if missing or schema_score < 40 else []
+    _append_missing_schema_evidence(
+        findings,
+        config.FINDING_CART_CHECKOUT_CONTRACT_MISSING,
+        config.D_UCP5_ID,
+        missing_fields,
+        "Cart and checkout payload contracts are incomplete.",
+    )
     return _dimension(config.D_UCP5_ID, caps_score + schema_score, findings)
 
 
@@ -292,7 +429,8 @@ def _order_policy_dimension(
         manifest.capabilities_declared,
         maximum=60,
     )
-    schema_score = _schema_keyword_score(schema_probes, "order_policy", maximum=25)
+    schema_score = _schema_field_score(schema_probes, "order_policy", maximum=25)
+    missing_fields = _missing_schema_fields(schema_probes, "order_policy")
     payment_score = 15 if manifest.payment_handlers else 0
     missing = [
         item
@@ -309,6 +447,8 @@ def _order_policy_dimension(
                 "Order, fulfillment, discount, or policy payload contracts are incomplete.",
             )
         )
+        if missing_fields:
+            findings[-1].evidence.append({"missing_schema_fields": missing_fields})
     if not manifest.payment_handlers:
         findings.append(
             UCPFinding(
@@ -321,16 +461,39 @@ def _order_policy_dimension(
     return _dimension(config.D_UCP6_ID, caps_score + schema_score + payment_score, findings)
 
 
-def _transport_probe_score(probe: UCPTransportProbe) -> int:
+def _transport_probe_score(
+    probe: UCPTransportProbe,
+    schema_probes: list[UCPSchemaProbe],
+) -> int:
     if probe.negotiated:
         return 100
-    if probe.transport == "embedded" and probe.reachable:
+    if probe.transport == "embedded" and _embedded_schema_valid(probe, schema_probes):
         return 80
     if probe.profile_required:
         return 70
     if probe.reachable:
         return 50
     return 0
+
+
+def _transport_reachable(
+    probe: UCPTransportProbe,
+    schema_probes: list[UCPSchemaProbe],
+) -> bool:
+    if probe.transport == "embedded":
+        return _embedded_schema_valid(probe, schema_probes)
+    return probe.reachable
+
+
+def _embedded_schema_valid(
+    probe: UCPTransportProbe,
+    schema_probes: list[UCPSchemaProbe],
+) -> bool:
+    schema_url = str(probe.schema_url or "")
+    return bool(
+        schema_url
+        and any(item.url == schema_url and item.reachable and item.schema_valid for item in schema_probes)
+    )
 
 
 def _coverage_score(required: tuple[str, ...], declared: list[str], *, maximum: int) -> int:
@@ -340,25 +503,30 @@ def _coverage_score(required: tuple[str, ...], declared: list[str], *, maximum: 
     return int(maximum * (found / len(required)))
 
 
-def _schema_keyword_score(
+def _schema_field_score(
     probes: list[UCPSchemaProbe],
     group: str,
     *,
     maximum: int,
 ) -> int:
-    keywords = config.UCP_REQUIRED_SCHEMA_KEYWORDS[group]
-    if not keywords:
+    required = config.UCP_REQUIRED_SCHEMA_FIELDS[group]
+    if not required:
         return maximum
-    found = 0
-    for keyword in keywords:
-        if any(
+    found = len(required) - len(_missing_schema_fields(probes, group))
+    return int(maximum * (found / len(required)))
+
+
+def _missing_schema_fields(probes: list[UCPSchemaProbe], group: str) -> list[str]:
+    missing: list[str] = []
+    for field in config.UCP_REQUIRED_SCHEMA_FIELDS[group]:
+        if not any(
             probe.reachable
-            and probe.valid_json
-            and keyword in f"{probe.url} {probe.title}".lower()
+            and probe.schema_valid
+            and probe.field_results.get(group, {}).get(field)
             for probe in probes
         ):
-            found += 1
-    return int(maximum * (found / len(keywords)))
+            missing.append(field)
+    return missing
 
 
 def _missing_finding(
@@ -376,6 +544,28 @@ def _missing_finding(
         count_kind="contracts",
         evidence=[{"missing": list(missing)}],
     )
+
+
+def _append_missing_schema_evidence(
+    findings: list[UCPFinding],
+    code: str,
+    dimension_id: str,
+    missing_fields: list[str],
+    message: str,
+) -> None:
+    if not missing_fields:
+        return
+    if not findings:
+        findings.append(
+            UCPFinding(
+                code=code,
+                dimension_id=dimension_id,
+                severity=config.UCP_FINDING_WARNING,
+                message=message,
+                evidence=[],
+            )
+        )
+    findings[0].evidence.append({"missing_schema_fields": missing_fields})
 
 
 def _dimension(
@@ -423,6 +613,99 @@ def _tool_entries(payload: dict) -> list[dict]:
     if not isinstance(raw_tools, list):
         return []
     return [dict(item) for item in raw_tools if isinstance(item, dict)]
+
+
+def _mcp_conformance_errors(payload: dict, *, expected_id: str) -> list[str]:
+    if payload.get("error"):
+        return []
+    errors: list[str] = []
+    if payload.get("jsonrpc") != "2.0":
+        errors.append("MCP response missing jsonrpc=2.0")
+    if str(payload.get("id") or "") != expected_id:
+        errors.append("MCP response did not echo request id")
+    tools = _tool_entries(payload)
+    if not tools:
+        errors.append("MCP tools/list did not return result.tools")
+    for tool in tools:
+        if not isinstance(tool.get("inputSchema"), dict):
+            errors.append(f"MCP tool {tool.get('name') or '<unknown>'} lacks inputSchema")
+    return errors
+
+
+def _profile_required(payload: dict) -> bool:
+    error = payload.get("error")
+    if not isinstance(error, dict):
+        return False
+    try:
+        raw_code = error.get("code")
+        if raw_code is None:
+            return False
+        code = int(raw_code)
+    except (TypeError, ValueError):
+        return False
+    message = str(error.get("message") or "").lower()
+    return -32099 <= code <= -32000 and "profile" in message and (
+        "missing" in message or "invalid" in message or "required" in message
+    )
+
+
+def _schema_error(payload: dict) -> str:
+    try:
+        validator_cls = validator_for(payload)
+        validator_cls.check_schema(payload)
+    except SchemaError as exc:
+        return str(exc.message)
+    return ""
+
+
+def _schema_field_results(payload: dict) -> dict[str, dict[str, bool]]:
+    return {
+        group: {
+            field: _schema_contains_field(payload, field)
+            for field in required_fields
+        }
+        for group, required_fields in config.UCP_REQUIRED_SCHEMA_FIELDS.items()
+    }
+
+
+def _schema_contains_field(value: object, field: str) -> bool:
+    if isinstance(value, dict):
+        for key, child in value.items():
+            if str(key).lower() == field:
+                return True
+            if key == "required" and isinstance(child, list):
+                if any(str(item).lower() == field for item in child):
+                    return True
+            if key == "properties" and isinstance(child, dict):
+                if any(str(item).lower() == field for item in child):
+                    return True
+            if _schema_contains_field(child, field):
+                return True
+    if isinstance(value, list):
+        return any(_schema_contains_field(item, field) for item in value)
+    return False
+
+
+def _schema_groups(url: str, payload: dict) -> list[str]:
+    text = f"{url} {payload.get('title') or ''} {payload.get('$id') or ''}".lower()
+    groups = [
+        group
+        for group, keywords in config.UCP_REQUIRED_SCHEMA_KEYWORDS.items()
+        if any(keyword in text for keyword in keywords)
+    ]
+    field_results = _schema_field_results(payload)
+    for group, results in field_results.items():
+        if any(results.values()) and group not in groups:
+            groups.append(group)
+    return groups
+
+
+def _entry_validation_errors(entries: list[dict]) -> list[dict[str, Any]]:
+    return [
+        {"name": str(entry.get("name") or ""), "errors": list(entry.get("_errors") or [])}
+        for entry in entries
+        if entry.get("_errors")
+    ]
 
 
 def _preview(payload: dict) -> dict:

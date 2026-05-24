@@ -5,10 +5,13 @@ import type { ReactNode } from 'react';
 import { Button } from '../ui/primitives';
 import {
   AdditionalFieldInput,
+  CsvFileField,
   FieldEditorHeader,
   ManualFieldEditor,
   SettingSection,
   SliderRow,
+  SitemapConfigFields,
+  TargetUrlField,
 } from './form-fields';
 import type { FieldRow, FieldRowMessageTone, ValidationState } from './form-fields';
 import { LogTerminal, buildLogSiteGroups, getLogStage } from './log-terminal';
@@ -99,6 +102,7 @@ export {
 export type { QualityLevel, QualitySnapshot };
 export {
   AdditionalFieldInput,
+  CsvFileField,
   FieldEditorHeader,
   LogTerminal,
   ManualFieldEditor,
@@ -106,6 +110,8 @@ export {
   RecordThumbnail,
   SettingSection,
   SliderRow,
+  SitemapConfigFields,
+  TargetUrlField,
   buildLogSiteGroups,
   getLogStage,
   scrollViewportToBottom,

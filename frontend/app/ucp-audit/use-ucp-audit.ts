@@ -69,8 +69,9 @@ export function useUcpAudit() {
   });
 
   function startAudit() {
-    if (!domain.trim()) {
-      setError('Domain is required.');
+    const validationError = validateDomain(domain);
+    if (validationError) {
+      setError(validationError);
       return;
     }
     createMutation.mutate();
@@ -78,7 +79,7 @@ export function useUcpAudit() {
 
   function updateDomain(value: string) {
     setDomain(value);
-    if (error === 'Domain is required.' && value.trim()) {
+    if (error && !validateDomain(value)) {
       setError('');
     }
   }
@@ -106,4 +107,24 @@ export function useUcpAudit() {
     startAudit,
     selectJob,
   };
+}
+
+function validateDomain(value: string): string | null {
+  const text = value.trim();
+  if (!text) return 'Domain is required.';
+  const withScheme = /^https?:\/\//i.test(text) ? text : `https://${text}`;
+  let parsed: URL;
+  try {
+    parsed = new URL(withScheme);
+  } catch {
+    return 'Enter a valid domain like example.com.';
+  }
+  if (parsed.pathname !== '/' || parsed.search || parsed.hash) {
+    return 'Enter only the domain, without a path or query string.';
+  }
+  const hostname = parsed.hostname.trim();
+  if (!hostname.includes('.')) {
+    return 'Enter a valid domain like example.com.';
+  }
+  return null;
 }

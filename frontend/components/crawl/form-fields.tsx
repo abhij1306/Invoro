@@ -249,6 +249,131 @@ export function AdditionalFieldInput({
   );
 }
 
+export function SitemapConfigFields({
+  domain,
+  filterKeyword,
+  maxUrls,
+  onDomainChange,
+  onFilterKeywordChange,
+  onMaxUrlsChange,
+}: Readonly<{
+  domain: string;
+  filterKeyword: string;
+  maxUrls: number;
+  onDomainChange: (value: string) => void;
+  onFilterKeywordChange: (value: string) => void;
+  onMaxUrlsChange: (value: number) => void;
+}>) {
+  return (
+    <div className="grid gap-4">
+      <label className="grid gap-2">
+        <span className="type-control font-medium">Site Domain</span>
+        <Input
+          value={domain}
+          onChange={(event) => onDomainChange(event.target.value)}
+          placeholder="example.com or https://example.com/sitemap.xml"
+          className="font-mono"
+          aria-label="Sitemap domain input"
+        />
+        <span className="type-caption text-muted">
+          App will auto-discover sitemap from this domain.
+        </span>
+      </label>
+
+      <label className="grid gap-2">
+        <span className="type-control flex items-center gap-1.5 font-medium">
+          Collection Filter
+          <Tooltip content="Only child sitemaps whose filename contains this keyword will be crawled. For Shopify use collections. For WooCommerce or Magento use category.">
+            <Info className="text-muted size-3.5 cursor-help" />
+          </Tooltip>
+        </span>
+        <Input
+          value={filterKeyword}
+          onChange={(event) => onFilterKeywordChange(event.target.value)}
+          placeholder="collections"
+          className="font-mono"
+          aria-label="Sitemap filter keyword input"
+        />
+      </label>
+
+      <label className="grid gap-2">
+        <span className="type-control flex items-center gap-1.5 font-medium">
+          Max Category URLs
+          <Tooltip content="Maximum number of category URLs to crawl from the sitemap.">
+            <Info className="text-muted size-3.5 cursor-help" />
+          </Tooltip>
+        </span>
+        <Input
+          type="number"
+          min={1}
+          max={2000}
+          value={maxUrls}
+          onChange={(event) => {
+            const parsed = parseInt(event.target.value, 10);
+            const nextValue = Number.isNaN(parsed) ? maxUrls || 1 : parsed;
+            onMaxUrlsChange(Math.min(2000, Math.max(1, nextValue)));
+          }}
+          aria-label="Sitemap max URLs input"
+        />
+      </label>
+    </div>
+  );
+}
+
+export function TargetUrlField({
+  value,
+  placeholder,
+  onChange,
+}: Readonly<{
+  value: string;
+  placeholder: string;
+  onChange: (value: string) => void;
+}>) {
+  return (
+    <label className="grid gap-2">
+      <span className="type-control font-medium">Target URL</span>
+      <Input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="font-mono"
+        placeholder={placeholder}
+        aria-label="Target URL input"
+      />
+    </label>
+  );
+}
+
+export function CsvFileField({
+  file,
+  onChange,
+}: Readonly<{
+  file: File | null;
+  onChange: (file: File | null) => void;
+}>) {
+  return (
+    <label className="grid gap-2">
+      <span className="type-control font-medium">CSV File</span>
+      <div className="flex items-center gap-4">
+        <input
+          id="csv-file-input"
+          type="file"
+          accept=".csv,text/csv"
+          onChange={(event) => onChange(event.target.files?.[0] ?? null)}
+          className="sr-only"
+          aria-label="CSV file input"
+        />
+        <label
+          htmlFor="csv-file-input"
+          className="ui-on-accent-surface bg-accent hover:bg-accent-hover type-control cursor-pointer rounded-[var(--radius-md)] px-3 py-1.5 transition-colors"
+        >
+          Choose file
+        </label>
+        <span className="text-muted type-body">{file ? file.name : 'No file chosen'}</span>
+      </div>
+    </label>
+  );
+}
+
 export function ManualFieldEditor({
   row,
   onChange,

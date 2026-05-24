@@ -137,6 +137,23 @@ describe('CrawlConfigScreen bulk prefill', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('renders dedicated sitemap controls instead of the target URL field', async () => {
+    render(
+      <TopBarProvider>
+        <CrawlConfigScreen
+          requestedTab="category"
+          requestedCategoryMode="sitemap"
+          requestedPdpMode={null}
+        />
+      </TopBarProvider>,
+    );
+
+    expect(screen.getByLabelText('Sitemap domain input')).toBeInTheDocument();
+    expect(screen.getByLabelText('Sitemap filter keyword input')).toHaveValue('collections');
+    expect(screen.getByLabelText('Sitemap max URLs input')).toHaveValue(500);
+    expect(screen.queryByLabelText('Target URL input')).not.toBeInTheDocument();
+  });
+
   it('does not apply proxy defaults from the saved domain run profile', async () => {
     getDomainRunProfileMock.mockResolvedValue({
       domain: 'example.com',

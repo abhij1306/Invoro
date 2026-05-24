@@ -3,11 +3,19 @@ from __future__ import annotations
 import pytest
 
 from app.models.llm import LLMConfig
-from app.services.config.data_enrichment import DATA_ENRICHMENT_LLM_TASK
+from app.services.config.data_enrichment import (
+    DATA_ENRICHMENT_LLM_TASK,
+    DATA_ENRICHMENT_PROMPT_REGISTRY,
+)
+from app.services.config.field_mappings import PROMPT_REGISTRY
 from app.services.crawl.batch_runtime import process_run
 from app.services.acquisition.acquirer import AcquisitionResult
 from app.services.crawl.crud import get_run_records
-from app.services.llm.config_service import resolve_run_config, snapshot_active_configs
+from app.services.llm.config_service import (
+    get_prompt_task,
+    resolve_run_config,
+    snapshot_active_configs,
+)
 
 
 def _detail_html() -> str:
@@ -145,6 +153,49 @@ async def test_resolve_run_config_prefers_explicit_snapshot_over_run_snapshot(
     assert resolved is not None
     assert resolved["provider"] == "groq"
     assert resolved["model"] == "live-enrichment-model"
+
+
+@pytest.mark.asyncio
+async def test_resolve_run_config_skips_malformed_snapshot(
+    db_session,
+) -> None:
+    db_session.add(
+        LLMConfig(
+            provider="groq",
+            model="live-model",
+            api_key_encrypted="enc-live",
+            task_type="general",
+            is_active=True,
+        )
+    )
+    await db_session.commit()
+
+    resolved = await resolve_run_config(
+        db_session,
+        run_id=None,
+        task_type=DATA_ENRICHMENT_LLM_TASK,
+        config_snapshot={DATA_ENRICHMENT_LLM_TASK: {"provider": "groq"}},
+    )
+
+    assert resolved is not None
+    assert resolved["model"] == "live-model"
+
+
+def test_get_prompt_task_logs_registry_collisions(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    task = {
+        "system_file": "data_enrichment_semantic.system.txt",
+        "user_file": "data_enrichment_semantic.user.txt",
+    }
+    monkeypatch.setitem(DATA_ENRICHMENT_PROMPT_REGISTRY, "collision_task", task)
+    monkeypatch.setitem(PROMPT_REGISTRY, "collision_task", task)
+
+    with caplog.at_level("WARNING"):
+        assert get_prompt_task("collision_task") is None
+
+    assert "multiple registries" in caplog.text
 
 
 @pytest.mark.asyncio

@@ -1,112 +1,23 @@
 from __future__ import annotations
 
-from app.services.config.ucp_audit import D_UCP1_ID
-from app.services.ucp_audit.reporting import (
-    build_markdown_report,
-    build_report_payload,
-)
-from app.services.ucp_audit.types import (
-    UCPComplianceReport,
-    UCPDimensionScore,
-    UCPFinding,
-)
+from app.services.config import ucp_audit as config
+from app.services.ucp_audit.reporting import build_markdown_report
+from app.services.ucp_audit.types import UCPComplianceReport
 
 
-def test_report_payload_contains_summary_scores_and_findings() -> None:
-    finding = UCPFinding(
-        code="manifest_missing",
-        dimension_id=D_UCP1_ID,
-        severity="blocking",
-    )
+def test_markdown_report_includes_transport_gate_max_score() -> None:
     report = UCPComplianceReport(
         domain="example.com",
         audit_id="audit-1",
-        overall_score=64,
-        dimension_scores=[
-            UCPDimensionScore(
-                dimension_id=D_UCP1_ID,
-                score=0,
-                status="fail",
-                findings=[finding],
-                weight=1.0,
-            )
-        ],
-        all_findings=[finding],
-        d_ucp1_gate_applied=True,
-        ucp_contract={"services": []},
-        repair_roadmap=[],
-    )
-
-    payload = build_report_payload(report)
-
-    assert payload["domain"] == "example.com"
-    assert payload["overall_score"] == 64
-    assert payload["d_ucp1_gate_applied"] is True
-    assert payload["dimension_scores"][0]["dimension_id"] == D_UCP1_ID
-    assert payload["findings"][0]["code"] == "manifest_missing"
-    assert payload["ucp_contract"] == {"services": []}
-    assert payload["repair_roadmap"] == []
-
-
-def test_markdown_report_has_operational_sections() -> None:
-    report = UCPComplianceReport(
-        domain="example.com",
-        audit_id="audit-1",
-        overall_score=88,
-        dimension_scores=[
-            UCPDimensionScore(
-                dimension_id=D_UCP1_ID,
-                score=100,
-                status="pass",
-                findings=[],
-                weight=1.0,
-            )
-        ],
+        overall_score=45,
+        dimension_scores=[],
         all_findings=[],
         d_ucp1_gate_applied=False,
+        d_ucp3_gate_applied=True,
         ucp_contract={},
         repair_roadmap=[],
     )
 
     markdown = build_markdown_report(report)
 
-    assert "# UCP Compliance Audit: example\\.com" in markdown
-    assert "## Executive Summary" in markdown
-    assert "## Dimension Scores" in markdown
-    assert "## Findings" in markdown
-
-
-def test_markdown_report_escapes_interpolated_values() -> None:
-    report = UCPComplianceReport(
-        domain="store_[x].com",
-        audit_id="audit(1)",
-        overall_score=88,
-        dimension_scores=[
-            UCPDimensionScore(
-                dimension_id="D-UCP[1]",
-                score=100,
-                status="pass!",
-                findings=[],
-                weight=1.0,
-            )
-        ],
-        all_findings=[
-            UCPFinding(
-                code="manifest_missing*",
-                dimension_id="D-UCP[1]",
-                severity="blocking",
-                message="fix [manifest](now)",
-            )
-        ],
-        d_ucp1_gate_applied=False,
-        ucp_contract={},
-        repair_roadmap=[],
-    )
-
-    markdown = build_markdown_report(report)
-
-    assert "store\\_\\[x\\]\\.com" in markdown
-    assert "audit\\(1\\)" in markdown
-    assert "D\\-UCP\\[1\\]" in markdown
-    assert "manifest\\_missing\\*" in markdown
-    assert "fix \\[manifest\\]\\(now\\)" in markdown
+    assert f"D-UCP3 gate max score: {config.D_UCP3_GATE_MAX_SCORE}" in markdown

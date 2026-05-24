@@ -18,6 +18,7 @@ import { telemetryErrorPayload, trackEvent } from '../../lib/telemetry/events';
 import {
   AdditionalFieldInput,
   clampNumber,
+  CsvFileField,
   type CategoryMode,
   type CrawlTab,
   deriveSurface,
@@ -32,6 +33,8 @@ import {
   type PdpMode,
   SettingSection,
   SliderRow,
+  SitemapConfigFields,
+  TargetUrlField,
   validateAdditionalFieldName,
   normalizeField,
   uniqueRequestedFields,
@@ -101,6 +104,9 @@ export function CrawlConfigScreen({
     () => requestedCategoryMode ?? 'single',
   );
   const [pdpMode, setPdpMode] = useState<PdpMode>(() => requestedPdpMode ?? 'single');
+  const [sitemapDomain, setSitemapDomain] = useState('');
+  const [sitemapFilterKeyword, setSitemapFilterKeyword] = useState('collections');
+  const [sitemapMaxUrls, setSitemapMaxUrls] = useState(500);
   const {
     handleSubmit,
     setValue,
@@ -347,6 +353,10 @@ export function CrawlConfigScreen({
       mode: crawlTab === 'category' ? categoryMode : effectivePdpMode,
       target_url: targetUrl,
       bulk_urls: bulkUrls,
+      sitemap_domain: categoryMode === 'sitemap' ? sitemapDomain.trim() : undefined,
+      sitemap_filter_keyword:
+        categoryMode === 'sitemap' ? sitemapFilterKeyword.trim() || 'collections' : undefined,
+      sitemap_max_urls: categoryMode === 'sitemap' ? sitemapMaxUrls : undefined,
       csv_file: csvFile,
       smart_extraction: smartExtraction,
       max_records: clampNumber(
@@ -372,6 +382,9 @@ export function CrawlConfigScreen({
       proxyEnabled,
       proxyInput,
       respectRobotsTxt,
+      sitemapDomain,
+      sitemapFilterKeyword,
+      sitemapMaxUrls,
       smartExtraction,
       targetUrl,
     ],
@@ -667,10 +680,13 @@ export function CrawlConfigScreen({
   }
 
   const hasTarget =
-    singleUrlMode || categoryMode === 'sitemap'
-      ? targetUrl.trim().length > 0
+    crawlTab === 'category' && categoryMode === 'sitemap'
+      ? sitemapDomain.trim().length > 0
+      : singleUrlMode
+        ? targetUrl.trim().length > 0
       : bulkUrls.trim().length > 0 || csvFile !== null;
-  const canSubmit = canPreview(config, fieldRows, { runProfile, studioMode }) && !isSubmitting;
+  const canSubmit =
+    hasTarget && canPreview(config, fieldRows, { runProfile, studioMode }) && !isSubmitting;
 
   return (
     <div className="page-stack gap-4">
@@ -784,45 +800,24 @@ export function CrawlConfigScreen({
                 </div>
               </label>
             ) : crawlTab === 'pdp' && pdpMode === 'csv' ? (
-              <label className="grid gap-2">
-                <span className="type-control font-medium">CSV File</span>
-                <div className="flex items-center gap-4">
-                  <input
-                    key="csv-file-input"
-                    id="csv-file-input"
-                    type="file"
-                    accept=".csv,text/csv"
-                    onChange={(event) => setCsvFile(event.target.files?.[0] ?? null)}
-                    className="sr-only"
-                    aria-label="CSV file input"
-                  />
-                  <label
-                    htmlFor="csv-file-input"
-                    className="ui-on-accent-surface bg-accent hover:bg-accent-hover type-control cursor-pointer rounded-[var(--radius-md)] px-3 py-1.5 transition-colors"
-                  >
-                    Choose file
-                  </label>
-                  <span className="text-muted type-body">
-                    {csvFile ? csvFile.name : 'No file chosen'}
-                  </span>
-                </div>
-              </label>
+              <CsvFileField file={csvFile} onChange={setCsvFile} />
+            ) : crawlTab === 'category' && categoryMode === 'sitemap' ? (
+              <SitemapConfigFields
+                domain={sitemapDomain}
+                filterKeyword={sitemapFilterKeyword}
+                maxUrls={sitemapMaxUrls}
+                onDomainChange={setSitemapDomain}
+                onFilterKeywordChange={setSitemapFilterKeyword}
+                onMaxUrlsChange={setSitemapMaxUrls}
+              />
             ) : (
-              <label className="grid gap-2">
-                <span className="type-control font-medium">Target URL</span>
-                <Input
-                  key="target-url-input"
-                  value={targetUrl}
-                  onChange={(event) => setValue('targetUrl', event.target.value)}
-                  className="font-mono"
-                  placeholder={
-                    crawlTab === 'category'
-                      ? 'https://example.com/list'
-                      : 'https://example.com/page'
-                  }
-                  aria-label="Target URL input"
-                />
-              </label>
+              <TargetUrlField
+                value={targetUrl}
+                onChange={(value) => setValue('targetUrl', value)}
+                placeholder={
+                  crawlTab === 'category' ? 'https://example.com/list' : 'https://example.com/page'
+                }
+              />
             )}
 
             {savedProfileMessage ? (

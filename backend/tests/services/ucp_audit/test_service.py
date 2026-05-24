@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -80,7 +82,12 @@ async def test_ucp_audit_run_job_persists_report_and_endpoint_result(
     test_user,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    async def fake_report(domain: str, audit_id: str, options: dict[str, object]):
+    async def fake_report(
+        domain: str,
+        audit_id: str,
+        options: dict[str, object],
+        **kwargs,
+    ):
         assert domain == "example.com"
         assert options["sample_size"] == 2
         return _sample_report(audit_id=audit_id)
@@ -123,7 +130,12 @@ async def test_ucp_audit_job_payload_serializes(
     test_user,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    async def fake_report(domain: str, audit_id: str, options: dict[str, object]):
+    async def fake_report(
+        domain: str,
+        audit_id: str,
+        options: dict[str, object],
+        **kwargs,
+    ):
         del domain, options
         return _sample_report(audit_id=audit_id)
 
@@ -207,9 +219,50 @@ async def test_ucp_report_scores_protocol_contract_not_json_ld(
         ]
 
     async def fake_schema_probe(urls: list[str]) -> list[UCPSchemaProbe]:
+        del urls
         return [
-            UCPSchemaProbe(url=url, reachable=True, valid_json=True, title=url)
-            for url in urls
+            UCPSchemaProbe(
+                url="https://ucp.dev/catalog_search.json",
+                reachable=True,
+                valid_json=True,
+                schema_valid=True,
+                field_results={
+                    "catalog": {
+                        "product_id": True,
+                        "title": True,
+                        "price": True,
+                        "currency": True,
+                        "availability": True,
+                    }
+                },
+            ),
+            UCPSchemaProbe(
+                url="https://ucp.dev/cart.json",
+                reachable=True,
+                valid_json=True,
+                schema_valid=True,
+                field_results={
+                    "cart_checkout": {
+                        "cart_id": True,
+                        "line_items": True,
+                        "total": True,
+                        "currency": True,
+                    }
+                },
+            ),
+            UCPSchemaProbe(
+                url="https://ucp.dev/order.json",
+                reachable=True,
+                valid_json=True,
+                schema_valid=True,
+                field_results={
+                    "order_policy": {
+                        "order_id": True,
+                        "status": True,
+                        "fulfillment": True,
+                    }
+                },
+            ),
         ]
 
     monkeypatch.setattr("app.services.ucp_audit.service.discover_ucp_manifest", fake_discover)
@@ -236,4 +289,85 @@ async def test_ucp_report_scores_protocol_contract_not_json_ld(
     assert by_dimension[D_UCP6_ID].score == 100
     assert "schema_missing" not in finding_codes
     assert report.ucp_contract["payment_handlers"] == ["com.google.pay"]
-    assert report.repair_roadmap[-1].sub_skill == "shop-skill advisory"
+    assert all(item.sub_skill != "shop-skill advisory" for item in report.repair_roadmap)
+
+
+@pytest.mark.asyncio
+async def test_ucp_schema_llm_analysis_runs_only_when_enabled(
+    db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manifest = UCPManifestResult(
+        manifest_found=True,
+        manifest_valid=True,
+        services_declared=["dev.ucp.shopping"],
+        capabilities_declared=["dev.ucp.shopping.catalog.search"],
+        schema_urls=["https://ucp.dev/catalog_search.json"],
+        raw_manifest={"ucp": {"version": "2026-04-08"}},
+    )
+    schema_probe = UCPSchemaProbe(
+        url="https://ucp.dev/catalog_search.json",
+        reachable=True,
+        valid_json=True,
+        schema_valid=True,
+        groups=["catalog"],
+        field_results={
+            "catalog": {
+                "product_id": True,
+                "title": True,
+                "price": False,
+                "currency": False,
+                "availability": False,
+            }
+        },
+    )
+    calls = 0
+
+    async def fake_discover(domain: str) -> UCPManifestResult:
+        del domain
+        return manifest
+
+    async def fake_transport_probe(result: UCPManifestResult) -> list[UCPTransportProbe]:
+        del result
+        return []
+
+    async def fake_schema_probe(urls: list[str]) -> list[UCPSchemaProbe]:
+        del urls
+        return [schema_probe]
+
+    async def fake_llm(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        return SimpleNamespace(
+            payload={
+                "summary": "Add missing catalog fields.",
+                "recommended_changes": ["Add price, currency, availability."],
+                "risk_notes": [],
+            },
+            error_message="",
+            error_category="",
+            provider="test",
+            model="test-model",
+        )
+
+    monkeypatch.setattr("app.services.ucp_audit.service.discover_ucp_manifest", fake_discover)
+    monkeypatch.setattr("app.services.ucp_audit.service.probe_transports", fake_transport_probe)
+    monkeypatch.setattr("app.services.ucp_audit.service.probe_schemas", fake_schema_probe)
+    monkeypatch.setattr("app.services.ucp_audit.service.run_prompt_task", fake_llm)
+
+    disabled = await build_ucp_report_for_domain(
+        "example.com",
+        "audit-1",
+        {"llm_enabled": False},
+        session=db_session,
+    )
+    enabled = await build_ucp_report_for_domain(
+        "example.com",
+        "audit-2",
+        {"llm_enabled": True},
+        session=db_session,
+    )
+
+    assert calls == 1
+    assert enabled.ucp_contract["schemas"][0]["llm_analysis"]["summary"]
+    assert enabled.overall_score == disabled.overall_score

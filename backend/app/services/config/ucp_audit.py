@@ -2,9 +2,12 @@ from __future__ import annotations
 
 UCP_MANIFEST_PATH = "/.well-known/ucp"
 UCP_DEFAULT_URL_SCHEME = "https"
+UCP_TARGET_VERSION = "2026-04-08"
+UCP_ACCEPT_HEADER = "application/json, application/vnd.ucp+json;q=0.9"
 UCP_DISCOVERY_TIMEOUT_SECONDS = 5.0
 UCP_SCHEMA_TIMEOUT_SECONDS = 5.0
 UCP_TRANSPORT_TIMEOUT_SECONDS = 5.0
+UCP_SCHEMA_LLM_TIMEOUT_SECONDS = 20.0
 
 UCP_AUDIT_JOB_STATUS_QUEUED = "queued"
 UCP_AUDIT_JOB_STATUS_RUNNING = "running"
@@ -48,6 +51,11 @@ UCP_REQUIRED_SCHEMA_KEYWORDS = {
     "cart_checkout": ("cart", "checkout"),
     "order_policy": ("order", "fulfillment", "discount"),
 }
+UCP_REQUIRED_SCHEMA_FIELDS = {
+    "catalog": ("product_id", "title", "price", "currency", "availability"),
+    "cart_checkout": ("cart_id", "line_items", "total", "currency"),
+    "order_policy": ("order_id", "status", "fulfillment"),
+}
 UCP_SAFE_READ_ONLY_TOOL_KEYWORDS = ("catalog", "search", "lookup", "product")
 UCP_SIDE_EFFECT_TOOL_KEYWORDS = (
     "cart",
@@ -80,16 +88,32 @@ DIMENSION_WEIGHTS = {
     D_UCP6_ID: 0.15,
 }
 D_UCP1_GATE_MAX_SCORE = 30
+D_UCP3_GATE_MAX_SCORE = 45
 
 FINDING_MANIFEST_MISSING = "manifest_missing"
 FINDING_MANIFEST_INVALID = "manifest_invalid"
+FINDING_MANIFEST_CONTENT_TYPE_INVALID = "manifest_content_type_invalid"
+FINDING_MANIFEST_REDIRECTED = "manifest_redirected"
 FINDING_SERVICE_MISSING = "service_missing"
+FINDING_SERVICE_INVALID = "service_invalid"
 FINDING_CAPABILITY_MISSING = "capability_missing"
+FINDING_CAPABILITY_INVALID = "capability_invalid"
 FINDING_TRANSPORT_MISSING = "transport_missing"
+FINDING_TRANSPORT_UNREACHABLE = "transport_unreachable"
 FINDING_TRANSPORT_NEGOTIATION_INCOMPLETE = "transport_negotiation_incomplete"
 FINDING_SCHEMA_MISSING = "schema_missing"
 FINDING_SCHEMA_UNREACHABLE = "schema_unreachable"
+FINDING_SCHEMA_FIELD_MISSING = "schema_field_missing"
 FINDING_CATALOG_CONTRACT_MISSING = "catalog_contract_missing"
 FINDING_CART_CHECKOUT_CONTRACT_MISSING = "cart_checkout_contract_missing"
 FINDING_ORDER_POLICY_CONTRACT_MISSING = "order_policy_contract_missing"
 FINDING_PAYMENT_HANDLER_MISSING = "payment_handler_missing"
+
+UCP_SCHEMA_ANALYSIS_LLM_TASK = "ucp_schema_analysis"
+UCP_AUDIT_PROMPT_REGISTRY = {
+    UCP_SCHEMA_ANALYSIS_LLM_TASK: {
+        "response_type": "object",
+        "system_file": "ucp_schema_analysis.system.txt",
+        "user_file": "ucp_schema_analysis.user.txt",
+    },
+}

@@ -242,7 +242,7 @@ export function stripDomainMemoryFieldRows(rows: FieldRow[]) {
 
 export function inferRunTypeHint(config: CrawlConfig) {
   if (config.module === 'category') {
-    return config.mode === 'bulk' ? 'batch' : 'crawl';
+    return config.mode === 'bulk' || config.mode === 'sitemap' ? 'batch' : 'crawl';
   }
   if (config.mode === 'csv') {
     return 'csv';
@@ -338,6 +338,24 @@ export function buildDispatch(
   };
 
   if (config.module === 'category') {
+    if (config.mode === 'sitemap') {
+      const domain = config.sitemap_domain?.trim();
+      if (!domain) throw new Error('Enter a site domain for sitemap discovery.');
+      return {
+        runType: 'batch',
+        surface,
+        url: domain,
+        urls: undefined,
+        settings: {
+          ...commonSettings,
+          sitemap_domain: domain,
+          sitemap_filter_keyword: config.sitemap_filter_keyword?.trim() || 'collections',
+          sitemap_max_urls: config.sitemap_max_urls ?? 500,
+        },
+        additionalFields,
+        csvFile: null,
+      };
+    }
     if (config.mode === 'bulk') {
       const urls = parseLines(config.bulk_urls);
       if (!urls.length) throw new Error('Bulk crawl needs at least one URL.');

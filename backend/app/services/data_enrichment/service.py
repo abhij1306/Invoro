@@ -1,5 +1,7 @@
 from __future__ import annotations
+import asyncio
 import logging
+import re
 from datetime import UTC, datetime
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
@@ -194,7 +196,7 @@ async def _run_job(session: AsyncSession, job: DataEnrichmentJob) -> None:
         for product in products
         if product.id is not None and product.source_record_id is not None
     ]
-    await session.flush()
+    await session.commit()
 
     enriched_count = 0
     failed_count = 0
@@ -329,22 +331,19 @@ async def _run_llm_enrichment(
         product=product,
         category_candidates=category_candidates,
     )
-    result = await run_prompt_task(
+    variables: dict[str, object] = {
+        "product_json": prompt_context,
+        "taxonomy_hint": _taxonomy_hint(
+            product.category_path,
+            category_candidates=category_candidates,
+            missing_fields=_missing_llm_backfill_fields(product),
+        ),
+    }
+    result = await _run_prompt_task_with_rate_limit_retry(
         session,
-        task_type=DATA_ENRICHMENT_LLM_TASK,
-        run_id=record.run_id,
-        domain=source_domain(record.source_url),
-        budget_scope=f"{DATA_ENRICHMENT_LLM_TASK}:{job.id}",
-        timeout_seconds=data_enrichment_settings.llm_call_timeout_seconds,
-        config_snapshot=_llm_config_snapshot(job),
-        variables={
-            "product_json": prompt_context,
-            "taxonomy_hint": _taxonomy_hint(
-                product.category_path,
-                category_candidates=category_candidates,
-                missing_fields=_missing_llm_backfill_fields(product),
-            ),
-        },
+        job=job,
+        record=record,
+        variables=variables,
     )
     if result.error_message:
         return {
@@ -369,6 +368,37 @@ async def _run_llm_enrichment(
         "provider": result.provider or "",
         "model": result.model or "",
     }
+
+
+async def _run_prompt_task_with_rate_limit_retry(
+    session: AsyncSession,
+    *,
+    job: DataEnrichmentJob,
+    record: CrawlRecord,
+    variables: dict[str, object],
+):
+    attempts = data_enrichment_settings.llm_rate_limit_retries + 1
+    result = None
+    for attempt in range(attempts):
+        result = await run_prompt_task(
+            session,
+            task_type=DATA_ENRICHMENT_LLM_TASK,
+            run_id=record.run_id,
+            domain=source_domain(record.source_url),
+            budget_scope=f"{DATA_ENRICHMENT_LLM_TASK}:{job.id}",
+            timeout_seconds=data_enrichment_settings.llm_call_timeout_seconds,
+            config_snapshot=_llm_config_snapshot(job),
+            variables=variables,
+        )
+        if str(result.error_category or "") != "rate_limited":
+            return result
+        if attempt + 1 < attempts:
+            delay = (
+                data_enrichment_settings.llm_rate_limit_retry_delay_seconds
+                * (2**attempt)
+            )
+            await asyncio.sleep(delay)
+    return result
 
 
 def _llm_config_snapshot(job: DataEnrichmentJob) -> dict[str, object] | None:
@@ -462,7 +492,29 @@ def _apply_llm_payload(
         "ai_discovery_tags",
         "suggested_bundles",
     ):
-        values = string_list(payload.get(field_name), max_items=10, max_chars=60)
+        max_chars = (
+            data_enrichment_settings.llm_semantic_list_item_chars
+            if field_name in {"intent_attributes", "audience", "style_tags"}
+            else 60
+        )
+        values = string_list(payload.get(field_name), max_items=10, max_chars=max_chars)
+        if field_name == "ai_discovery_tags":
+            allowed = set(ai_discovery_allowed_tags_for_product(product))
+            kept: list[str] = []
+            discarded: list[dict[str, str]] = []
+            for value in values:
+                slug = discovery_tag_slug(value)
+                if slug and slug in allowed:
+                    kept.append(slug)
+                elif slug:
+                    discarded.append({"value": str(value), "slug": slug})
+            if discarded:
+                logger.warning(
+                    "Discarded unsupported ai_discovery_tags for product_id=%s: %s",
+                    product.id,
+                    discarded,
+                )
+            values = kept
         setattr(product, field_name, values or None)
         if values:
             applied.append(field_name)
@@ -584,18 +636,13 @@ def _llm_prompt_context(
             "taxonomy_version": DATA_ENRICHMENT_TAXONOMY_VERSION,
             "missing_backfill_fields": _missing_llm_backfill_fields(product),
             "taxonomy_candidates": [
-                without_empty(
-                    {
-                        "category_id": candidate.get("category_id"),
-                        "category_path": candidate.get("category_path"),
-                        "score": candidate.get("score"),
-                    }
-                )
+                _taxonomy_candidate_context(candidate)
                 for candidate in category_candidates[
                     : data_enrichment_settings.llm_taxonomy_hint_count
                 ]
             ],
             "category_attributes": category_attribute_handles(category_anchor),
+            "ai_discovery_allowed_tags": ai_discovery_allowed_tags_for_product(product),
         }
     )
     if description:
@@ -603,6 +650,71 @@ def _llm_prompt_context(
             : data_enrichment_settings.llm_description_excerpt_chars
         ]
     return context
+
+
+def _taxonomy_candidate_context(candidate: dict[str, object]) -> dict[str, object]:
+    taxonomy_reference = object_dict(candidate.get("taxonomy_reference"))
+    return without_empty(
+        {
+            "category_id": candidate.get("category_id"),
+            "category_path": candidate.get("category_path"),
+            "score": candidate.get("score"),
+            "source": candidate.get("source"),
+            "taxonomy_version": candidate.get("taxonomy_version")
+            or taxonomy_reference.get("taxonomy_version")
+            or DATA_ENRICHMENT_TAXONOMY_VERSION,
+            "attribute_handles": object_list(taxonomy_reference.get("attribute_handles")),
+        }
+    )
+
+
+def ai_discovery_allowed_tags_for_product(product: EnrichedProduct) -> list[str]:
+    seo_keywords = product.seo_keywords if isinstance(product.seo_keywords, list) else []
+    materials = (
+        product.materials_normalized
+        if isinstance(product.materials_normalized, list)
+        else []
+    )
+    sizes = product.size_normalized if isinstance(product.size_normalized, list) else []
+    prioritized_values: list[tuple[int, object]] = [
+        *((100, value) for value in seo_keywords),
+        (90, product.category_path),
+        *((85, value) for value in category_attribute_handles(product.category_path) if product.category_path),
+        (70, product.color_family),
+        (70, product.gender_normalized),
+        *((50, value) for value in materials),
+        *((50, value) for value in sizes),
+    ]
+    scored: dict[str, tuple[int, int]] = {}
+    for index, (priority, value) in enumerate(prioritized_values):
+        for tag in discovery_tag_candidates(value):
+            current = scored.get(tag)
+            if current is None or priority > current[0]:
+                scored[tag] = (priority, index)
+    return [
+        tag
+        for tag, _score in sorted(
+            scored.items(),
+            key=lambda item: (-item[1][0], item[1][1], item[0]),
+        )[:50]
+    ]
+
+
+def discovery_tag_candidates(value: object) -> list[str]:
+    text = clean_text(value).casefold()
+    if not text:
+        return []
+    parts = [text]
+    if ">" in text:
+        parts.extend(clean_text(part).casefold() for part in text.split(">"))
+    return [tag for part in parts if (tag := discovery_tag_slug(part))]
+
+
+def discovery_tag_slug(value: object) -> str:
+    text = clean_text(value).casefold()
+    text = re.sub(r"[^a-z0-9]+", "-", text).strip("-")
+    text = re.sub(r"-{2,}", "-", text)
+    return text
 
 
 def _taxonomy_hint(

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildDispatch } from './crawl-config-logic';
+import { buildDispatch, inferRunTypeHint } from './crawl-config-logic';
 import type { FieldRow } from './shared';
 import type { CrawlConfig, DomainRunProfile } from '../../lib/api/types';
 
@@ -28,6 +28,9 @@ function baseConfig(overrides: Partial<CrawlConfig> = {}): CrawlConfig {
     proxy_enabled: false,
     proxy_lines: [],
     additional_fields: [],
+    sitemap_domain: '',
+    sitemap_filter_keyword: undefined,
+    sitemap_max_urls: undefined,
     ...overrides,
   };
 }
@@ -293,6 +296,70 @@ describe('buildDispatch', () => {
     expect(dispatch.settings.fetch_profile).toMatchObject({
       traversal_mode: null,
     });
+  });
+
+  it('submits category sitemap as listing batch without explicit urls', () => {
+    const dispatch = buildDispatch(
+      baseConfig({
+        mode: 'sitemap',
+        target_url: '',
+        sitemap_domain: 'dashingdiva.com',
+        sitemap_filter_keyword: 'collections',
+        sitemap_max_urls: 250,
+      }),
+      [],
+      { runProfile: baseProfile() },
+    );
+
+    expect(dispatch.runType).toBe('batch');
+    expect(dispatch.surface).toBe('ecommerce_listing');
+    expect(dispatch.url).toBe('dashingdiva.com');
+    expect(dispatch.urls).toBeUndefined();
+    expect(dispatch.settings.urls).toBeUndefined();
+    expect(dispatch.settings.sitemap_domain).toBe('dashingdiva.com');
+    expect(dispatch.settings.sitemap_filter_keyword).toBe('collections');
+    expect(dispatch.settings.sitemap_max_urls).toBe(250);
+  });
+
+  it('defaults sitemap filter settings when omitted', () => {
+    const dispatch = buildDispatch(
+      baseConfig({
+        mode: 'sitemap',
+        target_url: '',
+        sitemap_domain: 'https://example.com',
+      }),
+      [],
+      { runProfile: baseProfile() },
+    );
+
+    expect(dispatch.settings.sitemap_filter_keyword).toBe('collections');
+    expect(dispatch.settings.sitemap_max_urls).toBe(500);
+  });
+
+  it('throws when sitemap mode has no domain', () => {
+    expect(() =>
+      buildDispatch(
+        baseConfig({
+          mode: 'sitemap',
+          target_url: '',
+          sitemap_domain: ' ',
+        }),
+        [],
+        { runProfile: baseProfile() },
+      ),
+    ).toThrow('Enter a site domain for sitemap discovery.');
+  });
+
+  it('infers category sitemap runs as batch', () => {
+    expect(
+      inferRunTypeHint(
+        baseConfig({
+          mode: 'sitemap',
+          target_url: '',
+          sitemap_domain: 'example.com',
+        }),
+      ),
+    ).toBe('batch');
   });
 
   it('maps jobs pdp batch runs to job detail surface', () => {

@@ -83,25 +83,160 @@ DATA_ENRICHMENT_TAXONOMY_CONTEXT_ONLY_TOKENS = frozenset(
         "girl",
         "kid",
         "men",
+        "s",
+        "single",
         "toddler",
         "unisex",
         "women",
+        "star",
     }
+)
+DATA_ENRICHMENT_TAXONOMY_ACCESSORY_PATH_TERMS = (
+    "accessories",
+    "accessory",
+    "parts",
+    "replacement",
+    "cases",
+    "covers",
+    "skins",
+    "wraps",
+    "cushions",
+    "tips",
+    "adapters",
+    "cables",
+    "chargers",
+    "stands",
+    "mounts",
+    "straps",
+    "storage",
+)
+DATA_ENRICHMENT_TAXONOMY_ACCESSORY_EVIDENCE_TERMS = (
+    "adapter",
+    "adapters",
+    "cable",
+    "cables",
+    "case",
+    "cases",
+    "charger",
+    "chargers",
+    "cover",
+    "covers",
+    "cushion",
+    "cushions",
+    "dock",
+    "mount",
+    "mounts",
+    "part",
+    "parts",
+    "protector",
+    "replacement",
+    "skin",
+    "skins",
+    "stand",
+    "stands",
+    "strap",
+    "straps",
+    "tip",
+    "tips",
+    "wrap",
+    "wraps",
+)
+DATA_ENRICHMENT_TAXONOMY_TOY_EVIDENCE_TERMS = (
+    "block",
+    "blocks",
+    "building",
+    "doll",
+    "figure",
+    "figures",
+    "kids",
+    "lego",
+    "minifigure",
+    "minifigures",
+    "play",
+    "playground",
+    "playset",
+    "toy",
+    "toys",
+)
+DATA_ENRICHMENT_TAXONOMY_SPORT_EVIDENCE_TERMS = (
+    "athletic",
+    "athletics",
+    "ball",
+    "balls",
+    "fitness",
+    "padel",
+    "sport",
+    "sports",
+    "tennis",
+)
+DATA_ENRICHMENT_TAXONOMY_GAME_EVIDENCE_TERMS = (
+    "capcom",
+    "game",
+    "games",
+    "gaming",
+    "nintendo",
+    "preorder",
+    "switch",
+    "video",
+)
+DATA_ENRICHMENT_TAXONOMY_SPECIFIC_SPORT_TERMS = (
+    "badminton",
+    "baseball",
+    "basketball",
+    "cricket",
+    "football",
+    "golf",
+    "hockey",
+    "padel",
+    "pickleball",
+    "racquetball",
+    "soccer",
+    "squash",
+    "tennis",
+    "volleyball",
+)
+DATA_ENRICHMENT_CATEGORY_URL_CONTEXT_MARKERS = (
+    "product",
+    "products",
+)
+DATA_ENRICHMENT_CATEGORY_URL_CONTEXT_STOP_SEGMENTS = (
+    "en",
+    "en-us",
+    "gb",
+    "intl",
+    "shop",
+    "store",
+    "us",
+    "www",
+)
+DATA_ENRICHMENT_PRICE_EFFECTIVE_FIELDS = (
+    "price",
+    "sale_price",
+    "current_price",
+    "final_price",
+    "discounted_price",
+)
+DATA_ENRICHMENT_PRICE_ORIGINAL_FIELDS = (
+    "original_price",
+    "compare_at_price",
+    "list_price",
+    "was_price",
+    "regular_price",
 )
 DATA_ENRICHMENT_COLOR_FAMILY_ALIASES = {
     "black": ("black",),
-    "blue": ("blue", "navy"),
-    "brown": ("beige", "brown", "tan"),
-    "gold": ("gold", "bronze", "rose gold"),
-    "gray": ("gray", "grey", "silver"),
-    "green": ("green",),
-    "multi": ("multicolor",),
-    "orange": ("orange",),
-    "pink": ("pink",),
-    "purple": ("purple",),
-    "red": ("red",),
-    "white": ("white", "clear"),
-    "yellow": ("yellow",),
+    "blue": ("blue", "navy", "cobalt", "royal blue", "sky blue", "teal", "turquoise"),
+    "brown": ("beige", "brown", "tan", "camel", "chocolate", "taupe", "khaki"),
+    "gold": ("gold", "bronze", "champagne", "rose gold"),
+    "gray": ("gray", "grey", "silver", "charcoal", "slate"),
+    "green": ("green", "olive", "mint", "emerald", "sage", "forest green"),
+    "multi": ("multicolor", "multi", "multi color", "rainbow", "assorted"),
+    "orange": ("orange", "coral", "terracotta", "rust", "peach"),
+    "pink": ("pink", "blush", "rose", "fuchsia", "magenta", "mauve"),
+    "purple": ("purple", "lavender", "lilac", "plum", "violet"),
+    "red": ("red", "burgundy", "maroon", "crimson", "wine"),
+    "white": ("white", "clear", "ivory", "cream", "ecru", "off white", "off-white"),
+    "yellow": ("yellow", "mustard", "lemon"),
 }
 DATA_ENRICHMENT_GENDER_ALIASES = {
     "female": (
@@ -122,6 +257,11 @@ DATA_ENRICHMENT_GENDER_ALIASES = {
         "gender neutral",
         "gender-neutral",
     ),
+}
+DATA_ENRICHMENT_AUDIENCE_ALIASES = {
+    "adults": ("adult", "adults"),
+    "babies": ("baby", "babies", "infant", "infants"),
+    "children": ("child", "children", "kid", "kids", "toddler", "toddlers"),
 }
 DATA_ENRICHMENT_AVAILABILITY_TERMS = {
     "in_stock": (
@@ -175,6 +315,26 @@ DATA_ENRICHMENT_COLOR_CANDIDATE_TARGETS = frozenset(
     {COLOR_FIELD, "colour", "shade", "finish", "tone"}
 )
 DATA_ENRICHMENT_SIZE_CANDIDATE_FIELDS = (SIZE_FIELD, AVAILABLE_SIZES_FIELD)
+DATA_ENRICHMENT_SIZE_CONTEXT_FIELDS = (
+    "category",
+    "product_type",
+    "title",
+    "department",
+)
+DATA_ENRICHMENT_SIZE_CONTEXT_TERMS = (
+    "apparel",
+    "clothing",
+    "dress",
+    "footwear",
+    "jacket",
+    "pant",
+    "pants",
+    "shirt",
+    "shoe",
+    "shoes",
+    "sneaker",
+    "trouser",
+)
 DATA_ENRICHMENT_SIZE_CANDIDATE_SOURCES = (
     VARIANTS_FIELD,
     VARIANT_AXES_FIELD,
@@ -196,6 +356,9 @@ DATA_ENRICHMENT_MATERIAL_CONTEXT_STRIP_PATTERNS = (
     r"\bdo\s+not\s+iron\b.*$",
     r"\bdry clean\b.*$",
 )
+DATA_ENRICHMENT_MATERIAL_PERCENTAGE_RE = (
+    r"\b(?P<percent>\d{1,3}(?:\.\d+)?)\s*%\s*(?P<material>[a-z]+(?:-[a-z]+)?(?:\s+[a-z]+(?:-[a-z]+)?){0,4})\b"
+)
 """Taxonomy conflict blocks.
 
 ``context_terms`` are positive source-text cues. ``path_terms`` are taxonomy
@@ -209,16 +372,52 @@ DATA_ENRICHMENT_TAXONOMY_CONTEXT_BLOCKS = (
             "clothing",
             "dress",
             "fashion",
+            "jacket",
             "pant",
+            "bag",
+            "bags",
+            "handbag",
+            "handbags",
             "shirt",
+            "scarf",
+            "scarves",
+            "shawl",
+            "stole",
+            "sunglasses",
             "t-shirt",
             "tee",
             "trouser",
         ),
-        "path_terms": ("furniture", "shopping bags"),
+        "path_terms": (
+            "animals & pet supplies",
+            "arts & crafts",
+            "fabric",
+            "furniture",
+            "hardware",
+            "pet apparel",
+            "shopping bags",
+            "textiles",
+            "tools",
+        ),
     },
     {
         "context_terms": ("boot", "footwear", "oxford", "shoe", "sneaker"),
+        "path_terms": (
+            "foot care",
+            "insoles",
+            "arch supports",
+            "shoe care",
+            "shoe polishes",
+            "undergarments",
+            "underwear",
+        ),
+    },
+    {
+        "context_terms": ("adult", "men", "mens", "women", "womens", "male", "female"),
+        "path_terms": ("baby & children's", "baby", "children"),
+    },
+    {
+        "context_terms": ("scarf", "scarves", "shawl", "stole", "accessories"),
         "path_terms": ("undergarments", "underwear"),
     },
 )
@@ -284,9 +483,12 @@ class DataEnrichmentSettings:
     category_match_threshold: float = 0.42
     candidate_flatten_max_depth: int = 50
     max_seo_keywords: int = 20
-    llm_description_excerpt_chars: int = 300
+    llm_description_excerpt_chars: int = 600
     llm_taxonomy_hint_count: int = 5
+    llm_semantic_list_item_chars: int = 80
     llm_call_timeout_seconds: float = 20.0
+    llm_rate_limit_retries: int = 1
+    llm_rate_limit_retry_delay_seconds: float = 6.0
 
 
 data_enrichment_settings = DataEnrichmentSettings()

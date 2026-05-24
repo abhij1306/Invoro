@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import asdict
 from typing import Any, Iterable, Literal
 
+from app.services.config import ucp_audit as config
 from app.services.ucp_audit.types import UCPComplianceReport
 
 _MARKDOWN_SPECIAL_CHARS = "\\`*_{}[]()#+-.!"
@@ -33,6 +34,9 @@ def build_report_payload(report: UCPComplianceReport) -> dict[str, Any]:
         "audit_id": report.audit_id,
         "overall_score": report.overall_score,
         "d_ucp1_gate_applied": report.d_ucp1_gate_applied,
+        "d_ucp1_gate_max_score": config.D_UCP1_GATE_MAX_SCORE,
+        "d_ucp3_gate_applied": report.d_ucp3_gate_applied,
+        "d_ucp3_gate_max_score": config.D_UCP3_GATE_MAX_SCORE,
         "dimension_scores": [asdict(item) for item in report.dimension_scores],
         "findings": [asdict(item) for item in report.all_findings],
         "ucp_contract": report.ucp_contract,
@@ -48,6 +52,9 @@ def build_markdown_report(report: UCPComplianceReport) -> str:
         f"- Audit ID: {escape_markdown(report.audit_id, mode='selective')}",
         f"- Overall score: {escape_markdown(report.overall_score)}",
         f"- D-UCP1 gate applied: {escape_markdown(report.d_ucp1_gate_applied)}",
+        f"- D-UCP1 gate max score: {escape_markdown(config.D_UCP1_GATE_MAX_SCORE)}",
+        f"- D-UCP3 gate applied: {escape_markdown(report.d_ucp3_gate_applied)}",
+        f"- D-UCP3 gate max score: {escape_markdown(config.D_UCP3_GATE_MAX_SCORE)}",
         "",
         "## Dimension Scores",
     ]

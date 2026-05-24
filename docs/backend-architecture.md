@@ -188,7 +188,7 @@ Responsibilities:
 - load, merge, persist, and learn reusable domain run-profile acquisition settings
 - persist records and summary state
 - create on-demand enrichment jobs from persisted ecommerce detail records
-- normalize deterministic enrichment fields and match Shopify taxonomy/attributes
+- normalize deterministic enrichment fields and match Shopify taxonomy/attributes; taxonomy matching uses exact Shopify path/leaf matches first, then deterministic token scoring, with LLM backfill only when explicitly enabled
 - emit logs and progress
 
 Current live behavior:
@@ -527,7 +527,7 @@ Notable current schema direction:
 - max-records trigger support
 - URL identity keys on records
 - enrichment status metadata on crawl records, with derived enrichment data stored separately in `enriched_products`
-- UCP audit report storage separated from crawl records, with JSON/Markdown artifacts in `ucp_audit_reports`
+- UCP audit report storage separated from crawl records, with JSON/Markdown artifacts in `ucp_audit_reports`; report JSON now carries UCP discovery negotiation metadata, D-UCP1/D-UCP3 gate caps, transport probe details, schema field results, optional advisory LLM schema analysis, and evidence-backed repair roadmap items
 - orchestration project/workflow/step shells store references and resolved config only; extracted data stays in `crawl_records`, recurring state stays in monitor tables
 - domain-memory storage
 - split crawl-data reset versus domain-memory reset, so destructive cleanup no longer wipes learned selectors/profiles/cookies by default

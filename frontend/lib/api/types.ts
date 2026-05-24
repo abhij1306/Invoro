@@ -726,6 +726,9 @@ export type CrawlConfig = {
   mode: CrawlMode;
   target_url: string;
   bulk_urls: string;
+  sitemap_domain?: string;
+  sitemap_filter_keyword?: string;
+  sitemap_max_urls?: number;
   csv_file: File | null;
   smart_extraction: boolean;
   max_records: number;

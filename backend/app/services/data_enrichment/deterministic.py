@@ -5,18 +5,27 @@ import re
 from collections.abc import Collection, Sequence
 from decimal import Decimal, InvalidOperation
 from functools import lru_cache
+from urllib.parse import urlparse
 
 from app.services.config.data_enrichment import (
     DATA_ENRICHMENT_AVAILABILITY_CANDIDATE_SOURCES,
     DATA_ENRICHMENT_AVAILABILITY_CANDIDATE_TARGETS,
     DATA_ENRICHMENT_BASE_REQUIRED_ATTRIBUTES,
+    DATA_ENRICHMENT_CATEGORY_URL_CONTEXT_MARKERS,
+    DATA_ENRICHMENT_CATEGORY_URL_CONTEXT_STOP_SEGMENTS,
     DATA_ENRICHMENT_COLOR_CANDIDATE_FIELDS,
     DATA_ENRICHMENT_COLOR_CANDIDATE_SOURCES,
     DATA_ENRICHMENT_COLOR_CANDIDATE_TARGETS,
     DATA_ENRICHMENT_MATERIAL_CONTEXT_STRIP_PATTERNS,
     DATA_ENRICHMENT_MATERIAL_FALLBACK_FIELDS,
+    DATA_ENRICHMENT_MATERIAL_PERCENTAGE_RE,
     DATA_ENRICHMENT_MATERIAL_PRIMARY_FIELDS,
+    DATA_ENRICHMENT_PRICE_EFFECTIVE_FIELDS,
+    DATA_ENRICHMENT_PRICE_ORIGINAL_FIELDS,
+    DATA_ENRICHMENT_SHOPIFY_ATTRIBUTE_CRAWL_FIELDS,
     DATA_ENRICHMENT_SIZE_CANDIDATE_FIELDS,
+    DATA_ENRICHMENT_SIZE_CONTEXT_FIELDS,
+    DATA_ENRICHMENT_SIZE_CONTEXT_TERMS,
     DATA_ENRICHMENT_SIZE_CANDIDATE_SOURCES,
     DATA_ENRICHMENT_SIZE_CANDIDATE_TARGETS,
     data_enrichment_settings,
@@ -53,10 +62,12 @@ def build_deterministic_enrichment(
     data: dict[str, object], *, source_url: str
 ) -> dict[str, object]:
     attribute_data = {**data, "source_url": source_url}
+    if url_context := category_url_context(data.get("url") or source_url):
+        attribute_data["url_category_context"] = url_context
     price_normalized = normalize_price(data, source_url=source_url)
     repository = load_attribute_repository()
     terms = repository_terms(repository)
-    category_candidates = top_taxonomy_candidates(data)
+    category_candidates = top_taxonomy_candidates(attribute_data)
     category_match = category_candidates[0] if category_candidates else None
     category_path = (
         text_or_none(category_match.get("category_path")) if category_match else None
@@ -81,7 +92,10 @@ def build_deterministic_enrichment(
         category_match=category_match,
     )
     gender_normalized = normalize_from_terms(
-        candidate_values(data, "gender", "category", "product_type", "title"),
+        candidate_values(
+            data,
+            *DATA_ENRICHMENT_SHOPIFY_ATTRIBUTE_CRAWL_FIELDS["gender"],
+        ),
         term_dict(terms, "gender_terms"),
     )
     materials_normalized = normalize_materials(data, terms=terms)
@@ -125,7 +139,11 @@ def build_deterministic_enrichment(
 def normalize_price(
     data: dict[str, object], *, source_url: str
 ) -> dict[str, object] | None:
-    raw_price = first_present(data, "price", "sale_price", "original_price")
+    raw_price = first_present(
+        data,
+        *DATA_ENRICHMENT_PRICE_EFFECTIVE_FIELDS,
+        *DATA_ENRICHMENT_PRICE_ORIGINAL_FIELDS,
+    )
     if raw_price in (None, "", [], {}):
         return None
     currency = (
@@ -150,7 +168,14 @@ def normalize_price(
     amount = decimal_text(raw_price)
     if amount is None:
         return None
-    return without_empty({"amount": float(amount), "currency": currency})
+    normalized: dict[str, object] = {"amount": float(amount), "currency": currency}
+    sale_amount = decimal_text(first_present(data, "sale_price", "discounted_price"))
+    original_amount = decimal_text(first_present(data, *DATA_ENRICHMENT_PRICE_ORIGINAL_FIELDS))
+    if sale_amount is not None:
+        normalized["sale_price"] = float(sale_amount)
+    if original_amount is not None:
+        normalized["original_price"] = float(original_amount)
+    return without_empty(normalized)
 
 
 def normalize_sizes(
@@ -181,8 +206,9 @@ def normalize_sizes(
     category_supports_size = (
         category_supports_attribute(category_match, "size")
         if category_match
-        else not clean_text(data.get("category") or data.get("product_type"))
+        else False
     )
+    size_context = has_size_context(data)
     if not values and not category_supports_size:
         return None, None
     normalized: list[str] = []
@@ -196,7 +222,7 @@ def normalize_sizes(
             cleaned,
             aliases=aliases,
             systems=systems,
-            require_strong=not category_supports_size,
+            require_strong=not (category_supports_size or size_context),
         ):
             continue
         canonical = aliases.get(
@@ -249,7 +275,19 @@ def detect_size_system(value: str, systems: dict[str, set[str]]) -> str | None:
     for system, values in systems.items():
         if normalized in values:
             return system
+    if re.fullmatch(r"\d+(?:\.\d+)?", normalized):
+        return "numeric"
     return None
+
+
+def has_size_context(data: dict[str, object]) -> bool:
+    context = " ".join(
+        clean_text(value).casefold()
+        for value in candidate_values(data, *DATA_ENRICHMENT_SIZE_CONTEXT_FIELDS)
+    )
+    if not context:
+        return False
+    return any(term_present(context, term) for term in DATA_ENRICHMENT_SIZE_CONTEXT_TERMS)
 
 
 def normalize_materials(
@@ -260,19 +298,96 @@ def normalize_materials(
     seen: set[str] = set()
     values = candidate_values(data, *DATA_ENRICHMENT_MATERIAL_PRIMARY_FIELDS)
     fallback_values = candidate_values(data, *DATA_ENRICHMENT_MATERIAL_FALLBACK_FIELDS)
-    for value in [*values, *fallback_values]:
-        lowered = strip_material_context_noise(
-            clean_text(strip_html_tags(value)).casefold()
+    for value in values:
+        lowered = clean_text(strip_html_tags(value)).casefold()
+        collect_material_matches(lowered, material_terms, found, seen)
+    for value in fallback_values:
+        lowered = clean_text(strip_html_tags(value)).casefold()
+        collect_material_percentage_matches(lowered, material_terms, found, seen)
+        collect_material_matches(
+            strip_material_context_noise(lowered), material_terms, found, seen
         )
-        for canonical, tokens in material_terms.items():
-            if canonical in seen:
-                continue
-            if isinstance(tokens, list) and any(
-                term_present(lowered, token) for token in tokens
-            ):
-                found.append(str(canonical))
-                seen.add(str(canonical))
     return found or None
+
+
+def collect_material_matches(
+    text: str,
+    material_terms: dict[str, object],
+    found: list[str],
+    seen: set[str],
+) -> None:
+    collect_material_percentage_matches(text, material_terms, found, seen)
+    for canonical, tokens in material_terms.items():
+        if canonical in seen:
+            continue
+        if isinstance(tokens, list) and any(term_present(text, token) for token in tokens):
+            found.append(str(canonical))
+            seen.add(str(canonical))
+
+
+def collect_material_percentage_matches(
+    text: str,
+    material_terms: dict[str, object],
+    found: list[str],
+    seen: set[str],
+) -> None:
+    for material in percentage_material_parse(text):
+        add_material_match(material, material_terms, found, seen)
+
+
+def percentage_material_parse(text: str) -> list[str]:
+    materials: list[str] = []
+    material_token = r"[a-z]+(?:-[a-z]+)?"
+    material_phrase = rf"{material_token}(?:\s+{material_token}){{0,4}}"
+    pattern = re.compile(DATA_ENRICHMENT_MATERIAL_PERCENTAGE_RE, re.I)
+    for match in pattern.finditer(text):
+        material = clean_percentage_material(match.group("material"))
+        if material:
+            materials.append(material)
+    reverse_pattern = re.compile(
+        rf"\b(?P<material>{material_phrase})\s*(?P<percent>\d{{1,3}}(?:\.\d+)?)\s*(?:%|percent)\b",
+        re.I,
+    )
+    for match in reverse_pattern.finditer(text):
+        material = clean_percentage_material(match.group("material"))
+        if material:
+            materials.append(material)
+    word_pattern = re.compile(
+        rf"\b(?P<percent>\d{{1,3}}(?:\.\d+)?)\s*percent\s*(?P<material>{material_phrase})\b",
+        re.I,
+    )
+    for match in word_pattern.finditer(text):
+        material = clean_percentage_material(match.group("material"))
+        if material:
+            materials.append(material)
+    return materials
+
+
+def clean_percentage_material(value: object) -> str:
+    material = clean_text(value).casefold()
+    material = re.sub(r"^(?:and|or|with|of|made\s+with|made\s+of)\s+", "", material)
+    material = re.sub(r"^.*\b(?:with|of|contains|composition|fabric)\s+", "", material)
+    material = re.split(r"\b(?:and|or|plus)\b|[,.;:/()]", material, maxsplit=1)[0]
+    return clean_text(material)
+
+
+def add_material_match(
+    value: str,
+    material_terms: dict[str, object],
+    found: list[str],
+    seen: set[str],
+) -> None:
+    normalized = clean_text(value).casefold()
+    for canonical, tokens in material_terms.items():
+        if canonical in seen:
+            continue
+        if normalized == str(canonical).casefold() or (
+            isinstance(tokens, list)
+            and any(term_present(normalized, token) for token in tokens)
+        ):
+            found.append(str(canonical))
+            seen.add(str(canonical))
+            return
 
 
 @lru_cache(maxsize=1)
@@ -338,7 +453,18 @@ def match_category_path(data: dict[str, object]) -> dict[str, object] | None:
 
 def category_match_values(data: dict[str, object]) -> list[object]:
     values: list[object] = []
-    for key in ("category", "product_type", "title"):
+    for key in (
+        "category",
+        "product_type",
+        "title",
+        "description",
+        "tags",
+        "materials",
+        "material",
+        "product_attributes",
+        "specifications",
+        "url_category_context",
+    ):
         value = first_present(data, key)
         if value in (None, "", [], {}):
             continue
@@ -374,6 +500,12 @@ def build_seo_keywords(
     ]
     keywords: list[str] = []
     seen: set[str] = set()
+    stem_seen: set[str] = set()
+    brand_phrase = clean_text(data.get("brand")).casefold()
+    if brand_phrase and " " in brand_phrase:
+        keywords.append(brand_phrase)
+        seen.add(brand_phrase)
+        stem_seen.add(brand_phrase)
     title_tokens = keyword_tokens(data.get("title"), stopwords)
     unigram_tokens = keyword_tokens(
         " ".join(clean_text(part) for part in raw_parts), stopwords
@@ -383,13 +515,62 @@ def build_seo_keywords(
         *semantic_bigrams(title_tokens, set(unigram_tokens)),
     ]:
         cleaned = clean_text(token).casefold()
-        if len(cleaned) < 3 or cleaned in stopwords or cleaned in seen:
+        stemmed = keyword_stem_key(cleaned)
+        if (
+            len(cleaned) < 3
+            or cleaned in stopwords
+            or cleaned in seen
+            or stemmed in stem_seen
+        ):
             continue
         seen.add(cleaned)
+        stem_seen.add(stemmed)
         keywords.append(cleaned)
         if len(keywords) >= data_enrichment_settings.max_seo_keywords:
             break
     return keywords or None
+
+
+def category_url_context(source_url: object) -> str | None:
+    try:
+        path = urlparse(clean_text(source_url)).path
+        if not path:
+            return None
+        segments = [
+            segment.strip().casefold()
+            for segment in path.split("/")
+            if segment.strip()
+        ]
+        for marker in DATA_ENRICHMENT_CATEGORY_URL_CONTEXT_MARKERS:
+            if marker not in segments:
+                continue
+            before_marker = segments[: segments.index(marker)]
+            useful = [
+                segment.replace("-", " ").replace("_", " ")
+                for segment in before_marker
+                if segment not in DATA_ENRICHMENT_CATEGORY_URL_CONTEXT_STOP_SEGMENTS
+                and not re.fullmatch(r"[a-z]{2}(?:-[a-z]{2})?", segment)
+            ]
+            context = clean_text(" ".join(useful))
+            context_tokens = set(tokens(context))
+            if {"camera", "cameras"} & context_tokens and "lens" in context_tokens:
+                context = clean_text(f"{context} digital cameras")
+            return context or None
+    except (ValueError, UnicodeError, re.error):
+        return None
+    return None
+
+
+def keyword_stem_key(value: str) -> str:
+    if " " in value:
+        return value
+    for suffix in ("ing", "ers", "er", "ed"):
+        if len(value) > len(suffix) + 3 and value.endswith(suffix):
+            stem = value[: -len(suffix)]
+            if len(stem) >= 2 and stem[-1] == stem[-2]:
+                stem = stem[:-1]
+            return stem
+    return value
 
 
 def semantic_bigrams(tokens: list[str], unigrams: set[str]) -> list[str]:
@@ -622,7 +803,9 @@ def split_values(values: list[object]) -> list[str]:
         if not text:
             continue
         rows.extend(
-            clean_text(part) for part in re.split(r"[,/|]", text) if clean_text(part)
+            clean_text(part)
+            for part in re.split(r"[,/|;·]", text)
+            if clean_text(part)
         )
     return rows
 

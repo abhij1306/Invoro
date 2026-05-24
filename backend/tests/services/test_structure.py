@@ -78,6 +78,7 @@ ALLOWED_PRIVATE_TEST_IMPORTS: set[str] = {
     "tests/services/test_public_api_auth.py -> app.main:_public_auth_session",
     "tests/services/test_public_api_rate_limit.py -> app.api.public.rate_limit:_retry_after",
     "tests/services/test_public_api_rate_limit.py -> app.api.public.rate_limit:_trim",
+    "tests/services/test_sitemap_resolver.py -> app.services.crawl.sitemap_resolver:_normalize_sitemap_url",
 }
 ALLOWED_ROOT_EXTRACTION_MODULES = {
     # Slice 2 keeps this as the public listing orchestration facade.
@@ -235,8 +236,9 @@ FILE_LOC_BUDGETS = {
     Path("app/services/selectors_runtime.py"): 600,
     Path("app/services/selector_suggestions.py"): 250,
     # Enrichment service owns job orchestration and delegates deterministic normalization.
-    Path("app/services/data_enrichment/service.py"): 725,
-    Path("app/services/data_enrichment/deterministic.py"): 725,
+    # Data enrichment quality plan added prompt-context validation and optional semantic tags.
+    Path("app/services/data_enrichment/service.py"): 825,
+    Path("app/services/data_enrichment/deterministic.py"): 890,
     # LLM task runtime now only orchestrates task execution. Prompt rendering,
     # payload validation, provider calls, budget/cache, and cost logging have
     # separate owners.

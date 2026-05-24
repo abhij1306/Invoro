@@ -8,6 +8,13 @@ from typing import Any
 class UCPManifestResult:
     manifest_found: bool = False
     manifest_valid: bool = False
+    target_version: str = ""
+    selected_version: str = ""
+    version_source: str = ""
+    discovery_source: str = "well-known"
+    content_type: str = ""
+    final_url: str = ""
+    redirect_chain: list[str] = field(default_factory=list)
     capabilities_declared: list[str] = field(default_factory=list)
     missing_required_capabilities: list[str] = field(default_factory=list)
     services_declared: list[str] = field(default_factory=list)
@@ -26,6 +33,7 @@ class UCPTransportProbe:
     service: str
     transport: str
     endpoint: str = ""
+    schema_url: str = ""
     reachable: bool = False
     negotiated: bool = False
     profile_required: bool = False
@@ -41,8 +49,14 @@ class UCPSchemaProbe:
     url: str
     reachable: bool = False
     valid_json: bool = False
+    schema_valid: bool = False
+    status_code: int = 0
+    content_type: str = ""
     title: str = ""
     error: str = ""
+    groups: list[str] = field(default_factory=list)
+    field_results: dict[str, dict[str, bool]] = field(default_factory=dict)
+    llm_analysis: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(slots=True)
@@ -52,6 +66,9 @@ class UCPRepairRoadmapItem:
     finding_codes: list[str]
     action: str
     source: str
+    evidence: list[dict[str, Any]] = field(default_factory=list)
+    effort: str = "review"
+    depends_on: list[str] = field(default_factory=list)
 
 
 @dataclass(slots=True)
@@ -83,5 +100,6 @@ class UCPComplianceReport:
     dimension_scores: list[UCPDimensionScore]
     all_findings: list[UCPFinding]
     d_ucp1_gate_applied: bool
+    d_ucp3_gate_applied: bool = False
     ucp_contract: dict[str, Any] = field(default_factory=dict)
     repair_roadmap: list[UCPRepairRoadmapItem] = field(default_factory=list)

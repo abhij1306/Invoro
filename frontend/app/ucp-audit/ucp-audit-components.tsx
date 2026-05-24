@@ -1,16 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import {
-  AlertTriangle,
-  Check,
-  CheckSquare,
-  Download,
-  ExternalLink,
-  Info,
-  ShieldAlert,
-  Sparkles,
-} from 'lucide-react';
+import { AlertTriangle, Check, CheckSquare, Download, ShieldAlert, Sparkles } from 'lucide-react';
 
 import { DataRegionEmpty, DataRegionLoading, TableSurface } from '../../components/ui/patterns';
 import { Badge, Button } from '../../components/ui/primitives';
@@ -164,6 +155,7 @@ type NormalizedFinding = {
   effort: string;
   action: string;
   impact: 'critical' | 'high' | 'medium';
+  evidence: Array<Record<string, unknown>>;
 };
 
 type ContractTransport = {
@@ -174,16 +166,41 @@ type ContractTransport = {
   negotiated?: boolean;
   profile_required?: boolean;
   status_code?: number;
+  error?: string;
+  tool_names?: string[];
 };
 
 type UcpContract = {
-  manifest?: { found?: boolean; valid?: boolean; supported_versions?: string[] };
+  manifest?: {
+    found?: boolean;
+    valid?: boolean;
+    supported_versions?: string[];
+    target_version?: string;
+    selected_version?: string;
+    version_source?: string;
+    content_type?: string;
+    final_url?: string;
+    redirect_chain?: string[];
+    discovery_source?: string;
+  };
   services?: string[];
   capabilities?: string[];
   missing_required_services?: string[];
   missing_required_capabilities?: string[];
   transports?: ContractTransport[];
-  schemas?: Array<{ url?: string; reachable?: boolean; valid_json?: boolean; title?: string }>;
+  schemas?: Array<{
+    url?: string;
+    reachable?: boolean;
+    valid_json?: boolean;
+    schema_valid?: boolean;
+    title?: string;
+    error?: string;
+    status_code?: number;
+    content_type?: string;
+    groups?: string[];
+    field_results?: Record<string, Record<string, boolean>>;
+    llm_analysis?: Record<string, unknown>;
+  }>;
   payment_handlers?: string[];
 };
 
@@ -193,17 +210,24 @@ type RepairRoadmapItem = {
   finding_codes?: string[];
   action?: string;
   source?: string;
+  evidence?: Array<Record<string, unknown>>;
+  effort?: string;
+  depends_on?: string[];
 };
 
 export function UcpScoreSummary({
   report,
   job,
-}: Readonly<{ report: UcpAuditReport | null; job: UcpAuditJob | null }>) {
+  loading = false,
+}: Readonly<{ report: UcpAuditReport | null; job: UcpAuditJob | null; loading?: boolean }>) {
   const score = report?.overall_score ?? Number(job?.summary?.overall_score ?? 0);
   const findings = useNormalizedFindings(report);
   const blocking = findings.filter((finding) => finding.severity === 'blocking').length;
   const warnings = findings.filter((finding) => finding.severity !== 'blocking').length;
   const gateApplied = Boolean(report?.report_json?.d_ucp1_gate_applied);
+  const transportGateApplied = Boolean(report?.report_json?.d_ucp3_gate_applied);
+  const dUcp1GateMax = Number(report?.report_json?.d_ucp1_gate_max_score ?? 30);
+  const dUcp3GateMax = Number(report?.report_json?.d_ucp3_gate_max_score ?? 45);
 
   return (
     <section className="border-border bg-panel overflow-hidden rounded-[var(--radius-lg)] border shadow-sm">
@@ -211,11 +235,13 @@ export function UcpScoreSummary({
         <div className="border-divider bg-background/30 relative flex flex-col items-center justify-center border-b p-6 lg:border-r lg:border-b-0">
           <div className="absolute inset-x-0 top-3 flex items-center justify-center gap-1.5">
             <Sparkles className="text-accent size-3 animate-pulse" />
-            <span className="text-muted font-sans text-xs font-semibold tracking-wider uppercase">
-              UCP PROTOCOL INDEX
-            </span>
+            <span className="type-label-mono text-muted">UCP PROTOCOL INDEX</span>
           </div>
-          <ScoreRing score={report ? score : 0} size={156} stroke={10} />
+          {loading && !report ? (
+            <LoadingScoreRing size={156} />
+          ) : (
+            <ScoreRing score={report ? score : 0} size={156} stroke={10} />
+          )}
           <div className="mt-4 flex w-full flex-col gap-2.5 px-2">
             <SummaryRow label="Blocking gaps" value={blocking} tone="danger" />
             <SummaryRow label="Warnings" value={warnings} tone="warning" />
@@ -229,10 +255,29 @@ export function UcpScoreSummary({
 
         <div className="flex min-w-0 flex-col justify-center p-5">
           {gateApplied ? (
-            <div className="border-danger/30 bg-danger/5 text-danger mb-4 flex items-center gap-2.5 rounded-[var(--radius-md)] border px-3 py-2.5 text-xs">
+            <div className="border-danger/30 bg-danger/5 text-danger mb-4 flex items-center gap-2.5 rounded-[var(--radius-md)] border px-3 py-2.5">
               <ShieldAlert className="size-4 shrink-0" />
-              <div className="leading-snug font-semibold">
-                Discovery blocked. UCP clients cannot locate this store contract.
+              <div className="leading-snug">
+                <p className="type-subheading text-danger">
+                  Discovery blocked - overall score capped at {dUcp1GateMax}.
+                </p>
+                <p className="type-caption text-danger/75 mt-0.5">
+                  Publish /.well-known/ucp before other dimensions are evaluated.
+                </p>
+              </div>
+            </div>
+          ) : null}
+
+          {transportGateApplied ? (
+            <div className="border-danger/30 bg-danger/5 text-danger mb-4 flex items-center gap-2.5 rounded-[var(--radius-md)] border px-3 py-2.5">
+              <ShieldAlert className="size-4 shrink-0" />
+              <div className="leading-snug">
+                <p className="type-subheading text-danger">
+                  Transport blocked - overall score capped at {dUcp3GateMax}.
+                </p>
+                <p className="type-caption text-danger/75 mt-0.5">
+                  Make one declared REST, MCP, or embedded transport reachable.
+                </p>
               </div>
             </div>
           ) : null}
@@ -275,9 +320,7 @@ export function UcpDimensionTable({
     <TableSurface contentClassName="min-h-[280px]">
       <header className="border-divider bg-background/25 flex items-center justify-between gap-3 border-b px-4 py-3">
         <div>
-          <h2 className="text-muted font-sans text-xs font-bold tracking-widest uppercase">
-            UCP PROTOCOL DIMENSIONS
-          </h2>
+          <h2 className="type-label-mono text-muted">UCP PROTOCOL DIMENSIONS</h2>
           <p className="type-caption text-muted mt-0.5">
             Compliance measured against discovery, services, transport, and payload contracts.
           </p>
@@ -308,25 +351,21 @@ export function UcpDimensionTable({
               >
                 <div className="lg:border-divider/40 flex flex-col justify-start border-b pr-4 pb-4 lg:border-r lg:border-b-0 lg:pb-0">
                   <div className="mb-2 flex items-center gap-2">
-                    <span className="text-muted bg-background border-border/80 rounded border px-2 py-0.5 font-mono text-[10px] font-normal">
+                    <span className="type-caption-mono text-muted bg-background border-border/80 rounded border px-2 py-0.5">
                       {dimension.dimension_id}
                     </span>
                     <Badge tone={badgeTone(dimension.status)} className="scale-90">
                       {dimension.status}
                     </Badge>
                   </div>
-                  <h3 className="text-foreground mt-1 text-[14px] leading-snug font-normal">
-                    {meta.label}
-                  </h3>
-                  <p className="text-muted mt-2 pr-2 text-[11.5px] leading-relaxed">{meta.desc}</p>
+                  <h3 className="type-subheading text-foreground mt-1">{meta.label}</h3>
+                  <p className="type-caption text-muted mt-2 pr-2">{meta.desc}</p>
                 </div>
 
                 <div className="flex min-w-0 flex-col justify-center lg:pl-4">
                   <div className="mb-3.5 flex flex-wrap items-center gap-2">
                     <ScoreBadge score={dimension.score} />
-                    <span className="type-caption text-secondary text-[11px] font-normal tracking-wider uppercase">
-                      {meta.subtitle}
-                    </span>
+                    <span className="type-label text-secondary">{meta.subtitle}</span>
                   </div>
 
                   {findings.length ? (
@@ -343,18 +382,25 @@ export function UcpDimensionTable({
                             )}
                           />
                           <div className="min-w-0 flex-1">
-                            <div className="text-foreground text-[13px] leading-relaxed font-normal">
+                            <div className="type-body-sm text-foreground">
                               {finding.description}
                             </div>
-                            <div className="text-muted mt-1 text-[11px]">{finding.fix}</div>
+                            <div className="type-caption text-muted mt-1">{finding.fix}</div>
+                            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                              <Badge tone="neutral" className="type-caption-mono">
+                                {finding.effort}
+                              </Badge>
+                              <span className="type-caption-mono text-muted">{finding.action}</span>
+                            </div>
+                            <EvidenceChips evidence={finding.evidence} />
                           </div>
                         </li>
                       ))}
                     </ul>
                   ) : (
-                    <div className="border-success/20 bg-success/5 text-success flex w-full max-w-[760px] items-center gap-2.5 rounded-[var(--radius-md)] border p-3.5 text-xs">
+                    <div className="border-success/20 bg-success/5 text-success flex w-full max-w-[760px] items-center gap-2.5 rounded-[var(--radius-md)] border p-3.5">
                       <Check className="text-success size-4 shrink-0" />
-                      <span className="text-[12.5px] font-semibold">
+                      <span className="type-subheading text-success">
                         Protocol contract is present for this dimension.
                       </span>
                     </div>
@@ -376,18 +422,15 @@ export function UcpDimensionTable({
 
 export function UcpContractPanel({ report }: Readonly<{ report: UcpAuditReport | null }>) {
   const contract = getContract(report);
-  const transports = contract.transports ?? [];
   const schemas = contract.schemas ?? [];
 
   return (
     <TableSurface>
       <header className="border-divider bg-background/25 flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
         <div>
-          <h2 className="text-muted font-sans text-xs font-bold tracking-widest uppercase">
-            UCP CONTRACT CHECKS
-          </h2>
+          <h2 className="type-label-mono text-muted">UCP CONTRACT CHECKS</h2>
           <p className="type-caption text-muted mt-0.5">
-            Discovery profile, capabilities, transports, schemas, and payment handlers.
+            Discovery profile and payload schema validation.
           </p>
         </div>
         {contract.manifest ? (
@@ -398,100 +441,65 @@ export function UcpContractPanel({ report }: Readonly<{ report: UcpAuditReport |
       </header>
 
       {report ? (
-        <div className="grid gap-4 p-4 lg:grid-cols-3">
-          <ContractCard title="Services" items={contract.services ?? []} />
-          <ContractCard title="Capabilities" items={contract.capabilities ?? []} />
-          <ContractCard title="Payment Handlers" items={contract.payment_handlers ?? []} />
-
-          <div className="lg:col-span-3">
-            <h3 className="text-muted mb-2 font-sans text-xs font-bold tracking-widest uppercase">
-              TRANSPORTS
-            </h3>
+        <div className="grid gap-5 p-4">
+          <div>
+            <h3 className="type-label-mono text-muted mb-2">SCHEMA MATRIX</h3>
             <div className="overflow-x-auto">
-              <Table className="min-w-[760px]">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Service</TableHead>
-                    <TableHead>Transport</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Endpoint</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {transports.length ? (
-                    transports.map((transport, index) => (
-                      <TableRow key={`${transport.endpoint ?? transport.transport}-${index}`}>
-                        <TableCell className="font-mono text-xs">
-                          {transport.service || '-'}
+              {schemas.length ? (
+                <Table className="min-w-[980px]">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Schema</TableHead>
+                      <TableHead>Result</TableHead>
+                      <TableHead>Coverage</TableHead>
+                      <TableHead>Missing</TableHead>
+                      <TableHead>LLM / Error</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {schemas.map((schema, index) => (
+                      <TableRow key={`${schema.url ?? 'schema'}-${index}`}>
+                        <TableCell className="max-w-[320px] align-top">
+                          <div className="type-caption-mono text-foreground truncate">
+                            {schema.url}
+                          </div>
+                          {schema.title ? (
+                            <div className="type-caption text-muted mt-1 truncate">
+                              {schema.title}
+                            </div>
+                          ) : null}
                         </TableCell>
-                        <TableCell className="font-mono text-xs">
-                          {transport.transport || '-'}
-                        </TableCell>
-                        <TableCell>
+                        <TableCell className="w-[120px] align-top">
                           <Badge
                             tone={
-                              transport.negotiated
+                              schema.reachable && schema.valid_json && schema.schema_valid
                                 ? 'success'
-                                : transport.reachable
-                                  ? 'warning'
-                                  : 'danger'
+                                : 'danger'
                             }
                           >
-                            {transport.negotiated
-                              ? 'negotiated'
-                              : transport.profile_required
-                                ? 'profile required'
-                                : transport.transport === 'embedded' && transport.reachable
-                                  ? 'declared'
-                                  : transport.reachable
-                                    ? 'reachable'
-                                    : 'failed'}
+                            {schema.reachable && schema.valid_json && schema.schema_valid
+                              ? 'schema'
+                              : 'bad'}
                           </Badge>
+                          {schema.status_code ? (
+                            <div className="type-caption-mono text-muted mt-1">
+                              {schema.status_code}
+                            </div>
+                          ) : null}
                         </TableCell>
-                        <TableCell className="max-w-[360px] truncate font-mono text-xs">
-                          {transport.endpoint ? (
-                            <a
-                              href={transport.endpoint}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-accent inline-flex items-center gap-1"
-                            >
-                              <span className="truncate">{transport.endpoint}</span>
-                              <ExternalLink className="size-3" />
-                            </a>
-                          ) : (
-                            '-'
-                          )}
+                        <TableCell className="min-w-[360px] align-top">
+                          <SchemaCoverageCell schema={schema} />
+                        </TableCell>
+                        <TableCell className="min-w-[220px] align-top">
+                          <SchemaMissingCell schema={schema} />
+                        </TableCell>
+                        <TableCell className="type-caption max-w-[260px] align-top">
+                          <SchemaAnalysisText schema={schema} />
                         </TableCell>
                       </TableRow>
-                    ))
-                  ) : (
-                    <TableRow>
-                      <TableCell colSpan={4}>No transports declared.</TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </div>
-
-          <div className="lg:col-span-3">
-            <h3 className="text-muted mb-2 font-sans text-xs font-bold tracking-widest uppercase">
-              SCHEMAS
-            </h3>
-            <div className="grid gap-2 md:grid-cols-2">
-              {schemas.length ? (
-                schemas.map((schema) => (
-                  <div
-                    key={schema.url}
-                    className="border-border bg-background/25 flex items-center justify-between gap-3 rounded-[var(--radius-md)] border p-3"
-                  >
-                    <span className="truncate font-mono text-xs">{schema.url}</span>
-                    <Badge tone={schema.reachable && schema.valid_json ? 'success' : 'danger'}>
-                      {schema.reachable && schema.valid_json ? 'json' : 'bad'}
-                    </Badge>
-                  </div>
-                ))
+                    ))}
+                  </TableBody>
+                </Table>
               ) : (
                 <DataRegionEmpty
                   title="No schema declarations"
@@ -531,7 +539,10 @@ export function UcpFixSequence({ report }: Readonly<{ report: UcpAuditReport | n
   function exportPlan() {
     const lines = roadmap.map((item, index) => {
       const checked = done[item.id] ? 'x' : ' ';
-      return `- [${checked}] ${index + 1}. [${item.subSkill}] ${item.action} (${item.priority})\n   Source: ${item.source}`;
+      const evidenceLines = evidenceToLines(item.evidence)
+        .map((line) => `   - ${line}`)
+        .join('\n');
+      return `- [${checked}] ${index + 1}. [${item.subSkill}] ${item.action} (${item.priority}, ${item.effort})\n   Source: ${item.source}${evidenceLines ? `\n${evidenceLines}` : ''}`;
     });
     const content = `# UCP Repair Roadmap\n\nTarget Domain: ${(report?.report_json?.domain as string) ?? 'Audit Store'}\nOverall Compliance: ${report?.overall_score ?? 0}/100\n\n${lines.join('\n\n')}\n`;
     const blob = new Blob([content], { type: 'text/markdown' });
@@ -547,9 +558,7 @@ export function UcpFixSequence({ report }: Readonly<{ report: UcpAuditReport | n
     <TableSurface>
       <header className="border-divider bg-background/25 flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
         <div>
-          <h2 className="text-muted font-sans text-xs font-bold tracking-widest uppercase">
-            REPAIR ROADMAP
-          </h2>
+          <h2 className="type-label-mono text-muted">REPAIR ROADMAP</h2>
           <p className="type-caption text-muted mt-0.5">
             Grouped by UCP and Shopify repair sub-skills.
           </p>
@@ -571,10 +580,8 @@ export function UcpFixSequence({ report }: Readonly<{ report: UcpAuditReport | n
           <div className="bg-background/10 flex flex-wrap items-center justify-between gap-4 px-4 py-3">
             <div className="flex items-center gap-2">
               <CheckSquare className="text-success size-4" />
-              <span className="text-foreground font-mono text-xs font-normal">
-                ROADMAP PROGRESS:
-              </span>
-              <span className="bg-background border-border text-success rounded border px-1.5 py-0.5 font-mono text-xs font-normal">
+              <span className="type-label-mono text-foreground">ROADMAP PROGRESS:</span>
+              <span className="type-caption-mono bg-background border-border text-success rounded border px-1.5 py-0.5">
                 {doneCount} of {roadmap.length} fixed ({progressPercent}%)
               </span>
             </div>
@@ -614,19 +621,28 @@ export function UcpFixSequence({ report }: Readonly<{ report: UcpAuditReport | n
                   <div className="min-w-0">
                     <div
                       className={cn(
-                        'text-foreground flex flex-wrap items-center gap-2 text-xs font-semibold',
+                        'type-body-sm text-foreground flex flex-wrap items-center gap-2',
                         isChecked && 'text-muted line-through',
                       )}
                     >
-                      <span className="text-secondary font-mono">{index + 1}.</span>
-                      <span className="bg-background/80 border-border rounded border px-1.5 py-0.5 font-mono text-[10px] leading-none">
+                      <span className="type-caption-mono text-secondary">{index + 1}.</span>
+                      <span className="type-caption-mono bg-background/80 border-border rounded border px-1.5 py-0.5">
                         {item.subSkill}
                       </span>
                       <span>{item.action}</span>
                     </div>
-                    <p className="text-muted mt-1 text-[11px] leading-relaxed">
-                      Source: {item.source}
-                    </p>
+                    <p className="type-caption text-muted mt-1">Source: {item.source}</p>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      <Badge tone="neutral" className="type-caption-mono">
+                        {item.effort}
+                      </Badge>
+                      {item.dependsOn.length ? (
+                        <span className="type-caption-mono text-muted">
+                          Depends: {item.dependsOn.join(', ')}
+                        </span>
+                      ) : null}
+                    </div>
+                    <EvidenceChips evidence={item.evidence} />
                   </div>
 
                   <Badge
@@ -657,28 +673,137 @@ export function UcpFixSequence({ report }: Readonly<{ report: UcpAuditReport | n
   );
 }
 
-function ContractCard({ title, items }: Readonly<{ title: string; items: string[] }>) {
+const SCHEMA_GROUP_LABELS: Record<string, string> = {
+  catalog: 'Catalog',
+  cart_checkout: 'Cart',
+  order_policy: 'Order',
+};
+
+function SchemaCoverageCell({
+  schema,
+}: Readonly<{ schema: NonNullable<UcpContract['schemas']>[number] }>) {
+  const groups = activeSchemaGroups(schema);
+  if (!groups.length) {
+    return <span className="type-caption-mono text-muted">No UCP payload group detected</span>;
+  }
   return (
-    <section className="border-border bg-background/20 rounded-[var(--radius-md)] border p-4">
-      <h3 className="text-muted mb-3 font-sans text-xs font-bold tracking-widest uppercase">
-        {title}
-      </h3>
-      {items.length ? (
-        <div className="flex flex-wrap gap-1.5">
-          {items.map((item) => (
-            <Badge key={item} tone="neutral" className="font-mono text-[10px]">
-              {item}
-            </Badge>
-          ))}
-        </div>
-      ) : (
-        <div className="text-muted flex items-center gap-2 text-xs">
-          <Info className="size-3.5" />
-          None declared
-        </div>
-      )}
-    </section>
+    <div className="grid gap-2 sm:grid-cols-3">
+      {groups.map((group) => (
+        <SchemaGroupSummary key={group} schema={schema} group={group} />
+      ))}
+    </div>
   );
+}
+
+function SchemaGroupSummary({
+  schema,
+  group,
+}: Readonly<{ schema: NonNullable<UcpContract['schemas']>[number]; group: string }>) {
+  const fields = schema.field_results?.[group] ?? {};
+  const entries = Object.entries(fields);
+  const total = entries.length;
+  const present = entries.filter(([, value]) => value).length;
+  const percent = total ? Math.round((present / total) * 100) : 0;
+  const complete = total > 0 && present === total;
+  return (
+    <div className="border-border/60 bg-background/25 rounded border px-2 py-1.5">
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <span className="type-caption-mono text-muted">{SCHEMA_GROUP_LABELS[group] ?? group}</span>
+        <span className={cn('type-caption-mono', complete ? 'text-success' : 'text-danger')}>
+          {present}/{total}
+        </span>
+      </div>
+      <div className="bg-border h-1.5 overflow-hidden rounded-full">
+        <div
+          className={cn('h-full rounded-full', complete ? 'bg-success' : 'bg-danger')}
+          style={{ width: `${percent}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function SchemaMissingCell({
+  schema,
+}: Readonly<{ schema: NonNullable<UcpContract['schemas']>[number] }>) {
+  const missing = activeSchemaGroups(schema)
+    .flatMap((group) =>
+      Object.entries(schema.field_results?.[group] ?? {})
+        .filter(([, present]) => !present)
+        .map(([field]) => field),
+    )
+    .filter((field, index, fields) => fields.indexOf(field) === index);
+  if (!missing.length) {
+    return <span className="type-caption-mono text-success">Complete</span>;
+  }
+  return (
+    <div className="flex max-w-[260px] flex-wrap gap-1">
+      {missing.map((field) => (
+        <Badge key={field} tone="danger" className="type-caption-mono">
+          {field}
+        </Badge>
+      ))}
+    </div>
+  );
+}
+
+function activeSchemaGroups(schema: NonNullable<UcpContract['schemas']>[number]) {
+  const declared = (schema.groups ?? []).filter((group) => schema.field_results?.[group]);
+  if (declared.length) return declared;
+  return Object.entries(schema.field_results ?? {})
+    .filter(([, fields]) => Object.values(fields).some(Boolean))
+    .map(([group]) => group);
+}
+
+function SchemaAnalysisText({
+  schema,
+}: Readonly<{ schema: NonNullable<UcpContract['schemas']>[number] }>) {
+  const llmSummary =
+    schema.llm_analysis && typeof schema.llm_analysis.summary === 'string'
+      ? schema.llm_analysis.summary
+      : '';
+  if (llmSummary) return <span className="text-accent">{llmSummary}</span>;
+  if (schema.error) return <span className="text-danger">{schema.error}</span>;
+  return <span className="text-muted">-</span>;
+}
+
+function EvidenceChips({ evidence }: Readonly<{ evidence: Array<Record<string, unknown>> }>) {
+  const lines = evidenceToLines(evidence);
+  if (!lines.length) return null;
+  return (
+    <div className="mt-2 flex flex-wrap gap-1">
+      {lines.map((line, index) => (
+        <code
+          key={`${line}-${index}`}
+          className="type-caption-mono bg-background border-border rounded border px-1 py-0.5"
+        >
+          {line}
+        </code>
+      ))}
+    </div>
+  );
+}
+
+function evidenceToLines(evidence: Array<Record<string, unknown>> = []) {
+  return evidence
+    .flatMap((entry) =>
+      Object.entries(entry).flatMap(([key, value]) => {
+        if (Array.isArray(value)) {
+          return value.map((item) => `${key}: ${formatEvidenceValue(item)}`);
+        }
+        if (value && typeof value === 'object') {
+          return `${key}: ${JSON.stringify(value)}`;
+        }
+        return `${key}: ${formatEvidenceValue(value)}`;
+      }),
+    )
+    .filter((line) => line.trim().length > 0)
+    .slice(0, 12);
+}
+
+function formatEvidenceValue(value: unknown) {
+  if (value == null || value === '') return '-';
+  return String(value);
 }
 
 function DimensionScoreCard({
@@ -702,7 +827,7 @@ function DimensionScoreCard({
     >
       {blocked ? (
         <div className="bg-background/10 absolute inset-0 z-10 flex items-center justify-center rounded-[var(--radius-md)] backdrop-blur-[0.5px]">
-          <span className="text-danger border-danger/45 bg-background/90 rotate-12 rounded border px-2 py-0.5 font-mono text-xs font-normal shadow">
+          <span className="type-caption-mono text-danger border-danger/45 bg-background/90 rotate-12 rounded border px-2 py-0.5 shadow">
             BLOCKED
           </span>
         </div>
@@ -710,18 +835,18 @@ function DimensionScoreCard({
       <div className="flex items-start justify-between gap-3">
         <ScoreRing score={dimension.score} size={70} stroke={8} compact />
         {dimension.findings.length ? (
-          <Badge tone="danger" className="font-mono text-[9px] font-normal">
+          <Badge tone="danger" className="type-caption-mono">
             {dimension.findings.length} gaps
           </Badge>
         ) : (
-          <Badge tone="success" className="font-mono text-[9px] font-normal">
+          <Badge tone="success" className="type-caption-mono">
             READY
           </Badge>
         )}
       </div>
       <div className="mt-3.5">
-        <div className="text-foreground text-[13px] leading-snug font-normal">{meta.label}</div>
-        <p className="text-muted mt-1.5 text-[11px] leading-normal">{meta.subtitle}</p>
+        <div className="type-subheading text-foreground">{meta.label}</div>
+        <p className="type-caption text-muted mt-1.5">{meta.subtitle}</p>
       </div>
     </div>
   );
@@ -734,11 +859,9 @@ function SummaryRow({
 }: Readonly<{ label: string; value: string | number; tone: string }>) {
   return (
     <div className="border-border/40 flex items-center justify-between border-b pb-1.5">
-      <span className="text-muted font-sans text-xs font-semibold tracking-wider uppercase">
-        {label}
-      </span>
+      <span className="type-label text-muted">{label}</span>
       <span
-        className={cn('bg-background-alt rounded px-1.5 py-0.5 font-mono text-xs', toneClass(tone))}
+        className={cn('type-caption-mono bg-background-alt rounded px-1.5 py-0.5', toneClass(tone))}
       >
         {value}
       </span>
@@ -785,18 +908,25 @@ function ScoreRing({
       <div className="absolute text-center select-none">
         <div
           className={cn(
-            'text-foreground font-mono leading-none font-normal tracking-tighter tabular-nums',
-            compact ? 'text-sm' : 'text-3xl',
+            'text-foreground font-mono leading-none font-semibold tabular-nums',
+            compact ? 'text-sm' : 'text-2xl',
           )}
         >
           {score}
         </div>
-        {!compact && (
-          <div className="text-muted mt-0.5 font-mono text-[9px] leading-none font-normal uppercase">
-            /100
-          </div>
-        )}
+        {!compact && <div className="type-caption-mono text-muted mt-0.5 leading-none">/100</div>}
       </div>
+    </div>
+  );
+}
+
+function LoadingScoreRing({ size }: Readonly<{ size: number }>) {
+  return (
+    <div
+      className="border-border bg-background-alt grid animate-pulse place-items-center rounded-full border"
+      style={{ width: size, height: size }}
+    >
+      <div className="bg-border h-10 w-16 rounded" />
     </div>
   );
 }
@@ -832,6 +962,9 @@ function normalizeFinding(finding: Record<string, unknown>, index: number): Norm
     effort: copy.effort,
     action: copy.action,
     impact: copy.impact,
+    evidence: Array.isArray(finding.evidence)
+      ? (finding.evidence as Array<Record<string, unknown>>)
+      : [],
   };
 }
 
@@ -851,6 +984,13 @@ function getRoadmap(report: UcpAuditReport | null) {
         priority: String(roadmap.priority ?? 'medium'),
         action: String(roadmap.action ?? 'Repair UCP contract'),
         source: String(roadmap.source ?? 'UCP Overview and UCP Schema Reference'),
+        evidence: Array.isArray(roadmap.evidence)
+          ? (roadmap.evidence as Array<Record<string, unknown>>)
+          : [],
+        effort: String(roadmap.effort ?? 'review'),
+        dependsOn: Array.isArray(roadmap.depends_on)
+          ? roadmap.depends_on.map((item) => String(item))
+          : [],
       };
     });
   }
@@ -862,6 +1002,9 @@ function getRoadmap(report: UcpAuditReport | null) {
       priority: normalized.impact,
       action: normalized.action,
       source: 'UCP Overview and UCP Schema Reference',
+      evidence: normalized.evidence,
+      effort: normalized.effort,
+      dependsOn: [],
     };
   });
 }
