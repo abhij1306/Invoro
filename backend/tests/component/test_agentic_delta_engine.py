@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+import pytest_asyncio
 import httpx
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select
@@ -103,7 +104,7 @@ def _detail_html(*, title: str, price: str, availability: str, sku: str = "W-100
     """
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def public_client(db_session, test_user):
     async def _override_db():
         yield db_session

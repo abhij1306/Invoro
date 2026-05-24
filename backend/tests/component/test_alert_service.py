@@ -222,8 +222,5 @@ def test_rules_payload_normalizes_rule_shapes_and_warns_on_unexpected_types(
         ]
     )
 
-    assert payload == [
-        {"path": "price"},
-        {"1": "value", "details": None},
-    ]
+    assert payload == [{"path": "price"}]
     assert "Unsupported alert rule payload type" in caplog.text

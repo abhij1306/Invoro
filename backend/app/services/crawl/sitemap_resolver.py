@@ -78,8 +78,6 @@ async def _resolve_child_sitemap_urls(
         for child_url in child_urls:
             child_xml = await _fetch_xml(client, child_url)
             all_urls.extend(_filter_urls(await _safe_locs(child_xml), keyword))
-            if len(all_urls) >= max_urls:
-                break
     return all_urls[:max_urls]
 
 

@@ -279,7 +279,7 @@ def _schema_probe_missing_fields(probe: object) -> dict[str, list[str]]:
         return {}
     groups = [
         str(item)
-        for item in list(getattr(probe, "groups", []) or [])
+        for item in (getattr(probe, "groups", []) or [])
         if str(item) in field_results
     ] or list(field_results.keys())
     missing: dict[str, list[str]] = {}

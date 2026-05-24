@@ -304,11 +304,16 @@ def _rules_payload(rules: object) -> list[dict[str, Any]]:
                 {str(key): value for key, value in rule.model_dump(exclude_none=True).items()}
             )
         elif callable(getattr(rule, "model_dump", None)):
+            try:
+                validated = AlertRule.model_validate(rule.model_dump(exclude_none=True))
+            except ValidationError:
+                logger.warning(
+                    "Unsupported alert rule payload type",
+                    extra={"rule_type": type(rule).__name__},
+                )
+                continue
             output.append(
-                {
-                    str(key): value
-                    for key, value in rule.model_dump(exclude_none=True).items()
-                }
+                {str(key): value for key, value in validated.model_dump(exclude_none=True).items()}
             )
         elif isinstance(rule, dict):
             output.append({str(key): value for key, value in rule.items() if value is not None})

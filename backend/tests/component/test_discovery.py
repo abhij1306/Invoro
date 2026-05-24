@@ -306,8 +306,11 @@ async def test_supported_version_string_list_declares_target(
         "signing_keys": [],
     }
 
-    async def fake_fetch_page(*args, **kwargs):
+    calls = []
+
+    async def fake_fetch_page(url: str, *args, **kwargs):
         del args, kwargs
+        calls.append(url)
         return DummyPage(status_code=200, html=json.dumps(payload))
 
     monkeypatch.setattr(
@@ -320,6 +323,40 @@ async def test_supported_version_string_list_declares_target(
     assert result.manifest_found is True
     assert result.version_source == "supported_versions"
     assert "not declared" not in " ".join(result.errors)
+    assert len(calls) == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.component
+async def test_supported_version_dict_bare_string_declares_target_without_fetch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payload = {
+        "ucp": {
+            "version": "2025-01-01",
+            "supported_versions": {"2026-04-08": "2026-04-08"},
+            "services": {},
+            "capabilities": {},
+        },
+        "signing_keys": [],
+    }
+    calls = []
+
+    async def fake_fetch_page(url: str, *args, **kwargs):
+        del args, kwargs
+        calls.append(url)
+        return DummyPage(status_code=200, html=json.dumps(payload))
+
+    monkeypatch.setattr(
+        "app.services.ucp_audit.discovery._fetch_manifest_page",
+        fake_fetch_page,
+    )
+
+    result = await discover_ucp_manifest("https://example.com")
+
+    assert result.manifest_found is True
+    assert result.version_source == "supported_versions"
+    assert len(calls) == 1
 
 
 @pytest.mark.asyncio

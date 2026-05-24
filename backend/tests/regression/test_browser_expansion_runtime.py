@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, cast
+from typing import Any
 
 import httpx
 import pytest
@@ -33,6 +33,10 @@ from app.services.config.selectors import CARD_SELECTORS
 from app.services.pipeline.extract_records import extract_records
 
 
+async def _async_checkpoint() -> None:
+    await asyncio.sleep(0)
+
+
 def _network_capture_summary() -> SimpleNamespace:
     return SimpleNamespace(
         network_payload_count=0,
@@ -48,14 +52,17 @@ def _network_capture_summary() -> SimpleNamespace:
 
 class _StaticPayloadCapture:
     async def close(self, _page):
+        await _async_checkpoint()
         return _network_capture_summary()
 
 
 async def _emit_browser_event_noop(*_args, **_kwargs):
+    await _async_checkpoint()
     return None
 
 
 async def _classify_browser_page_ok(_html: str, _status_code: int):
+    await _async_checkpoint()
     return browser_page_flow.BlockPageClassification(
         blocked=False,
         evidence=[],
@@ -68,9 +75,11 @@ def browser_finalize_support(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace
     visual_calls: list[str | None] = []
 
     async def _capture_fragments(*_args, **_kwargs):
+        await _async_checkpoint()
         return []
 
     async def _capture_visuals(*_args, **_kwargs):
+        await _async_checkpoint()
         visual_calls.append(_kwargs.get("surface"))
         return []
 
@@ -360,6 +369,7 @@ async def test_fast_finalize_keeps_location_clear_when_precheck_found_no_signal(
 async def test_location_interstitial_dismisses_by_safe_text_token() -> None:
     class _MissingLocator:
         async def count(self) -> int:
+            await _async_checkpoint()
             return 0
 
         @property
@@ -378,6 +388,7 @@ async def test_location_interstitial_dismisses_by_safe_text_token() -> None:
             return _MissingLocator()
 
         async def evaluate(self, script: str, payload: dict[str, object]):
+            await _async_checkpoint()
             if "selectors" in payload:
                 return not self.dismissed
             assert "Continue" in payload["tokens"]
@@ -386,6 +397,7 @@ async def test_location_interstitial_dismisses_by_safe_text_token() -> None:
             return {"status": "dismissed", "selector": "text:continue"}
 
         async def wait_for_timeout(self, timeout_ms: int) -> None:
+            await _async_checkpoint()
             del timeout_ms
             self.waited = True
 
@@ -405,9 +417,11 @@ async def test_location_interstitial_dismissal_counts_before_first_locator() -> 
             self._page = page
 
         async def wait_for(self, **_kwargs) -> None:
+            await _async_checkpoint()
             return None
 
         async def click(self, **_kwargs) -> None:
+            await _async_checkpoint()
             self._page.dismissed = True
             return None
 
@@ -420,6 +434,7 @@ async def test_location_interstitial_dismissal_counts_before_first_locator() -> 
             return _FirstLocator(self._page)
 
         async def count(self) -> int:
+            await _async_checkpoint()
             return 1
 
     class _Page:
@@ -433,11 +448,13 @@ async def test_location_interstitial_dismissal_counts_before_first_locator() -> 
             return _Locator(self)
 
         async def evaluate(self, _script: str, payload: dict[str, object]):
+            await _async_checkpoint()
             if "selectors" in payload:
                 return not self.dismissed
             return {"status": "not_found"}
 
         async def wait_for_timeout(self, _timeout_ms: int) -> None:
+            await _async_checkpoint()
             self.waited = True
 
     result = await browser_page_flow.dismiss_safe_location_interstitial(_Page())
@@ -450,9 +467,11 @@ async def test_location_interstitial_dismissal_counts_before_first_locator() -> 
 async def test_location_interstitial_dismissal_requires_modal_to_clear() -> None:
     class _FirstLocator:
         async def wait_for(self, **_kwargs) -> None:
+            await _async_checkpoint()
             return None
 
         async def click(self, **_kwargs) -> None:
+            await _async_checkpoint()
             return None
 
     class _Locator:
@@ -461,6 +480,7 @@ async def test_location_interstitial_dismissal_requires_modal_to_clear() -> None
             return _FirstLocator()
 
         async def count(self) -> int:
+            await _async_checkpoint()
             return 1
 
     class _Page:
@@ -470,9 +490,11 @@ async def test_location_interstitial_dismissal_requires_modal_to_clear() -> None
             return _Locator()
 
         async def wait_for_timeout(self, _timeout_ms: int) -> None:
+            await _async_checkpoint()
             return None
 
         async def evaluate(self, _script: str, _payload: dict[str, object]):
+            await _async_checkpoint()
             return True
 
     result = await browser_page_flow.dismiss_safe_location_interstitial(_Page())
@@ -495,6 +517,7 @@ async def test_location_interstitial_dismissal_skips_when_no_signal_present() ->
             )
 
         async def evaluate(self, script: str, payload: dict[str, object]):
+            await _async_checkpoint()
             if "selectors" in payload:
                 return False
             raise AssertionError(
@@ -502,11 +525,13 @@ async def test_location_interstitial_dismissal_skips_when_no_signal_present() ->
             )
 
         async def wait_for_timeout(self, *_args, **_kwargs) -> None:
+            await _async_checkpoint()
             raise AssertionError(
                 "wait_for_timeout should be skipped when no signal exists"
             )
 
         async def content(self) -> str:
+            await _async_checkpoint()
             raise AssertionError("content should be skipped when no signal exists")
 
     result = await browser_page_flow.dismiss_safe_location_interstitial(_Page())
@@ -567,9 +592,11 @@ async def test_settle_browser_page_skips_platform_selector_when_probe_is_ready()
     calls = {"probe": 0, "wait": 0}
 
     async def get_page_html_impl(_page):
+        await _async_checkpoint()
         return "<html><body>Searching...</body></html>"
 
     async def probe_browser_readiness(*_args, **_kwargs):
+        await _async_checkpoint()
         calls["probe"] += 1
         return {
             "is_ready": True,
@@ -578,6 +605,7 @@ async def test_settle_browser_page_skips_platform_selector_when_probe_is_ready()
         }
 
     async def wait_for_listing_readiness(*_args, **_kwargs):
+        await _async_checkpoint()
         calls["wait"] += 1
         return {"status": "ok"}
 
@@ -638,14 +666,12 @@ def test_detail_expansion_extractability_reuses_supplied_soup_without_reparse(
 def test_detail_expansion_extractability_limits_probe_fields_to_requested(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    seen_probe_fields: list[str] | None = None
+    seen_probe_fields: set[str] | None = None
 
     def _fake_extractability(*_args, **kwargs):
         nonlocal seen_probe_fields
         raw_probe_fields = kwargs.get("probe_fields")
-        seen_probe_fields = (
-            list(raw_probe_fields) if isinstance(raw_probe_fields, list) else None
-        )
+        seen_probe_fields = set(raw_probe_fields or [])
         return {
             "verified": True,
             "matched_requested_fields": ["materials"],
@@ -665,21 +691,19 @@ def test_detail_expansion_extractability_limits_probe_fields_to_requested(
         requested_fields=["materials"],
     )
 
-    assert seen_probe_fields == ["materials"]
+    assert seen_probe_fields == {"materials"}
 
 
 @pytest.mark.regression
 def test_detail_expansion_extractability_uses_default_dom_probe_fields_without_requests(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    seen_probe_fields: list[str] | None = None
+    seen_probe_fields: set[str] | None = None
 
     def _fake_extractability(*_args, **kwargs):
         nonlocal seen_probe_fields
         raw_probe_fields = kwargs.get("probe_fields")
-        seen_probe_fields = (
-            list(raw_probe_fields) if isinstance(raw_probe_fields, list) else None
-        )
+        seen_probe_fields = set(raw_probe_fields or [])
         return {
             "verified": False,
             "matched_requested_fields": [],
@@ -700,9 +724,8 @@ def test_detail_expansion_extractability_uses_default_dom_probe_fields_without_r
     )
 
     assert seen_probe_fields is not None
-    probe_fields = cast(set[str], seen_probe_fields)
-    assert "description" in probe_fields
-    assert "materials" in probe_fields
+    assert "description" in seen_probe_fields
+    assert "materials" in seen_probe_fields
 
 
 @dataclass
@@ -719,6 +742,7 @@ class _FakeHandle:
     inside_aside: bool = False
 
     async def evaluate(self, script: str) -> str | dict[str, bool] | None:
+        await _async_checkpoint()
         if "pieces" in script:
             return self.label
         if "insideMain" in script:
@@ -737,19 +761,23 @@ class _FakeHandle:
         return None
 
     async def inner_text(self) -> str:
+        await _async_checkpoint()
         return self.label
 
     async def get_attribute(self, name: str) -> str | None:
+        await _async_checkpoint()
         return self.attributes.get(name)
 
     async def is_visible(self) -> bool:
+        await _async_checkpoint()
         return self.actionable
 
     async def scroll_into_view_if_needed(self) -> None:
+        await _async_checkpoint()
         return None
 
-    async def click(self, timeout: int | None = None) -> None:
-        del timeout
+    async def click(self, **_kwargs) -> None:
+        await _async_checkpoint()
         self.page.expanded = True
 
 
@@ -763,6 +791,7 @@ class _FakeLocator:
         return self
 
     async def element_handles(self) -> list[_FakeHandle]:
+        await _async_checkpoint()
         handles: list[_FakeHandle] = []
         for row in self._page.labels:
             attributes = {
@@ -798,44 +827,48 @@ class _FakeLocator:
         aria_controls = str(attributes.get("aria-controls") or "")
         aria_expanded = str(attributes.get("aria-expanded") or "").lower()
         lowered_tag = tag_name.lower()
-        if selector == "summary" or selector == "details > summary":
-            return lowered_tag == "summary"
-        if selector == "[aria-expanded='false']":
-            return aria_expanded == "false"
-        if selector == "button[aria-controls]":
-            return lowered_tag == "button" and bool(aria_controls)
-        if selector == "[role='button'][aria-controls]":
-            return role == "button" and bool(aria_controls)
-        if selector == "[role='tab'][aria-controls]":
-            return role == "tab" and bool(aria_controls)
+        tag_selectors = {
+            "summary": "summary",
+            "details > summary": "summary",
+            "button": "button",
+            "a": "a",
+        }
+        if selector in tag_selectors:
+            return lowered_tag == tag_selectors[selector]
+        if selector == "[role='button']":
+            return role == "button"
+        controlled_selectors = {
+            "button[aria-controls]": lowered_tag == "button",
+            "[role='button'][aria-controls]": role == "button",
+            "[role='tab'][aria-controls]": role == "tab",
+        }
+        if selector in controlled_selectors:
+            return controlled_selectors[selector] and bool(aria_controls)
         if selector == "a[href^='#']":
             return lowered_tag == "a" and str(attributes.get("href") or "").startswith(
                 "#"
             )
-        if selector == "button":
-            return lowered_tag == "button"
-        if selector == "[role='button']":
-            return role == "button"
-        if selector == "a":
-            return lowered_tag == "a"
+        if selector == "[aria-expanded='false']":
+            return aria_expanded == "false"
         return False
 
     async def count(self) -> int:
+        await _async_checkpoint()
         if self._selector in self._page.selector_counts:
             return int(self._page.selector_counts[self._selector])
         if self._selector in self._page.card_selectors:
             return int(self._page.card_count)
         return 0
 
-    async def is_visible(self, timeout: int | None = None) -> bool:
-        del timeout
+    async def is_visible(self, **_kwargs) -> bool:
         return await self.count() > 0
 
     async def is_disabled(self) -> bool:
+        await _async_checkpoint()
         return False
 
-    async def click(self, timeout: int | None = None) -> None:
-        del timeout
+    async def click(self, **_kwargs) -> None:
+        await _async_checkpoint()
         self._page.expanded = True
 
 
@@ -855,21 +888,21 @@ class _FakeRoleLocator:
         return self
 
     async def count(self) -> int:
+        await _async_checkpoint()
         return sum(
             1
             for role, name in self._page.role_targets
             if role == self._role and self._matches_name(name)
         )
 
-    async def is_visible(self, timeout: int | None = None) -> bool:
-        del timeout
+    async def is_visible(self, **_kwargs) -> bool:
         return await self.count() > 0
 
     async def is_disabled(self) -> bool:
+        await _async_checkpoint()
         return False
 
-    async def click(self, timeout: int | None = None) -> None:
-        del timeout
+    async def click(self, **_kwargs) -> None:
         if await self.count():
             self._page.expanded = True
 
@@ -880,7 +913,7 @@ class _FakeRoleLocator:
 
 
 class _NoTimeoutRoleLocator(_FakeRoleLocator):
-    async def is_visible(self) -> bool:
+    async def is_visible(self) -> bool:  # NOSONAR - exercises locators without timeout support.
         return await self.count() > 0
 
 
@@ -893,9 +926,9 @@ class _WaitingRoleLocator(_FakeRoleLocator):
         self,
         *,
         state: str | None = None,
-        timeout: int | None = None,
+        **kwargs,
     ) -> None:
-        self.wait_for_calls.append((state, timeout))
+        self.wait_for_calls.append((state, kwargs.get("timeout")))
         if await self.count() == 0:
             raise PlaywrightTimeoutError("not visible")
 
@@ -911,6 +944,7 @@ class _FakePageContext:
         await self._page._close_context()
 
     async def new_page(self) -> "_FakeExpansionPage":
+        await _async_checkpoint()
         warm_page = _FakeExpansionPage(base_html=self._page.base_html)
         self._page.spawned_pages.append(warm_page)
         return warm_page
@@ -933,31 +967,27 @@ class _FakeExpansionPage:
         self,
         *,
         base_html: str,
-        expanded_html: str | None = None,
-        labels: list[dict[str, object]] | None = None,
-        selector_counts: dict[str, int] | None = None,
-        card_count: int = 0,
-        accessibility_snapshot: dict[str, object] | None = None,
-        role_targets: set[tuple[str, str]] | None = None,
-        goto_failures: dict[str, Exception] | None = None,
-        goto_status: int = 200,
-        response_events: list[Any] | None = None,
-        wait_for_selector_error: Exception | None = None,
-        shadow_html: str | None = None,
-        rendered_listing_fragments: list[str] | None = None,
-        wait_html_sequence: list[str] | None = None,
-        cookie_snapshots: list[list[dict[str, object]]] | None = None,
-        content_blocker: asyncio.Event | None = None,
-        content_block_after_calls: int = 0,
-        ignore_content_cancellation: bool = False,
-        content_entered: asyncio.Event | None = None,
+        **options: Any,
     ) -> None:
+        expanded_html = options.get("expanded_html")
+        labels = options.get("labels")
+        selector_counts = options.get("selector_counts")
+        accessibility_snapshot = options.get("accessibility_snapshot")
+        role_targets = options.get("role_targets")
+        goto_failures = options.get("goto_failures")
+        response_events = options.get("response_events")
+        rendered_listing_fragments = options.get("rendered_listing_fragments")
+        wait_html_sequence = options.get("wait_html_sequence")
+        cookie_snapshots = options.get("cookie_snapshots")
+        content_blocker = options.get("content_blocker")
+        content_entered = options.get("content_entered")
+
         self.base_html = base_html
-        self.expanded_html = expanded_html or base_html
-        self.shadow_html = shadow_html
-        self.labels = list(labels or [])
+        self.expanded_html = str(expanded_html or base_html)
+        self.shadow_html = options.get("shadow_html")
+        self.labels = [*labels] if labels else []
         self.selector_counts = dict(selector_counts or {})
-        self.card_count = int(card_count)
+        self.card_count = int(options.get("card_count", 0))
         self.expanded = False
         self.url = "https://example.com/products/widget"
         self.wait_timeout_calls: list[int] = []
@@ -968,17 +998,23 @@ class _FakeExpansionPage:
         self.goto_calls: list[str] = []
         self.goto_timeout_calls: list[int | None] = []
         self.goto_failures = dict(goto_failures or {})
-        self.goto_status = int(goto_status)
-        self.response_events = list(response_events or [])
-        self.wait_for_selector_error = wait_for_selector_error
+        self.goto_status = int(options.get("goto_status", 200))
+        self.response_events = [*response_events] if response_events else []
+        self.wait_for_selector_error = options.get("wait_for_selector_error")
         self.wait_for_selector_calls: list[tuple[str, str | None, int | None]] = []
         self.listeners: dict[str, list[Any]] = {}
-        self.rendered_listing_fragments = list(rendered_listing_fragments or [])
-        self.wait_html_sequence = list(wait_html_sequence or [])
-        self.cookie_snapshots = list(cookie_snapshots or [[]])
+        self.rendered_listing_fragments = (
+            [*rendered_listing_fragments] if rendered_listing_fragments else []
+        )
+        self.wait_html_sequence = [*wait_html_sequence] if wait_html_sequence else []
+        self.cookie_snapshots = [*cookie_snapshots] if cookie_snapshots else [[]]
         self.content_blocker = content_blocker
-        self.content_block_after_calls = max(0, int(content_block_after_calls))
-        self.ignore_content_cancellation = ignore_content_cancellation
+        self.content_block_after_calls = max(
+            0, int(options.get("content_block_after_calls", 0))
+        )
+        self.ignore_content_cancellation = bool(
+            options.get("ignore_content_cancellation", False)
+        )
         self.content_entered = content_entered
         self.content_calls = 0
         self.context_close_calls = 0
@@ -992,6 +1028,7 @@ class _FakeExpansionPage:
         self.context = _FakePageContext(self)
 
     async def _snapshot(self) -> dict[str, object] | None:
+        await _async_checkpoint()
         return self._accessibility_snapshot
 
     def on(self, event_name: str, callback: Any) -> None:
@@ -1009,15 +1046,17 @@ class _FakeExpansionPage:
         self,
         url: str,
         wait_until: str | None = None,
-        timeout: int | None = None,
+        **kwargs,
     ) -> Any:
+        await _async_checkpoint()
         self.url = url
         strategy = str(wait_until or "")
         self.goto_calls.append(strategy)
+        timeout = kwargs.get("timeout")
         self.goto_timeout_calls.append(timeout)
         if strategy in self.goto_failures:
             raise self.goto_failures[strategy]
-        for callback in list(self.listeners.get("response", [])):
+        for callback in tuple(self.listeners.get("response", [])):
             for response in self.response_events:
                 callback(response)
         return SimpleNamespace(
@@ -1026,26 +1065,30 @@ class _FakeExpansionPage:
         )
 
     async def _cookies(self, *_args, **_kwargs) -> list[dict[str, object]]:
-        return list(self.cookie_snapshots[0] if self.cookie_snapshots else [])
+        await _async_checkpoint()
+        return [*(self.cookie_snapshots[0] if self.cookie_snapshots else [])]
 
     async def _close_context(self) -> None:
+        await _async_checkpoint()
         self.context_close_calls += 1
         if self.content_blocker is not None:
             self.content_blocker.set()
 
     async def close(self) -> None:
+        await _async_checkpoint()
         self.page_close_calls += 1
         if self.content_blocker is not None:
             self.content_blocker.set()
 
     async def evaluate(self, script: str, arg: Any | None = None) -> Any:
+        await _async_checkpoint()
         if "document.querySelectorAll('*')" in script and self.shadow_html is not None:
             self.shadow_flattened = True
             return 1
         if "const selectors = Array.isArray(args?.selectors)" in script:
-            return list(self.rendered_listing_fragments)
+            return [*self.rendered_listing_fragments]
         if "querySelectorAll(selector).length" in script:
-            selectors = list(arg or [])
+            selectors = [*(arg or [])]
             return max(
                 (int(self.selector_counts.get(selector, 0)) for selector in selectors),
                 default=0,
@@ -1055,6 +1098,7 @@ class _FakeExpansionPage:
         return None
 
     async def wait_for_timeout(self, timeout_ms: int) -> None:
+        await _async_checkpoint()
         self.wait_timeout_calls.append(timeout_ms)
         if self.wait_html_sequence:
             next_html = self.wait_html_sequence.pop(0)
@@ -1063,14 +1107,11 @@ class _FakeExpansionPage:
         if len(self.cookie_snapshots) > 1:
             self.cookie_snapshots.pop(0)
 
-    async def wait_for_function(
-        self,
-        _script: str,
-        *,
-        arg: object | None = None,
-        timeout: int | None = None,
-    ) -> None:
+    async def wait_for_function(self, _script: str, **kwargs) -> None:
+        await _async_checkpoint()
+        arg = kwargs.get("arg")
         del arg
+        timeout = kwargs.get("timeout")
         self.wait_function_calls.append(int(timeout or 0))
         if self.wait_html_sequence:
             next_html = self.wait_html_sequence.pop(0)
@@ -1079,12 +1120,8 @@ class _FakeExpansionPage:
         if len(self.cookie_snapshots) > 1:
             self.cookie_snapshots.pop(0)
 
-    async def wait_for_load_state(
-        self,
-        state: str,
-        timeout: int | None = None,
-    ) -> None:
-        del timeout
+    async def wait_for_load_state(self, state: str, **_kwargs) -> None:
+        await _async_checkpoint()
         self.load_state_calls.append(state)
 
     async def wait_for_selector(
@@ -1092,8 +1129,10 @@ class _FakeExpansionPage:
         selector: str,
         *,
         state: str | None = None,
-        timeout: int | None = None,
+        **kwargs,
     ) -> None:
+        await _async_checkpoint()
+        timeout = kwargs.get("timeout")
         self.wait_for_selector_calls.append((selector, state, timeout))
         if self.wait_for_selector_error is not None:
             raise self.wait_for_selector_error
@@ -1128,6 +1167,7 @@ class _FakeExpansionPage:
         return html
 
     async def screenshot(self, *, path: str | Path | None = None, **kwargs) -> bytes:
+        await _async_checkpoint()
         del kwargs
         payload = b"fake-png"
         if path is not None:
@@ -1141,6 +1181,7 @@ class _FakeRuntime:
 
     @asynccontextmanager
     async def page(self, **_kwargs):
+        await _async_checkpoint()
         yield self._page
 
 
@@ -1164,6 +1205,7 @@ async def test_browser_fetch_fast_paths_ready_detail_without_extra_waits() -> No
     )
 
     async def _fake_runtime(**_kwargs):
+        await _async_checkpoint()
         return _FakeRuntime(page)
 
     result = await browser_runtime.browser_fetch(
@@ -1199,10 +1241,10 @@ async def test_browser_fetch_closes_unexpected_popup_pages() -> None:
             self,
             url: str,
             wait_until: str | None = None,
-            timeout: int | None = None,
+            **kwargs,
         ) -> Any:
-            response = await super().goto(url, wait_until=wait_until, timeout=timeout)
-            for callback in list(self.listeners.get("context:page", [])):
+            response = await super().goto(url, wait_until=wait_until, **kwargs)
+            for callback in tuple(self.listeners.get("context:page", [])):
                 callback(popup_page)
             await asyncio.sleep(0)
             return response
@@ -1224,6 +1266,7 @@ async def test_browser_fetch_closes_unexpected_popup_pages() -> None:
     )
 
     async def _fake_runtime(**_kwargs):
+        await _async_checkpoint()
         return _FakeRuntime(page)
 
     result = await browser_runtime.browser_fetch(
@@ -1268,9 +1311,11 @@ async def test_browser_fetch_recovers_direct_navigation_challenge(
     )
 
     async def _fake_runtime(**_kwargs):
+        await _async_checkpoint()
         return _FakeRuntime(page)
 
     async def _classify_blocked_page(html: str, status_code: int):
+        await _async_checkpoint()
         lowered = html.lower()
         return SimpleNamespace(
             blocked=int(status_code or 0) == 403 and "access denied" in lowered,
@@ -1315,16 +1360,19 @@ async def test_browser_fetch_does_not_repeat_challenge_recovery_after_navigation
     )
 
     async def _fake_runtime(**_kwargs):
+        await _async_checkpoint()
         return _FakeRuntime(page)
 
     recover_calls: list[str] = []
 
     async def _recover_once(*args, **kwargs):
+        await _async_checkpoint()
         del args, kwargs
         recover_calls.append("recover")
         return SimpleNamespace(status=403, headers={"content-type": "text/html"})
 
     async def _classify_blocked_page(_html: str, _status_code: int):
+        await _async_checkpoint()
         return SimpleNamespace(
             blocked=True,
             evidence=["title:access denied"],
@@ -1360,12 +1408,13 @@ async def test_browser_fetch_fast_paths_ready_listing_cards_without_networkidle(
     selectors = list(CARD_SELECTORS.get("ecommerce") or [])
     page = _FakeExpansionPage(
         base_html="<html><body><article class='product-card'>A</article></body></html>",
-        selector_counts={selector: 3 for selector in selectors[:1]},
+        selector_counts=dict.fromkeys(selectors[:1], 3),
         card_count=3,
     )
     page.card_selectors = set(selectors)
 
     async def _fake_runtime(**_kwargs):
+        await _async_checkpoint()
         return _FakeRuntime(page)
 
     result = await browser_runtime.browser_fetch(
@@ -1406,12 +1455,13 @@ async def test_browser_fetch_listing_does_not_treat_product_titles_as_extractabl
           </body>
         </html>
         """,
-        selector_counts={selector: 2 for selector in selectors[:1]},
+        selector_counts=dict.fromkeys(selectors[:1], 2),
         card_count=2,
     )
     page.card_selectors = set(selectors)
 
     async def _fake_runtime(**_kwargs):
+        await _async_checkpoint()
         return _FakeRuntime(page)
 
     result = await browser_runtime.browser_fetch(
@@ -1434,12 +1484,13 @@ async def test_browser_fetch_listing_skips_detail_extractability_probe(
     selectors = list(CARD_SELECTORS.get("ecommerce") or [])
     page = _FakeExpansionPage(
         base_html="<html><body><article class='product-card'>A</article></body></html>",
-        selector_counts={selector: 3 for selector in selectors[:1]},
+        selector_counts=dict.fromkeys(selectors[:1], 3),
         card_count=3,
     )
     page.card_selectors = set(selectors)
 
     async def _fake_runtime(**_kwargs):
+        await _async_checkpoint()
         return _FakeRuntime(page)
 
     def _unexpected_extractability(*args, **kwargs):
@@ -1527,12 +1578,14 @@ async def test_browser_fetch_attempts_implicit_networkidle_for_unmatched_spa_lis
     )
 
     async def _fake_runtime(**_kwargs):
+        await _async_checkpoint()
         return _FakeRuntime(page)
 
     original_probe_browser_readiness = browser_runtime.probe_browser_readiness
     try:
 
         async def _fake_probe_browser_readiness(*args, **kwargs):
+            await _async_checkpoint()
             del args, kwargs
             return next(probe_results)
 
@@ -1703,9 +1756,11 @@ async def test_browser_fetch_bounds_response_capture_workers_under_burst_load(
     )
 
     async def _fake_runtime(**_kwargs):
+        await _async_checkpoint()
         return _FakeRuntime(page)
 
     async def _fake_read_network_payload_body(response, **_kwargs):
+        await _async_checkpoint()
         return browser_runtime.NetworkPayloadReadResult(
             body=f'{{"id": "{response.url}"}}'.encode("utf-8"),
             outcome="ok",
@@ -1772,6 +1827,7 @@ async def test_browser_fetch_expands_detail_accordions_before_collecting_html() 
     )
 
     async def _fake_runtime(**_kwargs):
+        await _async_checkpoint()
         return _FakeRuntime(page)
 
     result = await browser_runtime.browser_fetch(
@@ -1811,6 +1867,7 @@ async def test_browser_fetch_expands_requested_field_sections_even_when_probe_is
     )
 
     async def _fake_runtime(**_kwargs):
+        await _async_checkpoint()
         return _FakeRuntime(page)
 
     result = await browser_runtime.browser_fetch(
@@ -1849,6 +1906,7 @@ async def test_browser_fetch_skips_detail_expansion_when_requested_section_is_al
     )
 
     async def _fake_runtime(**_kwargs):
+        await _async_checkpoint()
         return _FakeRuntime(page)
 
     result = await browser_runtime.browser_fetch(
@@ -1887,6 +1945,7 @@ async def test_browser_fetch_expands_requested_dom_pattern_content_without_headi
     )
 
     async def _fake_runtime(**_kwargs):
+        await _async_checkpoint()
         return _FakeRuntime(page)
 
     result = await browser_runtime.browser_fetch(
@@ -1913,6 +1972,7 @@ async def test_expand_detail_content_if_needed_skips_aom_when_page_is_already_re
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     async def _unexpected_aom(*args, **kwargs):
+        await _async_checkpoint()
         raise AssertionError("AOM expansion should be skipped")
 
     monkeypatch.setattr(
@@ -2077,6 +2137,7 @@ async def test_browser_fetch_flattens_shadow_dom_before_serializing_html() -> No
     )
 
     async def _fake_runtime(**_kwargs):
+        await _async_checkpoint()
         return _FakeRuntime(page)
 
     result = await browser_runtime.browser_fetch(
@@ -2109,6 +2170,7 @@ async def test_browser_fetch_keeps_markdown_removed() -> None:
     )
 
     async def _fake_runtime(**_kwargs):
+        await _async_checkpoint()
         return _FakeRuntime(page)
 
     result = await browser_runtime.browser_fetch(
@@ -2148,6 +2210,7 @@ async def test_browser_fetch_captures_rendered_listing_fragments_artifact() -> N
     )
 
     async def _fake_runtime(**_kwargs):
+        await _async_checkpoint()
         return _FakeRuntime(page)
 
     result = await browser_runtime.browser_fetch(
@@ -2181,9 +2244,11 @@ async def test_browser_fetch_ignores_non_string_rendered_listing_fragments(
     page.url = "https://example.com/collections/widgets"
 
     async def _fake_runtime(**_kwargs):
+        await _async_checkpoint()
         return _FakeRuntime(page)
 
     async def _bad_fragments(*args, **kwargs):
+        await _async_checkpoint()
         del args, kwargs
         return [123, {"html": "<article>bad</article>"}, " <article>good</article> "]
 
@@ -2214,13 +2279,16 @@ async def test_browser_fetch_keeps_empty_successful_listing_artifacts(
     page.url = "https://example.com/collections/widgets"
 
     async def _fake_runtime(**_kwargs):
+        await _async_checkpoint()
         return _FakeRuntime(page)
 
     async def _empty_fragments(*args, **kwargs):
+        await _async_checkpoint()
         del args, kwargs
         return []
 
     async def _empty_visuals(*args, **kwargs):
+        await _async_checkpoint()
         del args, kwargs
         return []
 
@@ -2247,6 +2315,7 @@ async def test_browser_fetch_keeps_empty_successful_listing_artifacts(
 async def test_detail_expansion_keywords_include_ecommerce_fallbacks_without_requested_fields() -> (
     None
 ):
+    await _async_checkpoint()
     default_keywords = browser_runtime.detail_expansion_keywords("ecommerce_detail")
     requested_keywords = browser_runtime.detail_expansion_keywords(
         "ecommerce_detail",
@@ -2479,6 +2548,7 @@ async def test_browser_fetch_records_extractable_sections_after_detail_expansion
     )
 
     async def _fake_runtime(**_kwargs):
+        await _async_checkpoint()
         return _FakeRuntime(page)
 
     result = await browser_runtime.browser_fetch(
@@ -2529,6 +2599,7 @@ async def test_browser_fetch_does_not_skip_requested_dom_pattern_when_selector_i
     )
 
     async def _fake_runtime(**_kwargs):
+        await _async_checkpoint()
         return _FakeRuntime(page)
 
     result = await browser_runtime.browser_fetch(
@@ -2595,6 +2666,7 @@ async def test_browser_fetch_extracts_requested_features_from_dell_like_tab() ->
     )
 
     async def _fake_runtime(**_kwargs):
+        await _async_checkpoint()
         return _FakeRuntime(page)
 
     result = await browser_runtime.browser_fetch(
@@ -2842,6 +2914,7 @@ async def test_browser_fetch_waits_for_challenge_recovery_before_settling(
     calls = {"count": 0}
 
     async def _fake_classify_blocked_page_async(_html: str, _status: int):
+        await _async_checkpoint()
         calls["count"] += 1
         blocked = calls["count"] == 1
         return SimpleNamespace(
@@ -2857,6 +2930,7 @@ async def test_browser_fetch_waits_for_challenge_recovery_before_settling(
         )
 
     async def _fake_runtime(**_kwargs):
+        await _async_checkpoint()
         return _FakeRuntime(page)
 
     monkeypatch.setattr(
@@ -2884,6 +2958,7 @@ async def test_finalize_browser_fetch_keeps_blocked_html_checker_fallback(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     async def _fake_capture_close(_page):
+        await _async_checkpoint()
         return SimpleNamespace(
             payloads=[],
             network_payload_count=0,
@@ -2896,15 +2971,19 @@ async def test_finalize_browser_fetch_keeps_blocked_html_checker_fallback(
         )
 
     async def _fake_capture_fragments(*_args, **_kwargs):
+        await _async_checkpoint()
         return []
 
     async def _fake_capture_visuals(*_args, **_kwargs):
+        await _async_checkpoint()
         return []
 
     async def _fake_classify_blocked_page_async(_html: str, _status: int):
+        await _async_checkpoint()
         return SimpleNamespace(blocked=False, outcome="ok", evidence=[])
 
     async def _fake_emit_browser_event(*_args, **_kwargs):
+        await _async_checkpoint()
         return None
 
     monkeypatch.setattr(
@@ -2985,6 +3064,7 @@ async def test_browser_fetch_uses_aom_expansion_when_dom_keyword_scan_misses() -
     )
 
     async def _fake_runtime(**_kwargs):
+        await _async_checkpoint()
         return _FakeRuntime(page)
 
     result = await browser_runtime.browser_fetch(
@@ -3015,6 +3095,7 @@ async def test_dom_detail_expansion_stops_after_click_exceeds_time_budget() -> N
     )
 
     async def _snapshot(handle: _FakeHandle) -> dict[str, object]:
+        await _async_checkpoint()
         return {
             "probe": handle.label.lower(),
             "label": handle.label.lower(),
@@ -3071,6 +3152,7 @@ async def test_browser_fetch_aom_expansion_respects_interaction_cap(
     )
 
     async def _fake_runtime(**_kwargs):
+        await _async_checkpoint()
         return _FakeRuntime(page)
 
     result = await browser_runtime.browser_fetch(
@@ -3206,6 +3288,7 @@ async def test_expand_detail_content_if_needed_skips_non_detail_like_pages(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     async def _unexpected_dom_expand(*args, **kwargs):
+        await _async_checkpoint()
         raise AssertionError("DOM expansion should be skipped")
 
     monkeypatch.setattr(
@@ -3234,6 +3317,7 @@ async def test_listing_card_signal_count_uses_heuristic_card_fallback_after_sele
     async def _fake_count_listing_cards(
         page, *, surface: str, allow_heuristic: bool = True
     ) -> int:
+        await _async_checkpoint()
         del page, surface
         calls.append(bool(allow_heuristic))
         return 9 if allow_heuristic else 0
@@ -3262,6 +3346,7 @@ async def test_probe_browser_readiness_uses_heuristic_listing_card_fallback(
     async def _fake_count_listing_cards(
         page, *, surface: str, allow_heuristic: bool = True
     ) -> int:
+        await _async_checkpoint()
         del page, surface
         calls.append(bool(allow_heuristic))
         return 12 if allow_heuristic else 0
@@ -3308,6 +3393,7 @@ async def test_browser_capture_close_drains_inflight_response_callbacks() -> Non
             asyncio.get_running_loop().call_soon(callback, _FakeResponse())
 
     async def _fake_read_payload_body(response, **_kwargs):
+        await _async_checkpoint()
         del response
         return browser_runtime.NetworkPayloadReadResult(
             body=b'{"id":"captured"}',
@@ -3340,6 +3426,7 @@ async def test_browser_capture_decodes_react_server_component_payloads() -> None
             self.request = SimpleNamespace(method="GET")
 
         async def body(self) -> bytes:
+            await _async_checkpoint()
             return (
                 b'0:["$","$L1",null,{"title":"Trail Runner","price":"109.00"}]\n'
                 b'1:{"product":{"title":"Trail Runner","sku":"TRAIL-1"}}\n'
@@ -3373,6 +3460,7 @@ async def test_browser_capture_offloads_payload_decoding_to_thread() -> None:
             self.request = SimpleNamespace(method="GET")
 
         async def body(self) -> bytes:
+            await _async_checkpoint()
             return b'{"id":"captured"}'
 
     page = _FakeExpansionPage(base_html="<html><body></body></html>")
@@ -3434,6 +3522,7 @@ async def test_browser_capture_close_awaits_sentinel_enqueue_when_queue_put_bloc
             self.put_calls: list[object] = []
 
         async def join(self) -> None:
+            await _async_checkpoint()
             return None
 
         async def put(self, value: object) -> None:
@@ -3462,6 +3551,7 @@ async def test_browser_capture_close_cancels_workers_when_sentinel_enqueue_times
 
     class _Queue:
         async def join(self) -> None:
+            await _async_checkpoint()
             return None
 
         async def put(self, value: object) -> None:
@@ -3486,9 +3576,11 @@ async def test_probe_browser_readiness_skips_listing_queries_for_detail_pages(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     async def _unexpected_listing_card_count(*args, **kwargs):
+        await _async_checkpoint()
         raise AssertionError("listing card count should not run for detail pages")
 
     async def _unexpected_selector_count(*args, **kwargs):
+        await _async_checkpoint()
         raise AssertionError("listing selector count should not run for detail pages")
 
     monkeypatch.setattr(
@@ -3516,6 +3608,7 @@ async def test_probe_browser_readiness_skips_listing_queries_for_detail_pages(
 async def test_count_matching_selectors_ignores_timeout_misses() -> None:
     class _Locator:
         async def count(self) -> int:
+            await _async_checkpoint()
             raise PlaywrightTimeoutError("timed out")
 
     class _Page:
@@ -3800,6 +3893,7 @@ def test_build_failed_browser_diagnostics_marks_unsupported_proxy_explicitly() -
 @pytest.mark.regression
 async def test_browser_fetch_attaches_failure_diagnostics_to_direct_errors() -> None:
     async def _failing_runtime(**_kwargs):
+        await _async_checkpoint()
         raise RuntimeError("runtime bootstrap failed")
 
     with pytest.raises(RuntimeError, match="runtime bootstrap failed") as excinfo:
@@ -3840,6 +3934,7 @@ async def test_browser_fetch_logs_non_usable_outcomes(
     )
 
     async def _fake_runtime(**_kwargs):
+        await _async_checkpoint()
         return _FakeRuntime(page)
 
     with caplog.at_level("WARNING", logger=browser_page_flow.logger.name):
@@ -3869,6 +3964,7 @@ async def test_browser_fetch_respects_disabled_screenshot_capture(
     )
 
     async def _fake_runtime(**_kwargs):
+        await _async_checkpoint()
         return _FakeRuntime(page)
 
     with caplog.at_level("WARNING", logger=browser_page_flow.logger.name):
@@ -3908,6 +4004,7 @@ async def test_browser_fetch_surfaces_rendered_listing_evidence_counts() -> None
     page.url = "https://example.com/collections/widgets"
 
     async def _fake_runtime(**_kwargs):
+        await _async_checkpoint()
         return _FakeRuntime(page)
 
     result = await browser_runtime.browser_fetch(
@@ -3947,6 +4044,7 @@ async def test_browser_fetch_bounds_listing_artifact_capture_time(
     page.url = "https://example.com/collections/widgets"
 
     async def _fake_runtime(**_kwargs):
+        await _async_checkpoint()
         return _FakeRuntime(page)
 
     async def _slow_rendered_listing_fragments(*args, **kwargs):
@@ -4002,6 +4100,7 @@ async def test_capture_listing_artifact_with_timeout_reports_playwright_error(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     async def _boom():
+        await _async_checkpoint()
         raise PlaywrightError("Target page, context or browser has been closed")
 
     with caplog.at_level("DEBUG", logger=browser_page_flow.logger.name):
@@ -4027,6 +4126,7 @@ async def test_capture_listing_artifact_with_timeout_reports_playwright_error(
 async def test_capture_rendered_listing_fragments_returns_fragment_html() -> None:
     class _RegressionPage:
         async def evaluate(self, script: str, arg: Any | None = None) -> list[str]:
+            await _async_checkpoint()
             del arg
             assert "const selectors = Array.isArray(args?.selectors)" in script
             assert "const seenFragments = new Set();" in script
@@ -4053,6 +4153,7 @@ async def test_capture_rendered_listing_fragments_ignores_non_listing_surfaces()
 ):
     class _RegressionPage:
         async def evaluate(self, script: str, arg: Any | None = None) -> list[str]:
+            await _async_checkpoint()
             raise AssertionError("evaluate should not be called")
 
     rows = await browser_recovery.capture_rendered_listing_fragments(
@@ -4075,19 +4176,23 @@ async def test_emit_challenge_activity_randomizes_mouse_targets(
 
     class _Mouse:
         async def move(self, x: int, y: int) -> None:
+            await _async_checkpoint()
             move_calls.append((x, y))
 
         async def wheel(self, delta_x: int, delta_y: int) -> None:
+            await _async_checkpoint()
             wheel_calls.append((delta_x, delta_y))
 
     class _Page:
         mouse = _Mouse()
 
         async def evaluate(self, script: str, arg: Any | None = None) -> dict[str, int]:
+            await _async_checkpoint()
             del script, arg
             return {"width": 900, "height": 700}
 
         async def wait_for_timeout(self, delay_ms: int) -> None:
+            await _async_checkpoint()
             wait_calls.append(delay_ms)
 
     random_counter = {"value": 0}
@@ -4122,19 +4227,23 @@ async def test_emit_challenge_activity_ignores_negative_scroll(
 
     class _Mouse:
         async def move(self, x: int, y: int, *, steps: int) -> None:
+            await _async_checkpoint()
             del x, y, steps
 
         async def wheel(self, delta_x: int, delta_y: int) -> None:
+            await _async_checkpoint()
             wheel_calls.append((delta_x, delta_y))
 
     class _Page:
         mouse = _Mouse()
 
         async def evaluate(self, script: str, arg: Any | None = None) -> dict[str, int]:
+            await _async_checkpoint()
             del script, arg
             return {"width": 900, "height": 700}
 
         async def wait_for_timeout(self, delay_ms: int) -> None:
+            await _async_checkpoint()
             del delay_ms
 
     monkeypatch.setattr(browser_recovery.secrets, "randbelow", lambda limit: 0)
@@ -4155,19 +4264,23 @@ async def test_emit_browser_behavior_activity_adds_scroll_physics(
 
     class _Mouse:
         async def move(self, x: int, y: int) -> None:
+            await _async_checkpoint()
             move_calls.append((x, y))
 
         async def wheel(self, delta_x: int, delta_y: int) -> None:
+            await _async_checkpoint()
             wheel_calls.append((delta_x, delta_y))
 
     class _Page:
         mouse = _Mouse()
 
         async def evaluate(self, script: str, arg: Any | None = None) -> dict[str, int]:
+            await _async_checkpoint()
             del script, arg
             return {"width": 900, "height": 700}
 
         async def wait_for_timeout(self, delay_ms: int) -> None:
+            await _async_checkpoint()
             wait_calls.append(delay_ms)
 
     monkeypatch.setattr(browser_recovery.secrets, "randbelow", lambda limit: 0)
@@ -4244,11 +4357,14 @@ async def test_type_text_like_human_types_one_character_at_a_time(
     clicks: list[int] = []
 
     class _Locator:
-        async def click(self, *, timeout: int) -> None:
+        async def click(self, **kwargs) -> None:
+            await _async_checkpoint()
+            timeout = kwargs.get("timeout")
             clicks.append(timeout)
 
     class _Keyboard:
         async def type(self, value: str) -> None:
+            await _async_checkpoint()
             typed.append(value)
 
     class _Page:
@@ -4259,6 +4375,7 @@ async def test_type_text_like_human_types_one_character_at_a_time(
             return _Locator()
 
         async def wait_for_timeout(self, delay_ms: int) -> None:
+            await _async_checkpoint()
             assert delay_ms >= 0
 
     monkeypatch.setattr(browser_recovery.secrets, "randbelow", lambda limit: 0)
@@ -4288,18 +4405,22 @@ async def test_recover_browser_challenge_keeps_original_response_when_retry_stay
             self.goto_calls = 0
 
         async def goto(self, *_args, **_kwargs):
+            await _async_checkpoint()
             self.goto_calls += 1
             return retried_response
 
         async def wait_for_timeout(self, _ms: int) -> None:
+            await _async_checkpoint()
             return None
 
     page = _Page()
 
     async def _get_page_html(_page: Any) -> str:
+        await _async_checkpoint()
         return "<html><body>blocked</body></html>"
 
     async def _classify_blocked_page(_html: str, _status_code: int):
+        await _async_checkpoint()
         return SimpleNamespace(blocked=True, provider_hits=[])
 
     result = await browser_recovery.recover_browser_challenge(
@@ -4338,10 +4459,12 @@ async def test_recover_browser_challenge_runs_for_real_chrome() -> None:
             self.wait_calls = 0
 
         async def goto(self, *_args, **_kwargs):
+            await _async_checkpoint()
             self.goto_calls += 1
             return retried_response
 
         async def wait_for_timeout(self, _ms: int) -> None:
+            await _async_checkpoint()
             self.wait_calls += 1
             return None
 
@@ -4349,9 +4472,11 @@ async def test_recover_browser_challenge_runs_for_real_chrome() -> None:
     classify_calls = {"count": 0}
 
     async def _get_page_html(_page: Any) -> str:
+        await _async_checkpoint()
         return "<html><body>product title $12.00 add to cart</body></html>"
 
     async def _classify_blocked_page(_html: str, _status_code: int):
+        await _async_checkpoint()
         classify_calls["count"] += 1
         return SimpleNamespace(blocked=classify_calls["count"] == 1, provider_hits=[])
 
@@ -4390,6 +4515,7 @@ async def test_recover_browser_challenge_waits_on_provider_low_content_shell() -
             self.html = "<html><body>akamai shell</body></html>"
 
         async def wait_for_timeout(self, _timeout: int) -> None:
+            await _async_checkpoint()
             self.wait_calls += 1
             self.html = (
                 "<html><body><h1>Widget Prime</h1><span>$12.00</span>"
@@ -4397,14 +4523,17 @@ async def test_recover_browser_challenge_waits_on_provider_low_content_shell() -
             )
 
         async def goto(self, *_args, **_kwargs):
+            await _async_checkpoint()
             raise AssertionError("wait recovery should clear before retry navigation")
 
     page = _Page()
 
     async def _get_page_html(active_page: Any) -> str:
+        await _async_checkpoint()
         return active_page.html
 
     async def _classify_blocked_page(_html: str, _status_code: int):
+        await _async_checkpoint()
         return SimpleNamespace(blocked=False, provider_hits=["akamai"])
 
     result = await browser_recovery.recover_browser_challenge(
@@ -4441,15 +4570,19 @@ async def test_recover_browser_challenge_drops_stale_block_status_after_wait_cle
         mouse = None
 
         async def goto(self, *_args, **_kwargs):
+            await _async_checkpoint()
             raise AssertionError("retry should not run after challenge clears")
 
         async def wait_for_timeout(self, _ms: int) -> None:
+            await _async_checkpoint()
             return None
 
     async def _get_page_html(_page: Any) -> str:
+        await _async_checkpoint()
         return "<html><body>product title $12.00 add to cart</body></html>"
 
     async def _classify_blocked_page(_html: str, status_code: int):
+        await _async_checkpoint()
         status_codes.append(status_code)
         return SimpleNamespace(blocked=len(status_codes) == 1, provider_hits=[])
 
@@ -4493,13 +4626,16 @@ async def test_recover_browser_challenge_marks_retry_response_without_wrapping()
             self.retried = False
 
         async def goto(self, *_args, **_kwargs):
+            await _async_checkpoint()
             self.retried = True
             return retried_response
 
         async def wait_for_timeout(self, _ms: int) -> None:
+            await _async_checkpoint()
             return None
 
     async def _get_page_html(page: Any) -> str:
+        await _async_checkpoint()
         return (
             "<html><body>product title $12.00 add to cart</body></html>"
             if page.retried
@@ -4507,6 +4643,7 @@ async def test_recover_browser_challenge_marks_retry_response_without_wrapping()
         )
 
     async def _classify_blocked_page(html: str, _status_code: int):
+        await _async_checkpoint()
         return SimpleNamespace(blocked="blocked" in html, provider_hits=[])
 
     page = _Page()
@@ -4544,12 +4681,14 @@ async def test_get_page_html_falls_back_to_outer_html_after_driver_close(
             self.content_calls = 0
 
         async def content(self) -> str:
+            await _async_checkpoint()
             self.content_calls += 1
             raise RuntimeError(
                 "Page.content: Connection closed while reading from the driver"
             )
 
         async def evaluate(self, script: str):
+            await _async_checkpoint()
             if "flattenedRoots" in script:
                 return 0
             return "<html><body><main><h1>Recovered</h1></main></body></html>"
@@ -4568,11 +4707,13 @@ async def test_get_page_html_outer_html_fallback_preserves_doctype(
 
     class _Page:
         async def content(self) -> str:
+            await _async_checkpoint()
             raise RuntimeError(
                 "Page.content: Connection closed while reading from the driver"
             )
 
         async def evaluate(self, script: str):
+            await _async_checkpoint()
             if "flattenedRoots" in script:
                 return 0
             return "<!DOCTYPE html><html><body>Recovered</body></html>"
@@ -4595,6 +4736,7 @@ async def test_page_might_have_location_interstitial_uses_live_selector_probe() 
         url = "https://example.com/product"
 
         async def evaluate(self, script: str, payload: dict[str, object]):
+            await _async_checkpoint()
             assert "document.querySelector" in script
             assert "selectors" in payload
             return True
@@ -4750,6 +4892,7 @@ async def test_browser_fetch_records_navigation_timing_when_fallback_navigation_
     )
 
     async def _fake_runtime(**_kwargs):
+        await _async_checkpoint()
         return _FakeRuntime(page)
 
     with pytest.raises(PlaywrightError, match="fallback failed") as excinfo:
@@ -4857,7 +5000,7 @@ async def test_origin_warmup_skips_for_listing_surface() -> None:
     )
 
     assert page.goto_calls == []
-    assert page.spawned_pages == []
+    assert not page.spawned_pages
 
 
 @pytest.mark.asyncio
@@ -4877,7 +5020,7 @@ async def test_origin_warmup_skips_for_rotating_proxy_profile() -> None:
     )
 
     assert page.goto_calls == []
-    assert page.spawned_pages == []
+    assert not page.spawned_pages
 
 
 @pytest.mark.asyncio
@@ -4999,7 +5142,7 @@ async def test_origin_warmup_skips_for_real_chrome_with_saved_domain_state() -> 
         phase_timings_ms={},
     )
 
-    assert page.spawned_pages == []
+    assert not page.spawned_pages
 
 
 @pytest.mark.asyncio
@@ -5019,7 +5162,7 @@ async def test_origin_warmup_skips_for_known_vendor_block_memory() -> None:
     )
 
     assert page.goto_calls == []
-    assert page.spawned_pages == []
+    assert not page.spawned_pages
 
 
 @pytest.mark.asyncio
@@ -5051,9 +5194,11 @@ async def test_browser_fetch_skips_real_chrome_warmup_when_domain_cookies_exist(
     captured_skip_flags: list[bool] = []
 
     async def _fake_runtime(**_kwargs):
+        await _async_checkpoint()
         return _FakeRuntime(page)
 
     async def _fake_load_storage_state_for_domain(*_args, **_kwargs):
+        await _async_checkpoint()
         return {
             "cookies": [
                 {
@@ -5067,6 +5212,7 @@ async def test_browser_fetch_skips_real_chrome_warmup_when_domain_cookies_exist(
         }
 
     async def _fake_warm_origin(*_args, **kwargs):
+        await _async_checkpoint()
         captured_skip_flags.append(bool(kwargs.get("skip_for_reusable_domain_state")))
 
     monkeypatch.setattr(
@@ -5107,6 +5253,7 @@ def test_browser_runtime_snapshot_uses_capacity_fallback_for_pooled_runtimes(
             }
 
         async def close(self) -> None:
+            await _async_checkpoint()
             return None
 
     monkeypatch.setattr(
@@ -5134,6 +5281,7 @@ async def test_browser_fetch_disables_storage_reuse_for_rotating_proxy_profile(
 
     @asynccontextmanager
     async def _fake_page_context():
+        await _async_checkpoint()
         raise _StopFetch
         yield
 
@@ -5178,6 +5326,7 @@ async def test_browser_fetch_recovers_when_commit_navigation_is_interrupted_by_s
     )
 
     async def _fake_runtime(**_kwargs):
+        await _async_checkpoint()
         return _FakeRuntime(page)
 
     result = await browser_runtime.browser_fetch(
@@ -5205,6 +5354,7 @@ async def test_browser_fetch_force_closes_context_when_cancelled_mid_stage() -> 
     )
 
     async def _fake_runtime(**_kwargs):
+        await _async_checkpoint()
         return _FakeRuntime(page)
 
     task = asyncio.create_task(
@@ -5216,11 +5366,13 @@ async def test_browser_fetch_force_closes_context_when_cancelled_mid_stage() -> 
         )
     )
 
-    await asyncio.wait_for(content_entered.wait(), timeout=0.5)
+    async with asyncio.timeout(0.5):
+        await content_entered.wait()
     task.cancel()
 
     with pytest.raises(asyncio.CancelledError):
-        await asyncio.wait_for(task, timeout=0.5)
+        async with asyncio.timeout(0.5):
+            await task
 
     assert page.page_close_calls + page.context_close_calls >= 1
 
@@ -5238,6 +5390,7 @@ async def test_browser_fetch_force_closes_context_when_stage_times_out(
     )
 
     async def _fake_runtime(**_kwargs):
+        await _async_checkpoint()
         return _FakeRuntime(page)
 
     remaining_timeouts = iter([5.0, 0.05, 0.05, 0.05])
@@ -5248,16 +5401,14 @@ async def test_browser_fetch_force_closes_context_when_stage_times_out(
     )
 
     with pytest.raises(TimeoutError, match="Browser settle stage exceeded") as excinfo:
-        await asyncio.wait_for(
-            browser_runtime.browser_fetch(
+        async with asyncio.timeout(0.5):
+            await browser_runtime.browser_fetch(
                 "https://example.com/products/widget",
                 5,
                 surface="ecommerce_detail",
                 browser_reason="http-escalation",
                 runtime_provider=_fake_runtime,
-            ),
-            timeout=0.5,
-        )
+            )
 
     diagnostics = browser_runtime.build_failed_browser_diagnostics(
         browser_reason="http-escalation",
@@ -5286,9 +5437,11 @@ async def test_browser_fetch_surfaces_traversal_fragment_metrics(
     page.url = "https://example.com/collections/widgets"
 
     async def _fake_runtime(**_kwargs):
+        await _async_checkpoint()
         return _FakeRuntime(page)
 
     async def _fake_execute_listing_traversal(*args, **kwargs):
+        await _async_checkpoint()
         del args, kwargs
         return TraversalResult(
             requested_mode="paginate",
@@ -5355,9 +5508,11 @@ async def test_browser_fetch_keeps_full_rendered_html_when_traversal_makes_no_pr
     page.url = "https://example.com/collections/widgets"
 
     async def _fake_runtime(**_kwargs):
+        await _async_checkpoint()
         return _FakeRuntime(page)
 
     async def _fake_execute_listing_traversal(*args, **kwargs):
+        await _async_checkpoint()
         del args, kwargs
         return TraversalResult(
             requested_mode="paginate",
@@ -5415,9 +5570,11 @@ async def test_browser_fetch_prefers_rendered_html_when_progress_traversal_fragm
     page.url = "https://example.com/collections/widgets"
 
     async def _fake_runtime(**_kwargs):
+        await _async_checkpoint()
         return _FakeRuntime(page)
 
     async def _fake_execute_listing_traversal(*args, **kwargs):
+        await _async_checkpoint()
         del args, kwargs
         return TraversalResult(
             requested_mode="paginate",
@@ -5470,9 +5627,11 @@ async def test_browser_fetch_runs_listing_recovery_when_thin_listing_retry_reque
     calls = {"count": 0}
 
     async def _fake_runtime(**_kwargs):
+        await _async_checkpoint()
         return _FakeRuntime(page)
 
     async def _fake_recover_listing_page_content(*args, **kwargs):
+        await _async_checkpoint()
         del args, kwargs
         calls["count"] += 1
         return {

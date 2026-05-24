@@ -214,7 +214,18 @@ def _supported_version_url(value: object, base_url: str) -> str:
     if isinstance(raw, dict):
         raw = raw.get("url") or raw.get("href") or raw.get("profile")
     candidate = str(raw or "").strip()
-    return urljoin(base_url, candidate) if candidate else ""
+    if not candidate or not _looks_like_profile_url(candidate):
+        return ""
+    return urljoin(base_url, candidate)
+
+
+def _looks_like_profile_url(value: str) -> bool:
+    parsed = urlparse(value)
+    return bool(
+        parsed.scheme in {"http", "https"}
+        or value.startswith(("/", "./", "../"))
+        or ("/" in value and not _VERSION_RE.match(value))
+    )
 
 
 async def _fetch_manifest_page(url: str):

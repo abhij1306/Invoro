@@ -453,6 +453,23 @@ def test_schema_contains_field_resolves_local_refs() -> None:
 
 
 @pytest.mark.component
+def test_schema_contains_field_resolves_chained_refs_in_composed_schemas() -> None:
+    schema = {
+        "allOf": [{"$ref": "#/components/schemas/ProductEnvelope"}],
+        "components": {
+            "schemas": {
+                "ProductEnvelope": {
+                    "allOf": [{"$ref": "#/components/schemas/Product"}]
+                },
+                "Product": {"properties": {"product_id": {}}},
+            }
+        },
+    }
+
+    assert protocol_checks._schema_contains_field(schema, "product_id", root=schema)
+
+
+@pytest.mark.component
 def test_schema_groups_detect_monolithic_shopping_schema() -> None:
     payload = {
         "properties": {
@@ -510,6 +527,23 @@ async def test_probe_rest_requires_ucp_shaped_get(monkeypatch: pytest.MonkeyPatc
     )
 
     assert probe.negotiated is True
+
+    fake_client.options_resp = _response("OPTIONS", endpoint, 500, {})
+    fake_client.get_resp = _response(
+        "GET",
+        endpoint,
+        200,
+        {"capabilities": ["catalog.search"]},
+    )
+
+    probe = await protocol_checks._probe_rest(
+        service="dev.ucp.shopping",
+        endpoint=endpoint,
+    )
+
+    assert probe.reachable is True
+    assert probe.negotiated is True
+    assert probe.status_code == 200
 
 
 @pytest.mark.asyncio

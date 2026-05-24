@@ -67,7 +67,13 @@ async def test_oracle_hcm_adapter_accepts_list_payloads_from_shared_json_contrac
         surface="job_listing",
     )
 
-    assert len(records) == 1
+    assert records == [
+        {
+            "title": "Platform Engineer",
+            "job_id": "123",
+            "url": "https://example.com/job/123",
+        }
+    ]
 
 
 @pytest.mark.asyncio
@@ -116,7 +122,14 @@ async def test_oracle_hcm_adapter_uses_shared_request_json_contract(
         surface="job_listing",
     )
 
-    assert len(records) == 1
+    assert records == [
+        {
+            "title": "Platform Engineer",
+            "job_id": "123",
+            "url": "https://example.com/job/123",
+        }
+    ]
+    assert calls and "recruitingCEJobRequisitions" in calls[0][0]
 
 
 @pytest.mark.component

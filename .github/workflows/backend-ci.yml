@@ -76,4 +76,4 @@ jobs:
         run: python -m mypy app
 
       - name: Pytest
-        run: python -m pytest tests -q -m "unit or component"
+        run: python -m pytest tests -q

@@ -810,7 +810,7 @@ async def test_curl_handoff_failure_falls_back_to_real_chrome(
 async def test_fetch_page_preserves_requested_fields_on_http_to_browser_escalation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    captured_requested_fields: list[str] | None = None
+    captured_requested_fields: list[str] = []
 
     @_as_async
     def _fake_curl(url: str, timeout_seconds: float, *, proxy: str | None = None):
@@ -884,7 +884,7 @@ async def test_fetch_page_preserves_requested_fields_on_http_to_browser_escalati
 async def test_fetch_page_preserves_requested_fields_on_browser_first_path(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    captured_requested_fields: list[str] | None = None
+    captured_requested_fields: list[str] = []
 
     @_as_async
     def _fake_run_browser_attempts(
@@ -1551,8 +1551,8 @@ async def test_run_browser_attempts_lets_browser_runtime_own_stage_timeouts(
         runtime_policy={},
     )
 
-    async def _fake_browser_fetch(url: str, timeout: float, **kwargs):
-        del url, timeout
+    async def _fake_browser_fetch(url: str, stage_budget: float, **kwargs):
+        del url, stage_budget
         browser_engine = str(kwargs.get("browser_engine"))
         attempted_engines.append(browser_engine)
         if browser_engine == "patchright":
@@ -1645,11 +1645,11 @@ async def test_fetch_page_browser_only_stamps_engine_and_lane_diagnostics(
 async def test_fetch_page_forwards_proxy_profile_to_browser_fetch(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    captured_proxy_profile: dict[str, object] | None = None
+    captured_proxy_profile: dict[str, object] = {}
 
     @_as_async
-    def _fake_browser_fetch(url: str, timeout: float, **kwargs):
-        del url, timeout
+    def _fake_browser_fetch(url: str, _timeout: float, **kwargs):
+        del url, _timeout
         nonlocal captured_proxy_profile
         captured_proxy_profile = dict(kwargs.get("proxy_profile") or {})
         return PageFetchResult(
@@ -2898,18 +2898,18 @@ async def test_fetch_page_retries_patchright_http2_protocol_error_with_real_chro
         events.append((level, message))
 
     @_as_async
-    def _failing_curl(request_url: str, timeout: float, *, proxy: str | None = None):
-        del request_url, timeout, proxy
+    def _failing_curl(request_url: str, _timeout: float, *, proxy: str | None = None):
+        del request_url, _timeout, proxy
         raise httpx.ReadTimeout("curl timed out")
 
     @_as_async
-    def _failing_http(request_url: str, timeout: float, *, proxy: str | None = None):
-        del request_url, timeout, proxy
+    def _failing_http(request_url: str, _timeout: float, *, proxy: str | None = None):
+        del request_url, _timeout, proxy
         raise httpx.ReadTimeout("httpx timed out")
 
     @_as_async
-    def _browser_fetch(request_url, timeout, **kwargs):
-        del timeout
+    def _browser_fetch(request_url, _timeout, **kwargs):
+        del _timeout
         engine = str(kwargs.get("browser_engine") or "")
         browser_engines.append(engine)
         if engine == "patchright":
@@ -2978,9 +2978,9 @@ async def test_fetch_page_uses_remaining_timeout_budget_across_http_and_browser_
             headers={"x-datadome": "blocked"},
         )
 
-    async def _browser_fetch(request_url: str, timeout: float, **kwargs):
+    async def _browser_fetch(request_url: str, browser_budget: float, **kwargs):
         del request_url
-        browser_timeouts.append(timeout)
+        browser_timeouts.append(browser_budget)
         engine = str(kwargs.get("browser_engine") or "")
         if engine == "patchright":
             await asyncio.sleep(0.06)
@@ -3059,10 +3059,11 @@ async def test_run_browser_attempts_caps_patchright_probe_timeout_for_vendor_blo
         ),
     )
 
-    async def _fake_browser_fetch(url: str, timeout: float, **kwargs):
+    @_as_async
+    def _fake_browser_fetch(url: str, browser_timeout: float, **kwargs):
         del url
         engine = str(kwargs.get("browser_engine") or "")
-        browser_calls.append((engine, timeout))
+        browser_calls.append((engine, browser_timeout))
         if engine == "patchright":
             raise TimeoutError("patchright budget exhausted")
         return PageFetchResult(

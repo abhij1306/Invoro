@@ -35,7 +35,7 @@ def test_estimate_cost_usd_uses_configured_groq_rates() -> None:
 
 @pytest.mark.asyncio
 @pytest.mark.regression
-async def test_provider_retry_fails_fast_on_rate_limit(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_provider_retry_retries_rate_limit(monkeypatch: pytest.MonkeyPatch) -> None:
     calls = 0
 
     async def fake_call_provider(**_kwargs):
@@ -69,10 +69,10 @@ async def test_provider_retry_fails_fast_on_rate_limit(monkeypatch: pytest.Monke
         base_delay_s=0,
     )
 
-    assert calls == 1
-    assert result == "Error: HTTP 429: rate limited"
-    assert input_tokens == 0
-    assert output_tokens == 0
+    assert calls == 2
+    assert result == '{"ok": true}'
+    assert input_tokens == 1
+    assert output_tokens == 1
 
 
 @pytest.mark.asyncio

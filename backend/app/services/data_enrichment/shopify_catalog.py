@@ -337,6 +337,9 @@ def phrase_path_category_match(
         if not taxonomy_candidate_conflicts(source_tokens, item.get("category_path"))
     ]
     if not matches:
+        # Fallback: build leaf token sets via clean_text/tokenize_text, then keep
+        # paths whose normalized path tokens cover the phrase, share a leaf token,
+        # and do not conflict; the post-filter prefers non-accessory paths.
         leaf_tokens_by_path = {
             str(item.get("category_path") or ""): set(
                 tokenize_text(item.get("leaf") or clean_text(item.get("category_path")).split(">")[-1])

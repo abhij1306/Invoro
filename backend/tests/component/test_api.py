@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
 from app.core.dependencies import get_current_user, get_db
@@ -8,7 +9,7 @@ from app.main import app
 from app.services.config.ucp_audit import UCP_AUDIT_JOB_STATUS_QUEUED
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def ucp_audit_api_client(db_session, test_user, monkeypatch: pytest.MonkeyPatch):
     async def _override_db():
         yield db_session

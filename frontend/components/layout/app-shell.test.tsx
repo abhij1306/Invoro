@@ -43,7 +43,7 @@ describe('AppShell reset workspace', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     const storage = new Map<string, string>();
-    Object.defineProperty(window, 'localStorage', {
+    Object.defineProperty(globalThis, 'localStorage', {
       writable: true,
       value: {
         getItem: vi.fn((key: string) => storage.get(key) ?? null),
@@ -58,7 +58,7 @@ describe('AppShell reset workspace', () => {
         }),
       },
     });
-    Object.defineProperty(window, 'matchMedia', {
+    Object.defineProperty(globalThis, 'matchMedia', {
       writable: true,
       value: vi.fn().mockImplementation(() => ({
         matches: false,

@@ -126,6 +126,7 @@ async def test_resolve_sitemap_index_filters_final_urls_not_child_sitemaps(
         root_url,
         "https://example.com/sitemap_products_1.xml",
         child_url,
+        "https://example.com/sitemap_pages_2.xml",
     ]
 
 

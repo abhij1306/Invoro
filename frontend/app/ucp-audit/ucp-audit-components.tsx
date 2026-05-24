@@ -261,17 +261,6 @@ type UcpContract = {
   payment_handlers?: string[];
 };
 
-type RepairRoadmapItem = {
-  sub_skill?: string;
-  priority?: string;
-  finding_codes?: string[];
-  action?: string;
-  source?: string;
-  evidence?: Array<Record<string, unknown>>;
-  effort?: string;
-  depends_on?: string[];
-};
-
 export function UcpScoreSummary({
   report,
   job,
@@ -590,8 +579,8 @@ export function UcpFixSequence({ report }: Readonly<{ report: UcpAuditReport | n
   function toggle(id: string) {
     const next = { ...done, [id]: !done[id] };
     setDone(next);
-    if (storageKey && typeof window !== 'undefined') {
-      window.localStorage.setItem(storageKey, JSON.stringify(next));
+    if (storageKey && typeof globalThis.window !== 'undefined') {
+      globalThis.window.localStorage.setItem(storageKey, JSON.stringify(next));
     }
   }
 
@@ -601,9 +590,11 @@ export function UcpFixSequence({ report }: Readonly<{ report: UcpAuditReport | n
       const evidenceLines = evidenceToLines(item.evidence)
         .map((line) => `   - ${line}`)
         .join('\n');
-      return `- [${checked}] ${index + 1}. [${item.subSkill}] ${item.action} (${item.priority}, ${item.effort})\n   Source: ${item.source}${evidenceLines ? `\n${evidenceLines}` : ''}`;
+      const evidenceBlock = evidenceLines ? `\n${evidenceLines}` : '';
+      return `- [${checked}] ${index + 1}. [${item.subSkill}] ${item.action} (${item.priority}, ${item.effort})\n   Source: ${item.source}${evidenceBlock}`;
     });
-    const content = `# UCP Repair Roadmap\n\nTarget Domain: ${(report?.report_json?.domain as string) ?? 'Audit Store'}\nOverall Compliance: ${report?.overall_score ?? 0}/100\n\n${lines.join('\n\n')}\n`;
+    const domain = formatUnknownText(report?.report_json?.domain, 'Audit Store');
+    const content = `# UCP Repair Roadmap\n\nTarget Domain: ${domain}\nOverall Compliance: ${report?.overall_score ?? 0}/100\n\n${lines.join('\n\n')}\n`;
     const blob = new Blob([content], { type: 'text/markdown' });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
@@ -655,6 +646,7 @@ export function UcpFixSequence({ report }: Readonly<{ report: UcpAuditReport | n
           <ol className="divide-divider divide-y">
             {roadmap.map((item, index) => {
               const isChecked = done[item.id];
+              const priorityTone = roadmapPriorityTone(item.priority);
               return (
                 <li
                   key={item.id}
@@ -704,17 +696,7 @@ export function UcpFixSequence({ report }: Readonly<{ report: UcpAuditReport | n
                     <EvidenceChips evidence={item.evidence} />
                   </div>
 
-                  <Badge
-                    tone={
-                      item.priority === 'critical'
-                        ? 'danger'
-                        : item.priority === 'high'
-                          ? 'warning'
-                          : 'neutral'
-                    }
-                  >
-                    {item.priority}
-                  </Badge>
+                  <Badge tone={priorityTone}>{item.priority}</Badge>
                 </li>
               );
             })}
@@ -748,6 +730,12 @@ function ManifestSummary({
   const cacheFindings = findingsForCodes(findings, ['cache_control_missing']);
   const structuralFindings = findingsForCodes(findings, ['manifest_invalid']);
   const redirectFindings = findingsForCodes(findings, ['manifest_redirected']);
+  let profileValue = 'invalid';
+  if (manifest.found === false) {
+    profileValue = 'not found';
+  } else if (manifest.valid) {
+    profileValue = 'valid';
+  }
 
   return (
     <div>
@@ -755,7 +743,7 @@ function ManifestSummary({
       <div className="grid gap-3 lg:grid-cols-2">
         <ManifestFact
           label="Profile"
-          value={manifest.found === false ? 'not found' : manifest.valid ? 'valid' : 'invalid'}
+          value={profileValue}
           tone={manifest.found === false || manifest.valid === false ? 'danger' : 'success'}
           detail={manifest.final_url}
         />
@@ -831,56 +819,45 @@ function TransportSummary({ transports }: Readonly<{ transports: ContractTranspo
             </TableRow>
           </TableHeader>
           <TableBody>
-            {transports.map((transport, index) => (
-              <TableRow key={`${transport.transport ?? 'transport'}-${index}`}>
-                <TableCell className="align-top">
-                  <div className="type-caption-mono text-foreground">
-                    {(transport.transport ?? 'unknown').toUpperCase()}
-                  </div>
-                  {transport.service ? (
-                    <div className="type-caption text-muted mt-1">{transport.service}</div>
-                  ) : null}
-                </TableCell>
-                <TableCell className="align-top">
-                  <Badge
-                    tone={
-                      transport.negotiated
-                        ? 'success'
-                        : transport.reachable || transport.profile_required
-                          ? 'warning'
-                          : 'danger'
-                    }
-                  >
-                    {transport.negotiated
-                      ? 'negotiated'
-                      : transport.profile_required
-                        ? 'profile required'
-                        : transport.reachable
-                          ? 'reachable'
-                          : 'unreachable'}
-                  </Badge>
-                  {transport.status_code ? (
-                    <div className="type-caption-mono text-muted mt-1">
-                      HTTP {transport.status_code}
+            {transports.map((transport, index) => {
+              const negotiationTone = transportNegotiationTone(transport);
+              const negotiationLabel = transportNegotiationLabel(transport);
+              let detail = <span className="text-muted">-</span>;
+              if (transport.error) {
+                detail = <span className="text-danger">{transport.error}</span>;
+              } else if (transport.tool_names?.length) {
+                detail = (
+                  <span className="text-muted">Tools: {transport.tool_names.join(', ')}</span>
+                );
+              }
+
+              return (
+                <TableRow key={`${transport.transport ?? 'transport'}-${index}`}>
+                  <TableCell className="align-top">
+                    <div className="type-caption-mono text-foreground">
+                      {(transport.transport ?? 'unknown').toUpperCase()}
                     </div>
-                  ) : null}
-                </TableCell>
-                <TableCell className="max-w-[300px] align-top">
-                  <div className="type-caption-mono text-foreground truncate">
-                    {transport.endpoint || '-'}
-                  </div>
-                </TableCell>
-                <TableCell className="type-caption max-w-[320px] align-top">
-                  {transport.error ? (
-                    <span className="text-danger">{transport.error}</span>
-                  ) : transport.tool_names?.length ? (
-                    <span className="text-muted">Tools: {transport.tool_names.join(', ')}</span>
-                  ) : (
-                    <span className="text-muted">-</span>
-                  )}
-                </TableCell>
-              </TableRow>
-            ))}
+                    {transport.service ? (
+                      <div className="type-caption text-muted mt-1">{transport.service}</div>
+                    ) : null}
+                  </TableCell>
+                  <TableCell className="align-top">
+                    <Badge tone={negotiationTone}>{negotiationLabel}</Badge>
+                    {transport.status_code ? (
+                      <div className="type-caption-mono text-muted mt-1">
+                        HTTP {transport.status_code}
+                      </div>
+                    ) : null}
+                  </TableCell>
+                  <TableCell className="max-w-[300px] align-top">
+                    <div className="type-caption-mono text-foreground truncate">
+                      {transport.endpoint || '-'}
+                    </div>
+                  </TableCell>
+                  <TableCell className="type-caption max-w-[320px] align-top">{detail}</TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </div>
@@ -993,7 +970,7 @@ function EvidenceChips({ evidence }: Readonly<{ evidence: Array<Record<string, u
   );
 }
 
-function evidenceToLines(evidence: Array<Record<string, unknown>> = []) {
+function evidenceToLines(evidence: Array<Record<string, unknown>> = []): string[] {
   return evidence
     .flatMap((entry) =>
       Object.entries(entry).flatMap(([key, value]) => {
@@ -1012,7 +989,7 @@ function evidenceToLines(evidence: Array<Record<string, unknown>> = []) {
 
 function findingsForCodes(findings: Array<Record<string, unknown>>, codes: string[]) {
   return findings
-    .filter((finding) => codes.includes(String(finding.code ?? '')))
+    .filter((finding) => codes.includes(formatUnknownText(finding.code)))
     .map((finding) => ({
       ...finding,
       evidence: Array.isArray(finding.evidence)
@@ -1021,9 +998,25 @@ function findingsForCodes(findings: Array<Record<string, unknown>>, codes: strin
     }));
 }
 
-function formatEvidenceValue(value: unknown) {
-  if (value == null || value === '') return '-';
-  return String(value);
+function formatEvidenceValue(value: unknown): string {
+  return formatUnknownText(value, '-');
+}
+
+function formatUnknownText(value: unknown, fallback = ''): string {
+  if (value == null || value === '') return fallback;
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
+    return String(value);
+  }
+  if (Array.isArray(value)) {
+    const items: string[] = value.map((item) => formatUnknownText(item)).filter(Boolean);
+    return items.length ? items.join(', ') : fallback;
+  }
+  try {
+    return JSON.stringify(value) ?? fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 function DimensionScoreCard({
@@ -1163,10 +1156,10 @@ function useNormalizedFindings(report: UcpAuditReport | null) {
 }
 
 function normalizeFinding(finding: Record<string, unknown>, index: number): NormalizedFinding {
-  const code = String(finding.code ?? 'unknown_finding');
-  const dimension = String(finding.dimension_id ?? finding.dimension ?? '');
+  const code = formatUnknownText(finding.code, 'unknown_finding');
+  const dimension = formatUnknownText(finding.dimension_id ?? finding.dimension);
   const copy = FINDING_COPY[code] ?? {
-    description: String(finding.message || code),
+    description: formatUnknownText(finding.message, code),
     fix: 'Inspect the exported UCP contract payload and repair the declared service contract.',
     effort: 'review',
     action: `Resolve ${code}`,
@@ -1176,8 +1169,8 @@ function normalizeFinding(finding: Record<string, unknown>, index: number): Norm
     id: `${dimension}-${code}-${index}`,
     code,
     dimension,
-    severity: String(finding.severity ?? 'info'),
-    description: String(finding.message || copy.description),
+    severity: formatUnknownText(finding.severity, 'info'),
+    description: formatUnknownText(finding.message, copy.description),
     fix: copy.fix,
     effort: copy.effort,
     action: copy.action,
@@ -1190,26 +1183,27 @@ function normalizeFinding(finding: Record<string, unknown>, index: number): Norm
 
 function getContract(report: UcpAuditReport | null): UcpContract {
   const raw = report?.report_json?.ucp_contract;
-  return raw && typeof raw === 'object' ? (raw as UcpContract) : {};
+  return raw && typeof raw === 'object' ? raw : {};
 }
 
 function getRoadmap(report: UcpAuditReport | null) {
   const raw = report?.report_json?.repair_roadmap;
   if (Array.isArray(raw) && raw.length) {
     return raw.map((item, index) => {
-      const roadmap = item as RepairRoadmapItem;
+      const roadmap = item;
+      const subSkill = formatUnknownText(roadmap.sub_skill, 'ucp');
       return {
-        id: `${roadmap.sub_skill ?? 'roadmap'}-${index}`,
-        subSkill: String(roadmap.sub_skill ?? 'ucp'),
-        priority: String(roadmap.priority ?? 'medium'),
-        action: String(roadmap.action ?? 'Repair UCP contract'),
-        source: String(roadmap.source ?? 'UCP Overview and UCP Schema Reference'),
+        id: `${subSkill}-${index}`,
+        subSkill,
+        priority: formatUnknownText(roadmap.priority, 'medium'),
+        action: formatUnknownText(roadmap.action, 'Repair UCP contract'),
+        source: formatUnknownText(roadmap.source, 'UCP Overview and UCP Schema Reference'),
         evidence: Array.isArray(roadmap.evidence)
           ? (roadmap.evidence as Array<Record<string, unknown>>)
           : [],
-        effort: String(roadmap.effort ?? 'review'),
+        effort: formatUnknownText(roadmap.effort, 'review'),
         dependsOn: Array.isArray(roadmap.depends_on)
-          ? roadmap.depends_on.map((item) => String(item))
+          ? roadmap.depends_on.map(formatUnknownText)
           : [],
       };
     });
@@ -1233,6 +1227,25 @@ function scoreTone(score: number) {
   if (score >= 80) return 'success';
   if (score >= 50) return 'warning';
   return 'danger';
+}
+
+function roadmapPriorityTone(priority: string) {
+  if (priority === 'critical') return 'danger';
+  if (priority === 'high') return 'warning';
+  return 'neutral';
+}
+
+function transportNegotiationTone(transport: ContractTransport) {
+  if (transport.negotiated) return 'success';
+  if (transport.reachable || transport.profile_required) return 'warning';
+  return 'danger';
+}
+
+function transportNegotiationLabel(transport: ContractTransport) {
+  if (transport.negotiated) return 'negotiated';
+  if (transport.profile_required) return 'profile required';
+  if (transport.reachable) return 'reachable';
+  return 'unreachable';
 }
 
 function statusTone(status?: string) {

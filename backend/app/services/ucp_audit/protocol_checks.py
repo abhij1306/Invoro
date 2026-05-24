@@ -207,7 +207,7 @@ async def _probe_rest(*, service: str, endpoint: str) -> UCPTransportProbe:
                 headers={"Accept": config.UCP_ACCEPT_HEADER},
             )
         allow = options_resp.headers.get("allow", "")
-        reachable = options_resp.status_code < 500
+        reachable = get_resp.status_code < 500
         get_payload = _safe_json(get_resp)
         ucp_shaped = (
             _non_empty_collection(get_payload.get("capabilities"))
@@ -222,8 +222,8 @@ async def _probe_rest(*, service: str, endpoint: str) -> UCPTransportProbe:
             endpoint=endpoint,
             reachable=reachable,
             negotiated=negotiated,
-            status_code=options_resp.status_code,
-            error="" if reachable else options_resp.text[:240],
+            status_code=get_resp.status_code,
+            error="" if reachable else get_resp.text[:240],
             response_preview={"allow": allow, "get_keys": sorted(get_payload.keys())}
             if allow
             else {},
@@ -790,18 +790,22 @@ def _schema_field_results(payload: dict) -> dict[str, dict[str, bool]]:
     }
 
 
-def _resolve_refs(node: object, root: dict) -> object:
+def _resolve_refs(node: object, root: dict, seen: set[str] | None = None) -> object:
     if not isinstance(node, dict):
         return node
     ref = node.get("$ref")
     if not ref or not isinstance(ref, str) or not ref.startswith("#/"):
         return node
+    seen = set() if seen is None else seen
+    if ref in seen:
+        return node
+    seen.add(ref)
     cursor: object = root
     for part in ref.lstrip("#/").split("/"):
         if not isinstance(cursor, dict):
             return node
         cursor = cursor.get(part, {})
-    return cursor if cursor != {} else node
+    return _resolve_refs(cursor, root, seen) if cursor != {} else node
 
 
 def _schema_contains_field(value: object, field: str, root: dict | None = None) -> bool:
@@ -867,9 +871,9 @@ def _supported_versions(payload: dict) -> list[str]:
     if isinstance(versions, dict):
         return sorted(str(item) for item in versions.keys())
     if isinstance(versions, list):
-        return sorted(
+        normalized = [
             str(item.get("version") if isinstance(item, dict) else item)
             for item in versions
-            if str(item.get("version") if isinstance(item, dict) else item).strip()
-        )
+        ]
+        return sorted(item for item in normalized if item.strip())
     return []
