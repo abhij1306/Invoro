@@ -4,15 +4,22 @@ import Script from 'next/script';
 import './globals.css';
 
 // Next.js App Router root layout; invoked by file-system routing.
-import { Bricolage_Grotesque, JetBrains_Mono } from 'next/font/google';
+import { Bricolage_Grotesque, JetBrains_Mono, Public_Sans } from 'next/font/google';
 
 import { AppShell } from '../components/layout/app-shell';
 import { QueryProvider } from '../components/ui/query-provider';
 
-const mainFont = Bricolage_Grotesque({
+const primaryFont = Public_Sans({
   subsets: ['latin'],
   weight: ['300', '400', '500', '600', '700', '800'],
   variable: '--font-primary-source',
+  display: 'swap',
+});
+
+const displayFont = Bricolage_Grotesque({
+  subsets: ['latin'],
+  weight: ['300', '400', '500', '600', '700', '800'],
+  variable: '--font-display-source',
   display: 'swap',
 });
 
@@ -37,12 +44,13 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
         <Script src="/theme-init.js" strategy="beforeInteractive" nonce={nonce} />
       </head>
       {/*
-        Only apply font variables here, NOT mainFont.className.
-        mainFont.className hardcodes a font-family class directly on body,
+        Only apply font variables here, NOT primaryFont.className.
+        primaryFont.className hardcodes a font-family class directly on body,
         bypassing the CSS variable cascade in globals.css entirely.
-        The variables are picked up by --font-primary-family and --font-mono-family.
+        The variables are picked up by --font-primary-family, --font-display-family,
+        and --font-mono-family.
       */}
-      <body className={`${mainFont.variable} ${monoFont.variable}`}>
+      <body className={`${primaryFont.variable} ${displayFont.variable} ${monoFont.variable}`}>
         <div className="noise-overlay" aria-hidden="true" />
         <QueryProvider>
           <AppShell>{children}</AppShell>

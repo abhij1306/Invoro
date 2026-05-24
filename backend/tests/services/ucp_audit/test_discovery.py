@@ -4,8 +4,15 @@ import json
 from dataclasses import dataclass
 
 import pytest
+import httpx
 
-from app.services.ucp_audit.discovery import discover_ucp_manifest, link_header_ucp_url
+from app.services.ucp_audit import discovery
+from app.services.ucp_audit.discovery import (
+    check_manifest_cache_headers,
+    check_version_alignment,
+    discover_ucp_manifest,
+    link_header_ucp_url,
+)
 
 
 @dataclass(slots=True)
@@ -16,6 +23,22 @@ class DummyPage:
     final_url: str = "https://example.com/.well-known/ucp"
     redirect_chain: list[str] | None = None
     version_source: str = ""
+    headers: dict | None = None
+
+
+class DummyAsyncClient:
+    def __init__(self, response: httpx.Response) -> None:
+        self.response = response
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return None
+
+    async def get(self, url: str, *, headers: dict):
+        del url, headers
+        return self.response
 
 
 @pytest.mark.asyncio
@@ -52,43 +75,54 @@ async def test_valid_manifest_parses_capabilities(monkeypatch: pytest.MonkeyPatc
                                     "transport": "mcp",
                                     "endpoint": "https://example.com/api/ucp/mcp",
                                     "schema": "https://ucp.dev/shopping/mcp.openrpc.json",
+                                    "spec": "https://ucp.dev/spec",
                                 }
                             ]
                         },
                         "capabilities": {
                             "dev.ucp.shopping.catalog.search": {
                                 "version": "2026-04-08",
-                                "schema": "https://ucp.dev/catalog_search.json"
+                                "schema": "https://ucp.dev/catalog_search.json",
+                                "spec": "https://ucp.dev/spec",
                             },
                             "dev.ucp.shopping.catalog.lookup": {
                                 "version": "2026-04-08",
-                                "schema": "https://ucp.dev/catalog_lookup.json"
+                                "schema": "https://ucp.dev/catalog_lookup.json",
+                                "spec": "https://ucp.dev/spec",
                             },
                             "dev.ucp.shopping.cart": {
                                 "version": "2026-04-08",
                                 "schema": "https://ucp.dev/cart.json",
+                                "spec": "https://ucp.dev/spec",
                             },
                             "dev.ucp.shopping.checkout": {
                                 "version": "2026-04-08",
                                 "schema": "https://ucp.dev/checkout.json",
+                                "spec": "https://ucp.dev/spec",
                             },
                             "dev.ucp.shopping.order": {
                                 "version": "2026-04-08",
                                 "schema": "https://ucp.dev/order.json",
+                                "spec": "https://ucp.dev/spec",
                             },
                             "dev.ucp.shopping.fulfillment": {
                                 "version": "2026-04-08",
-                                "schema": "https://ucp.dev/fulfillment.json"
+                                "schema": "https://ucp.dev/fulfillment.json",
+                                "spec": "https://ucp.dev/spec",
                             },
                             "dev.ucp.shopping.discount": {
                                 "version": "2026-04-08",
                                 "schema": "https://ucp.dev/discount.json",
+                                "spec": "https://ucp.dev/spec",
                             },
                         },
                     },
-                    "signing_keys": [],
+                    "signing_keys": [
+                        {"kid": "k1", "kty": "EC", "use": "sig", "alg": "ES256"}
+                    ],
                 }
             ),
+            headers={"cache-control": "public, max-age=300"},
         )
 
     monkeypatch.setattr(
@@ -128,7 +162,11 @@ async def test_supported_version_profile_can_declare_supported_versions(
                 "2026-04-08": "https://example.com/ucp/2026-04-08.json"
             },
             "services": {
-                "dev.ucp.shopping": {"version": "2026-04-08", "transport": "mcp"}
+                "dev.ucp.shopping": {
+                    "version": "2026-04-08",
+                    "transport": "mcp",
+                    "spec": "https://ucp.dev/spec",
+                }
             },
             "capabilities": {},
         },
@@ -155,16 +193,108 @@ async def test_supported_version_profile_can_declare_supported_versions(
 
 
 @pytest.mark.asyncio
-async def test_supported_version_can_be_declared_without_profile_url(
+async def test_supported_version_profile_url_may_be_relative(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payload = {
+        "ucp": {
+            "version": "2025-01-01",
+            "supported_versions": {"2026-04-08": "/ucp/2026-04-08.json"},
+            "services": {},
+            "capabilities": {},
+        },
+        "signing_keys": [],
+    }
+    supported = {
+        "ucp": {
+            "version": "2026-04-08",
+            "services": {
+                "dev.ucp.shopping": {
+                    "version": "2026-04-08",
+                    "transport": "mcp",
+                    "spec": "https://ucp.dev/spec",
+                }
+            },
+            "capabilities": {},
+        },
+        "signing_keys": [],
+    }
+
+    async def fake_fetch_page(url: str, *args, **kwargs):
+        del args, kwargs
+        if url == "https://example.com/ucp/2026-04-08.json":
+            return DummyPage(status_code=200, html=json.dumps(supported), final_url=url)
+        return DummyPage(status_code=200, html=json.dumps(payload))
+
+    monkeypatch.setattr(
+        "app.services.ucp_audit.discovery._fetch_manifest_page",
+        fake_fetch_page,
+    )
+
+    result = await discover_ucp_manifest("https://example.com")
+
+    assert result.manifest_found is True
+    assert result.version_source == "supported_versions"
+    assert result.raw_manifest == supported
+
+
+@pytest.mark.asyncio
+async def test_supported_version_profile_list_may_be_relative(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payload = {
+        "ucp": {
+            "version": "2025-01-01",
+            "supported_versions": [
+                {"version": "2026-04-08", "url": "/ucp/2026-04-08.json"}
+            ],
+            "services": {},
+            "capabilities": {},
+        },
+        "signing_keys": [],
+    }
+    supported = {
+        "ucp": {
+            "version": "2026-04-08",
+            "services": {
+                "dev.ucp.shopping": {
+                    "version": "2026-04-08",
+                    "transport": "mcp",
+                    "spec": "https://ucp.dev/spec",
+                }
+            },
+            "capabilities": {},
+        },
+        "signing_keys": [],
+    }
+
+    async def fake_fetch_page(url: str, *args, **kwargs):
+        del args, kwargs
+        if url == "https://example.com/ucp/2026-04-08.json":
+            return DummyPage(status_code=200, html=json.dumps(supported), final_url=url)
+        return DummyPage(status_code=200, html=json.dumps(payload))
+
+    monkeypatch.setattr(
+        "app.services.ucp_audit.discovery._fetch_manifest_page",
+        fake_fetch_page,
+    )
+
+    result = await discover_ucp_manifest("https://example.com")
+
+    assert result.manifest_found is True
+    assert result.version_source == "supported_versions"
+    assert result.raw_manifest == supported
+
+
+@pytest.mark.asyncio
+async def test_supported_version_string_list_declares_target(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     payload = {
         "ucp": {
             "version": "2025-01-01",
             "supported_versions": ["2026-04-08"],
-            "services": {
-                "dev.ucp.shopping": {"version": "2026-04-08", "transport": "mcp"}
-            },
+            "services": {},
             "capabilities": {},
         },
         "signing_keys": [],
@@ -183,7 +313,7 @@ async def test_supported_version_can_be_declared_without_profile_url(
 
     assert result.manifest_found is True
     assert result.version_source == "supported_versions"
-    assert result.raw_manifest == payload
+    assert "not declared" not in " ".join(result.errors)
 
 
 @pytest.mark.asyncio
@@ -219,14 +349,101 @@ def test_link_header_ucp_url_rejects_cross_origin_manifest() -> None:
 
 
 @pytest.mark.asyncio
-async def test_link_header_fallback_uses_well_known_final_origin(
+async def test_link_header_discovery_uses_final_origin_after_root_redirect(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    response = httpx.Response(
+        200,
+        headers={"link": '</ucp.json>; rel="ucp"'},
+        request=httpx.Request("GET", "https://www.shop.example/"),
+    )
+    monkeypatch.setattr(
+        "app.services.ucp_audit.discovery.build_async_http_client",
+        lambda **kwargs: DummyAsyncClient(response),
+    )
+
+    assert await discovery._discover_link_manifest_url("https://shop.example") == (
+        "https://www.shop.example/ucp.json"
+    )
+
+
+def test_manifest_cache_headers_validate_required_directives() -> None:
+    assert check_manifest_cache_headers({})
+    assert check_manifest_cache_headers({"cache-control": "public, max-age=300"}) == []
+
+
+def test_version_alignment_detects_capability_mismatch() -> None:
+    mismatches = check_version_alignment(
+        [{"name": "dev.ucp.shopping", "version": "2026-04-08"}],
+        [{"name": "dev.ucp.shopping.cart", "version": "2026-01-11"}],
+        "dev.ucp.shopping",
+    )
+
+    assert mismatches
+    assert (
+        check_version_alignment(
+            [{"name": "dev.ucp.shopping", "version": "2026-04-08"}],
+            [{"name": "dev.ucp.shopping.cart", "version": "2026-04-08"}],
+            "dev.ucp.shopping",
+        )
+        == []
+    )
+
+
+def test_manifest_shape_validates_signing_keys_as_security_errors() -> None:
+    payload = {
+        "ucp": {
+            "version": "2026-04-08",
+            "services": {},
+            "capabilities": {},
+        },
+        "signing_keys": [{}],
+    }
+
+    structural_errors, security_errors = discovery._validate_manifest_shape(payload)
+
+    assert structural_errors == []
+    assert any("missing required JWK fields" in item for item in security_errors)
+
+    payload["signing_keys"] = [
+        {"kid": "k1", "kty": "EC", "use": "sig", "alg": "ES256", "crv": "P-256"}
+    ]
+
+    assert discovery._validate_manifest_shape(payload) == ([], [])
+
+
+def test_entry_versions_require_spec_url() -> None:
+    entries = [{"name": "dev.ucp.shopping", "version": "2026-04-08"}]
+    discovery._validate_entry_versions(entries, "service")
+
+    assert any("Missing spec URL" in item for item in entries[0]["_errors"])
+
+    entries = [
+        {
+            "name": "dev.ucp.shopping",
+            "version": "2026-04-08",
+            "transport": "mcp",
+            "spec": "https://ucp.dev/spec",
+        }
+    ]
+    discovery._validate_entry_versions(entries, "service")
+
+    assert "_errors" not in entries[0]
+
+
+@pytest.mark.asyncio
+async def test_link_header_fallback_uses_requested_origin_after_redirect(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     payload = {
         "ucp": {
             "version": "2026-04-08",
             "services": {
-                "dev.ucp.shopping": {"version": "2026-04-08", "transport": "mcp"}
+                "dev.ucp.shopping": {
+                    "version": "2026-04-08",
+                    "transport": "mcp",
+                    "spec": "https://ucp.dev/spec",
+                }
             },
             "capabilities": {},
         },
@@ -282,14 +499,18 @@ async def test_valid_manifest_accepts_ucp_services(monkeypatch: pytest.MonkeyPat
                                 {
                                     "version": "2026-04-08",
                                     "transport": "mcp",
+                                    "spec": "https://ucp.dev/spec",
                                 }
                             ]
                         },
                         "capabilities": {},
                     },
-                    "signing_keys": [],
+                    "signing_keys": [
+                        {"kid": "k1", "kty": "EC", "use": "sig", "alg": "ES256"}
+                    ],
                 }
             ),
+            headers={"cache-control": "public, max-age=300"},
         )
 
     monkeypatch.setattr(
@@ -316,7 +537,13 @@ async def test_manifest_content_type_must_be_json(monkeypatch: pytest.MonkeyPatc
                 {
                     "ucp": {
                         "version": "2026-04-08",
-                        "services": {"dev.ucp.shopping": {"version": "2026-04-08", "transport": "mcp"}},
+                        "services": {
+                            "dev.ucp.shopping": {
+                                "version": "2026-04-08",
+                                "transport": "mcp",
+                                "spec": "https://ucp.dev/spec",
+                            }
+                        },
                         "capabilities": {},
                     },
                     "signing_keys": [],

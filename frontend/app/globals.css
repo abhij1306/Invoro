@@ -72,6 +72,7 @@
 
   /* Typography */
   --font-sans: var(--font-primary-family);
+  --font-display: var(--font-display-family);
   --font-mono: var(--font-mono-family);
   --font-size-2xs: var(--text-2xs);
   --font-size-xs: var(--text-xs);
@@ -112,7 +113,9 @@
 
   /* ── Fonts */
   --font-primary-family:
-    var(--font-primary-source, 'Bricolage Grotesque'), 'Bricolage Grotesque', system-ui,
+    var(--font-primary-source, 'Public Sans'), 'Public Sans', system-ui, -apple-system, sans-serif;
+  --font-display-family:
+    var(--font-display-source, 'Bricolage Grotesque'), 'Bricolage Grotesque', system-ui,
     -apple-system, sans-serif;
   --font-mono-family:
     var(--font-mono-source, 'JetBrains Mono'), 'JetBrains Mono', ui-monospace, monospace;
@@ -762,7 +765,7 @@ textarea:disabled {
 
 /* ── TIER 1: Display */
 .type-display {
-  font-family: var(--font-mono-family);
+  font-family: var(--font-display-family);
   font-size: var(--text-2xl); /* 30px */
   font-weight: 700;
   line-height: 1;
@@ -773,7 +776,7 @@ textarea:disabled {
 }
 
 .type-display-sm {
-  font-family: var(--font-mono-family);
+  font-family: var(--font-display-family);
   font-size: var(--text-lg); /* 17px */
   font-weight: var(--weight-semibold);
   line-height: 1;
@@ -785,6 +788,7 @@ textarea:disabled {
 
 /* ── TIER 2: Heading */
 .type-heading-1 {
+  font-family: var(--font-display-family);
   font-size: var(--text-2xl); /* 30px */
   font-weight: var(--weight-bold);
   line-height: 1.1;
@@ -793,6 +797,7 @@ textarea:disabled {
 }
 
 .type-heading-2 {
+  font-family: var(--font-display-family);
   font-size: var(--text-xl); /* 22px */
   font-weight: var(--weight-semibold);
   line-height: 1.2;
@@ -801,6 +806,7 @@ textarea:disabled {
 }
 
 .type-heading-3 {
+  font-family: var(--font-display-family);
   font-size: var(--text-lg); /* 17px */
   font-weight: var(--weight-semibold);
   line-height: 1.35;
@@ -810,7 +816,7 @@ textarea:disabled {
 
 /* Subheading — card titles, drawer headers, named groups */
 .type-subheading {
-  font-family: var(--font-primary-family);
+  font-family: var(--font-display-family);
   font-size: var(--text-sm); /* 13px */
   font-weight: var(--weight-semibold);
   line-height: 1.35;
@@ -820,6 +826,7 @@ textarea:disabled {
 
 /* Backward-compat alias — prefer type-heading-* above */
 .type-heading {
+  font-family: var(--font-display-family);
   font-weight: var(--weight-semibold);
   line-height: 1.2;
   letter-spacing: var(--tracking-tight);

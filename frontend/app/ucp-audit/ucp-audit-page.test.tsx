@@ -170,8 +170,15 @@ describe('UcpAuditPage', () => {
     expect(screen.getByText(/Discovery blocked - overall score capped at 30/i)).toBeInTheDocument();
     expect(screen.getByText(/Transport blocked - overall score capped at 45/i)).toBeInTheDocument();
     expect(screen.getByText('missing_schema_fields: price')).toBeInTheDocument();
-    expect(screen.getByText('1 sprint')).toBeInTheDocument();
+    expect(screen.getAllByText('1 sprint').length).toBeGreaterThan(0);
     expect(screen.getByText('SCHEMA MATRIX')).toBeInTheDocument();
+    expect(screen.getByText('DISCOVERY PROFILE')).toBeInTheDocument();
+    expect(screen.getByText('Signing keys')).toBeInTheDocument();
+    expect(screen.getByText('missing or invalid')).toBeInTheDocument();
+    expect(screen.getByText('Cache-Control')).toBeInTheDocument();
+    expect(screen.getByText('needs header')).toBeInTheDocument();
+    expect(screen.getByText('TRANSPORTS')).toBeInTheDocument();
+    expect(screen.getAllByText('profile required').length).toBeGreaterThan(0);
     expect(screen.getByText('Catalog')).toBeInTheDocument();
     expect(screen.getByText('price')).toBeInTheDocument();
     expect(screen.getByText('Add missing price.')).toBeInTheDocument();
@@ -220,16 +227,48 @@ function sampleReport() {
     dimension_scores: [
       {
         dimension_id: 'D-UCP1',
-        score: 0,
-        status: 'fail',
+        score: 80,
+        status: 'warning',
         weight: 0.2,
         findings: [
           {
-            code: 'manifest_invalid',
+            code: 'signing_keys_missing',
             dimension_id: 'D-UCP1',
-            severity: 'blocking',
-            message: 'Manifest invalid.',
+            severity: 'warning',
+            message: 'signing_keys array is missing or empty.',
             evidence: [{ errors: ['Missing required array: signing_keys'] }],
+          },
+          {
+            code: 'cache_control_missing',
+            dimension_id: 'D-UCP1',
+            severity: 'warning',
+            message: 'UCP discovery profile response lacks required cache headers.',
+            evidence: [
+              {
+                errors: ['Missing Cache-Control header (spec requires public, max-age >= 60)'],
+              },
+            ],
+          },
+        ],
+      },
+      {
+        dimension_id: 'D-UCP3',
+        score: 70,
+        status: 'warning',
+        weight: 0.15,
+        findings: [
+          {
+            code: 'transport_negotiation_incomplete',
+            dimension_id: 'D-UCP3',
+            severity: 'warning',
+            message: 'At least one reachable transport did not complete full negotiation.',
+            evidence: [
+              {
+                transport: 'mcp',
+                endpoint: 'https://example.com/ucp',
+                profile_required: true,
+              },
+            ],
           },
         ],
       },
@@ -251,11 +290,35 @@ function sampleReport() {
     ],
     findings: [
       {
-        code: 'manifest_invalid',
+        code: 'signing_keys_missing',
         dimension_id: 'D-UCP1',
-        severity: 'blocking',
-        message: 'Manifest invalid.',
+        severity: 'warning',
+        message: 'signing_keys array is missing or empty.',
         evidence: [{ errors: ['Missing required array: signing_keys'] }],
+      },
+      {
+        code: 'cache_control_missing',
+        dimension_id: 'D-UCP1',
+        severity: 'warning',
+        message: 'UCP discovery profile response lacks required cache headers.',
+        evidence: [
+          {
+            errors: ['Missing Cache-Control header (spec requires public, max-age >= 60)'],
+          },
+        ],
+      },
+      {
+        code: 'transport_negotiation_incomplete',
+        dimension_id: 'D-UCP3',
+        severity: 'warning',
+        message: 'At least one reachable transport did not complete full negotiation.',
+        evidence: [
+          {
+            transport: 'mcp',
+            endpoint: 'https://example.com/ucp',
+            profile_required: true,
+          },
+        ],
       },
       {
         code: 'catalog_contract_missing',
@@ -272,7 +335,14 @@ function sampleReport() {
       d_ucp3_gate_applied: true,
       d_ucp3_gate_max_score: 45,
       ucp_contract: {
-        manifest: { valid: false },
+        manifest: {
+          found: true,
+          valid: true,
+          target_version: '2026-04-08',
+          selected_version: '2026-04-08',
+          version_source: 'current',
+          final_url: 'https://example.com/.well-known/ucp',
+        },
         services: ['dev.ucp.shopping'],
         capabilities: ['dev.ucp.shopping.catalog.search'],
         transports: [
@@ -280,10 +350,11 @@ function sampleReport() {
             service: 'dev.ucp.shopping',
             transport: 'mcp',
             endpoint: 'https://example.com/ucp',
-            reachable: false,
+            reachable: true,
             negotiated: false,
+            profile_required: true,
             status_code: 404,
-            error: 'tools/list failed',
+            error: 'profile required',
           },
         ],
         schemas: [

@@ -184,7 +184,6 @@ def top_taxonomy_candidates(
         "brand",
         "materials",
         "material",
-        "description",
         "tags",
         "product_attributes",
         "specifications",
@@ -332,14 +331,32 @@ def phrase_path_category_match(
         return None
     if phrase_tokens <= DATA_ENRICHMENT_TAXONOMY_CONTEXT_ONLY_TOKENS:
         return None
-    accessory_terms = normalized_token_set(DATA_ENRICHMENT_TAXONOMY_ACCESSORY_PATH_TERMS)
-    if phrase_tokens & accessory_terms:
-        return None
     matches = [
         item
         for item in taxonomy_index.path_phrase_lookup.get(phrase, ())
         if not taxonomy_candidate_conflicts(source_tokens, item.get("category_path"))
     ]
+    if not matches:
+        leaf_tokens_by_path = {
+            str(item.get("category_path") or ""): set(
+                tokenize_text(item.get("leaf") or clean_text(item.get("category_path")).split(">")[-1])
+            )
+            for item in taxonomy_index.categories
+        }
+        matches = [
+            item
+            for item in taxonomy_index.categories
+            if phrase_tokens <= normalized_token_set(
+                string_iterable(item.get("path_match_tokens"))
+            )
+            and bool(phrase_tokens & leaf_tokens_by_path[str(item.get("category_path") or "")])
+            and not taxonomy_candidate_conflicts(source_tokens, item.get("category_path"))
+        ]
+    non_accessory_matches = [
+        item for item in matches if not taxonomy_accessory_path(clean_text(item.get("category_path")).casefold())
+    ]
+    if non_accessory_matches:
+        matches = non_accessory_matches
     if not matches:
         return None
     matches.sort(

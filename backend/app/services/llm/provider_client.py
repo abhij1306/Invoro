@@ -177,9 +177,9 @@ async def call_provider_with_retry(
         category = classify_error(result)
         await record_failure(normalized_provider, category)
         if category in {
-            LLMErrorCategory.RATE_LIMITED,
             LLMErrorCategory.AUTH_FAILURE,
             LLMErrorCategory.CLIENT_ERROR,
+            LLMErrorCategory.RATE_LIMITED,
         }:
             return result, input_tokens, output_tokens
         last_error = result

@@ -67,11 +67,32 @@ const FINDING_COPY: Record<
     impact: 'critical',
   },
   manifest_invalid: {
-    description: 'The UCP discovery profile exists but the shopping service contract is invalid.',
-    fix: 'Declare dev.ucp.shopping and a valid UCP profile shape.',
+    description: 'The UCP discovery profile has structural errors.',
+    fix: 'Fix missing UCP objects, version fields, or malformed service declarations.',
     effort: '2 hours',
     action: 'Fix discovery profile',
     impact: 'critical',
+  },
+  manifest_redirected: {
+    description: 'The UCP profile did not resolve at the canonical well-known path.',
+    fix: 'Serve /.well-known/ucp directly without redirect hops.',
+    effort: '1 hour',
+    action: 'Remove discovery redirect',
+    impact: 'medium',
+  },
+  signing_keys_missing: {
+    description: 'The UCP profile is missing usable top-level signing keys.',
+    fix: "Add a top-level signing_keys array with at least one public JWK using use='sig'.",
+    effort: '2-4 hours',
+    action: 'Add signing keys',
+    impact: 'medium',
+  },
+  cache_control_missing: {
+    description: 'The discovery profile response is missing required cache headers.',
+    fix: 'Serve Cache-Control: public, max-age=300 or another public max-age of at least 60 seconds.',
+    effort: '1 hour',
+    action: 'Add cache headers',
+    impact: 'medium',
   },
   service_missing: {
     description: 'Required UCP shopping service is not declared.',
@@ -80,6 +101,13 @@ const FINDING_COPY: Record<
     action: 'Declare shopping service',
     impact: 'critical',
   },
+  service_invalid: {
+    description: 'One or more UCP service entries are malformed.',
+    fix: 'Add required service version, transport, endpoint, schema, and spec fields.',
+    effort: '2 hours',
+    action: 'Fix service entries',
+    impact: 'high',
+  },
   capability_missing: {
     description: 'Required UCP shopping capabilities are missing.',
     fix: 'Declare catalog, cart, checkout, order, fulfillment, and discount capabilities.',
@@ -87,11 +115,32 @@ const FINDING_COPY: Record<
     action: 'Declare missing capabilities',
     impact: 'high',
   },
+  capability_invalid: {
+    description: 'One or more UCP capability entries are malformed.',
+    fix: 'Add required capability version, schema, and spec fields.',
+    effort: '2 hours',
+    action: 'Fix capability entries',
+    impact: 'high',
+  },
+  capability_version_mismatch: {
+    description: 'Capability versions do not match the shopping service version.',
+    fix: 'Align capability versions with dev.ucp.shopping so capability intersection succeeds.',
+    effort: '2 hours',
+    action: 'Align capability versions',
+    impact: 'medium',
+  },
   transport_missing: {
     description: 'No REST, MCP, or embedded UCP transport was declared.',
     fix: 'Expose at least one supported UCP transport endpoint or embedded contract.',
     effort: '1 sprint',
     action: 'Expose transport',
+    impact: 'critical',
+  },
+  transport_unreachable: {
+    description: 'No declared UCP transport is reachable.',
+    fix: 'Make at least one REST, MCP, A2A, or embedded transport reachable from the public web.',
+    effort: '1 sprint',
+    action: 'Fix transport reachability',
     impact: 'critical',
   },
   transport_negotiation_incomplete: {
@@ -113,6 +162,13 @@ const FINDING_COPY: Record<
     fix: 'Make declared schema URLs public and JSON-readable.',
     effort: '2 hours',
     action: 'Fix schema URLs',
+    impact: 'high',
+  },
+  schema_field_missing: {
+    description: 'Declared schemas are missing required UCP payload fields.',
+    fix: 'Add the missing fields to the relevant JSON Schema or OpenAPI component.',
+    effort: '1 sprint',
+    action: 'Add schema fields',
     impact: 'high',
   },
   catalog_contract_missing: {
@@ -174,6 +230,7 @@ type UcpContract = {
   manifest?: {
     found?: boolean;
     valid?: boolean;
+    errors?: string[];
     supported_versions?: string[];
     target_version?: string;
     selected_version?: string;
@@ -442,6 +499,8 @@ export function UcpContractPanel({ report }: Readonly<{ report: UcpAuditReport |
 
       {report ? (
         <div className="grid gap-5 p-4">
+          <ManifestSummary contract={contract} findings={report.findings} />
+          <TransportSummary transports={contract.transports ?? []} />
           <div>
             <h3 className="type-label-mono text-muted mb-2">SCHEMA MATRIX</h3>
             <div className="overflow-x-auto">
@@ -679,6 +738,156 @@ const SCHEMA_GROUP_LABELS: Record<string, string> = {
   order_policy: 'Order',
 };
 
+function ManifestSummary({
+  contract,
+  findings,
+}: Readonly<{ contract: UcpContract; findings: Array<Record<string, unknown>> }>) {
+  const manifest = contract.manifest;
+  if (!manifest) return null;
+  const signingKeyFindings = findingsForCodes(findings, ['signing_keys_missing']);
+  const cacheFindings = findingsForCodes(findings, ['cache_control_missing']);
+  const structuralFindings = findingsForCodes(findings, ['manifest_invalid']);
+  const redirectFindings = findingsForCodes(findings, ['manifest_redirected']);
+
+  return (
+    <div>
+      <h3 className="type-label-mono text-muted mb-2">DISCOVERY PROFILE</h3>
+      <div className="grid gap-3 lg:grid-cols-2">
+        <ManifestFact
+          label="Profile"
+          value={manifest.found === false ? 'not found' : manifest.valid ? 'valid' : 'invalid'}
+          tone={manifest.found === false || manifest.valid === false ? 'danger' : 'success'}
+          detail={manifest.final_url}
+        />
+        <ManifestFact
+          label="Version"
+          value={manifest.selected_version || manifest.target_version || '-'}
+          tone={manifest.selected_version ? 'success' : 'neutral'}
+          detail={manifest.version_source ? `source: ${manifest.version_source}` : undefined}
+        />
+        <ManifestFact
+          label="Signing keys"
+          value={signingKeyFindings.length ? 'missing or invalid' : 'ok'}
+          tone={signingKeyFindings.length ? 'warning' : 'success'}
+        />
+        <ManifestFact
+          label="Cache-Control"
+          value={cacheFindings.length ? 'needs header' : 'ok'}
+          tone={cacheFindings.length ? 'warning' : 'success'}
+        />
+      </div>
+      <EvidenceChips
+        evidence={[
+          ...structuralFindings.flatMap((finding) => finding.evidence),
+          ...signingKeyFindings.flatMap((finding) => finding.evidence),
+          ...cacheFindings.flatMap((finding) => finding.evidence),
+          ...redirectFindings.flatMap((finding) => finding.evidence),
+        ]}
+      />
+    </div>
+  );
+}
+
+function ManifestFact({
+  label,
+  value,
+  tone,
+  detail,
+}: Readonly<{ label: string; value: string; tone: string; detail?: string }>) {
+  return (
+    <div className="border-border/60 bg-background/25 rounded border p-3">
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <span className="type-caption-mono text-muted">{label}</span>
+        <Badge tone={badgeTone(tone)}>{value}</Badge>
+      </div>
+      {detail ? <div className="type-caption-mono text-muted truncate">{detail}</div> : null}
+    </div>
+  );
+}
+
+function TransportSummary({ transports }: Readonly<{ transports: ContractTransport[] }>) {
+  if (!transports.length) {
+    return (
+      <div>
+        <h3 className="type-label-mono text-muted mb-2">TRANSPORTS</h3>
+        <DataRegionEmpty
+          title="No declared transports"
+          description="The manifest did not expose REST, MCP, A2A, or embedded transports."
+        />
+      </div>
+    );
+  }
+  return (
+    <div>
+      <h3 className="type-label-mono text-muted mb-2">TRANSPORTS</h3>
+      <div className="overflow-x-auto">
+        <Table className="min-w-[820px]">
+          <TableHeader>
+            <TableRow>
+              <TableHead>Transport</TableHead>
+              <TableHead>Negotiation</TableHead>
+              <TableHead>Endpoint</TableHead>
+              <TableHead>Details</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {transports.map((transport, index) => (
+              <TableRow key={`${transport.transport ?? 'transport'}-${index}`}>
+                <TableCell className="align-top">
+                  <div className="type-caption-mono text-foreground">
+                    {(transport.transport ?? 'unknown').toUpperCase()}
+                  </div>
+                  {transport.service ? (
+                    <div className="type-caption text-muted mt-1">{transport.service}</div>
+                  ) : null}
+                </TableCell>
+                <TableCell className="align-top">
+                  <Badge
+                    tone={
+                      transport.negotiated
+                        ? 'success'
+                        : transport.reachable || transport.profile_required
+                          ? 'warning'
+                          : 'danger'
+                    }
+                  >
+                    {transport.negotiated
+                      ? 'negotiated'
+                      : transport.profile_required
+                        ? 'profile required'
+                        : transport.reachable
+                          ? 'reachable'
+                          : 'unreachable'}
+                  </Badge>
+                  {transport.status_code ? (
+                    <div className="type-caption-mono text-muted mt-1">
+                      HTTP {transport.status_code}
+                    </div>
+                  ) : null}
+                </TableCell>
+                <TableCell className="max-w-[300px] align-top">
+                  <div className="type-caption-mono text-foreground truncate">
+                    {transport.endpoint || '-'}
+                  </div>
+                </TableCell>
+                <TableCell className="type-caption max-w-[320px] align-top">
+                  {transport.error ? (
+                    <span className="text-danger">{transport.error}</span>
+                  ) : transport.tool_names?.length ? (
+                    <span className="text-muted">Tools: {transport.tool_names.join(', ')}</span>
+                  ) : (
+                    <span className="text-muted">-</span>
+                  )}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  );
+}
+
 function SchemaCoverageCell({
   schema,
 }: Readonly<{ schema: NonNullable<UcpContract['schemas']>[number] }>) {
@@ -801,6 +1010,17 @@ function evidenceToLines(evidence: Array<Record<string, unknown>> = []) {
     .slice(0, 12);
 }
 
+function findingsForCodes(findings: Array<Record<string, unknown>>, codes: string[]) {
+  return findings
+    .filter((finding) => codes.includes(String(finding.code ?? '')))
+    .map((finding) => ({
+      ...finding,
+      evidence: Array.isArray(finding.evidence)
+        ? (finding.evidence as Array<Record<string, unknown>>)
+        : [],
+    }));
+}
+
 function formatEvidenceValue(value: unknown) {
   if (value == null || value === '') return '-';
   return String(value);
@@ -908,8 +1128,8 @@ function ScoreRing({
       <div className="absolute text-center select-none">
         <div
           className={cn(
-            'text-foreground font-mono leading-none font-semibold tabular-nums',
-            compact ? 'text-sm' : 'text-2xl',
+            'text-foreground tabular-nums',
+            compact ? 'type-display-sm' : 'type-display',
           )}
         >
           {score}

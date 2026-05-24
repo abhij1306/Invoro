@@ -11,6 +11,7 @@ from app.services.llm.config_service import load_prompt_file
 from app.models.llm import LLMCostLog
 from app.services.llm import runtime as llm_runtime
 from app.services.llm import prompt_rendering as llm_prompt_rendering
+from app.services.llm import provider_client
 from app.services.llm.provider_client import estimate_cost_usd
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -28,6 +29,47 @@ def test_estimate_cost_usd_uses_configured_groq_rates() -> None:
     assert estimate_cost_usd("groq", MODEL_GROQ, 1000, 1000) == Decimal("0.0014")
     assert estimate_cost_usd("groq", MODEL_GROQ, 0, 0) == Decimal("0.0000")
     assert estimate_cost_usd("groq", MODEL_GROQ, None, None) == Decimal("0.0000")
+
+
+@pytest.mark.asyncio
+async def test_provider_retry_fails_fast_on_rate_limit(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls = 0
+
+    async def fake_call_provider(**_kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return "Error: HTTP 429: rate limited", 0, 0
+        return '{"ok": true}', 1, 1
+
+    async def fake_circuit_open(_provider: str) -> bool:
+        return False
+
+    async def fake_record_failure(_provider, _category):
+        return None
+
+    async def fake_record_success(_provider):
+        return None
+
+    monkeypatch.setattr(provider_client, "call_provider", fake_call_provider)
+    monkeypatch.setattr(provider_client, "circuit_is_open", fake_circuit_open)
+    monkeypatch.setattr(provider_client, "record_failure", fake_record_failure)
+    monkeypatch.setattr(provider_client, "record_success", fake_record_success)
+
+    result, input_tokens, output_tokens = await provider_client.call_provider_with_retry(
+        provider="groq",
+        model=MODEL_GROQ,
+        api_key="key",
+        system_prompt="system",
+        user_prompt="user",
+        max_retries=1,
+        base_delay_s=0,
+    )
+
+    assert calls == 1
+    assert result == "Error: HTTP 429: rate limited"
+    assert input_tokens == 0
+    assert output_tokens == 0
 
 
 @pytest.mark.asyncio

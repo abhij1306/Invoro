@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -17,7 +16,9 @@ from app.services.config.ucp_audit import (
     D_UCP6_ID,
     UCP_AUDIT_JOB_STATUS_COMPLETE,
     UCP_AUDIT_JOB_STATUS_QUEUED,
+    UCP_AUDIT_PROMPT_REGISTRY,
     UCP_MANIFEST_MODE,
+    UCP_SCHEMA_ANALYSIS_LLM_TASK,
 )
 from app.services.ucp_audit.service import (
     build_ucp_audit_job_payload,
@@ -34,9 +35,6 @@ from app.services.ucp_audit.types import (
     UCPSchemaProbe,
     UCPTransportProbe,
 )
-
-BACKEND_ROOT = Path(__file__).resolve().parents[3]
-
 
 def _sample_report(audit_id: str = "audit-1") -> UCPComplianceReport:
     return UCPComplianceReport(
@@ -59,18 +57,12 @@ def _sample_report(audit_id: str = "audit-1") -> UCPComplianceReport:
     )
 
 
-def test_ucp_schema_analysis_system_prompt_anchors_response_shape() -> None:
-    prompt = (
-        BACKEND_ROOT
-        / "app"
-        / "data"
-        / "prompts"
-        / "ucp_schema_analysis.system.txt"
-    ).read_text(encoding="utf-8")
+def test_ucp_schema_analysis_prompt_registry_uses_structured_payload() -> None:
+    task = UCP_AUDIT_PROMPT_REGISTRY[UCP_SCHEMA_ANALYSIS_LLM_TASK]
 
-    assert '"summary"' in prompt
-    assert '"recommended_changes"' in prompt
-    assert '"risk_notes"' in prompt
+    assert task["response_type"] == "object"
+    assert task["system_file"] == "ucp_schema_analysis.system.txt"
+    assert task["user_file"] == "ucp_schema_analysis.user.txt"
 
 
 @pytest.mark.asyncio
@@ -215,6 +207,7 @@ async def test_ucp_report_scores_protocol_contract_not_json_ld(
         ],
         payment_handlers=["com.google.pay"],
         raw_manifest={"ucp": {"supported_versions": {"2026-04-08": "https://example.com"}}},
+        response_headers={"cache-control": "public, max-age=300"},
     )
 
     async def fake_discover(domain: str) -> UCPManifestResult:

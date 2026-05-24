@@ -51,22 +51,25 @@ async def resolve_category_urls_from_sitemap(
         ]
         if not child_urls:
             raise ValueError(f"No child sitemaps found in {root_url}.")
-        urls = await _resolve_child_sitemap_urls(child_urls, limit if not keyword else None)
-        filtered = _filter_urls(urls, keyword)
+        filtered = await _resolve_child_sitemap_urls(child_urls, keyword, limit)
         if not filtered:
             raise ValueError(f"No URLs matched filter '{keyword}' in {root_url}.")
-        return filtered[:limit]
+        return filtered
 
     if root_tag == "urlset":
         urls = _filter_urls(await _safe_locs(root_xml), keyword)
         if not urls:
-            raise ValueError(f"No URLs matched filter '{keyword}' in {root_url}.")
+            if keyword:
+                raise ValueError(f"No URLs matched filter '{keyword}' in {root_url}.")
+            raise ValueError(f"No URLs found in sitemap {root_url}.")
         return urls[:limit]
 
     raise ValueError(f"Unrecognised sitemap root tag: {root_tag}")
 
 
-async def _resolve_child_sitemap_urls(child_urls: list[str], max_urls: int | None) -> list[str]:
+async def _resolve_child_sitemap_urls(
+    child_urls: list[str], keyword: str, max_urls: int
+) -> list[str]:
     all_urls: list[str] = []
     async with httpx.AsyncClient(
         follow_redirects=True,
@@ -74,10 +77,10 @@ async def _resolve_child_sitemap_urls(child_urls: list[str], max_urls: int | Non
     ) as client:
         for child_url in child_urls:
             child_xml = await _fetch_xml(client, child_url)
-            all_urls.extend(await _safe_locs(child_xml))
-            if max_urls is not None and len(all_urls) >= max_urls:
+            all_urls.extend(_filter_urls(await _safe_locs(child_xml), keyword))
+            if len(all_urls) >= max_urls:
                 break
-    return all_urls[:max_urls] if max_urls is not None else all_urls
+    return all_urls[:max_urls]
 
 
 def _filter_urls(urls: list[str], keyword: str) -> list[str]:

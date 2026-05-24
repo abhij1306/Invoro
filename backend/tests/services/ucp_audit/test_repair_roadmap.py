@@ -46,3 +46,35 @@ def test_shopify_advisory_is_conditional() -> None:
     assert no_findings == []
     assert shopify[-1].sub_skill == "shop-skill advisory"
     assert cart_gap[-1].sub_skill == "shop-skill advisory"
+
+
+def test_repair_roadmap_action_surfaces_specific_errors() -> None:
+    roadmap = build_repair_roadmap(
+        [
+            UCPFinding(
+                code=config.FINDING_MANIFEST_INVALID,
+                dimension_id=config.D_UCP1_ID,
+                severity=config.UCP_FINDING_BLOCKING,
+                evidence=[{"errors": ["Missing ucp.version"]}],
+            )
+        ],
+        domain="example.com",
+    )
+
+    assert "Missing ucp.version" in roadmap[0].action
+
+
+def test_repair_roadmap_ignores_non_mapping_evidence_for_action_details() -> None:
+    roadmap = build_repair_roadmap(
+        [
+            UCPFinding(
+                code=config.FINDING_MANIFEST_INVALID,
+                dimension_id=config.D_UCP1_ID,
+                severity=config.UCP_FINDING_BLOCKING,
+                evidence=["invalid json"],
+            )
+        ],
+        domain="example.com",
+    )
+
+    assert roadmap[0].sub_skill == "discovery"

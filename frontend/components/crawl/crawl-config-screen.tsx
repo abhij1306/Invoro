@@ -684,7 +684,7 @@ export function CrawlConfigScreen({
       ? sitemapDomain.trim().length > 0
       : singleUrlMode
         ? targetUrl.trim().length > 0
-      : bulkUrls.trim().length > 0 || csvFile !== null;
+        : bulkUrls.trim().length > 0 || csvFile !== null;
   const canSubmit =
     hasTarget && canPreview(config, fieldRows, { runProfile, studioMode }) && !isSubmitting;
 

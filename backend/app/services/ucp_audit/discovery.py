@@ -26,9 +26,8 @@ async def discover_ucp_manifest(domain: str) -> UCPManifestResult:
     result = await _fetch_manifest_page(target_url)
     discovery_source = "well-known"
     if _should_try_link_fallback(result):
-        fallback_url = await _discover_link_manifest_url(
-            str(getattr(result, "final_url", "") or domain)
-        )
+        fallback_origin = str(getattr(result, "final_url", "") or domain)
+        fallback_url = await _discover_link_manifest_url(fallback_origin)
         if fallback_url:
             fallback_result = await _fetch_manifest_page(fallback_url)
             if fallback_result is not None and not _page_error(fallback_result):
@@ -160,9 +159,10 @@ async def _selected_manifest_payload(result: object) -> tuple[object, dict | Non
         _set_result_attr(result, "version_source", "current")
         return result, payload, []
     supported = root.get("supported_versions") if isinstance(root, dict) else None
-    version_url = ""
-    if isinstance(supported, dict):
-        version_url = str(supported.get(config.UCP_TARGET_VERSION) or "").strip()
+    version_url = _supported_version_url(
+        supported,
+        str(getattr(result, "final_url", "") or getattr(result, "url", "") or ""),
+    )
     target_declared = _supported_versions_declares_target(supported)
     if version_url:
         fetched = await _fetch_manifest_page(version_url)
@@ -193,8 +193,28 @@ def _supported_versions_declares_target(value: object) -> bool:
     if isinstance(value, dict):
         return target in value
     if isinstance(value, list):
-        return any(str(item).strip() == target for item in value)
+        return any(
+            item == target
+            if isinstance(item, str)
+            else isinstance(item, dict) and str(item.get("version") or "") == target
+            for item in value
+        )
     return False
+
+
+def _supported_version_url(value: object, base_url: str) -> str:
+    raw: object = None
+    if isinstance(value, dict):
+        raw = value.get(config.UCP_TARGET_VERSION)
+    elif isinstance(value, list):
+        for item in value:
+            if isinstance(item, dict) and str(item.get("version") or "") == config.UCP_TARGET_VERSION:
+                raw = item.get("url") or item.get("href") or item.get("profile")
+                break
+    if isinstance(raw, dict):
+        raw = raw.get("url") or raw.get("href") or raw.get("profile")
+    candidate = str(raw or "").strip()
+    return urljoin(base_url, candidate) if candidate else ""
 
 
 async def _fetch_manifest_page(url: str):
@@ -231,13 +251,14 @@ async def _fetch_manifest_page(url: str):
 
 
 async def _discover_link_manifest_url(domain: str) -> str:
+    root_url = _root_url(domain)
     try:
         async with build_async_http_client(
             follow_redirects=True,
             timeout=config.UCP_DISCOVERY_TIMEOUT_SECONDS,
         ) as client:
             response = await client.get(
-                _root_url(domain),
+                root_url,
                 headers={"Accept": config.UCP_ACCEPT_HEADER},
             )
     except (httpx.HTTPError, OSError, TimeoutError, asyncio.TimeoutError):

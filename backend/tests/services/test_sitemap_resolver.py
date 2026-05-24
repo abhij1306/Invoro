@@ -80,6 +80,7 @@ async def test_resolve_sitemap_index_filters_final_urls_not_child_sitemaps(
                 f"""<sitemapindex xmlns="{SITEMAP_NS}">
                   <sitemap><loc>https://example.com/sitemap_products_1.xml</loc></sitemap>
                   <sitemap><loc>{child_url}</loc></sitemap>
+                  <sitemap><loc>https://example.com/sitemap_pages_2.xml</loc></sitemap>
                 </sitemapindex>""",
             ),
             "https://example.com/sitemap_products_1.xml": _xml_response(
@@ -95,6 +96,12 @@ async def test_resolve_sitemap_index_filters_final_urls_not_child_sitemaps(
                   <url><loc>https://example.com/collections/b</loc></url>
                 </urlset>""",
             ),
+            "https://example.com/sitemap_pages_2.xml": _xml_response(
+                "https://example.com/sitemap_pages_2.xml",
+                f"""<urlset xmlns="{SITEMAP_NS}">
+                  <url><loc>https://example.com/collections/c</loc></url>
+                </urlset>""",
+            ),
         }
     )
     monkeypatch.setattr(
@@ -106,7 +113,7 @@ async def test_resolve_sitemap_index_filters_final_urls_not_child_sitemaps(
         _valid_target,
     )
 
-    urls = await resolve_category_urls_from_sitemap("example.com", "collections", 500)
+    urls = await resolve_category_urls_from_sitemap("example.com", "collections", 2)
 
     assert urls == [
         "https://example.com/collections/a",
@@ -216,6 +223,32 @@ async def test_resolver_default_does_not_filter_urls(
         "https://example.com/pages/a",
         "https://example.com/products/p",
     ]
+
+
+@pytest.mark.asyncio
+async def test_resolver_empty_urlset_without_filter_reports_no_urls(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root_url = "https://example.com/sitemap.xml"
+    fake_client = _FakeClient(
+        {
+            root_url: _xml_response(
+                root_url,
+                f"""<urlset xmlns="{SITEMAP_NS}"></urlset>""",
+            ),
+        }
+    )
+    monkeypatch.setattr(
+        "app.services.crawl.sitemap_resolver.httpx.AsyncClient",
+        lambda **kwargs: fake_client,
+    )
+    monkeypatch.setattr(
+        "app.services.crawl.sitemap_resolver.validate_public_target",
+        _valid_target,
+    )
+
+    with pytest.raises(ValueError, match="No URLs found in sitemap"):
+        await resolve_category_urls_from_sitemap("example.com", "", 500)
 
 
 @pytest.mark.asyncio

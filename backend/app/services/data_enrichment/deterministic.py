@@ -453,19 +453,11 @@ def match_category_path(data: dict[str, object]) -> dict[str, object] | None:
 
 def category_match_values(data: dict[str, object]) -> list[object]:
     values: list[object] = []
-    for key in (
-        "category",
-        "product_type",
-        "title",
-        "url_category_context",
-    ):
+    for key in ("category", "product_type", "title", "url_category_context"):
         value = first_present(data, key)
         if value in (None, "", [], {}):
             continue
         values.append(value)
-    description = clean_text(first_present(data, "description"))
-    if description and len(description) <= data_enrichment_settings.taxonomy_phrase_source_max_chars:
-        values.append(description)
     return values
 
 
@@ -509,7 +501,7 @@ def build_seo_keywords(
     )
     for token in [
         *unigram_tokens,
-        *semantic_bigrams(title_tokens, set(unigram_tokens)),
+        *title_bigrams(title_tokens, set(unigram_tokens)),
     ]:
         cleaned = clean_text(token).casefold()
         stemmed = keyword_stem_key(cleaned)
@@ -570,7 +562,7 @@ def keyword_stem_key(value: str) -> str:
     return value
 
 
-def semantic_bigrams(tokens: list[str], unigrams: set[str]) -> list[str]:
+def title_bigrams(tokens: list[str], unigrams: set[str]) -> list[str]:
     phrases: list[str] = []
     seen: set[str] = set()
     for index in range(len(tokens) - 1):

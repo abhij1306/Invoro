@@ -62,7 +62,8 @@ def _require_url_processing_result(url_result: object) -> URLProcessingResult:
 
 def _safe_sitemap_max_urls(value: object) -> int:
     try:
-        return int(value or SITEMAP_DEFAULT_MAX_URLS)
+        candidate = value if value not in (None, "") else SITEMAP_DEFAULT_MAX_URLS
+        return int(str(candidate))
     except (TypeError, ValueError):
         return SITEMAP_DEFAULT_MAX_URLS
 

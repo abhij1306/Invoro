@@ -98,7 +98,7 @@ export default function UcpAuditPage() {
               value={controller.domain}
               onChange={(event) => controller.setDomain(event.target.value)}
               placeholder="example-domain.com"
-              className="border-border focus:border-accent h-[var(--control-height)] font-mono text-sm"
+              className="border-border focus:border-accent type-control h-[var(--control-height)]"
               aria-label="Domain"
             />
           </label>
@@ -116,7 +116,7 @@ export default function UcpAuditPage() {
                   sample_size: Number(event.target.value || 1),
                 }))
               }
-              className="h-[var(--control-height)] font-mono text-sm"
+              className="type-control h-[var(--control-height)]"
             />
           </label>
         </div>

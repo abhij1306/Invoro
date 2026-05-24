@@ -12,6 +12,10 @@ from jsonschema.validators import validator_for
 
 from app.services.config import ucp_audit as config
 from app.services.network_resolution import build_async_http_client
+from app.services.ucp_audit.discovery import (
+    check_manifest_cache_headers,
+    check_version_alignment,
+)
 from app.services.ucp_audit.types import (
     UCPDimensionScore,
     UCPFinding,
@@ -35,6 +39,9 @@ async def probe_transports(manifest: UCPManifestResult) -> list[UCPTransportProb
             continue
         if transport == "rest" and endpoint:
             probes.append(await _probe_rest(service=service, endpoint=endpoint))
+            continue
+        if transport == "a2a" and endpoint:
+            probes.append(await _probe_a2a(service=service, endpoint=endpoint))
             continue
         probes.append(
             UCPTransportProbe(
@@ -150,7 +157,10 @@ async def _probe_mcp(*, service: str, endpoint: str) -> UCPTransportProbe:
             response = await client.post(
                 endpoint,
                 json=body,
-                headers={"Accept": config.UCP_ACCEPT_HEADER},
+                headers={
+                    "Accept": config.UCP_ACCEPT_HEADER,
+                    "UCP-Agent": f'profile="{config.UCP_AUDIT_PLATFORM_PROFILE_URL}"',
+                },
             )
         payload = _safe_json(response)
         errors = _mcp_conformance_errors(payload, expected_id=str(body["id"]))
@@ -188,27 +198,77 @@ async def _probe_rest(*, service: str, endpoint: str) -> UCPTransportProbe:
             follow_redirects=True,
             timeout=config.UCP_TRANSPORT_TIMEOUT_SECONDS,
         ) as client:
-            response = await client.options(
+            options_resp = await client.options(
                 endpoint,
                 headers={"Accept": config.UCP_ACCEPT_HEADER},
             )
-        allow = response.headers.get("allow", "")
-        negotiated = response.status_code < 400 and bool(allow or response.headers)
+            get_resp = await client.get(
+                endpoint,
+                headers={"Accept": config.UCP_ACCEPT_HEADER},
+            )
+        allow = options_resp.headers.get("allow", "")
+        reachable = options_resp.status_code < 500
+        get_payload = _safe_json(get_resp)
+        ucp_shaped = (
+            _non_empty_collection(get_payload.get("capabilities"))
+            or _non_empty_collection(get_payload.get("services"))
+            or bool(get_resp.headers.get("UCP-Version"))
+            or "ucp" in str(get_payload.get("$schema") or "").lower()
+        )
+        negotiated = reachable and get_resp.status_code < 400 and ucp_shaped
         return UCPTransportProbe(
             service=service,
             transport="rest",
             endpoint=endpoint,
-            reachable=response.status_code < 500,
+            reachable=reachable,
             negotiated=negotiated,
-            status_code=response.status_code,
-            error="" if response.status_code < 400 else response.text[:240],
-            response_preview={"allow": allow} if allow else {},
+            status_code=options_resp.status_code,
+            error="" if reachable else options_resp.text[:240],
+            response_preview={"allow": allow, "get_keys": sorted(get_payload.keys())}
+            if allow
+            else {},
         )
     except (httpx.HTTPError, OSError, TimeoutError, asyncio.TimeoutError) as exc:
         logger.debug("UCP REST probe failed for %s: %s", endpoint, exc, exc_info=True)
         return UCPTransportProbe(
             service=service,
             transport="rest",
+            endpoint=endpoint,
+            error=str(exc),
+        )
+
+
+async def _probe_a2a(*, service: str, endpoint: str) -> UCPTransportProbe:
+    try:
+        async with build_async_http_client(
+            follow_redirects=True,
+            timeout=config.UCP_TRANSPORT_TIMEOUT_SECONDS,
+        ) as client:
+            response = await client.get(
+                endpoint,
+                headers={"Accept": config.UCP_ACCEPT_HEADER},
+            )
+        payload = _safe_json(response)
+        a2a_shaped = (
+            isinstance(payload.get("capabilities"), (list, dict))
+            or "agent" in payload
+            or bool(response.headers.get("A2A-Version"))
+        )
+        return UCPTransportProbe(
+            service=service,
+            transport="a2a",
+            endpoint=endpoint,
+            reachable=response.status_code < 500,
+            negotiated=response.status_code < 400 and a2a_shaped,
+            status_code=response.status_code,
+            error="" if response.status_code < 400 else response.text[:240],
+            response_preview=_preview(payload),
+        )
+    except (httpx.HTTPError, OSError, TimeoutError, asyncio.TimeoutError) as exc:
+        logger.debug("UCP A2A probe failed for %s: %s", endpoint, exc, exc_info=True)
+        return UCPTransportProbe(
+            service=service,
+            transport="a2a",
             endpoint=endpoint,
             error=str(exc),
         )
@@ -232,8 +292,32 @@ def _discovery_dimension(manifest: UCPManifestResult) -> UCPDimensionScore:
                 code=config.FINDING_MANIFEST_INVALID,
                 dimension_id=config.D_UCP1_ID,
                 severity=config.UCP_FINDING_BLOCKING,
-                message="UCP discovery profile exists but does not declare a valid shopping service.",
-                evidence=[{"errors": manifest.errors}],
+                message="UCP discovery profile has structural errors.",
+                evidence=[{"errors": [e for e in manifest.errors if "signing_keys" not in e]}],
+            )
+        )
+    if manifest.signing_keys_errors:
+        findings.append(
+            UCPFinding(
+                code=config.FINDING_SIGNING_KEYS_MISSING,
+                dimension_id=config.D_UCP1_ID,
+                severity=config.UCP_FINDING_WARNING,
+                message=(
+                    "signing_keys array is missing or empty. "
+                    "Webhook signatures cannot be verified per RFC 7797."
+                ),
+                evidence=[{"errors": list(manifest.signing_keys_errors)}],
+            )
+        )
+    cache_errors = check_manifest_cache_headers(manifest.response_headers)
+    if cache_errors:
+        findings.append(
+            UCPFinding(
+                code=config.FINDING_CACHE_CONTROL_MISSING,
+                dimension_id=config.D_UCP1_ID,
+                severity=config.UCP_FINDING_WARNING,
+                message="UCP discovery profile response lacks required cache headers.",
+                evidence=[{"errors": cache_errors}],
             )
         )
     if not manifest.final_url.endswith(config.UCP_MANIFEST_PATH) and manifest.final_url:
@@ -251,7 +335,13 @@ def _discovery_dimension(manifest: UCPManifestResult) -> UCPDimensionScore:
                 ],
             )
         )
-    return _dimension(config.D_UCP1_ID, 60 if findings else 100, findings)
+    if any(finding.code == config.FINDING_MANIFEST_INVALID for finding in findings):
+        score = 40
+    elif findings:
+        score = 80
+    else:
+        score = 100
+    return _dimension(config.D_UCP1_ID, score, findings)
 
 
 def _services_dimension(manifest: UCPManifestResult) -> UCPDimensionScore:
@@ -264,6 +354,11 @@ def _services_dimension(manifest: UCPManifestResult) -> UCPDimensionScore:
     findings: list[UCPFinding] = []
     service_errors = _entry_validation_errors(manifest.service_entries)
     capability_errors = _entry_validation_errors(manifest.capability_entries)
+    version_mismatches = check_version_alignment(
+        manifest.service_entries,
+        manifest.capability_entries,
+        config.UCP_SHOPPING_SERVICE,
+    )
     if manifest.missing_required_services:
         findings.append(
             _missing_finding(
@@ -306,6 +401,16 @@ def _services_dimension(manifest: UCPManifestResult) -> UCPDimensionScore:
                 evidence=capability_errors,
             )
         )
+    if version_mismatches:
+        findings.append(
+            UCPFinding(
+                code=config.FINDING_CAPABILITY_VERSION_MISMATCH,
+                dimension_id=config.D_UCP2_ID,
+                severity=config.UCP_FINDING_WARNING,
+                message="Capability versions do not align with the shopping service version.",
+                evidence=[{"errors": version_mismatches}],
+            )
+        )
     return _dimension(config.D_UCP2_ID, service_score + capability_score, findings)
 
 
@@ -339,17 +444,25 @@ def _transport_dimension(
                 evidence=[asdict(item) for item in transport_probes],
             )
         )
-    if any(not item.negotiated for item in transport_probes):
+    reachable_incomplete = [
+        item
+        for item in transport_probes
+        if _transport_reachable(item, schema_probes) and not item.negotiated
+    ]
+    if reachable_incomplete:
         findings.append(
-        UCPFinding(
-            code=config.FINDING_TRANSPORT_NEGOTIATION_INCOMPLETE,
-            dimension_id=config.D_UCP3_ID,
-            severity=config.UCP_FINDING_WARNING,
-            message="At least one transport is reachable but did not complete full negotiation.",
-            evidence=[asdict(item) for item in transport_probes if not item.negotiated],
+            UCPFinding(
+                code=config.FINDING_TRANSPORT_NEGOTIATION_INCOMPLETE,
+                dimension_id=config.D_UCP3_ID,
+                severity=config.UCP_FINDING_WARNING,
+                message="At least one reachable transport did not complete full negotiation.",
+                evidence=[asdict(item) for item in reachable_incomplete],
+            )
         )
-    )
-    return _dimension(config.D_UCP3_ID, _average(scores), findings)
+    best = max(scores, default=0)
+    bonus = min(10, 5 * max(0, len([s for s in scores if s >= 70]) - 1))
+    final_score = min(100, best + bonus)
+    return _dimension(config.D_UCP3_ID, final_score, findings)
 
 
 def _catalog_dimension(
@@ -586,7 +699,8 @@ def _dimension(
 def _status(score: int, findings: list[UCPFinding]) -> str:
     if any(item.severity == config.UCP_FINDING_BLOCKING for item in findings):
         return config.UCP_STATUS_FAIL
-    if score >= 80 and not findings:
+    has_warnings = any(item.severity == config.UCP_FINDING_WARNING for item in findings)
+    if score >= 80 and not has_warnings:
         return config.UCP_STATUS_PASS
     if score >= 50:
         return config.UCP_STATUS_WARNING
@@ -643,9 +757,17 @@ def _profile_required(payload: dict) -> bool:
         code = int(raw_code)
     except (TypeError, ValueError):
         return False
-    message = str(error.get("message") or "").lower()
-    return -32099 <= code <= -32000 and "profile" in message and (
-        "missing" in message or "invalid" in message or "required" in message
+    raw_data = error.get("data")
+    data: dict = raw_data if isinstance(raw_data, dict) else {}
+    text = " ".join(
+        [
+            str(error.get("message") or "").lower(),
+            str(data.get("code") or "").lower(),
+            str(data.get("content") or "").lower(),
+        ]
+    )
+    return -32099 <= code <= -32000 and "profile" in text and any(
+        kw in text for kw in ("missing", "invalid", "required", "uri", "url")
     )
 
 
@@ -661,15 +783,34 @@ def _schema_error(payload: dict) -> str:
 def _schema_field_results(payload: dict) -> dict[str, dict[str, bool]]:
     return {
         group: {
-            field: _schema_contains_field(payload, field)
+            field: _schema_contains_field(payload, field, root=payload)
             for field in required_fields
         }
         for group, required_fields in config.UCP_REQUIRED_SCHEMA_FIELDS.items()
     }
 
 
-def _schema_contains_field(value: object, field: str) -> bool:
+def _resolve_refs(node: object, root: dict) -> object:
+    if not isinstance(node, dict):
+        return node
+    ref = node.get("$ref")
+    if not ref or not isinstance(ref, str) or not ref.startswith("#/"):
+        return node
+    cursor: object = root
+    for part in ref.lstrip("#/").split("/"):
+        if not isinstance(cursor, dict):
+            return node
+        cursor = cursor.get(part, {})
+    return cursor if cursor != {} else node
+
+
+def _schema_contains_field(value: object, field: str, root: dict | None = None) -> bool:
+    if root is None:
+        root = value if isinstance(value, dict) else {}
     if isinstance(value, dict):
+        value = _resolve_refs(value, root)
+        if not isinstance(value, dict):
+            return False
         for key, child in value.items():
             if str(key).lower() == field:
                 return True
@@ -679,10 +820,10 @@ def _schema_contains_field(value: object, field: str) -> bool:
             if key == "properties" and isinstance(child, dict):
                 if any(str(item).lower() == field for item in child):
                     return True
-            if _schema_contains_field(child, field):
+            if _schema_contains_field(child, field, root):
                 return True
     if isinstance(value, list):
-        return any(_schema_contains_field(item, field) for item in value)
+        return any(_schema_contains_field(item, field, root) for item in value)
     return False
 
 
@@ -716,9 +857,19 @@ def _preview(payload: dict) -> dict:
     return {"keys": sorted(payload.keys())}
 
 
+def _non_empty_collection(value: object) -> bool:
+    return isinstance(value, (list, dict)) and bool(value)
+
+
 def _supported_versions(payload: dict) -> list[str]:
     root = payload.get("ucp") if isinstance(payload.get("ucp"), dict) else payload
     versions = root.get("supported_versions") if isinstance(root, dict) else None
     if isinstance(versions, dict):
         return sorted(str(item) for item in versions.keys())
+    if isinstance(versions, list):
+        return sorted(
+            str(item.get("version") if isinstance(item, dict) else item)
+            for item in versions
+            if str(item.get("version") if isinstance(item, dict) else item).strip()
+        )
     return []

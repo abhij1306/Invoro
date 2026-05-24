@@ -85,9 +85,7 @@ def get_prompt_task(task_type: str) -> dict | None:
             normalized,
             [name for name, _task in matches],
         )
-    task = matches[0][1] if len(matches) == 1 else None
-    if len(matches) > 1:
-        task = matches[0][1]
+    task = matches[0][1] if matches else None
     return dict(task) if isinstance(task, dict) else None
 
 

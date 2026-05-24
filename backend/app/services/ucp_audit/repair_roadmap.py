@@ -17,10 +17,22 @@ _ACTION_BY_CODE = {
     config.FINDING_MANIFEST_INVALID: "Fix the UCP profile shape and declare dev.ucp.shopping.",
     config.FINDING_MANIFEST_CONTENT_TYPE_INVALID: "Serve the UCP profile with a JSON content type.",
     config.FINDING_MANIFEST_REDIRECTED: "Serve the canonical well-known UCP path without redirects.",
+    config.FINDING_SIGNING_KEYS_MISSING: (
+        "Add a signing_keys array at the top level of /.well-known/ucp with at least one "
+        "EC or RSA JWK public key. Required fields per JWK spec: kty, kid, alg, use='sig'. "
+        "Used for webhook signature verification per RFC 7797."
+    ),
+    config.FINDING_CACHE_CONTROL_MISSING: (
+        "Add 'Cache-Control: public, max-age=300' (or higher) to the /.well-known/ucp "
+        "response. The UCP spec requires at least 60 seconds to allow platforms to cache the profile."
+    ),
     config.FINDING_SERVICE_MISSING: "Declare dev.ucp.shopping in the UCP services map.",
     config.FINDING_SERVICE_INVALID: "Fix malformed UCP service entries and declare valid versions.",
     config.FINDING_CAPABILITY_MISSING: "Declare all required shopping capabilities.",
     config.FINDING_CAPABILITY_INVALID: "Fix malformed UCP capability entries and declare valid versions.",
+    config.FINDING_CAPABILITY_VERSION_MISMATCH: (
+        "Align capability versions with the declared dev.ucp.shopping service version."
+    ),
     config.FINDING_TRANSPORT_MISSING: "Expose a REST, MCP, or embedded UCP transport.",
     config.FINDING_TRANSPORT_UNREACHABLE: "Make at least one declared UCP transport reachable.",
     config.FINDING_TRANSPORT_NEGOTIATION_INCOMPLETE: (
@@ -46,10 +58,13 @@ _EFFORT_BY_CODE = {
     config.FINDING_MANIFEST_INVALID: "2 hours",
     config.FINDING_MANIFEST_CONTENT_TYPE_INVALID: "1 hour",
     config.FINDING_MANIFEST_REDIRECTED: "1 hour",
+    config.FINDING_SIGNING_KEYS_MISSING: "2-4 hours",
+    config.FINDING_CACHE_CONTROL_MISSING: "1 hour",
     config.FINDING_SERVICE_MISSING: "1 hour",
     config.FINDING_SERVICE_INVALID: "2 hours",
     config.FINDING_CAPABILITY_MISSING: "2-4 hours",
     config.FINDING_CAPABILITY_INVALID: "2 hours",
+    config.FINDING_CAPABILITY_VERSION_MISMATCH: "2 hours",
     config.FINDING_TRANSPORT_MISSING: "1 sprint",
     config.FINDING_TRANSPORT_UNREACHABLE: "1 sprint",
     config.FINDING_TRANSPORT_NEGOTIATION_INCOMPLETE: "1 sprint",
@@ -97,7 +112,7 @@ def build_repair_roadmap(
             sub_skill=_SUB_SKILL_BY_DIMENSION.get(finding.dimension_id, "ucp"),
             priority=_priority(finding),
             finding_codes=[finding.code],
-            action=_ACTION_BY_CODE.get(finding.code, finding.message or finding.code),
+            action=_action_for(finding),
             source="UCP Overview and UCP Schema Reference",
             evidence=finding.evidence,
             effort=_EFFORT_BY_CODE.get(finding.code, "review"),
@@ -121,6 +136,22 @@ def build_repair_roadmap(
             )
         )
     return items
+
+
+def _action_for(finding: UCPFinding) -> str:
+    base = _ACTION_BY_CODE.get(finding.code, finding.message or finding.code)
+    if finding.evidence:
+        first = finding.evidence[0]
+        errors = first.get("errors") if isinstance(first, dict) else []
+        if errors and finding.code in {
+            config.FINDING_MANIFEST_INVALID,
+            config.FINDING_SIGNING_KEYS_MISSING,
+            config.FINDING_SERVICE_INVALID,
+            config.FINDING_CAPABILITY_INVALID,
+        }:
+            detail = "; ".join(str(error) for error in errors[:3])
+            return f"{base} Errors: {detail}"
+    return base
 
 
 def _priority(finding: UCPFinding) -> str:

@@ -80,7 +80,7 @@ def test_serialize_config_snapshot_keeps_encrypted_key() -> None:
     }
 
 
-def test_get_prompt_task_prefers_specific_registry_on_duplicate(
+def test_get_prompt_task_uses_registry_priority_for_duplicate_entries(
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
@@ -100,9 +100,33 @@ def test_get_prompt_task_prefers_specific_registry_on_duplicate(
 
 
 @pytest.mark.asyncio
-async def test_resolve_run_config_accepts_snapshot_without_stored_key(
+async def test_resolve_run_config_accepts_complete_snapshot(
     db_session,
 ) -> None:
+    resolved = await resolve_run_config(
+        db_session,
+        run_id=None,
+        task_type="data_enrichment_semantic",
+        config_snapshot={
+            "data_enrichment_semantic": {
+                "provider": "groq",
+                "model": "llama-3.3-70b-versatile",
+                "api_key_encrypted": "",
+                "task_type": "data_enrichment_semantic",
+            }
+        },
+    )
+
+    assert resolved == {
+        "provider": "groq",
+        "model": "llama-3.3-70b-versatile",
+        "api_key_encrypted": "",
+        "task_type": "data_enrichment_semantic",
+    }
+
+
+@pytest.mark.asyncio
+async def test_resolve_run_config_accepts_legacy_snapshot(db_session) -> None:
     resolved = await resolve_run_config(
         db_session,
         run_id=None,

@@ -184,6 +184,7 @@ async def _run_job(session: AsyncSession, job: DataEnrichmentJob) -> None:
     job_id = int(job.id)
     job.status = DATA_ENRICHMENT_STATUS_RUNNING
     job.summary = {**dict(job.summary or {}), "started_at": now.isoformat()}
+    await session.commit()
     product_refs = [
         (int(product_id), int(source_record_id))
         for product_id, source_record_id in (
@@ -195,7 +196,6 @@ async def _run_job(session: AsyncSession, job: DataEnrichmentJob) -> None:
         ).all()
         if product_id is not None and source_record_id is not None
     ]
-    await session.commit()
 
     enriched_count = 0
     failed_count = 0
@@ -215,7 +215,6 @@ async def _run_job(session: AsyncSession, job: DataEnrichmentJob) -> None:
         try:
             product.status = DATA_ENRICHMENT_STATUS_RUNNING
             record.enrichment_status = DATA_ENRICHMENT_STATUS_RUNNING
-            await session.commit()
             await _enrich_product(
                 session,
                 job=job,
