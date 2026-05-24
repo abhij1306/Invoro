@@ -150,6 +150,7 @@ Flow:
 | `acquisition/cookie_store.py` | Temp storage state plus domain cookie memory helpers |
 | `fetch/fetch_context.py` | `fetch_page()` owner: HTTP/browser decision, escalation, block detection |
 | `fetch/browser_policy.py` | Proxy shaping, browser escalation policy, engine attempt selection, and diagnostics merge helpers |
+| `fetch/types.py` | Typed fetch request and runtime context containers |
 | `robots_policy.py` | robots.txt policy |
 | `url_safety.py` | SSRF and public-target validation |
 

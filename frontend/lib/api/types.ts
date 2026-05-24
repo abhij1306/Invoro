@@ -403,7 +403,6 @@ export type DataEnrichmentJobDetail = {
 
 export type UcpAuditOptions = {
   sample_size?: number;
-  include_agent_delta?: boolean;
   llm_enabled?: boolean;
   report_formats?: string[];
   jobsPollInterval?: number | false;

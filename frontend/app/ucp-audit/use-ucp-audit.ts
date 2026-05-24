@@ -8,7 +8,6 @@ import type { UcpAuditJob, UcpAuditOptions } from '../../lib/api/types';
 
 const defaultOptions: UcpAuditOptions = {
   sample_size: 5,
-  include_agent_delta: false,
   llm_enabled: false,
   report_formats: ['json', 'markdown'],
   jobsPollInterval: 5000,

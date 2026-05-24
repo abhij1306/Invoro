@@ -14,7 +14,6 @@ class UCPAuditOptions(BaseModel):
         ge=1,
         le=config.UCP_AUDIT_MAX_SAMPLE_SIZE,
     )
-    include_agent_delta: bool = config.UCP_AUDIT_DEFAULT_INCLUDE_AGENT_DELTA
     llm_enabled: bool = False
     report_formats: list[str] = Field(
         default_factory=lambda: list(config.UCP_AUDIT_DEFAULT_REPORT_FORMATS)

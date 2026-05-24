@@ -12,26 +12,24 @@ from app.services.config.ucp_audit import (
     D_UCP4_ID,
     D_UCP5_ID,
     D_UCP6_ID,
-    D_UCP7_ID,
-    FINDING_DIMENSION_NOT_EVALUATED,
     UCP_AUDIT_JOB_STATUS_COMPLETE,
     UCP_AUDIT_JOB_STATUS_QUEUED,
+    UCP_MANIFEST_MODE,
 )
 from app.services.ucp_audit.service import (
-    best_agent_delta_url,
-    build_ucp_report_for_domain,
     build_ucp_audit_job_payload,
+    build_ucp_report_for_domain,
     create_ucp_audit_job,
     get_ucp_audit_job,
     list_ucp_audit_jobs,
     run_job,
 )
 from app.services.ucp_audit.types import (
-    AgentViewDelta,
     UCPComplianceReport,
     UCPDimensionScore,
     UCPManifestResult,
-    UCPSchemaScore,
+    UCPSchemaProbe,
+    UCPTransportProbe,
 )
 
 
@@ -51,7 +49,8 @@ def _sample_report(audit_id: str = "audit-1") -> UCPComplianceReport:
         ],
         all_findings=[],
         d_ucp1_gate_applied=False,
-        agent_view_samples=[],
+        ucp_contract={"services": ["dev.ucp.shopping"]},
+        repair_roadmap=[],
     )
 
 
@@ -65,7 +64,7 @@ async def test_ucp_audit_job_creates_queued_row(
         user=test_user,
         payload={
             "domain": "https://example.com",
-            "options": {"sample_size": 3, "include_agent_delta": False},
+            "options": {"sample_size": 3},
         },
     )
 
@@ -76,7 +75,7 @@ async def test_ucp_audit_job_creates_queued_row(
 
 
 @pytest.mark.asyncio
-async def test_ucp_audit_run_job_persists_report_and_page_result(
+async def test_ucp_audit_run_job_persists_report_and_endpoint_result(
     db_session: AsyncSession,
     test_user,
     monkeypatch: pytest.MonkeyPatch,
@@ -113,7 +112,9 @@ async def test_ucp_audit_run_job_persists_report_and_page_result(
     assert job.summary["overall_score"] == 82
     assert report.overall_score == 82
     assert report.report_json["domain"] == "example.com"
-    assert page_result.url == "https://example.com"
+    assert report.report_json["ucp_contract"]["services"] == ["dev.ucp.shopping"]
+    assert page_result.url == "https://example.com/.well-known/ucp"
+    assert page_result.acquisition_mode == UCP_MANIFEST_MODE
 
 
 @pytest.mark.asyncio
@@ -148,120 +149,76 @@ async def test_ucp_audit_job_payload_serializes(
 
 
 @pytest.mark.asyncio
-async def test_ucp_report_evaluates_sampled_product_dimensions(
+async def test_ucp_report_scores_protocol_contract_not_json_ld(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    product_url = "https://example.com/products/widget"
-    product_html = """
-    <script type="application/ld+json">
-    {
-      "@type": "Product",
-      "name": "Widget",
-      "sku": "W-1",
-      "brand": "Example",
-      "description": "Strong widget",
-      "image": "https://example.com/widget.jpg",
-      "category": "Beauty > Nails > Press Ons",
-      "additionalProperty": [
-        {"name": "color", "value": "Red"},
-        {"name": "size", "value": "M"},
-        {"name": "material", "value": "Gel"},
-        {"name": "brand", "value": "Example"},
-        {"name": "gtin", "value": "123"}
-      ],
-      "offers": {
-        "price": "10.00",
-        "availability": "https://schema.org/InStock",
-        "priceCurrency": "USD",
-        "shippingDetails": {"shippingRate": "0"}
-      }
-    }
-    </script>
-    """
+    manifest = UCPManifestResult(
+        manifest_found=True,
+        manifest_valid=True,
+        services_declared=["dev.ucp.shopping"],
+        capabilities_declared=[
+            "dev.ucp.shopping.catalog.search",
+            "dev.ucp.shopping.catalog.lookup",
+            "dev.ucp.shopping.cart",
+            "dev.ucp.shopping.checkout",
+            "dev.ucp.shopping.order",
+            "dev.ucp.shopping.fulfillment",
+            "dev.ucp.shopping.discount",
+        ],
+        service_entries=[],
+        capability_entries=[],
+        transport_entries=[
+            {
+                "service": "dev.ucp.shopping",
+                "transport": "mcp",
+                "endpoint": "https://example.com/api/ucp/mcp",
+                "schema": "https://ucp.dev/shopping/mcp.openrpc.json",
+            }
+        ],
+        schema_urls=[
+            "https://ucp.dev/catalog_search.json",
+            "https://ucp.dev/catalog_lookup.json",
+            "https://ucp.dev/cart.json",
+            "https://ucp.dev/checkout.json",
+            "https://ucp.dev/order.json",
+            "https://ucp.dev/fulfillment.json",
+            "https://ucp.dev/discount.json",
+        ],
+        payment_handlers=["com.google.pay"],
+        raw_manifest={"ucp": {"supported_versions": {"2026-04-08": "https://example.com"}}},
+    )
 
     async def fake_discover(domain: str) -> UCPManifestResult:
         del domain
-        return UCPManifestResult(
-            manifest_found=True,
-            capabilities_declared=["dev.ucp.shopping"],
-            missing_required_capabilities=[],
-            manifest_valid=True,
-            raw_manifest={},
-        )
+        return manifest
 
-    async def fake_fetch_page(url: str, **kwargs):
-        del kwargs
-
-        class DummyPage:
-            status_code = 200
-            final_url = url
-            content_type = "text/html"
-            html = product_html
-
-        if str(url).endswith("/sitemap.xml"):
-            DummyPage.content_type = "application/xml"
-            DummyPage.html = (
-                "<?xml version='1.0'?><urlset>"
-                f"<url><loc>{product_url}</loc></url>"
-                "</urlset>"
-            )
-        return DummyPage()
-
-    def fake_extract_records(*args, **kwargs):
-        del args, kwargs
+    async def fake_transport_probe(result: UCPManifestResult) -> list[UCPTransportProbe]:
+        assert result is manifest
         return [
-            {
-                "variants": [
-                    {
-                        "price": "10.00",
-                        "currency": "USD",
-                        "sku": "W-RED",
-                        "availability": "in_stock",
-                    },
-                    {
-                        "price": "11.00",
-                        "currency": "USD",
-                        "sku": "W-BLUE",
-                        "availability": "in_stock",
-                    },
-                ]
-            }
+            UCPTransportProbe(
+                service="dev.ucp.shopping",
+                transport="mcp",
+                endpoint="https://example.com/api/ucp/mcp",
+                reachable=True,
+                negotiated=False,
+                profile_required=True,
+                status_code=422,
+            )
         ]
 
-    async def fake_agent_delta(url: str) -> AgentViewDelta:
-        return AgentViewDelta(
-            url=url,
-            agent_extracted={"name": "Widget", "price": "10.00"},
-            human_visible={"name": "Widget", "price": "10.00"},
-            fidelity_score=1.0,
-        )
+    async def fake_schema_probe(urls: list[str]) -> list[UCPSchemaProbe]:
+        return [
+            UCPSchemaProbe(url=url, reachable=True, valid_json=True, title=url)
+            for url in urls
+        ]
 
-    monkeypatch.setattr(
-        "app.services.ucp_audit.service.discover_ucp_manifest",
-        fake_discover,
-    )
-    monkeypatch.setattr(
-        "app.services.ucp_audit.service._fetch_audit_page",
-        fake_fetch_page,
-    )
-    monkeypatch.setattr(
-        "app.services.ucp_audit.service.extract_records",
-        fake_extract_records,
-        raising=False,
-    )
-    monkeypatch.setattr(
-        "app.services.ucp_audit.service.build_agent_view_delta",
-        fake_agent_delta,
-        raising=False,
-    )
+    monkeypatch.setattr("app.services.ucp_audit.service.discover_ucp_manifest", fake_discover)
+    monkeypatch.setattr("app.services.ucp_audit.service.probe_transports", fake_transport_probe)
+    monkeypatch.setattr("app.services.ucp_audit.service.probe_schemas", fake_schema_probe)
 
-    report = await build_ucp_report_for_domain(
-        "example.com",
-        "audit-1",
-        {"sample_size": 1, "include_agent_delta": True},
-    )
-
+    report = await build_ucp_report_for_domain("example.com", "audit-1", {"sample_size": 1})
     by_dimension = {item.dimension_id: item for item in report.dimension_scores}
+    finding_codes = {finding.code for finding in report.all_findings}
 
     assert set(by_dimension) == {
         D_UCP1_ID,
@@ -270,36 +227,13 @@ async def test_ucp_report_evaluates_sampled_product_dimensions(
         D_UCP4_ID,
         D_UCP5_ID,
         D_UCP6_ID,
-        D_UCP7_ID,
     }
-    assert all(
-        finding.code != FINDING_DIMENSION_NOT_EVALUATED
-        for finding in report.all_findings
-    )
-    assert by_dimension[D_UCP2_ID].score > 0
-    assert by_dimension[D_UCP3_ID].score > 0
-    assert by_dimension[D_UCP4_ID].score > 0
-    assert by_dimension[D_UCP5_ID].score > 0
-    assert by_dimension[D_UCP6_ID].score > 0
-    assert by_dimension[D_UCP7_ID].score == 100
-    assert report.agent_view_samples[0].missing_in_agent_view == []
-
-
-def test_agent_delta_uses_richest_discounted_sample() -> None:
-    sampled_pages = [
-        ("https://example.com/products/plain", "<html><h1>Plain</h1></html>"),
-        (
-            "https://example.com/products/variant",
-            "<html><h1>Variant</h1><p>25% OFF IN CART</p></html>",
-        ),
-    ]
-    schema_scores = [
-        UCPSchemaScore(url=sampled_pages[0][0], product_jsonld_found=True, raw_offers=[{}]),
-        UCPSchemaScore(
-            url=sampled_pages[1][0],
-            product_jsonld_found=True,
-            raw_offers=[{}, {}, {}],
-        ),
-    ]
-
-    assert best_agent_delta_url(sampled_pages, schema_scores) == sampled_pages[1][0]
+    assert by_dimension[D_UCP1_ID].score == 100
+    assert by_dimension[D_UCP2_ID].score == 100
+    assert by_dimension[D_UCP3_ID].score == 70
+    assert by_dimension[D_UCP4_ID].score == 100
+    assert by_dimension[D_UCP5_ID].score == 100
+    assert by_dimension[D_UCP6_ID].score == 100
+    assert "schema_missing" not in finding_codes
+    assert report.ucp_contract["payment_handlers"] == ["com.google.pay"]
+    assert report.repair_roadmap[-1].sub_skill == "shop-skill advisory"

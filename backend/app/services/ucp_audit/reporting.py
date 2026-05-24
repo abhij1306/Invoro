@@ -35,7 +35,8 @@ def build_report_payload(report: UCPComplianceReport) -> dict[str, Any]:
         "d_ucp1_gate_applied": report.d_ucp1_gate_applied,
         "dimension_scores": [asdict(item) for item in report.dimension_scores],
         "findings": [asdict(item) for item in report.all_findings],
-        "agent_view_samples": [asdict(item) for item in report.agent_view_samples],
+        "ucp_contract": report.ucp_contract,
+        "repair_roadmap": [asdict(item) for item in report.repair_roadmap],
     }
 
 

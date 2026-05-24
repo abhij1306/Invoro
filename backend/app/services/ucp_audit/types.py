@@ -7,42 +7,51 @@ from typing import Any
 @dataclass(slots=True)
 class UCPManifestResult:
     manifest_found: bool = False
+    manifest_valid: bool = False
     capabilities_declared: list[str] = field(default_factory=list)
     missing_required_capabilities: list[str] = field(default_factory=list)
-    manifest_valid: bool = False
-    raw_manifest: dict | None = None
+    services_declared: list[str] = field(default_factory=list)
+    missing_required_services: list[str] = field(default_factory=list)
+    service_entries: list[dict[str, Any]] = field(default_factory=list)
+    capability_entries: list[dict[str, Any]] = field(default_factory=list)
+    transport_entries: list[dict[str, Any]] = field(default_factory=list)
+    schema_urls: list[str] = field(default_factory=list)
+    payment_handlers: list[str] = field(default_factory=list)
+    raw_manifest: dict[str, Any] | None = None
     errors: list[str] = field(default_factory=list)
 
 
 @dataclass(slots=True)
-class UCPSchemaScore:
-    url: str = ""
-    product_jsonld_found: bool = False
-    required_fields_present: list[str] = field(default_factory=list)
-    recommended_fields_present: list[str] = field(default_factory=list)
-    ucp_fields_present: list[str] = field(default_factory=list)
-    completeness_score: int = 0
-    missing_required: list[str] = field(default_factory=list)
-    missing_recommended: list[str] = field(default_factory=list)
-    raw_additional_properties: list[dict] = field(default_factory=list)
-    raw_product_type: str | None = None
-    raw_offers: list[dict] = field(default_factory=list)
+class UCPTransportProbe:
+    service: str
+    transport: str
+    endpoint: str = ""
+    reachable: bool = False
+    negotiated: bool = False
+    profile_required: bool = False
+    status_code: int = 0
+    error: str = ""
+    tool_names: list[str] = field(default_factory=list)
+    tool_schemas: list[dict[str, Any]] = field(default_factory=list)
+    response_preview: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(slots=True)
-class MetafieldCoverageReport:
-    total_sampled: int = 0
-    coverage_by_attribute: dict[str, float] = field(default_factory=dict)
-    critical_gaps: list[str] = field(default_factory=list)
-    worst_product_types: list[str] = field(default_factory=list)
+class UCPSchemaProbe:
+    url: str
+    reachable: bool = False
+    valid_json: bool = False
+    title: str = ""
+    error: str = ""
 
 
 @dataclass(slots=True)
-class TaxonomyConsistencyReport:
-    unique_raw_values: list[str] = field(default_factory=list)
-    duplicate_clusters: list[list[str]] = field(default_factory=list)
-    shallow_categories: list[str] = field(default_factory=list)
-    consistency_score: int = 0
+class UCPRepairRoadmapItem:
+    sub_skill: str
+    priority: str
+    finding_codes: list[str]
+    action: str
+    source: str
 
 
 @dataclass(slots=True)
@@ -55,36 +64,6 @@ class UCPFinding:
     count_kind: str = "items"
     affected_urls: list[str] = field(default_factory=list)
     evidence: list[dict[str, Any]] = field(default_factory=list)
-
-
-@dataclass(slots=True)
-class VariantFidelityReport:
-    products_with_variants_sampled: int = 0
-    collapsed_offers_count: int = 0
-    missing_sku_count: int = 0
-    missing_availability_count: int = 0
-    fidelity_score: int = 0
-    findings: list[UCPFinding] = field(default_factory=list)
-
-
-@dataclass(slots=True)
-class PolicyReadabilityReport:
-    structured_shipping_found: bool = False
-    return_period_machine_readable: bool = False
-    currency_is_iso4217: bool = False
-    policy_page_http_accessible: bool = False
-    readability_score: int = 0
-    findings: list[UCPFinding] = field(default_factory=list)
-
-
-@dataclass(slots=True)
-class AgentViewDelta:
-    url: str
-    agent_extracted: dict[str, Any] = field(default_factory=dict)
-    human_visible: dict[str, Any] = field(default_factory=dict)
-    missing_in_agent_view: list[str] = field(default_factory=list)
-    agent_only_signals: list[str] = field(default_factory=list)
-    fidelity_score: float = 0.0
 
 
 @dataclass(slots=True)
@@ -104,4 +83,5 @@ class UCPComplianceReport:
     dimension_scores: list[UCPDimensionScore]
     all_findings: list[UCPFinding]
     d_ucp1_gate_applied: bool
-    agent_view_samples: list[AgentViewDelta] = field(default_factory=list)
+    ucp_contract: dict[str, Any] = field(default_factory=dict)
+    repair_roadmap: list[UCPRepairRoadmapItem] = field(default_factory=list)

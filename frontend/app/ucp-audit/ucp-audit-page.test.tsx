@@ -128,7 +128,6 @@ describe('UcpAuditPage', () => {
         domain: 'https://dashingdiva.com',
         options: {
           sample_size: 5,
-          include_agent_delta: false,
           llm_enabled: false,
           report_formats: ['json', 'markdown'],
         },

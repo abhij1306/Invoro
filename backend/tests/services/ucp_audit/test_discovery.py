@@ -39,10 +39,32 @@ async def test_valid_manifest_parses_capabilities(monkeypatch: pytest.MonkeyPatc
             status_code=200,
             html=json.dumps(
                 {
-                    "capabilities": {
-                        "product_discovery": {},
-                        "checkout": {},
-                        "orders": {},
+                    "ucp": {
+                        "services": {
+                            "dev.ucp.shopping": [
+                                {
+                                    "version": "2026-04-08",
+                                    "transport": "mcp",
+                                    "endpoint": "https://example.com/api/ucp/mcp",
+                                    "schema": "https://ucp.dev/shopping/mcp.openrpc.json",
+                                }
+                            ]
+                        },
+                        "capabilities": {
+                            "dev.ucp.shopping.catalog.search": {
+                                "schema": "https://ucp.dev/catalog_search.json"
+                            },
+                            "dev.ucp.shopping.catalog.lookup": {
+                                "schema": "https://ucp.dev/catalog_lookup.json"
+                            },
+                            "dev.ucp.shopping.cart": {"schema": "https://ucp.dev/cart.json"},
+                            "dev.ucp.shopping.checkout": {"schema": "https://ucp.dev/checkout.json"},
+                            "dev.ucp.shopping.order": {"schema": "https://ucp.dev/order.json"},
+                            "dev.ucp.shopping.fulfillment": {
+                                "schema": "https://ucp.dev/fulfillment.json"
+                            },
+                            "dev.ucp.shopping.discount": {"schema": "https://ucp.dev/discount.json"},
+                        },
                     }
                 }
             ),
@@ -57,7 +79,9 @@ async def test_valid_manifest_parses_capabilities(monkeypatch: pytest.MonkeyPatc
 
     assert result.manifest_found is True
     assert result.manifest_valid is True
-    assert result.capabilities_declared == ["checkout", "orders", "product_discovery"]
+    assert "dev.ucp.shopping.catalog.search" in result.capabilities_declared
+    assert result.services_declared == ["dev.ucp.shopping"]
+    assert result.transport_entries[0]["transport"] == "mcp"
     assert result.missing_required_capabilities == []
 
 
@@ -91,8 +115,9 @@ async def test_valid_manifest_accepts_ucp_services(monkeypatch: pytest.MonkeyPat
 
     assert result.manifest_found is True
     assert result.manifest_valid is True
-    assert result.capabilities_declared == ["dev.ucp.shopping"]
-    assert result.missing_required_capabilities == []
+    assert result.capabilities_declared == []
+    assert result.services_declared == ["dev.ucp.shopping"]
+    assert result.missing_required_capabilities
 
 
 @pytest.mark.asyncio

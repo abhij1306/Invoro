@@ -5,8 +5,6 @@ from functools import partial
 from inspect import signature
 import logging
 import time
-from dataclasses import dataclass, field
-from urllib.parse import urlparse
 from typing import Any
 import httpx
 
@@ -80,8 +78,13 @@ from app.services.fetch.browser_policy import (
     resolve_proxy_attempts as _resolve_proxy_attempts,
     vendor_confirmed_block as _vendor_confirmed_block,
 )
+from app.services.fetch.types import FetchPageCall, FetchRuntimeContext
+from app.services.shared.url_utils import ensure_scheme
 
 logger = logging.getLogger(__name__)
+
+_FetchRuntimeContext = FetchRuntimeContext
+_FetchPageCall = FetchPageCall
 
 
 async def _load_host_protection_policy_compat(
@@ -105,76 +108,6 @@ async def _emit_fetch_event(on_event: Any | None, level: str, message: str) -> N
         await on_event(level, message)
     except Exception:
         logger.debug("Fetch event callback failed", exc_info=True)
-
-
-@dataclass(slots=True)
-class _FetchRuntimeContext:
-    url: str
-    resolved_timeout: float
-    deadline_monotonic: float
-    run_id: int | None
-    surface: str | None
-    traversal_mode: str | None
-    max_pages: int
-    max_scrolls: int
-    max_records: int | None
-    on_event: object | None
-    browser_reason: str | None
-    requested_fields: list[str]
-    listing_recovery_mode: str | None
-    proxies: list[str | None]
-    proxy_profile: dict[str, object]
-    traversal_required: bool
-    fetch_mode: str
-    runtime_policy: dict[str, object]
-    capture_screenshot: bool = False
-    forced_browser_engine: str | None = None
-    host_memory_ttl_seconds: int = 0
-    prefer_curl_handoff: bool = False
-    handoff_cookie_engine: str | None = None
-    locality_profile: dict[str, object] = field(default_factory=dict)
-    host_policy: HostProtectionPolicy | None = None
-    last_browser_attempt_diagnostics: dict[str, object] = field(default_factory=dict)
-    last_error: Exception | None = None
-
-
-@dataclass(slots=True)
-class _FetchPageCall:
-    url: str
-    run_id: int | None = None
-    timeout_seconds: float | None = None
-    proxy_list: list[str] | None = None
-    proxy_profile: dict[str, object] | None = None
-    locality_profile: dict[str, object] | None = None
-    fetch_mode: str = "auto"
-    prefer_browser: bool = False
-    browser_reason: str | None = None
-    surface: str | None = None
-    traversal_mode: str | None = None
-    requested_fields: list[str] | None = None
-    listing_recovery_mode: str | None = None
-    capture_screenshot: bool = False
-    host_memory_ttl_seconds: int | None = None
-    prefer_curl_handoff: bool = False
-    handoff_cookie_engine: str | None = None
-    forced_browser_engine: str | None = None
-    max_pages: int = 1
-    max_scrolls: int = 1
-    max_records: int | None = None
-    on_event: Any | None = None
-
-
-def _ensure_scheme(url: str) -> str:
-    stripped = str(url or "").strip()
-    if not stripped:
-        return stripped
-    parsed = urlparse(stripped)
-    if parsed.scheme:
-        return stripped
-    if stripped.startswith(("/", "#", "javascript:")):
-        return stripped
-    return f"https://{stripped}"
-
 
 def _should_retry_patchright_with_real_chrome(
     *,
@@ -350,7 +283,7 @@ async def fetch_page(
     on_event: Any | None = None,
 ) -> PageFetchResult:
     call = _FetchPageCall(
-        url=_ensure_scheme(url),
+        url=ensure_scheme(url),
         run_id=run_id,
         timeout_seconds=timeout_seconds,
         proxy_list=proxy_list,

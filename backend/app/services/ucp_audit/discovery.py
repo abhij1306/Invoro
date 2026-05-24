@@ -17,33 +17,28 @@ logger = logging.getLogger(__name__)
 
 
 async def discover_ucp_manifest(domain: str) -> UCPManifestResult:
-    target_url = _manifest_url(domain)
+    target_url = manifest_url(domain)
     result = await _fetch_manifest_page(target_url)
     if result is None:
         return UCPManifestResult(
             manifest_found=False,
-            capabilities_declared=[],
             missing_required_capabilities=list(config.UCP_REQUIRED_CAPABILITIES),
-            manifest_valid=False,
-            raw_manifest=None,
+            missing_required_services=list(config.UCP_REQUIRED_SERVICE_NAMES),
             errors=[f"{config.UCP_MANIFEST_PATH} fetch failed"],
         )
-    if getattr(result, "error", ""):
+    fetch_error = _page_error(result)
+    if fetch_error:
         return UCPManifestResult(
             manifest_found=False,
-            capabilities_declared=[],
             missing_required_capabilities=list(config.UCP_REQUIRED_CAPABILITIES),
-            manifest_valid=False,
-            raw_manifest=None,
-            errors=[str(result.error)],
+            missing_required_services=list(config.UCP_REQUIRED_SERVICE_NAMES),
+            errors=[fetch_error],
         )
     if int(getattr(result, "status_code", 0) or 0) == 404:
         return UCPManifestResult(
             manifest_found=False,
-            capabilities_declared=[],
             missing_required_capabilities=list(config.UCP_REQUIRED_CAPABILITIES),
-            manifest_valid=False,
-            raw_manifest=None,
+            missing_required_services=list(config.UCP_REQUIRED_SERVICE_NAMES),
             errors=[f"{config.UCP_MANIFEST_PATH} returned 404"],
         )
     raw_body = str(getattr(result, "html", "") or "")
@@ -52,28 +47,42 @@ async def discover_ucp_manifest(domain: str) -> UCPManifestResult:
     except json.JSONDecodeError as exc:
         return UCPManifestResult(
             manifest_found=True,
-            capabilities_declared=[],
             missing_required_capabilities=list(config.UCP_REQUIRED_CAPABILITIES),
-            manifest_valid=False,
-            raw_manifest=None,
+            missing_required_services=list(config.UCP_REQUIRED_SERVICE_NAMES),
             errors=[str(exc)],
         )
     if not isinstance(payload, dict):
         return UCPManifestResult(
             manifest_found=True,
-            capabilities_declared=[],
             missing_required_capabilities=list(config.UCP_REQUIRED_CAPABILITIES),
-            manifest_valid=False,
-            raw_manifest=None,
+            missing_required_services=list(config.UCP_REQUIRED_SERVICE_NAMES),
             errors=[type(payload).__name__],
         )
-    declared = _declared_capabilities(payload)
-    missing = _missing_required_capabilities(payload, declared)
+
+    services = _service_entries(payload)
+    capabilities = _capability_entries(payload)
+    service_names = sorted({item["name"] for item in services})
+    capability_names = sorted({item["name"] for item in capabilities})
+    missing_services = [
+        item for item in config.UCP_REQUIRED_SERVICE_NAMES if item not in service_names
+    ]
+    missing_capabilities = [
+        item for item in config.UCP_REQUIRED_CAPABILITIES if item not in capability_names
+    ]
+    profile_valid = bool(_profile_root(payload)) and not missing_services
+
     return UCPManifestResult(
         manifest_found=True,
-        capabilities_declared=declared,
-        missing_required_capabilities=missing,
-        manifest_valid=not missing,
+        manifest_valid=profile_valid,
+        capabilities_declared=capability_names,
+        missing_required_capabilities=missing_capabilities,
+        services_declared=service_names,
+        missing_required_services=missing_services,
+        service_entries=services,
+        capability_entries=capabilities,
+        transport_entries=_transport_entries(services),
+        schema_urls=_schema_urls(services, capabilities, _payment_handler_entries(payload)),
+        payment_handlers=sorted({item["name"] for item in _payment_handler_entries(payload)}),
         raw_manifest=payload,
         errors=[],
     )
@@ -105,48 +114,85 @@ async def _fetch_manifest_page(url: str):
         )
 
 
-def _manifest_url(value: str) -> str:
+def manifest_url(value: str) -> str:
     parsed = urlparse(str(value or "").strip())
     if not parsed.scheme:
         parsed = urlparse(f"{config.UCP_DEFAULT_URL_SCHEME}://{value}")
     return urlunparse(
-        (
-            parsed.scheme,
-            parsed.netloc,
-            config.UCP_MANIFEST_PATH,
-            "",
-            "",
-            "",
-        )
+        (parsed.scheme, parsed.netloc, config.UCP_MANIFEST_PATH, "", "", "")
     )
 
 
-def _declared_capabilities(payload: dict) -> list[str]:
-    raw = payload.get("capabilities")
-    if isinstance(raw, dict):
-        values: Iterable[object] = raw.keys()
-    elif isinstance(raw, list):
-        values = raw
-    else:
-        services = _service_map(payload)
-        values = services.keys() if services else []
-    return sorted({str(item).strip() for item in values if str(item).strip()})
-
-
-def _service_map(payload: dict) -> dict:
-    direct = payload.get("services")
-    if isinstance(direct, dict):
-        return direct
+def _profile_root(payload: dict) -> dict:
     nested = payload.get("ucp")
-    if isinstance(nested, dict) and isinstance(nested.get("services"), dict):
-        return nested["services"]
-    return {}
+    return nested if isinstance(nested, dict) else payload
 
 
-def _missing_required_capabilities(payload: dict, declared: list[str]) -> list[str]:
-    declared_set = set(declared)
-    if _service_map(payload):
-        return [
-            item for item in config.UCP_REQUIRED_SERVICE_NAMES if item not in declared_set
-        ]
-    return [item for item in config.UCP_REQUIRED_CAPABILITIES if item not in declared_set]
+def _page_error(result: object) -> str:
+    return str(getattr(result, "error", "") or "")
+
+
+def _service_entries(payload: dict) -> list[dict]:
+    root = _profile_root(payload)
+    services = root.get("services")
+    if not isinstance(services, dict):
+        return []
+    return _named_entries(services)
+
+
+def _capability_entries(payload: dict) -> list[dict]:
+    root = _profile_root(payload)
+    capabilities = root.get("capabilities")
+    if not isinstance(capabilities, dict):
+        return []
+    return _named_entries(capabilities)
+
+
+def _payment_handler_entries(payload: dict) -> list[dict]:
+    root = _profile_root(payload)
+    handlers = root.get("payment_handlers")
+    if not isinstance(handlers, dict):
+        return []
+    return _named_entries(handlers)
+
+
+def _named_entries(raw_map: dict) -> list[dict]:
+    entries: list[dict] = []
+    for name, raw in raw_map.items():
+        raw_entries: Iterable[object]
+        if isinstance(raw, list):
+            raw_entries = raw
+        else:
+            raw_entries = [raw]
+        for raw_entry in raw_entries:
+            entry = dict(raw_entry) if isinstance(raw_entry, dict) else {}
+            entry["name"] = str(name)
+            entries.append(entry)
+    return entries
+
+
+def _transport_entries(service_entries: list[dict]) -> list[dict]:
+    entries: list[dict] = []
+    for service in service_entries:
+        transport = str(service.get("transport") or "").strip().lower()
+        if not transport:
+            continue
+        entries.append(
+            {
+                "service": str(service.get("name") or ""),
+                "transport": transport,
+                "endpoint": str(service.get("endpoint") or ""),
+                "schema": str(service.get("schema") or ""),
+            }
+        )
+    return entries
+
+
+def _schema_urls(*entry_sets: list[dict]) -> list[str]:
+    urls: set[str] = set()
+    for entries in entry_sets:
+        for entry in entries:
+            value = str(entry.get("schema") or "").strip()
+            if value:
+                urls.add(value)
+    return sorted(urls)

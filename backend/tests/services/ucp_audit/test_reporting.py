@@ -33,7 +33,8 @@ def test_report_payload_contains_summary_scores_and_findings() -> None:
         ],
         all_findings=[finding],
         d_ucp1_gate_applied=True,
-        agent_view_samples=[],
+        ucp_contract={"services": []},
+        repair_roadmap=[],
     )
 
     payload = build_report_payload(report)
@@ -43,7 +44,8 @@ def test_report_payload_contains_summary_scores_and_findings() -> None:
     assert payload["d_ucp1_gate_applied"] is True
     assert payload["dimension_scores"][0]["dimension_id"] == D_UCP1_ID
     assert payload["findings"][0]["code"] == "manifest_missing"
-    assert payload["agent_view_samples"] == []
+    assert payload["ucp_contract"] == {"services": []}
+    assert payload["repair_roadmap"] == []
 
 
 def test_markdown_report_has_operational_sections() -> None:
@@ -62,7 +64,8 @@ def test_markdown_report_has_operational_sections() -> None:
         ],
         all_findings=[],
         d_ucp1_gate_applied=False,
-        agent_view_samples=[],
+        ucp_contract={},
+        repair_roadmap=[],
     )
 
     markdown = build_markdown_report(report)
@@ -96,7 +99,8 @@ def test_markdown_report_escapes_interpolated_values() -> None:
             )
         ],
         d_ucp1_gate_applied=False,
-        agent_view_samples=[],
+        ucp_contract={},
+        repair_roadmap=[],
     )
 
     markdown = build_markdown_report(report)

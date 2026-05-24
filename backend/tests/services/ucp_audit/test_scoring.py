@@ -7,7 +7,6 @@ from app.services.config.ucp_audit import (
     D_UCP4_ID,
     D_UCP5_ID,
     D_UCP6_ID,
-    D_UCP7_ID,
     DIMENSION_WEIGHTS,
 )
 from app.services.ucp_audit.scoring import build_compliance_report
@@ -39,8 +38,8 @@ def test_d_ucp1_zero_caps_overall_score() -> None:
             dimension(D_UCP4_ID, 90),
             dimension(D_UCP5_ID, 90),
             dimension(D_UCP6_ID, 90),
-            dimension(D_UCP7_ID, 90),
         ],
+        ucp_contract={},
     )
 
     assert report.overall_score <= 30
@@ -58,8 +57,8 @@ def test_d_ucp1_pass_uses_weighted_average() -> None:
             dimension(D_UCP4_ID, 80),
             dimension(D_UCP5_ID, 80),
             dimension(D_UCP6_ID, 80),
-            dimension(D_UCP7_ID, 80),
         ],
+        ucp_contract={},
     )
 
     expected = int(

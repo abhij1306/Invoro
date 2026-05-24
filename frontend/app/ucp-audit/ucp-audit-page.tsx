@@ -1,24 +1,14 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import {
-  Play,
-  RefreshCcw,
-  ShieldCheck,
-  Layers,
-  AlertTriangle,
-  Eye,
-  CheckSquare,
-  History,
-} from 'lucide-react';
+import { Play, RefreshCcw, Layers, CheckSquare, History, Network } from 'lucide-react';
 
 import { InlineAlert, PageHeader } from '../../components/ui/patterns';
-import { Button, Input, Toggle } from '../../components/ui/primitives';
+import { Button, Input } from '../../components/ui/primitives';
 import { HistoryDrawer, type HistoryItem } from '../../components/ui/history-drawer';
 import {
-  UcpAgentViewPanel,
+  UcpContractPanel,
   UcpDimensionTable,
-  UcpFindingsPanel,
   UcpFixSequence,
   UcpScoreSummary,
 } from './ucp-audit-components';
@@ -27,9 +17,9 @@ import { cn } from '../../lib/utils';
 
 export default function UcpAuditPage() {
   const controller = useUcpAudit();
-  const [activeTab, setActiveTab] = useState<
-    'compliance' | 'findings' | 'agent-delta' | 'fix-sequence'
-  >('compliance');
+  const [activeTab, setActiveTab] = useState<'compliance' | 'contract' | 'fix-sequence'>(
+    'compliance',
+  );
   const [historyOpen, setHistoryOpen] = useState(false);
 
   const description =
@@ -39,8 +29,7 @@ export default function UcpAuditPage() {
 
   const tabOptions = [
     { id: 'compliance', label: 'Compliance Index', icon: Layers },
-    { id: 'findings', label: 'Findings Log', icon: AlertTriangle },
-    { id: 'agent-delta', label: 'Fidelity Delta (D-UCP7)', icon: Eye },
+    { id: 'contract', label: 'Contract Checks', icon: Network },
     { id: 'fix-sequence', label: 'Repair Roadmap', icon: CheckSquare },
   ] as const;
 
@@ -102,7 +91,7 @@ export default function UcpAuditPage() {
 
       {/* Horizontal Compact Config Ribbon (Saves huge space) */}
       <section className="border-border bg-panel border-l-accent relative overflow-hidden rounded-[var(--radius-lg)] border border-l-4 p-4 shadow-sm">
-        <div className="grid gap-4 sm:grid-cols-[1fr_140px_auto] sm:items-end">
+        <div className="grid gap-4 sm:grid-cols-[1fr_140px] sm:items-end">
           <label className="grid gap-1">
             <span className="field-label">Target Domain</span>
             <Input
@@ -130,20 +119,6 @@ export default function UcpAuditPage() {
               className="h-[var(--control-height)] font-mono text-sm"
             />
           </label>
-
-          <div className="border-border bg-background/30 flex h-[var(--control-height)] min-w-[130px] items-center justify-between gap-3 rounded-[var(--radius-md)] border px-3">
-            <span className="text-secondary text-xs font-normal">Agent Delta</span>
-            <Toggle
-              checked={Boolean(controller.options.include_agent_delta)}
-              onChange={(value) =>
-                controller.setOptions((current) => ({
-                  ...current,
-                  include_agent_delta: value,
-                }))
-              }
-              ariaLabel="Toggle agent delta"
-            />
-          </div>
         </div>
       </section>
 
@@ -184,8 +159,7 @@ export default function UcpAuditPage() {
               loading={controller.detailQuery.isLoading}
             />
           )}
-          {activeTab === 'findings' && <UcpFindingsPanel report={controller.report} />}
-          {activeTab === 'agent-delta' && <UcpAgentViewPanel report={controller.report} />}
+          {activeTab === 'contract' && <UcpContractPanel report={controller.report} />}
           {activeTab === 'fix-sequence' && <UcpFixSequence report={controller.report} />}
         </div>
       </div>
