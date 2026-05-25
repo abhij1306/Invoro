@@ -1,9 +1,9 @@
 # Active Plan
 
-**Current:** UCP Audit Compliance Upgrade → `docs/plans/ucp-audit-compliance-plan.md`
+**Current:** UCP Audit Tab Design Refresh → `docs/plans/ucp-audit-design-refresh-plan.md`
 **Status:** DONE
-**Started:** 2026-05-24
-**Last slice completed:** Slice 5 - Frontend Evidence Display
+**Started:** 2026-05-25
+**Last slice completed:** None
 
 ## Queue
 1. Agentic Delta Engine (BLOCKED - full backend verify has unrelated pre-existing failures) → `docs/plans/agentic-delta-engine-plan.md`

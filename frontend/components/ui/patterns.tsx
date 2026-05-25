@@ -118,6 +118,8 @@ export function TabBar({
   compact = false,
   className,
   variant = 'pill',
+  size = 'md',
+  fullWidth = false,
 }: Readonly<{
   value: string;
   onChange: (value: string) => void;
@@ -125,14 +127,29 @@ export function TabBar({
   compact?: boolean;
   className?: string;
   variant?: 'pill' | 'underline';
+  size?: 'sm' | 'md' | 'lg';
+  fullWidth?: boolean;
 }>) {
-  const padX = compact ? 'px-2.5' : 'px-3';
+  const padX = compact
+    ? (size === 'sm' ? 'px-2' : 'px-2.5')
+    : (size === 'lg' ? 'px-4' : size === 'sm' ? 'px-2.5' : 'px-3');
+
+  const heightClass =
+    size === 'lg'
+      ? 'h-[var(--control-height-lg)]'
+      : size === 'sm'
+        ? 'h-[var(--control-height-sm)]'
+        : 'h-[var(--control-height)]';
+
+  const gapClass = size === 'lg' ? 'gap-2' : 'gap-1.5';
 
   if (variant === 'underline') {
     return (
       <div
         className={cn(
-          '-mb-px flex h-[var(--control-height)] items-stretch bg-transparent p-0',
+          '-mb-px flex items-stretch bg-transparent p-0',
+          heightClass,
+          fullWidth && 'w-full',
           className,
         )}
       >
@@ -143,7 +160,8 @@ export function TabBar({
             aria-pressed={value === option.value}
             onClick={() => onChange(option.value)}
             className={cn(
-              'type-control relative -mb-px inline-flex shrink-0 items-center justify-center whitespace-nowrap transition-all',
+              'type-control font-sans tracking-normal relative -mb-px inline-flex shrink-0 items-center justify-center whitespace-nowrap transition-all',
+              fullWidth && 'flex-1',
               padX,
               value === option.value
                 ? 'border-accent text-accent border-b-2'
@@ -151,7 +169,7 @@ export function TabBar({
             )}
           >
             {option.icon ? (
-              <span className="inline-flex items-center gap-1.5">
+              <span className={cn('inline-flex items-center', gapClass)}>
                 <span className="shrink-0">{option.icon}</span>
                 <span>{option.label}</span>
               </span>
@@ -167,7 +185,9 @@ export function TabBar({
   return (
     <div
       className={cn(
-        'border-border bg-background-alt inline-flex h-[var(--control-height)] items-center gap-0.5 rounded-[var(--radius-md)] border p-0.5 shadow-none transition-all',
+        'border-border bg-background-alt inline-flex items-center gap-0.5 rounded-[var(--radius-md)] border p-0.5 shadow-none transition-all',
+        heightClass,
+        fullWidth && 'w-full flex',
         className,
       )}
     >
@@ -178,7 +198,8 @@ export function TabBar({
           aria-pressed={value === option.value}
           onClick={() => onChange(option.value)}
           className={cn(
-            'type-control relative z-10 inline-flex h-full min-w-[72px] shrink-0 items-center justify-center rounded-[var(--radius-sm)] text-sm whitespace-nowrap transition-[background-color,color,border-color,box-shadow] duration-150 ease-out select-none',
+            'type-control font-sans tracking-normal relative z-10 inline-flex h-full min-w-[72px] shrink-0 items-center justify-center rounded-[var(--radius-sm)] text-sm whitespace-nowrap transition-[background-color,color,border-color,box-shadow] duration-150 ease-out select-none',
+            fullWidth && 'flex-1',
             padX,
             value === option.value
               ? 'border-border bg-panel text-foreground border shadow-xs'
@@ -186,7 +207,7 @@ export function TabBar({
           )}
         >
           {option.icon ? (
-            <span className="inline-flex items-center gap-1.5">
+            <span className={cn('inline-flex items-center', gapClass)}>
               <span className="shrink-0">{option.icon}</span>
               <span>{option.label}</span>
             </span>

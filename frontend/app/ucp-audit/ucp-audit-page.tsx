@@ -3,8 +3,8 @@
 import { useMemo, useState } from 'react';
 import { Play, RefreshCcw, Layers, CheckSquare, History, Network } from 'lucide-react';
 
-import { InlineAlert, PageHeader } from '../../components/ui/patterns';
-import { Button, Input } from '../../components/ui/primitives';
+import { InlineAlert, PageHeader, TabBar } from '../../components/ui/patterns';
+import { Button, Input, Field } from '../../components/ui/primitives';
 import { HistoryDrawer, type HistoryItem } from '../../components/ui/history-drawer';
 import {
   UcpContractPanel,
@@ -27,11 +27,14 @@ export default function UcpAuditPage() {
       ? `${controller.activeJob.domain} · score ${controller.report.overall_score}`
       : 'Run deterministic UCP compliance checks against ecommerce domains.';
 
-  const tabOptions = [
-    { id: 'compliance', label: 'Compliance Index', icon: Layers },
-    { id: 'contract', label: 'Contract Checks', icon: Network },
-    { id: 'fix-sequence', label: 'Repair Roadmap', icon: CheckSquare },
-  ] as const;
+  const tabOptions = useMemo(
+    () => [
+      { value: 'compliance', label: 'Compliance Index', icon: <Layers className="size-3.5" /> },
+      { value: 'contract', label: 'Contract Checks', icon: <Network className="size-3.5" /> },
+      { value: 'fix-sequence', label: 'Repair Roadmap', icon: <CheckSquare className="size-3.5" /> },
+    ],
+    [],
+  );
 
   const historyItems: HistoryItem[] = useMemo(() => {
     return controller.historyItems.map((job) => ({
@@ -92,8 +95,7 @@ export default function UcpAuditPage() {
       {/* Horizontal Compact Config Ribbon (Saves huge space) */}
       <section className="border-border bg-panel border-l-accent relative overflow-hidden rounded-[var(--radius-lg)] border border-l-4 p-4 shadow-sm">
         <div className="grid gap-4 sm:grid-cols-[1fr_140px] sm:items-end">
-          <label className="grid gap-1">
-            <span className="field-label">Target Domain</span>
+          <Field label="Target Domain" className="w-full">
             <Input
               value={controller.domain}
               onChange={(event) => controller.setDomain(event.target.value)}
@@ -101,10 +103,9 @@ export default function UcpAuditPage() {
               className="border-border focus:border-accent type-control h-[var(--control-height)]"
               aria-label="Domain"
             />
-          </label>
+          </Field>
 
-          <label className="grid gap-1">
-            <span className="field-label">Sample Size</span>
+          <Field label="Sample Size">
             <Input
               type="number"
               min={1}
@@ -118,7 +119,7 @@ export default function UcpAuditPage() {
               }
               className="type-control h-[var(--control-height)]"
             />
-          </label>
+          </Field>
         </div>
       </section>
 
@@ -132,26 +133,13 @@ export default function UcpAuditPage() {
         />
 
         {/* Workspace tab selectors */}
-        <div className="workspace-tabs flex w-full flex-wrap gap-1 p-1">
-          {tabOptions.map((tab) => {
-            const TabIcon = tab.icon;
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setActiveTab(tab.id)}
-                data-active={isActive}
-                className={cn(
-                  'workspace-tab flex min-w-[120px] flex-1 cursor-pointer items-center justify-center gap-2 px-3 py-2 transition-all',
-                )}
-              >
-                <TabIcon className="size-3.5" />
-                <span>{tab.label}</span>
-              </button>
-            );
-          })}
-        </div>
+        <TabBar
+          value={activeTab}
+          onChange={(val) => setActiveTab(val as 'compliance' | 'contract' | 'fix-sequence')}
+          options={tabOptions}
+          fullWidth
+          size="lg"
+        />
 
         {/* Tab viewports spanning full width */}
         <div className="animate-in fade-in w-full min-w-0 duration-300">

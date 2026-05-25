@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { AlertTriangle, Check, CheckSquare, Download, ShieldAlert, Sparkles } from 'lucide-react';
 
 import { DataRegionEmpty, DataRegionLoading, TableSurface } from '../../components/ui/patterns';
-import { Badge, Button } from '../../components/ui/primitives';
+import { Badge, Button, Card } from '../../components/ui/primitives';
 import {
   Table,
   TableBody,
@@ -397,7 +397,7 @@ export function UcpDimensionTable({
               >
                 <div className="lg:border-divider/40 flex flex-col justify-start border-b pr-4 pb-4 lg:border-r lg:border-b-0 lg:pb-0">
                   <div className="mb-2 flex items-center gap-2">
-                    <span className="type-caption-mono text-muted bg-background border-border/80 rounded border px-2 py-0.5">
+                    <span className="font-mono text-xs text-foreground bg-background border-border/80 rounded border px-2 py-0.5">
                       {dimension.dimension_id}
                     </span>
                     <Badge tone={badgeTone(dimension.status)} className="scale-90">
@@ -419,7 +419,7 @@ export function UcpDimensionTable({
                       {findings.map((finding) => (
                         <li
                           key={finding.id}
-                          className="border-border/50 bg-background/20 flex w-full min-w-0 items-start gap-3 rounded-[var(--radius-md)] border p-4 shadow-sm"
+                          className="border-border bg-panel flex w-full min-w-0 items-start gap-3 rounded-[var(--radius-md)] border p-4 shadow-sm"
                         >
                           <AlertTriangle
                             className={cn(
@@ -433,10 +433,10 @@ export function UcpDimensionTable({
                             </div>
                             <div className="type-caption text-muted mt-1">{finding.fix}</div>
                             <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                              <Badge tone="neutral" className="type-caption-mono">
+                              <Badge tone="neutral" className="font-mono lowercase">
                                 {finding.effort}
                               </Badge>
-                              <span className="type-caption-mono text-muted">{finding.action}</span>
+                              <span className="font-sans text-xs font-medium text-secondary">{finding.action}</span>
                             </div>
                             <EvidenceChips evidence={finding.evidence} />
                           </div>
@@ -444,9 +444,9 @@ export function UcpDimensionTable({
                       ))}
                     </ul>
                   ) : (
-                    <div className="border-success/20 bg-success/5 text-success flex w-full max-w-[760px] items-center gap-2.5 rounded-[var(--radius-md)] border p-3.5">
-                      <Check className="text-success size-4 shrink-0" />
-                      <span className="type-subheading text-success">
+                    <div className="border-success-border bg-success-bg text-success-text flex w-full max-w-[760px] items-center gap-2.5 rounded-[var(--radius-md)] border p-3.5">
+                      <Check className="text-success-text size-4 shrink-0" />
+                      <span className="type-subheading text-success-text font-medium">
                         Protocol contract is present for this dimension.
                       </span>
                     </div>
@@ -507,17 +507,17 @@ export function UcpContractPanel({ report }: Readonly<{ report: UcpAuditReport |
                   <TableBody>
                     {schemas.map((schema, index) => (
                       <TableRow key={`${schema.url ?? 'schema'}-${index}`}>
-                        <TableCell className="max-w-[320px] align-top">
-                          <div className="type-caption-mono text-foreground truncate">
+                        <TableCell className="max-w-[320px] py-3 align-top">
+                          <div className="font-mono text-xs text-foreground break-all">
                             {schema.url}
                           </div>
                           {schema.title ? (
-                            <div className="type-caption text-muted mt-1 truncate">
+                            <div className="type-caption text-muted mt-1 break-words">
                               {schema.title}
                             </div>
                           ) : null}
                         </TableCell>
-                        <TableCell className="w-[120px] align-top">
+                        <TableCell className="w-[120px] py-3 align-top">
                           <Badge
                             tone={
                               schema.reachable && schema.valid_json && schema.schema_valid
@@ -535,13 +535,13 @@ export function UcpContractPanel({ report }: Readonly<{ report: UcpAuditReport |
                             </div>
                           ) : null}
                         </TableCell>
-                        <TableCell className="min-w-[360px] align-top">
+                        <TableCell className="min-w-[360px] py-3 align-top">
                           <SchemaCoverageCell schema={schema} />
                         </TableCell>
-                        <TableCell className="min-w-[220px] align-top">
+                        <TableCell className="min-w-[220px] py-3 align-top">
                           <SchemaMissingCell schema={schema} />
                         </TableCell>
-                        <TableCell className="type-caption max-w-[260px] align-top">
+                        <TableCell className="type-caption max-w-[260px] py-3 align-top">
                           <SchemaAnalysisText schema={schema} />
                         </TableCell>
                       </TableRow>
@@ -676,19 +676,19 @@ export function UcpFixSequence({ report }: Readonly<{ report: UcpAuditReport | n
                         isChecked && 'text-muted line-through',
                       )}
                     >
-                      <span className="type-caption-mono text-secondary">{index + 1}.</span>
-                      <span className="type-caption-mono bg-background/80 border-border rounded border px-1.5 py-0.5">
+                      <span className="font-mono text-xs text-secondary">{index + 1}.</span>
+                      <span className="font-mono text-xs bg-background border-border text-foreground font-medium rounded border px-1.5 py-0.5">
                         {item.subSkill}
                       </span>
                       <span>{item.action}</span>
                     </div>
                     <p className="type-caption text-muted mt-1">Source: {item.source}</p>
                     <div className="mt-2 flex flex-wrap gap-1.5">
-                      <Badge tone="neutral" className="type-caption-mono">
+                      <Badge tone="neutral" className="font-mono lowercase">
                         {item.effort}
                       </Badge>
                       {item.dependsOn.length ? (
-                        <span className="type-caption-mono text-muted">
+                        <span className="font-mono text-xs text-muted">
                           Depends: {item.dependsOn.join(', ')}
                         </span>
                       ) : null}
@@ -783,12 +783,12 @@ function ManifestFact({
   detail,
 }: Readonly<{ label: string; value: string; tone: string; detail?: string }>) {
   return (
-    <div className="border-border/60 bg-background/25 rounded border p-3">
+    <div className="border-border bg-panel rounded-[var(--radius-md)] border p-3">
       <div className="mb-1 flex items-center justify-between gap-2">
-        <span className="type-caption-mono text-muted">{label}</span>
+        <span className="type-label text-secondary">{label}</span>
         <Badge tone={badgeTone(tone)}>{value}</Badge>
       </div>
-      {detail ? <div className="type-caption-mono text-muted truncate">{detail}</div> : null}
+      {detail ? <div className="font-mono text-xs text-foreground mt-1 break-all">{detail}</div> : null}
     </div>
   );
 }
@@ -833,28 +833,28 @@ function TransportSummary({ transports }: Readonly<{ transports: ContractTranspo
 
               return (
                 <TableRow key={`${transport.transport ?? 'transport'}-${index}`}>
-                  <TableCell className="align-top">
-                    <div className="type-caption-mono text-foreground">
+                  <TableCell className="py-3 align-top">
+                    <div className="font-mono text-xs text-foreground">
                       {(transport.transport ?? 'unknown').toUpperCase()}
                     </div>
                     {transport.service ? (
                       <div className="type-caption text-muted mt-1">{transport.service}</div>
                     ) : null}
                   </TableCell>
-                  <TableCell className="align-top">
+                  <TableCell className="py-3 align-top">
                     <Badge tone={negotiationTone}>{negotiationLabel}</Badge>
                     {transport.status_code ? (
-                      <div className="type-caption-mono text-muted mt-1">
+                      <div className="font-mono text-xs text-muted mt-1">
                         HTTP {transport.status_code}
                       </div>
                     ) : null}
                   </TableCell>
-                  <TableCell className="max-w-[300px] align-top">
-                    <div className="type-caption-mono text-foreground truncate">
+                  <TableCell className="max-w-[300px] py-3 align-top">
+                    <div className="font-mono text-xs text-foreground break-all">
                       {transport.endpoint || '-'}
                     </div>
                   </TableCell>
-                  <TableCell className="type-caption max-w-[320px] align-top">{detail}</TableCell>
+                  <TableCell className="type-caption max-w-[320px] py-3 align-top break-words">{detail}</TableCell>
                 </TableRow>
               );
             })}
@@ -892,10 +892,10 @@ function SchemaGroupSummary({
   const percent = total ? Math.round((present / total) * 100) : 0;
   const complete = total > 0 && present === total;
   return (
-    <div className="border-border/60 bg-background/25 rounded border px-2 py-1.5">
+    <div className="border-border bg-background-alt/30 rounded px-2.5 py-2">
       <div className="mb-1 flex items-center justify-between gap-2">
-        <span className="type-caption-mono text-muted">{SCHEMA_GROUP_LABELS[group] ?? group}</span>
-        <span className={cn('type-caption-mono', complete ? 'text-success' : 'text-danger')}>
+        <span className="type-label text-secondary">{SCHEMA_GROUP_LABELS[group] ?? group}</span>
+        <span className={cn('font-mono text-xs font-semibold', complete ? 'text-success' : 'text-danger')}>
           {present}/{total}
         </span>
       </div>
@@ -920,12 +920,12 @@ function SchemaMissingCell({
     )
     .filter((field, index, fields) => fields.indexOf(field) === index);
   if (!missing.length) {
-    return <span className="type-caption-mono text-success">Complete</span>;
+    return <span className="font-mono text-xs text-success font-medium">Complete</span>;
   }
   return (
     <div className="flex max-w-[260px] flex-wrap gap-1">
       {missing.map((field) => (
-        <Badge key={field} tone="danger" className="type-caption-mono">
+        <Badge key={field} tone="danger" className="font-mono lowercase">
           {field}
         </Badge>
       ))}
@@ -961,7 +961,7 @@ function EvidenceChips({ evidence }: Readonly<{ evidence: Array<Record<string, u
       {lines.map((line, index) => (
         <code
           key={`${line}-${index}`}
-          className="type-caption-mono bg-background border-border rounded border px-1 py-0.5"
+          className="font-mono text-xs text-foreground bg-background-alt/80 border-border/80 rounded border px-1.5 py-0.5"
         >
           {line}
         </code>
@@ -1032,14 +1032,14 @@ function DimensionScoreCard({
     desc: '',
   };
   return (
-    <div
+    <Card
       className={cn(
-        'border-border bg-background/25 hover:border-accent/60 relative flex min-h-[160px] flex-col justify-between rounded-[var(--radius-md)] border p-5 transition-all duration-300 hover:scale-[1.02] hover:shadow-md',
+        'relative flex min-h-[160px] flex-col justify-between p-5 hover:border-accent/60 hover:scale-[1.02] hover:shadow-md duration-300 ease-out bg-panel border-border rounded-[var(--radius-lg)] border',
         blocked && 'pointer-events-none opacity-35 select-none',
       )}
     >
       {blocked ? (
-        <div className="bg-background/10 absolute inset-0 z-10 flex items-center justify-center rounded-[var(--radius-md)] backdrop-blur-[0.5px]">
+        <div className="bg-background/10 absolute inset-0 z-10 flex items-center justify-center rounded-[var(--radius-lg)] backdrop-blur-[0.5px]">
           <span className="type-caption-mono text-danger border-danger/45 bg-background/90 rotate-12 rounded border px-2 py-0.5 shadow">
             BLOCKED
           </span>
@@ -1058,10 +1058,10 @@ function DimensionScoreCard({
         )}
       </div>
       <div className="mt-3.5">
-        <div className="type-subheading text-foreground">{meta.label}</div>
-        <p className="type-caption text-muted mt-1.5">{meta.subtitle}</p>
+        <h4 className="type-subheading text-foreground">{meta.label}</h4>
+        <p className="type-caption text-muted mt-1.5 mb-0">{meta.subtitle}</p>
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -1070,14 +1070,16 @@ function SummaryRow({
   value,
   tone,
 }: Readonly<{ label: string; value: string | number; tone: string }>) {
+  const badgeToneVal = (tone === 'success' || tone === 'warning' || tone === 'danger' || tone === 'neutral' || tone === 'accent' || tone === 'info')
+    ? tone
+    : 'neutral';
+
   return (
     <div className="border-border/40 flex items-center justify-between border-b pb-1.5">
       <span className="type-label text-muted">{label}</span>
-      <span
-        className={cn('type-caption-mono bg-background-alt rounded px-1.5 py-0.5', toneClass(tone))}
-      >
+      <Badge tone={badgeToneVal} className="font-mono lowercase">
         {value}
-      </span>
+      </Badge>
     </div>
   );
 }
@@ -1097,12 +1099,26 @@ function ScoreRing({
       style={{ width: size, height: size }}
     >
       <svg width={size} height={size} className="-rotate-90">
+        <defs>
+          <linearGradient id="score-ring-success" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="var(--success)" />
+            <stop offset="100%" stopColor="color-mix(in srgb, var(--success) 60%, black)" />
+          </linearGradient>
+          <linearGradient id="score-ring-warning" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="var(--warning)" />
+            <stop offset="100%" stopColor="color-mix(in srgb, var(--warning) 60%, black)" />
+          </linearGradient>
+          <linearGradient id="score-ring-danger" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="var(--danger)" />
+            <stop offset="100%" stopColor="color-mix(in srgb, var(--danger) 60%, black)" />
+          </linearGradient>
+        </defs>
         <circle
           cx={size / 2}
           cy={size / 2}
           r={radius}
           fill="none"
-          className="stroke-border"
+          className="stroke-border-subtle/50"
           strokeWidth={stroke}
         />
         <circle
@@ -1110,7 +1126,13 @@ function ScoreRing({
           cy={size / 2}
           r={radius}
           fill="none"
-          className={ringClass(score)}
+          stroke={
+            score >= 80
+              ? 'url(#score-ring-success)'
+              : score >= 50
+                ? 'url(#score-ring-warning)'
+                : 'url(#score-ring-danger)'
+          }
           strokeWidth={stroke}
           strokeLinecap="round"
           strokeDasharray={circumference}
@@ -1121,7 +1143,7 @@ function ScoreRing({
       <div className="absolute text-center select-none">
         <div
           className={cn(
-            'text-foreground tabular-nums',
+            'text-foreground tabular-nums font-semibold',
             compact ? 'type-display-sm' : 'type-display',
           )}
         >
@@ -1262,17 +1284,4 @@ function badgeTone(value: string) {
     return 'danger';
   }
   return 'neutral';
-}
-
-function toneClass(tone: string) {
-  if (tone === 'success') return 'text-success';
-  if (tone === 'warning') return 'text-warning';
-  if (tone === 'danger') return 'text-danger';
-  return 'text-foreground';
-}
-
-function ringClass(score: number) {
-  if (score >= 80) return 'stroke-success';
-  if (score >= 50) return 'stroke-warning';
-  return 'stroke-danger';
 }

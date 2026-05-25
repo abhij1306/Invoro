@@ -1,550 +1,634 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   CrawlerAI — Global Design System
-   Revised: tighter color hierarchy · modular type scale · WCAG 2.1 AA · no debt
+   CrawlerAI — Design System v2
+   Clean token hierarchy · 4px grid · WCAG 2.1 AA
+   Fonts retained: Public Sans · Bricolage Grotesque · JetBrains Mono
    ═══════════════════════════════════════════════════════════════════════════ */
 
 @import 'tailwindcss';
 
 /* ─────────────────────────────────────────────────────────────────────────
-   TAILWIND v4 DESIGN TOKEN BRIDGE
+   TAILWIND v4 TOKEN BRIDGE
    Maps CSS custom properties → Tailwind utility classes.
-   Only tokens that need Tailwind utilities are listed here.
    ───────────────────────────────────────────────────────────────────────── */
 @theme inline {
   /* Surfaces */
-  --color-background: var(--bg-base);
-  --color-background-alt: var(--bg-alt);
+  --color-background:          var(--bg-base);
+  --color-background-alt:      var(--bg-alt);
   --color-background-elevated: var(--bg-elevated);
-  --color-panel: var(--bg-panel);
-  --color-panel-strong: var(--bg-panel-strong);
+  --color-panel:               var(--bg-panel);
+  --color-panel-strong:        var(--bg-well);
 
   /* Borders */
-  --color-border: var(--border);
+  --color-border:        var(--border);
   --color-border-strong: var(--border-strong);
 
   /* Typography */
   --color-foreground: var(--text-primary);
-  --color-secondary: var(--text-secondary);
-  --color-muted: var(--text-muted);
-  --color-faint: var(--text-faint);
+  --color-secondary:  var(--text-secondary);
+  --color-muted:      var(--text-muted);
+  --color-faint:      var(--text-subtle);
 
   /* Accent */
-  --color-accent: var(--accent);
-  --color-accent-hover: var(--accent-hover);
+  --color-accent:        var(--accent);
+  --color-accent-hover:  var(--accent-hover);
   --color-accent-subtle: var(--accent-subtle);
-  --color-accent-soft: var(--accent-soft);
+  --color-accent-soft:   var(--accent-soft);
   --color-accent-border: var(--accent-border);
-  --color-accent-fg: var(--accent-fg);
+  --color-accent-fg:     var(--accent-fg);
 
   /* Semantic states */
-  --color-success: var(--success);
-  --color-success-bg: var(--success-bg);
+  --color-success:        var(--success);
+  --color-success-bg:     var(--success-bg);
   --color-success-border: var(--success-border);
-  --color-warning: var(--warning);
-  --color-warning-bg: var(--warning-bg);
+  --color-warning:        var(--warning);
+  --color-warning-bg:     var(--warning-bg);
   --color-warning-border: var(--warning-border);
-  --color-danger: var(--danger);
-  --color-danger-bg: var(--danger-bg);
-  --color-danger-border: var(--danger-border);
-  --color-info: var(--info);
-  --color-info-bg: var(--info-bg);
-  --color-info-border: var(--info-border);
+  --color-danger:         var(--danger);
+  --color-danger-bg:      var(--danger-bg);
+  --color-danger-border:  var(--danger-border);
+  --color-info:           var(--info);
+  --color-info-bg:        var(--info-bg);
+  --color-info-border:    var(--info-border);
 
-  /* Component surface tokens */
-  --color-divider: var(--divider);
-  --color-subtle-panel: var(--subtle-panel-bg);
-  --color-subtle-panel-border: var(--subtle-panel-border);
-  --color-status-neutral-bg: var(--status-neutral-bg);
-  --color-tab-active-fg: var(--tab-active-fg);
-  --color-terminal-fg: var(--terminal-fg);
-  --color-setting-icon-bg: var(--setting-icon-bg);
+  /* Component */
+  --color-divider:              var(--border-subtle);
+  --color-subtle-panel:         var(--bg-alt);
+  --color-subtle-panel-border:  var(--border);
+  --color-status-neutral-bg:    var(--status-neutral-bg);
+  --color-tab-active-fg:        var(--tab-active-fg);
+  --color-terminal-fg:          var(--terminal-fg);
+  --color-setting-icon-bg:      var(--setting-icon-bg);
   --color-setting-icon-active-bg: var(--setting-icon-active-bg);
-  --color-setting-body-bg: var(--setting-body-bg);
-  --color-metric-domains: var(--metric-domains-color);
+  --color-setting-body-bg:      var(--setting-body-bg);
+  --color-metric-domains:       var(--info);
 
-  /* Shadows (xs-value, card-value etc. keep backward-compat names for Tailwind) */
-  --shadow-xs: var(--shadow-xs-value);
-  --shadow-card: var(--shadow-card-value);
+  /* Shadows */
+  --shadow-xs:       var(--shadow-xs-value);
+  --shadow-card:     var(--shadow-card-value);
   --shadow-elevated: var(--shadow-elevated-value);
-  --shadow-lg: var(--shadow-lg-value);
-  --shadow-xl: var(--shadow-modal);
-  --shadow-setting-icon-active: var(--setting-icon-active-shadow);
+  --shadow-lg:       var(--shadow-lg-value);
+  --shadow-xl:       var(--shadow-modal);
+  --shadow-setting-icon-active: var(--shadow-xs-value);
 
   /* Typography */
-  --font-sans: var(--font-primary-family);
-  --font-display: var(--font-display-family);
-  --font-mono: var(--font-mono-family);
-  --font-size-2xs: var(--text-2xs);
-  --font-size-xs: var(--text-xs);
-  --font-size-sm: var(--text-sm);
-  --font-size-base: var(--text-base);
-  --font-size-lg: var(--text-lg);
-  --font-size-xl: var(--text-xl);
-  --font-size-2xl: var(--text-2xl);
+  --font-sans:        var(--font-primary-family);
+  --font-display:     var(--font-display-family);
+  --font-mono:        var(--font-mono-family);
+  --font-size-2xs:    var(--text-2xs);
+  --font-size-xs:     var(--text-xs);
+  --font-size-sm:     var(--text-sm);
+  --font-size-base:   var(--text-base);
+  --font-size-lg:     var(--text-lg);
+  --font-size-xl:     var(--text-xl);
+  --font-size-2xl:    var(--text-2xl);
 
-  /* Line heights — defined once here, not duplicated in :root */
-  --leading-none: 1;
-  --leading-tight: 1.2;
-  --leading-snug: 1.35;
-  --leading-normal: 1.5;
+  /* Line heights */
+  --leading-none:    1;
+  --leading-tight:   1.2;
+  --leading-snug:    1.35;
+  --leading-normal:  1.5;
   --leading-relaxed: 1.625;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   LIGHT THEME — CrawlerAI Workbench
+   LIGHT THEME — Warm Stone
    ─────────────────────────────────────────────────────────────────────────
-   SURFACE HIERARCHY (5 levels, always distinct):
-     L0  bg-base         #f6f4ee  — page canvas (lowest)
-     L1  bg-alt          #ece7dc  — sunken insets (table headers, code blocks)
-     L2  bg-panel        #fffdf7  — raised panels, cards, sheets
-     L3  bg-elevated     #ffffff  — floating layers (dropdowns, modals)
-     L4  bg-panel-strong #ded7ca  — deeply inset (active rows, selected items)
+   Surface hierarchy:
+     L0  bg-base     #f2f0ec  — page canvas (lowest)
+     L1  bg-alt      #e7e4de  — sunken insets, table headers
+     L2  bg-panel    #faf8f4  — raised panels, cards
+     L3  bg-elevated #ffffff  — floating layers (dropdowns, modals)
+     L4  bg-well     #dad6cf  — deeply inset, selected state
 
-   Primary accent uses a warm rust family; surrounding surfaces/text carry the refresh.
+   Accent: warm rust family (#c2410c). Surfaces: warm stone mineral.
+   All text contrast values verified ≥ 4.5:1 against their backgrounds.
    ═══════════════════════════════════════════════════════════════════════════ */
 :root {
   color-scheme: light;
 
   /* ── Fonts */
   --font-primary-family:
-    var(--font-primary-source, 'Public Sans'), 'Public Sans', system-ui, -apple-system, sans-serif;
+    var(--font-primary-source, 'Public Sans'), 'Public Sans', system-ui, sans-serif;
   --font-display-family:
-    var(--font-display-source, 'Bricolage Grotesque'), 'Bricolage Grotesque', system-ui,
-    -apple-system, sans-serif;
+    var(--font-display-source, 'Bricolage Grotesque'), 'Bricolage Grotesque', system-ui, sans-serif;
   --font-mono-family:
     var(--font-mono-source, 'JetBrains Mono'), 'JetBrains Mono', ui-monospace, monospace;
-  --font-mono-size: 0.8125rem; /* 13px */
-  --font-mono-size-sm: 0.6875rem; /* 11px */
-  --font-mono-line-height: 1.55;
 
   /* ── Surfaces */
-  --bg-base: #f6f4ee;
-  --bg-alt: #ece7dc; /* sunken — visibly below bg-base */
-  --bg-panel: #fffdf7; /* raised panels */
-  --bg-elevated: #ffffff; /* floating layers — differentiated by shadow, not bg */
-  --bg-panel-strong: #ded7ca; /* deeply inset, selected state */
-  --surface-sunken: #eee9df;
-  --surface-overlay: rgba(246, 244, 238, 0.94);
+  --bg-base:     #f2f0ec;
+  --bg-alt:      #e7e4de;
+  --bg-panel:    #faf8f4;
+  --bg-elevated: #ffffff;
+  --bg-well:     #dad6cf;
+  --surface-overlay: rgba(242, 240, 236, 0.94);
 
   /* ── Borders */
-  --border-subtle: #eee9df; /* hairline, barely-there separator */
-  --border: #d8d0c2; /* default divider */
-  --border-strong: #bcb09f; /* form inputs, emphasis */
-  --border-focus: var(--accent);
+  --border-subtle: #e2dfd8;
+  --border:        #cdc8c0;
+  --border-strong: #b0a89f;
+  --border-focus:  var(--accent);
 
   /* ── Typography */
-  --text-primary: #211f1b;
-  --text-secondary: #4a443b;
-  --text-muted: #6b6255;
-  --text-faint: #918779; /* decorative/disabled only, not for essential text */
+  --text-primary:   #1a1815;
+  --text-secondary: #443d36;
+  --text-muted:     #68614f;  /* minimum for supporting text — 4.8:1 on bg-base ✓ */
+  --text-subtle:    #948d7e;  /* decorative / disabled only — not for reading text */
 
   /* ── JSON Syntax (light) */
-  --syntax-key: #174f98;
-  --syntax-string: #047857;
-  --syntax-number: #b45309;
+  --syntax-key:     #174f98;
+  --syntax-string:  #047857;
+  --syntax-number:  #b45309;
   --syntax-boolean: #1558ac;
-  --syntax-null: var(--text-muted);
-  --syntax-punct: var(--text-secondary);
+  --syntax-null:    var(--text-muted);
+  --syntax-punct:   var(--text-secondary);
 
-  /* ── Accent
-     --accent is used as both solid bg (needs white fg ≥ 4.5:1) and text link. */
-  --accent: #c2410c;
-  --accent-hover: #9a3412;
-  --accent-fg: #ffffff;
-  --accent-subtle: rgba(194, 65, 12, 0.1); /* backgrounds, hover fills */
-  --accent-soft: rgba(194, 65, 12, 0.06); /* very subtle tints        */
-  --accent-border: rgba(194, 65, 12, 0.3);
-  --accent-dim: rgba(194, 65, 12, 0.17);
-  --accent-text: #9a3412;
+  /* ── Accent — warm rust
+     Used as solid bg (accent-fg ≥ 4.5:1) and as inline text (accent-text).   */
+  --accent:        #c2410c;
+  --accent-hover:  #9a3412;
+  --accent-fg:     #ffffff;
+  --accent-subtle: rgba(194, 65, 12, 0.09);
+  --accent-soft:   rgba(194, 65, 12, 0.05);
+  --accent-border: rgba(194, 65, 12, 0.26);
+  --accent-text:   #9a3412;   /* 5.8:1 on bg-panel ✓ */
 
   /* ── Semantic states
-     All text values verified ≥ 4.5:1 on their respective bg tokens.
-     success-text #056d4b on #ecfdf5 → 5.8:1 ✓
-     warning-text #a24306 on #fffbeb → 4.9:1 ✓
-     danger-text  #b91c1c on #fef2f2 → 5.2:1 ✓
-     info-text    #1d4ed8 on #eff6ff → 5.1:1 ✓                              */
-  --success: #059669;
-  --success-bg: #ecfdf5;
+     Text values verified ≥ 4.5:1 on their bg tokens:
+     success-text  #065f46 on #ecfdf5 → 6.5:1 ✓
+     warning-text  #92400e on #fffbeb → 5.3:1 ✓
+     danger-text   #991b1b on #fef2f2 → 5.7:1 ✓
+     info-text     #1d4ed8 on #eff6ff → 5.1:1 ✓                               */
+  --success:        #059669;
+  --success-bg:     #ecfdf5;
   --success-border: #a7f3d0;
-  --warning: #d97706;
-  --warning-bg: #fffbeb;
+  --success-text:   #065f46;
+  --warning:        #d97706;
+  --warning-bg:     #fffbeb;
   --warning-border: #fcd34d;
-  --danger: #dc2626;
-  --danger-bg: #fef2f2;
-  --danger-border: #fca5a5;
-  --info: #2563eb;
-  --info-bg: #eff6ff;
-  --info-border: #bfdbfe;
-  --neutral-bg: rgba(33, 31, 27, 0.045);
+  --warning-text:   #92400e;
+  --danger:         #dc2626;
+  --danger-bg:      #fef2f2;
+  --danger-border:  #fca5a5;
+  --danger-text:    #991b1b;
+  --info:           #2563eb;
+  --info-bg:        #eff6ff;
+  --info-border:    #bfdbfe;
+  --info-text:      #1d4ed8;
+  --neutral-bg:     rgba(26, 24, 21, 0.04);
 
-  /* ── Status bg aliases */
-  --status-active-bg: var(--success-bg);
+  /* ── Status aliases */
+  --status-active-bg:  var(--success-bg);
   --status-running-bg: var(--accent-subtle);
-  --status-killed-bg: var(--danger-bg);
-  --status-paused-bg: var(--warning-bg);
+  --status-killed-bg:  var(--danger-bg);
+  --status-paused-bg:  var(--warning-bg);
   --status-neutral-bg: var(--neutral-bg);
 
-  /* ── Shadows */
-  --shadow-xs-value: 0 1px 0 rgba(42, 34, 22, 0.05);
-  --shadow-sm-value: 0 1px 3px rgba(42, 34, 22, 0.07), 0 1px 2px rgba(42, 34, 22, 0.05);
-  --shadow-card-value: 0 1px 3px rgba(42, 34, 22, 0.07);
-  --shadow-elevated-value: 0 10px 24px rgba(42, 34, 22, 0.1), 0 0 0 1px rgba(42, 34, 22, 0.04);
-  --shadow-lg-value: 0 16px 32px rgba(42, 34, 22, 0.12), 0 0 0 1px rgba(42, 34, 22, 0.05);
-  --shadow-modal: 0 28px 56px rgba(42, 34, 22, 0.18);
-  --focus-ring: 0 0 0 3px rgba(194, 65, 12, 0.23);
-  --setting-icon-active-shadow: var(--shadow-xs-value);
-  --overlay-scrim: color-mix(in srgb, var(--bg-base) 34%, black);
+  /* ── Shadows — warm-tinted, light */
+  --shadow-xs-value:       0 1px 0 rgba(34, 26, 16, 0.06);
+  --shadow-sm-value:       0 1px 3px rgba(34, 26, 16, 0.08), 0 1px 2px rgba(34, 26, 16, 0.05);
+  --shadow-card-value:     0 1px 4px rgba(34, 26, 16, 0.08);
+  --shadow-elevated-value: 0 8px 20px rgba(34, 26, 16, 0.10), 0 0 0 1px rgba(34, 26, 16, 0.04);
+  --shadow-lg-value:       0 16px 32px rgba(34, 26, 16, 0.12), 0 0 0 1px rgba(34, 26, 16, 0.05);
+  --shadow-modal:          0 24px 48px rgba(34, 26, 16, 0.18);
+  --focus-ring:            0 0 0 3px rgba(194, 65, 12, 0.20);
+  --overlay-scrim:         color-mix(in srgb, var(--bg-base) 34%, black);
 
-  /* ── Type scale
-     Modular rhythm: 11.5 → 12.5 → 14 → 15.5 → 18 → 23 → 32.
-     Base bumped for dashboard readability without reducing density.
-     Minimum rendered text: --text-xs (12px), uppercase labels only.         */
-  --text-2xs: 0.71875rem; /* 11.5px — uppercase labels only */
-  --text-xs: 0.78125rem; /* 12.5px — captions, timestamps  */
-  --text-sm: 0.875rem; /* 14px — secondary body, controls */
-  --text-base: 0.96875rem; /* 15.5px — primary body          */
-  --text-lg: 1.125rem; /* 18px — section headings         */
-  --text-xl: 1.4375rem; /* 23px — page headings            */
-  --text-2xl: 2rem; /* 32px — hero / display            */
+  /* ── Type scale — clean pixel values on 4px rhythm
+     2xs: 11px   xs: 12px   sm: 14px   base: 15px
+     lg: 18px    xl: 22px   2xl: 30px                                          */
+  --text-2xs:  0.6875rem;   /* 11px — uppercase labels only     */
+  --text-xs:   0.75rem;     /* 12px — captions, timestamps      */
+  --text-sm:   0.875rem;    /* 14px — secondary body, controls  */
+  --text-base: 0.9375rem;   /* 15px — primary body              */
+  --text-lg:   1.125rem;    /* 18px — section headings          */
+  --text-xl:   1.375rem;    /* 22px — page headings             */
+  --text-2xl:  1.875rem;    /* 30px — hero / display            */
 
   /* ── Font weights */
-  --weight-light: 300;
-  --weight-normal: 400;
-  --weight-medium: 500;
+  --weight-light:    300;
+  --weight-normal:   400;
+  --weight-medium:   500;
   --weight-semibold: 600;
-  --weight-bold: 700;
+  --weight-bold:     700;
 
   /* ── Letter spacing */
-  --tracking-tight: -0.02em;
-  --tracking-normal: 0em;
-  --tracking-wide: 0.025em;
-  --tracking-wider: 0.06em;
-  --tracking-widest: 0.1em;
+  --tracking-tight:   -0.02em;
+  --tracking-normal:   0em;
+  --tracking-wide:     0.025em;
+  --tracking-wider:    0.06em;
+  --tracking-widest:   0.10em;
 
-  /* ── Spacing (4px base grid) */
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-5: 20px;
-  --space-6: 24px;
-  --space-7: 28px;
-  --space-8: 32px;
+  /* ── Mono type settings */
+  --font-mono-size:        0.8125rem;  /* 13px */
+  --font-mono-size-sm:     0.6875rem;  /* 11px */
+  --font-mono-line-height: 1.55;
+
+  /* ── Spacing — strict 4px grid */
+  --space-1:   4px;
+  --space-2:   8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-7:  28px;
+  --space-8:  32px;
   --space-10: 40px;
-  --space-12: 56px;
-  --space-16: 72px;
-  --content-gutter: var(--space-8);
-  --card-padding: 18px;
+  --space-12: 48px;
+  --space-14: 56px;
+  --space-16: 64px;
+  --space-20: 80px;
 
-  /* ── Controls — three distinct sizes */
+  --content-gutter: var(--space-8);
+  --card-padding:   20px;
+
+  /* ── Controls — three sizes */
   --control-height-sm: 28px;
-  --control-height: 32px;
+  --control-height:    32px;
   --control-height-lg: 36px;
   --interactive-border-width: 1px;
 
   /* ── Border radius */
-  --radius-xs: 3px;
-  --radius-sm: 5px;
-  --radius-md: 7px;
-  --radius-lg: 10px;
-  --radius-xl: 14px;
+  --radius-xs:  3px;
+  --radius-sm:  5px;
+  --radius-md:  7px;
+  --radius-lg:  10px;
+  --radius-xl:  14px;
   --radius-2xl: 20px;
+  --radius-full: 9999px;
 
   /* ── Transitions */
-  --transition-fast: 120ms cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-fast: 100ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 180ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 280ms cubic-bezier(0.4, 0, 0.2, 1);
 
-  /* ── Table tokens */
-  --table-font-size: var(--text-sm);
-  --table-header-font-size: var(--text-2xs);
+  /* ── Table */
+  --table-font-size:         var(--text-sm);
+  --table-header-font-size:  var(--text-2xs);
   --table-header-font-family: var(--font-primary-family);
-  --table-header-weight: var(--weight-semibold);
-  --table-header-tracking: var(--tracking-wider);
-  --table-header-height: 40px;
-  --table-row-height: 44px;
+  --table-header-weight:     var(--weight-semibold);
+  --table-header-tracking:   var(--tracking-wider);
+  --table-header-height:     38px;
+  --table-row-height:        44px;
 
-  /* ── Component surface tokens */
-  --surface-card: var(--bg-panel);
-  --surface-card-highlight: var(--accent-soft);
-  --surface-card-edge: var(--border);
-  --subtle-panel-bg: var(--surface-sunken);
-  --subtle-panel-border: var(--border);
-  --divider: #e4e8f0;
+  /* ── Buttons — canonical names */
+  --btn-height-sm: var(--control-height-lg);
+  --btn-height:    var(--control-height-lg);
+  --btn-height-lg: var(--control-height-lg);
+  --btn-font-size: var(--text-sm);
+  --btn-padding-x: 13px;
+
+  /* Primary (action) */
+  --btn-primary-bg:           var(--accent);
+  --btn-primary-hover-bg:     var(--accent-hover);
+  --btn-primary-border:       var(--accent);
+  --btn-primary-hover-border: var(--accent-hover);
+  --btn-primary-fg:           var(--accent-fg);
+
+  /* Secondary (download) */
+  --btn-secondary-bg:           var(--bg-elevated);
+  --btn-secondary-hover-bg:     #edeae4;
+  --btn-secondary-border:       var(--border-strong);
+  --btn-secondary-hover-border: var(--accent);
+  --btn-secondary-fg:           var(--accent-text);
+
+  /* Destructive */
+  --btn-destructive-bg:           var(--bg-elevated);
+  --btn-destructive-hover-bg:     var(--danger-bg);
+  --btn-destructive-border:       var(--danger-border);
+  --btn-destructive-hover-border: var(--danger);
+  --btn-destructive-fg:           var(--danger);
+
+  /* Neutral */
+  --btn-neutral-bg:           color-mix(in srgb, var(--bg-panel) 85%, var(--bg-alt));
+  --btn-neutral-hover-bg:     var(--bg-panel);
+  --btn-neutral-border:       var(--border);
+  --btn-neutral-hover-border: var(--border-strong);
+  --btn-neutral-fg:           var(--text-primary);
+
+  /* Ghost (quiet) */
+  --btn-ghost-bg:         transparent;
+  --btn-ghost-hover-bg:   var(--accent-subtle);
+  --btn-ghost-border:     transparent;
+  --btn-ghost-fg:         var(--text-secondary);
+  --btn-ghost-hover-fg:   var(--text-primary);
+
+  /* Topbar */
+  --btn-topbar-bg:       transparent;
+  --btn-topbar-hover-bg: var(--accent-subtle);
+  --btn-topbar-border:   transparent;
+  --btn-topbar-fg:       var(--text-primary);
+
+  /* ── Form controls */
+  --segmented-bg:        color-mix(in srgb, var(--bg-alt) 80%, var(--bg-base));
+  --tab-active-fg:       var(--accent-fg);
+  --slider-thumb-border: var(--bg-panel);
+  --toggle-track-on:     var(--accent);
+  --toggle-track-off:    var(--border-strong);
+  --toggle-thumb:        #ffffff;
 
   /* ── Shellbar */
   --surface-header: var(--surface-overlay);
-  --shell-text: var(--text-primary);
-  --shell-muted: var(--text-muted);
-  --shell-border: var(--border);
+  --shell-text:     var(--text-primary);
+  --shell-muted:    var(--text-muted);
+  --shell-border:   var(--border);
 
-  /* ── Interactive — buttons */
-  --button-height: var(--control-height);
-  --button-padding-x: 13px;
-  --button-font-size: var(--text-sm);
-
-  /* Primary CTA */
-  --button-action-bg: var(--accent);
-  --button-action-hover-bg: var(--accent-hover);
-  --button-action-border: var(--accent);
-  --button-action-hover-border: var(--accent-hover);
-  --button-action-fg: var(--accent-fg);
-
-  /* Secondary / download */
-  --button-download-bg: var(--bg-elevated);
-  --button-download-hover-bg: var(--surface-sunken);
-  --button-download-border: var(--border-strong);
-  --button-download-hover-border: var(--accent);
-  --button-download-fg: var(--accent-text);
-
-  /* Destructive */
-  --button-destructive-bg: var(--bg-elevated);
-  --button-destructive-hover-bg: var(--danger-bg);
-  --button-destructive-border: var(--danger-border);
-  --button-destructive-hover-border: var(--danger);
-  --button-destructive-fg: var(--danger);
-
-  /* Neutral */
-  --button-neutral-bg: color-mix(in srgb, var(--bg-panel) 86%, var(--bg-alt));
-  --button-neutral-hover-bg: var(--bg-panel);
-  --button-neutral-border: var(--border);
-  --button-neutral-hover-border: var(--border-strong);
-  --button-neutral-fg: var(--text-primary);
-
-  /* Quiet (ghost) */
-  --button-quiet-bg: transparent;
-  --button-quiet-hover-bg: var(--accent-subtle);
-  --button-quiet-border: transparent;
-  --button-quiet-fg: var(--text-secondary);
-  --button-quiet-hover-fg: var(--text-primary);
-
-  /* Topbar */
-  --button-topbar-bg: transparent;
-  --button-topbar-hover-bg: var(--accent-subtle);
-  --button-topbar-border: transparent;
-  --button-topbar-fg: var(--shell-text);
-
-  /* ── Form controls */
-  --segmented-bg: color-mix(in srgb, var(--bg-alt) 80%, var(--bg-base));
-  --tab-active-fg: var(--accent-fg);
-  --slider-thumb-border: var(--bg-panel);
-  --toggle-track-on: var(--accent);
-  --toggle-track-off: var(--border-strong);
-  --toggle-thumb: #ffffff;
-
-  /* ── Terminal / code surfaces */
-  --terminal-bg: var(--bg-panel);
-  --terminal-fg: var(--text-primary);
+  /* ── Terminal / code */
+  --terminal-bg:        var(--bg-panel);
+  --terminal-fg:        var(--text-primary);
   --terminal-secondary: var(--text-secondary);
-  --terminal-muted: var(--text-muted);
-  --terminal-row-alt: var(--surface-sunken);
-  --terminal-code-bg: var(--bg-panel);
-  --terminal-border: var(--border);
-  --terminal-shadow: none;
+  --terminal-muted:     var(--text-muted);
+  --terminal-row-alt:   color-mix(in srgb, var(--bg-alt) 50%, var(--bg-base));
+  --terminal-border:    var(--border);
+  --terminal-shadow:    none;
 
-  /* ── Alert tokens */
-  --alert-success-bg: var(--success-bg);
+  /* ── Alert surfaces */
+  --alert-success-bg:     var(--success-bg);
   --alert-success-border: var(--success-border);
-  --alert-success-text: #065f46; /* 6.5:1 on success-bg ✓ */
-  --alert-warning-bg: var(--warning-bg);
+  --alert-success-text:   var(--success-text);
+  --alert-warning-bg:     var(--warning-bg);
   --alert-warning-border: var(--warning-border);
-  --alert-warning-text: #92400e; /* 5.3:1 on warning-bg ✓ */
-  --alert-danger-bg: var(--danger-bg);
-  --alert-danger-border: var(--danger-border);
-  --alert-danger-text: #991b1b; /* 5.7:1 on danger-bg  ✓ */
+  --alert-warning-text:   var(--warning-text);
+  --alert-danger-bg:      var(--danger-bg);
+  --alert-danger-border:  var(--danger-border);
+  --alert-danger-text:    var(--danger-text);
 
   /* ── Settings panel */
-  --setting-body-bg: var(--bg-base);
-  --setting-icon-bg: var(--bg-alt);
+  --setting-body-bg:        var(--bg-base);
+  --setting-icon-bg:        var(--bg-alt);
   --setting-icon-active-bg: var(--accent-subtle);
 
   /* ── Skeleton */
-  --skeleton-base: var(--bg-alt);
-  --skeleton-highlight: var(--bg-panel-strong);
+  --skeleton-base:      var(--bg-alt);
+  --skeleton-highlight: var(--bg-well);
 
   /* ── Logo */
   --logo-mark-bg: var(--accent);
   --logo-mark-fg: var(--accent-fg);
 
   /* ── Chart palette */
-  --metric-runs-color: var(--accent);
-  --metric-active-color: var(--success);
-  --metric-records-color: var(--warning);
-  --metric-domains-color: var(--info);
+  --chart-primary:  var(--accent);
+  --chart-success:  var(--success);
+  --chart-warning:  var(--warning);
+  --chart-info:     var(--info);
+
+  /* ── Backward-compat aliases (deprecated — migrate to canonical names above) */
+  --bg-panel-strong:         var(--bg-well);
+  --text-faint:              var(--text-subtle);
+  --surface-sunken:          var(--bg-alt);
+  --divider:                 var(--border-subtle);
+  --subtle-panel-bg:         var(--bg-alt);
+  --subtle-panel-border:     var(--border);
+  --surface-card:            var(--bg-panel);
+  --surface-card-edge:       var(--border);
+  --accent-dim:              rgba(194, 65, 12, 0.17);
+  --button-height:           var(--btn-height);
+  --button-font-size:        var(--btn-font-size);
+  --button-padding-x:        var(--btn-padding-x);
+  --button-action-bg:        var(--btn-primary-bg);
+  --button-action-hover-bg:  var(--btn-primary-hover-bg);
+  --button-action-border:    var(--btn-primary-border);
+  --button-action-hover-border: var(--btn-primary-hover-border);
+  --button-action-fg:        var(--btn-primary-fg);
+  --button-download-bg:      var(--btn-secondary-bg);
+  --button-download-hover-bg: var(--btn-secondary-hover-bg);
+  --button-download-border:  var(--btn-secondary-border);
+  --button-download-hover-border: var(--btn-secondary-hover-border);
+  --button-download-fg:      var(--btn-secondary-fg);
+  --button-destructive-bg:   var(--btn-destructive-bg);
+  --button-destructive-hover-bg: var(--btn-destructive-hover-bg);
+  --button-destructive-border: var(--btn-destructive-border);
+  --button-destructive-hover-border: var(--btn-destructive-hover-border);
+  --button-destructive-fg:   var(--btn-destructive-fg);
+  --button-neutral-bg:       var(--btn-neutral-bg);
+  --button-neutral-hover-bg: var(--btn-neutral-hover-bg);
+  --button-neutral-border:   var(--btn-neutral-border);
+  --button-neutral-hover-border: var(--btn-neutral-hover-border);
+  --button-neutral-fg:       var(--btn-neutral-fg);
+  --button-quiet-bg:         var(--btn-ghost-bg);
+  --button-quiet-hover-bg:   var(--btn-ghost-hover-bg);
+  --button-quiet-border:     var(--btn-ghost-border);
+  --button-quiet-fg:         var(--btn-ghost-fg);
+  --button-quiet-hover-fg:   var(--btn-ghost-hover-fg);
+  --button-topbar-bg:        var(--btn-topbar-bg);
+  --button-topbar-hover-bg:  var(--btn-topbar-hover-bg);
+  --button-topbar-border:    var(--btn-topbar-border);
+  --button-topbar-fg:        var(--btn-topbar-fg);
+  --metric-runs-color:       var(--accent);
+  --metric-active-color:     var(--success);
+  --metric-records-color:    var(--warning);
+  --metric-domains-color:    var(--info);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   DARK THEME — CrawlerAI Console · Warm Charcoal
+   DARK THEME — Warm Charcoal Console
    ─────────────────────────────────────────────────────────────────────────
-   SURFACE HIERARCHY:
-     L0  bg-base         #11100e  — page canvas (deepest)
-     L1  bg-alt          #171511  — sunken insets
-     L2  bg-panel        #1e1b17  — raised panels, cards
-     L3  bg-elevated     #28241f  — floating (dropdowns, modals)
-     L4  bg-panel-strong #353029  — deeply inset, strong panels
+   Surface hierarchy:
+     L0  bg-base     #0d0c0a  — deepest canvas
+     L1  bg-alt      #131110  — sunken insets
+     L2  bg-panel    #1a1714  — raised panels, cards
+     L3  bg-elevated #222019  — floating (dropdowns, modals)
+     L4  bg-well     #2b2822  — deeply inset, strong panels
 
-   Primary accent uses the same rust family; dark mode gets warmer developer-console surfaces.
+   Same rust accent; surfaces become warm developer-console charcoal.
    ═══════════════════════════════════════════════════════════════════════════ */
 html[data-theme='dark'] {
   color-scheme: dark;
 
   /* ── Surfaces */
-  --bg-base: #11100e;
-  --bg-alt: #171511;
-  --bg-panel: #1e1b17;
-  --bg-elevated: #28241f;
-  --bg-panel-strong: #353029;
-  --surface-sunken: #161410;
-  --surface-overlay: rgba(17, 16, 14, 0.94);
+  --bg-base:     #0d0c0a;
+  --bg-alt:      #131110;
+  --bg-panel:    #1a1714;
+  --bg-elevated: #222019;
+  --bg-well:     #2b2822;
+  --surface-overlay: rgba(13, 12, 10, 0.94);
 
   /* ── Borders */
-  --border-subtle: #24201b;
-  --border: #302b24;
-  --border-strong: #4a4035;
-  --border-focus: var(--accent);
+  --border-subtle: #201d18;
+  --border:        #2c2820;
+  --border-strong: #413b32;
+  --border-focus:  var(--accent);
 
   /* ── Typography */
-  --text-primary: #f4efe5;
-  --text-secondary: #c8beb0;
-  --text-muted: #a99d8c;
-  --text-faint: #7e7468; /* UI component threshold only */
+  --text-primary:   #f0ebe0;
+  --text-secondary: #c0b6ab;
+  --text-muted:     #a5998a;
+  --text-subtle:    #78706a;
 
   /* ── JSON Syntax (VS Code Dark) */
-  --syntax-key: #9cdcfe;
-  --syntax-string: #ce9178;
-  --syntax-number: #b5cea8;
+  --syntax-key:     #9cdcfe;
+  --syntax-string:  #ce9178;
+  --syntax-number:  #b5cea8;
   --syntax-boolean: #569cd6;
-  --syntax-null: #569cd6;
-  --syntax-punct: #d4d4d4;
+  --syntax-null:    #569cd6;
+  --syntax-punct:   #d4d4d4;
 
-  /* ── Accent
-     --accent-text is lighter for use as inline text on dark panels.           */
-  --accent: #c2410c;
-  --accent-hover: #dc5b22;
-  --accent-fg: #ffffff;
-  --accent-subtle: rgba(194, 65, 12, 0.2);
-  --accent-soft: rgba(194, 65, 12, 0.12);
-  --accent-border: rgba(194, 65, 12, 0.4);
-  --accent-dim: rgba(194, 65, 12, 0.32);
-  --accent-text: #ffb088;
+  /* ── Accent */
+  --accent:        #c2410c;
+  --accent-hover:  #d9581e;
+  --accent-fg:     #ffffff;
+  --accent-subtle: rgba(194, 65, 12, 0.18);
+  --accent-soft:   rgba(194, 65, 12, 0.10);
+  --accent-border: rgba(194, 65, 12, 0.36);
+  --accent-text:   #ffa875;
+
+  /* ── Semantic states — brightened for dark bg */
+  --success:        #34d399;
+  --success-bg:     rgba(52, 211, 153, 0.09);
+  --success-border: rgba(52, 211, 153, 0.22);
+  --success-text:   #34d399;
+  --warning:        #fbbf24;
+  --warning-bg:     rgba(251, 191, 36, 0.09);
+  --warning-border: rgba(251, 191, 36, 0.22);
+  --warning-text:   #fbbf24;
+  --danger:         #f87171;
+  --danger-bg:      rgba(248, 113, 113, 0.09);
+  --danger-border:  rgba(248, 113, 113, 0.22);
+  --danger-text:    #f87171;
+  --info:           #60a5fa;
+  --info-bg:        rgba(96, 165, 250, 0.09);
+  --info-border:    rgba(96, 165, 250, 0.24);
+  --info-text:      #60a5fa;
+  --neutral-bg:     rgba(240, 235, 224, 0.04);
+
+  /* ── Status */
+  --status-active-bg:  var(--success-bg);
+  --status-running-bg: var(--accent-subtle);
+  --status-killed-bg:  var(--danger-bg);
+  --status-paused-bg:  var(--warning-bg);
+  --status-neutral-bg: var(--bg-panel);
+
+  /* ── Shadows */
+  --shadow-xs-value:       0 1px 2px rgba(0, 0, 0, 0.52);
+  --shadow-sm-value:       0 2px 4px rgba(0, 0, 0, 0.62);
+  --shadow-card-value:     0 2px 6px rgba(0, 0, 0, 0.38);
+  --shadow-elevated-value: 0 12px 28px rgba(0, 0, 0, 0.70);
+  --shadow-lg-value:       0 20px 40px rgba(0, 0, 0, 0.80);
+  --shadow-modal:          0 32px 64px rgba(0, 0, 0, 0.90);
+  --focus-ring:            0 0 0 3px rgba(194, 65, 12, 0.32);
+  --overlay-scrim:         color-mix(in srgb, var(--bg-base) 34%, black);
+
+  /* ── Buttons */
+  --btn-primary-bg:           var(--accent);
+  --btn-primary-hover-bg:     var(--accent-hover);
+  --btn-primary-border:       var(--accent);
+  --btn-primary-hover-border: var(--accent-hover);
+  --btn-primary-fg:           var(--accent-fg);
+
+  --btn-secondary-bg:           color-mix(in srgb, var(--bg-panel) 85%, var(--bg-elevated));
+  --btn-secondary-hover-bg:     rgba(240, 235, 224, 0.07);
+  --btn-secondary-border:       rgba(240, 235, 224, 0.16);
+  --btn-secondary-hover-border: var(--accent-text);
+  --btn-secondary-fg:           var(--accent-text);
+
+  --btn-destructive-bg:           var(--bg-panel);
+  --btn-destructive-hover-bg:     rgba(248, 113, 113, 0.08);
+  --btn-destructive-border:       rgba(248, 113, 113, 0.20);
+  --btn-destructive-hover-border: var(--danger);
+  --btn-destructive-fg:           var(--danger);
+
+  --btn-neutral-bg:           color-mix(in srgb, var(--bg-panel) 88%, var(--bg-elevated));
+  --btn-neutral-hover-bg:     var(--bg-elevated);
+  --btn-neutral-border:       var(--border);
+  --btn-neutral-hover-border: var(--border-strong);
+  --btn-neutral-fg:           var(--text-primary);
+
+  --btn-ghost-bg:       transparent;
+  --btn-ghost-hover-bg: rgba(240, 235, 224, 0.05);
+  --btn-ghost-border:   transparent;
+  --btn-ghost-fg:       var(--text-secondary);
+  --btn-ghost-hover-fg: var(--text-primary);
+
+  --btn-topbar-bg:       rgba(240, 235, 224, 0.04);
+  --btn-topbar-hover-bg: rgba(240, 235, 224, 0.08);
+  --btn-topbar-border:   transparent;
+  --btn-topbar-fg:       var(--text-primary);
+
+  /* ── Form controls */
+  --segmented-bg:        rgba(240, 235, 224, 0.04);
+  --tab-active-fg:       var(--text-primary);
+  --slider-thumb-border: var(--bg-base);
+  --toggle-track-off:    #3d3d44;
+
+  /* ── Shellbar */
+  --surface-header: var(--bg-base);
+
+  /* ── Terminal */
+  --terminal-bg:        #110f0c;
+  --terminal-fg:        var(--text-primary);
+  --terminal-secondary: #b0a898;
+  --terminal-muted:     var(--text-subtle);
+  --terminal-row-alt:   #181512;
+  --terminal-border:    var(--border);
+  --terminal-shadow:    0 6px 12px rgba(0, 0, 0, 0.48);
+
+  /* ── Alert surfaces */
+  --alert-success-bg:     var(--success-bg);
+  --alert-success-border: rgba(52, 211, 153, 0.22);
+  --alert-success-text:   var(--success);
+  --alert-warning-bg:     var(--warning-bg);
+  --alert-warning-border: rgba(251, 191, 36, 0.22);
+  --alert-warning-text:   var(--warning);
+  --alert-danger-bg:      var(--danger-bg);
+  --alert-danger-border:  rgba(248, 113, 113, 0.22);
+  --alert-danger-text:    var(--danger);
+
+  /* ── Settings */
+  --setting-body-bg:        var(--bg-alt);
+  --setting-icon-bg:        var(--bg-base);
+  --setting-icon-active-bg: var(--accent-subtle);
+
+  /* ── Skeleton */
+  --skeleton-base:      var(--bg-panel);
+  --skeleton-highlight: var(--bg-elevated);
 
   /* ── Logo */
   --logo-mark-bg: var(--accent);
   --logo-mark-fg: var(--accent-fg);
 
-  /* ── Shellbar */
-  --surface-header: var(--bg-base);
-  --shell-text: var(--text-primary);
-  --shell-muted: var(--text-muted);
-  --shell-border: var(--border);
-
-  /* ── Semantic states — brightened for dark bg contrast */
-  --success: #34d399;
-  --success-bg: rgba(52, 211, 153, 0.1);
-  --success-border: rgba(52, 211, 153, 0.25);
-  --warning: #fbbf24;
-  --warning-bg: rgba(251, 191, 36, 0.1);
-  --warning-border: rgba(251, 191, 36, 0.25);
-  --danger: #f87171;
-  --danger-bg: rgba(248, 113, 113, 0.1);
-  --danger-border: rgba(248, 113, 113, 0.25);
-  --info: #60a5fa;
-  --info-bg: rgba(96, 165, 250, 0.1);
-  --info-border: rgba(96, 165, 250, 0.28);
-  --neutral-bg: rgba(255, 255, 255, 0.04);
-
-  /* ── Status */
-  --status-active-bg: var(--success-bg);
-  --status-running-bg: var(--accent-subtle);
-  --status-killed-bg: var(--danger-bg);
-  --status-paused-bg: var(--warning-bg);
-  --status-neutral-bg: var(--bg-panel);
-
-  /* ── Shadows */
-  --shadow-xs-value: 0 1px 2px rgba(0, 0, 0, 0.6);
-  --shadow-sm-value: 0 2px 4px rgba(0, 0, 0, 0.7);
-  --shadow-card-value: 0 2px 6px rgba(0, 0, 0, 0.4);
-  --shadow-elevated-value: 0 16px 32px rgba(0, 0, 0, 0.75);
-  --shadow-lg-value: 0 20px 40px rgba(0, 0, 0, 0.8);
-  --shadow-modal: 0 32px 64px rgba(0, 0, 0, 0.9);
-  --focus-ring: 0 0 0 3px rgba(194, 65, 12, 0.34);
-  --setting-icon-active-shadow: var(--shadow-xs-value);
-  --overlay-scrim: color-mix(in srgb, var(--bg-base) 34%, black);
-
-  /* ── Component surface tokens */
-  --surface-card: var(--bg-panel);
-  --surface-card-highlight: rgba(255, 255, 255, 0.02);
-  --surface-card-edge: var(--border);
-  --subtle-panel-bg: var(--bg-alt);
-  --subtle-panel-border: var(--border);
-  --divider: var(--border);
-
-  /* ── Buttons */
-  --button-action-bg: var(--accent);
-  --button-action-hover-bg: var(--accent-hover);
-  --button-action-border: var(--accent);
-  --button-action-hover-border: var(--accent-hover);
-  --button-action-fg: var(--accent-fg);
-  --button-download-bg: color-mix(in srgb, var(--bg-panel) 86%, var(--bg-elevated));
-  --button-download-hover-bg: rgba(244, 239, 229, 0.07);
-  --button-download-border: rgba(244, 239, 229, 0.2);
-  --button-download-hover-border: var(--accent-text);
-  --button-download-fg: var(--accent-text);
-  --button-destructive-bg: var(--bg-panel);
-  --button-destructive-hover-bg: rgba(248, 113, 113, 0.08);
-  --button-destructive-border: rgba(248, 113, 113, 0.22);
-  --button-destructive-hover-border: var(--danger);
-  --button-destructive-fg: var(--danger);
-  --button-neutral-bg: color-mix(in srgb, var(--bg-panel) 88%, var(--bg-elevated));
-  --button-neutral-hover-bg: var(--bg-elevated);
-  --button-neutral-border: var(--border);
-  --button-neutral-hover-border: var(--border-strong);
-  --button-neutral-fg: var(--text-primary);
-  --button-quiet-bg: transparent;
-  --button-quiet-hover-bg: rgba(244, 239, 229, 0.055);
-  --button-quiet-border: transparent;
-  --button-quiet-fg: var(--text-secondary);
-  --button-quiet-hover-fg: var(--text-primary);
-  --button-topbar-bg: rgba(244, 239, 229, 0.04);
-  --button-topbar-hover-bg: rgba(244, 239, 229, 0.08);
-  --button-topbar-border: transparent;
-  --button-topbar-fg: var(--shell-text);
-
-  /* ── Form controls */
-  --segmented-bg: rgba(244, 239, 229, 0.035);
-  --tab-active-fg: var(--text-primary);
-  --slider-thumb-border: var(--bg-base);
-  --toggle-track-off: #3f3f46;
-
-  /* ── Terminal */
-  --terminal-bg: #14120f;
-  --terminal-fg: var(--text-primary);
-  --terminal-secondary: #b3a896;
-  --terminal-muted: var(--text-faint);
-  --terminal-row-alt: #1b1814;
-  --terminal-code-bg: var(--bg-base);
-  --terminal-border: var(--border);
-  --terminal-shadow: 0 6px 12px rgba(0, 0, 0, 0.5);
-
-  /* ── Alert tokens */
-  --alert-success-bg: var(--success-bg);
-  --alert-success-border: rgba(52, 211, 153, 0.25);
-  --alert-success-text: var(--success);
-  --alert-warning-bg: var(--warning-bg);
-  --alert-warning-border: rgba(251, 191, 36, 0.25);
-  --alert-warning-text: var(--warning);
-  --alert-danger-bg: var(--danger-bg);
-  --alert-danger-border: rgba(248, 113, 113, 0.25);
-  --alert-danger-text: var(--danger);
-
-  /* ── Settings panel */
-  --setting-body-bg: var(--bg-alt);
-  --setting-icon-bg: var(--bg-base);
-  --setting-icon-active-bg: var(--accent-subtle);
-
-  /* ── Skeleton */
-  --skeleton-base: var(--bg-panel);
-  --skeleton-highlight: var(--bg-elevated);
+  /* ── Backward-compat aliases */
+  --bg-panel-strong:         var(--bg-well);
+  --text-faint:              var(--text-subtle);
+  --surface-sunken:          var(--bg-alt);
+  --divider:                 var(--border);
+  --subtle-panel-bg:         var(--bg-alt);
+  --subtle-panel-border:     var(--border);
+  --surface-card:            var(--bg-panel);
+  --surface-card-edge:       var(--border);
+  --accent-dim:              rgba(194, 65, 12, 0.30);
+  --accent-text:             #ffa875;
+  --button-action-bg:        var(--btn-primary-bg);
+  --button-action-hover-bg:  var(--btn-primary-hover-bg);
+  --button-action-border:    var(--btn-primary-border);
+  --button-action-hover-border: var(--btn-primary-hover-border);
+  --button-action-fg:        var(--btn-primary-fg);
+  --button-download-bg:      var(--btn-secondary-bg);
+  --button-download-hover-bg: var(--btn-secondary-hover-bg);
+  --button-download-border:  var(--btn-secondary-border);
+  --button-download-hover-border: var(--btn-secondary-hover-border);
+  --button-download-fg:      var(--btn-secondary-fg);
+  --button-destructive-bg:   var(--btn-destructive-bg);
+  --button-destructive-hover-bg: var(--btn-destructive-hover-bg);
+  --button-destructive-border: var(--btn-destructive-border);
+  --button-destructive-hover-border: var(--btn-destructive-hover-border);
+  --button-destructive-fg:   var(--btn-destructive-fg);
+  --button-neutral-bg:       var(--btn-neutral-bg);
+  --button-neutral-hover-bg: var(--btn-neutral-hover-bg);
+  --button-neutral-border:   var(--btn-neutral-border);
+  --button-neutral-hover-border: var(--btn-neutral-hover-border);
+  --button-neutral-fg:       var(--btn-neutral-fg);
+  --button-quiet-bg:         var(--btn-ghost-bg);
+  --button-quiet-hover-bg:   var(--btn-ghost-hover-bg);
+  --button-quiet-border:     var(--btn-ghost-border);
+  --button-quiet-fg:         var(--btn-ghost-fg);
+  --button-quiet-hover-fg:   var(--btn-ghost-hover-fg);
+  --button-topbar-bg:        var(--btn-topbar-bg);
+  --button-topbar-hover-bg:  var(--btn-topbar-hover-bg);
+  --button-topbar-border:    var(--btn-topbar-border);
+  --button-topbar-fg:        var(--btn-topbar-fg);
+  --metric-runs-color:       var(--accent);
+  --metric-active-color:     var(--success);
+  --metric-records-color:    var(--warning);
+  --metric-domains-color:    var(--info);
 
   background: var(--bg-base);
 }
@@ -562,7 +646,7 @@ html {
   min-height: 100%;
   background: var(--bg-base);
   scrollbar-gutter: stable;
-  font-size: 100%; /* respects browser font-size preference (WCAG 1.4.4) */
+  font-size: 100%; /* respects user browser font-size (WCAG 1.4.4) */
 }
 
 body {
@@ -573,21 +657,18 @@ body {
   background-image:
     radial-gradient(
       circle at 16px 16px,
-      color-mix(in srgb, var(--border) 22%, transparent) 1px,
+      color-mix(in srgb, var(--border) 20%, transparent) 1px,
       transparent 1.5px
     ),
-    linear-gradient(color-mix(in srgb, var(--border) 8%, transparent) 1px, transparent 1px),
-    linear-gradient(90deg, color-mix(in srgb, var(--border) 8%, transparent) 1px, transparent 1px);
+    linear-gradient(color-mix(in srgb, var(--border) 7%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--border) 7%, transparent) 1px, transparent 1px);
   background-size: 40px 40px;
   background-position: center top;
   color: var(--text-primary);
   font-family: var(--font-primary-family);
   font-size: var(--text-base);
-  line-height: 1.5; /* WCAG 1.4.12: paragraph text line-height ≥ 1.5 */
-  font-feature-settings:
-    'cv11' 1,
-    'ss01' 1,
-    'calt' 1;
+  line-height: 1.5; /* WCAG 1.4.12 */
+  font-feature-settings: 'cv11' 1, 'ss01' 1, 'calt' 1;
   font-optical-sizing: auto;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -595,12 +676,7 @@ body {
   text-size-adjust: 100%;
 }
 
-h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
+h1, h2, h3, h4, h5, h6 {
   margin: 0;
   font-weight: var(--weight-bold);
   line-height: 1.2;
@@ -616,7 +692,7 @@ p:last-child {
   margin-block-end: 0;
 }
 
-/* Theme transition suppression — prevents flash on theme toggle */
+/* Theme-toggle transition suppression — prevents flash */
 html[data-theme-transition] *,
 html[data-theme-transition] *::before,
 html[data-theme-transition] *::after {
@@ -661,10 +737,7 @@ samp {
 }
 
 /* ── Form elements inherit font */
-button,
-input,
-textarea,
-select {
+button, input, textarea, select {
   font: inherit;
 }
 
@@ -680,24 +753,22 @@ button,
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Disabled state (WCAG 1.4.3 — communicates non-interactivity) */
+/* ── Disabled state (WCAG 1.4.3) */
 button:disabled,
 [role='button'][aria-disabled='true'],
 input:disabled,
 select:disabled,
 textarea:disabled {
-  opacity: 0.45;
+  opacity: 0.42;
   cursor: not-allowed;
   pointer-events: none;
 }
 
-/* ── Focus rings
-   WCAG 2.4.7 + 2.4.11: minimum 3:1 contrast ratio of focus indicator.
-   Keyboard-only (focus-visible), not mouse (focus).                          */
+/* ── Focus rings — keyboard-only (WCAG 2.4.7 + 2.4.11) */
 :focus-visible {
   outline: 2.5px solid var(--accent);
   outline-offset: 2px;
-  forced-color-adjust: auto; /* visible in Windows High Contrast */
+  forced-color-adjust: auto;
 }
 :focus:not(:focus-visible) {
   outline: none;
@@ -716,47 +787,46 @@ textarea:disabled {
 
 /* ── Text selection */
 ::selection {
-  background: color-mix(in srgb, var(--accent) 26%, transparent);
+  background: color-mix(in srgb, var(--accent) 24%, transparent);
   color: var(--text-primary);
 }
 
 /* ── Scrollbar */
 ::-webkit-scrollbar {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--text-muted) 40%, transparent);
-  border-radius: 999px;
+  background: color-mix(in srgb, var(--text-muted) 36%, transparent);
+  border-radius: var(--radius-full);
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: color-mix(in srgb, var(--text-muted) 65%, transparent);
+  background: color-mix(in srgb, var(--text-muted) 60%, transparent);
 }
 * {
   scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--text-muted) 40%, transparent) transparent;
+  scrollbar-color: color-mix(in srgb, var(--text-muted) 36%, transparent) transparent;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    TYPE SYSTEM — 4-tier hierarchy
    ─────────────────────────────────────────────────────────────────────────
-   TIER 1  DISPLAY    Hero numbers, KPI values — mono, tabular, tight
-   TIER 2  HEADING    Page/section titles — sans, semibold/bold
-   TIER 3  BODY       Reading content, control labels — sans, normal
-   TIER 4  LABEL      Column headers, field labels, captions — mono/sans, upper
-   ─────────────────────────────────────────────────────────────────────────
-   Rule: font-weight values are standard integers (100–900).
-         650 was non-standard and snapped to 700 in all browsers.
+   T1  DISPLAY   Hero numbers, KPI values — bold, tight, tabular
+   T2  HEADING   Page/section titles — display font, semibold/bold
+   T3  BODY      Reading content, control labels — sans, normal/medium
+   T4  LABEL     Column headers, captions — uppercase, tracked
+
+   Weights are standard integers (100–900) only.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-/* ── TIER 1: Display */
+/* ── T1: Display */
 .type-display {
   font-family: var(--font-display-family);
   font-size: var(--text-2xl);
-  font-weight: 700;
+  font-weight: var(--weight-bold);
   line-height: 1;
   letter-spacing: -0.03em;
   font-variant-numeric: tabular-nums;
@@ -769,13 +839,13 @@ textarea:disabled {
   font-size: var(--text-lg);
   font-weight: var(--weight-semibold);
   line-height: 1;
-  letter-spacing: -0.025em;
+  letter-spacing: -0.022em;
   font-variant-numeric: tabular-nums;
   font-synthesis: none;
   color: var(--text-primary);
 }
 
-/* ── TIER 2: Heading */
+/* ── T2: Headings */
 .type-heading-1 {
   font-family: var(--font-display-family);
   font-size: var(--text-2xl);
@@ -791,7 +861,7 @@ textarea:disabled {
   font-size: var(--text-xl);
   font-weight: var(--weight-semibold);
   line-height: 1.2;
-  letter-spacing: var(--tracking-normal);
+  letter-spacing: -0.01em;
   color: var(--text-primary);
 }
 
@@ -799,12 +869,12 @@ textarea:disabled {
   font-family: var(--font-display-family);
   font-size: var(--text-lg);
   font-weight: var(--weight-semibold);
-  line-height: 1.35;
+  line-height: 1.3;
   letter-spacing: var(--tracking-normal);
   color: var(--text-primary);
 }
 
-/* Subheading — card titles, drawer headers, named groups */
+/* Card titles, drawer headers, named groups */
 .type-subheading {
   font-family: var(--font-display-family);
   font-size: var(--text-sm);
@@ -814,38 +884,29 @@ textarea:disabled {
   color: var(--text-primary);
 }
 
-/* Backward-compat alias — prefer type-heading-* above */
-.type-heading {
-  font-family: var(--font-display-family);
-  font-weight: var(--weight-semibold);
-  line-height: 1.2;
-  letter-spacing: var(--tracking-tight);
-  color: var(--text-primary);
-}
-
-/* ── TIER 3: Body */
+/* ── T3: Body */
 .type-body {
   font-size: var(--text-base);
   font-weight: var(--weight-normal);
-  line-height: 1.5;
+  line-height: 1.55;
   color: var(--text-secondary);
 }
 
 .type-body-sm {
   font-size: var(--text-sm);
   font-weight: var(--weight-normal);
-  line-height: 1.5;
+  line-height: 1.55;
   color: var(--text-secondary);
 }
 
-/* Control — buttons, tabs, interactive affordances */
+/* Buttons, tabs, interactive affordances */
 .type-control {
   font-size: var(--text-sm);
   font-weight: var(--weight-semibold);
   line-height: 1.25;
 }
 
-/* ── TIER 4: Label */
+/* ── T4: Labels */
 .type-label {
   font-family: var(--font-primary-family);
   font-size: var(--text-2xs);
@@ -867,17 +928,6 @@ textarea:disabled {
   font-synthesis: none;
 }
 
-/* Backward-compat alias — identical to type-label; consolidate in future */
-.type-micro-label {
-  font-family: var(--font-primary-family);
-  font-size: var(--text-2xs);
-  font-weight: var(--weight-semibold);
-  letter-spacing: var(--tracking-wider);
-  text-transform: uppercase;
-  line-height: 1;
-  color: var(--text-muted);
-}
-
 .type-caption {
   font-size: var(--text-xs);
   font-weight: var(--weight-normal);
@@ -895,7 +945,7 @@ textarea:disabled {
   font-variant-numeric: tabular-nums;
 }
 
-/* ── Metric — KPI number blocks */
+/* KPI number blocks */
 .type-metric {
   font-family: var(--font-mono-family);
   font-weight: var(--weight-bold);
@@ -903,6 +953,26 @@ textarea:disabled {
   letter-spacing: -0.025em;
   font-variant-numeric: tabular-nums;
   font-synthesis: none;
+  color: var(--text-primary);
+}
+
+/* ─── deprecated aliases — keep building; remove in next major version ─── */
+/* type-micro-label → type-label */
+.type-micro-label {
+  font-family: var(--font-primary-family);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+  line-height: 1;
+  color: var(--text-muted);
+}
+/* type-heading → type-heading-2/3 depending on context */
+.type-heading {
+  font-family: var(--font-display-family);
+  font-weight: var(--weight-semibold);
+  line-height: 1.2;
+  letter-spacing: var(--tracking-tight);
   color: var(--text-primary);
 }
 
@@ -959,125 +1029,133 @@ textarea:disabled {
 
 /* ═══════════════════════════════════════════════════════════════════════════
    BUTTON SURFACES
+   ─────────────────────────────────────────────────────────────────────────
+   .ui-button        — base structure; apply one surface modifier below
+   .ui-button-{sm|md|lg} — size modifiers via scoped custom properties
+   .button-*-surface — background / border / fg tokens per variant
    ═══════════════════════════════════════════════════════════════════════════ */
 .ui-button {
-  height: var(--button-height) !important;
-  font-size: var(--button-font-size) !important;
-  font-weight: var(--weight-semibold) !important;
+  --_h:  var(--btn-height);
+  --_fs: var(--btn-font-size);
+  --_px: var(--btn-padding-x);
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--_h);
+  padding-inline: var(--_px);
+  font-size: var(--_fs);
+  font-weight: var(--weight-semibold);
   letter-spacing: 0;
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, white 18%, transparent),
-    var(--shadow-xs-value);
-}
-
-.ui-button svg {
-  color: inherit !important;
-  stroke: currentColor;
-}
-
-.ui-button-sm {
-  --button-height: var(--control-height-sm) !important;
-  --button-font-size: var(--text-xs) !important;
-  --button-padding-x: 10px !important;
-  border-radius: var(--radius-sm) !important;
-  gap: 6px !important;
-}
-
-.ui-button-md {
-  --button-height: var(--control-height) !important;
-  --button-font-size: var(--text-sm) !important;
-  --button-padding-x: 14px !important;
-}
-
-.ui-button-lg {
-  --button-height: var(--control-height-lg) !important;
-  --button-font-size: var(--text-base) !important;
-  --button-padding-x: 16px !important;
-}
-
-/* Surface variants — background/border/fg tokens */
-.button-action-surface,
-.button-download-surface,
-.button-destructive-surface,
-.button-neutral-surface,
-.button-quiet-surface,
-.button-topbar-surface {
+  border-radius: var(--radius-md);
+  border: var(--interactive-border-width) solid transparent;
+  gap: var(--space-2);
+  white-space: nowrap;
+  text-decoration: none;
+  user-select: none;
   box-shadow:
     inset 0 1px 0 color-mix(in srgb, white 16%, transparent),
     var(--shadow-xs-value);
 }
 
+.ui-button svg {
+  color: inherit;
+  stroke: currentColor;
+  flex-shrink: 0;
+}
+
+.ui-button-sm {
+  --_h:  var(--btn-height);
+  --_fs: var(--btn-font-size);
+  --_px: 10px;
+  border-radius: var(--radius-sm);
+  gap: 6px;
+}
+
+.ui-button-md {
+  --_h:  var(--btn-height);
+  --_fs: var(--btn-font-size);
+  --_px: 13px;
+}
+
+.ui-button-lg {
+  --_h:  var(--btn-height);
+  --_fs: var(--btn-font-size);
+  --_px: 16px;
+}
+
+/* ── Surface variants */
 .button-action-surface {
-  border-color: var(--button-action-border);
-  background: var(--button-action-bg);
-  color: var(--button-action-fg);
+  background: var(--btn-primary-bg);
+  border-color: var(--btn-primary-border);
+  color: var(--btn-primary-fg);
 }
 .button-action-surface:hover:not(:disabled) {
-  border-color: var(--button-action-hover-border);
-  background: var(--button-action-hover-bg);
+  background: var(--btn-primary-hover-bg);
+  border-color: var(--btn-primary-hover-border);
   box-shadow:
     inset 0 1px 0 color-mix(in srgb, white 18%, transparent),
-    0 5px 14px color-mix(in srgb, var(--accent) 24%, transparent);
+    0 4px 12px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
 .button-download-surface {
-  border-color: var(--button-download-border);
-  background: var(--button-download-bg);
-  color: var(--button-download-fg);
+  background: var(--btn-secondary-bg);
+  border-color: var(--btn-secondary-border);
+  color: var(--btn-secondary-fg);
 }
 .button-download-surface:hover:not(:disabled) {
-  border-color: var(--button-download-hover-border);
-  background: var(--button-download-hover-bg);
+  background: var(--btn-secondary-hover-bg);
+  border-color: var(--btn-secondary-hover-border);
 }
 
 .button-destructive-surface {
-  border-color: var(--button-destructive-border);
-  background: var(--button-destructive-bg);
-  color: var(--button-destructive-fg);
+  background: var(--btn-destructive-bg);
+  border-color: var(--btn-destructive-border);
+  color: var(--btn-destructive-fg);
 }
 .button-destructive-surface:hover:not(:disabled) {
-  border-color: var(--button-destructive-hover-border);
-  background: var(--button-destructive-hover-bg);
+  background: var(--btn-destructive-hover-bg);
+  border-color: var(--btn-destructive-hover-border);
 }
 
 .button-neutral-surface {
-  border-color: var(--button-neutral-border);
-  background: var(--button-neutral-bg);
-  color: var(--button-neutral-fg);
+  background: var(--btn-neutral-bg);
+  border-color: var(--btn-neutral-border);
+  color: var(--btn-neutral-fg);
 }
 .button-neutral-surface:hover:not(:disabled) {
-  border-color: var(--button-neutral-hover-border);
-  background: var(--button-neutral-hover-bg);
+  background: var(--btn-neutral-hover-bg);
+  border-color: var(--btn-neutral-hover-border);
   box-shadow:
     inset 0 1px 0 color-mix(in srgb, white 18%, transparent),
     var(--shadow-sm-value);
 }
 
 .button-quiet-surface {
-  border-color: var(--button-quiet-border);
-  background: var(--button-quiet-bg);
-  color: var(--button-quiet-fg);
+  background: var(--btn-ghost-bg);
+  border-color: var(--btn-ghost-border);
+  color: var(--btn-ghost-fg);
   box-shadow: none;
 }
 .button-quiet-surface:hover:not(:disabled) {
-  background: var(--button-quiet-hover-bg);
-  color: var(--button-quiet-hover-fg);
+  background: var(--btn-ghost-hover-bg);
+  color: var(--btn-ghost-hover-fg);
 }
 
 .button-topbar-surface {
-  border-color: var(--button-topbar-border);
-  background: var(--button-topbar-bg);
-  color: var(--button-topbar-fg);
+  background: var(--btn-topbar-bg);
+  border-color: var(--btn-topbar-border);
+  color: var(--btn-topbar-fg);
   box-shadow: none;
 }
 .button-topbar-surface:hover:not(:disabled) {
-  background: var(--button-topbar-hover-bg);
+  background: var(--btn-topbar-hover-bg);
 }
 
 .button-link-surface {
   height: auto;
-  border-color: transparent;
   background: transparent;
+  border-color: transparent;
   color: var(--accent-text);
   padding: 0;
   text-decoration: underline;
@@ -1089,32 +1167,19 @@ textarea:disabled {
   background: transparent;
 }
 
-/* Anchors styled as buttons — color must not be overridden by browser <a> default.
-   One rule per variant; hover/focus-visible inherit via !important on base.    */
-a.ui-button.button-action-surface {
-  color: var(--button-action-fg) !important;
-}
-a.ui-button.button-download-surface {
-  color: var(--button-download-fg) !important;
-}
-a.ui-button.button-destructive-surface {
-  color: var(--button-destructive-fg) !important;
-}
-a.ui-button.button-neutral-surface {
-  color: var(--button-neutral-fg) !important;
-}
-a.ui-button.button-quiet-surface {
-  color: var(--button-quiet-fg) !important;
-}
-a.ui-button.button-quiet-surface:hover {
-  color: var(--button-quiet-hover-fg) !important;
-}
+/* Anchors styled as buttons — prevent browser <a> color override */
+a.ui-button.button-action-surface      { color: var(--btn-primary-fg); }
+a.ui-button.button-download-surface    { color: var(--btn-secondary-fg); }
+a.ui-button.button-destructive-surface { color: var(--btn-destructive-fg); }
+a.ui-button.button-neutral-surface     { color: var(--btn-neutral-fg); }
+a.ui-button.button-quiet-surface       { color: var(--btn-ghost-fg); }
+a.ui-button.button-quiet-surface:hover { color: var(--btn-ghost-hover-fg); }
 
 .ui-on-accent-surface {
-  color: var(--button-action-fg) !important;
+  color: var(--btn-primary-fg);
 }
 
-/* ── Toggle selected */
+/* ── Toggle selected (pill toggle) */
 .toggle-selected {
   border: 1px solid var(--accent);
   background: var(--accent-subtle);
@@ -1122,23 +1187,13 @@ a.ui-button.button-quiet-surface:hover {
 }
 
 /* ── Toggle track/thumb */
-.toggle-track-on {
-  background-color: var(--toggle-track-on);
-}
-.toggle-track-off {
-  background-color: var(--toggle-track-off);
-}
-.toggle-thumb {
-  background-color: var(--toggle-thumb);
-}
-.toggle-thumb-shadow {
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.28);
-}
+.toggle-track-on  { background-color: var(--toggle-track-on); }
+.toggle-track-off { background-color: var(--toggle-track-off); }
+.toggle-thumb     { background-color: var(--toggle-thumb); }
+.toggle-thumb-shadow { box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25); }
 
 /* ── Overlay scrim */
-.overlay-scrim {
-  background: var(--overlay-scrim);
-}
+.overlay-scrim { background: var(--overlay-scrim); }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    TOOLTIP & SEGMENTED CONTROL
@@ -1152,16 +1207,17 @@ a.ui-button.button-quiet-surface:hover {
   background: var(--segmented-bg);
   box-shadow:
     inset 0 1px 2px color-mix(in srgb, black 8%, transparent),
-    0 1px 0 color-mix(in srgb, white 12%, transparent);
+    0 1px 0 color-mix(in srgb, white 10%, transparent);
 }
 
+/* ── Workspace tabs (segmented variant with rounded corners) */
 .workspace-tabs {
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--segmented-bg);
   box-shadow:
-    inset 0 1px 2px color-mix(in srgb, black 8%, transparent),
-    0 1px 0 color-mix(in srgb, white 12%, transparent);
+    inset 0 1px 2px color-mix(in srgb, black 7%, transparent),
+    0 1px 0 color-mix(in srgb, white 10%, transparent);
 }
 
 .workspace-tab {
@@ -1173,24 +1229,22 @@ a.ui-button.button-quiet-surface:hover {
   font-weight: var(--weight-semibold);
   letter-spacing: 0;
 }
-
 .workspace-tab:hover {
-  border-color: color-mix(in srgb, var(--border-strong) 70%, transparent);
-  background: color-mix(in srgb, var(--bg-panel) 72%, transparent);
+  border-color: color-mix(in srgb, var(--border-strong) 65%, transparent);
+  background: color-mix(in srgb, var(--bg-panel) 70%, transparent);
   color: var(--text-primary);
 }
-
 .workspace-tab[data-active='true'] {
   border-color: var(--accent-border);
   background: linear-gradient(
     180deg,
-    color-mix(in srgb, var(--accent) 14%, var(--bg-panel)),
-    color-mix(in srgb, var(--accent) 8%, var(--bg-panel))
+    color-mix(in srgb, var(--accent) 13%, var(--bg-panel)),
+    color-mix(in srgb, var(--accent) 7%, var(--bg-panel))
   );
   color: var(--text-primary);
   box-shadow:
-    inset 0 1px 0 color-mix(in srgb, white 16%, transparent),
-    0 1px 2px color-mix(in srgb, var(--accent) 18%, transparent);
+    inset 0 1px 0 color-mix(in srgb, white 14%, transparent),
+    0 1px 2px color-mix(in srgb, var(--accent) 16%, transparent);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -1204,25 +1258,26 @@ a.ui-button.button-quiet-surface:hover {
   cursor: pointer;
 }
 .slider-control::-webkit-slider-runnable-track {
-  height: 4px;
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--text-muted) 30%, transparent);
+  height: 3px;
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--text-muted) 28%, transparent);
 }
 .slider-control::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
   width: 16px;
   height: 16px;
-  margin-top: -6px;
+  margin-top: -6.5px;
   border: 2px solid var(--slider-thumb-border);
   border-radius: 50%;
   background: var(--accent);
+  box-shadow: var(--shadow-sm-value);
 }
 .slider-control::-moz-range-track {
-  height: 4px;
+  height: 3px;
   border: 0;
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--text-muted) 30%, transparent);
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--text-muted) 28%, transparent);
 }
 .slider-control::-moz-range-thumb {
   width: 16px;
@@ -1230,6 +1285,7 @@ a.ui-button.button-quiet-surface:hover {
   border: 2px solid var(--slider-thumb-border);
   border-radius: 50%;
   background: var(--accent);
+  box-shadow: var(--shadow-sm-value);
 }
 .slider-control:focus-visible {
   outline: 2.5px solid var(--accent);
@@ -1239,29 +1295,17 @@ a.ui-button.button-quiet-surface:hover {
 /* ═══════════════════════════════════════════════════════════════════════════
    LAYOUT HELPERS
    ═══════════════════════════════════════════════════════════════════════════ */
-.page-stack {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
-}
-.page-stack-lg {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-6);
-}
-.section-card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
+.page-stack    { display: flex; flex-direction: column; gap: var(--space-5); }
+.page-stack-lg { display: flex; flex-direction: column; gap: var(--space-6); }
+.section-card  { display: flex; flex-direction: column; gap: var(--space-4); }
 
 .surface-muted {
-  border: 1px solid var(--subtle-panel-border);
-  background: var(--subtle-panel-bg);
+  border: 1px solid var(--border);
+  background: var(--bg-alt);
 }
 
 .card-gradient {
-  background: var(--surface-card);
+  background: var(--bg-panel);
   box-shadow: none;
 }
 
@@ -1274,39 +1318,22 @@ html:not([data-theme='dark']) .code-block {
   border-color: var(--border);
 }
 
-.filter-toolbar {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-.filter-toolbar-field {
-  min-width: 0;
-  flex: 1;
-  width: 100%;
-}
+.filter-toolbar { display: flex; flex-direction: column; gap: var(--space-2); }
+.filter-toolbar-field { min-width: 0; flex: 1; width: 100%; }
 
 /* Metric decorators */
 .ring-glow {
   position: relative;
   border-radius: 50%;
   border: 2px solid var(--accent);
-  box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 25%, transparent);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
-.metric-stripe {
-  background: var(--metric-stripe-color, var(--accent));
-}
-.metric-icon-tile {
-  background: var(--metric-icon-bg, var(--accent-soft));
-  color: var(--metric-icon-color, var(--accent));
-}
+.metric-stripe    { background: var(--metric-stripe-color, var(--accent)); }
+.metric-icon-tile { background: var(--metric-icon-bg, var(--accent-soft)); color: var(--metric-icon-color, var(--accent)); }
 
-.bg-warning\/12 {
-  background: color-mix(in srgb, var(--warning) 12%, transparent);
-}
-.bg-danger\/12 {
-  background: color-mix(in srgb, var(--danger) 12%, transparent);
-}
+.bg-warning\/12 { background: color-mix(in srgb, var(--warning) 12%, transparent); }
+.bg-danger\/12  { background: color-mix(in srgb, var(--danger) 12%, transparent); }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    ALERT SURFACES
@@ -1319,32 +1346,16 @@ html:not([data-theme='dark']) .code-block {
   box-shadow: none;
 }
 
-.alert-neutral {
-  background: var(--subtle-panel-bg);
-  border-color: var(--border);
-  color: var(--text-secondary);
-}
-.alert-success {
-  background: var(--alert-success-bg);
-  border-color: var(--alert-success-border);
-  color: var(--alert-success-text);
-}
-.alert-warning {
-  background: var(--alert-warning-bg);
-  border-color: var(--alert-warning-border);
-  color: var(--alert-warning-text);
-}
-.alert-danger {
-  background: var(--alert-danger-bg);
-  border-color: var(--alert-danger-border);
-  color: var(--alert-danger-text);
-}
+.alert-neutral     { background: var(--bg-alt); border-color: var(--border); color: var(--text-secondary); }
+.alert-success     { background: var(--alert-success-bg); border-color: var(--alert-success-border); color: var(--alert-success-text); }
+.alert-warning     { background: var(--alert-warning-bg); border-color: var(--alert-warning-border); color: var(--alert-warning-text); }
+.alert-danger      { background: var(--alert-danger-bg);  border-color: var(--alert-danger-border);  color: var(--alert-danger-text); }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    CODE BLOCK
    ═══════════════════════════════════════════════════════════════════════════ */
 .code-block {
-  background: var(--subtle-panel-bg);
+  background: var(--bg-alt);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: var(--space-3) var(--space-4);
@@ -1375,7 +1386,6 @@ html:not([data-theme='dark']) .code-block {
   overflow-y: auto;
   max-height: 320px;
   box-shadow: var(--terminal-shadow);
-  /* scrollable regions: add tabIndex in JSX for keyboard accessibility */
 }
 
 .crawl-terminal,
@@ -1387,21 +1397,21 @@ html:not([data-theme='dark']) .code-block {
   letter-spacing: 0;
 }
 
-/* Terminal shell context — overrides text/border tokens for mono surface */
+/* Terminal shell context — scoped token overrides */
 .crawl-terminal-shell {
-  --text-primary: var(--terminal-fg);
+  --text-primary:   var(--terminal-fg);
   --text-secondary: var(--terminal-secondary);
-  --text-muted: var(--terminal-muted);
-  --border: var(--terminal-border);
-  --bg-alt: var(--terminal-row-alt);
-  --bg-panel: var(--terminal-bg);
+  --text-muted:     var(--terminal-muted);
+  --border:         var(--terminal-border);
+  --bg-alt:         var(--terminal-row-alt);
+  --bg-panel:       var(--terminal-bg);
 }
 
 /* JSON viewer — always dark regardless of theme */
 .crawl-terminal-json {
-  background: #09090b !important;
-  color: #d4d4d4 !important;
-  border-color: #27272a !important;
+  background: #09090b;
+  color: #d4d4d4;
+  border-color: #27272a;
   font-family: var(--font-mono-family);
   font-size: var(--font-mono-size);
   line-height: var(--font-mono-line-height);
@@ -1411,20 +1421,20 @@ html:not([data-theme='dark']) .code-block {
   padding: var(--space-4) var(--space-5);
 }
 
-/* Force VS Code dark syntax colors in all dark-background contexts */
+/* Force VS Code dark syntax in all dark-bg contexts */
 .crawl-terminal-json,
 .bg-zinc-950,
 .bg-zinc-900,
 [data-json-dark-theme='true'] {
-  --syntax-key: #9cdcfe;
-  --syntax-string: #ce9178;
-  --syntax-number: #b5cea8;
+  --syntax-key:     #9cdcfe;
+  --syntax-string:  #ce9178;
+  --syntax-number:  #b5cea8;
   --syntax-boolean: #569cd6;
-  --syntax-null: #569cd6;
-  --syntax-punct: #d4d4d4;
+  --syntax-null:    #569cd6;
+  --syntax-punct:   #d4d4d4;
 }
 
-/* Activity log (uses sans-serif, not mono) */
+/* Activity log (sans-serif, not mono) */
 .crawl-activity-log,
 .crawl-activity-log * {
   font-family: var(--font-primary-family);
@@ -1435,42 +1445,23 @@ html:not([data-theme='dark']) .code-block {
 }
 
 /* ── JSON Syntax Highlighting */
-.syntax-key {
-  color: var(--syntax-key);
-}
-.syntax-string {
-  color: var(--syntax-string);
-}
-.syntax-number {
-  color: var(--syntax-number);
-}
-.syntax-boolean {
-  color: var(--syntax-boolean);
-}
-.syntax-null {
-  color: var(--syntax-null);
-  font-style: italic;
-}
-.syntax-punct {
-  color: var(--syntax-punct);
-}
+.syntax-key     { color: var(--syntax-key); }
+.syntax-string  { color: var(--syntax-string); }
+.syntax-number  { color: var(--syntax-number); }
+.syntax-boolean { color: var(--syntax-boolean); }
+.syntax-null    { color: var(--syntax-null); font-style: italic; }
+.syntax-punct   { color: var(--syntax-punct); }
 
 @keyframes log-entry-in {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 .log-entry-animate {
   animation: log-entry-in 180ms ease-out both;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   GLOBAL DATA TABLES
+   DATA TABLES
    ═══════════════════════════════════════════════════════════════════════════ */
 .compact-data-table {
   width: 100%;
@@ -1480,7 +1471,7 @@ html:not([data-theme='dark']) .code-block {
 }
 
 .compact-data-table thead {
-  background: var(--surface-sunken);
+  background: var(--bg-alt);
 }
 .compact-data-table thead tr th {
   border-bottom: 1px solid var(--border);
@@ -1506,7 +1497,7 @@ html:not([data-theme='dark']) .code-block {
 .compact-data-table td {
   height: var(--table-row-height);
   padding-inline: var(--space-5);
-  border-bottom: 1px solid var(--divider);
+  border-bottom: 1px solid var(--border-subtle);
   vertical-align: middle;
   color: var(--text-primary);
   font-feature-settings: 'tnum' 1;
@@ -1523,22 +1514,14 @@ html:not([data-theme='dark']) .code-block {
   border-bottom: none;
 }
 .compact-data-table tbody tr:hover {
-  background: var(--surface-sunken) !important;
+  background: var(--bg-alt);
 }
 
-/* Outer corner rounding */
-.compact-data-table thead tr:first-child th:first-child {
-  border-top-left-radius: var(--radius-md);
-}
-.compact-data-table thead tr:first-child th:last-child {
-  border-top-right-radius: var(--radius-md);
-}
-.compact-data-table tbody tr:last-child td:first-child {
-  border-bottom-left-radius: var(--radius-md);
-}
-.compact-data-table tbody tr:last-child td:last-child {
-  border-bottom-right-radius: var(--radius-md);
-}
+/* Corner rounding */
+.compact-data-table thead tr:first-child th:first-child { border-top-left-radius: var(--radius-md); }
+.compact-data-table thead tr:first-child th:last-child  { border-top-right-radius: var(--radius-md); }
+.compact-data-table tbody tr:last-child td:first-child  { border-bottom-left-radius: var(--radius-md); }
+.compact-data-table tbody tr:last-child td:last-child   { border-bottom-right-radius: var(--radius-md); }
 
 /* Light mode outer border */
 html:not([data-theme='dark']) .compact-data-table {
@@ -1553,7 +1536,9 @@ html:not([data-theme='dark']) .compact-data-table {
   box-shadow: none;
 }
 
-/* ── Commerce table variant */
+/* ═══════════════════════════════════════════════════════════════════════════
+   COMMERCE TABLE
+   ═══════════════════════════════════════════════════════════════════════════ */
 .commerce-table {
   --ct-img-size: 44px;
 }
@@ -1591,7 +1576,7 @@ html:not([data-theme='dark']) .compact-data-table {
   transition: border-color var(--transition-fast);
 }
 .commerce-table tbody tr:hover .ct-image-wrap {
-  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+  border-color: color-mix(in srgb, var(--accent) 38%, var(--border));
 }
 .commerce-table .ct-image-wrap img {
   width: 100%;
@@ -1623,9 +1608,7 @@ html:not([data-theme='dark']) .compact-data-table {
   text-decoration: underline;
   text-underline-offset: 0.15em;
 }
-.commerce-table .ct-muted {
-  color: var(--text-muted);
-}
+.commerce-table .ct-muted { color: var(--text-muted); }
 .commerce-table .ct-header-badge {
   font-size: var(--text-xs);
   font-weight: var(--weight-bold);
@@ -1701,7 +1684,7 @@ html:not([data-theme='dark']) .compact-data-table {
 
 .metric-pulse-value {
   font-family: var(--font-mono-family);
-  font-size: var(--text-2xl); /* 30px */
+  font-size: var(--text-2xl);
   font-weight: var(--weight-bold);
   color: var(--text-primary);
   line-height: 1;
@@ -1713,120 +1696,74 @@ html:not([data-theme='dark']) .compact-data-table {
 .pulse-dot {
   width: 6px;
   height: 6px;
-  border-radius: 9999px;
+  border-radius: var(--radius-full);
   background: var(--success);
   animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 @keyframes pulse-ring {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.4;
-  }
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.35; }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    SKELETON LOADER
    ═══════════════════════════════════════════════════════════════════════════ */
 @keyframes shimmer {
-  0% {
-    background-position: -600px 0;
-  }
-  100% {
-    background-position: 600px 0;
-  }
+  0%   { background-position: -600px 0; }
+  100% { background-position: 600px 0; }
 }
 
 .skeleton {
   background: linear-gradient(
     90deg,
-    var(--skeleton-base) 35%,
+    var(--skeleton-base)      35%,
     var(--skeleton-highlight) 50%,
-    var(--skeleton-base) 65%
+    var(--skeleton-base)      65%
   );
   background-size: 1200px 100%;
-  animation: shimmer 2.4s linear infinite;
+  animation: shimmer 2.2s linear infinite;
   border-radius: var(--radius-sm);
   pointer-events: none;
-  /* aria-busy="true" belongs in markup, not CSS */
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    ANIMATIONS
    ═══════════════════════════════════════════════════════════════════════════ */
 @keyframes fade-in {
-  from {
-    opacity: 0;
-    transform: translateY(3px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(3px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes dropdown-in {
-  from {
-    opacity: 0;
-    transform: translateY(-4px) scale(0.97);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
+  from { opacity: 0; transform: translateY(-4px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 @keyframes dropdown-in-up {
-  from {
-    opacity: 0;
-    transform: translateY(4px) scale(0.97);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
+  from { opacity: 0; transform: translateY(4px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 @keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
+  to { transform: rotate(360deg); }
 }
 
-.animate-fade-in {
-  animation: fade-in var(--transition-base) both;
-}
-.animate-spin-slow {
-  animation: spin 0.75s linear infinite;
-}
+.animate-fade-in  { animation: fade-in var(--transition-base) both; }
+.animate-spin-slow { animation: spin 0.75s linear infinite; }
 
-.stagger-children > * {
-  animation: fade-in 180ms ease-out both;
-}
-.stagger-children > *:nth-child(2) {
-  animation-delay: 50ms;
-}
-.stagger-children > *:nth-child(3) {
-  animation-delay: 100ms;
-}
-.stagger-children > *:nth-child(4) {
-  animation-delay: 150ms;
-}
-.stagger-children > *:nth-child(5) {
-  animation-delay: 200ms;
-}
-.stagger-children > *:nth-child(6) {
-  animation-delay: 250ms;
-}
+.stagger-children > * { animation: fade-in 180ms ease-out both; }
+.stagger-children > *:nth-child(2) { animation-delay: 50ms; }
+.stagger-children > *:nth-child(3) { animation-delay: 100ms; }
+.stagger-children > *:nth-child(4) { animation-delay: 150ms; }
+.stagger-children > *:nth-child(5) { animation-delay: 200ms; }
+.stagger-children > *:nth-child(6) { animation-delay: 250ms; }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   RESPONSIVE BREAKPOINTS
+   RESPONSIVE
    ═══════════════════════════════════════════════════════════════════════════ */
 @media (max-width: 480px) {
   :root {
-    --text-xl: 1.25rem; /* 20px on small screens */
+    --text-xl: 1.25rem;   /* 20px on small screens */
     --text-2xl: 1.625rem; /* 26px on small screens */
     --content-gutter: var(--space-4);
   }
@@ -1834,12 +1771,10 @@ html:not([data-theme='dark']) .compact-data-table {
 
 /* ═══════════════════════════════════════════════════════════════════════════
    ACCESSIBILITY — REDUCED MOTION (WCAG 2.3.3)
-   Must be last to override all animations above.
+   Must remain last to override all animations above.
    ═══════════════════════════════════════════════════════════════════════════ */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
+  *, *::before, *::after {
     animation-duration: 1ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 1ms !important;

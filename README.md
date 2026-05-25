@@ -1,10 +1,6 @@
-<div align="center">
+# CrawlerAI
 
-![CrawlerAI Logo](docs/assets/crawlerai-logo.png)
-
-# 🤖 CrawlerAI
-
-**Deterministic Web Acquisition, Extraction & Review Engine**
+**Deterministic crawl, extraction, review, monitoring, and export system**
 
 [![Python](https://img.shields.io/badge/Python-3.12%2B-blue?logo=python)](https://www.python.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-20%2B-green?logo=node.js)](https://nodejs.org/)
@@ -14,221 +10,250 @@
 [![Redis](https://img.shields.io/badge/Redis-7%2B-DC382D?logo=redis)](https://redis.io/)
 [![License](https://img.shields.io/badge/License-AGPLv3-blue.svg)](LICENSE)
 
-> 🕷️ A research-first crawling framework that prioritizes **deterministic extraction** over opaque LLM inference — for ecommerce, jobs, automobiles, and any structured target.
-
 </div>
 
----
+CrawlerAI extracts structured data from ecommerce, job, automobile, and tabular targets. It prefers deterministic evidence first: platform adapters, structured sources, JS state, network payloads, and DOM selectors. LLM calls are optional backfill only.
 
-## ✨ What Makes It Different
+## Features
 
-Most scrapers reach for the LLM first. **CrawlerAI reaches for it last.**
+| Area                   | What it does                                                                                                                               |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| HTTP-first acquisition | Starts with `curl-cffi`, escalates to Patchright/Playwright only when blocking, hydration, or browser-only content requires it.            |
+| Tiered extraction      | Runs `adapter -> structured source -> JS state -> DOM -> confidence scoring -> optional LLM gap fill`.                                     |
+| Surface-aware crawling | Supports ecommerce listing/detail, job listing/detail, automobile listing/detail, and tabular surfaces.                                    |
+| Domain memory          | Stores reusable run profiles, cookie state, learned selectors, acquisition evidence, and field feedback by normalized `(domain, surface)`. |
+| Review workflow        | Lets operators inspect crawl records, artifact HTML, selector candidates, field winners, and promote domain selectors.                     |
+| Exports                | Produces JSON, CSV, artifact bundles, and Discoverist-style exports from persisted crawl records.                                          |
+| Product Intelligence   | Discovers matching products, scores candidates, launches candidate crawls, reviews matches, and can create monitors from accepted jobs.    |
+| Data enrichment        | Builds ecommerce enrichment jobs from persisted detail records with deterministic taxonomy, attribute, and pricing normalization.          |
+| Product monitors       | Schedules recurring crawl runs, diffs tracked fields, stores snapshots/events, and emits in-app notifications.                             |
+| Agentic Delta alerts   | Adds single-product price/availability alerts with sandboxed conditions, test polling, history, and webhook delivery logs.                 |
+| Public API v1          | Exposes API-key authenticated extraction, domain lookup, capabilities, and alert endpoints under `/api/v1`.                                |
+| MCP wrappers           | Provides a hosted FastMCP server for product extraction tools and a stdio alert wrapper over public alert endpoints.                       |
+| Orchestration          | Groups projects and workflows around normal crawl runs; current workflow supports competitive pricing snapshots and monitor promotion.     |
+| UCP audit              | Runs deterministic UCP compliance audits, stores report artifacts, and exports JSON/Markdown repair roadmaps.                              |
+| Observability          | Uses structured logs, correlation IDs, health checks, Prometheus metrics, run logs, and artifact capture.                                  |
 
-We believe structured data should be extracted with **surgical precision**, not probabilistic guesses. The system exhausts every deterministic tier — platform adapters, JSON-LD, Open Graph, network payloads, DOM selectors — before ever calling an LLM. And when an LLM does run, it's **explicitly opt-in** and only fills gaps the machine couldn't close.
-
----
-
-## 🚀 Key Features
-
-| Feature | Description |
-|---------|-------------|
-| 🔍 **HTTP-First, Browser-Second** | Intelligent escalation from `curl-cffi` to Playwright only when anti-bot walls or JS hydration demand it |
-| 🧠 **Tiered Extraction Pipeline** | `Adapter → Structured Sources → DOM → Confidence Scoring → LLM Backfill (opt-in)` |
-| 🏪 **Multi-Domain Intelligence** | First-class support for **ecommerce**, **job boards**, **automotive listings**, and **tabular data** with surface-aware adapters |
-| 🔄 **Self-Healing Selectors** | Selector memory scoped by `(domain, surface)` auto-learns, repairs, and validates XPath/CSS improvements |
-| 🧬 **Domain Memory & Contracts** | Learned acquisition contracts, cookie state, and execution profiles persist per domain for faster repeat runs |
-| 🛡️ **Anti-Block Resilience** | BrowserForge fingerprints, patchright stealth, cookie reuse, and block-detection with content recovery |
-| 📊 **Data Enrichment Layer** | Derive semantic product fields (taxonomy, attributes, normalized pricing) from extracted crawl records |
-| 🧪 **Observability Built-In** | `structlog` tracing + `prometheus-client` metrics with per-run diagnostics and artifact capture |
-| 🎛️ **Modern UI** | Next.js 16 + React 19 + Tailwind CSS v4 dashboard with crawl studio, run review, and selector promotion |
-| ⚡ **Async Workers** | Celery + Redis task queue for scalable background acquisition and extraction |
-
----
-
-## 🏗️ Architecture
+## Architecture
 
 ```mermaid
-graph TD
-    A[URL Input] --> B{HTTP Acquisition<br/>curl-cffi}
-    B -->|Blocked / JS Needed| C[Playwright<br/>patchright + BrowserForge]
-    B -->|Success| D[Acquisition Result]
-    C --> D
-    
-    D --> E[Extraction Pipeline]
-    
-    E --> F1[Platform Adapter<br/>Known Platforms]
-    E --> F2[Structured Sources<br/>JSON-LD / Microdata / OG / Network Payloads]
-    E --> F3[JS State Mapper<br/>Nuxt / React State]
-    E --> F4[DOM Selectors<br/>XPath / CSS]
-    
-    F1 --> G[Field Candidates]
-    F2 --> G
-    F3 --> G
-    F4 --> G
-    
-    G --> H[Confidence Scoring<br/>Field-by-Field Winner]
-    
-    H --> I{Gaps Remain?}
-    I -->|Yes & LLM Enabled| J[LLM Backfill<br/>Opt-In Only]
-    I -->|No / LLM Disabled| K[Final Record]
-    J --> K
-    
-    K --> L[Persist<br/>CrawlRecord]
-    L --> M[Export<br/>JSON / CSV / Markdown]
-    M --> N[Enrich<br/>Product Intelligence]
-    N --> O[Review<br/>Selector Promotion]
-    
-    O -.->|Selector Memory| F4
-    O -.->|Domain Profile| B
+flowchart TD
+    A[User/API request] --> B[Crawl run settings]
+    B --> C[Acquisition policy]
+    C --> D{HTTP enough?}
+    D -->|yes| E[HTTP result]
+    D -->|no| F[Patchright/Playwright result]
+    E --> G[Extraction loop]
+    F --> G
+    G --> H[Adapters]
+    G --> I[Structured sources]
+    G --> J[JS state and network payloads]
+    G --> K[DOM selectors]
+    H --> L[Field candidates]
+    I --> L
+    J --> L
+    K --> L
+    L --> M[Confidence scoring]
+    M --> N{Gaps remain and LLM enabled?}
+    N -->|yes| O[LLM backfill]
+    N -->|no| P[Persist crawl records]
+    O --> P
+    P --> Q[Review and exports]
+    P --> R[Enrichment]
+    P --> S[Monitors and alerts]
+    P --> T[Public API and MCP]
+    Q -. selector learning .-> K
+    S -. run profiles .-> B
 ```
 
-### Tech Stack
+## Tech Stack
 
-| Layer | Technology |
-|-------|------------|
-| **Frontend** | Next.js 16 · React 19 · Tailwind CSS v4 · Radix UI · TanStack Query · Recharts · Zustand |
-| **API** | FastAPI · Uvicorn · Pydantic v2 · asyncpg · SQLAlchemy 2.0 · Alembic |
-| **Workers** | Celery · Redis |
-| **Browser** | Playwright (patchright) · BrowserForge |
-| **Extraction** | BeautifulSoup4 · selectolax · lxml · extruct · JMESPath · glom |
-| **Observability** | structlog · prometheus-client |
-| **Testing** | pytest · Vitest · Playwright · MSW |
+| Layer         | Tools                                                                              |
+| ------------- | ---------------------------------------------------------------------------------- |
+| Backend API   | FastAPI, Uvicorn, Pydantic v2, SQLAlchemy 2, asyncpg, Alembic                      |
+| Workers       | Celery, Redis                                                                      |
+| Acquisition   | `curl-cffi`, Patchright/Playwright, BrowserForge                                   |
+| Extraction    | BeautifulSoup4, selectolax, lxml, extruct, JMESPath, glom                          |
+| Frontend      | Next.js 16, React 19, Tailwind CSS v4, Radix UI, TanStack Query, Recharts, Zustand |
+| Testing       | pytest, Vitest, Playwright, MSW                                                    |
+| Observability | structlog, prometheus-client                                                       |
 
----
+## Prerequisites
 
-## 🛠️ Quick Start
+- Python 3.12+
+- Node.js 20+
+- PostgreSQL 15+
+- Redis 7+
 
-### Prerequisites
+## Quickstart
 
-- Python ≥ 3.12
-- Node.js ≥ 20
-- PostgreSQL ≥ 15
-- Redis ≥ 7
-
-### 1. Configure
-
-```bash
+```powershell
 cp .env.example .env
-# Edit .env with your DB, Redis, and secret values
 ```
 
-### 2. Backend
+Edit `.env` before first run. Minimum local values:
 
-```bash
-cd backend
-python -m venv .venv
+| Variable                                              | Required | Default/example                                                   | Notes                                              |
+| ----------------------------------------------------- | -------- | ----------------------------------------------------------------- | -------------------------------------------------- |
+| `DATABASE_URL`                                        | Yes      | `postgresql+asyncpg://postgres:postgres@localhost:5432/crawlerai` | PostgreSQL database.                               |
+| `REDIS_URL`                                           | Yes      | `redis://localhost:6379/0`                                        | Queue, scheduler, and cache dependency.            |
+| `JWT_SECRET_KEY`                                      | Yes      | `replace-with-64-byte-random-secret`                              | Replace for real use.                              |
+| `ENCRYPTION_KEY`                                      | Yes      | `replace-with-32-byte-minimum-secret`                             | Replace for real use.                              |
+| `DEFAULT_ADMIN_EMAIL`                                 | Yes      | `admin@example.com`                                               | Bootstrap admin identity.                          |
+| `DEFAULT_ADMIN_PASSWORD`                              | Yes      | `replace-with-strong-admin-password`                              | Replace before login.                              |
+| `CELERY_DISPATCH_ENABLED`                             | No       | `false`                                                           | Keep `false` for simple local in-process runs.     |
+| `LEGACY_INPROCESS_RUNNER_ENABLED`                     | No       | `true`                                                            | Lets local crawls run without Celery worker setup. |
+| `ANTHROPIC_API_KEY`, `GROQ_API_KEY`, `NVIDIA_API_KEY` | No       | empty                                                             | Only needed for enabled LLM backfill tasks.        |
 
-# Windows
-.venv\Scripts\pip install -e ".[dev]"
-.venv\Scripts\python init_db.py
-
-# macOS / Linux
-.venv/bin/pip install -e ".[dev]"
-.venv/bin/python init_db.py
-```
-
-### 3. Frontend
-
-```bash
-cd frontend
-npm install
-```
-
-### 4. Run
-
-```bash
-# One-shot (Windows)
-start.bat
-
-# Or manually — Terminal 1
-cd backend && .venv\Scripts\python run_dev_server.py
-
-# Terminal 2
-cd frontend && npm run dev
-```
-
-API → `http://127.0.0.1:8000`  
-UI  → `http://127.0.0.1:3000`
-
----
-
-## 🧪 Testing
-
-**Backend**
+### Backend
 
 ```powershell
 cd backend
-$env:PYTHONPATH = '.'
+python -m venv .venv
+.\.venv\Scripts\pip install -e ".[dev]"
+.\.venv\Scripts\python init_db.py
+.\.venv\Scripts\python run_dev_server.py
+```
+
+API: `http://127.0.0.1:8000`
+
+### Frontend
+
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+
+UI: `http://127.0.0.1:3000`
+
+### One-Shot Windows Start
+
+```powershell
+.\start.bat
+```
+
+## Main Routes
+
+| Route                   | Purpose                                                                     |
+| ----------------------- | --------------------------------------------------------------------------- |
+| `/dashboard`            | Run summary, recent jobs, and metrics.                                      |
+| `/crawl`                | Crawl Studio for single, batch, CSV, and review workflows.                  |
+| `/product-intelligence` | Product discovery, candidate review, and monitor creation.                  |
+| `/monitors`             | Recurring extraction monitors with events, history, snapshots, and exports. |
+| `/alerts`               | Product price/availability alerts with optional webhooks.                   |
+| `/projects`             | Orchestration projects and competitive pricing workflows.                   |
+| `/ucp-audit`            | UCP compliance audit jobs and repair-roadmap exports.                       |
+| `/admin/llm`            | Runtime LLM provider configuration, test connection, and cost log.          |
+| `/admin/users`          | Admin user management.                                                      |
+
+## API Surfaces
+
+| Prefix                                         | Purpose                                                                             |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `/api/crawls`                                  | Run creation, status, records, logs, domain recipes, and exports.                   |
+| `/api/selectors`                               | Selector CRUD, suggestions, tests, and preview HTML.                                |
+| `/api/review`                                  | Review payload, artifact HTML, and field mapping save.                              |
+| `/api/data-enrichment`                         | Enrichment job creation and result lookup.                                          |
+| `/api/product-intelligence`                    | Discovery, jobs, match review, and monitor creation.                                |
+| `/api/monitors`                                | Monitor CRUD, run-now, events, history, snapshots, and exports.                     |
+| `/api/alerts`                                  | Console-auth alert CRUD, test poll, history, and webhook deliveries.                |
+| `/api/orchestration`                           | Projects, templates, workflow runs, promotion, and price comparison results.        |
+| `/api/ucp-audit`                               | Audit job lifecycle and JSON/Markdown report export.                                |
+| `/api/v1`                                      | API-key authenticated public extraction, domain, capabilities, and alert endpoints. |
+| `/api/health`, `/health/live`, `/health/ready` | Health checks.                                                                      |
+| `/api/metrics`                                 | Prometheus metrics.                                                                 |
+
+## Public API and MCP
+
+Create API keys in the UI or through `/api/api-keys`. Public routes use bearer auth:
+
+```powershell
+curl -H "Authorization: Bearer <api-key>" http://127.0.0.1:8000/api/v1/capabilities
+```
+
+Hosted MCP server:
+
+```powershell
+cd backend
+$env:CRAWLERAI_API_KEY='<api-key>'
+$env:CRAWLERAI_API_BASE_URL='http://127.0.0.1:8000/api/v1'
+.\.venv\Scripts\python.exe -m app.mcp_server.server
+```
+
+Alert stdio wrapper:
+
+```powershell
+cd backend
+$env:CRAWLERAI_API_KEY='<api-key>'
+$env:CRAWLERAI_API_BASE_URL='http://127.0.0.1:8000/api/v1'
+.\.venv\Scripts\python.exe -m app.mcp.alert_server
+```
+
+## Development
+
+Backend checks:
+
+```powershell
+cd backend
+$env:PYTHONPATH='.'
 .\.venv\Scripts\python.exe -m pytest tests -q
 .\.venv\Scripts\python.exe run_acquire_smoke.py commerce
 .\.venv\Scripts\python.exe run_extraction_smoke.py
 .\.venv\Scripts\python.exe run_test_sites_acceptance.py
 ```
 
-**Frontend**
+Frontend checks:
 
-```bash
+```powershell
 cd frontend
-npm run test        # Vitest unit tests
-npm run test:e2e    # Playwright E2E
 npm run lint
+npm run test
+npm run test:e2e
 ```
 
----
+Use the smallest relevant check for local slices. Run broader smoke or acceptance checks when changing shared acquisition, extraction, persistence, monitor, or API behavior.
 
-## 🧬 Extraction Philosophy
+## Project Layout
 
-> **Fix upstream, not downstream.**  
-> A bad field value is repaired in the extractor, never hidden by a publisher normalizer.
-
-- **Deterministic before stochastic** — adapters and structured sources outrank LLM guesses
-- **Config lives in `app/services/config/*`** — no magic strings in service code
-- **Per-field winner, not record-level merge** — price can come from JSON-LD while SKU comes from DOM
-- **Explicit LLM gating** — circuit breakers, run-level flags, and gap-only invocation
-
----
-
-## 📁 Project Layout
-
-```
+```text
 backend/
   app/
-    api/           FastAPI routes & auth
-    core/          Config, logging, DB engine
-    data/          Extraction, acquisition, adapters, selectors
-  tests/           Contract tests, smoke, acceptance
-  alembic/         Database migrations
+    api/              FastAPI route modules
+    core/             app config, auth helpers, database, metrics, telemetry
+    mcp/              stdio alert wrapper
+    mcp_server/       hosted FastMCP wrapper over public API v1
+    models/           SQLAlchemy models
+    schemas/          Pydantic request/response schemas
+    services/         acquisition, extraction, crawl, enrichment, monitors, alerts
+  tests/              unit, integration, smoke, and acceptance tests
 
 frontend/
-  app/             Next.js App Router
-  components/      React components (crawl studio, layout, selectors)
-  lib/             API clients, utilities, constants
-  e2e/             Playwright smoke tests
+  app/                Next.js App Router pages
+  components/         shared UI and domain components
+  lib/                API clients, types, utilities, state
+  e2e/                Playwright tests
 
 docs/
-  INVARIANTS.md         Hard runtime contracts
-  CODEBASE_MAP.md       File & subsystem ownership
-  BUSINESS_LOGIC.md     User-visible decision rules
-  ENGINEERING_STRATEGY.md Architecture constraints & anti-patterns
-  plans/                Active work plans
+  INVARIANTS.md       hard runtime contracts
+  CODEBASE_MAP.md     ownership map
+  BUSINESS_LOGIC.md   user-visible rules and workflow semantics
+  ENGINEERING_STRATEGY.md
+  plans/              active and queued plan docs
 ```
 
----
+## Engineering Rules
 
-## ⚠️ Disclaimer
+- Fix extraction defects upstream, not in publishers or exports.
+- Keep runtime strings, thresholds, tokens, fields, and tunables in `backend/app/services/config/*`.
+- Respect explicit user controls for surface, traversal, proxy, browser, and `llm_enabled`.
+- Use LLMs only when both run settings and active config allow them.
+- Reuse existing owners before adding new files or abstractions.
 
-This tool is for **educational and research purposes only**. Users are solely responsible for ensuring their use complies with:
+## Safety
 
-- **Terms of Service** of any target website
-- **robots.txt** directives and crawl-delay policies
-- **Rate limiting** and respectful access patterns
-- **Data privacy** regulations (GDPR, CCPA, etc.)
-- **Copyright** and intellectual property laws
+CrawlerAI is for educational and research use. You are responsible for target-site terms, robots.txt, rate limits, privacy law, copyright, and permission before crawling at scale.
 
-The authors assume no liability for misuse. Always obtain explicit permission before scraping at scale.
+## License
 
----
-
-## 📜 License
-
-This project is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0) - see the [LICENSE](LICENSE) file for details.
+GNU Affero General Public License v3.0. See [LICENSE](LICENSE).
