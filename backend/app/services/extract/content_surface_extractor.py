@@ -274,7 +274,7 @@ def _collapse_tokenized_code_block(body: str) -> str:
 
     Syntax-highlighted pages (e.g. Firecrawl docs) emit one <span> per token;
     get_text() turns each span into its own line.  The heuristic fires when
-    avg line length <= 20 chars and >= 60% of lines are single-token.
+    avg line length < 15 chars and > 60 % of lines are single-token.
     """
     lines = body.split("\n")
     non_empty = [ln for ln in lines if ln.strip()]
