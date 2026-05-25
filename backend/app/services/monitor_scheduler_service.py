@@ -60,8 +60,23 @@ class MonitorSchedulerService:
         try:
             async with httpx.AsyncClient(timeout=HEAD_CHECK_TIMEOUT_SECONDS, follow_redirects=True) as client:
                 response = await client.head(url)
-                if response.status_code == 405:
-                    response = await client.get(url)
+                if _head_response_needs_get_fallback(response):
+                    content_hash = await _stream_content_hash(client, url)
+                    state.last_checked_at = now
+                    had_prior_hash = bool(state.last_content_hash)
+                    changed = not had_prior_hash or state.last_content_hash != content_hash
+                    if content_hash is not None:
+                        state.last_content_hash = content_hash
+                    if changed:
+                        state.last_changed_at = now
+                        state.consecutive_unchanged_count = 0
+                    else:
+                        state.consecutive_unchanged_count = int(state.consecutive_unchanged_count or 0) + 1
+                    logger.info(
+                        "head_precheck_failed_get_succeeded",
+                        extra={"url": url, "status_code": response.status_code},
+                    )
+                    return changed
                 response.raise_for_status()
                 etag = response.headers.get("etag")
                 last_modified = response.headers.get("last-modified")
@@ -201,3 +216,9 @@ async def _stream_content_hash(client: httpx.AsyncClient, url: str) -> str | Non
                 return None
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _head_response_needs_get_fallback(response: httpx.Response) -> bool:
+    if response.status_code in {403, 405, 429}:
+        return True
+    return str(response.headers.get("cf-mitigated") or "").strip().lower() == "challenge"

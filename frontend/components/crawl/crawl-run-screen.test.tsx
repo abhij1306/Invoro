@@ -1014,6 +1014,49 @@ describe('CrawlRunScreen', () => {
     }
   });
 
+  it('uses formatted markdown as the primary output for content runs', async () => {
+    apiMock.getCrawl.mockResolvedValue({
+      ...terminalRun(101),
+      url: 'https://codeforces.com/',
+      surface: 'content_detail',
+      requested_fields: ['title', 'markdown', 'url'],
+      result_summary: {
+        extraction_verdict: 'success',
+        record_count: 1,
+      },
+    });
+    apiMock.getRecords.mockResolvedValue({
+      items: [
+        {
+          ...makeRecord(1),
+          source_url: 'https://codeforces.com/',
+          data: {
+            title: 'Codeforces',
+            markdown:
+              '# Codeforces\n\nProgramming contests and **practice**.\n\n- Contests\n- Problemset\n\n[Visit](https://codeforces.com/)',
+            url: 'https://codeforces.com/',
+          },
+        },
+      ],
+      meta: { page: 1, limit: 100, total: 1 },
+    });
+
+    renderRunScreen();
+
+    expect(await screen.findByRole('heading', { name: 'Codeforces' })).toBeInTheDocument();
+    const markdownButtons = screen.getAllByRole('button', { name: 'Markdown' });
+    expect(markdownButtons.some((button) => button.getAttribute('aria-pressed') === 'true')).toBe(
+      true,
+    );
+    expect(screen.queryByRole('button', { name: /Table/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Excel (CSV)' })).not.toBeInTheDocument();
+    expect(screen.getByText(/Programming contests and/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Visit' })).toHaveAttribute(
+      'href',
+      'https://codeforces.com/',
+    );
+  });
+
   it('keeps table and exports visible for failed terminal runs with records', async () => {
     apiMock.getCrawl.mockResolvedValue({
       ...terminalRun(101),

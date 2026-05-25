@@ -588,6 +588,9 @@ async def test_public_capabilities_uses_api_key_envelope(
     assert response.headers["X-RateLimit-Limit"] == "600"
     payload = response.json()
     assert payload["status"] == "ok"
+    assert {"auto", "content", "article", "forum_thread", "ecommerce"}.issubset(
+        set(payload["data"]["surfaces"])
+    )
     assert "extract_product" in payload["data"]["tools"]
     assert "alert_product" in payload["data"]["tools"]
     assert "watches" not in payload["data"]["deferred"]
@@ -900,6 +903,75 @@ async def test_public_extract_rejects_unsupported_surface(db_session, test_user)
 
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "INVALID_SURFACE"
+
+
+@pytest.mark.asyncio
+@pytest.mark.component
+async def test_public_extract_accepts_auto_surface(
+    db_session,
+    test_user,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    raw_key = "crawlerai_extract_auto_key"
+    db_session.add(
+        ApiKey(
+            user_id=test_user.id,
+            name="extract",
+            key_prefix="crawlerai",
+            key_hash=hash_api_key(raw_key),
+            is_active=True,
+        )
+    )
+    await db_session.commit()
+    seen: dict[str, object] = {}
+
+    async def _fake_process_single_url(*, session, run, url, config):
+        seen["surface"] = run.surface
+        seen["surface_resolution"] = run.settings.get("surface_resolution")
+        session.add(
+            CrawlRecord(
+                run_id=run.id,
+                source_url=url,
+                data={"title": "Codeforces", "url": url},
+                raw_data={},
+                discovered_data={"acquisition_method": "httpx"},
+                source_trace={"fetch_method": "http"},
+                created_at=datetime.now(UTC),
+            )
+        )
+        await session.flush()
+
+        class _Result:
+            verdict = "success"
+            url_metrics = {"record_count": 1}
+            records = []
+
+        return _Result()
+
+    async def _override_db():
+        yield db_session
+
+    monkeypatch.setattr(
+        "app.services.public_api.extraction_service.process_single_url",
+        _fake_process_single_url,
+    )
+    app.dependency_overrides[get_db] = _override_db
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver") as client:
+            response = await client.post(
+                "/api/v1/extract",
+                headers={"Authorization": f"Bearer {raw_key}"},
+                json={"url": "https://codeforces.com/", "surface": "auto"},
+            )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["data"]["surface"] == "article"
+    assert payload["data"]["fields"] == {"title": "Codeforces", "url": "https://codeforces.com/"}
+    assert seen["surface"] == "article_listing"
+    assert seen["surface_resolution"]["surface"] == "article_listing"
 
 
 # from backend/tests/services/test_public_watch_api.py

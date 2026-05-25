@@ -166,6 +166,16 @@ CONTENT_SURFACE_PROTECTED_DESCENDANT_SELECTORS = (
     ".post",
     ".post-content",
 )
+CONTENT_SURFACE_MAIN_SELECTORS = (
+    "main",
+    "[role='main']",
+    "#pageContent",
+    ".main-content",
+    ".content",
+    "article",
+    ".post",
+    ".entry-content",
+)
 CONTENT_SURFACE_DATE_SELECTORS = (
     "time[datetime]",
     "[itemprop='datePublished']",
@@ -277,6 +287,7 @@ __all__ = [
     "CONTENT_SURFACE_SANITIZE_SELECTORS",
     "CONTENT_SURFACE_CONTAINER_TAGS",
     "CONTENT_SURFACE_PROTECTED_DESCENDANT_SELECTORS",
+    "CONTENT_SURFACE_MAIN_SELECTORS",
     "CONTENT_SURFACE_DATE_SELECTORS",
     "CONTENT_SURFACE_FORUM_BODY_SELECTORS",
     "CONTENT_DETAIL_MIN_BODY_TEXT_LENGTH",

@@ -137,7 +137,7 @@ describe('CrawlConfigScreen bulk prefill', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('renders dedicated sitemap controls instead of the target URL field', async () => {
+  it('does not expose sitemap controls while auto surface is selected', async () => {
     render(
       <TopBarProvider>
         <CrawlConfigScreen
@@ -148,10 +148,10 @@ describe('CrawlConfigScreen bulk prefill', () => {
       </TopBarProvider>,
     );
 
-    expect(screen.getByLabelText('Sitemap domain input')).toBeInTheDocument();
-    expect(screen.getByLabelText('Sitemap filter keyword input')).toHaveValue('collections');
-    expect(screen.getByLabelText('Sitemap max URLs input')).toHaveValue(500);
-    expect(screen.queryByLabelText('Target URL input')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Sitemap domain input')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Sitemap filter keyword input')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Sitemap max URLs input')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Target URL input')).toBeInTheDocument();
   });
 
   it('does not apply proxy defaults from the saved domain run profile', async () => {

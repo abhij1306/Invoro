@@ -3,6 +3,7 @@ import type { CrawlDomain, CrawlSurface } from '../../lib/api/types';
 export type DomainCrawlTab = 'category' | 'pdp';
 
 export const DOMAIN_OPTIONS: Array<{ value: CrawlDomain; label: string }> = [
+  { value: 'auto', label: 'Auto' },
   { value: 'content', label: 'Content' },
   { value: 'commerce', label: 'Commerce' },
   { value: 'jobs', label: 'Jobs' },
@@ -12,10 +13,8 @@ export const DOMAIN_OPTIONS: Array<{ value: CrawlDomain; label: string }> = [
 ];
 
 export const DOMAIN_TABS: Record<CrawlDomain, Array<{ value: DomainCrawlTab; label: string }>> = {
-  content: [
-    { value: 'category', label: 'Rows From Page' },
-    { value: 'pdp', label: 'Page Content' },
-  ],
+  auto: [{ value: 'pdp', label: 'Auto' }],
+  content: [{ value: 'pdp', label: 'Page Content' }],
   commerce: [
     { value: 'category', label: 'Category Crawl' },
     { value: 'pdp', label: 'PDP Crawl' },
@@ -24,14 +23,8 @@ export const DOMAIN_TABS: Record<CrawlDomain, Array<{ value: DomainCrawlTab; lab
     { value: 'category', label: 'Jobs Listing' },
     { value: 'pdp', label: 'Job Detail' },
   ],
-  automobiles: [
-    { value: 'category', label: 'Listings' },
-    { value: 'pdp', label: 'Detail' },
-  ],
-  article: [
-    { value: 'category', label: 'Article Feed' },
-    { value: 'pdp', label: 'Article Page' },
-  ],
+  automobiles: [{ value: 'pdp', label: 'Detail' }],
+  article: [{ value: 'pdp', label: 'Article Page' }],
   forum_thread: [{ value: 'pdp', label: 'Forum Thread' }],
 };
 
@@ -40,6 +33,8 @@ type SurfaceDispatchKey =
   | 'forum_thread:pdp';
 
 export const SURFACE_DISPATCH: Record<SurfaceDispatchKey, CrawlSurface> = {
+  'auto:category': 'auto',
+  'auto:pdp': 'auto',
   'content:category': 'content_listing',
   'content:pdp': 'content_detail',
   'commerce:category': 'ecommerce_listing',
@@ -54,6 +49,7 @@ export const SURFACE_DISPATCH: Record<SurfaceDispatchKey, CrawlSurface> = {
 };
 
 export const DEFAULT_FIELDS: Record<CrawlSurface, string[]> = {
+  auto: ['title', 'content', 'url'],
   content_detail: ['title', 'content', 'url'],
   content_listing: ['title', 'url'],
   ecommerce_listing: ['title', 'price', 'image_url', 'url'],

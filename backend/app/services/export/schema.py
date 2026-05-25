@@ -6,6 +6,7 @@ from urllib.parse import urlparse
 from app.models.crawl_run import CrawlRecord
 from app.services.config.public_record_policy import (
     PUBLIC_RECORD_FALLBACK_INTERNAL_FIELDS,
+    PUBLIC_RECORD_PRESENTATION_FIELDS,
 )
 from app.services.db_utils import mapping_or_empty
 from app.services.shared.field_coerce import object_list as _object_list
@@ -161,6 +162,7 @@ def clean_export_data(data: dict) -> dict:
             v not in (None, "", [], {})
             and not str(k).strip().startswith("_")
             and str(k).strip().lower() not in PUBLIC_RECORD_FALLBACK_INTERNAL_FIELDS
+            and str(k).strip().lower() not in PUBLIC_RECORD_PRESENTATION_FIELDS
         )
     }
 

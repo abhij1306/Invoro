@@ -15,6 +15,7 @@ from app.services.domain_memory_service import (
     load_domain_selector_rules,
 )
 from app.services.domain_utils import normalize_domain
+from app.services.extract.content_surface_extractor import CONTENT_DETAIL_SURFACES
 from app.services.field_policy import repair_target_fields_for_surface
 from app.services.pipeline.extract_records import extract_records
 from app.services.pipeline.runtime_helpers import (
@@ -50,7 +51,10 @@ async def _extract_records_for_acquisition(
     fetched: _FetchedURLStage,
 ) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
     acquisition_result = fetched.acquisition_result
-    if not _browser_result_is_extractable(acquisition_result):
+    if not _browser_result_is_extractable(acquisition_result) and not (
+        context.surface in CONTENT_DETAIL_SURFACES
+        and str(getattr(acquisition_result, "html", "") or "").strip()
+    ):
         return [], []
     await _populate_adapter_records(context, acquisition_result)
     _assign_platform_family(acquisition_result)

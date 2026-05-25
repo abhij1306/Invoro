@@ -200,6 +200,9 @@ export function normalizeHttpLookupDomain(rawUrl: string) {
 }
 
 export function surfaceLabel(surface: string) {
+  if (surface === 'auto') {
+    return 'Auto';
+  }
   if (surface === 'content_listing') {
     return 'Content Rows';
   }

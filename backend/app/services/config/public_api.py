@@ -1,5 +1,14 @@
 from __future__ import annotations
 
+from app.services.config.surface_detection import (
+    PUBLIC_SURFACE_ARTICLE,
+    PUBLIC_SURFACE_AUTO,
+    PUBLIC_SURFACE_CONTENT,
+    PUBLIC_SURFACE_ECOMMERCE,
+    PUBLIC_SURFACE_FORUM_THREAD,
+    PUBLIC_SUPPORTED_SURFACES,
+)
+
 PUBLIC_API_KEY_PREFIX = "cai_"
 PUBLIC_API_KEY_BYTES = 32
 PUBLIC_API_KEY_PREFIX_DISPLAY_LENGTH = 12
@@ -7,9 +16,13 @@ PUBLIC_API_KEY_PREFIX_DISPLAY_LENGTH = 12
 PUBLIC_API_STATUS_OK = "ok"
 PUBLIC_API_STATUS_ERROR = "error"
 
-PUBLIC_API_SURFACE_ECOMMERCE = "ecommerce"
+PUBLIC_API_SURFACE_AUTO = PUBLIC_SURFACE_AUTO
+PUBLIC_API_SURFACE_ECOMMERCE = PUBLIC_SURFACE_ECOMMERCE
+PUBLIC_API_SURFACE_CONTENT = PUBLIC_SURFACE_CONTENT
+PUBLIC_API_SURFACE_ARTICLE = PUBLIC_SURFACE_ARTICLE
+PUBLIC_API_SURFACE_FORUM_THREAD = PUBLIC_SURFACE_FORUM_THREAD
 PUBLIC_API_INTERNAL_ECOMMERCE_SURFACE = "ecommerce_detail"
-PUBLIC_API_SUPPORTED_SURFACES = frozenset({PUBLIC_API_SURFACE_ECOMMERCE})
+PUBLIC_API_SUPPORTED_SURFACES = PUBLIC_SUPPORTED_SURFACES
 
 PUBLIC_API_DEFAULT_ECOMMERCE_FIELDS = (
     "title",
@@ -21,6 +34,15 @@ PUBLIC_API_DEFAULT_ECOMMERCE_FIELDS = (
     "additional_images",
     "variants",
 )
+PUBLIC_API_DEFAULT_FIELDS_BY_SURFACE = {
+    "ecommerce_detail": PUBLIC_API_DEFAULT_ECOMMERCE_FIELDS,
+    "ecommerce_listing": ("title", "price", "image_url", "url"),
+    "content_detail": ("title", "content", "url"),
+    "content_listing": ("title", "url"),
+    "article_detail": ("title", "author", "publication_date", "content", "url"),
+    "article_listing": ("title", "publication_date", "author", "url"),
+    "forum_detail": ("title", "author", "content", "reply_count", "view_count", "url"),
+}
 PUBLIC_API_FIELD_ALIASES = {
     "product_name": "title",
     "name": "title",
@@ -61,7 +83,7 @@ PUBLIC_API_MCP_DEFAULT_BASE_URL = "https://api.crawlerai.com/api/v1"
 
 PUBLIC_API_CAPABILITIES = {
     "version": "v1",
-    "surfaces": [PUBLIC_API_SURFACE_ECOMMERCE],
+    "surfaces": sorted(PUBLIC_API_SUPPORTED_SURFACES),
     "tools": [
         "extract_product",
         "alert_product",

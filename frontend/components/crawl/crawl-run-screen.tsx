@@ -65,48 +65,31 @@ import {
   inferDomainFromSurface,
   isListingRun,
   LogTerminal,
+  mergeLogs,
+  mergeRecords,
   type OutputTabKey,
   qualityTone,
   RecordsTable,
   scoreFieldQuality,
   scrollViewportToBottom,
+  selectorWinnerLabel,
   uniqueNumbers,
   uniqueStrings,
 } from './shared';
 import { AlertBuilderDrawer } from './alert-builder-drawer';
 import { useCrawlRunStore } from './crawl-run-store';
+import {
+  buildMarkdownDocument,
+  downloadMarkdown,
+  isMarkdownOutputRun,
+  MarkdownOutputPanel,
+} from './markdown-output';
 import { useLiveClock, useTerminalRecordSync, useTerminalSync } from './use-run-polling';
 import { useRunWorkspace } from './use-run-workspace';
 
 type CrawlRunScreenProps = {
   runId: number;
 };
-
-function selectorWinnerLabel(selectorKind: string | null | undefined): string {
-  const normalized = String(selectorKind || '')
-    .trim()
-    .toLowerCase();
-  if (!normalized) return 'Selector winner';
-  if (normalized === 'xpath') return 'XPath winner';
-  if (normalized === 'css_selector') return 'CSS selector winner';
-  return `${selectorKind} winner`;
-}
-
-function mergeRecords(current: CrawlRecord[], incoming: CrawlRecord[]) {
-  const byId = new Map<number, CrawlRecord>();
-  for (const row of current) byId.set(row.id, row);
-  for (const row of incoming) byId.set(row.id, row);
-  return Array.from(byId.values()).sort((a, b) => a.id - b.id);
-}
-
-function mergeLogs(current: CrawlLog[], incoming: CrawlLog[]) {
-  const byId = new Map<number, CrawlLog>();
-  for (const row of current) byId.set(row.id, row);
-  for (const row of incoming) byId.set(row.id, row);
-  return Array.from(byId.values())
-    .sort((a, b) => a.id - b.id)
-    .slice(-CRAWL_DEFAULTS.MAX_LIVE_LOGS);
-}
 
 function llmTouchedFieldNames(record: CrawlRecord): string[] {
   const raw =
@@ -249,14 +232,21 @@ export function CrawlRunScreen({ runId }: Readonly<CrawlRunScreenProps>) {
     Number(run?.result_summary?.record_count ?? 0) === 0,
   );
   const showRunLearningTab = Boolean(run?.run_type === 'crawl' && terminal);
+  const markdownOutputRun = isMarkdownOutputRun(run);
+  const defaultOutputTab = markdownOutputRun ? 'markdown' : 'table';
   const effectiveOutputTab =
-    failedRunWithoutRecords && outputTab === 'table'
+    failedRunWithoutRecords && (outputTab === 'table' || outputTab === 'markdown')
       ? 'logs'
       : (outputTab === 'learning' && !showRunLearningTab) || outputTab === 'run_config'
-        ? 'table'
-        : outputTab;
+        ? defaultOutputTab
+        : markdownOutputRun && outputTab === 'table'
+          ? 'markdown'
+          : !markdownOutputRun && outputTab === 'markdown'
+            ? 'table'
+            : outputTab;
   const shouldFetchTableRecords = Boolean(run) && effectiveOutputTab === 'table';
-  const shouldFetchJsonRecords = Boolean(run) && effectiveOutputTab === 'json';
+  const shouldFetchJsonRecords =
+    Boolean(run) && (effectiveOutputTab === 'json' || effectiveOutputTab === 'markdown');
   const shouldFetchLogs = Boolean(run) && (live || effectiveOutputTab === 'logs');
 
   const tableRecordsLimit = CRAWL_DEFAULTS.TABLE_PAGE_SIZE * 4 * tablePage;
@@ -313,6 +303,7 @@ export function CrawlRunScreen({ runId }: Readonly<CrawlRunScreenProps>) {
   }, [runsQuery.data]);
 
   const records = useMemo(() => jsonRecordsQuery.data?.items ?? [], [jsonRecordsQuery.data?.items]);
+  const markdownDocument = useMemo(() => buildMarkdownDocument(records), [records]);
   const recordsFetchCapReached = useMemo(
     () => records.length >= recordsFetchLimit && recordsFetchLimit >= 800,
     [records, recordsFetchLimit],
@@ -1002,15 +993,28 @@ export function CrawlRunScreen({ runId }: Readonly<CrawlRunScreenProps>) {
                       {dataEnrichmentLabel}
                     </Button>
                   ) : null}
-                  <Button
-                    variant="download"
-                    type="button"
-                    size="sm"
-                    onClick={() => void downloadExport('csv')}
-                  >
-                    <Download className="size-3" />
-                    Excel (CSV)
-                  </Button>
+                  {markdownOutputRun ? (
+                    <Button
+                      variant="download"
+                      type="button"
+                      size="sm"
+                      disabled={!markdownDocument}
+                      onClick={() => downloadMarkdown(markdownDocument, run)}
+                    >
+                      <Download className="size-3" />
+                      Markdown
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="download"
+                      type="button"
+                      size="sm"
+                      onClick={() => void downloadExport('csv')}
+                    >
+                      <Download className="size-3" />
+                      Excel (CSV)
+                    </Button>
+                  )}
                   <Button
                     variant="download"
                     type="button"
@@ -1037,7 +1041,9 @@ export function CrawlRunScreen({ runId }: Readonly<CrawlRunScreenProps>) {
                   variant="underline"
                   onChange={(value) => setOutputTab(value as OutputTabKey)}
                   options={[
-                    { value: 'table', label: `Table (${summary.records})` },
+                    ...(markdownOutputRun
+                      ? [{ value: 'markdown', label: 'Markdown' }]
+                      : [{ value: 'table', label: `Table (${summary.records})` }]),
                     { value: 'json', label: 'JSON' },
                     { value: 'logs', label: 'Logs' },
                     ...(showRunLearningTab ? [{ value: 'learning', label: 'Learning' }] : []),
@@ -1071,6 +1077,15 @@ export function CrawlRunScreen({ runId }: Readonly<CrawlRunScreenProps>) {
               }
               content={
                 <>
+                  {effectiveOutputTab === 'markdown' ? (
+                    <MarkdownOutputPanel
+                      isLoading={jsonRecordsQuery.isLoading && !records.length}
+                      markdown={markdownDocument}
+                      emptyTitle={emptyRecordsState.title}
+                      emptyDescription={emptyRecordsState.description}
+                    />
+                  ) : null}
+
                   {effectiveOutputTab === 'table' ? (
                     <div className="min-h-[55vh] space-y-3">
                       {tableRecordsQuery.isLoading && !tableRecords.length ? (

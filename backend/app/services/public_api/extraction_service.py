@@ -12,7 +12,7 @@ from app.api.public.common import PublicApiError
 from app.models.crawl_run import CrawlRecord
 from app.schemas.public_api import PublicExtractRequest
 from app.services.config.public_api import (
-    PUBLIC_API_DEFAULT_ECOMMERCE_FIELDS,
+    PUBLIC_API_DEFAULT_FIELDS_BY_SURFACE,
     PUBLIC_API_ERROR_BOT_BLOCK,
     PUBLIC_API_ERROR_BROWSER_REQUIRED,
     PUBLIC_API_ERROR_EXTRACTION_FAILED,
@@ -22,8 +22,6 @@ from app.services.config.public_api import (
     PUBLIC_API_ERROR_TIMEOUT,
     PUBLIC_API_ERROR_URL_UNREACHABLE,
     PUBLIC_API_FIELD_ALIASES,
-    PUBLIC_API_INTERNAL_ECOMMERCE_SURFACE,
-    PUBLIC_API_SURFACE_ECOMMERCE,
 )
 from app.services.crawl.crud import create_crawl_run
 from app.services.crawl.state import CrawlStatus, update_run_status
@@ -33,6 +31,10 @@ from app.services.pipeline.runtime_helpers import log_event, mark_run_failed
 from app.services.pipeline.types import URLProcessingConfig
 from app.services.platform_policy import resolve_platform_runtime_policy
 from app.services.publish import VERDICT_BLOCKED, VERDICT_ERROR, VERDICT_EMPTY
+from app.services.surface_resolver import (
+    public_surface_for_internal,
+    resolve_public_surface,
+)
 
 
 async def extract_public_product(
@@ -42,7 +44,8 @@ async def extract_public_product(
     payload: PublicExtractRequest,
 ) -> dict[str, Any]:
     url = _validate_url(payload.url)
-    surface = _internal_surface(payload.surface)
+    surface_resolution = _internal_surface(payload.surface, url=url)
+    surface = surface_resolution.surface
     if _platform_requires_browser(url, surface):
         raise PublicApiError(
             PUBLIC_API_ERROR_BROWSER_REQUIRED,
@@ -58,7 +61,10 @@ async def extract_public_product(
             "url": url,
             "surface": surface,
             "requested_fields": requested_fields,
-            "settings": _public_http_only_settings(payload.options.max_wait_seconds),
+            "settings": _public_http_only_settings(
+                payload.options.max_wait_seconds,
+                surface_resolution=surface_resolution.as_dict(),
+            ),
         },
     )
     update_run_status(run, CrawlStatus.RUNNING)
@@ -136,7 +142,11 @@ async def extract_public_product(
         raise
     update_run_status(run, CrawlStatus.COMPLETED)
     await session.commit()
-    return _shape_product_response(record, requested_fields=requested_fields)
+    return _shape_record_response(
+        record,
+        requested_fields=requested_fields,
+        surface=surface,
+    )
 
 
 def _validate_url(value: str) -> str:
@@ -151,18 +161,25 @@ def _validate_url(value: str) -> str:
     return url
 
 
-def _internal_surface(value: str) -> str:
-    if str(value or "").strip().lower() != PUBLIC_API_SURFACE_ECOMMERCE:
+def _internal_surface(value: str, *, url: str) -> Any:
+    resolution = resolve_public_surface(value, url=url)
+    if resolution is None:
         raise PublicApiError(
             PUBLIC_API_ERROR_INVALID_SURFACE,
-            "Only surface='ecommerce' is supported in public API v1.",
+            "Unsupported public extraction surface.",
             status_code=422,
         )
-    return PUBLIC_API_INTERNAL_ECOMMERCE_SURFACE
+    return resolution
 
 
 def _public_requested_fields(values: list[str], *, surface: str) -> list[str]:
-    public_fields = list(values or PUBLIC_API_DEFAULT_ECOMMERCE_FIELDS)
+    public_fields = list(
+        values
+        or PUBLIC_API_DEFAULT_FIELDS_BY_SURFACE.get(
+            surface,
+            canonical_fields_for_surface(surface),
+        )
+    )
     allowed = set(canonical_fields_for_surface(surface))
     normalized: list[str] = []
     for original in public_fields:
@@ -171,7 +188,7 @@ def _public_requested_fields(values: list[str], *, surface: str) -> list[str]:
         if canonical not in allowed:
             raise PublicApiError(
                 PUBLIC_API_ERROR_INVALID_FIELD,
-                f"Field is not supported for ecommerce extraction: {original}",
+                f"Field is not supported for {public_surface_for_internal(surface)} extraction: {original}",
                 status_code=422,
                 details={"field": original},
             )
@@ -180,7 +197,11 @@ def _public_requested_fields(values: list[str], *, surface: str) -> list[str]:
     return normalized
 
 
-def _public_http_only_settings(max_wait_seconds: int) -> dict[str, Any]:
+def _public_http_only_settings(
+    max_wait_seconds: int,
+    *,
+    surface_resolution: dict[str, object],
+) -> dict[str, Any]:
     return {
         "max_records": 1,
         "respect_robots_txt": False,
@@ -214,6 +235,7 @@ def _public_http_only_settings(max_wait_seconds: int) -> dict[str, Any]:
             "stale_after_failures": {"failure_count": 0, "stale": False},
         },
         "public_api": True,
+        "surface_resolution": surface_resolution,
         "use_cache": "noop_v1",
     }
 
@@ -241,14 +263,19 @@ async def _first_record(session: AsyncSession, *, run_id: int) -> CrawlRecord | 
     return result.scalar_one_or_none()
 
 
-def _shape_product_response(record: CrawlRecord, *, requested_fields: list[str]) -> dict[str, Any]:
+def _shape_record_response(
+    record: CrawlRecord,
+    *,
+    requested_fields: list[str],
+    surface: str,
+) -> dict[str, Any]:
     data = dict(record.data or {})
     fields = {field: data.get(field) for field in requested_fields if field in data}
     source_trace = dict(record.source_trace or {})
     crawl_method = _crawl_method(record, source_trace=source_trace)
     return {
         "url": record.source_url,
-        "surface": PUBLIC_API_SURFACE_ECOMMERCE,
+        "surface": public_surface_for_internal(surface),
         "extracted_at": record.created_at or datetime.now(UTC),
         "crawl_method": crawl_method,
         "fields": fields,

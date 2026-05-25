@@ -257,6 +257,7 @@ def test_clean_export_data_keeps_variant_payloads_but_hides_internal_markdown() 
             "variants": [{"sku": "W-1", "color": "Black"}],
             "variant_axes": {"color": ["Black"]},
             "selected_variant": {"sku": "W-1", "color": "Black"},
+            "markdown": "# rendered markdown",
             "page_markdown": "# internal",
             "_source": "dom",
         }

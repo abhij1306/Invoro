@@ -17,7 +17,14 @@ import type { FieldRow, FieldRowMessageTone, ValidationState } from './form-fiel
 import { LogTerminal, buildLogSiteGroups, getLogStage } from './log-terminal';
 import { RecordThumbnail } from './record-thumbnail';
 import { RecordsTable } from './records-table';
-import type { CrawlDomain, CrawlRun, CrawlSurface } from '../../lib/api/types';
+import type {
+  CrawlDomain,
+  CrawlLog,
+  CrawlRecord,
+  CrawlRun,
+  CrawlSurface,
+} from '../../lib/api/types';
+import { CRAWL_DEFAULTS } from '../../lib/constants/crawl-defaults';
 import { SURFACE_DISPATCH } from './domain-surface-config';
 import { cn } from '../../lib/utils';
 import {
@@ -130,7 +137,34 @@ export type PendingDispatch = {
   additionalFields: string[];
   csvFile: File | null;
 };
-export type OutputTabKey = 'table' | 'json' | 'logs' | 'learning' | 'run_config';
+export type OutputTabKey = 'markdown' | 'table' | 'json' | 'logs' | 'learning' | 'run_config';
+
+export function selectorWinnerLabel(selectorKind: string | null | undefined): string {
+  const normalized = String(selectorKind || '')
+    .trim()
+    .toLowerCase();
+  if (!normalized) return 'Selector winner';
+  if (normalized === 'xpath') return 'XPath winner';
+  if (normalized === 'css_selector') return 'CSS selector winner';
+  return `${selectorKind} winner`;
+}
+
+export function mergeRecords(current: CrawlRecord[], incoming: CrawlRecord[]) {
+  const byId = new Map<number, CrawlRecord>();
+  for (const row of current) byId.set(row.id, row);
+  for (const row of incoming) byId.set(row.id, row);
+  return Array.from(byId.values()).sort((a, b) => a.id - b.id);
+}
+
+export function mergeLogs(current: CrawlLog[], incoming: CrawlLog[]) {
+  const byId = new Map<number, CrawlLog>();
+  for (const row of current) byId.set(row.id, row);
+  for (const row of incoming) byId.set(row.id, row);
+  return Array.from(byId.values())
+    .sort((a, b) => a.id - b.id)
+    .slice(-CRAWL_DEFAULTS.MAX_LIVE_LOGS);
+}
+
 export function parseRequestedCrawlTab(value: string | null): CrawlTab | null {
   return value === 'category' || value === 'pdp' ? value : null;
 }
@@ -144,6 +178,9 @@ export function parseRequestedPdpMode(value: string | null): PdpMode | null {
 }
 
 export function deriveSurface(domain: CrawlDomain, module: CrawlTab): CrawlSurface {
+  if (domain === 'auto') {
+    return 'auto';
+  }
   if (domain === 'forum_thread') {
     return 'forum_detail';
   }
@@ -152,6 +189,9 @@ export function deriveSurface(domain: CrawlDomain, module: CrawlTab): CrawlSurfa
 
 export function inferDomainFromSurface(surface: string | null | undefined): CrawlDomain | null {
   const normalizedSurface = String(surface || '').toLowerCase();
+  if (normalizedSurface === 'auto') {
+    return 'auto';
+  }
   if (normalizedSurface.startsWith('job_')) {
     return 'jobs';
   }

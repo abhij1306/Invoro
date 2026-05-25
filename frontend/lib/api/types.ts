@@ -22,6 +22,7 @@ export type CrawlModule = 'category' | 'pdp';
 // Domain boundaries: content is the generic catch-all; article is a specific editorial subtype.
 // forum_thread means an individual discussion thread, while commerce/jobs/automobiles are verticals.
 export type CrawlDomain =
+  | 'auto'
   | 'content'
   | 'commerce'
   | 'jobs'
@@ -29,6 +30,7 @@ export type CrawlDomain =
   | 'article'
   | 'forum_thread';
 export type CrawlSurface =
+  | 'auto'
   | 'content_detail'
   | 'content_listing'
   | 'ecommerce_listing'

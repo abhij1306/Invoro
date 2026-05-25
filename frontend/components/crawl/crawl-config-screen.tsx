@@ -72,6 +72,7 @@ import {
   type StudioMode,
   type TraversalDropdownValue,
 } from './crawl-config-logic';
+import { resolveAutoSurface } from './auto-surface';
 import { DOMAIN_OPTIONS, DOMAIN_TABS } from './domain-surface-config';
 import * as crawlConfigForm from './use-crawl-config';
 
@@ -99,7 +100,7 @@ export function CrawlConfigScreen({
 }: Readonly<CrawlConfigScreenProps>) {
   const router = useRouter();
   const [crawlTab, setCrawlTab] = useState<CrawlTab>(() => requestedTab ?? 'category');
-  const [crawlDomain, setCrawlDomain] = useState<CrawlDomain>('commerce');
+  const [crawlDomain, setCrawlDomain] = useState<CrawlDomain>('auto');
   const [categoryMode, setCategoryMode] = useState<CategoryMode>(
     () => requestedCategoryMode ?? 'single',
   );
@@ -148,23 +149,27 @@ export function CrawlConfigScreen({
   const lastProfileKeyRef = useRef('');
   const lastDomainMemoryKeyRef = useRef('');
 
-  const effectivePdpMode = crawlDomain === 'forum_thread' ? 'single' : pdpMode;
-  const activeMode = crawlTab === 'category' ? categoryMode : effectivePdpMode;
+  const modePickerEnabled = crawlDomain === 'commerce' || crawlDomain === 'jobs';
+  const effectivePdpMode = modePickerEnabled ? pdpMode : 'single';
+  const activeMode = modePickerEnabled && crawlTab === 'category' ? categoryMode : effectivePdpMode;
   const surface = deriveSurface(crawlDomain, crawlTab);
+  const autoSurfaceResolution =
+    surface === 'auto' ? resolveAutoSurface(targetUrl, crawlTab) : null;
+  const effectiveSurface = autoSurfaceResolution?.surface ?? surface;
   const domainTabs = DOMAIN_TABS[crawlDomain];
   const activeTabLabel =
     domainTabs.find((tab) => tab.value === crawlTab)?.label ?? surfaceLabel(surface);
   const showSurfaceTabs = domainTabs.length > 1;
-  const showModePicker = crawlDomain !== 'forum_thread';
+  const showModePicker = modePickerEnabled;
   const singleUrlMode = isSingleUrlMode(crawlTab, activeMode);
   const normalizedTargetDomain = normalizeHttpLookupDomain(targetUrl);
   const profileLookupKey =
-    singleUrlMode && normalizedTargetDomain && surface
-      ? `${normalizedTargetDomain}|${surface}`
+    singleUrlMode && normalizedTargetDomain && effectiveSurface
+      ? `${normalizedTargetDomain}|${effectiveSurface}`
       : '';
   const domainMemoryLookupKey =
-    singleUrlMode && normalizedTargetDomain && surface
-      ? `${normalizedTargetDomain}|${surface}`
+    singleUrlMode && normalizedTargetDomain && effectiveSurface
+      ? `${normalizedTargetDomain}|${effectiveSurface}`
       : '';
   const diagnosticsPreset = diagnosticsPresetForProfile(runProfile);
 
@@ -196,9 +201,9 @@ export function CrawlConfigScreen({
   }, [crawlDomain, crawlTab, domainTabs]);
 
   useEffect(() => {
-    if (crawlDomain !== 'forum_thread') return;
+    if (modePickerEnabled) return;
     setPdpMode((current) => (current === 'single' ? current : 'single'));
-  }, [crawlDomain]);
+  }, [modePickerEnabled]);
 
   useEffect(() => {
     const routeMode = crawlTab === 'category' ? requestedCategoryMode : requestedPdpMode;
@@ -266,7 +271,7 @@ export function CrawlConfigScreen({
       try {
         const response = await api.getDomainRunProfile({
           url: profileLookupTargetUrlRef.current,
-          surface,
+          surface: effectiveSurface,
         });
         if (profileLookupRequestRef.current !== requestId) {
           return;
@@ -299,7 +304,7 @@ export function CrawlConfigScreen({
       }
     }, UI_DELAYS.DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
-  }, [profileLookupKey, surface]);
+  }, [effectiveSurface, profileLookupKey]);
 
   useEffect(() => {
     if (lastDomainMemoryKeyRef.current !== domainMemoryLookupKey) {
@@ -325,7 +330,7 @@ export function CrawlConfigScreen({
         if (domainMemoryLookupRequestRef.current !== requestId) {
           return;
         }
-        const matchingRecords = selectRelevantSelectorRecords(records, surface);
+        const matchingRecords = selectRelevantSelectorRecords(records, effectiveSurface);
         if (!matchingRecords.length) {
           setFieldRows((current) => stripDomainMemoryFieldRows(current));
           return;
@@ -344,7 +349,7 @@ export function CrawlConfigScreen({
       }
     }, UI_DELAYS.DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
-  }, [domainMemoryLookupKey, normalizedTargetDomain, setFieldRows, surface]);
+  }, [domainMemoryLookupKey, effectiveSurface, normalizedTargetDomain, setFieldRows]);
 
   const config = useMemo<CrawlConfig>(
     () => ({
@@ -404,7 +409,7 @@ export function CrawlConfigScreen({
       if (domainMemoryLookupRequestRef.current !== requestId) {
         return;
       }
-      const matchingRecords = selectRelevantSelectorRecords(records, surface);
+      const matchingRecords = selectRelevantSelectorRecords(records, effectiveSurface);
       if (!matchingRecords.length) {
         setFieldConfigMessage('No saved domain memory found for this URL.');
         setFieldRows((current) => stripDomainMemoryFieldRows(current));
@@ -519,7 +524,7 @@ export function CrawlConfigScreen({
       setFieldConfigError('Enter a target URL before generating selectors.');
       return;
     }
-    const expectedColumns = selectorGenerationFields(surface, fieldRows, additionalFields);
+    const expectedColumns = selectorGenerationFields(effectiveSurface, fieldRows, additionalFields);
     if (!expectedColumns.length) {
       setFieldConfigError(
         'Add at least one field or additional field before generating selectors.',
@@ -532,7 +537,7 @@ export function CrawlConfigScreen({
       const response = await api.suggestSelectors({
         url: target,
         expected_columns: expectedColumns,
-        surface,
+        surface: effectiveSurface,
       });
       const incomingRows = expectedColumns.map((fieldName) =>
         buildFieldRowFromSuggestion(
@@ -629,7 +634,7 @@ export function CrawlConfigScreen({
     try {
       const existingRecords = selectRelevantSelectorRecords(
         await api.listSelectors({ domain }),
-        surface,
+        effectiveSurface,
       );
       const existingByField = new Map(
         existingRecords.map((record) => [normalizeField(record.field_name), record] as const),
@@ -653,7 +658,7 @@ export function CrawlConfigScreen({
           }
           await api.createSelector({
             domain,
-            surface,
+            surface: effectiveSurface,
             ...payload,
           });
         }),
@@ -867,7 +872,6 @@ export function CrawlConfigScreen({
                     options={DOMAIN_OPTIONS}
                   />
                 </div>
-
                 <div className={RUN_SETUP_ROW_CLASS}>
                   <div className={RUN_SETUP_LABEL_CLASS}>
                     <SlidersHorizontal className="text-accent size-4 shrink-0" />
@@ -947,7 +951,7 @@ export function CrawlConfigScreen({
                   <div className="text-secondary type-body leading-[var(--leading-relaxed)]">
                     Saved domain profile active:{' '}
                     <span className="type-label-mono text-foreground">{savedProfileDomain}</span> ·{' '}
-                    {surfaceLabel(surface)}
+                    {surfaceLabel(effectiveSurface)}
                   </div>
                 ) : null}
               </div>

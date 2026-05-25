@@ -1,7 +1,9 @@
 # Backend Architecture| `monitors.py` | Product monitor CRUD, run-now dispatch, history/events/snapshot, and exports |
+
 | `alerts.py` | Agentic Delta Engine alert CRUD, test poll, history, and webhook delivery log |
 | `public_alerts.py` | API-key authenticated `/api/v1/alerts` public alert surface |
 | `api_keys.py` | Dashboard API-key create/list/revoke endpoints; returns plaintext only on create |
+
 > Last updated: 2026-05-07
 >
 > Canonical detailed backend reference. This is the merged replacement for the older split architecture docs.
@@ -80,7 +82,7 @@ Domain-recipe routes live under `api/crawl_domain.py`:
 
 - `run_type`: `crawl | batch | csv`
 - `url` and/or `urls`
-- `surface`: `ecommerce_listing | ecommerce_detail | job_listing | job_detail | automobile_listing | automobile_detail | tabular`
+- `surface`: `auto | ecommerce_listing | ecommerce_detail | job_listing | job_detail | automobile_listing | automobile_detail | content_listing | content_detail | article_listing | article_detail | forum_detail | tabular`
 - `settings`
 - `requested_fields`
 - `additional_fields`
@@ -204,7 +206,7 @@ Current live behavior:
 - Data Enrichment is separate from the crawl pipeline: it reads persisted ecommerce detail `CrawlRecord` rows, writes `EnrichedProduct` rows, and only updates source-record enrichment status metadata.
 - Product Monitoring is a recurring crawl orchestration layer: `MonitorJob` rows store URL sets, schedule interval, priority, tracked fields, retention, and crawl settings; scheduler drivers call `MonitorSchedulerService.check_due_jobs()`; monitor runs are normal `CrawlRun` rows tagged with `settings.monitor_id`; `MonitorChangeDetectionService` diffs completed run records against the latest snapshot; `monitor_alert_service.py` creates in-app notifications for tracked field changes; retention purges monitor snapshots/events only.
 - Agentic Delta Engine alerts extend Product Monitoring instead of creating a second engine: single-URL ecommerce alerts are `MonitorJob` rows with `poll_interval_seconds`, `condition`, `webhook_url`, `last_known_values`, and delivery state; condition evaluation is sandboxed in `monitor_condition.py`; webhook attempts are stored in `MonitorWebhookDelivery`; the MCP stdio wrapper in `app/mcp/alert_server.py` is a thin client over `/api/v1/alerts`.
-- Public API v1 is a lightweight FastAPI surface under `/api/v1` for Railway-style single-process deployment. API keys are dashboard-owned rows in `ApiKey`; public auth and rate limits are keyed by API key, not client IP. `POST /api/v1/extract` creates a normal single-URL ecommerce detail crawl and runs one URL inline with HTTP-only settings, disabled LLM/browser/traversal/screenshots/network capture, and a capped timeout. Batch extraction remains deferred with structured `WORKER_REQUIRED`. Product alerts are active under `/api/v1/alerts` and reuse monitor-owned crawl runs, snapshots, events, and webhook delivery logs; stale `/api/v1/watches` routes are not registered. `GET /api/v1/domains/{domain}` reads existing `DomainMemory`, `DomainRunProfile`, and recent crawl rows without probing the target. `app/mcp_server/*` is a stateless FastMCP wrapper over `/api/v1` and does not import crawl services.
+- Public API v1 is a lightweight FastAPI surface under `/api/v1` for Railway-style single-process deployment. API keys are dashboard-owned rows in `ApiKey`; public auth and rate limits are keyed by API key, not client IP. `POST /api/v1/extract` creates a normal single-URL crawl and runs one URL inline with HTTP-only settings, disabled LLM/browser/traversal/screenshots/network capture, and a capped timeout; public `surface="auto"` resolves to an internal concrete surface before run creation, while `ecommerce`, `content`, `article`, and `forum_thread` map to existing internal surfaces. Batch extraction remains deferred with structured `WORKER_REQUIRED`. Product alerts are active under `/api/v1/alerts` and reuse monitor-owned crawl runs, snapshots, events, and webhook delivery logs; stale `/api/v1/watches` routes are not registered. `GET /api/v1/domains/{domain}` reads existing `DomainMemory`, `DomainRunProfile`, and recent crawl rows without probing the target. `app/mcp_server/*` is a stateless FastMCP wrapper over `/api/v1` and does not import crawl services.
 - Orchestration is a use-case-first sequencing layer: `OrchestrationProject` groups business context, `OrchestrationWorkflowRun` stores resolved versioned template config, and `OrchestrationStepRun` links steps to normal `CrawlRun` rows. The MVP template is `competitive_pricing_snapshot`, which launches listing first, starts detail from completed listing record URLs, renders comparison rows from detail records, and promotes to normal `MonitorJob` rows. It does not implement extraction or mutate pipeline behavior.
 - Scheduler driver split is explicit: `SCHEDULER_DRIVER=dev` starts `AsyncSchedulerLoop` from FastAPI lifespan with no Celery Beat; `SCHEDULER_DRIVER=celery` registers Celery Beat tasks `monitor.check_due_jobs` and `monitor.purge_expired_snapshots`.
 

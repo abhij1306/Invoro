@@ -12,27 +12,27 @@
 
 </div>
 
-CrawlerAI extracts structured data from ecommerce, job, automobile, and tabular targets. It prefers deterministic evidence first: platform adapters, structured sources, JS state, network payloads, and DOM selectors. LLM calls are optional backfill only.
+CrawlerAI extracts structured data from ecommerce, job, automobile, content, article, forum-thread, and tabular targets. It prefers deterministic evidence first: platform adapters, structured sources, JS state, network payloads, and DOM selectors. LLM calls are optional backfill only.
 
 ## Features
 
-| Area                   | What it does                                                                                                                               |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| HTTP-first acquisition | Starts with `curl-cffi`, escalates to Patchright/Playwright only when blocking, hydration, or browser-only content requires it.            |
-| Tiered extraction      | Runs `adapter -> structured source -> JS state -> DOM -> confidence scoring -> optional LLM gap fill`.                                     |
-| Surface-aware crawling | Supports ecommerce listing/detail, job listing/detail, automobile listing/detail, and tabular surfaces.                                    |
-| Domain memory          | Stores reusable run profiles, cookie state, learned selectors, acquisition evidence, and field feedback by normalized `(domain, surface)`. |
-| Review workflow        | Lets operators inspect crawl records, artifact HTML, selector candidates, field winners, and promote domain selectors.                     |
-| Exports                | Produces JSON, CSV, artifact bundles, and Discoverist-style exports from persisted crawl records.                                          |
-| Product Intelligence   | Discovers matching products, scores candidates, launches candidate crawls, reviews matches, and can create monitors from accepted jobs.    |
-| Data enrichment        | Builds ecommerce enrichment jobs from persisted detail records with deterministic taxonomy, attribute, and pricing normalization.          |
-| Product monitors       | Schedules recurring crawl runs, diffs tracked fields, stores snapshots/events, and emits in-app notifications.                             |
-| Agentic Delta alerts   | Adds single-product price/availability alerts with sandboxed conditions, test polling, history, and webhook delivery logs.                 |
-| Public API v1          | Exposes API-key authenticated extraction, domain lookup, capabilities, and alert endpoints under `/api/v1`.                                |
-| MCP wrappers           | Provides a hosted FastMCP server for product extraction tools and a stdio alert wrapper over public alert endpoints.                       |
-| Orchestration          | Groups projects and workflows around normal crawl runs; current workflow supports competitive pricing snapshots and monitor promotion.     |
-| UCP audit              | Runs deterministic UCP compliance audits, stores report artifacts, and exports JSON/Markdown repair roadmaps.                              |
-| Observability          | Uses structured logs, correlation IDs, health checks, Prometheus metrics, run logs, and artifact capture.                                  |
+| Area                   | What it does                                                                                                                                        |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| HTTP-first acquisition | Starts with `curl-cffi`, escalates to Patchright/Playwright only when blocking, hydration, or browser-only content requires it.                     |
+| Tiered extraction      | Runs `adapter -> structured source -> JS state -> DOM -> confidence scoring -> optional LLM gap fill`.                                              |
+| Surface-aware crawling | Supports ecommerce, jobs, automobiles, content pages, article feeds/pages, forum threads, and tabular surfaces.                                     |
+| Domain memory          | Stores reusable run profiles, cookie state, learned selectors, acquisition evidence, and field feedback by normalized `(domain, surface)`.          |
+| Review workflow        | Lets operators inspect crawl records, artifact HTML, selector candidates, field winners, and promote domain selectors.                              |
+| Exports                | Produces JSON, CSV, artifact bundles, and Discoverist-style exports from persisted crawl records.                                                   |
+| Product Intelligence   | Discovers matching products, scores candidates, launches candidate crawls, reviews matches, and can create monitors from accepted jobs.             |
+| Data enrichment        | Builds ecommerce enrichment jobs from persisted detail records with deterministic taxonomy, attribute, and pricing normalization.                   |
+| Product monitors       | Schedules recurring crawl runs, diffs tracked fields, stores snapshots/events, and emits in-app notifications.                                      |
+| Agentic Delta alerts   | Adds single-product price/availability alerts with sandboxed conditions, test polling, history, and webhook delivery logs.                          |
+| Public API v1          | Exposes API-key authenticated extraction with auto/content/article/forum routing, domain lookup, capabilities, and alert endpoints under `/api/v1`. |
+| MCP wrappers           | Provides a hosted FastMCP server for product extraction tools and a stdio alert wrapper over public alert endpoints.                                |
+| Orchestration          | Groups projects and workflows around normal crawl runs; current workflow supports competitive pricing snapshots and monitor promotion.              |
+| UCP audit              | Runs deterministic UCP compliance audits, stores report artifacts, and exports JSON/Markdown repair roadmaps.                                       |
+| Observability          | Uses structured logs, correlation IDs, health checks, Prometheus metrics, run logs, and artifact capture.                                           |
 
 ## Architecture
 

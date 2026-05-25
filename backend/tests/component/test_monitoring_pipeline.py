@@ -5,6 +5,7 @@ import contextlib
 from types import SimpleNamespace
 
 import pytest
+import httpx
 from sqlalchemy import select
 
 from app.api.product_intelligence import router as product_intelligence_router
@@ -163,6 +164,50 @@ async def test_ecommerce_monitor_defaults_to_skip_head_check(db_session, test_us
     )
 
     assert monitor.settings[SKIP_HEAD_CHECK_KEY] is True
+
+
+@pytest.mark.asyncio
+@pytest.mark.component
+async def test_monitor_head_challenge_falls_back_to_get_hash(monkeypatch):
+    calls: list[str] = []
+
+    class _FakeClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_args):
+            return None
+
+        async def head(self, url: str):
+            calls.append(f"HEAD {url}")
+            return httpx.Response(403, headers={"Cf-Mitigated": "challenge"})
+
+    async def _fake_hash(_client, url: str):
+        calls.append(f"GET {url}")
+        return "hash-1"
+
+    monkeypatch.setattr(
+        "app.services.monitor_scheduler_service.httpx.AsyncClient",
+        lambda **_kwargs: _FakeClient(),
+    )
+    monkeypatch.setattr(
+        "app.services.monitor_scheduler_service._stream_content_hash",
+        _fake_hash,
+    )
+    state = SimpleNamespace(
+        last_etag=None,
+        last_modified=None,
+        last_content_hash=None,
+        last_checked_at=None,
+        last_changed_at=None,
+        consecutive_unchanged_count=0,
+    )
+
+    changed = await MonitorSchedulerService().pre_check_url("https://codeforces.com/", state)
+
+    assert changed is True
+    assert state.last_content_hash == "hash-1"
+    assert calls == ["HEAD https://codeforces.com/", "GET https://codeforces.com/"]
 
 
 @pytest.mark.asyncio

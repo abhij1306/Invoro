@@ -2,9 +2,15 @@ from __future__ import annotations
 
 from typing import Any
 
+from bs4 import BeautifulSoup
+
 from app.services.acquisition.runtime import classify_blocked_page
 from app.services.config.runtime_settings import crawler_runtime_settings
 from app.services.extract.content_listing_handler import validate_table_rows_quality
+from app.services.extract.content_surface_extractor import (
+    CONTENT_DETAIL_SURFACES,
+    extract as extract_content_surface,
+)
 from app.services.extract.detail.identity.core import (
     listing_detail_like_path,
     listing_url_is_structural,
@@ -91,6 +97,22 @@ def extract_records(
             page_url=page_url,
             requested_page_url=requested_page_url,
         )
+    if normalized_surface in CONTENT_DETAIL_SURFACES:
+        record = extract_content_surface(
+            BeautifulSoup(html or "", "html.parser"),
+            page_url=page_url,
+            surface=normalized_surface,
+        )
+        if not record:
+            return []
+        if _html_is_blocked_extraction_shell(html) and not _content_record_is_useful(
+            record
+        ):
+            return []
+        finalized_record = finalize_record(record, surface=normalized_surface)
+        if record.get("markdown"):
+            finalized_record["markdown"] = record["markdown"]
+        return [finalized_record]
     if _html_is_blocked_extraction_shell(html):
         return []
     if "listing" in normalized_surface:
@@ -197,6 +219,7 @@ def extract_records(
         html=html,
         page_url=page_url,
         requested_page_url=requested_page_url,
+        surface=normalized_surface,
         repair_quality=False,
     )
     return detail_rows
@@ -218,6 +241,12 @@ def _html_is_blocked_extraction_shell(html: str) -> bool:
     )
 
 
+def _content_record_is_useful(record: dict[str, Any]) -> bool:
+    markdown = clean_text(record.get("markdown"))
+    content = clean_text(record.get("content"))
+    return len(markdown) >= 300 or len(content) >= 300
+
+
 def _finalize_listing_rows(rows: list[dict]) -> list[dict[str, Any]]:
     return [
         finalize_listing_price_fields(dict(row))
@@ -232,6 +261,7 @@ def _postprocess_detail_records(
     html: str,
     page_url: str,
     requested_page_url: str | None,
+    surface: str = "ecommerce_detail",
     repair_quality: bool = True,
 ) -> list[dict]:
     rows: list[dict] = []
@@ -246,7 +276,7 @@ def _postprocess_detail_records(
                 requested_page_url=requested_page_url,
             )
         drop_low_signal_zero_detail_price(record)
-        rows.append(finalize_record(record, surface="ecommerce_detail"))
+        rows.append(finalize_record(record, surface=surface))
     return rows
 
 
