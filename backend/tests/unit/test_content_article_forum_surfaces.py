@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 
 from bs4 import BeautifulSoup
@@ -143,6 +145,77 @@ def test_content_detail_bypasses_ecommerce_shell_rejection_guard() -> None:
 
     assert kept == records
     assert reason is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_content_detail_skips_detail_repair_pipeline(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.services.pipeline import extraction_loop
+
+    async def _fake_extract_records_for_acquisition(context, fetched):
+        del context, fetched
+        return [{"title": "Docs", "content": "Body", "markdown": "# Docs"}], []
+
+    async def _fake_empty_retry(context, fetched, *, records, selector_rules):
+        del context, fetched
+        return records, selector_rules
+
+    async def _fake_log_extraction_outcome(context, acquisition_result, records):
+        del context, acquisition_result, records
+
+    async def _unexpected_detail_stage(*args, **kwargs):
+        del args, kwargs
+        raise AssertionError("content_detail should not run detail repair stages")
+
+    monkeypatch.setattr(
+        extraction_loop,
+        "_extract_records_for_acquisition",
+        _fake_extract_records_for_acquisition,
+    )
+    monkeypatch.setattr(
+        extraction_loop,
+        "_retry_empty_extraction_with_browser",
+        _fake_empty_retry,
+    )
+    monkeypatch.setattr(
+        extraction_loop,
+        "_retry_low_quality_extraction_with_browser",
+        _unexpected_detail_stage,
+    )
+    monkeypatch.setattr(
+        extraction_loop,
+        "_retry_listing_integrity_with_stronger_tier",
+        _unexpected_detail_stage,
+    )
+    monkeypatch.setattr(
+        extraction_loop,
+        "_apply_extraction_post_processing",
+        _unexpected_detail_stage,
+    )
+    monkeypatch.setattr(
+        extraction_loop,
+        "_record_detail_expansion_extraction_outcome",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(
+        extraction_loop,
+        "_log_extraction_outcome",
+        _fake_log_extraction_outcome,
+    )
+
+    fetched = SimpleNamespace(
+        acquisition_result=SimpleNamespace(method="curl_cffi", browser_diagnostics={}),
+        url_metrics={},
+    )
+    context = SimpleNamespace(surface="content_detail", requested_fields=[])
+
+    extracted = await extraction_loop._run_extraction_stage(context, fetched)
+
+    assert extracted.records == [
+        {"title": "Docs", "content": "Body", "markdown": "# Docs"}
+    ]
 
 
 @pytest.mark.unit
