@@ -579,7 +579,7 @@ export function UcpFixSequence({ report }: Readonly<{ report: UcpAuditReport | n
   function toggle(id: string) {
     const next = { ...done, [id]: !done[id] };
     setDone(next);
-    if (storageKey && typeof globalThis.window !== 'undefined') {
+    if (storageKey && globalThis.window !== undefined) {
       globalThis.window.localStorage.setItem(storageKey, JSON.stringify(next));
     }
   }

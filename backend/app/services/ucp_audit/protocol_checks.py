@@ -88,9 +88,9 @@ async def probe_schemas(schema_urls: list[str]) -> list[UCPSchemaProbe]:
                 groups=_schema_groups(url, payload if isinstance(payload, dict) else {}),
                 field_results=field_results,
             )
-        except (json.JSONDecodeError, ValueError) as exc:
+        except ValueError as exc:
             return UCPSchemaProbe(url=url, reachable=True, valid_json=False, error=str(exc))
-        except (httpx.HTTPError, OSError, TimeoutError, asyncio.TimeoutError) as exc:
+        except (httpx.HTTPError, OSError, TimeoutError) as exc:
             logger.debug("UCP schema probe failed for %s: %s", url, exc, exc_info=True)
             return UCPSchemaProbe(url=url, error=str(exc))
 
@@ -167,6 +167,11 @@ async def _probe_mcp(*, service: str, endpoint: str) -> UCPTransportProbe:
         error_text = json.dumps(payload.get("error", payload))[:500].lower()
         profile_required = _profile_required(payload)
         tools = _tool_entries(payload)
+        error_message = _transport_probe_error(
+            errors=errors,
+            successful=response.status_code < 400,
+            error_text=error_text,
+        )
         return UCPTransportProbe(
             service=service,
             transport="mcp",
@@ -175,14 +180,12 @@ async def _probe_mcp(*, service: str, endpoint: str) -> UCPTransportProbe:
             negotiated=response.status_code < 400 and not payload.get("error") and not errors,
             profile_required=profile_required,
             status_code=response.status_code,
-            error="; ".join(errors)[:240]
-            if errors
-            else ("" if response.status_code < 400 else error_text[:240]),
+            error=error_message,
             tool_names=[str(item.get("name") or "") for item in tools if item.get("name")],
             tool_schemas=tools,
             response_preview=_preview(payload),
         )
-    except (httpx.HTTPError, OSError, TimeoutError, asyncio.TimeoutError) as exc:
+    except (httpx.HTTPError, OSError, TimeoutError) as exc:
         logger.debug("UCP MCP probe failed for %s: %s", endpoint, exc, exc_info=True)
         return UCPTransportProbe(
             service=service,
@@ -228,7 +231,7 @@ async def _probe_rest(*, service: str, endpoint: str) -> UCPTransportProbe:
             if allow
             else {},
         )
-    except (httpx.HTTPError, OSError, TimeoutError, asyncio.TimeoutError) as exc:
+    except (httpx.HTTPError, OSError, TimeoutError) as exc:
         logger.debug("UCP REST probe failed for %s: %s", endpoint, exc, exc_info=True)
         return UCPTransportProbe(
             service=service,
@@ -264,7 +267,7 @@ async def _probe_a2a(*, service: str, endpoint: str) -> UCPTransportProbe:
             error="" if response.status_code < 400 else response.text[:240],
             response_preview=_preview(payload),
         )
-    except (httpx.HTTPError, OSError, TimeoutError, asyncio.TimeoutError) as exc:
+    except (httpx.HTTPError, OSError, TimeoutError) as exc:
         logger.debug("UCP A2A probe failed for %s: %s", endpoint, exc, exc_info=True)
         return UCPTransportProbe(
             service=service,
@@ -790,6 +793,19 @@ def _schema_field_results(payload: dict) -> dict[str, dict[str, bool]]:
     }
 
 
+def _transport_probe_error(
+    *,
+    errors: list[str],
+    successful: bool,
+    error_text: str,
+) -> str:
+    if errors:
+        return "; ".join(errors)[:240]
+    if successful:
+        return ""
+    return error_text[:240]
+
+
 def _resolve_refs(node: object, root: dict, seen: set[str] | None = None) -> object:
     if not isinstance(node, dict):
         return node
@@ -810,25 +826,44 @@ def _resolve_refs(node: object, root: dict, seen: set[str] | None = None) -> obj
 
 def _schema_contains_field(value: object, field: str, root: dict | None = None) -> bool:
     if root is None:
-        root = value if isinstance(value, dict) else {}
+        root = _schema_root(value)
     if isinstance(value, dict):
         value = _resolve_refs(value, root)
         if not isinstance(value, dict):
             return False
-        for key, child in value.items():
-            if str(key).lower() == field:
-                return True
-            if key == "required" and isinstance(child, list):
-                if any(str(item).lower() == field for item in child):
-                    return True
-            if key == "properties" and isinstance(child, dict):
-                if any(str(item).lower() == field for item in child):
-                    return True
-            if _schema_contains_field(child, field, root):
-                return True
+        return _schema_dict_contains_field(value, field, root)
     if isinstance(value, list):
         return any(_schema_contains_field(item, field, root) for item in value)
     return False
+
+
+def _schema_root(value: object) -> dict:
+    return value if isinstance(value, dict) else {}
+
+
+def _schema_dict_contains_field(value: dict, field: str, root: dict) -> bool:
+    return any(
+        _schema_entry_contains_field(key, child, field, root)
+        for key, child in value.items()
+    )
+
+
+def _schema_entry_contains_field(key: object, child: object, field: str, root: dict) -> bool:
+    if str(key).lower() == field:
+        return True
+    if key == "required" and _schema_list_contains_field(child, field):
+        return True
+    if key == "properties" and _schema_properties_contain_field(child, field):
+        return True
+    return _schema_contains_field(child, field, root)
+
+
+def _schema_list_contains_field(value: object, field: str) -> bool:
+    return isinstance(value, list) and any(str(item).lower() == field for item in value)
+
+
+def _schema_properties_contain_field(value: object, field: str) -> bool:
+    return isinstance(value, dict) and any(str(item).lower() == field for item in value)
 
 
 def _schema_groups(url: str, payload: dict) -> list[str]:

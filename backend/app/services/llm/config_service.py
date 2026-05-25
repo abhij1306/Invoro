@@ -25,6 +25,16 @@ _CONFIG_SNAPSHOT_REQUIRED_KEYS = frozenset(
 )
 _LLM_PROVIDER_DEFINITIONS = (
     {
+        "provider": "mistral",
+        "label": "Mistral",
+        "settings_attr": "mistral_api_key",
+        "recommended_models": [
+            "mistral-small-latest",
+            "mistral-small-2603",
+            "ministral-8b-2512",
+        ],
+    },
+    {
         "provider": "groq",
         "label": "Groq",
         "settings_attr": "groq_api_key",

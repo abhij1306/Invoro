@@ -17,6 +17,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 MODEL_GROQ = "llama-3.3-70b-versatile"
+MODEL_MISTRAL = "mistral-small-latest"
 
 
 @pytest.mark.regression
@@ -31,6 +32,11 @@ def test_estimate_cost_usd_uses_configured_groq_rates() -> None:
     assert estimate_cost_usd("groq", MODEL_GROQ, 1000, 1000) == Decimal("0.0014")
     assert estimate_cost_usd("groq", MODEL_GROQ, 0, 0) == Decimal("0.0000")
     assert estimate_cost_usd("groq", MODEL_GROQ, None, None) == Decimal("0.0000")
+
+
+@pytest.mark.regression
+def test_estimate_cost_usd_uses_configured_mistral_rates() -> None:
+    assert estimate_cost_usd("mistral", MODEL_MISTRAL, 1000, 1000) == Decimal("0.0008")
 
 
 @pytest.mark.asyncio

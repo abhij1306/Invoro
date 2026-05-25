@@ -91,22 +91,16 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   LIGHT THEME — CrawlerAI Refresh Console
+   LIGHT THEME — CrawlerAI Workbench
    ─────────────────────────────────────────────────────────────────────────
    SURFACE HIERARCHY (5 levels, always distinct):
-     L0  bg-base        #f5f7fa  — page canvas (lowest)
-     L1  bg-alt         #eaecf2  — sunken insets (table headers, code blocks)
-     L2  bg-panel       #ffffff  — raised panels, cards, sheets
-     L3  bg-elevated    #ffffff  — floating layers (dropdowns, modals) ← shadow differentiates
-     L4  bg-panel-strong #e1e5ee — deeply inset (active rows, selected items)
+     L0  bg-base         #f6f4ee  — page canvas (lowest)
+     L1  bg-alt          #ece7dc  — sunken insets (table headers, code blocks)
+     L2  bg-panel        #fffdf7  — raised panels, cards, sheets
+     L3  bg-elevated     #ffffff  — floating layers (dropdowns, modals)
+     L4  bg-panel-strong #ded7ca  — deeply inset (active rows, selected items)
 
-   CONTRAST AUDIT (WCAG 2.1 AA — all body/UI text ≥ 4.5:1):
-     text-primary   #0d1626  on #fff → 19.2:1  ✓ AAA
-     text-secondary #3b4658  on #fff →  9.0:1  ✓ AAA
-     text-muted     #626f87  on #fff →  5.1:1  ✓ AA
-     text-faint     #8b95a8  on #fff →  3.1:1  ✓ (UI components ≥ 3:1 — non-essential text only)
-     accent         #1665cc  on #fff →  5.0:1  ✓ AA (text links, icon fills)
-     accent-fg      #ffffff  on #1665cc → 5.0:1 ✓ AA (button label)
+   Primary accent uses a warm rust family; surrounding surfaces/text carry the refresh.
    ═══════════════════════════════════════════════════════════════════════════ */
 :root {
   color-scheme: light;
@@ -124,25 +118,25 @@
   --font-mono-line-height: 1.55;
 
   /* ── Surfaces */
-  --bg-base: #f5f7fa;
-  --bg-alt: #eaecf2; /* sunken — visibly below bg-base */
-  --bg-panel: #ffffff; /* raised panels */
+  --bg-base: #f6f4ee;
+  --bg-alt: #ece7dc; /* sunken — visibly below bg-base */
+  --bg-panel: #fffdf7; /* raised panels */
   --bg-elevated: #ffffff; /* floating layers — differentiated by shadow, not bg */
-  --bg-panel-strong: #e1e5ee; /* deeply inset, selected state */
-  --surface-sunken: var(--bg-alt);
-  --surface-overlay: rgba(245, 247, 250, 0.94);
+  --bg-panel-strong: #ded7ca; /* deeply inset, selected state */
+  --surface-sunken: #eee9df;
+  --surface-overlay: rgba(246, 244, 238, 0.94);
 
   /* ── Borders */
-  --border-subtle: #edf0f5; /* hairline, barely-there separator */
-  --border: #d8dde8; /* default divider */
-  --border-strong: #bec6d4; /* form inputs, emphasis */
+  --border-subtle: #eee9df; /* hairline, barely-there separator */
+  --border: #d8d0c2; /* default divider */
+  --border-strong: #bcb09f; /* form inputs, emphasis */
   --border-focus: var(--accent);
 
   /* ── Typography */
-  --text-primary: #0d1626;
-  --text-secondary: #3b4658;
-  --text-muted: #626f87;
-  --text-faint: #8b95a8; /* 3.1:1 — decorative/disabled only, not for essential text */
+  --text-primary: #211f1b;
+  --text-secondary: #4a443b;
+  --text-muted: #6b6255;
+  --text-faint: #918779; /* decorative/disabled only, not for essential text */
 
   /* ── JSON Syntax (light) */
   --syntax-key: #174f98;
@@ -153,16 +147,15 @@
   --syntax-punct: var(--text-secondary);
 
   /* ── Accent
-     --accent is used as both solid bg (needs white fg ≥ 4.5:1) and text link.
-     #1665cc on white = 5.0:1. #ffffff on #1665cc = 5.0:1. Both ✓ AA.     */
-  --accent: #1665cc;
-  --accent-hover: #1254ae;
+     --accent is used as both solid bg (needs white fg ≥ 4.5:1) and text link. */
+  --accent: #c2410c;
+  --accent-hover: #9a3412;
   --accent-fg: #ffffff;
-  --accent-subtle: rgba(22, 101, 204, 0.1); /* backgrounds, hover fills */
-  --accent-soft: rgba(22, 101, 204, 0.06); /* very subtle tints          */
-  --accent-border: rgba(22, 101, 204, 0.28);
-  --accent-dim: rgba(22, 101, 204, 0.16);
-  --accent-text: #1254ae; /* text links (darker for ≥ 5.8:1 on white) */
+  --accent-subtle: rgba(194, 65, 12, 0.1); /* backgrounds, hover fills */
+  --accent-soft: rgba(194, 65, 12, 0.06); /* very subtle tints        */
+  --accent-border: rgba(194, 65, 12, 0.3);
+  --accent-dim: rgba(194, 65, 12, 0.17);
+  --accent-text: #9a3412;
 
   /* ── Semantic states
      All text values verified ≥ 4.5:1 on their respective bg tokens.
@@ -182,7 +175,7 @@
   --info: #2563eb;
   --info-bg: #eff6ff;
   --info-border: #bfdbfe;
-  --neutral-bg: rgba(13, 22, 38, 0.04);
+  --neutral-bg: rgba(33, 31, 27, 0.045);
 
   /* ── Status bg aliases */
   --status-active-bg: var(--success-bg);
@@ -192,27 +185,27 @@
   --status-neutral-bg: var(--neutral-bg);
 
   /* ── Shadows */
-  --shadow-xs-value: 0 1px 0 rgba(13, 22, 38, 0.04);
-  --shadow-sm-value: 0 1px 3px rgba(13, 22, 38, 0.06), 0 1px 2px rgba(13, 22, 38, 0.04);
-  --shadow-card-value: 0 1px 3px rgba(13, 22, 38, 0.06);
-  --shadow-elevated-value: 0 8px 20px rgba(13, 22, 38, 0.08), 0 0 0 1px rgba(13, 22, 38, 0.04);
-  --shadow-lg-value: 0 12px 28px rgba(13, 22, 38, 0.1), 0 0 0 1px rgba(13, 22, 38, 0.04);
-  --shadow-modal: 0 24px 48px rgba(13, 22, 38, 0.16);
-  --focus-ring: 0 0 0 3px rgba(22, 101, 204, 0.22);
+  --shadow-xs-value: 0 1px 0 rgba(42, 34, 22, 0.05);
+  --shadow-sm-value: 0 1px 3px rgba(42, 34, 22, 0.07), 0 1px 2px rgba(42, 34, 22, 0.05);
+  --shadow-card-value: 0 1px 3px rgba(42, 34, 22, 0.07);
+  --shadow-elevated-value: 0 10px 24px rgba(42, 34, 22, 0.1), 0 0 0 1px rgba(42, 34, 22, 0.04);
+  --shadow-lg-value: 0 16px 32px rgba(42, 34, 22, 0.12), 0 0 0 1px rgba(42, 34, 22, 0.05);
+  --shadow-modal: 0 28px 56px rgba(42, 34, 22, 0.18);
+  --focus-ring: 0 0 0 3px rgba(194, 65, 12, 0.23);
   --setting-icon-active-shadow: var(--shadow-xs-value);
   --overlay-scrim: color-mix(in srgb, var(--bg-base) 34%, black);
 
   /* ── Type scale
-     Modular rhythm: 11 → 12 → 13 → 15 → 17 → 22 → 30.
-     Base bumped 14px → 15px for readability (WCAG 1.4.4 text resize).
+     Modular rhythm: 11.5 → 12.5 → 14 → 15.5 → 18 → 23 → 32.
+     Base bumped for dashboard readability without reducing density.
      Minimum rendered text: --text-xs (12px), uppercase labels only.         */
-  --text-2xs: 0.6875rem; /* 11px — uppercase labels only  */
-  --text-xs: 0.75rem; /* 12px — captions, timestamps   */
-  --text-sm: 0.8125rem; /* 13px — secondary body, controls */
-  --text-base: 0.9375rem; /* 15px — primary body (bumped)  */
-  --text-lg: 1.0625rem; /* 17px — section headings       */
-  --text-xl: 1.375rem; /* 22px — page headings          */
-  --text-2xl: 1.875rem; /* 30px — hero / display         */
+  --text-2xs: 0.71875rem; /* 11.5px — uppercase labels only */
+  --text-xs: 0.78125rem; /* 12.5px — captions, timestamps  */
+  --text-sm: 0.875rem; /* 14px — secondary body, controls */
+  --text-base: 0.96875rem; /* 15.5px — primary body          */
+  --text-lg: 1.125rem; /* 18px — section headings         */
+  --text-xl: 1.4375rem; /* 23px — page headings            */
+  --text-2xl: 2rem; /* 32px — hero / display            */
 
   /* ── Font weights */
   --weight-light: 300;
@@ -287,7 +280,7 @@
 
   /* ── Interactive — buttons */
   --button-height: var(--control-height);
-  --button-padding-x: 12px;
+  --button-padding-x: 13px;
   --button-font-size: var(--text-sm);
 
   /* Primary CTA */
@@ -312,8 +305,8 @@
   --button-destructive-fg: var(--danger);
 
   /* Neutral */
-  --button-neutral-bg: var(--bg-elevated);
-  --button-neutral-hover-bg: var(--bg-alt);
+  --button-neutral-bg: color-mix(in srgb, var(--bg-panel) 86%, var(--bg-alt));
+  --button-neutral-hover-bg: var(--bg-panel);
   --button-neutral-border: var(--border);
   --button-neutral-hover-border: var(--border-strong);
   --button-neutral-fg: var(--text-primary);
@@ -332,7 +325,7 @@
   --button-topbar-fg: var(--shell-text);
 
   /* ── Form controls */
-  --segmented-bg: var(--surface-sunken);
+  --segmented-bg: color-mix(in srgb, var(--bg-alt) 80%, var(--bg-base));
   --tab-active-fg: var(--accent-fg);
   --slider-thumb-border: var(--bg-panel);
   --toggle-track-on: var(--accent);
@@ -345,7 +338,7 @@
   --terminal-secondary: var(--text-secondary);
   --terminal-muted: var(--text-muted);
   --terminal-row-alt: var(--surface-sunken);
-  --terminal-code-bg: var(--surface-sunken);
+  --terminal-code-bg: var(--bg-panel);
   --terminal-border: var(--border);
   --terminal-shadow: none;
 
@@ -381,47 +374,40 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   DARK THEME — CrawlerAI Console · Deep Zinc
+   DARK THEME — CrawlerAI Console · Warm Charcoal
    ─────────────────────────────────────────────────────────────────────────
    SURFACE HIERARCHY:
-     L0  bg-base         #09090b  — page canvas (deepest)
-     L1  bg-alt          #111115  — sunken insets
-     L2  bg-panel        #18181c  — raised panels, cards
-     L3  bg-elevated     #222228  — floating (dropdowns, modals)
-     L4  bg-panel-strong #2e2e36  — deeply inset, strong panels
+     L0  bg-base         #11100e  — page canvas (deepest)
+     L1  bg-alt          #171511  — sunken insets
+     L2  bg-panel        #1e1b17  — raised panels, cards
+     L3  bg-elevated     #28241f  — floating (dropdowns, modals)
+     L4  bg-panel-strong #353029  — deeply inset, strong panels
 
-   CONTRAST AUDIT:
-     text-primary   #f4f4f5  on #09090b → 17.4:1  ✓ AAA
-     text-secondary #a1a1aa  on #09090b →  7.9:1  ✓ AAA
-     text-muted     #9098ab  on #18181c →  5.8:1  ✓ AA  (bumped from #71717a)
-     text-faint     #6b7280  on #18181c →  3.5:1  ✓ UI-component (non-essential only)
-     accent (solid) #3f6eb5  on #09090b →  5.0:1  ✓ AA
-     accent-fg      #ffffff  on #3f6eb5  →  5.0:1  ✓ AA  (fixed from #4c84c8 which was 3.65:1)
-     accent-text    #7aaee8  on #18181c →  6.8:1  ✓ AA  (text links on panels)
+   Primary accent uses the same rust family; dark mode gets warmer developer-console surfaces.
    ═══════════════════════════════════════════════════════════════════════════ */
 html[data-theme='dark'] {
   color-scheme: dark;
 
   /* ── Surfaces */
-  --bg-base: #09090b;
-  --bg-alt: #111115;
-  --bg-panel: #18181c;
-  --bg-elevated: #222228;
-  --bg-panel-strong: #2e2e36;
-  --surface-sunken: var(--bg-alt);
-  --surface-overlay: rgba(9, 9, 11, 0.94);
+  --bg-base: #11100e;
+  --bg-alt: #171511;
+  --bg-panel: #1e1b17;
+  --bg-elevated: #28241f;
+  --bg-panel-strong: #353029;
+  --surface-sunken: #161410;
+  --surface-overlay: rgba(17, 16, 14, 0.94);
 
   /* ── Borders */
-  --border-subtle: #18181c;
-  --border: #252529;
-  --border-strong: #3a3a42;
+  --border-subtle: #24201b;
+  --border: #302b24;
+  --border-strong: #4a4035;
   --border-focus: var(--accent);
 
   /* ── Typography */
-  --text-primary: #f4f4f5;
-  --text-secondary: #a1a1aa;
-  --text-muted: #9098ab; /* bumped from #71717a for reliable AA on panels */
-  --text-faint: #6b7280; /* 3.5:1 on bg-panel — UI component threshold only */
+  --text-primary: #f4efe5;
+  --text-secondary: #c8beb0;
+  --text-muted: #a99d8c;
+  --text-faint: #7e7468; /* UI component threshold only */
 
   /* ── JSON Syntax (VS Code Dark) */
   --syntax-key: #9cdcfe;
@@ -432,17 +418,15 @@ html[data-theme='dark'] {
   --syntax-punct: #d4d4d4;
 
   /* ── Accent
-     FIXED: was #4c84c8 (#ffffff on it = 3.65:1 — WCAG FAIL).
-     Now #3f6eb5: #ffffff on it = 5.0:1 ✓ AA.
      --accent-text is lighter for use as inline text on dark panels.           */
-  --accent: #3f6eb5;
-  --accent-hover: #4f80c8;
+  --accent: #c2410c;
+  --accent-hover: #dc5b22;
   --accent-fg: #ffffff;
-  --accent-subtle: rgba(63, 110, 181, 0.18);
-  --accent-soft: rgba(63, 110, 181, 0.1);
-  --accent-border: rgba(63, 110, 181, 0.35);
-  --accent-dim: rgba(63, 110, 181, 0.3);
-  --accent-text: #7aaee8; /* text links on dark panels — 6.8:1 on #18181c ✓ */
+  --accent-subtle: rgba(194, 65, 12, 0.2);
+  --accent-soft: rgba(194, 65, 12, 0.12);
+  --accent-border: rgba(194, 65, 12, 0.4);
+  --accent-dim: rgba(194, 65, 12, 0.32);
+  --accent-text: #ffb088;
 
   /* ── Logo */
   --logo-mark-bg: var(--accent);
@@ -483,13 +467,13 @@ html[data-theme='dark'] {
   --shadow-elevated-value: 0 16px 32px rgba(0, 0, 0, 0.75);
   --shadow-lg-value: 0 20px 40px rgba(0, 0, 0, 0.8);
   --shadow-modal: 0 32px 64px rgba(0, 0, 0, 0.9);
-  --focus-ring: 0 0 0 3px rgba(63, 110, 181, 0.32);
+  --focus-ring: 0 0 0 3px rgba(194, 65, 12, 0.34);
   --setting-icon-active-shadow: var(--shadow-xs-value);
   --overlay-scrim: color-mix(in srgb, var(--bg-base) 34%, black);
 
   /* ── Component surface tokens */
   --surface-card: var(--bg-panel);
-  --surface-card-highlight: rgba(255, 255, 255, 0.015);
+  --surface-card-highlight: rgba(255, 255, 255, 0.02);
   --surface-card-edge: var(--border);
   --subtle-panel-bg: var(--bg-alt);
   --subtle-panel-border: var(--border);
@@ -501,9 +485,9 @@ html[data-theme='dark'] {
   --button-action-border: var(--accent);
   --button-action-hover-border: var(--accent-hover);
   --button-action-fg: var(--accent-fg);
-  --button-download-bg: var(--bg-panel);
-  --button-download-hover-bg: rgba(244, 244, 245, 0.07);
-  --button-download-border: rgba(244, 244, 245, 0.22);
+  --button-download-bg: color-mix(in srgb, var(--bg-panel) 86%, var(--bg-elevated));
+  --button-download-hover-bg: rgba(244, 239, 229, 0.07);
+  --button-download-border: rgba(244, 239, 229, 0.2);
   --button-download-hover-border: var(--accent-text);
   --button-download-fg: var(--accent-text);
   --button-destructive-bg: var(--bg-panel);
@@ -511,33 +495,33 @@ html[data-theme='dark'] {
   --button-destructive-border: rgba(248, 113, 113, 0.22);
   --button-destructive-hover-border: var(--danger);
   --button-destructive-fg: var(--danger);
-  --button-neutral-bg: var(--bg-panel);
+  --button-neutral-bg: color-mix(in srgb, var(--bg-panel) 88%, var(--bg-elevated));
   --button-neutral-hover-bg: var(--bg-elevated);
   --button-neutral-border: var(--border);
   --button-neutral-hover-border: var(--border-strong);
   --button-neutral-fg: var(--text-primary);
   --button-quiet-bg: transparent;
-  --button-quiet-hover-bg: rgba(255, 255, 255, 0.05);
+  --button-quiet-hover-bg: rgba(244, 239, 229, 0.055);
   --button-quiet-border: transparent;
   --button-quiet-fg: var(--text-secondary);
   --button-quiet-hover-fg: var(--text-primary);
-  --button-topbar-bg: rgba(255, 255, 255, 0.04);
-  --button-topbar-hover-bg: rgba(255, 255, 255, 0.08);
+  --button-topbar-bg: rgba(244, 239, 229, 0.04);
+  --button-topbar-hover-bg: rgba(244, 239, 229, 0.08);
   --button-topbar-border: transparent;
   --button-topbar-fg: var(--shell-text);
 
   /* ── Form controls */
-  --segmented-bg: rgba(255, 255, 255, 0.03);
+  --segmented-bg: rgba(244, 239, 229, 0.035);
   --tab-active-fg: var(--text-primary);
   --slider-thumb-border: var(--bg-base);
   --toggle-track-off: #3f3f46;
 
   /* ── Terminal */
-  --terminal-bg: #111115;
+  --terminal-bg: #14120f;
   --terminal-fg: var(--text-primary);
-  --terminal-secondary: #8898b2;
+  --terminal-secondary: #b3a896;
   --terminal-muted: var(--text-faint);
-  --terminal-row-alt: #16161b;
+  --terminal-row-alt: #1b1814;
   --terminal-code-bg: var(--bg-base);
   --terminal-border: var(--border);
   --terminal-shadow: 0 6px 12px rgba(0, 0, 0, 0.5);
@@ -587,8 +571,13 @@ body {
   margin: 0;
   background-color: var(--bg-base);
   background-image:
-    linear-gradient(color-mix(in srgb, var(--border) 10%, transparent) 1px, transparent 1px),
-    linear-gradient(90deg, color-mix(in srgb, var(--border) 10%, transparent) 1px, transparent 1px);
+    radial-gradient(
+      circle at 16px 16px,
+      color-mix(in srgb, var(--border) 22%, transparent) 1px,
+      transparent 1.5px
+    ),
+    linear-gradient(color-mix(in srgb, var(--border) 8%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--border) 8%, transparent) 1px, transparent 1px);
   background-size: 40px 40px;
   background-position: center top;
   color: var(--text-primary);
@@ -766,7 +755,7 @@ textarea:disabled {
 /* ── TIER 1: Display */
 .type-display {
   font-family: var(--font-display-family);
-  font-size: var(--text-2xl); /* 30px */
+  font-size: var(--text-2xl);
   font-weight: 700;
   line-height: 1;
   letter-spacing: -0.03em;
@@ -777,7 +766,7 @@ textarea:disabled {
 
 .type-display-sm {
   font-family: var(--font-display-family);
-  font-size: var(--text-lg); /* 17px */
+  font-size: var(--text-lg);
   font-weight: var(--weight-semibold);
   line-height: 1;
   letter-spacing: -0.025em;
@@ -789,16 +778,17 @@ textarea:disabled {
 /* ── TIER 2: Heading */
 .type-heading-1 {
   font-family: var(--font-display-family);
-  font-size: var(--text-2xl); /* 30px */
+  font-size: var(--text-2xl);
   font-weight: var(--weight-bold);
   line-height: 1.1;
   letter-spacing: var(--tracking-tight);
   color: var(--text-primary);
+  text-wrap: balance;
 }
 
 .type-heading-2 {
   font-family: var(--font-display-family);
-  font-size: var(--text-xl); /* 22px */
+  font-size: var(--text-xl);
   font-weight: var(--weight-semibold);
   line-height: 1.2;
   letter-spacing: var(--tracking-normal);
@@ -807,7 +797,7 @@ textarea:disabled {
 
 .type-heading-3 {
   font-family: var(--font-display-family);
-  font-size: var(--text-lg); /* 17px */
+  font-size: var(--text-lg);
   font-weight: var(--weight-semibold);
   line-height: 1.35;
   letter-spacing: var(--tracking-normal);
@@ -817,7 +807,7 @@ textarea:disabled {
 /* Subheading — card titles, drawer headers, named groups */
 .type-subheading {
   font-family: var(--font-display-family);
-  font-size: var(--text-sm); /* 13px */
+  font-size: var(--text-sm);
   font-weight: var(--weight-semibold);
   line-height: 1.35;
   letter-spacing: var(--tracking-tight);
@@ -835,14 +825,14 @@ textarea:disabled {
 
 /* ── TIER 3: Body */
 .type-body {
-  font-size: var(--text-base); /* 15px */
+  font-size: var(--text-base);
   font-weight: var(--weight-normal);
   line-height: 1.5;
   color: var(--text-secondary);
 }
 
 .type-body-sm {
-  font-size: var(--text-sm); /* 13px */
+  font-size: var(--text-sm);
   font-weight: var(--weight-normal);
   line-height: 1.5;
   color: var(--text-secondary);
@@ -850,15 +840,15 @@ textarea:disabled {
 
 /* Control — buttons, tabs, interactive affordances */
 .type-control {
-  font-size: var(--text-sm); /* 13px */
-  font-weight: var(--weight-medium);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
   line-height: 1.25;
 }
 
 /* ── TIER 4: Label */
 .type-label {
   font-family: var(--font-primary-family);
-  font-size: var(--text-2xs); /* 11px */
+  font-size: var(--text-2xs);
   font-weight: var(--weight-semibold);
   line-height: 1.35;
   letter-spacing: var(--tracking-wider);
@@ -868,7 +858,7 @@ textarea:disabled {
 
 .type-label-mono {
   font-family: var(--font-mono-family);
-  font-size: var(--text-2xs); /* 11px */
+  font-size: var(--text-2xs);
   font-weight: var(--weight-semibold);
   line-height: 1.35;
   letter-spacing: var(--tracking-wider);
@@ -889,7 +879,7 @@ textarea:disabled {
 }
 
 .type-caption {
-  font-size: var(--text-xs); /* 12px */
+  font-size: var(--text-xs);
   font-weight: var(--weight-normal);
   line-height: 1.35;
   color: var(--text-muted);
@@ -897,7 +887,7 @@ textarea:disabled {
 
 .type-caption-mono {
   font-family: var(--font-mono-family);
-  font-size: var(--font-mono-size-sm); /* 11px */
+  font-size: var(--font-mono-size-sm);
   font-weight: var(--weight-normal);
   line-height: 1.35;
   color: var(--text-muted);
@@ -973,7 +963,11 @@ textarea:disabled {
 .ui-button {
   height: var(--button-height) !important;
   font-size: var(--button-font-size) !important;
-  font-weight: var(--weight-medium) !important;
+  font-weight: var(--weight-semibold) !important;
+  letter-spacing: 0;
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, white 18%, transparent),
+    var(--shadow-xs-value);
 }
 
 .ui-button svg {
@@ -984,7 +978,7 @@ textarea:disabled {
 .ui-button-sm {
   --button-height: var(--control-height-sm) !important;
   --button-font-size: var(--text-xs) !important;
-  --button-padding-x: 9px !important;
+  --button-padding-x: 10px !important;
   border-radius: var(--radius-sm) !important;
   gap: 6px !important;
 }
@@ -1008,7 +1002,9 @@ textarea:disabled {
 .button-neutral-surface,
 .button-quiet-surface,
 .button-topbar-surface {
-  box-shadow: var(--shadow-xs-value);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, white 16%, transparent),
+    var(--shadow-xs-value);
 }
 
 .button-action-surface {
@@ -1019,6 +1015,9 @@ textarea:disabled {
 .button-action-surface:hover:not(:disabled) {
   border-color: var(--button-action-hover-border);
   background: var(--button-action-hover-bg);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, white 18%, transparent),
+    0 5px 14px color-mix(in srgb, var(--accent) 24%, transparent);
 }
 
 .button-download-surface {
@@ -1049,6 +1048,9 @@ textarea:disabled {
 .button-neutral-surface:hover:not(:disabled) {
   border-color: var(--button-neutral-hover-border);
   background: var(--button-neutral-hover-bg);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, white 18%, transparent),
+    var(--shadow-sm-value);
 }
 
 .button-quiet-surface {
@@ -1148,7 +1150,47 @@ a.ui-button.button-quiet-surface:hover {
 .segmented-root {
   border: var(--interactive-border-width) solid var(--border);
   background: var(--segmented-bg);
-  box-shadow: none;
+  box-shadow:
+    inset 0 1px 2px color-mix(in srgb, black 8%, transparent),
+    0 1px 0 color-mix(in srgb, white 12%, transparent);
+}
+
+.workspace-tabs {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--segmented-bg);
+  box-shadow:
+    inset 0 1px 2px color-mix(in srgb, black 8%, transparent),
+    0 1px 0 color-mix(in srgb, white 12%, transparent);
+}
+
+.workspace-tab {
+  min-height: 36px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0;
+}
+
+.workspace-tab:hover {
+  border-color: color-mix(in srgb, var(--border-strong) 70%, transparent);
+  background: color-mix(in srgb, var(--bg-panel) 72%, transparent);
+  color: var(--text-primary);
+}
+
+.workspace-tab[data-active='true'] {
+  border-color: var(--accent-border);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--accent) 14%, var(--bg-panel)),
+    color-mix(in srgb, var(--accent) 8%, var(--bg-panel))
+  );
+  color: var(--text-primary);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, white 16%, transparent),
+    0 1px 2px color-mix(in srgb, var(--accent) 18%, transparent);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

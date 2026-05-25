@@ -22,6 +22,9 @@ _groq_client_lock = asyncio.Lock()
 _anthropic_client: httpx.AsyncClient | None = None
 _anthropic_client_timeout: float | None = None
 _anthropic_client_lock = asyncio.Lock()
+_mistral_client: httpx.AsyncClient | None = None
+_mistral_client_timeout: float | None = None
+_mistral_client_lock = asyncio.Lock()
 _nvidia_client: httpx.AsyncClient | None = None
 _nvidia_client_timeout: float | None = None
 _nvidia_client_lock = asyncio.Lock()
@@ -34,6 +37,7 @@ async def close_llm_provider_clients() -> None:
     """Close shared provider clients on shutdown after all request handlers finish."""
     global _groq_client, _groq_client_timeout
     global _anthropic_client, _anthropic_client_timeout
+    global _mistral_client, _mistral_client_timeout
     global _nvidia_client, _nvidia_client_timeout
     global _openrouter_client, _openrouter_client_timeout
     async with _groq_client_lock:
@@ -44,6 +48,10 @@ async def close_llm_provider_clients() -> None:
         await _close_provider_client("anthropic", _anthropic_client)
         _anthropic_client = None
         _anthropic_client_timeout = None
+    async with _mistral_client_lock:
+        await _close_provider_client("mistral", _mistral_client)
+        _mistral_client = None
+        _mistral_client_timeout = None
     async with _nvidia_client_lock:
         await _close_provider_client("nvidia", _nvidia_client)
         _nvidia_client = None
@@ -110,6 +118,16 @@ async def _shared_nvidia_client() -> httpx.AsyncClient:
             _nvidia_client_timeout,
         )
         return _nvidia_client
+
+
+async def _shared_mistral_client() -> httpx.AsyncClient:
+    global _mistral_client, _mistral_client_timeout
+    async with _mistral_client_lock:
+        _mistral_client, _mistral_client_timeout = await _refresh_shared_client(
+            _mistral_client,
+            _mistral_client_timeout,
+        )
+        return _mistral_client
 
 
 async def _shared_openrouter_client() -> httpx.AsyncClient:
@@ -350,6 +368,25 @@ async def _call_nvidia(
     )
 
 
+async def _call_mistral(
+    api_key: str,
+    model: str,
+    system_prompt: str,
+    user_prompt: str,
+) -> tuple[str, int, int]:
+    client = await _shared_mistral_client()
+    return await _call_chat_completions_endpoint(
+        client,
+        url=llm_runtime_settings.mistral_chat_completions_url,
+        api_key=api_key,
+        model=model,
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+        max_tokens=llm_runtime_settings.mistral_max_tokens,
+        temperature=llm_runtime_settings.mistral_temperature,
+    )
+
+
 async def _call_openrouter(
     api_key: str,
     model: str,
@@ -372,6 +409,7 @@ async def _call_openrouter(
 _PROVIDER_DISPATCH = {
     "groq": _call_groq,
     "anthropic": _call_anthropic,
+    "mistral": _call_mistral,
     "nvidia": _call_nvidia,
     "openrouter": _call_openrouter,
 }

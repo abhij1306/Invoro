@@ -65,6 +65,14 @@ class Settings(BaseSettings):
     http_max_keepalive_connections: int = 20
     anthropic_api_key: str = ""
     groq_api_key: str = ""
+    mistral_api_key: str = Field(
+        default="",
+        validation_alias=AliasChoices(
+            "MISTRAL_API_KEY",
+            "MISTRALAI_API_KEY",
+            "mistral_api_key",
+        ),
+    )
     nvidia_api_key: str = ""
     openrouter_api_key: str = ""
     request_id_header: str = "X-Request-ID"

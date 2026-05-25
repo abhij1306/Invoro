@@ -50,8 +50,8 @@ export default function AdminLlmPage() {
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [form, setForm] = useState<LlmConfigCreatePayload>({
-    provider: 'groq',
-    model: 'llama-3.3-70b-versatile',
+    provider: 'mistral',
+    model: 'mistral-small-latest',
     task_type: 'xpath_discovery',
     api_key: '',
     per_domain_daily_budget_usd: '0',

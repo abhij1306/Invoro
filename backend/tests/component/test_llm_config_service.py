@@ -156,11 +156,26 @@ def test_llm_provider_catalog_exposes_expected_provider_anchors() -> None:
     catalog = {item["provider"]: item for item in llm_provider_catalog()}
 
     assert "llama-3.3-70b-versatile" in catalog["groq"]["recommended_models"]
+    assert "mistral-small-latest" in catalog["mistral"]["recommended_models"]
     assert "meta/llama-3.1-70b-instruct" in catalog["nvidia"]["recommended_models"]
     assert "openrouter/free" in catalog["openrouter"]["recommended_models"]
     assert catalog["groq"]["recommended_models"]
+    assert catalog["mistral"]["recommended_models"]
     assert catalog["nvidia"]["recommended_models"]
     assert catalog["openrouter"]["recommended_models"]
+
+
+@pytest.mark.component
+def test_resolve_provider_api_key_supports_mistral_env_alias(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "app.services.llm.config_service.settings.mistral_api_key",
+        "mistral-env-secret",
+    )
+
+    assert (
+        resolve_provider_api_key(provider="mistral", encrypted_value="")
+        == "mistral-env-secret"
+    )
 
 
 @pytest.mark.asyncio

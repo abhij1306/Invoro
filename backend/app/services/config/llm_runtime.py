@@ -15,13 +15,16 @@ from pydantic_settings import BaseSettings
 
 from app.services.config.runtime_settings import settings_config
 
-SUPPORTED_LLM_PROVIDERS = frozenset({"groq", "anthropic", "nvidia", "openrouter"})
+SUPPORTED_LLM_PROVIDERS = frozenset(
+    {"groq", "anthropic", "mistral", "nvidia", "openrouter"}
+)
 PARSE_PROVIDER_JSON_ERROR = (
     "Error: Provider response could not be parsed as structured JSON."
 )
 DEFAULT_LLM_TOKEN_PRICING_PER_MILLION_USD = {
     "groq/llama-3.3-70b-versatile": [0.59, 0.79],
     "anthropic/claude-3-5-haiku-latest": [0.8, 4.0],
+    "mistral/mistral-small-latest": [0.15, 0.6],
     "nvidia/meta/llama-3.1-70b-instruct": [0.35, 0.4],
     "openrouter/openrouter/free": [0.0, 0.0],
 }
@@ -100,6 +103,9 @@ class LLMRuntimeSettings(BaseSettings):
     anthropic_messages_url: str = "https://api.anthropic.com/v1/messages"
     anthropic_max_tokens: int = 3000
     anthropic_temperature: float = 0.1
+    mistral_chat_completions_url: str = "https://api.mistral.ai/v1/chat/completions"
+    mistral_max_tokens: int = 1200
+    mistral_temperature: float = 0.1
     nvidia_chat_completions_url: str = (
         "https://integrate.api.nvidia.com/v1/chat/completions"
     )

@@ -330,7 +330,6 @@ export default function DataEnrichmentPage() {
                       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                         <KVTile
                           label="Price (Normalized)"
-                          mono
                           value={formatValue(selectedProduct.price_normalized) || '--'}
                         />
                         <KVTile label="Color Family" value={selectedProduct.color_family || '--'} />
@@ -360,23 +359,15 @@ export default function DataEnrichmentPage() {
                         <span className="bg-info size-1.5 rounded-full" />
                         Taxonomy & Context
                       </h3>
-                      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                        <div className="md:col-span-2">
-                          <KVTile
-                            label="Category Path"
-                            value={selectedProduct.category_path || '--'}
-                          />
-                        </div>
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:col-span-1">
-                          <KVTile
-                            label="Audience"
-                            value={selectedProduct.audience?.join(', ') || '--'}
-                          />
-                          <KVTile
-                            label="Taxonomy Version"
-                            value={selectedProduct.taxonomy_version || '--'}
-                          />
-                        </div>
+                      <div className="grid grid-cols-1 gap-4">
+                        <KVTile
+                          label="Category Path"
+                          value={selectedProduct.category_path || '--'}
+                        />
+                        <KVTile
+                          label="Audience"
+                          value={selectedProduct.audience?.join(', ') || '--'}
+                        />
                       </div>
                     </div>
 

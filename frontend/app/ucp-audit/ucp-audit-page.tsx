@@ -132,7 +132,7 @@ export default function UcpAuditPage() {
         />
 
         {/* Workspace tab selectors */}
-        <div className="border-border bg-panel flex w-full flex-wrap gap-1 rounded-[var(--radius-lg)] border p-1">
+        <div className="workspace-tabs flex w-full flex-wrap gap-1 p-1">
           {tabOptions.map((tab) => {
             const TabIcon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -141,11 +141,9 @@ export default function UcpAuditPage() {
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
+                data-active={isActive}
                 className={cn(
-                  'type-control flex min-w-[120px] flex-1 cursor-pointer items-center justify-center gap-2 rounded-[var(--radius-md)] px-3 py-2 transition-all',
-                  isActive
-                    ? 'bg-accent text-accent-fg shadow-sm'
-                    : 'text-muted hover:bg-background-alt hover:text-foreground',
+                  'workspace-tab flex min-w-[120px] flex-1 cursor-pointer items-center justify-center gap-2 px-3 py-2 transition-all',
                 )}
               >
                 <TabIcon className="size-3.5" />

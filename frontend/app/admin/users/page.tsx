@@ -2,6 +2,7 @@
 
 // Next.js App Router entrypoint for `/admin/users`; invoked by file-system routing.
 import { useQuery } from '@tanstack/react-query';
+import type { ReactNode } from 'react';
 import { useMemo, useState } from 'react';
 
 import { api } from '../../../lib/api';
@@ -63,6 +64,88 @@ export default function AdminUsersPage() {
     }
   }
 
+  let usersContent: ReactNode;
+  if (usersQuery.isLoading) {
+    usersContent = <DataRegionLoading count={6} />;
+  } else if (users.length) {
+    usersContent = (
+      <div className="surface-muted rounded-[var(--radius-md)] border">
+        <Table
+          wrapperClassName="max-h-[70vh]"
+          className="compact-data-table min-w-[840px] table-fixed"
+        >
+          <colgroup>
+            <col style={{ width: '40%' }} />
+            <col style={{ width: '15%' }} />
+            <col style={{ width: '15%' }} />
+            <col style={{ width: '15%' }} />
+            <col style={{ width: '15%' }} />
+          </colgroup>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Email</TableHead>
+              <TableHead>Role</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Joined</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {users.map((user) => (
+              <TableRow key={user.id}>
+                <TableCell className="type-body font-normal">{user.email}</TableCell>
+                <TableCell>
+                  <Dropdown<User['role']>
+                    value={user.role}
+                    onChange={(role) => {
+                      void updateUser(user.id, { role });
+                    }}
+                    disabled={pendingUserId === user.id}
+                    options={[
+                      { value: 'user', label: 'user' },
+                      { value: 'harness', label: 'harness' },
+                      { value: 'admin', label: 'admin' },
+                    ]}
+                    ariaLabel="User role"
+                    className="min-w-24"
+                  />
+                </TableCell>
+                <TableCell>
+                  <Badge tone={user.is_active ? 'success' : 'danger'} flat>
+                    {user.is_active ? 'active' : 'inactive'}
+                  </Badge>
+                </TableCell>
+                <TableCell className="type-caption text-muted">
+                  {formatDate(user.created_at)}
+                </TableCell>
+                <TableCell className="text-right">
+                  <Button
+                    type="button"
+                    variant="neutral"
+                    size="sm"
+                    disabled={pendingUserId === user.id}
+                    onClick={() => void updateUser(user.id, { is_active: !user.is_active })}
+                    className="min-w-[96px]"
+                  >
+                    {user.is_active ? 'Deactivate' : 'Reactivate'}
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    );
+  } else {
+    usersContent = (
+      <DataRegionEmpty
+        title="No users found"
+        description="Adjust the filters to broaden the result set."
+        className="px-0"
+      />
+    );
+  }
+
   return (
     <div className="page-stack">
       <PageHeader title="Users" description="Manage roles and account status." />
@@ -103,82 +186,7 @@ export default function AdminUsersPage() {
           />
         ) : null}
 
-        {usersQuery.isLoading ? (
-          <DataRegionLoading count={6} />
-        ) : users.length ? (
-          <div className="surface-muted rounded-[var(--radius-md)] border">
-            <Table
-              wrapperClassName="max-h-[70vh]"
-              className="compact-data-table min-w-[840px] table-fixed"
-            >
-              <colgroup>
-                <col style={{ width: '40%' }} />
-                <col style={{ width: '15%' }} />
-                <col style={{ width: '15%' }} />
-                <col style={{ width: '15%' }} />
-                <col style={{ width: '15%' }} />
-              </colgroup>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Joined</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {users.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell className="type-body font-normal">{user.email}</TableCell>
-                    <TableCell>
-                      <Dropdown<User['role']>
-                        value={user.role}
-                        onChange={(role) => {
-                          void updateUser(user.id, { role });
-                        }}
-                        disabled={pendingUserId === user.id}
-                        options={[
-                          { value: 'user', label: 'user' },
-                          { value: 'harness', label: 'harness' },
-                          { value: 'admin', label: 'admin' },
-                        ]}
-                        ariaLabel="User role"
-                        className="min-w-24"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Badge tone={user.is_active ? 'success' : 'danger'} flat>
-                        {user.is_active ? 'active' : 'inactive'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="type-caption text-muted">
-                      {formatDate(user.created_at)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        type="button"
-                        variant="neutral"
-                        size="sm"
-                        disabled={pendingUserId === user.id}
-                        onClick={() => void updateUser(user.id, { is_active: !user.is_active })}
-                        className="min-w-[96px]"
-                      >
-                        {user.is_active ? 'Deactivate' : 'Reactivate'}
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        ) : (
-          <DataRegionEmpty
-            title="No users found"
-            description="Adjust the filters to broaden the result set."
-            className="px-0"
-          />
-        )}
+        {usersContent}
       </SectionCard>
     </div>
   );
