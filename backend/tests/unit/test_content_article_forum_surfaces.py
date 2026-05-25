@@ -119,6 +119,31 @@ def test_content_detail_keeps_real_article_that_mentions_bot_terms() -> None:
 
 
 @pytest.mark.unit
+def test_content_detail_preserves_syntax_highlighted_code_lines() -> None:
+    rows = extract_records(
+        """
+        <html><body><main>
+          <h1>Python client</h1>
+          <pre><code><span>import</span> <span>asyncio</span>
+<span>from</span> <span>parsel</span> <span>import</span> <span>Selector</span>
+
+<span>async</span> <span>def</span> <span>main</span><span>()</span><span>:</span>
+    <span>return</span> <span>Selector</span><span>()</span></code></pre>
+        </main></body></html>
+        """,
+        "https://example.com/docs/code",
+        "content_detail",
+        max_records=5,
+    )
+
+    markdown = rows[0]["markdown"]
+
+    assert "```\nimport asyncio\nfrom parsel import Selector" in markdown
+    assert "async def main():\n    return Selector()" in markdown
+    assert "import\n\nasyncio" not in markdown
+
+
+@pytest.mark.unit
 def test_content_detail_bypasses_ecommerce_shell_rejection_guard() -> None:
     class Context:
         surface = "content_detail"

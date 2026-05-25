@@ -485,7 +485,7 @@ def _markdown_lines(node: Tag, page_url: str) -> list[str]:
             lang = _code_language(child)
             # Use inner <code> text when present so we strip the wrapper tag.
             code_node = child.find("code")
-            raw_text = (code_node if isinstance(code_node, Tag) else child).get_text("\n", strip=False)
+            raw_text = (code_node if isinstance(code_node, Tag) else child).get_text("", strip=False)
             # Normalise trailing whitespace per line but keep empty lines.
             text = "\n".join(ln.rstrip() for ln in raw_text.splitlines()).strip()
             if text:
