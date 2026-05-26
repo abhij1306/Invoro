@@ -365,7 +365,7 @@ def _container_markdown(container: Tag, page_url: str) -> str:
         is_list = bool(_LIST_ITEM_RE.match(text))
 
         if result:
-            last_nonempty = next((l for l in reversed(result) if l), None)
+            last_nonempty = next((line for line in reversed(result) if line), None)
             needs_blank = (
                 last_nonempty is not None
                 and not (is_list and prev_is_list)  # keep list items tight
