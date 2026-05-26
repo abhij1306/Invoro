@@ -1,8 +1,8 @@
-# CrawlerAI — Forensic Architecture Audit
+# Invoro — Forensic Architecture Audit
 
 ## System Context
 
-CrawlerAI is a Python/FastAPI web crawling and data extraction platform. It uses a
+Invoro is a Python/FastAPI web crawling and data extraction platform. It uses a
 hybrid acquisition pipeline (curl_cffi default → Playwright fallback), selectors/domain-
 memory feedback loops, provenance-aware record responses, admin-managed LLM runtime/config,
 and supports ecommerce, jobs, automobiles, and tabular targets. Audit shared/generic paths

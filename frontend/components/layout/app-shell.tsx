@@ -261,7 +261,7 @@ function LogoMark({
     <div className="app-logo">
       <div className={cn('app-logo-mark', auth && 'app-logo-mark-large')}>{mark}</div>
       <div className="app-logo-copy">
-        <span className="app-logo-title">CrawlerAI</span>
+        <span className="app-logo-title">Invoro</span>
       </div>
     </div>
   );
@@ -683,5 +683,5 @@ function getFallbackHeader(pathname: string): TopBarState {
     return { title: 'LLM Config', description: 'Control provider settings and prompts.' };
   if (pathname.startsWith('/jobs'))
     return { title: 'Jobs', description: 'Review worker activity and queued work.' };
-  return { title: 'CrawlerAI' };
+  return { title: 'Invoro' };
 }

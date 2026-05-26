@@ -1,16 +1,16 @@
-# CrawlerAI — Agentic Vision
+# Invoro — Agentic Vision
 
 > **Status:** DRAFT
 > **Created:** 2026-04-21
-> **Purpose:** Define what CrawlerAI is, where it is going, and what architectural
+> **Purpose:** Define what Invoro is, where it is going, and what architectural
 > boundaries must be preserved as it gets there. This document informs every agent
 > and engineer touching the codebase. It is not an implementation plan.
 
 ---
 
-## 1. What CrawlerAI Is
+## 1. What Invoro Is
 
-CrawlerAI is an **agentic web intelligence platform**. Specialized agents collaborate to
+Invoro is an **agentic web intelligence platform**. Specialized agents collaborate to
 acquire, extract, normalize, enrich, and act on web data. The core pipeline runs
 deterministically and always. Optional agents extend it — enriching output and taking
 supervised real-world actions — without affecting the core.

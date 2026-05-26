@@ -1,4 +1,4 @@
-# CrawlerAI Codebase Map
+# Invoro Codebase Map
 
 Use this doc for ownership and file location. Do not filesystem-wander first.
 If a file is not listed, assume it is a helper under a listed owner.

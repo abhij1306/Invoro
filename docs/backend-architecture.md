@@ -10,7 +10,7 @@
 
 ## 1. Scope
 
-CrawlerAI backend is a crawl execution, extraction, review, and export system with:
+Invoro backend is a crawl execution, extraction, review, and export system with:
 
 - authenticated FastAPI APIs
 - Postgres persistence

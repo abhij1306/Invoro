@@ -27,7 +27,7 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    app_name: str = "CrawlerAI"
+    app_name: str = "Invoro"
     app_env: str = Field(
         default="development",
         validation_alias=AliasChoices("APP_ENV", "app_env"),

@@ -9,7 +9,7 @@
 
 ## Goal
 
-Expand CrawlerAI beyond commerce/jobs/autos with deterministic extraction for general content, articles, and forum threads, while keeping the existing single-API path:
+Expand Invoro beyond commerce/jobs/autos with deterministic extraction for general content, articles, and forum threads, while keeping the existing single-API path:
 
 `acquire -> extract -> normalize -> persist`
 

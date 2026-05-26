@@ -1,4 +1,4 @@
-# Agent Skills — CrawlerAI
+# Agent Skills — Invoro
 
 Use the matching recipe for the task. Keep fixes in the owning subsystem.
 If paths moved, update this file after confirming ownership in `docs/CODEBASE_MAP.md`.

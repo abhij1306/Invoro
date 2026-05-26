@@ -1,6 +1,6 @@
-# CrawlerAI
+# Invoro
 
-**Deterministic crawl, extraction, review, monitoring, and export system**
+**AI commerce intelligence platform for deterministic extraction, review, monitoring, and agent-ready export**
 
 [![Python](https://img.shields.io/badge/Python-3.12%2B-blue?logo=python)](https://www.python.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-20%2B-green?logo=node.js)](https://nodejs.org/)
@@ -12,7 +12,7 @@
 
 </div>
 
-CrawlerAI extracts structured data from ecommerce, job, automobile, content, article, forum-thread, and tabular targets. It prefers deterministic evidence first: platform adapters, structured sources, JS state, network payloads, and DOM selectors. LLM calls are optional backfill only.
+Invoro extracts structured data from ecommerce, job, automobile, content, article, forum-thread, and tabular targets. It prefers deterministic evidence first: platform adapters, structured sources, JS state, network payloads, and DOM selectors. LLM calls are optional backfill only.
 
 ## Features
 
@@ -36,34 +36,22 @@ CrawlerAI extracts structured data from ecommerce, job, automobile, content, art
 
 ## Architecture
 
-```mermaid
-flowchart TD
-    A[User/API request] --> B[Crawl run settings]
-    B --> C[Acquisition policy]
-    C --> D{HTTP enough?}
-    D -->|yes| E[HTTP result]
-    D -->|no| F[Patchright/Playwright result]
-    E --> G[Extraction loop]
-    F --> G
-    G --> H[Adapters]
-    G --> I[Structured sources]
-    G --> J[JS state and network payloads]
-    G --> K[DOM selectors]
-    H --> L[Field candidates]
-    I --> L
-    J --> L
-    K --> L
-    L --> M[Confidence scoring]
-    M --> N{Gaps remain and LLM enabled?}
-    N -->|yes| O[LLM backfill]
-    N -->|no| P[Persist crawl records]
-    O --> P
-    P --> Q[Review and exports]
-    P --> R[Enrichment]
-    P --> S[Monitors and alerts]
-    P --> T[Public API and MCP]
-    Q -. selector learning .-> K
-    S -. run profiles .-> B
+Core runtime flow:
+
+```text
+User/API request
+  -> Crawl run settings
+  -> Acquisition policy
+  -> HTTP or browser fetch
+  -> Extraction loop
+     -> adapters
+     -> structured sources
+     -> JS state and network payloads
+     -> DOM selectors
+  -> Confidence scoring
+  -> Optional LLM backfill
+  -> Persist crawl records
+  -> Review, enrichment, monitors, alerts, API, and MCP
 ```
 
 ## Tech Stack
@@ -95,7 +83,7 @@ Edit `.env` before first run. Minimum local values:
 
 | Variable                                              | Required | Default/example                                                   | Notes                                              |
 | ----------------------------------------------------- | -------- | ----------------------------------------------------------------- | -------------------------------------------------- |
-| `DATABASE_URL`                                        | Yes      | `postgresql+asyncpg://postgres:postgres@localhost:5432/crawlerai` | PostgreSQL database.                               |
+| `DATABASE_URL`                                        | Yes      | `postgresql+asyncpg://postgres:postgres@localhost:5432/invoro`    | PostgreSQL database.                               |
 | `REDIS_URL`                                           | Yes      | `redis://localhost:6379/0`                                        | Queue, scheduler, and cache dependency.            |
 | `JWT_SECRET_KEY`                                      | Yes      | `replace-with-64-byte-random-secret`                              | Replace for real use.                              |
 | `ENCRYPTION_KEY`                                      | Yes      | `replace-with-32-byte-minimum-secret`                             | Replace for real use.                              |
@@ -252,7 +240,7 @@ docs/
 
 ## Safety
 
-CrawlerAI is for educational and research use. You are responsible for target-site terms, robots.txt, rate limits, privacy law, copyright, and permission before crawling at scale.
+Invoro is for educational and research use. You are responsible for target-site terms, robots.txt, rate limits, privacy law, copyright, and permission before crawling at scale.
 
 ## License
 

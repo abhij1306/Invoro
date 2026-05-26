@@ -1,8 +1,8 @@
 ---
 version: "1.2"
-name: "CrawlerAI Refresh Console"
+name: "Invoro Refresh Console"
 description: >
-  Operator-first crawler workspace using the CrawlerAI Refresh visual system:
+  Operator-first crawler workspace using the Invoro Refresh visual system:
   compact professional controls, quiet light surfaces, Feedonomics-style blue
   accent, and preserved dark theme colors. This spec changes visual treatment
   only; it does not change page structure, feature behavior, or font families.
@@ -110,7 +110,7 @@ components:
 
 # Overview
 
-CrawlerAI uses a compact operator console style. The visual goal is professional density: clear hierarchy, predictable controls, and quiet data surfaces. This migration adopts the CrawlerAI Refresh reference from `C:\Users\abhij\Downloads\CrawlerAI` while preserving existing application behavior and page arrangement.
+Invoro uses a compact operator console style. The visual goal is professional density: clear hierarchy, predictable controls, and quiet data surfaces. This migration adopts the Invoro Refresh reference from `C:\Users\abhij\Downloads\CrawlerAI` while preserving existing application behavior and page arrangement.
 
 The app keeps its current font-family tokens. Only size, weight, color, hierarchy, spacing, component treatment, and light-theme palette change.
 

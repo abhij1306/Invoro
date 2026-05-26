@@ -31,8 +31,8 @@ const monoFont = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'CrawlerAI',
-  description: 'Web crawling and structured data extraction platform.',
+  title: 'Invoro',
+  description: 'AI commerce intelligence and structured extraction platform.',
 };
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

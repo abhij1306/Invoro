@@ -1,6 +1,6 @@
 # Business Logic
 
-> This is the product-behavior map for CrawlerAI.
+> This is the product-behavior map for Invoro.
 > Read this after `docs/CODEBASE_MAP.md` and before changing shared runtime or extraction logic.
 > If you change one of the rules below, you are changing user-visible behavior.
 

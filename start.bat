@@ -4,14 +4,14 @@ setlocal
 set "ROOT=%~dp0"
 cd /d "%ROOT%"
 
-call :kill_window "CrawlerAI Backend"
-call :kill_window "CrawlerAI Frontend"
+call :kill_window "Invoro Backend"
+call :kill_window "Invoro Frontend"
 
 call :kill_port 8000
 call :kill_port 3000
 
-start "CrawlerAI Backend" cmd /k "cd /d ""%ROOT%backend"" && .venv\Scripts\python.exe run_dev_server.py"
-start "CrawlerAI Frontend" cmd /k "cd /d ""%ROOT%frontend"" && npm run dev"
+start "Invoro Backend" cmd /k "cd /d ""%ROOT%backend"" && .venv\Scripts\python.exe run_dev_server.py"
+start "Invoro Frontend" cmd /k "cd /d ""%ROOT%frontend"" && npm run dev"
 
 endlocal
 goto :eof
