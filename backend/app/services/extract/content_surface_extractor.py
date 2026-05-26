@@ -323,13 +323,22 @@ def _collapse_tokenized_code_blocks(markdown: str) -> str:
 # Map common <code class="language-*"> / highlight.js class names to fence labels.
 _LANG_CLASS_RE = re.compile(r"\blanguage-(\w+)\b|^(\w+)$")
 
+
+def _attribute_text(value: object) -> str:
+    if isinstance(value, str):
+        return value
+    if isinstance(value, list):
+        return " ".join(str(item) for item in value if item)
+    return ""
+
+
 def _code_language(node: Tag) -> str:
     """Extract a language hint from a <pre> or its first <code> child."""
     for candidate in (node, node.find("code")):
         if not isinstance(candidate, Tag):
             continue
-        classes = candidate.get("class") or []
-        for cls in (classes if isinstance(classes, list) else classes.split()):
+        classes: list[str] = _attribute_text(candidate.get("class")).split()
+        for cls in classes:
             m = _LANG_CLASS_RE.match(str(cls))
             if m:
                 lang = m.group(1) or m.group(2)
@@ -401,7 +410,7 @@ def _markdown_lines(node: Tag, page_url: str) -> list[str]:
         # Script — only care about MathJax embedded LaTeX                     #
         # ------------------------------------------------------------------ #
         if name == "script":
-            script_type = (child.get("type") or "").lower()
+            script_type = _attribute_text(child.get("type")).lower()
             if "math/tex" in script_type:
                 latex = clean_text(child.get_text())
                 if latex:
@@ -552,7 +561,7 @@ def _inline_markdown(node: Tag, page_url: str) -> str:
             continue
 
         if name == "script":
-            script_type = (child.get("type") or "").lower()
+            script_type = _attribute_text(child.get("type")).lower()
             if "math/tex" in script_type:
                 latex = clean_text(child.get_text())
                 if latex:
