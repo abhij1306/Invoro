@@ -968,10 +968,10 @@ async def test_public_extract_accepts_auto_surface(
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["data"]["surface"] == "article"
+    assert payload["data"]["surface"] == "content"
     assert payload["data"]["fields"] == {"title": "Codeforces", "url": "https://codeforces.com/"}
-    assert seen["surface"] == "article_listing"
-    assert seen["surface_resolution"]["surface"] == "article_listing"
+    assert seen["surface"] == "content_detail"
+    assert seen["surface_resolution"]["surface"] == "content_detail"
 
 
 # from backend/tests/services/test_public_watch_api.py
