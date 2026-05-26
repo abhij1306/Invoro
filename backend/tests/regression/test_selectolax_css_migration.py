@@ -1270,6 +1270,54 @@ async def test_amazon_adapter_variants_survive_full_detail_materialization() -> 
     ]
 
 
+@pytest.mark.regression
+def test_amazon_detail_sanitization_rejects_media_and_related_product_variants() -> None:
+    record = build_detail_record(
+        "<html><body><h1>EVGA GeForce RTX 3090</h1></body></html>",
+        "https://www.amazon.com/dp/B08J5F3G18",
+        "ecommerce_detail",
+        ["variants"],
+        adapter_records=[
+            {
+                "title": "EVGA GeForce RTX 3090",
+                "variants": [
+                    {
+                        "color": "Shop the Store on Amazon \u203a",
+                        "image_url": "https://m.media-amazon.com/images/I/51DRLHAa2AS.jpg",
+                    },
+                    {
+                        "url": "https://www.amazon.com/dp/B08J5F3G18#",
+                        "color": "Play Sponsored Video",
+                        "image_url": "https://m.media-amazon.com/images/I/51DRLHAa2AS.jpg",
+                    },
+                    {
+                        "url": "https://www.amazon.com/dp/B08J5F3G18#",
+                        "color": "Pause Sponsored Video",
+                        "image_url": "https://m.media-amazon.com/images/I/51DRLHAa2AS.jpg",
+                    },
+                    {
+                        "url": "https://www.amazon.com/dp/B08J5F3G18#",
+                        "color": "Mute Sponsored Video",
+                        "image_url": "https://m.media-amazon.com/images/I/51DRLHAa2AS.jpg",
+                    },
+                    {
+                        "color": (
+                            "Hemobllo GPU Support Bracket 7.66In Iron White - "
+                            "Anti-Sag Locking Screw for Heavy 4090/4080 - "
+                            "Magnetic Base Secures PSU Shroud - for Full-Tower "
+                            "or Micro-ATX PC Builds"
+                        ),
+                        "image_url": "https://m.media-amazon.com/images/I/21xLw9EXx7L.jpg",
+                    },
+                ],
+            }
+        ],
+    )
+
+    assert "variants" not in record
+    assert "variant_count" not in record
+
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_amazon_adapter_infers_twister_dimension_order_from_valid_rows() -> None:

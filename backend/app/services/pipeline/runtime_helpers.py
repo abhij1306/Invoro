@@ -194,4 +194,5 @@ async def persist_failure_state(
     )
     if run.status_value not in TERMINAL_STATUSES:
         update_run_status(run, CrawlStatus.FAILED)
+    session.add(CrawlLog(run_id=run_id, level="error", message=error_msg))
     await session.commit()

@@ -257,6 +257,7 @@ async def process_run(session: AsyncSession, run_id: int) -> None:
             update_run_status(run, CrawlStatus.RUNNING)
 
         _touch_run_heartbeat(run)
+        await session.commit()
         settings_view = run.settings_view
         url_list = await _resolve_run_urls(run, settings_view)
         total_urls = len(url_list)

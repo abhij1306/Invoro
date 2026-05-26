@@ -8,7 +8,7 @@ from app.services.crawl.batch_runtime import process_run
 from app.services.config.sitemap import SITEMAP_DEFAULT_MAX_URLS
 from app.services.acquisition.acquirer import AcquisitionResult
 from app.services.crawl.crud import create_crawl_run, get_run_records
-from app.models.crawl_run import CrawlRecord
+from app.models.crawl_run import CrawlLog, CrawlRecord
 from app.services.pipeline.types import URLProcessingResult
 from app.services.robots_policy import (
     ROBOTS_ALLOWED,
@@ -16,6 +16,7 @@ from app.services.robots_policy import (
     ROBOTS_MISSING,
     RobotsPolicyResult,
 )
+from sqlalchemy import select
 from sqlalchemy.exc import PendingRollbackError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -787,6 +788,62 @@ async def test_process_batch_run_defaults_bad_sitemap_max_urls(
     await process_run(db_session, run.id)
 
     assert resolved_inputs == [SITEMAP_DEFAULT_MAX_URLS]
+
+
+@pytest.mark.asyncio
+@pytest.mark.regression
+async def test_process_batch_run_marks_failed_when_sitemap_resolution_fails(
+    db_session: AsyncSession,
+    test_user,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run = await create_crawl_run(
+        db_session,
+        test_user.id,
+        {
+            "run_type": "batch",
+            "surface": "ecommerce_listing",
+            "url": "https://example.com",
+            "settings": {
+                "sitemap_domain": "example.com",
+                "sitemap_filter_keyword": "collections",
+            },
+        },
+    )
+
+    async def _fake_resolve_category_urls_from_sitemap(
+        domain: str,
+        filter_keyword: str,
+        max_urls: int,
+    ) -> list[str]:
+        del domain, filter_keyword, max_urls
+        raise ValueError(
+            "Sitemap fetch failed: https://example.com/sitemap.xml returned HTTP 503"
+        )
+
+    monkeypatch.setattr(
+        "app.services.crawl.batch_runtime.resolve_category_urls_from_sitemap",
+        _fake_resolve_category_urls_from_sitemap,
+        raising=False,
+    )
+
+    await process_run(db_session, run.id)
+    await db_session.refresh(run)
+    logs = (
+        await db_session.execute(
+            select(CrawlLog.message).where(CrawlLog.run_id == run.id)
+        )
+    ).scalars().all()
+
+    assert run.status == "failed"
+    assert run.completed_at is not None
+    assert (
+        run.result_summary["error"]
+        == "ValueError: Sitemap fetch failed: https://example.com/sitemap.xml returned HTTP 503"
+    )
+    assert logs == [
+        "ValueError: Sitemap fetch failed: https://example.com/sitemap.xml returned HTTP 503"
+    ]
 
 
 @pytest.mark.asyncio

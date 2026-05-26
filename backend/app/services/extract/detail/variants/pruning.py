@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 
 
 from app.services.config.extraction_rules import (
+    AMAZON_VARIANT_OPTION_VALUE_NOISE_PHRASES,
     SCALAR_FIELD_MAX_OPTION_TOKENS,
     VARIANT_OPTION_LABEL_MAX_WORDS,
 )
@@ -48,6 +49,16 @@ try:
     scalar_field_max_option_tokens = max(1, int(SCALAR_FIELD_MAX_OPTION_TOKENS))
 except (TypeError, ValueError):
     scalar_field_max_option_tokens = 1
+try:
+    variant_option_label_max_words = max(1, int(VARIANT_OPTION_LABEL_MAX_WORDS))
+except (TypeError, ValueError):
+    variant_option_label_max_words = 6
+_amazon_variant_option_value_noise_phrases = frozenset(
+    clean_text(value).casefold()
+    for value in tuple(AMAZON_VARIANT_OPTION_VALUE_NOISE_PHRASES or ())
+    if clean_text(value)
+)
+
 
 def _sanitize_detail_variant_payload(
     record: dict[str, Any], *, identity_url: str
@@ -86,6 +97,7 @@ def sanitize_variant_row(
     identity_url: str,
     title_hint: str = "",
 ) -> bool:
+    axis_value_rejected = False
     option_values = variant.get("option_values")
     if isinstance(option_values, dict):
         cleaned_options: dict[str, str] = {}
@@ -96,7 +108,12 @@ def sanitize_variant_row(
                 continue
             if axis_key.startswith("toggle") or _variant_option_value_is_noise(
                 cleaned_value
+            ) or _amazon_variant_axis_value_is_noise(
+                cleaned_value,
+                axis_key=axis_key,
+                identity_url=identity_url,
             ):
+                axis_value_rejected = True
                 continue
             if not variant_axis_name_is_semantic(axis_name):
                 continue
@@ -121,9 +138,19 @@ def sanitize_variant_row(
             continue
         if _variant_option_value_is_noise(cleaned_value):
             variant.pop(field_name, None)
+            axis_value_rejected = True
+            continue
+        if _amazon_variant_axis_value_is_noise(
+            cleaned_value,
+            axis_key=field_name,
+            identity_url=identity_url,
+        ):
+            variant.pop(field_name, None)
+            axis_value_rejected = True
             continue
         if _option_value_repeats_product_title(cleaned_value, title_hint=title_hint):
             variant.pop(field_name, None)
+            axis_value_rejected = True
             continue
         variant[field_name] = cleaned_value
     variant_url = text_or_none(variant.get("url"))
@@ -154,6 +181,8 @@ def sanitize_variant_row(
         if normalized_image.lower().startswith("http://"):
             normalized_image = "https://" + normalized_image[7:]
         variant["image_url"] = normalized_image
+    if axis_value_rejected and not _variant_has_public_axis_or_identity_signal(variant):
+        return False
     return any(
         variant.get(field_name) not in (None, "", [], {})
         for field_name in (
@@ -168,6 +197,39 @@ def sanitize_variant_row(
             *variant_axis_allowed_single_tokens,
         )
     )
+
+
+def _amazon_variant_axis_value_is_noise(
+    value: str,
+    *,
+    axis_key: str,
+    identity_url: str,
+) -> bool:
+    if axis_key not in {"color", "size"} or not _url_is_amazon(identity_url):
+        return False
+    normalized = clean_text(value).casefold()
+    if not normalized:
+        return False
+    if normalized in _amazon_variant_option_value_noise_phrases:
+        return True
+    if normalized.startswith("shop the store on amazon"):
+        return True
+    if "sponsored video" in normalized:
+        return True
+    words = re.findall(r"[a-z0-9]+", normalized)
+    if len(words) <= variant_option_label_max_words:
+        return False
+    # Amazon media/related-product clusters can be mistaken for color swatches.
+    # Real Twister values are short labels; long hardware/product names are not.
+    return bool(
+        re.search(r"\b(?:gpu|bracket|screw|magnetic|base|psu|tower|pc)\b", normalized)
+    )
+
+
+def _url_is_amazon(value: object) -> bool:
+    hostname = urlparse(str(value or "")).hostname or ""
+    hostname = hostname.casefold()
+    return bool(re.search(r"(^|\.)amazon\.", hostname))
 
 
 def _variant_has_public_axis_or_identity_signal(variant: dict[str, Any]) -> bool:

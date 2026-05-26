@@ -86,6 +86,12 @@ VARIANT_OPTION_VALUE_UI_NOISE_PHRASES = (
     "-",
     "+",
 )
+AMAZON_VARIANT_OPTION_VALUE_NOISE_PHRASES = (
+    "shop the store on amazon",
+    "play sponsored video",
+    "pause sponsored video",
+    "mute sponsored video",
+)
 VARIANT_OPTION_VALUE_EXACT_NOISE_TOKENS = frozenset(
     {"select", "choose", "option", "size guide", "your location"}
 )

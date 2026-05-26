@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import logging
 from xml.etree import ElementTree
 
 import httpx
@@ -7,12 +9,16 @@ import httpx
 from app.services.config.sitemap import (
     SITEMAP_DEFAULT_FILTER_KEYWORD,
     SITEMAP_DEFAULT_MAX_URLS,
+    SITEMAP_FETCH_RETRY_ATTEMPTS,
+    SITEMAP_FETCH_RETRY_DELAY_SECONDS,
+    SITEMAP_FETCH_RETRY_STATUS_CODES,
     SITEMAP_FETCH_TIMEOUT_SECONDS,
     SITEMAP_USER_AGENT,
 )
 from app.services.url_safety import validate_public_target
 
 SITEMAP_NS = "http://www.sitemaps.org/schemas/sitemap/0.9"
+logger = logging.getLogger(__name__)
 
 
 def _normalize_sitemap_url(domain: str) -> str:
@@ -76,7 +82,11 @@ async def _resolve_child_sitemap_urls(
         timeout=SITEMAP_FETCH_TIMEOUT_SECONDS,
     ) as client:
         for child_url in child_urls:
-            child_xml = await _fetch_xml(client, child_url)
+            try:
+                child_xml = await _fetch_xml(client, child_url)
+            except ValueError as exc:
+                logger.warning("Skipping failed child sitemap %s: %s", child_url, exc)
+                continue
             all_urls.extend(_filter_urls(await _safe_locs(child_xml), keyword))
     return all_urls[:max_urls]
 
@@ -89,11 +99,27 @@ def _filter_urls(urls: list[str], keyword: str) -> list[str]:
 
 async def _fetch_xml(client: httpx.AsyncClient, url: str) -> ElementTree.Element:
     await validate_public_target(url)
-    response = await client.get(url, headers={"User-Agent": SITEMAP_USER_AGENT})
-    if response.status_code != 200:
-        raise ValueError(
-            f"Sitemap fetch failed: {url} returned HTTP {response.status_code}"
+    attempts = max(1, int(SITEMAP_FETCH_RETRY_ATTEMPTS) + 1)
+    retry_status_codes = {int(code) for code in SITEMAP_FETCH_RETRY_STATUS_CODES}
+    response: httpx.Response | None = None
+    for attempt in range(attempts):
+        response = await client.get(url, headers={"User-Agent": SITEMAP_USER_AGENT})
+        if response.status_code == 200:
+            break
+        if response.status_code not in retry_status_codes or attempt >= attempts - 1:
+            raise ValueError(
+                f"Sitemap fetch failed: {url} returned HTTP {response.status_code}"
+            )
+        logger.warning(
+            "Retrying sitemap fetch for %s after HTTP %s (%s/%s)",
+            url,
+            response.status_code,
+            attempt + 1,
+            attempts,
         )
+        await asyncio.sleep(max(0.0, float(SITEMAP_FETCH_RETRY_DELAY_SECONDS)))
+    if response is None:
+        raise ValueError(f"Sitemap fetch failed: {url} returned no response")
     try:
         return ElementTree.fromstring(response.content)
     except ElementTree.ParseError as exc:

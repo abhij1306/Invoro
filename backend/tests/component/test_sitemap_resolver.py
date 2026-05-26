@@ -30,6 +30,26 @@ class _FakeClient:
         return self._responses[url]
 
 
+class _SequencedFakeClient:
+    def __init__(self, responses: dict[str, list[httpx.Response]]) -> None:
+        self._responses = {url: list(items) for url, items in responses.items()}
+        self.requested_urls: list[str] = []
+
+    async def __aenter__(self) -> _SequencedFakeClient:
+        return self
+
+    async def __aexit__(self, *args: object) -> None:
+        return None
+
+    async def get(self, url: str, headers: dict[str, str]) -> httpx.Response:
+        del headers
+        self.requested_urls.append(url)
+        responses = self._responses[url]
+        if len(responses) == 1:
+            return responses[0]
+        return responses.pop(0)
+
+
 def _xml_response(url: str, content: str, status_code: int = 200) -> httpx.Response:
     return httpx.Response(
         status_code,
@@ -127,6 +147,100 @@ async def test_resolve_sitemap_index_filters_final_urls_not_child_sitemaps(
         "https://example.com/sitemap_products_1.xml",
         child_url,
         "https://example.com/sitemap_pages_2.xml",
+    ]
+
+
+@pytest.mark.asyncio
+@pytest.mark.component
+async def test_resolve_sitemap_retries_transient_root_fetch_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root_url = "https://example.com/sitemap.xml"
+    fake_client = _SequencedFakeClient(
+        {
+            root_url: [
+                _xml_response(root_url, "busy", 503),
+                _xml_response(
+                    root_url,
+                    f"""<urlset xmlns="{SITEMAP_NS}">
+                      <url><loc>https://example.com/collections/a</loc></url>
+                    </urlset>""",
+                ),
+            ],
+        }
+    )
+
+    async def _no_sleep(seconds: float) -> None:
+        del seconds
+
+    monkeypatch.setattr(
+        "app.services.crawl.sitemap_resolver.httpx.AsyncClient",
+        lambda **kwargs: fake_client,
+    )
+    monkeypatch.setattr(
+        "app.services.crawl.sitemap_resolver.validate_public_target",
+        _valid_target,
+    )
+    monkeypatch.setattr("app.services.crawl.sitemap_resolver.asyncio.sleep", _no_sleep)
+
+    urls = await resolve_category_urls_from_sitemap("example.com", "collections", 500)
+
+    assert urls == ["https://example.com/collections/a"]
+    assert fake_client.requested_urls == [root_url, root_url]
+
+
+@pytest.mark.asyncio
+@pytest.mark.component
+async def test_resolve_sitemap_index_skips_failed_child_sitemaps(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root_url = "https://example.com/sitemap.xml"
+    failed_child_url = "https://example.com/sitemap_agentic_discovery.xml"
+    collections_child_url = "https://example.com/sitemap_collections_1.xml"
+    fake_client = _FakeClient(
+        {
+            root_url: _xml_response(
+                root_url,
+                f"""<sitemapindex xmlns="{SITEMAP_NS}">
+                  <sitemap><loc>{failed_child_url}</loc></sitemap>
+                  <sitemap><loc>{collections_child_url}</loc></sitemap>
+                </sitemapindex>""",
+            ),
+            failed_child_url: _xml_response(failed_child_url, "busy", 503),
+            collections_child_url: _xml_response(
+                collections_child_url,
+                f"""<urlset xmlns="{SITEMAP_NS}">
+                  <url><loc>https://example.com/collections/a</loc></url>
+                </urlset>""",
+            ),
+        }
+    )
+    monkeypatch.setattr(
+        "app.services.crawl.sitemap_resolver.httpx.AsyncClient",
+        lambda **kwargs: fake_client,
+    )
+    monkeypatch.setattr(
+        "app.services.crawl.sitemap_resolver.validate_public_target",
+        _valid_target,
+    )
+
+    async def _no_sleep(seconds: float) -> None:
+        del seconds
+
+    monkeypatch.setattr(
+        "app.services.crawl.sitemap_resolver.asyncio.sleep",
+        _no_sleep,
+    )
+
+    urls = await resolve_category_urls_from_sitemap("example.com", "collections", 500)
+
+    assert urls == ["https://example.com/collections/a"]
+    assert fake_client.requested_urls == [
+        root_url,
+        failed_child_url,
+        failed_child_url,
+        failed_child_url,
+        collections_child_url,
     ]
 
 
