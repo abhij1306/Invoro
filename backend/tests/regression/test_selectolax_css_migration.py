@@ -1614,6 +1614,81 @@ async def test_belk_adapter_ignores_aggregate_range_prices_in_state_payload() ->
 
 @pytest.mark.asyncio
 @pytest.mark.regression
+async def test_belk_adapter_extracts_detail_variants_with_color_and_size() -> None:
+    result = await BelkAdapter().extract(
+        "https://www.belk.com/p/kim-rogers-womens-denim-capri-pants/180430334287262.html",
+        """
+        <html>
+          <body>
+            <script id="__next_data__" type="application/json">
+            {
+              "props": {
+                "pageProps": {
+                  "product": {
+                    "id": "180430334287262",
+                    "title": "Women's Denim Capri Pants",
+                    "vendor": "Kim Rogers",
+                    "currency": "USD",
+                    "productUrl": "/p/kim-rogers-womens-denim-capri-pants/180430334287262.html",
+                    "options": [{"name": "Color"}, {"name": "Size"}],
+                    "variants": [
+                      {
+                        "id": 101,
+                        "sku": "KR-GRACE-6",
+                        "price": "26.99",
+                        "available": true,
+                        "inventory_quantity": 3,
+                        "option1": "GRACE WASH",
+                        "option2": "6"
+                      },
+                      {
+                        "id": 102,
+                        "sku": "KR-DIXIE-8",
+                        "price": "26.99",
+                        "available": false,
+                        "inventory_quantity": 0,
+                        "option1": "DIXIE WASH",
+                        "option2": "8"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+            </script>
+          </body>
+        </html>
+        """,
+        "ecommerce_detail",
+    )
+
+    assert len(result.records) == 1
+    record = result.records[0]
+    assert record["variant_count"] == 2
+    assert record["variants"] == [
+        {
+            "color": "GRACE WASH",
+            "size": "6",
+            "sku": "KR-GRACE-6",
+            "price": "26.99",
+            "currency": "USD",
+            "availability": "in_stock",
+            "stock_quantity": 3,
+        },
+        {
+            "color": "DIXIE WASH",
+            "size": "8",
+            "sku": "KR-DIXIE-8",
+            "price": "26.99",
+            "currency": "USD",
+            "availability": "out_of_stock",
+            "stock_quantity": 0,
+        },
+    ]
+
+
+@pytest.mark.asyncio
+@pytest.mark.regression
 async def test_amazon_adapter_does_not_fabricate_multi_axis_twister_product() -> None:
     result = await AmazonAdapter().extract(
         "https://www.amazon.com/Under-Armour-Mens-Tech-Shorts/dp/B016APPQ4S",

@@ -27,7 +27,7 @@ class ProductIntelligenceOptions(BaseModel):
         ),
     )
     search_provider: Literal["serpapi", "google_native"] = "serpapi"
-    private_label_mode: Literal["include", "flag", "exclude"] = "flag"
+    private_label_mode: Literal["include", "flag", "exclude"] = "exclude"
     confidence_threshold: float = Field(default=0.4, ge=0.0, le=1.0)
     allowed_domains: list[str] = Field(default_factory=list)
     excluded_domains: list[str] = Field(default_factory=list)

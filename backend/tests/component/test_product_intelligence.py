@@ -52,22 +52,26 @@ from app.services.product_intelligence.service import (
 
 
 @pytest.mark.component
-def test_product_intelligence_query_excludes_source_and_uses_identifier() -> None:
+def test_product_intelligence_query_uses_mpn_not_source_domain_or_sku() -> None:
     queries = build_search_queries(
         {
             "brand": "Levis",
             "title": "Men 511 Slim Fit Jeans",
-            "sku": "04511-2406",
+            "mpn": "04511-2406",
+            "sku": "BELK-ONLY-123",
         },
         source_domain_value="belk.com",
     )
 
     assert queries
+    assert queries[0] == 'site:levi.com "04511-2406"'
     assert "site:levi.com" in " ".join(queries)
     assert all("belk.com" not in query for query in queries)
     assert any("levi's" in query for query in queries)
     assert any("04511-2406" in query for query in queries)
-    assert len(queries) <= 5
+    assert any("Men 511 Slim Fit Jeans" in query for query in queries)
+    assert all("BELK-ONLY-123" not in query for query in queries)
+    assert len(queries) <= 4
 
 
 @pytest.mark.component
@@ -81,8 +85,8 @@ def test_product_intelligence_query_strips_repeated_brand_and_targets_brand_doma
         source_domain_value="belk.com",
     )
 
-    assert queries[0] == "wrangler relaxed bootcut jeans site:wrangler.com"
-    assert queries[1] == "wrangler relaxed bootcut jeans"
+    assert queries[0] == "site:wrangler.com wrangler Relaxed Bootcut Jeans"
+    assert queries[1] == "wrangler Relaxed Bootcut Jeans"
     assert "wrangler wrangler" not in " ".join(queries)
 
 
@@ -96,7 +100,7 @@ def test_product_intelligence_query_targets_configured_belk_brand_domains() -> N
         source_domain_value="belk.com",
     )
 
-    assert queries[0] == "baggallini modern everywhere bag site:baggallini.com"
+    assert queries[0] == "site:baggallini.com baggallini Modern Everywhere Bag"
     assert all("belk.com" not in query for query in queries)
 
 
@@ -106,6 +110,7 @@ def test_product_intelligence_query_keeps_brand_in_all_queries_when_brand_exists
         {
             "brand": "Mamaearth",
             "title": "Vit. C Daily Glow Cream 150g",
+            "mpn": "MC150G",
             "sku": "20510856",
         },
         source_domain_value="myntra.com",
@@ -114,9 +119,9 @@ def test_product_intelligence_query_keeps_brand_in_all_queries_when_brand_exists
     assert queries
     assert any("mamaearth" in query for query in queries)
     assert all("myntra.com" not in query for query in queries)
-    assert queries[0] == 'mamaearth vit c daily glow cream 150g'
-    assert queries[1] == 'mamaearth vit c daily glow cream 150g 20510856'
-    assert len(queries) <= 5
+    assert queries[0] == 'mamaearth Vit. C Daily Glow Cream 150g "MC150G"'
+    assert queries[1] == "mamaearth Vit. C Daily Glow Cream 150g"
+    assert len(queries) <= 3
 
 
 @pytest.mark.component
@@ -125,15 +130,17 @@ def test_product_intelligence_query_prefers_clean_brand_query_before_buy_for_agg
         {
             "brand": "Asaya",
             "title": "Even Evermore Cream 50g",
+            "mpn": "EEC50G",
             "sku": "31145778",
         },
         source_domain_value="flipkart.com",
     )
 
     assert queries
-    assert queries[0] == 'asaya even evermore cream 50g'
-    assert queries[1] == 'asaya even evermore cream 50g 31145778'
-    assert len(queries) <= 4
+    assert queries[0] == 'asaya Even Evermore Cream 50g "EEC50G"'
+    assert queries[1] == "asaya Even Evermore Cream 50g"
+    assert all("flipkart.com" not in query for query in queries)
+    assert len(queries) <= 2
 
 
 @pytest.mark.component
@@ -141,15 +148,56 @@ def test_product_intelligence_query_uses_brandless_fallback_only_when_brand_miss
     queries = build_search_queries(
         {
             "title": "Vit. C Daily Glow Cream 150g",
+            "mpn": "MC150G",
             "sku": "20510856",
         },
         source_domain_value="myntra.com",
     )
 
     assert queries
-    assert any('20510856' in query for query in queries)
+    assert any('MC150G' in query for query in queries)
     assert all("mamaearth" not in query for query in queries)
+    assert queries[0] == '"Vit. C Daily Glow Cream 150g" "MC150G"'
+    assert queries[1] == '"Vit. C Daily Glow Cream 150g" buy'
     assert len(queries) == 2
+
+
+@pytest.mark.component
+def test_product_intelligence_query_ignores_numeric_style_but_allows_alphanumeric_style() -> None:
+    numeric_queries = build_search_queries(
+        {
+            "brand": "Wrangler",
+            "title": "Relaxed Bootcut Jeans",
+            "style": "3200040112342570",
+        },
+        source_domain_value="belk.com",
+    )
+    style_queries = build_search_queries(
+        {
+            "brand": "Wrangler",
+            "title": "Relaxed Bootcut Jeans",
+            "style": "1123A257",
+        },
+        source_domain_value="belk.com",
+    )
+
+    assert all("3200040112342570" not in query for query in numeric_queries)
+    assert any("1123A257" in query for query in style_queries)
+
+
+@pytest.mark.component
+def test_product_intelligence_query_preserves_possessives_in_title_phrases() -> None:
+    queries = build_search_queries(
+        {
+            "brand": "Levis",
+            "title": "Levi's Men's 511 Slim-Fit Jeans",
+        },
+        source_domain_value="belk.com",
+    )
+
+    assert queries
+    assert any("Men's 511 Slim-Fit Jeans" in query for query in queries)
+    assert all("men s" not in query.casefold() for query in queries)
 
 
 @pytest.mark.component
@@ -498,12 +546,14 @@ def test_parse_google_native_results_extracts_redirect_targets() -> None:
 
 @pytest.mark.component
 def test_parse_google_native_results_skips_anchors_without_h3() -> None:
-    """Non-organic anchors (shopping carousel, PAA, ads, knowledge panels)
-    have anchor text but no inner h3; they must be ignored."""
+    """Non-product anchors without h3 must be ignored."""
     html = """
     <html><body>
       <a href="https://www.amazon.com/sponsored">Sponsored amazon link</a>
       <a href="https://en.wikipedia.org/wiki/Widget">People also ask: what is a widget?</a>
+      <a href="https://www.nike.com/t/run-defy-womens-road-running-shoes/HM9593">
+        Nike Run Defy Women's Road Running Shoes
+      </a>
       <div class="result">
         <a href="/url?q=https%3A%2F%2Fshop.example.com%2Fp%2Fwidget&sa=U">
           <h3>Widget Pro Edition</h3>
@@ -514,8 +564,10 @@ def test_parse_google_native_results_skips_anchors_without_h3() -> None:
 
     results = parse_google_native_results(html, limit=5)
 
-    assert len(results) == 1
-    assert results[0].url == "https://shop.example.com/p/widget"
+    assert [result.url for result in results] == [
+        "https://www.nike.com/t/run-defy-womens-road-running-shoes/HM9593",
+        "https://shop.example.com/p/widget",
+    ]
 
 
 @pytest.mark.component
@@ -599,13 +651,27 @@ def test_google_native_intelligence_keeps_provider_label() -> None:
 async def test_google_native_session_reuses_single_page_across_queries(monkeypatch) -> None:
     actions: list[str] = []
     current_url = GOOGLE_NATIVE_HOME_URL
-    html_by_url: dict[str, str] = {}
+    last_query = ""
+    html_by_query: dict[str, str] = {}
+
+    class _Locator:
+        async def fill(self, value: str) -> None:
+            nonlocal last_query
+            last_query = value
+            actions.append(f"fill:{value}")
+
+        async def press(self, value: str) -> None:
+            actions.append(f"press:{value}")
 
     class _Page:
         async def goto(self, url: str, *, wait_until: str, timeout: int):
             nonlocal current_url
             current_url = url
             actions.append(f"goto:{url}")
+
+        def locator(self, selector: str):
+            actions.append(f"locator:{selector}")
+            return _Locator()
 
         async def wait_for_timeout(self, timeout_ms: int) -> None:
             actions.append(f"wait:{timeout_ms}")
@@ -632,13 +698,9 @@ async def test_google_native_session_reuses_single_page_across_queries(monkeypat
         actions.append(f"engine:{browser_engine}")
         return _Runtime()
 
-    async def _fake_behavior(_page):
-        actions.append("behavior")
-        return {"enabled": True}
-
     async def _fake_html(_page):
-        return html_by_url.get(
-            current_url,
+        return html_by_query.get(
+            last_query,
             """
             <a href="/url?q=https%3A%2F%2Fshop.example.com%2Fp%2Fwidget"><h3>Widget</h3></a>
             """,
@@ -654,24 +716,26 @@ async def test_google_native_session_reuses_single_page_across_queries(monkeypat
     )
 
     async with google_native_session() as run_query:
-        html_by_url[_fake_search_url("blue shoe", 3)] = """
+        html_by_query["blue shoe"] = """
         <a href="/url?q=https%3A%2F%2Fshop.example.com%2Fp%2Fwidget"><h3>Widget</h3></a>
         """
-        html_by_url[_fake_search_url("red shoe", 3)] = """
+        html_by_query["red shoe"] = """
         <a href="/url?q=https%3A%2F%2Fshop.example.com%2Fp%2Fother"><h3>Other Widget</h3></a>
         """
-        html_by_url[_fake_search_url("green shoe", 3)] = """
+        html_by_query["green shoe"] = """
         <a href="/url?q=https%3A%2F%2Fshop.example.com%2Fp%2Fthird"><h3>Third Widget</h3></a>
         """
         first = await run_query("blue shoe", 3)
         second = await run_query("red shoe", 3)
         third = await run_query("green shoe", 3)
 
-    # One runtime acquisition, then a fresh page per query.
     assert actions.count("page-acquired:google.com") == 1
     assert actions.count("page-released") == 1
-    search_navs = [action for action in actions if action.startswith("goto:") and "/search" in action]
-    assert len(search_navs) == 3
+    assert actions.count(f"goto:{GOOGLE_NATIVE_HOME_URL}") == 3
+    assert "fill:blue shoe" in actions
+    assert "fill:red shoe" in actions
+    assert "fill:green shoe" in actions
+    assert actions.count("press:Enter") == 3
     assert first[0].url == "https://shop.example.com/p/widget"
     assert second and third
 
@@ -681,13 +745,27 @@ async def test_google_native_session_reuses_single_page_across_queries(monkeypat
 async def test_google_native_session_stops_after_google_sorry_page(monkeypatch) -> None:
     actions: list[str] = []
     current_url = GOOGLE_NATIVE_HOME_URL
-    html_by_url: dict[str, str] = {}
+    last_query = ""
+    html_by_query: dict[str, str] = {}
+
+    class _Locator:
+        async def fill(self, value: str) -> None:
+            nonlocal last_query
+            last_query = value
+            actions.append(f"fill:{value}")
+
+        async def press(self, value: str) -> None:
+            actions.append(f"press:{value}")
 
     class _Page:
         async def goto(self, url: str, *, wait_until: str, timeout: int):
             nonlocal current_url
             current_url = url
             actions.append(f"goto:{url}")
+
+        def locator(self, selector: str):
+            actions.append(f"locator:{selector}")
+            return _Locator()
 
         async def wait_for_timeout(self, timeout_ms: int) -> None:
             actions.append(f"wait:{timeout_ms}")
@@ -714,12 +792,8 @@ async def test_google_native_session_stops_after_google_sorry_page(monkeypatch) 
         actions.append(f"engine:{browser_engine}")
         return _Runtime()
 
-    async def _fake_behavior(_page):
-        actions.append("behavior")
-        return {"enabled": True}
-
     async def _fake_html(_page):
-        return html_by_url.get(current_url, "")
+        return html_by_query.get(last_query, "")
 
     monkeypatch.setattr(
         "app.services.product_intelligence.discovery.get_browser_runtime",
@@ -729,9 +803,7 @@ async def test_google_native_session_stops_after_google_sorry_page(monkeypatch) 
         "app.services.product_intelligence.discovery.get_page_html",
         _fake_html,
     )
-
-    blocked_url = _fake_search_url("blue shoe", 3)
-    html_by_url[blocked_url] = """
+    html_by_query["blue shoe"] = """
     <html><body>
       <p>Our systems have detected unusual traffic from your computer network.</p>
       <p>This page checks to see if it's really you sending the requests.</p>
@@ -744,17 +816,9 @@ async def test_google_native_session_stops_after_google_sorry_page(monkeypatch) 
 
     assert first == []
     assert second == []
-    search_navs = [action for action in actions if action.startswith("goto:") and "/search" in action]
-    assert len(search_navs) == 1
-
-
-def _fake_search_url(query: str, limit: int) -> str:
-    from urllib.parse import urlencode
-
-    return (
-        f"https://www.google.com/search?"
-        f"{urlencode({'q': query, 'num': str(limit)})}"
-    )
+    assert actions.count(f"goto:{GOOGLE_NATIVE_HOME_URL}") == 1
+    assert "fill:blue shoe" in actions
+    assert "fill:red shoe" not in actions
 
 
 @pytest.mark.component
@@ -1186,7 +1250,7 @@ def test_product_intelligence_parses_serpapi_immersive_store_links() -> None:
 
 @pytest.mark.asyncio
 @pytest.mark.component
-async def test_product_intelligence_serpapi_searches_shopping_then_organic(monkeypatch) -> None:
+async def test_product_intelligence_serpapi_searches_brand_organic_then_shopping(monkeypatch) -> None:
     engines: list[str] = []
     queries: list[str] = []
 
@@ -1211,8 +1275,8 @@ async def test_product_intelligence_serpapi_searches_shopping_then_organic(monke
                 {
                     "position": 1,
                     "title": "Levi's 511 Slim Fit Jeans",
-                    "link": "https://www.macys.com/p/04511.html",
-                    "snippet": "Retailer product page",
+                    "link": "https://www.levi.com/p/04511.html",
+                    "snippet": "Official product page",
                 }
             ]
         }
@@ -1224,23 +1288,23 @@ async def test_product_intelligence_serpapi_searches_shopping_then_organic(monke
         limit=5,
     )
 
-    assert engines == ["google_shopping", "google"]
-    assert queries == [
-        "levi 511 site:levi.com",
+    assert set(engines) == {"google_shopping", "google"}
+    assert sorted(queries) == [
+        "levi 511",
         "levi 511 site:levi.com",
     ]
-    assert [result.payload["provider"] for result in results] == [
-        "serpapi_shopping",
-        "serpapi",
-    ]
-    assert results[0].payload["product_id"] == "shopping-product-id"
+    assert [result.payload["provider"] for result in results] == ["serpapi"]
+    assert results[0].url == "https://www.levi.com/p/04511.html"
 
 
 @pytest.mark.asyncio
 @pytest.mark.component
-async def test_product_intelligence_serpapi_prefers_immersive_before_organic(monkeypatch) -> None:
+async def test_product_intelligence_serpapi_runs_identifier_organic_without_immersive(monkeypatch) -> None:
+    engines: list[str] = []
+
     async def fake_engine(query: str, *, engine: str, limit: int | None = None) -> dict[str, object]:
-        del query, limit
+        del limit
+        engines.append(engine)
         if engine == "google_shopping":
             return {
                 "shopping_results": [
@@ -1249,9 +1313,7 @@ async def test_product_intelligence_serpapi_prefers_immersive_before_organic(mon
                         "title": "Wrangler Relaxed Bootcut Jeans",
                         "source": "Wrangler",
                         "product_id": "shopping-product-id",
-                        "serpapi_immersive_product_api": (
-                            "https://serpapi.com/search.json?engine=google_immersive_product&page_token=abc"
-                        ),
+                        "link": "https://www.macys.com/p/wrangler-jeans/123.html",
                     }
                 ]
             }
@@ -1259,42 +1321,66 @@ async def test_product_intelligence_serpapi_prefers_immersive_before_organic(mon
             "organic_results": [
                 {
                     "position": 1,
-                    "title": "Wrangler Jeans Category",
-                    "link": "https://www.wrangler.com/collections/jeans",
-                    "snippet": "Shop jeans.",
+                    "title": "Wrangler Relaxed Bootcut Jeans",
+                    "link": "https://www.wrangler.com/shop/relaxed-bootcut-jeans.html",
+                    "snippet": "Official product page.",
                 }
             ]
         }
 
-    async def fake_immersive(page_token: str) -> dict[str, object]:
-        assert page_token == "abc"
-        return {
-            "product_results": {
-                "title": "Wrangler Relaxed Bootcut Jeans",
-                "product_id": "shopping-product-id",
-                "stores": [
-                    {
-                        "name": "Wrangler",
-                        "title": "Wrangler Relaxed Bootcut Jeans",
-                        "link": "https://www.wrangler.com/shop/relaxed-bootcut-jeans.html",
-                    }
-                ],
-            }
-        }
-
     monkeypatch.setattr(discovery_module, "_search_serpapi_engine", fake_engine)
-    monkeypatch.setattr(discovery_module, "_search_serpapi_immersive", fake_immersive)
 
     results = await discovery_module._search_serpapi(
-        "wrangler relaxed bootcut jeans site:wrangler.com",
+        "wrangler relaxed bootcut jeans 1123425700 site:wrangler.com",
         limit=5,
     )
 
+    assert engines.count("google") == 2
+    assert engines.count("google_shopping") == 1
     assert [result.payload["provider"] for result in results] == [
-        "serpapi_immersive",
         "serpapi",
+        "serpapi_shopping",
     ]
     assert results[0].url == "https://www.wrangler.com/shop/relaxed-bootcut-jeans.html"
+
+
+@pytest.mark.component
+def test_product_intelligence_serpapi_shopping_query_strips_site_filters() -> None:
+    assert (
+        discovery_module._shopping_query(
+            "wrangler relaxed bootcut jeans site:wrangler.com -site:belk.com"
+        )
+        == "wrangler relaxed bootcut jeans"
+    )
+
+
+@pytest.mark.component
+def test_product_intelligence_parses_serpapi_immersive_limit_before_about_link() -> None:
+    results = parse_serpapi_immersive_results(
+        {
+            "product_results": {
+                "title": "Levi's 511 Slim Fit Jeans",
+                "product_id": "immersive-product-id",
+                "stores": [
+                    {
+                        "name": "Levi's",
+                        "title": "Levi's 511 Slim Fit Jeans",
+                        "link": "https://www.levi.com/p/04511.html",
+                    }
+                ],
+                "about_the_product": {
+                    "title": "About Levi's 511 Slim Fit Jeans",
+                    "link": "https://www.levi.com/us/en_us/product/511",
+                    "displayed_link": "levi.com",
+                },
+            }
+        },
+        parent={"product_link": "https://www.google.com/search?ibp=oshop&q=levi"},
+        limit=1,
+    )
+
+    assert len(results) == 1
+    assert results[0].url == "https://www.levi.com/p/04511.html"
 
 
 @pytest.mark.asyncio
@@ -1679,6 +1765,51 @@ async def test_product_intelligence_discovery_rejects_unrelated_google_native_pr
 
 @pytest.mark.asyncio
 @pytest.mark.component
+async def test_product_intelligence_discovery_rejects_google_native_source_domain_and_url() -> None:
+    async def fake_run_query(query: str, limit: int) -> list[SearchResult]:
+        assert "belk.com" not in query
+        del limit
+        return [
+            SearchResult(
+                url="https://www.belk.com/p/nike-womens-run-defy-sneakers/2900020HM9593.html",
+                payload={
+                    "provider": "google_native",
+                    "title": "Women's Run Defy Sneakers",
+                    "snippet": "Nike sneakers at Belk.",
+                },
+            ),
+            SearchResult(
+                url="https://www.nike.com/t/run-defy-womens-road-running-shoes/HM9593",
+                payload={
+                    "provider": "google_native",
+                    "title": "Nike Run Defy Women's Road Running Shoes",
+                    "snippet": "Style HM9593.",
+                },
+            ),
+        ]
+
+    candidates = await discover_candidates(
+        {
+            "brand": "Nike",
+            "title": "Women's Run Defy Sneakers",
+            "sku": "HM9593",
+            "url": "https://www.belk.com/p/nike-womens-run-defy-sneakers/2900020HM9593.html",
+        },
+        source_domain_value="belk.com",
+        provider="google_native",
+        allowed_domains=[],
+        excluded_domains=[],
+        max_candidates=1,
+        run_query=fake_run_query,
+    )
+
+    assert [candidate.url for candidate in candidates] == [
+        "https://www.nike.com/t/run-defy-womens-road-running-shoes/HM9593"
+    ]
+
+
+@pytest.mark.asyncio
+@pytest.mark.component
 async def test_product_intelligence_discovery_keeps_search_delay_while_filling_pool(monkeypatch) -> None:
     recorded_delays: list[float] = []
 
@@ -1721,6 +1852,57 @@ async def test_product_intelligence_discovery_keeps_search_delay_while_filling_p
     assert recorded_delays == [0.025]
     assert len(candidates) == 1
     assert candidates[0].domain == "levi.com"
+
+
+@pytest.mark.asyncio
+@pytest.mark.component
+async def test_product_intelligence_discovery_fills_requested_count_after_strong_first_query_brand_dtc(monkeypatch) -> None:
+    seen_queries: list[str] = []
+    recorded_delays: list[float] = []
+
+    async def fake_search_results(provider: str, query: str, *, limit: int | None = None) -> list[SearchResult]:
+        del provider, limit
+        seen_queries.append(query)
+        if query == "query one":
+            return [
+                SearchResult(
+                    url="https://www.levi.com/p/04511-2406.html",
+                    payload={"title": "Levi's Men 511 Slim Fit Jeans"},
+                )
+            ]
+        return [
+            SearchResult(url="https://www.macys.com/p/04511.html", payload={"title": "Levi 511"}),
+        ]
+
+    async def fake_sleep(delay: float) -> None:
+        recorded_delays.append(delay)
+
+    monkeypatch.setattr(
+        "app.services.product_intelligence.discovery.build_search_queries",
+        lambda product, *, source_domain_value: ["query one", "query two"],
+    )
+    monkeypatch.setattr(
+        "app.services.product_intelligence.discovery._search_results",
+        fake_search_results,
+    )
+    monkeypatch.setattr(
+        "app.services.product_intelligence.discovery.asyncio.sleep",
+        fake_sleep,
+    )
+    monkeypatch.setattr(product_intelligence_settings, "search_delay_ms", 25)
+
+    candidates = await discover_candidates(
+        {"brand": "Levis", "title": "Men 511 Slim Fit Jeans", "sku": "04511-2406"},
+        source_domain_value="belk.com",
+        provider="serpapi",
+        allowed_domains=[],
+        excluded_domains=[],
+        max_candidates=2,
+    )
+
+    assert seen_queries == ["query one", "query two"]
+    assert recorded_delays == [0.025]
+    assert [candidate.domain for candidate in candidates] == ["levi.com", "macys.com"]
 
 
 @pytest.mark.asyncio
@@ -1826,6 +2008,7 @@ async def test_product_intelligence_discovery_preview_returns_source_and_payload
                 "max_source_products": 1,
                 "max_candidates_per_product": 1,
                 "search_provider": "serpapi",
+                "confidence_threshold": 0.0,
             },
         },
     )
@@ -1845,6 +2028,84 @@ async def test_product_intelligence_discovery_preview_returns_source_and_payload
     )
     assert persisted_match is not None
     assert persisted_match.candidate_price is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.component
+async def test_product_intelligence_discovery_preview_skips_search_result_llm_enrichment(
+    db_session: AsyncSession,
+    test_user,
+    monkeypatch,
+    create_test_run,
+) -> None:
+    run = await create_test_run(
+        url="https://www.belk.com/category",
+        surface="ecommerce_listing",
+    )
+    record = CrawlRecord(
+        run_id=run.id,
+        source_url="https://www.belk.com/p/levis-511-slim-fit-jeans/1.html",
+        data={
+            "brand": "Levis",
+            "title": "Men 511 Slim Fit Jeans",
+            "url": "https://www.belk.com/p/levis-511-slim-fit-jeans/1.html",
+        },
+        raw_data={},
+        discovered_data={},
+        source_trace={},
+    )
+    db_session.add(record)
+    await db_session.commit()
+    await db_session.refresh(record)
+
+    async def fake_search_results(provider: str, query: str, *, limit: int | None = None) -> list[SearchResult]:
+        del provider, query, limit
+        return [
+            SearchResult(
+                url="https://www.levi.com/p/04511.html",
+                payload={"provider": "serpapi", "title": "Levi's Men 511 Slim Fit Jeans"},
+            )
+        ]
+
+    async def fake_run_prompt_task(session, *, task_type, run_id, domain, variables):
+        del session, run_id, domain, variables
+        if task_type == "product_intelligence_enrichment":
+            raise AssertionError("Discovery preview must not call enrichment LLM")
+        return LLMTaskResult(
+            payload={"brand": "Levis", "confidence": 0.95},
+            provider="groq",
+            model="llama",
+        )
+
+    monkeypatch.setattr(
+        "app.services.product_intelligence.discovery._search_results",
+        fake_search_results,
+    )
+    monkeypatch.setattr(
+        "app.services.product_intelligence.service.run_prompt_task",
+        fake_run_prompt_task,
+    )
+
+    response = await discover_product_intelligence_candidates(
+        db_session,
+        user=test_user,
+        payload={
+            "source_run_id": run.id,
+            "source_record_ids": [record.id],
+            "options": {
+                "max_source_products": 1,
+                "max_candidates_per_product": 1,
+                "search_provider": "serpapi",
+                "llm_enrichment_enabled": True,
+            },
+        },
+    )
+
+    assert response["candidate_count"] == 1
+    assert response["candidates"][0]["intelligence"]["llm_enrichment"] == {
+        "requested": False,
+        "applied": False,
+    }
 
 
 @pytest.mark.asyncio
@@ -1877,7 +2138,7 @@ async def test_product_intelligence_discovery_prefers_row_source_url_for_query_e
         payload={
             "source_records": [
                 {
-                    "source_url": "https://www.myntra.com/shoes/example-item",
+                    "source_url": "https://www.myntra.com/p/shoes/example-item.html",
                     "data": {
                         "title": "Example Item",
                         "brand": "Example Brand",
@@ -1889,6 +2150,7 @@ async def test_product_intelligence_discovery_prefers_row_source_url_for_query_e
                 "max_source_products": 1,
                 "max_candidates_per_product": 1,
                 "search_provider": "serpapi",
+                "confidence_threshold": 0.0,
             },
         },
     )
@@ -1896,7 +2158,7 @@ async def test_product_intelligence_discovery_prefers_row_source_url_for_query_e
     assert seen_queries
     assert all("myntra.com" not in query for query in seen_queries)
     assert all("belk.com" not in query for query in seen_queries)
-    assert response["candidates"][0]["source_url"] == "https://www.myntra.com/shoes/example-item"
+    assert response["candidates"][0]["source_url"] == "https://www.myntra.com/p/shoes/example-item.html"
 
 
 @pytest.mark.asyncio
@@ -1954,6 +2216,7 @@ async def test_product_intelligence_discovery_uses_product_url_from_listing_reco
                 "max_source_products": 1,
                 "max_candidates_per_product": 1,
                 "search_provider": "serpapi",
+                "confidence_threshold": 0.0,
             },
         },
     )
@@ -1962,7 +2225,7 @@ async def test_product_intelligence_discovery_uses_product_url_from_listing_reco
         "https://www.belk.com/p/wrangler--relaxed-bootcut-jeans-/3200040112342570.html"
     )
     assert response["candidates"][0]["source_price"] == 39.95
-    assert seen_queries[0] == "wrangler relaxed bootcut jeans site:wrangler.com"
+    assert seen_queries[0] == "site:wrangler.com wrangler Relaxed Bootcut Jeans"
 
 
 @pytest.mark.asyncio
@@ -2077,6 +2340,7 @@ async def test_product_intelligence_discovery_returns_max_urls_per_input_source(
                 "max_source_products": 4,
                 "max_candidates_per_product": 3,
                 "search_provider": "serpapi",
+                "confidence_threshold": 0.0,
             },
         },
     )
@@ -2145,6 +2409,62 @@ async def test_product_intelligence_discovery_source_count_excludes_private_labe
 
 @pytest.mark.asyncio
 @pytest.mark.component
+async def test_product_intelligence_discovery_defaults_private_label_mode_to_exclude(
+    db_session: AsyncSession,
+    test_user,
+    monkeypatch,
+) -> None:
+    async def fake_search_results(provider: str, query: str, *, limit: int | None = None) -> list[SearchResult]:
+        del query
+        return [
+            SearchResult(
+                url="https://www.levi.com/p/511.html",
+                payload={"provider": provider, "title": "511 Jeans"},
+            )
+        ]
+
+    monkeypatch.setattr(
+        "app.services.product_intelligence.discovery._search_results",
+        fake_search_results,
+    )
+
+    response = await discover_product_intelligence_candidates(
+        db_session,
+        user=test_user,
+        payload={
+            "source_records": [
+                {
+                    "source_url": "https://www.belk.com/p/private.html",
+                    "data": {
+                        "brand": "New Directions",
+                        "title": "Private label shirt",
+                        "url": "https://www.belk.com/p/private.html",
+                    },
+                },
+                {
+                    "source_url": "https://www.belk.com/p/branded.html",
+                    "data": {
+                        "brand": "Levis",
+                        "title": "511 Jeans",
+                        "url": "https://www.belk.com/p/branded.html",
+                    },
+                },
+            ],
+            "options": {
+                "max_source_products": 2,
+                "max_candidates_per_product": 1,
+                "search_provider": "serpapi",
+            },
+        },
+    )
+
+    assert response["source_count"] == 1
+    assert response["candidate_count"] == 1
+    assert response["candidates"][0]["source_index"] == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.component
 async def test_product_intelligence_discovery_searches_title_only_sources(
     db_session: AsyncSession,
     test_user,
@@ -2189,6 +2509,7 @@ async def test_product_intelligence_discovery_searches_title_only_sources(
                 "max_source_products": 2,
                 "max_candidates_per_product": 3,
                 "search_provider": "serpapi",
+                "confidence_threshold": 0.0,
             },
         },
     )

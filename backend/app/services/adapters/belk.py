@@ -28,6 +28,10 @@ from app.services.config.extraction_rules import (
     LISTING_BRAND_MAX_WORDS,
 )
 from app.services.extract.listing_candidate_ranking import looks_like_utility_title
+from app.services.extract.variant_axis import normalized_variant_axis_key
+from app.services.extract.variant_normalization.contract import (
+    flatten_variants_for_public_output,
+)
 from app.services.shared.field_coerce import (
     absolute_url,
     clean_text,
@@ -196,6 +200,12 @@ def _record_from_payload(product: dict[str, Any], *, page_url: str) -> dict[str,
             currency = coerce_field_value("currency", nested_value, page_url)
             if currency not in (None, "", [], {}):
                 break
+    variants = _variants_from_payload(
+        product,
+        page_url=page_url,
+        product_url=str(url or page_url or ""),
+        currency=currency,
+    )
     return compact_dict(
         {
             "title": title,
@@ -208,8 +218,164 @@ def _record_from_payload(product: dict[str, Any], *, page_url: str) -> dict[str,
             "barcode": barcode,
             "product_id": _first_payload_field(product, field_name="product_id", page_url=page_url, keys=BELK_PRODUCT_ID_KEYS),
             "url": url,
+            "variants": variants,
+            "variant_count": len(variants or []) or None,
         }
     )
+
+
+def _variants_from_payload(
+    product: dict[str, Any],
+    *,
+    page_url: str,
+    product_url: str,
+    currency: object,
+) -> list[dict[str, object]] | None:
+    raw_variants = product.get("variants")
+    if not isinstance(raw_variants, list):
+        return None
+    option_names = _option_names(product.get("options"))
+    variants: list[dict[str, object]] = []
+    for raw_variant in raw_variants:
+        if not isinstance(raw_variant, dict):
+            continue
+        variant = _variant_from_payload(
+            raw_variant,
+            option_names=option_names,
+            page_url=page_url,
+            currency=currency,
+        )
+        if variant:
+            variants.append(variant)
+    return flatten_variants_for_public_output(variants, page_url=product_url or page_url)
+
+
+def _option_names(raw_options: object) -> list[str]:
+    names: list[str] = []
+    if not isinstance(raw_options, list):
+        return names
+    for option in raw_options:
+        label: object
+        if isinstance(option, str):
+            label = option
+        elif isinstance(option, dict):
+            label = option.get("name") or option.get("title") or option.get("label")
+        else:
+            label = None
+        cleaned = clean_text(label)
+        if cleaned:
+            names.append(cleaned)
+    return names
+
+
+def _variant_from_payload(
+    variant: dict[str, Any],
+    *,
+    option_names: list[str],
+    page_url: str,
+    currency: object,
+) -> dict[str, object] | None:
+    row: dict[str, object] = {}
+    sku = clean_text(
+        variant.get("sku")
+        or variant.get("skuId")
+        or variant.get("sku_id")
+        or variant.get("id")
+        or variant.get("variantId")
+        or variant.get("variant_id")
+    )
+    if sku:
+        row["sku"] = sku
+    price = normalize_price(
+        variant.get("price") or variant.get("salePrice") or variant.get("sellingPrice"),
+        interpret_integral_as_cents=False,
+    )
+    if price is not None:
+        row["price"] = price
+    variant_currency = coerce_field_value("currency", variant, page_url) or currency
+    if variant_currency not in (None, "", [], {}):
+        row["currency"] = str(variant_currency)
+    availability = _variant_availability(variant)
+    if availability:
+        row["availability"] = availability
+    stock_quantity = _variant_stock_quantity(variant)
+    if stock_quantity is not None:
+        row["stock_quantity"] = stock_quantity
+    image_url = _variant_image_url(variant, page_url=page_url)
+    if image_url:
+        row["image_url"] = image_url
+    option_values = _variant_option_values(variant, option_names=option_names)
+    if option_values:
+        row["option_values"] = option_values
+        for axis_key in ("color", "size"):
+            if option_values.get(axis_key):
+                row[axis_key] = option_values[axis_key]
+    if not any(row.get(axis_key) for axis_key in ("color", "size")):
+        for axis_key in ("color", "size"):
+            value = clean_text(variant.get(axis_key))
+            if value:
+                row[axis_key] = value
+    return row or None
+
+
+def _variant_option_values(
+    variant: dict[str, Any],
+    *,
+    option_names: list[str],
+) -> dict[str, str]:
+    option_values: dict[str, str] = {}
+    raw_options = variant.get("options")
+    variant_options = raw_options if isinstance(raw_options, list) else []
+    max_options = max(len(option_names), len(variant_options), 3)
+    for index in range(1, max_options + 1):
+        axis_name = option_names[index - 1] if index - 1 < len(option_names) else f"option_{index}"
+        axis_key = normalized_variant_axis_key(axis_name)
+        if not axis_key:
+            continue
+        value = variant.get(f"option{index}")
+        if value in (None, "", [], {}) and index - 1 < len(variant_options):
+            value = variant_options[index - 1]
+        cleaned = clean_text(value)
+        if cleaned:
+            option_values[axis_key] = cleaned
+    return option_values
+
+
+def _variant_availability(variant: dict[str, Any]) -> str | None:
+    value = variant.get("availability")
+    coerced = coerce_field_value("availability", value, "")
+    if coerced:
+        return str(coerced)
+    available = variant.get("available")
+    if isinstance(available, bool):
+        return "in_stock" if available else "out_of_stock"
+    if isinstance(available, (int, float)):
+        return "in_stock" if available else "out_of_stock"
+    if isinstance(available, str):
+        lowered = available.strip().lower()
+        if lowered in {"true", "1", "yes", "available", "in stock", "instock"}:
+            return "in_stock"
+        if lowered in {"false", "0", "no", "sold out", "out of stock", "outofstock"}:
+            return "out_of_stock"
+    return None
+
+
+def _variant_stock_quantity(variant: dict[str, Any]) -> int | None:
+    for key in ("stock_quantity", "stockQuantity", "inventory_quantity", "inventoryQuantity"):
+        value = variant.get(key)
+        try:
+            return int(str(value).strip())
+        except (TypeError, ValueError):
+            continue
+    return None
+
+
+def _variant_image_url(variant: dict[str, Any], *, page_url: str) -> str | None:
+    image = variant.get("image") or variant.get("featured_image") or variant.get("featuredImage")
+    if isinstance(image, dict):
+        image = image.get("url") or image.get("src")
+    cleaned = clean_text(image)
+    return absolute_url(page_url, cleaned) if cleaned else None
 
 
 def _dom_listing_records(page_url: str, html: str) -> list[dict[str, Any]]:

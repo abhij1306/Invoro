@@ -46,12 +46,12 @@ from app.services.crawl.crud import create_crawl_run, get_run_records
 from app.services.crawl.service import dispatch_run
 from app.services.domain_utils import normalize_domain
 from app.services.llm.runtime import run_prompt_task
+from app.services.product_intelligence.discovery import _looks_like_product_detail_url
 from app.services.product_intelligence.discovery import discover_candidates
 from app.services.product_intelligence.discovery import shared_query_runner
 from app.services.product_intelligence.matching import (
     build_search_result_intelligence,
     extract_product_snapshot,
-    extract_search_result_snapshot,
     is_private_label,
     normalize_brand,
     score_candidate,
@@ -72,7 +72,11 @@ def _resolved_source_url(
     row: dict[str, object],
     snapshot: dict[str, object],
 ) -> str:
-    return str(row.get("source_url") or snapshot.get("url") or "").strip()
+    row_url = str(row.get("source_url") or "").strip()
+    snapshot_url = str(snapshot.get("url") or "").strip()
+    if snapshot_url and (not row_url or not _looks_like_product_detail_url(row_url)):
+        return snapshot_url
+    return row_url or snapshot_url
 
 
 async def create_product_intelligence_job(
@@ -322,16 +326,11 @@ async def discover_product_intelligence_candidates(
                     source_type=candidate.source_type,
                     llm_enabled=llm_enabled,
                 )
-                intelligence = await _enrich_search_result_intelligence(
-                    session,
+                if not _meets_confidence_threshold(
+                    _as_float_or_default(intelligence.get("confidence_score"), 0.0),
                     options=options,
-                    source_snapshot=snapshot,
-                    candidate_payload=dict(candidate.payload or {}),
-                    candidate_url=candidate.url,
-                    candidate_domain=candidate.domain,
-                    source_type=candidate.source_type,
-                    intelligence=intelligence,
-                )
+                ):
+                    continue
                 discovered_payloads.append(
                     {
                         "source_record_id": _as_int(row.get("source_record_id")),
@@ -664,6 +663,12 @@ async def _score_candidate_if_ready(
         candidate=candidate_snapshot,
         source_type=candidate.source_type,
     )
+    if not _meets_confidence_threshold(
+        _as_float_or_default(result.get("score"), 0.0),
+        options=job.options,
+    ):
+        candidate.status = PRODUCT_INTELLIGENCE_CANDIDATE_STATUS_CRAWL_COMPLETE
+        return True
     llm_enrichment = await _build_llm_enrichment(
         session,
         job=job,
@@ -822,75 +827,6 @@ async def _build_llm_enrichment(
     }
 
 
-async def _enrich_search_result_intelligence(
-    session: AsyncSession,
-    *,
-    options: dict[str, object],
-    source_snapshot: dict[str, object],
-    candidate_payload: dict[str, object],
-    candidate_url: str,
-    candidate_domain: str,
-    source_type: str,
-    intelligence: dict[str, object],
-) -> dict[str, object]:
-    requested = bool(options.get("llm_enrichment_enabled"))
-    if not requested:
-        return intelligence
-    canonical = extract_search_result_snapshot(candidate_payload, url=candidate_url, domain=candidate_domain)
-    deterministic = {
-        "score": intelligence.get("confidence_score"),
-        "label": intelligence.get("confidence_label"),
-        "reasons": intelligence.get("score_reasons"),
-        "source_type": source_type,
-    }
-    result = await run_prompt_task(
-        session,
-        task_type=PRODUCT_INTELLIGENCE_LLM_TASK,
-        run_id=None,
-        domain=candidate_domain,
-        variables={
-            "source_product_json": source_snapshot,
-            "candidate_product_json": canonical,
-            "serpapi_result_json": candidate_payload,
-            "search_result_json": candidate_payload,
-            "deterministic_match_json": deterministic,
-        },
-    )
-    if result.error_message:
-        return {
-            **intelligence,
-            "llm_enrichment": {
-                "requested": True,
-                "applied": False,
-                "error": result.error_message,
-                "error_category": str(result.error_category or ""),
-            },
-        }
-    payload = result.payload if isinstance(result.payload, dict) else {}
-    cleaned = _canonical_record_from_llm(canonical, payload)
-    return {
-        **intelligence,
-        "canonical_record": cleaned,
-        "confidence_score": _bounded_float(
-            payload.get("suggested_score", payload.get("confidence")),
-            _as_float_or_default(intelligence.get("confidence_score"), 0.0),
-        ),
-        "confidence_label": score_candidate(
-            source=source_snapshot,
-            candidate=cleaned,
-            source_type=source_type,
-        )["label"],
-        "cleanup_source": f"llm_{_candidate_payload_provider(candidate_payload)}",
-        "llm_enrichment": {
-            "requested": True,
-            "applied": bool(payload),
-            "provider": result.provider or "",
-            "model": result.model or "",
-            "payload": payload,
-        },
-    }
-
-
 async def _update_job_summary(session: AsyncSession, job: ProductIntelligenceJob) -> None:
     source_count = await session.scalar(
         select(func.count()).select_from(ProductIntelligenceSourceProduct).where(ProductIntelligenceSourceProduct.job_id == job.id)
@@ -999,15 +935,21 @@ def _normalized_options(value: object) -> dict[str, object]:
         "llm_enrichment_enabled": bool(raw.get("llm_enrichment_enabled")),
     }
 
-
-def _candidate_payload_provider(payload: dict[str, object]) -> str:
-    provider = str(payload.get("provider") or "").strip().lower()
-    return provider or "search"
+def _meets_confidence_threshold(
+    score: float,
+    *,
+    options: dict[str, object] | None,
+) -> bool:
+    threshold = _bounded_float(
+        (options or {}).get("confidence_threshold"),
+        product_intelligence_settings.confidence_threshold,
+    )
+    return float(score) >= threshold
 
 
 def _private_label_mode(value: object) -> str:
-    mode = str(value or PRIVATE_LABEL_FLAG).strip().lower()
-    return mode if mode in {PRIVATE_LABEL_EXCLUDE, PRIVATE_LABEL_FLAG, PRIVATE_LABEL_INCLUDE} else PRIVATE_LABEL_FLAG
+    mode = str(value or PRIVATE_LABEL_EXCLUDE).strip().lower()
+    return mode if mode in {PRIVATE_LABEL_EXCLUDE, PRIVATE_LABEL_FLAG, PRIVATE_LABEL_INCLUDE} else PRIVATE_LABEL_EXCLUDE
 
 
 def _bounded_int(value: object, default: int) -> int:
@@ -1037,19 +979,6 @@ def _as_float_or_default(value: object, default: float) -> float:
 
 def _as_price(value: object) -> float | None:
     return float(value) if isinstance(value, (int, float)) else None
-
-
-def _canonical_record_from_llm(base: dict[str, object], payload: dict[str, object]) -> dict[str, object]:
-    normalized_title = str(payload.get("normalized_title") or "").strip()
-    return {
-        **base,
-        "title": normalized_title or str(base.get("title") or ""),
-        "style_name": str(payload.get("style_name") or "").strip(),
-        "model_name": str(payload.get("model_name") or "").strip(),
-        "inferred_attributes": payload.get("inferred_attributes") if isinstance(payload.get("inferred_attributes"), dict) else {},
-        "match_explanation": str(payload.get("match_explanation") or "").strip(),
-        "mismatch_risks": payload.get("mismatch_risks") if isinstance(payload.get("mismatch_risks"), list) else [],
-    }
 
 
 def _as_int(value: object) -> int | None:

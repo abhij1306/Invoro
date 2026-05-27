@@ -90,6 +90,36 @@ def test_detail_price_backfill_replaces_visible_outlier_price() -> None:
 
 
 @pytest.mark.regression
+def test_detail_price_backfill_replaces_visible_decimal_shift_outlier_price() -> None:
+    record = {
+        "url": "https://www.belk.com/p/scarlett-medium-satchel/1.html",
+        "price": "2995.00",
+        "currency": "USD",
+        "_field_sources": {"price": ["json_ld"], "currency": ["json_ld"]},
+    }
+    html = """
+    <html>
+      <head>
+        <script type="application/ld+json">
+        {"@type":"Product","offers":{"@type":"Offer","price":"2995","priceCurrency":"USD"}}
+        </script>
+      </head>
+      <body>
+        <main>
+          <h1>Scarlett Medium Satchel with Charm</h1>
+          <div data-testid="price">$299.50</div>
+        </main>
+      </body>
+    </html>
+    """
+
+    backfill_detail_price_from_html(record, html=html)
+
+    assert record["price"] == "299.50"
+    assert "dom_text" in record["_field_sources"]["price"]
+
+
+@pytest.mark.regression
 def test_detail_price_backfill_uses_visible_local_price_when_jsonld_currency_conflicts() -> None:
     record = {
         "url": "https://www.glossier.com/en-in/products/balm-dotcom",

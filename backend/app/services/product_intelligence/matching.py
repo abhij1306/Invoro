@@ -25,6 +25,7 @@ from app.services.config.product_intelligence import (
     SOURCE_STYLE_FIELDS,
     SOURCE_TITLE_FIELDS,
     SOURCE_TYPE_AUTHORITY_BONUS,
+    SOURCE_TYPE_BRAND_DTC,
     SOURCE_URL_FIELDS,
     product_intelligence_settings,
 )
@@ -126,10 +127,14 @@ def score_candidate(
         score += MATCH_SCORE_WEIGHTS["price_band"]
     reasons["price_band_match"] = price_match
 
-    authority_bonus = min(
-        float(SOURCE_TYPE_AUTHORITY_BONUS.get(str(source_type or ""), 0.0)),
-        MATCH_SCORE_WEIGHTS["source_authority"],
-    )
+    raw_authority_bonus = float(SOURCE_TYPE_AUTHORITY_BONUS.get(str(source_type or ""), 0.0))
+    if source_type == SOURCE_TYPE_BRAND_DTC:
+        authority_bonus = raw_authority_bonus
+    else:
+        authority_bonus = min(
+            raw_authority_bonus,
+            MATCH_SCORE_WEIGHTS["source_authority"],
+        )
     score += authority_bonus
     reasons["source_authority_bonus"] = round(authority_bonus, 4)
 
@@ -139,6 +144,8 @@ def score_candidate(
         score = max(score, 0.78)
     elif (sku_match or mpn_or_style_match) and brand_match and title_similarity >= 0.45:
         score = max(score, 0.72)
+    elif source_type == SOURCE_TYPE_BRAND_DTC and brand_match and title_similarity >= 0.50:
+        score = max(score, 0.80)
     final_score = round(min(max(score, 0.0), 1.0), 4)
     return {
         "score": final_score,

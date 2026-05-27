@@ -34,9 +34,9 @@ export type CandidateGroup = {
 
 export const DEFAULT_OPTIONS: ProductIntelligenceOptions = {
   max_source_products: 10,
-  max_candidates_per_product: 4,
+  max_candidates_per_product: 2,
   search_provider: 'serpapi',
-  private_label_mode: 'flag',
+  private_label_mode: 'exclude',
   confidence_threshold: 0.4,
   allowed_domains: [],
   excluded_domains: [],
@@ -90,9 +90,16 @@ export function detailToDiscovery(
     }
     sourcesById.set(source.id, { source, index });
   });
+  const matchesByCandidateId = new Map(
+    detail.matches.map((match) => [match.candidate_id, match]),
+  );
   const candidates = detail.candidates.map((candidate) => {
     const sourceEntry = sourcesById.get(candidate.source_product_id);
     const source = sourceEntry?.source;
+    const payload = candidate.payload ?? {};
+    const payloadIntelligence = isRecord(payload.intelligence) ? payload.intelligence : null;
+    const match = matchesByCandidateId.get(candidate.id);
+    const intelligence = payloadIntelligence ?? matchToIntelligence(match, candidate);
     return {
       source_record_id: source?.source_record_id ?? null,
       source_run_id: source?.source_run_id ?? null,
@@ -107,8 +114,8 @@ export function detailToDiscovery(
       source_type: candidate.source_type,
       query_used: candidate.query_used,
       search_rank: candidate.search_rank,
-      payload: candidate.payload ?? {},
-      intelligence: isRecord(candidate.payload?.intelligence) ? candidate.payload.intelligence : {},
+      payload,
+      intelligence,
     };
   });
   return {
@@ -117,6 +124,28 @@ export function detailToDiscovery(
     source_count: detail.source_products.length,
     candidate_count: candidates.length,
     candidates,
+  };
+}
+
+function matchToIntelligence(
+  match: ProductIntelligenceJobDetail['matches'][number] | undefined,
+  candidate: ProductIntelligenceJobDetail['candidates'][number],
+) {
+  if (!match) {
+    return {};
+  }
+  return {
+    canonical_record: {
+      url: match.candidate_url || candidate.url,
+      domain: match.candidate_domain || candidate.domain,
+      price: match.candidate_price,
+      currency: match.currency,
+      availability: match.availability,
+    },
+    confidence_score: match.score,
+    confidence_label: match.score_label,
+    score_reasons: match.score_reasons ?? {},
+    llm_enrichment: match.llm_enrichment ?? {},
   };
 }
 

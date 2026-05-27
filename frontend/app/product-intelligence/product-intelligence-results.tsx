@@ -46,14 +46,14 @@ function ResultsToolbar({ controller }: ProductIntelligenceResultsProps) {
         {controller.discovery?.candidates.length ? (
           <input
             type="checkbox"
-            className="border-divider text-accent focus:ring-accent h-3.5 w-3.5 cursor-pointer rounded"
+            className="focus-ring accent-accent border-border-strong h-3.5 w-3.5 cursor-pointer rounded bg-transparent"
             checked={allFilteredSelected}
             onChange={controller.toggleAllUrls}
             aria-label="Select all filtered URLs"
             title="Select all filtered URLs"
           />
         ) : null}
-        <h2 className="type-label-mono text-muted uppercase">DISCOVERED CANDIDATES</h2>
+        <h2 className="type-label text-muted">Discovered candidates</h2>
       </div>
       {controller.discovery?.candidates.length ? <ResultsFilters controller={controller} /> : null}
       <ToolbarActions controller={controller} />
@@ -63,7 +63,7 @@ function ResultsToolbar({ controller }: ProductIntelligenceResultsProps) {
 
 function ResultsSummary({ controller }: ProductIntelligenceResultsProps) {
   return (
-    <div className="border-divider bg-background-alt/60 grid gap-3 border-b px-4 py-3 sm:grid-cols-4">
+    <div className="border-divider bg-background-alt/50 grid gap-3 border-b px-4 py-3 sm:grid-cols-4">
       <SummaryMetric label="Sources" value={controller.discovery?.source_count ?? 0} />
       <SummaryMetric label="Candidates" value={controller.discovery?.candidate_count ?? 0} />
       <SummaryMetric label="High confidence" value={controller.confidenceDistribution.high} />
@@ -75,8 +75,8 @@ function ResultsSummary({ controller }: ProductIntelligenceResultsProps) {
 function SummaryMetric({ label, value }: { label: string; value: number }) {
   return (
     <div>
-      <div className="text-muted type-caption-mono uppercase">{label}</div>
-      <div className="text-foreground type-heading mt-0.5 text-lg font-semibold">{value}</div>
+      <div className="type-label text-muted">{label}</div>
+      <div className="type-metric mt-1 text-lg">{value}</div>
     </div>
   );
 }
@@ -91,7 +91,7 @@ function ResultsFilters({ controller }: ProductIntelligenceResultsProps) {
           value={controller.searchText}
           onChange={(event) => controller.setSearchText(event.target.value)}
           placeholder="Filter by title, domain, or brand..."
-          className="bg-background-alt focus:bg-background focus:border-accent/20 type-body-sm h-8 border-transparent pl-8"
+          className="bg-background-alt focus:bg-panel focus:border-accent type-body-sm h-8 border-transparent pl-8"
         />
       </div>
       <Dropdown
@@ -118,7 +118,7 @@ function ToolbarActions({ controller }: ProductIntelligenceResultsProps) {
       {controller.selectedDomainSummary ? (
         <>
           <div className="bg-accent border-accent flex items-center gap-2 rounded border px-2 py-1">
-            <span className="type-label-mono font-normal !text-white uppercase">
+            <span className="type-label font-normal !text-white">
               {controller.selectedDomainSummary.count} selected
             </span>
           </div>
@@ -225,7 +225,7 @@ function SourceRecordsPreview({ controller }: ProductIntelligenceResultsProps) {
               </div>
             </div>
             <Badge tone="neutral" className="h-5 shrink-0 px-1.5 text-xs">
-              Pending
+              Source
             </Badge>
           </div>
         );

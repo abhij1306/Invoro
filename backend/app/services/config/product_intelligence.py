@@ -361,13 +361,13 @@ SOURCE_TYPE_AUTHORITY_BONUS = {
 
 MATCH_SCORE_WEIGHTS = {
     "title_similarity": 0.22,
-    "brand_match": 0.18,
+    "brand_match": 0.15,
     "gtin_match": 0.22,
     "sku_match": 0.08,
     "mpn_or_style_match": 0.12,
     "shopping_product_group": 0.06,
     "price_band": 0.04,
-    "source_authority": 0.08,
+    "source_authority": 0.18,
 }
 
 PRODUCT_INTELLIGENCE_PROMPT_REGISTRY = {

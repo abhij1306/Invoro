@@ -8,6 +8,7 @@ __all__ = (
     "detail_price_decimal",
     "detail_price_from_html",
     "detail_price_from_selector_text",
+    "detail_price_is_visible_magnitude_copy",
     "detail_price_is_cent_magnitude_copy",
     "format_detail_price_decimal",
     "format_price_decimal",
@@ -40,6 +41,7 @@ from app.services.config.extraction_rules import (
     DETAIL_PRICE_MAGNITUDE_EPSILON_DECIMAL,
     DETAIL_PRICE_META_SELECTORS,
     DETAIL_RELATED_PRICE_CONTEXT_TOKENS,
+    DETAIL_VISIBLE_PRICE_MAGNITUDE_RATIOS_DECIMAL,
 )
 from app.services.normalizers import normalize_decimal_price
 from app.services.shared.field_coerce import extract_currency_code, text_or_none
@@ -223,12 +225,31 @@ def detail_price_is_cent_magnitude_copy(value: object, reference: object) -> boo
     )
 
 
+def detail_price_is_visible_magnitude_copy(value: object, reference: object) -> bool:
+    value_decimal = detail_price_decimal(value)
+    reference_decimal = detail_price_decimal(reference)
+    return bool(
+        value_decimal is not None
+        and reference_decimal is not None
+        and decimal_is_visible_magnitude_copy(value_decimal, reference_decimal)
+    )
+
+
 def decimal_is_cent_magnitude_copy(value: Decimal, reference: Decimal) -> bool:
     if value <= 0 or reference <= 0:
         return False
     return (
         abs(value - (reference * DETAIL_PRICE_CENT_MAGNITUDE_RATIO_DECIMAL))
         <= DETAIL_PRICE_MAGNITUDE_EPSILON_DECIMAL
+    )
+
+
+def decimal_is_visible_magnitude_copy(value: Decimal, reference: Decimal) -> bool:
+    if value <= 0 or reference <= 0:
+        return False
+    return any(
+        abs(value - (reference * ratio)) <= DETAIL_PRICE_MAGNITUDE_EPSILON_DECIMAL
+        for ratio in DETAIL_VISIBLE_PRICE_MAGNITUDE_RATIOS_DECIMAL
     )
 
 

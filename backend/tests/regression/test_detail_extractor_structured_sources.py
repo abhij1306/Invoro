@@ -6116,6 +6116,32 @@ def test_extract_detail_preserves_visible_integer_price_magnitude() -> None:
 
 
 @pytest.mark.regression
+def test_extract_detail_prefers_visible_decimal_shift_price_over_integral_jsonld() -> None:
+    rows = extract_records(
+        """
+        <html>
+          <head>
+            <script type="application/ld+json">
+            {"@type":"Product","name":"Scarlett Medium Satchel with Charm","offers":{"@type":"Offer","price":"2995","priceCurrency":"USD","availability":"https://schema.org/InStock"}}
+            </script>
+          </head>
+          <body><main>
+            <h1>Scarlett Medium Satchel with Charm</h1>
+            <div data-testid="price">$299.50</div>
+            <img src="https://example.com/bag.jpg">
+          </main></body>
+        </html>
+        """,
+        "https://www.belk.com/p/scarlett-medium-satchel/1.html",
+        "ecommerce_detail",
+        max_records=5,
+    )
+
+    assert len(rows) == 1
+    assert rows[0]["price"] == "299.50"
+
+
+@pytest.mark.regression
 def test_build_detail_record_rejects_broken_extensionless_transformed_image_urls() -> None:
     record = build_detail_record(
         "<html><body><main><h1>Adidas Samba OG Shoes</h1></main></body></html>",

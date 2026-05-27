@@ -25,6 +25,7 @@ from app.services.extract.detail.price.parsing import (
     detail_price_decimal,
     detail_price_from_html,
     detail_price_from_selector_text,
+    detail_price_is_visible_magnitude_copy,
     detail_price_is_cent_magnitude_copy,
     format_detail_price_decimal,
     format_price_decimal,
@@ -155,7 +156,7 @@ def backfill_detail_price_from_html(
             )
             localized_override_applied = True
         if visible_price and (
-            detail_price_is_cent_magnitude_copy(price, visible_price)
+            detail_price_is_visible_magnitude_copy(price, visible_price)
             or _should_override_record_price_from_dom(
                 record=record,
                 dom_price=visible_price,
@@ -708,7 +709,7 @@ def _should_override_record_price_from_dom(
         return True
     if record_price_is_low_signal:
         return True
-    if detail_price_is_cent_magnitude_copy(current_price, dom_price):
+    if detail_price_is_visible_magnitude_copy(current_price, dom_price):
         return True
     if not _detail_price_is_visible_outlier(current_price, dom_price):
         return False
@@ -801,7 +802,7 @@ def _detail_price_is_visible_outlier(value: object, visible_value: object) -> bo
     visible = detail_price_decimal(visible_value)
     if current is None or visible is None or current <= 0 or visible <= 0:
         return False
-    if decimal_is_cent_magnitude_copy(current, visible):
+    if detail_price_is_visible_magnitude_copy(current, visible):
         return True
     if visible <= current:
         return False

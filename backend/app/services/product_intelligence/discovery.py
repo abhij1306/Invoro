@@ -32,22 +32,17 @@ from app.services.config.product_intelligence import (
     SEARCH_PROVIDER_GOOGLE_NATIVE,
     SEARCH_PROVIDER_SERPAPI,
     SEARCH_SITE_PREFIX,
-    SEARCH_STOP_WORDS,
     SERPAPI_ENGINE,
     SERPAPI_ENGINE_PARAM,
-    SERPAPI_IMMERSIVE_PRODUCT_ENGINE,
     SERPAPI_KEY_PARAM,
     SERPAPI_LINK_FIELD,
-    SERPAPI_MORE_STORES_PARAM,
     SERPAPI_ORGANIC_RESULTS_FIELD,
-    SERPAPI_PAGE_TOKEN_PARAM,
     SERPAPI_POSITION_FIELD,
     SERPAPI_QUERY_PARAM,
     SERPAPI_RESULT_COUNT_PARAM,
     SERPAPI_SEARCH_URL,
     SERPAPI_SHOPPING_ENGINE,
     SERPAPI_SHOPPING_IMMERSIVE_API_FIELD,
-    SERPAPI_SHOPPING_IMMERSIVE_TOKEN_FIELD,
     SERPAPI_SHOPPING_LINK_FIELDS,
     SERPAPI_SHOPPING_PRODUCT_ID_FIELD,
     SERPAPI_SHOPPING_PRODUCT_LINK_FIELD,
@@ -74,7 +69,9 @@ from app.services.config.product_intelligence import (
     GOOGLE_NATIVE_RESULT_COUNT_PARAM,
     GOOGLE_NATIVE_RESULT_LINK_SELECTOR,
     GOOGLE_NATIVE_RESULT_WAIT_MS,
+    GOOGLE_NATIVE_SEARCH_INPUT_SELECTOR,
     GOOGLE_NATIVE_SEARCH_URL,
+    GOOGLE_NATIVE_SUBMIT_KEY,
     GOOGLE_NATIVE_THUMBNAIL_ANCESTOR_DEPTH,
     GOOGLE_NATIVE_THUMBNAIL_MIN_SRC_LENGTH,
     GOOGLE_NATIVE_TITLE_SELECTOR,
@@ -82,7 +79,10 @@ from app.services.config.product_intelligence import (
     product_intelligence_settings,
 )
 from app.services.shared.field_coerce import clean_text
-from app.services.product_intelligence.matching import normalize_brand, source_domain
+from app.services.product_intelligence.matching import (
+    normalize_brand,
+    source_domain,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -111,36 +111,36 @@ def build_search_queries(
     *,
     source_domain_value: str = "",
 ) -> list[str]:
-    del source_domain_value
     brand = normalize_brand(product.get("brand"))
-    title = _title_without_brand(_title_slug(product.get("title")), brand)
+    brand_query = brand
+    title = _title_without_brand(
+        product.get("title"),
+        product.get("brand"),
+        brand,
+    )
     queries: list[str] = []
     gtin = _identity_field(product, "gtin")
-    mpn = _identity_field(product, "mpn")
-    sku = _identity_field(product, "sku")
+    mpn = _query_identifier_value(product)
     brand_domain = BRAND_DOMAIN_MAP.get(brand)
     brand_site = f"{SEARCH_SITE_PREFIX}{brand_domain}" if brand_domain else ""
-    if brand and title:
-        if brand_site:
-            if gtin:
-                queries.append(_join_query_parts(_quoted(brand), _quoted(title), _quoted(gtin), brand_site))
-            if mpn:
-                queries.append(_join_query_parts(_quoted(brand), _quoted(title), _quoted(mpn), brand_site))
-            queries.append(_join_query_parts(_quoted(brand), _quoted(title), brand_site))
-            if sku:
-                queries.append(_join_query_parts(_quoted(brand), _quoted(title), _quoted(sku), brand_site))
-        queries.append(_join_query_parts(_quoted(brand), _quoted(title)))
-        if gtin:
-            queries.append(_join_query_parts(_quoted(brand), _quoted(title), _quoted(gtin)))
+
+    if gtin:
+        queries.append(_quoted(gtin))
+
+    if brand and title and brand_site:
         if mpn:
-            queries.append(_join_query_parts(_quoted(brand), _quoted(title), _quoted(mpn)))
-        if sku:
-            queries.append(_join_query_parts(_quoted(brand), _quoted(title), _quoted(sku)))
-        queries.append(_join_query_parts(_quoted(brand), _quoted(title), SEARCH_PHRASE_BUY))
-    identifier = gtin or mpn or sku
-    if title and identifier and not brand:
-        queries.append(_join_query_parts(_quoted(title), _quoted(identifier)))
+            queries.append(_join_query_parts(brand_site, _quoted(mpn)))
+        queries.append(_join_query_parts(brand_site, brand_query, title))
+
+    if brand and title:
+        if mpn:
+            queries.append(_join_query_parts(brand_query, title, _quoted(mpn)))
+        queries.append(_join_query_parts(brand_query, title))
+
     if title and not brand:
+        identifier = gtin or mpn
+        if identifier:
+            queries.append(_join_query_parts(_quoted(title), _quoted(identifier)))
         queries.append(_join_query_parts(_quoted(title), SEARCH_PHRASE_BUY))
     return _dedupe_keep_order(queries)
 
@@ -203,14 +203,18 @@ async def _collect_candidates(
     candidates: list[DiscoveredCandidate] = []
     seen: set[str] = set()
     domain_counts: dict[str, int] = {}
+    source_domains = _source_excluded_domains(product, source_domain_value)
+    source_urls = _source_excluded_urls(product)
     for query_order, query in enumerate(queries):
         results = await run_query(query, pool_limit)
         for rank, result in enumerate(results, start=1):
             normalized_url = _clean_result_url(result.url)
             if not normalized_url or normalized_url in seen:
                 continue
+            if _same_source_url(normalized_url, source_urls):
+                continue
             domain = source_domain(normalized_url)
-            if not _domain_allowed(domain, allowed_domains, excluded_domains, source_domain_value):
+            if not _domain_allowed(domain, allowed_domains, excluded_domains, source_domains):
                 continue
             if not _candidate_matches_product(product, normalized_url, result.payload):
                 continue
@@ -307,16 +311,22 @@ async def _search_results(provider: str, query: str, *, limit: int | None = None
 
 async def _search_serpapi(query: str, *, limit: int | None = None) -> list[SearchResult]:
     shopping_query = _shopping_query(query)
-    shopping = await _search_serpapi_engine(
-        shopping_query,
-        engine=SERPAPI_SHOPPING_ENGINE,
-        limit=limit,
+    brand_scoped_query = _brand_scoped_query(query)
+    dtc_raw, organic_raw, shopping_raw = await asyncio.gather(
+        _search_serpapi_engine(brand_scoped_query, engine=SERPAPI_ENGINE, limit=limit)
+        if brand_scoped_query
+        else _empty_search_payload(),
+        _search_serpapi_engine(shopping_query, engine=SERPAPI_ENGINE, limit=limit)
+        if shopping_query and _query_has_identifier(query)
+        else _empty_search_payload(),
+        _search_serpapi_engine(shopping_query, engine=SERPAPI_SHOPPING_ENGINE, limit=limit)
+        if shopping_query
+        else _empty_search_payload(),
     )
-    shopping_results = _parse_serpapi_shopping_results(shopping)
-    immersive_results = await _search_serpapi_immersive_from_shopping(shopping, limit=limit)
-    organic = await _search_serpapi_engine(query, engine=SERPAPI_ENGINE, limit=limit)
-    organic_results = _parse_serpapi_organic_results(organic)
-    return _dedupe_search_results([*shopping_results, *immersive_results, *organic_results])
+    dtc_results = _parse_serpapi_organic_results(dtc_raw)
+    organic_results = _parse_serpapi_organic_results(organic_raw)
+    shopping_results = _parse_serpapi_shopping_results(shopping_raw)
+    return _dedupe_search_results([*dtc_results, *organic_results, *shopping_results])
 
 
 def _shopping_query(query: str) -> str:
@@ -324,8 +334,29 @@ def _shopping_query(query: str) -> str:
         token
         for token in str(query or "").split()
         if not token.lower().startswith(SEARCH_EXCLUDED_DOMAIN_PREFIX)
+        and not token.lower().startswith(SEARCH_SITE_PREFIX)
     ]
     return " ".join(natural_tokens).strip() or str(query or "").strip()
+
+
+def _brand_scoped_query(query: str) -> str:
+    tokens = str(query or "").split()
+    return str(query or "").strip() if any(token.lower().startswith(SEARCH_SITE_PREFIX) for token in tokens) else ""
+
+
+def _query_has_identifier(query: str) -> bool:
+    for token in str(query or "").split():
+        lowered = token.strip().strip('"').casefold()
+        if lowered.startswith(SEARCH_SITE_PREFIX) or lowered.startswith(SEARCH_EXCLUDED_DOMAIN_PREFIX):
+            continue
+        compact = re.sub(r"[^a-z0-9]+", "", lowered)
+        if len(compact) >= 5 and any(char.isdigit() for char in compact):
+            return True
+    return False
+
+
+async def _empty_search_payload() -> dict[str, object]:
+    return {}
 
 
 async def _search_serpapi_engine(
@@ -348,56 +379,6 @@ async def _search_serpapi_engine(
             payload = response.json()
     except (httpx.HTTPError, ValueError, OSError) as exc:
         logger.warning("Product intelligence SerpAPI discovery failed engine=%s: %s", engine, exc)
-        return {}
-    return payload if isinstance(payload, dict) else {}
-
-
-async def _search_serpapi_immersive_from_shopping(
-    payload: dict[str, object],
-    *,
-    limit: int | None = None,
-) -> list[SearchResult]:
-    rows = payload.get(SERPAPI_SHOPPING_RESULTS_FIELD)
-    if not isinstance(rows, list):
-        return []
-    max_products = min(
-        len(rows),
-        int(product_intelligence_settings.serpapi_immersive_products_per_query),
-    )
-    if max_products <= 0:
-        return []
-    results: list[SearchResult] = []
-    for item in rows[:max_products]:
-        if not isinstance(item, dict):
-            continue
-        token = _shopping_immersive_token(item)
-        if not token:
-            continue
-        immersive_payload = await _search_serpapi_immersive(token)
-        results.extend(
-            _parse_serpapi_immersive_results(
-                immersive_payload,
-                parent=item,
-                limit=limit,
-            )
-        )
-    return results
-
-
-async def _search_serpapi_immersive(page_token: str) -> dict[str, object]:
-    params = {
-        SERPAPI_ENGINE_PARAM: SERPAPI_IMMERSIVE_PRODUCT_ENGINE,
-        SERPAPI_PAGE_TOKEN_PARAM: page_token,
-        SERPAPI_MORE_STORES_PARAM: "true",
-        SERPAPI_KEY_PARAM: product_intelligence_settings.serpapi_key,
-    }
-    try:
-        async with httpx.AsyncClient(timeout=product_intelligence_settings.search_timeout_seconds) as client:
-            response = await client.get(SERPAPI_SEARCH_URL, params=params)
-            response.raise_for_status()
-            payload = response.json()
-    except (httpx.HTTPError, ValueError, OSError) as exc:
-        logger.warning("Product intelligence SerpAPI immersive discovery failed: %s", exc)
         return {}
     return payload if isinstance(payload, dict) else {}
 
@@ -506,6 +487,8 @@ def _parse_serpapi_immersive_results(
         )
         if limit is not None and len(results) >= max(1, int(limit)):
             break
+    if limit is not None and len(results) >= max(1, int(limit)):
+        return results[: max(1, int(limit))]
     about = product.get("about_the_product")
     if isinstance(about, dict):
         about_url = _clean_result_url(about.get("link"))
@@ -528,20 +511,6 @@ def _parse_serpapi_immersive_results(
                 )
             )
     return results
-
-
-def _shopping_immersive_token(item: dict[str, object]) -> str:
-    token = str(item.get(SERPAPI_SHOPPING_IMMERSIVE_TOKEN_FIELD) or "").strip()
-    if token:
-        return token
-    api_url = str(item.get(SERPAPI_SHOPPING_IMMERSIVE_API_FIELD) or "").strip()
-    if not api_url:
-        return ""
-    try:
-        return parse_qs(urlsplit(api_url).query).get(SERPAPI_PAGE_TOKEN_PARAM, [""])[0]
-    except ValueError:
-        return ""
-
 
 def _first_shopping_url(item: dict[str, object]) -> str:
     for field in SERPAPI_SHOPPING_LINK_FIELDS:
@@ -593,33 +562,27 @@ async def _google_native_session():
                     wait_until="domcontentloaded",
                     timeout=int(GOOGLE_NATIVE_NAVIGATION_TIMEOUT_MS),
                 )
-                
+
                 locator_factory = getattr(page, "locator", None)
-                if callable(locator_factory):
-                    locator = locator_factory('textarea[name="q"], input[name="q"]')
-                    fill = getattr(locator, "fill", None)
-                    press = getattr(locator, "press", None)
-                    if callable(fill) and callable(press):
-                        await fill(normalized_query)
-                        await press("Enter")
-                        await page.wait_for_timeout(
-                            int(GOOGLE_NATIVE_RESULT_WAIT_MS)
-                            + int(GOOGLE_NATIVE_TYPING_EXTRA_WAIT_MS)
-                        )
-                    else:
-                        await page.goto(
-                            _google_native_search_url(normalized_query, result_limit),
-                            wait_until="domcontentloaded",
-                            timeout=int(GOOGLE_NATIVE_NAVIGATION_TIMEOUT_MS),
-                        )
-                        await page.wait_for_timeout(int(GOOGLE_NATIVE_RESULT_WAIT_MS))
-                else:
-                    await page.goto(
-                        _google_native_search_url(normalized_query, result_limit),
-                        wait_until="domcontentloaded",
-                        timeout=int(GOOGLE_NATIVE_NAVIGATION_TIMEOUT_MS),
+                if not callable(locator_factory):
+                    logger.warning(
+                        "Product intelligence native Google query aborted: page locator API unavailable"
                     )
-                    await page.wait_for_timeout(int(GOOGLE_NATIVE_RESULT_WAIT_MS))
+                    return []
+                locator = locator_factory(GOOGLE_NATIVE_SEARCH_INPUT_SELECTOR)
+                fill = getattr(locator, "fill", None)
+                press = getattr(locator, "press", None)
+                if not callable(fill) or not callable(press):
+                    logger.warning(
+                        "Product intelligence native Google query aborted: search input does not support fill/press"
+                    )
+                    return []
+                await fill(normalized_query)
+                await press(GOOGLE_NATIVE_SUBMIT_KEY)
+                await page.wait_for_timeout(
+                    int(GOOGLE_NATIVE_RESULT_WAIT_MS)
+                    + int(GOOGLE_NATIVE_TYPING_EXTRA_WAIT_MS)
+                )
 
                 html = await get_page_html(page)
                 current_url = _page_url(page)
@@ -679,7 +642,7 @@ def _parse_google_native_results(html: str, *, limit: int) -> list[SearchResult]
         domain = source_domain(url).removeprefix("www.").lower()
         if any(_domain_matches(domain, item) for item in GOOGLE_NATIVE_IGNORED_DOMAINS):
             continue
-        title = _google_native_anchor_title(anchor)
+        title = _google_native_anchor_title(anchor, url=url)
         if not title:
             continue
         thumbnail = _google_native_anchor_thumbnail(anchor)
@@ -702,18 +665,18 @@ def _parse_google_native_results(html: str, *, limit: int) -> list[SearchResult]
     return results
 
 
-def _google_native_anchor_title(anchor) -> str:
-    """Return the title text only when the anchor wraps an organic-result h3.
-
-    Google's SERP contains many non-organic anchors (shopping carousels,
-    People-also-ask, knowledge-panel cards, ads). Those anchors have text but
-    no inner ``<h3>``. Requiring an h3 keeps only the organic blue-link
-    results that the user actually wants.
-    """
+def _google_native_anchor_title(anchor, *, url: str) -> str:
+    """Return result title from organic h3, with product-link fallback."""
     heading = anchor.select_one(GOOGLE_NATIVE_TITLE_SELECTOR)
-    if heading is None:
+    if heading is not None:
+        return clean_text(heading.get_text(" ", strip=True))
+    if not _looks_like_product_detail_url(url):
         return ""
-    return clean_text(heading.get_text(" ", strip=True))
+    for attr in ("aria-label", "title"):
+        value = clean_text(anchor.get(attr))
+        if value:
+            return value
+    return clean_text(anchor.get_text(" ", strip=True))
 
 
 def _google_native_anchor_thumbnail(anchor) -> str:
@@ -954,19 +917,66 @@ def _domain_allowed(
     domain: str,
     allowed_domains: list[str],
     excluded_domains: list[str],
-    source_domain_value: str,
+    source_domains: set[str],
 ) -> bool:
     normalized = domain.removeprefix("www.").lower()
     if not normalized:
         return False
     excluded = {item.removeprefix("www.").lower() for item in excluded_domains if item}
-    source = source_domain_value.removeprefix("www.").lower()
-    if source:
-        excluded.add(source)
+    excluded.update(item.removeprefix("www.").lower() for item in source_domains if item)
     if any(_domain_matches(normalized, item) for item in excluded):
         return False
     allowed = {item.removeprefix("www.").lower() for item in allowed_domains if item}
     return not allowed or any(_domain_matches(normalized, item) for item in allowed)
+
+
+def _source_excluded_domains(
+    product: dict[str, object],
+    source_domain_value: str,
+) -> set[str]:
+    domains = {str(source_domain_value or "").removeprefix("www.").lower()}
+    for url in _source_url_values(product):
+        domains.add(source_domain(url))
+    return {domain for domain in domains if domain}
+
+
+def _source_excluded_urls(product: dict[str, object]) -> set[str]:
+    return {
+        normalized
+        for normalized in (_normalized_compare_url(url) for url in _source_url_values(product))
+        if normalized
+    }
+
+
+def _source_url_values(product: dict[str, object]) -> list[object]:
+    values: list[object] = [
+        product.get("url"),
+        product.get("source_url"),
+        product.get("canonical_url"),
+        product.get("product_url"),
+    ]
+    raw = product.get("raw")
+    if isinstance(raw, dict):
+        values.extend(
+            raw.get(key)
+            for key in ("url", "source_url", "canonical_url", "product_url")
+        )
+    return values
+
+
+def _same_source_url(candidate_url: str, source_urls: set[str]) -> bool:
+    return bool(source_urls and _normalized_compare_url(candidate_url) in source_urls)
+
+
+def _normalized_compare_url(value: object) -> str:
+    cleaned = _clean_result_url(value)
+    if not cleaned:
+        return ""
+    try:
+        parsed = urlsplit(cleaned)
+    except ValueError:
+        return ""
+    return parsed._replace(fragment="").geturl().rstrip("/")
 
 
 def _domain_matches(normalized_domain: str, target: str) -> bool:
@@ -980,30 +990,58 @@ def _domain_matches(normalized_domain: str, target: str) -> bool:
     )
 
 
-def _title_slug(value: object) -> str:
-    tokens = [
-        token
-        for token in re.split(r"[^a-z0-9]+", str(value or "").casefold())
-        if token and token not in SEARCH_STOP_WORDS
-    ]
-    return " ".join(tokens[: product_intelligence_settings.title_token_limit])
-
-
-def _title_without_brand(title: str, brand: str) -> str:
-    normalized_title = str(title or "").strip()
-    normalized_brand = str(brand or "").strip()
-    if not normalized_title or not normalized_brand:
-        return normalized_title
-    brand_tokens = _query_tokens(normalized_brand)
-    title_tokens = normalized_title.split()
-    if not brand_tokens or title_tokens[: len(brand_tokens)] != brand_tokens:
-        return normalized_title
-    trimmed = title_tokens[len(brand_tokens) :]
-    return " ".join(trimmed).strip() or normalized_title
+def _title_without_brand(title: object, *brand_variants: object) -> str:
+    normalized_title = _query_text(title)
+    if not normalized_title:
+        return ""
+    for brand_variant in brand_variants:
+        trimmed = _strip_query_prefix(normalized_title, _query_text(brand_variant))
+        if trimmed != normalized_title:
+            return _limit_query_tokens(trimmed)
+    return _limit_query_tokens(normalized_title)
 
 
 def _identity_field(product: dict[str, object], key: str) -> str:
     return str(product.get(key) or "").strip()
+
+
+def _query_text(value: object) -> str:
+    return clean_text(value).strip()
+
+
+def _strip_query_prefix(text: str, prefix: str) -> str:
+    normalized_text = str(text or "").strip()
+    normalized_prefix = str(prefix or "").strip()
+    if not normalized_text or not normalized_prefix:
+        return normalized_text
+    if not normalized_text.casefold().startswith(normalized_prefix.casefold()):
+        return normalized_text
+    trimmed = normalized_text[len(normalized_prefix) :].lstrip(" -\u2013\u2014:/|,")
+    return trimmed or normalized_text
+
+
+def _limit_query_tokens(text: str) -> str:
+    tokens = str(text or "").split()
+    if not tokens:
+        return ""
+    return " ".join(tokens[: product_intelligence_settings.title_token_limit])
+
+
+def _query_identifier_value(product: dict[str, object]) -> str:
+    mpn = _identity_field(product, "mpn")
+    if mpn:
+        return mpn
+    for key in ("style", "product_id"):
+        value = _identity_field(product, key)
+        if _looks_like_manufacturer_identifier(value):
+            return value
+    return ""
+
+
+def _looks_like_manufacturer_identifier(value: object) -> bool:
+    text = str(value or "").strip()
+    compact = re.sub(r"[^a-z0-9]+", "", text.casefold())
+    return bool(compact and any(char.isalpha() for char in compact) and any(char.isdigit() for char in compact))
 
 
 def _query_tokens(value: object) -> list[str]:
@@ -1039,7 +1077,9 @@ def _candidate_title_overlap(
 
 def _quoted(value: object) -> str:
     text = str(value or "").strip()
-    return text
+    if not text:
+        return ""
+    return f"\"{text.replace('\"', '\\\"')}\""
 
 
 def _join_query_parts(*parts: str) -> str:
