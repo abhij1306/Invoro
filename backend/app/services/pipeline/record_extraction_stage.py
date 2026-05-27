@@ -9,6 +9,7 @@ from app.services.acquisition_plan import AcquisitionPlan
 from app.services.adapters.base import AdapterResult
 from app.services.adapters.registry import run_adapter, try_blocked_adapter_recovery
 from app.services.crawl.profile import record_acquisition_contract_outcome
+from app.services.config.runtime_settings import crawler_runtime_settings
 from app.services.db_utils import mapping_or_empty
 from app.services.domain_memory_service import (
     compose_runtime_selector_rules,
@@ -121,6 +122,12 @@ async def _populate_adapter_records(
         )
         if adapter_result is not None and list(adapter_result.records or []):
             adapter_results.append(adapter_result)
+            if _adapter_result_satisfies_listing_context(
+                context,
+                acquisition_result=acquisition_result,
+                adapter_result=adapter_result,
+            ):
+                break
     adapter_result = _best_adapter_result(adapter_results)
     if (
         adapter_result is None or not list(adapter_result.records or [])
@@ -195,6 +202,48 @@ def _adapter_result_score(records: list[object]) -> tuple[int, int]:
             if not str(key).startswith("_")
         )
     return len(records), populated
+
+
+def _adapter_result_satisfies_listing_context(
+    context: _URLProcessingContext,
+    *,
+    acquisition_result: AcquisitionResult,
+    adapter_result: AdapterResult,
+) -> bool:
+    if "listing" not in str(context.surface or "").strip().lower():
+        return False
+    record_count = len(list(adapter_result.records or []))
+    if record_count <= 0:
+        return False
+    min_items = max(1, int(crawler_runtime_settings.listing_min_items))
+    target = max(min_items, int(context.config.max_records or min_items))
+    diagnostics = mapping_or_empty(
+        getattr(acquisition_result, "browser_diagnostics", {})
+    )
+    rendered_count = _positive_int(diagnostics.get("rendered_listing_fragment_count"))
+    if rendered_count <= 0:
+        evidence = mapping_or_empty(diagnostics.get("extractable_listing_evidence"))
+        rendered_count = _positive_int(evidence.get("rendered_listing_fragments"))
+    if rendered_count > 0:
+        target = max(min_items, min(target, rendered_count))
+    return record_count >= target
+
+
+def _positive_int(value: object) -> int:
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return max(0, value)
+    if isinstance(value, float):
+        return max(0, int(value))
+    if not isinstance(value, (str, bytes, bytearray)):
+        return 0
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return 0
+    return max(0, parsed)
+
 
 def _adapter_browser_artifact_htmls(
     acquisition_result: AcquisitionResult,

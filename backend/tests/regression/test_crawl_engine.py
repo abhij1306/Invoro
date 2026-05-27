@@ -1666,7 +1666,46 @@ async def test_belk_adapter_extracts_listing_brand_from_state_and_tiles() -> Non
 
     assert result.records[0]["brand"] == "Polo Ralph Lauren"
     assert result.records[0]["title"] == "Slim Straight Jeans"
-    assert result.records[0]["price"] == "89.50"
+
+
+@pytest.mark.regression
+async def test_belk_adapter_extracts_detail_sku_upc_without_overwriting_sku() -> None:
+    html = """
+    <html>
+      <body>
+        <script>
+          window.__INITIAL_STATE__ = {
+            "product": {
+              "productName": "511 Slim Fit Stretch Jeans",
+              "brandName": "Levi's",
+              "productUrl": "/p/levi-s-511-slim-fit-stretch-jeans/32009271204401.html",
+              "salePrice": "$59.99",
+              "imageUrl": "https://belk.scene7.com/is/image/Belk/3200927",
+              "productId": "32009271204401",
+              "sku": "32009271204401",
+              "variants": [
+                {
+                  "color": "Dark Wash",
+                  "sku_upc": "00194500874886"
+                }
+              ]
+            }
+          };
+        </script>
+      </body>
+    </html>
+    """
+
+    result = await BelkAdapter().extract(
+        "https://www.belk.com/p/levi-s-511-slim-fit-stretch-jeans/32009271204401.html",
+        html,
+        "ecommerce_detail",
+    )
+
+    assert result.records[0]["sku_upc"] == "00194500874886"
+    assert result.records[0]["barcode"] == "00194500874886"
+    assert result.records[0]["product_id"] == "32009271204401"
+    assert result.records[0].get("sku") != "00194500874886"
 
 
 @pytest.mark.asyncio
@@ -1699,6 +1738,41 @@ async def test_belk_adapter_extracts_title_brand_from_rendered_card_attrs() -> N
     assert result.records[0]["price"] == "22.50"
     assert result.records[0]["product_id"] == "92002171202220"
     assert result.records[1]["brand"] == "Crown & Ivy™"
+
+
+@pytest.mark.asyncio
+@pytest.mark.regression
+async def test_belk_adapter_dom_card_price_overrides_stale_state_price() -> None:
+    html = """
+    <html><body>
+      <script>
+        window.__BELK__ = {
+          product: {
+            name: "Wrangler Relaxed Bootcut Jeans",
+            brand: "Wrangler",
+            productUrl: "/p/wrangler--relaxed-bootcut-jeans-/3200040112342570.html",
+            price: "50"
+          }
+        };
+      </script>
+      <article class="product-tile" data-cnstrc-item-name="Wrangler Relaxed Bootcut Jeans" data-cnstrc-item-id="3200040112342570">
+        <a href="/p/wrangler--relaxed-bootcut-jeans-/3200040112342570.html">
+          <img alt="Wrangler Relaxed Bootcut Jeans" src="https://belk.scene7.com/is/image/Belk/3200040">
+        </a>
+        <span class="product-brand">Wrangler</span>
+        <span class="price">$39.95</span>
+      </article>
+    </body></html>
+    """
+
+    result = await BelkAdapter().extract(
+        "https://www.belk.com/men/mens-clothing/jeans/",
+        html,
+        "ecommerce_listing",
+    )
+
+    assert result.records[0]["title"] == "Wrangler Relaxed Bootcut Jeans"
+    assert result.records[0]["price"] == "39.95"
 
 
 @pytest.mark.asyncio
@@ -1768,6 +1842,80 @@ def test_listing_extractor_does_not_infer_belk_brand_from_pdp_slug_when_fragment
     )
 
     assert "brand" not in rows[0]
+
+
+@pytest.mark.regression
+def test_extract_records_belk_listing_ignores_purchase_promo_price() -> None:
+    rows = extract_records(
+        """
+        <html><body>
+          <article class="product-tile">
+            <a href="/p/izod--comfort-stretch-blue-denim-jeans-/3203394I39JN16.html">
+              <img src="/images/jeans.jpg" alt="Comfort Stretch Blue Denim Jeans">
+              <span>IZOD Comfort Stretch Blue Denim Jeans</span>
+            </a>
+            <div class="mb-2">
+              <span class="font-bold text-red-600">$22.75</span>
+              <span class="text-black line-through ml-2">$65.00</span>
+            </div>
+            <div class="text-xs font-bold text-blue-500">
+              $39.99 Your Choice Effy Freshwater Pearl Pendant or Earrings with $50 Purchase
+            </div>
+          </article>
+        </body></html>
+        """,
+        "https://www.belk.com/men/mens-clothing/jeans/",
+        "ecommerce_listing",
+        max_records=10,
+    )
+
+    assert rows[0]["price"] == "22.75"
+
+
+@pytest.mark.regression
+def test_extract_records_returns_sufficient_adapter_listing_without_dom_rescan() -> None:
+    rows = extract_records(
+        """
+        <html><body>
+          <article class="product-tile">
+            <a href="/p/izod--comfort-stretch-blue-denim-jeans-/3203394I39JN16.html">
+              <img src="/images/jeans-a.jpg" alt="Comfort Stretch Blue Denim Jeans">
+              <span>IZOD Comfort Stretch Blue Denim Jeans</span>
+            </a>
+            <div class="text-xs font-bold text-blue-500">$50 Purchase</div>
+          </article>
+          <article class="product-tile">
+            <a href="/p/wrangler--relaxed-bootcut-jeans-/3200040112342570.html">
+              <img src="/images/jeans-b.jpg" alt="Relaxed Bootcut Jeans">
+              <span>Wrangler Relaxed Bootcut Jeans</span>
+            </a>
+            <div class="text-xs font-bold text-blue-500">$50 Purchase</div>
+          </article>
+        </body></html>
+        """,
+        "https://www.belk.com/men/mens-clothing/jeans/",
+        "ecommerce_listing",
+        max_records=10,
+        adapter_records=[
+            {
+                "title": "IZOD Comfort Stretch Blue Denim Jeans",
+                "price": "22.75",
+                "image_url": "https://www.belk.com/images/jeans-a.jpg",
+                "url": "https://www.belk.com/p/izod--comfort-stretch-blue-denim-jeans-/3203394I39JN16.html",
+                "_source": "belk_adapter",
+            },
+            {
+                "title": "Wrangler Relaxed Bootcut Jeans",
+                "price": "39.95",
+                "image_url": "https://www.belk.com/images/jeans-b.jpg",
+                "url": "https://www.belk.com/p/wrangler--relaxed-bootcut-jeans-/3200040112342570.html",
+                "_source": "belk_adapter",
+            },
+        ],
+    )
+
+    assert [row["price"] for row in rows] == ["22.75", "39.95"]
+    assert {row["_source"] for row in rows} == {"belk_adapter"}
 
 
 @pytest.mark.regression

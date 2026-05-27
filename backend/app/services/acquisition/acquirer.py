@@ -206,8 +206,9 @@ async def acquire(request: AcquisitionRequest) -> AcquisitionResult:
         effective_url,
         surface=request.surface,
     )
-    acquisition_policy = _resolve_acquisition_policy(
-        request
+    acquisition_policy = _apply_runtime_policy_defaults(
+        _resolve_acquisition_policy(request),
+        runtime_policy=runtime_policy,
     ).with_platform_requirements(
         requires_browser=bool(runtime_policy.get("requires_browser")),
     )
@@ -261,6 +262,44 @@ async def acquire(request: AcquisitionRequest) -> AcquisitionResult:
     )
     await policy_middleware.after_fetch(acquisition_result)
     return acquisition_result
+
+
+def _apply_runtime_policy_defaults(
+    policy: AcquisitionPolicy,
+    *,
+    runtime_policy: Mapping[str, object] | None,
+) -> AcquisitionPolicy:
+    active_policy = dict(runtime_policy or {})
+    runtime_locality = active_policy.get("locality_profile")
+    runtime_context_profile = active_policy.get("browser_context_profile")
+    has_runtime_locality = isinstance(runtime_locality, Mapping) and bool(runtime_locality)
+    has_runtime_context_profile = isinstance(runtime_context_profile, Mapping) and bool(
+        runtime_context_profile
+    )
+    if not has_runtime_locality and not has_runtime_context_profile:
+        return policy
+    merged_locality = (
+        dict(cast(Mapping[str, object], runtime_locality))
+        if has_runtime_locality
+        else {}
+    )
+    explicit_locality = dict(policy.locality_profile)
+    explicit_context_profile = explicit_locality.get("browser_context_profile")
+    explicit_locality_without_context = dict(explicit_locality)
+    explicit_locality_without_context.pop("browser_context_profile", None)
+    merged_context_profile = (
+        dict(cast(Mapping[str, object], runtime_context_profile))
+        if has_runtime_context_profile
+        else {}
+    )
+    if isinstance(explicit_context_profile, Mapping):
+        merged_context_profile.update(dict(explicit_context_profile))
+    merged_locality.update(explicit_locality_without_context)
+    if merged_context_profile:
+        merged_locality["browser_context_profile"] = merged_context_profile
+    if merged_locality == dict(policy.locality_profile):
+        return policy
+    return policy.with_updates(locality_profile=merged_locality)
 
 
 def _resolve_acquisition_policy(

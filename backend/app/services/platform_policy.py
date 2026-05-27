@@ -33,6 +33,8 @@ class PlatformConfig(BaseModel):
     readiness_max_wait_ms: int = 0
     network_signature_patterns: list[str] = Field(default_factory=list)
     path_tenant_boundary: bool = False
+    locality_profile: dict[str, object] = Field(default_factory=dict)
+    browser_context_profile: dict[str, object] = Field(default_factory=dict)
     js_state_extractors: list["JSStateExtractorConfig"] = Field(default_factory=list)
 
 
@@ -420,5 +422,9 @@ def resolve_platform_runtime_policy(
         "family": family,
         "requires_browser": bool(config.requires_browser) if config else False,
         "proxy_policy": config.proxy_policy if config else None,
+        "locality_profile": dict(config.locality_profile or {}) if config else {},
+        "browser_context_profile": dict(config.browser_context_profile or {})
+        if config
+        else {},
         "http_browser_escalation": _resolve_http_browser_escalation_policy(surface),
     }

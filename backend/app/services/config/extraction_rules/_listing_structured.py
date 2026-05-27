@@ -7,6 +7,20 @@ from ._detail import *
 from ._detail_sections import *
 from ._variants import *
 
+BELK_PRODUCT_BARCODE_KEYS = (
+    "sku_upc",
+    "skuUpc",
+    "UPC",
+    "upc",
+    "barcode",
+    "barCode",
+    "gtin",
+    "gtin8",
+    "gtin12",
+    "gtin13",
+    "gtin14",
+    "ean",
+)
 FEATURE_SECTION_SELECTORS = (
     "[data-section='features']",
     ".features",
@@ -207,6 +221,7 @@ DETAIL_LONG_TEXT_RANK_FIELDS = frozenset({*LONG_TEXT_FIELDS, "features"})
 LISTING_PRICE_NODE_SELECTORS = (
     "[itemprop='price']",
     "[class*='price']",
+    "[class*='text-red']",
     "[data-testid*='price']",
     "[data-price]",
     "[aria-label*='price']",

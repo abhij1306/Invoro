@@ -34,8 +34,8 @@ export type CandidateGroup = {
 
 export const DEFAULT_OPTIONS: ProductIntelligenceOptions = {
   max_source_products: 10,
-  max_candidates_per_product: 2,
-  search_provider: 'google_native',
+  max_candidates_per_product: 4,
+  search_provider: 'serpapi',
   private_label_mode: 'flag',
   confidence_threshold: 0.4,
   allowed_domains: [],

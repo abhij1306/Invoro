@@ -312,6 +312,29 @@ def _browser_proxy_mode(
         return "launch"
     return "page"
 
+
+def _browser_storage_state_is_persistable(
+    *,
+    blocked: bool,
+    finalized_diagnostics: dict[str, object] | None,
+) -> bool:
+    if blocked:
+        return False
+    diagnostics = dict(finalized_diagnostics or {})
+    browser_outcome = str(diagnostics.get("browser_outcome") or "").strip().lower()
+    if browser_outcome in {"challenge_page", "low_content_shell", "location_required"}:
+        return False
+    provider_hits = diagnostics.get("challenge_provider_hits")
+    if not isinstance(provider_hits, list) or not provider_hits:
+        return True
+    readiness_probes = diagnostics.get("readiness_probes")
+    if not isinstance(readiness_probes, list):
+        return False
+    return any(
+        isinstance(probe, dict) and bool(probe.get("is_ready"))
+        for probe in readiness_probes
+    )
+
 async def _resolve_runtime_provider(
     runtime_provider,
     *,
@@ -632,12 +655,16 @@ async def browser_fetch(
                     browser_engine=runtime_engine,
                     browser_binary=runtime_binary,
                 )
+                persist_storage_state = _browser_storage_state_is_persistable(
+                    blocked=bool(finalized["blocked"]),
+                    finalized_diagnostics=finalized_diagnostics,
+                )
                 mark_storage_state_persist_policy(
                     page,
                     persist_run_storage_state=allow_storage_state
-                    and not bool(finalized["blocked"]),
+                    and persist_storage_state,
                     persist_domain_storage_state=allow_storage_state
-                    and not bool(finalized["blocked"]),
+                    and persist_storage_state,
                 )
                 return build_browser_fetch_result(
                     url=url,

@@ -72,6 +72,7 @@ describe('CrawlConfigScreen bulk prefill', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.sessionStorage.clear();
+    window.history.replaceState(null, '', '/');
     getDomainRunProfileMock.mockResolvedValue({
       domain: 'example.com',
       surface: 'ecommerce_listing',
@@ -92,8 +93,11 @@ describe('CrawlConfigScreen bulk prefill', () => {
     renderConfigScreen();
 
     await waitFor(() => {
-      expect(replaceMock).toHaveBeenCalledWith('/crawl?module=pdp&mode=batch');
+      expect(`${window.location.pathname}${window.location.search}`).toBe(
+        '/crawl?module=pdp&mode=batch',
+      );
     });
+    expect(replaceMock).not.toHaveBeenCalled();
 
     await waitFor(() => {
       expect(screen.getByRole('combobox', { name: 'Domain' })).toHaveTextContent('Jobs');
@@ -102,6 +106,37 @@ describe('CrawlConfigScreen bulk prefill', () => {
     expect(screen.getByLabelText('Bulk URLs input')).toHaveValue(
       'https://jobs.example.com/posting/1',
     );
+    expect(screen.getByRole('button', { name: 'Batch' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+  });
+
+  it('keeps pdp batch prefill active for non-picker domains', async () => {
+    window.sessionStorage.setItem(
+      STORAGE_KEYS.BULK_PREFILL,
+      JSON.stringify({
+        domain: 'automobiles',
+        urls: ['https://cars.example.com/listing/1'],
+      }),
+    );
+
+    renderConfigScreen();
+
+    await waitFor(() => {
+      expect(`${window.location.pathname}${window.location.search}`).toBe(
+        '/crawl?module=pdp&mode=batch',
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('combobox', { name: 'Domain' })).toHaveTextContent('Automobiles');
+    });
+
+    expect(screen.getByLabelText('Bulk URLs input')).toHaveValue(
+      'https://cars.example.com/listing/1',
+    );
+    expect(screen.queryByLabelText('Target URL input')).not.toBeInTheDocument();
   });
 
   it('loads domain memory as soon as the target URL is entered', async () => {

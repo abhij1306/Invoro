@@ -91,7 +91,8 @@ Public API schemas live in `api_key.py` and `public_api.py`.
 | `dispatch/` | `RunDispatcher` protocol + `LocalRunDispatcher` + `CeleryRunDispatcher` |
 | `crawl/profile/*` | Reusable domain run-profile normalization, merge, persistence, and acquisition-contract learning |
 | `crawl/events.py` | WebSocket log emission |
-| `product_intelligence/*` | Product web discovery, candidate crawl orchestration, deterministic match scoring |
+| `product_intelligence/*` | Product web discovery, brand registry loading, candidate crawl orchestration, deterministic match scoring |
+| `../data/product_intelligence/*` | Product Intelligence brand registry data, including Belk brand and exclusive/private-label lists |
 | `data_enrichment/service.py` | On-demand enrichment job orchestration and persistence for ecommerce detail records |
 | `ucp_audit/catalog_crawl.py`, `ucp_audit/catalog_checks.py`, `ucp_audit/*` | AI Discoverability catalog sampling, signal checks, scoring, reporting, repair roadmap, and job orchestration; dormant UCP protocol files remain here |
 | `monitor_service.py`, `monitor_scheduler_service.py`, `monitor_async_loop.py`, `monitor_change_detection.py`, `monitor_retention.py`, `monitor_alert_service.py` | Product monitoring CRUD support, due-job scheduling, dev scheduler loop, post-run diffing, retention, and in-app alerts |

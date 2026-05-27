@@ -559,7 +559,13 @@ The normal records API hides:
 - `_`-prefixed internal fields
 - obsolete raw manifest containers in standard display responses
 
-## 9. Recent Feature Status From Plans/Audits
+## 9. Product Intelligence Discovery
+
+Product Intelligence lives under `app/services/product_intelligence/` and remains upstream of candidate crawl/export paths. SerpAPI discovery is Shopping-first: `engine=google_shopping` results are parsed, Immersive Product store links are expanded, then organic results remain as fallback evidence. Candidate ranking prefers exact identifiers, Shopping product-group evidence, and title overlap before source-type authority, so a strong marketplace match can outrank a weak brand-site adjacent product without adding extra search queries.
+
+Belk brand inference uses data files under `app/data/product_intelligence/`, with `belk_brands.txt` for longest-match brand inference from Belk source titles/URLs and `belk_exclusive_brands.txt` for private-label exclusion. Belk detail extraction preserves UPC-like `sku_upc` values as public `barcode`/Product Intelligence `gtin` evidence while keeping retailer SKU/product ID separate. Confidence scoring is deterministic and evidence-based: title similarity, brand match, valid GTIN/barcode match, retailer SKU match, MPN/style match, Shopping product-group evidence, price band, and source authority are scored separately so the UI can explain why a candidate URL is strong or weak.
+
+## 10. Recent Feature Status From Plans/Audits
 
 Implemented from recent extraction/audit work:
 
@@ -578,7 +584,7 @@ Still worth treating as active engineering concerns:
 - frontend/backend client-surface drift where unused client methods outlive removed routes
 - selector tool and Crawl Studio now share selector memory semantics, so future selector changes need tests in both surfaces instead of assuming one page is authoritative
 
-## 10. Operational References
+## 11. Operational References
 
 Useful local commands:
 

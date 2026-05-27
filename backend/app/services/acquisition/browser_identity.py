@@ -122,6 +122,15 @@ def _context_color_scheme() -> str | None:
     return None
 
 
+def _browser_context_profile(
+    locality_profile: Mapping[str, object] | None,
+) -> dict[str, object]:
+    if not isinstance(locality_profile, Mapping):
+        return {}
+    raw_value = locality_profile.get("browser_context_profile")
+    return dict(raw_value) if isinstance(raw_value, Mapping) else {}
+
+
 def _viewport_from_screen(
     screen: Any,
     *,
@@ -1124,7 +1133,14 @@ def _playwright_context_options_from_identity(
     identity: BrowserIdentity,
     *,
     timezone_id: str | None = None,
+    locality_profile: Mapping[str, object] | None = None,
 ) -> dict[str, Any]:
+    context_profile = _browser_context_profile(locality_profile)
+    service_workers = str(
+        context_profile.get("service_workers") or "block"
+    ).strip().lower() or "block"
+    if service_workers not in {"allow", "block"}:
+        service_workers = "block"
     options = {
         "user_agent": identity.user_agent,
         "viewport": dict(identity.viewport),
@@ -1133,15 +1149,32 @@ def _playwright_context_options_from_identity(
         "device_scale_factor": identity.device_scale_factor,
         "has_touch": identity.has_touch,
         "is_mobile": identity.is_mobile,
-        "service_workers": "block",
+        "service_workers": service_workers,
         "bypass_csp": False,
     }
-    color_scheme = _context_color_scheme()
+    raw_color_scheme = context_profile.get("color_scheme", "__use_default__")
+    if raw_color_scheme == "__use_default__":
+        color_scheme = _context_color_scheme()
+    else:
+        normalized_color_scheme = str(raw_color_scheme or "").strip().lower()
+        color_scheme = (
+            normalized_color_scheme
+            if normalized_color_scheme in {"light", "dark", "no-preference"}
+            else None
+        )
     if color_scheme is not None:
         options["color_scheme"] = color_scheme
+    raw_permissions = context_profile.get("permissions", "__use_default__")
+    permission_values = (
+        tuple(crawler_runtime_settings.browser_context_permissions or ())
+        if raw_permissions == "__use_default__"
+        else tuple(raw_permissions)
+        if isinstance(raw_permissions, (list, tuple))
+        else ()
+    )
     permissions = [
         str(value or "").strip()
-        for value in tuple(crawler_runtime_settings.browser_context_permissions or ())
+        for value in permission_values
         if str(value or "").strip()
     ]
     if permissions:
@@ -1198,6 +1231,7 @@ def build_playwright_context_spec(
         context_options=_playwright_context_options_from_identity(
             identity,
             timezone_id=timezone_id,
+            locality_profile=locality_profile,
         ),
         init_script=None,
     )

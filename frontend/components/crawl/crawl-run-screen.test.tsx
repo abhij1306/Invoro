@@ -374,6 +374,63 @@ describe('CrawlRunScreen', () => {
     });
   });
 
+  it('prefills Product Intelligence from selected detail records', async () => {
+    apiMock.getCrawl.mockResolvedValue({
+      ...terminalRun(101),
+      surface: 'ecommerce_detail',
+      url: 'https://www.belk.com/p/levi-s-511-slim-fit-stretch-jeans/32009271204401.html',
+      settings: { crawl_module: 'pdp', crawl_mode: 'single' },
+    });
+    apiMock.getRecords.mockResolvedValue({
+      items: [
+        {
+          ...makeRecord(1),
+          source_url:
+            'https://www.belk.com/p/levi-s-511-slim-fit-stretch-jeans/32009271204401.html',
+          data: {
+            brand: "Levi's",
+            title: '511 Slim Fit Stretch Jeans',
+            price: '$59.99',
+            sku_upc: '00194500874886',
+            barcode: '00194500874886',
+            product_id: '32009271204401',
+            url: 'https://www.belk.com/p/levi-s-511-slim-fit-stretch-jeans/32009271204401.html',
+          },
+        },
+      ],
+      meta: { page: 1, limit: 100, total: 1 },
+    });
+
+    renderRunScreen();
+
+    const productButton = await screen.findByRole(
+      'button',
+      { name: 'Product Intelligence (1)' },
+      { timeout: 5000 },
+    );
+    fireEvent.click(productButton);
+
+    expect(replaceMock).toHaveBeenCalledWith('/product-intelligence');
+    expect(
+      JSON.parse(window.sessionStorage.getItem('product-intelligence-prefill-v1') || '{}'),
+    ).toMatchObject({
+      source_run_id: 101,
+      source_domain:
+        'https://www.belk.com/p/levi-s-511-slim-fit-stretch-jeans/32009271204401.html',
+      records: [
+        {
+          id: 1,
+          run_id: 101,
+          data: {
+            sku_upc: '00194500874886',
+            barcode: '00194500874886',
+            product_id: '32009271204401',
+          },
+        },
+      ],
+    });
+  });
+
   it('falls back to reduced Product Intelligence prefill when session storage is full', () => {
     const stored = new Map<string, string>();
     const setItemMock = vi.fn((key: string, value: string) => {

@@ -1025,6 +1025,99 @@ async def test_process_single_url_runs_adapter_against_browser_artifact_fragment
 
 @pytest.mark.asyncio
 @pytest.mark.regression
+async def test_process_single_url_skips_redundant_adapter_artifacts_when_main_html_sufficient(
+    db_session: AsyncSession,
+    test_user,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run = await create_crawl_run(
+        db_session,
+        test_user.id,
+        {
+            "run_type": "crawl",
+            "url": "https://www.belk.com/home/",
+            "surface": "ecommerce_listing",
+            "settings": {"respect_robots_txt": False, "max_records": 10},
+        },
+    )
+
+    fragment = """
+    <article class="product-tile">
+      <a href="/p/unused/999.html"><span class="product-name">Unused</span></a>
+      <span class="price">$9.99</span>
+    </article>
+    """
+    adapter_calls = 0
+
+    @_as_async
+    def _fake_acquire(request):
+        return _fake_acquire_result(
+            request,
+            html="<html><body>main product grid</body></html>",
+            method="browser",
+            artifacts={"rendered_listing_fragments": [fragment]},
+            browser_diagnostics={"rendered_listing_fragment_count": 2},
+        )
+
+    @_as_async
+    def _fake_run_adapter(url, html, surface):
+        del url, surface
+        nonlocal adapter_calls
+        adapter_calls += 1
+        assert "unused" not in html
+        return AdapterResult(
+            records=[
+                {
+                    "title": "Main One",
+                    "price": "22.75",
+                    "url": "https://www.belk.com/p/main-one/1.html",
+                    "_source": "belk_adapter",
+                },
+                {
+                    "title": "Main Two",
+                    "price": "39.95",
+                    "url": "https://www.belk.com/p/main-two/2.html",
+                    "_source": "belk_adapter",
+                },
+            ],
+            source_type="belk_adapter",
+            adapter_name="belk",
+        )
+
+    @_as_async
+    def _no_selector_rules(*args, **kwargs):
+        del args, kwargs
+        return []
+
+    def _fake_extract_records(*args, **kwargs):
+        return list(kwargs.get("adapter_records") or [])
+
+    @_as_async
+    def _persist_artifacts(**kwargs):
+        del kwargs
+        return "artifacts/belk.html"
+
+    monkeypatch.setattr("app.services.pipeline.extraction_loop.acquire", _fake_acquire)
+    monkeypatch.setattr("app.services.pipeline.extraction_loop.run_adapter", _fake_run_adapter)
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.load_domain_selector_rules", _no_selector_rules
+    )
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.extract_records", _fake_extract_records
+    )
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.persist_acquisition_artifacts",
+        _persist_artifacts,
+    )
+
+    result = await process_single_url(db_session, run, run.url)
+
+    assert adapter_calls == 1
+    assert [row["price"] for row in result.records] == ["22.75", "39.95"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.regression
 async def test_process_single_url_prefers_richer_adapter_artifact_rows(
     db_session: AsyncSession,
     test_user,

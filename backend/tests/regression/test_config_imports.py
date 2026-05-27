@@ -613,3 +613,25 @@ def test_platform_runtime_policy_does_not_force_browser_for_vendor_specific_doma
     policy = resolve_platform_runtime_policy("https://www.autozone.com/")
 
     assert policy["requires_browser"] is False
+
+
+@pytest.mark.regression
+def test_platform_runtime_policy_exposes_belk_us_locality_defaults() -> None:
+    policy = resolve_platform_runtime_policy(
+        "https://www.belk.com/p/example-product/123.html",
+        surface="ecommerce_detail",
+    )
+
+    assert policy["family"] == "belk"
+    assert policy["requires_browser"] is True
+    assert policy["locality_profile"] == {
+        "geo_country": "US",
+        "language_hint": "en-US",
+        "currency_hint": "USD",
+        "timezone_id": "America/New_York",
+    }
+    assert policy["browser_context_profile"] == {
+        "service_workers": "allow",
+        "permissions": [],
+        "color_scheme": None,
+    }

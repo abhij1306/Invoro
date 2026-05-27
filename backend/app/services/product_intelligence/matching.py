@@ -22,10 +22,16 @@ from app.services.config.product_intelligence import (
     SOURCE_MPN_FIELDS,
     SOURCE_PRICE_FIELDS,
     SOURCE_SKU_FIELDS,
+    SOURCE_STYLE_FIELDS,
     SOURCE_TITLE_FIELDS,
     SOURCE_TYPE_AUTHORITY_BONUS,
     SOURCE_URL_FIELDS,
     product_intelligence_settings,
+)
+from app.services.product_intelligence.brand_registry import (
+    infer_belk_brand,
+    infer_belk_brand_prefix,
+    is_belk_exclusive_brand,
 )
 
 
@@ -36,7 +42,7 @@ def normalize_brand(value: object) -> str:
 
 
 def is_private_label(brand: object) -> bool:
-    return normalize_brand(brand) in PRIVATE_LABEL_BRANDS
+    return normalize_brand(brand) in PRIVATE_LABEL_BRANDS or is_belk_exclusive_brand(brand)
 
 
 def source_domain(url: object) -> str:
@@ -67,6 +73,7 @@ def extract_product_snapshot(record: object) -> dict[str, object]:
         "sku": str(_first_present(data, SOURCE_SKU_FIELDS) or "").strip(),
         "mpn": str(_first_present(data, SOURCE_MPN_FIELDS) or "").strip(),
         "gtin": str(_first_present(data, SOURCE_GTIN_FIELDS) or "").strip(),
+        "style": str(_first_present(data, SOURCE_STYLE_FIELDS) or "").strip(),
         "availability": str(_first_present(data, SOURCE_AVAILABILITY_FIELDS) or "").strip(),
         "raw": data,
     }
@@ -93,10 +100,26 @@ def score_candidate(
         score += MATCH_SCORE_WEIGHTS["brand_match"]
     reasons["brand_match"] = brand_match
 
-    identifier_match = _identifier_match(source, candidate)
-    if identifier_match:
-        score += MATCH_SCORE_WEIGHTS["identifier_match"]
-    reasons["identifier_match"] = identifier_match
+    gtin_match = _gtin_match(source, candidate)
+    if gtin_match:
+        score += MATCH_SCORE_WEIGHTS["gtin_match"]
+    reasons["gtin_match"] = gtin_match
+
+    sku_match = _sku_match(source, candidate)
+    if sku_match:
+        score += MATCH_SCORE_WEIGHTS["sku_match"]
+    reasons["sku_match"] = sku_match
+
+    mpn_or_style_match = _mpn_or_style_match(source, candidate)
+    if mpn_or_style_match:
+        score += MATCH_SCORE_WEIGHTS["mpn_or_style_match"]
+    reasons["mpn_or_style_match"] = mpn_or_style_match
+
+    shopping_product_group = _shopping_product_group(candidate)
+    if shopping_product_group:
+        score += MATCH_SCORE_WEIGHTS["shopping_product_group"]
+    reasons["shopping_product_group"] = shopping_product_group
+    reasons["identifier_match"] = bool(gtin_match or sku_match or mpn_or_style_match)
 
     price_match = _price_within_band(source.get("price"), candidate.get("price"))
     if price_match:
@@ -110,6 +133,12 @@ def score_candidate(
     score += authority_bonus
     reasons["source_authority_bonus"] = round(authority_bonus, 4)
 
+    if gtin_match and brand_match and title_similarity >= 0.45:
+        score = max(score, 0.88)
+    elif gtin_match and title_similarity >= 0.55:
+        score = max(score, 0.78)
+    elif (sku_match or mpn_or_style_match) and brand_match and title_similarity >= 0.45:
+        score = max(score, 0.72)
     final_score = round(min(max(score, 0.0), 1.0), 4)
     return {
         "score": final_score,
@@ -146,12 +175,16 @@ def extract_search_result_snapshot(
         "description": str(description or "").strip(),
         "image_url": str(_first_present(merged, ("thumbnail", "image", "favicon")) or "").strip(),
         "url": str(url or merged.get("link") or "").strip(),
-        "sku": "",
-        "mpn": "",
-        "gtin": "",
+        "sku": str(_first_present(merged, ("sku",)) or "").strip(),
+        "mpn": str(_first_present(merged, ("mpn", "model", "model_number", "part_number")) or "").strip(),
+        "gtin": str(_first_present(merged, ("gtin", "barcode", "sku_upc", "upc", "ean")) or "").strip(),
+        "style": str(_first_present(merged, ("style", "style_id", "product_id")) or "").strip(),
         "availability": str(merged.get("availability") or "").strip(),
         "snippet": str(merged.get("snippet") or "").strip(),
         "source": str(merged.get("source") or merged.get("displayed_link") or domain or "").strip(),
+        "product_id": str(merged.get("product_id") or "").strip(),
+        "product_link": str(merged.get("product_link") or "").strip(),
+        "provider": str(merged.get("provider") or "").strip(),
         "raw": data,
     }
 
@@ -169,6 +202,9 @@ def build_search_result_intelligence(
         url=candidate_url,
         domain=candidate_domain,
     )
+    if not normalize_brand(canonical.get("brand")) and _candidate_mentions_source_brand(source, canonical):
+        canonical["brand"] = str(source.get("brand") or "").strip()
+        canonical["normalized_brand"] = normalize_brand(canonical["brand"])
     deterministic = score_candidate(source=source, candidate=canonical, source_type=source_type)
     provider = str((candidate_payload or {}).get("provider") or "search").strip().lower() or "search"
     return {
@@ -217,7 +253,26 @@ def _infer_brand(
     marker_brand = infer_brand_from_title_marker(title)
     if marker_brand:
         return marker_brand
+    registry_prefix_brand = infer_belk_brand_prefix(title)
+    if registry_prefix_brand:
+        return registry_prefix_brand
+    if _is_belk_source(source_url, domain, source):
+        belk_brand = infer_belk_brand(_url_path_text(source_url), title, snippet, source)
+        if belk_brand:
+            return belk_brand
     return infer_brand_from_product_url(url=str(source_url or ""), title=title) or ""
+
+
+def _is_belk_source(*values: object) -> bool:
+    return "belk.com" in " ".join(str(value or "") for value in values).casefold()
+
+
+def _url_path_text(value: object) -> str:
+    try:
+        parsed = urlsplit(str(value or ""))
+    except ValueError:
+        return str(value or "")
+    return " ".join(part for part in (parsed.path, parsed.query) if part)
 
 
 def _infer_known_brand(*values: object) -> str:
@@ -233,6 +288,22 @@ def _infer_known_brand(*values: object) -> str:
         ):
             return BRAND_ALIAS_MAP.get(brand, brand)
     return ""
+
+
+def _candidate_mentions_source_brand(
+    source: dict[str, object],
+    candidate: dict[str, object],
+) -> bool:
+    source_brand = normalize_brand(source.get("brand"))
+    if not source_brand:
+        return False
+    haystack = " ".join(
+        str(candidate.get(key) or "")
+        for key in ("title", "description", "snippet", "source", "url")
+    )
+    tokens = _token_set(haystack)
+    brand_tokens = _token_set(source_brand)
+    return bool(brand_tokens and brand_tokens.issubset(tokens))
 
 
 def _title_similarity(left: str, right: str) -> float:
@@ -253,13 +324,47 @@ def _token_set(value: object) -> set[str]:
     }
 
 
-def _identifier_match(source: dict[str, object], candidate: dict[str, object]) -> bool:
-    for key in ("gtin", "mpn", "sku"):
-        left = str(source.get(key) or "").strip().casefold()
-        right = str(candidate.get(key) or "").strip().casefold()
+def _sku_match(source: dict[str, object], candidate: dict[str, object]) -> bool:
+    return _field_match(source, candidate, ("sku",))
+
+
+def _gtin_match(source: dict[str, object], candidate: dict[str, object]) -> bool:
+    keys = ("gtin", "barcode", "sku_upc", "upc", "ean")
+    source_values = {_identity_value(source.get(key)) for key in keys}
+    candidate_values = {_identity_value(candidate.get(key)) for key in keys}
+    source_values.discard("")
+    candidate_values.discard("")
+    return bool(source_values and candidate_values and source_values & candidate_values)
+
+
+def _mpn_or_style_match(source: dict[str, object], candidate: dict[str, object]) -> bool:
+    return _field_match(source, candidate, ("mpn", "style", "model", "product_id"))
+
+
+def _field_match(
+    source: dict[str, object],
+    candidate: dict[str, object],
+    keys: tuple[str, ...],
+) -> bool:
+    for key in keys:
+        left = _identity_value(source.get(key))
+        right = _identity_value(candidate.get(key))
         if left and right and left == right:
             return True
     return False
+
+
+def _shopping_product_group(candidate: dict[str, object]) -> bool:
+    provider = str(candidate.get("provider") or "").strip().casefold()
+    product_id = str(candidate.get("product_id") or "").strip()
+    product_link = str(candidate.get("product_link") or "").strip()
+    return provider in {"serpapi_shopping", "serpapi_immersive"} and bool(
+        product_id or product_link
+    )
+
+
+def _identity_value(value: object) -> str:
+    return re.sub(r"[^a-z0-9]+", "", str(value or "").casefold())
 
 
 def _price_within_band(left: object, right: object) -> bool:

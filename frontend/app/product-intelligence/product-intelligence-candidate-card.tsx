@@ -1,6 +1,6 @@
 'use client';
 
-import { Code2, ExternalLink, ImageOff, Layers, ChevronDown } from 'lucide-react';
+import { CheckCircle2, Code2, ExternalLink, ImageOff, Layers, ChevronDown } from 'lucide-react';
 
 import { Badge, Button } from '../../components/ui/primitives';
 import { cn } from '../../lib/utils';
@@ -57,6 +57,20 @@ export function CandidateGroupSection({
                 {formatPrice(group.sourcePrice, group.sourceCurrency)}
               </span>
             ) : null}
+            {group.sourceUrl ? (
+              <>
+                <span className="bg-divider h-1 w-1 rounded-full" />
+                <a
+                  href={group.sourceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="link-accent type-caption truncate"
+                  title={group.sourceUrl}
+                >
+                  Source PDP
+                </a>
+              </>
+            ) : null}
           </div>
         </div>
         <ChevronDown className="text-muted size-4 shrink-0 transition-transform group-open:rotate-180" />
@@ -82,6 +96,11 @@ function CandidateCard({
   const intelligence = isRecord(candidate.intelligence) ? candidate.intelligence : {};
   const record = isRecord(intelligence.canonical_record) ? intelligence.canonical_record : {};
   const imageUrl = stringField(record.image_url);
+  const reasons = isRecord(intelligence.score_reasons) ? intelligence.score_reasons : {};
+  const provider = providerLabel(candidate.payload, intelligence);
+  const sourceType = sourceTypeLabel(candidate.source_type);
+  const candidatePrice = record.price;
+  const priceDelta = formatPriceDelta(candidate.source_price, candidatePrice);
   return (
     <div
       className={cn(
@@ -117,6 +136,11 @@ function CandidateCard({
               {stringField(record.price) && stringField(record.price) !== '--' ? (
                 <div className="text-foreground type-body-sm font-semibold">
                   {formatExtractedPrice(record.price, record.currency)}
+                  {priceDelta ? (
+                    <span className="text-muted type-caption-mono ml-2 font-normal">
+                      {priceDelta}
+                    </span>
+                  ) : null}
                 </div>
               ) : null}
               {stringField(record.brand) || candidate.source_brand ? (
@@ -131,6 +155,13 @@ function CandidateCard({
           </div>
         </div>
       </div>
+      <div className="border-divider mt-3 grid grid-cols-2 gap-2 border-t pt-3">
+        <ComparisonCell label="Provider" value={provider} />
+        <ComparisonCell label="Type" value={sourceType} />
+        <ComparisonCell label="Rank" value={`#${candidate.search_rank || 1}`} />
+        <ComparisonCell label="Query" value={candidate.query_used || '--'} title={candidate.query_used} />
+      </div>
+      <ReasonChips reasons={reasons} score={score} />
       <div className="border-divider mt-3 flex items-center justify-between border-t pt-2.5">
         <Button
           type="button"
@@ -140,6 +171,11 @@ function CandidateCard({
         >
           <Code2 className="mr-1.5 size-3" /> Raw JSON
         </Button>
+        {selected ? (
+          <span className="text-success type-label-mono flex items-center gap-1 uppercase">
+            <CheckCircle2 className="size-3" /> Selected
+          </span>
+        ) : null}
         <a
           href={candidate.url}
           target="_blank"
@@ -151,6 +187,102 @@ function CandidateCard({
       </div>
     </div>
   );
+}
+
+function ComparisonCell({
+  label,
+  value,
+  title,
+}: {
+  label: string;
+  value: string;
+  title?: string;
+}) {
+  return (
+    <div className="min-w-0">
+      <div className="text-muted type-caption-mono uppercase">{label}</div>
+      <div className="text-foreground type-caption truncate" title={title ?? value}>
+        {value || '--'}
+      </div>
+    </div>
+  );
+}
+
+function ReasonChips({ reasons, score }: { reasons: Record<string, unknown>; score: number }) {
+  const chips = confidenceChips(reasons, score);
+  if (!chips.length) return null;
+  return (
+    <div className="mt-3 flex flex-wrap gap-1.5">
+      {chips.map((chip) => (
+        <Badge key={chip.label} tone={chip.tone} className="h-5 px-1.5 text-xs">
+          {chip.label}
+        </Badge>
+      ))}
+    </div>
+  );
+}
+
+function confidenceChips(reasons: Record<string, unknown>, score: number) {
+  const chips: Array<{ label: string; tone: 'neutral' | 'success' | 'warning' | 'accent' }> = [];
+  if (reasons.brand_match === true) chips.push({ label: 'Brand match', tone: 'success' });
+  if (reasons.sku_match === true) chips.push({ label: 'SKU match', tone: 'success' });
+  if (reasons.mpn_or_style_match === true) chips.push({ label: 'Style match', tone: 'success' });
+  if (reasons.shopping_product_group === true)
+    chips.push({ label: 'Shopping evidence', tone: 'accent' });
+  if (reasons.price_band_match === true) chips.push({ label: 'Price band', tone: 'success' });
+  const titleSimilarity = Number(reasons.title_similarity ?? 0);
+  if (Number.isFinite(titleSimilarity) && titleSimilarity > 0) {
+    chips.push({
+      label: `Title ${Math.round(titleSimilarity * 100)}%`,
+      tone: titleSimilarity >= 0.6 ? 'success' : 'warning',
+    });
+  }
+  if (reasons.brand_match === false && score >= 0.4) {
+    chips.push({ label: 'Brand missing', tone: 'warning' });
+  }
+  return chips.slice(0, 6);
+}
+
+function providerLabel(
+  payload: ProductIntelligenceCandidate['payload'],
+  intelligence: Record<string, unknown>,
+) {
+  const payloadProvider = stringField(isRecord(payload) ? payload.provider : '');
+  const provider = (payloadProvider || stringField(intelligence.cleanup_source))
+    .replace(/^deterministic_/, '');
+  if (provider === 'serpapi_immersive') return 'SerpAPI Stores';
+  if (provider === 'serpapi_shopping') return 'SerpAPI Shopping';
+  if (provider === 'serpapi') return 'SerpAPI Organic';
+  if (provider === 'google_native') return 'Google Native';
+  return provider || 'Search';
+}
+
+function sourceTypeLabel(value: string) {
+  return (
+    {
+      brand_dtc: 'Brand DTC',
+      retailer: 'Retailer',
+      marketplace: 'Marketplace',
+      aggregator: 'Aggregator',
+      unknown: 'Unknown',
+    }[value] ?? value
+  );
+}
+
+function formatPriceDelta(sourcePrice: unknown, candidatePrice: unknown) {
+  const source = numericPrice(sourcePrice);
+  const candidate = numericPrice(candidatePrice);
+  if (source === null || candidate === null) return '';
+  const delta = candidate - source;
+  if (Math.abs(delta) < 0.01) return 'same price';
+  const sign = delta > 0 ? '+' : '-';
+  return `${sign}$${Math.abs(delta).toFixed(2)}`;
+}
+
+function numericPrice(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  const parsed = Number(String(value ?? '').replace(/[^0-9.]+/g, ''));
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
 function CandidateImage({

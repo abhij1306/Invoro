@@ -186,7 +186,7 @@ Primary files:
 - `components/ui/primitives.tsx` as the compatibility barrel plus dropdown, toggle, tooltip, skeleton, and field helpers
 - `components/ui/patterns.tsx` for shared operator-page patterns
 - `components/ui/table.module.css` for compact and commerce table styling
-- `app/product-intelligence/product-intelligence-components.tsx` for Product Intelligence local UI pieces
+- `app/product-intelligence/product-intelligence-components.tsx`, `product-intelligence-results.tsx`, and `product-intelligence-candidate-card.tsx` for Product Intelligence local UI pieces, result summaries, source-vs-candidate comparison rows, confidence reason chips, and URL selection actions; crawl result screens can prefill Product Intelligence from both listing and ecommerce detail records
 - `components/monitors/*` for Monitor and Alert Management list/detail/form/event/history/snapshot components
 - `app/ucp-audit/ucp-audit-components.tsx` for UCP audit report UI pieces
 

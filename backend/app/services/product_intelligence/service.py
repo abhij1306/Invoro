@@ -961,10 +961,11 @@ async def _load_source_rows(
 def _row_from_record(record: CrawlRecord) -> dict[str, object]:
     data = dict(record.data or {})
     data.setdefault("source_url", record.source_url)
+    source_url = str(data.get("url") or record.source_url or "").strip()
     return {
         "source_record_id": record.id,
         "source_run_id": record.run_id,
-        "source_url": record.source_url,
+        "source_url": source_url,
         "data": data,
     }
 

@@ -482,6 +482,17 @@
         "product-tile",
         "brandName"
       ],
+      "locality_profile": {
+        "geo_country": "US",
+        "language_hint": "en-US",
+        "currency_hint": "USD",
+        "timezone_id": "America/New_York"
+      },
+      "browser_context_profile": {
+        "service_workers": "allow",
+        "permissions": [],
+        "color_scheme": null
+      },
       "adapter_names": [
         "belk"
       ],

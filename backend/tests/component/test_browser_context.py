@@ -972,6 +972,60 @@ def test_build_playwright_context_spec_does_not_generate_init_script() -> None:
 
 
 @pytest.mark.component
+def test_build_playwright_context_spec_applies_browser_context_profile_overrides() -> (
+    None
+):
+    spec = browser_identity.build_playwright_context_spec(
+        identity=browser_identity.BrowserIdentity(
+            user_agent=(
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/145.0.0.0 Safari/537.36"
+            ),
+            viewport={"width": 1366, "height": 768},
+            extra_http_headers={"Accept-Language": "en-US,en;q=0.9"},
+            locale="en-US",
+            device_scale_factor=1.0,
+            has_touch=False,
+            is_mobile=False,
+            raw_fingerprint=None,
+        ),
+        locality_profile={
+            "browser_context_profile": {
+                "service_workers": "allow",
+                "permissions": [],
+                "color_scheme": None,
+            }
+        },
+    )
+
+    assert spec.context_options["service_workers"] == "allow"
+    assert "permissions" not in spec.context_options
+    assert "color_scheme" not in spec.context_options
+
+
+@pytest.mark.component
+def test_browser_storage_state_persist_policy_rejects_challenge_shell_without_ready_probe() -> (
+    None
+):
+    assert (
+        acquisition_browser_runtime._browser_storage_state_is_persistable(
+            blocked=False,
+            finalized_diagnostics={
+                "browser_outcome": "usable_content",
+                "challenge_provider_hits": ["perimeterx"],
+                "readiness_probes": [
+                    {
+                        "is_ready": False,
+                    }
+                ],
+            },
+        )
+        is False
+    )
+
+
+@pytest.mark.component
 def test_shared_browser_runtime_build_context_spec_uses_real_builder(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

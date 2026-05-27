@@ -279,3 +279,82 @@ async def test_acquire_persists_runtime_policy_updates_on_result_request(
     assert result.request.policy.requires_browser is True
     assert result.request.acquisition_profile["prefer_browser"] is True
     assert result.request.acquisition_profile["requires_browser"] is True
+
+
+@pytest.mark.asyncio
+@pytest.mark.component
+async def test_acquire_applies_runtime_locality_defaults_without_overriding_explicit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    async def _fake_fetch_page(url: str, *args, **kwargs):
+        del args
+        captured["url"] = url
+        captured.update(kwargs)
+        return type(
+            "FetchResult",
+            (),
+            {
+                "final_url": url,
+                "html": "<html></html>",
+                "method": "browser",
+                "status_code": 200,
+                "content_type": "text/html",
+                "blocked": False,
+                "headers": {},
+                "network_payloads": [],
+                "browser_diagnostics": {},
+                "artifacts": {},
+            },
+        )()
+
+    monkeypatch.setattr(
+        "app.services.acquisition.acquirer.fetch_page",
+        _fake_fetch_page,
+    )
+    monkeypatch.setattr(
+        "app.services.acquisition.acquirer.resolve_platform_runtime_policy",
+        lambda *_args, **_kwargs: {
+            "requires_browser": True,
+            "locality_profile": {
+                "geo_country": "US",
+                "language_hint": "en-US",
+                "currency_hint": "USD",
+                "timezone_id": "America/New_York",
+            },
+            "browser_context_profile": {
+                "service_workers": "allow",
+                "permissions": [],
+                "color_scheme": None,
+            },
+        },
+    )
+
+    await acquire(
+        AcquisitionRequest(
+            run_id=10,
+            url="https://www.belk.com/p/widget",
+            plan=AcquisitionPlan(surface="ecommerce_detail"),
+            acquisition_profile={
+                "locality_profile": {
+                    "language_hint": "fr-CA",
+                    "browser_context_profile": {
+                        "permissions": ["notifications"],
+                    },
+                }
+            },
+        )
+    )
+
+    assert captured["locality_profile"] == {
+        "geo_country": "US",
+        "language_hint": "fr-CA",
+        "currency_hint": "USD",
+        "timezone_id": "America/New_York",
+        "browser_context_profile": {
+            "service_workers": "allow",
+            "permissions": ["notifications"],
+            "color_scheme": None,
+        },
+    }

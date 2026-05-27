@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import re
+from pathlib import Path
+from urllib.parse import urlsplit
+
 from pydantic import AliasChoices, Field, model_validator
 
 from app.services.config.runtime_settings import settings_config
@@ -48,9 +52,10 @@ SOURCE_PRICE_FIELDS = ("price", "sale_price", "current_price", "final_price")
 SOURCE_CURRENCY_FIELDS = ("currency", "price_currency")
 SOURCE_IMAGE_FIELDS = ("image_url", "image", "primary_image", "thumbnail")
 SOURCE_URL_FIELDS = ("url", "product_url", "canonical_url", "source_url")
-SOURCE_SKU_FIELDS = ("sku", "style", "style_id")
-SOURCE_MPN_FIELDS = ("mpn", "model", "model_number")
-SOURCE_GTIN_FIELDS = ("gtin", "upc", "ean", "isbn")
+SOURCE_SKU_FIELDS = ("sku", "style", "style_id", "product_id", "id")
+SOURCE_MPN_FIELDS = ("mpn", "model", "model_number", "part_number")
+SOURCE_STYLE_FIELDS = ("style", "style_id", "product_id")
+SOURCE_GTIN_FIELDS = ("gtin", "barcode", "sku_upc", "upc", "ean", "isbn")
 SOURCE_AVAILABILITY_FIELDS = ("availability", "stock_status", "in_stock")
 
 SEARCH_STOP_WORDS = {
@@ -71,6 +76,7 @@ DISCOVERY_PRODUCT_PATH_HINTS = (
     "/proddetail/",
     "/dp/",
     "/gp/product/",
+    "/itm/",
     "/ip/",
 )
 DISCOVERY_PRODUCT_DETAIL_EXTENSIONS = (".html", ".htm")
@@ -83,6 +89,16 @@ DISCOVERY_LISTING_PATH_SEGMENTS = (
     "s",
     "search",
     "w",
+)
+DISCOVERY_NON_PRODUCT_PATH_SEGMENTS = (
+    "article",
+    "blog",
+    "blogs",
+    "guide",
+    "guides",
+    "how to",
+    "learn",
+    "stories",
 )
 DISCOVERY_GENERIC_PRODUCT_TOKENS = {
     "apparel",
@@ -118,7 +134,11 @@ SEARCH_EXCLUDED_DOMAIN_PREFIX = "-site:"
 SEARCH_SITE_PREFIX = "site:"
 SERPAPI_SEARCH_URL = "https://serpapi.com/search.json"
 SERPAPI_ENGINE = "google"
+SERPAPI_SHOPPING_ENGINE = "google_shopping"
+SERPAPI_IMMERSIVE_PRODUCT_ENGINE = "google_immersive_product"
 SERPAPI_QUERY_PARAM = "q"
+SERPAPI_PAGE_TOKEN_PARAM = "page_token"
+SERPAPI_MORE_STORES_PARAM = "more_stores"
 SERPAPI_KEY_PARAM = "api_key"
 SERPAPI_ENGINE_PARAM = "engine"
 SERPAPI_RESULT_COUNT_PARAM = "num"
@@ -129,6 +149,12 @@ SERPAPI_SNIPPET_FIELD = "snippet"
 SERPAPI_POSITION_FIELD = "position"
 SERPAPI_SOURCE_FIELD = "source"
 SERPAPI_DISPLAYED_LINK_FIELD = "displayed_link"
+SERPAPI_SHOPPING_RESULTS_FIELD = "shopping_results"
+SERPAPI_SHOPPING_PRODUCT_ID_FIELD = "product_id"
+SERPAPI_SHOPPING_PRODUCT_LINK_FIELD = "product_link"
+SERPAPI_SHOPPING_IMMERSIVE_API_FIELD = "serpapi_immersive_product_api"
+SERPAPI_SHOPPING_IMMERSIVE_TOKEN_FIELD = "immersive_product_page_token"
+SERPAPI_SHOPPING_LINK_FIELDS = ("direct_link", "link", "product_link")
 SERPAPI_PRICE_FIELDS = ("extracted_price", "price")
 SERPAPI_THUMBNAIL_FIELDS = ("thumbnail", "image", "favicon")
 GOOGLE_NATIVE_HOME_URL = "https://www.google.com/"
@@ -189,6 +215,50 @@ BRAND_ALIAS_MAP = {
     "tommy bahama r": BRAND_ALIAS_TOMMY_BAHAMA,
 }
 
+_DATA_DIR = Path(__file__).resolve().parents[2] / "data" / "product_intelligence"
+_BELK_BRAND_URLS_FILE = _DATA_DIR / "belk_brand_urls.tsv"
+
+
+def _brand_domain_key(value: object) -> str:
+    normalized = re.sub(r"[^a-z0-9]+", " ", str(value or "").casefold()).strip()
+    return BRAND_ALIAS_MAP.get(normalized, normalized)
+
+
+def _brand_domain_keys(value: object) -> set[str]:
+    text = str(value or "").strip()
+    values = {text, re.sub(r"\([^)]*\)", " ", text).strip()}
+    for separator in (" / ", "/"):
+        if separator in text:
+            values.update(part.strip() for part in text.split(separator))
+    return {key for key in (_brand_domain_key(item) for item in values) if key}
+
+
+def _domain_from_brand_url(value: object) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    parsed = urlsplit(text if "://" in text else f"https://{text}")
+    return str(parsed.hostname or "").removeprefix("www.").lower()
+
+
+def _load_brand_domain_file(path: Path) -> dict[str, str]:
+    try:
+        rows = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return {}
+    domains: dict[str, str] = {}
+    for row in rows[1:]:
+        if not row.strip() or "\t" not in row:
+            continue
+        brand, url = row.split("\t", 1)
+        domain = _domain_from_brand_url(url)
+        if not domain:
+            continue
+        for key in _brand_domain_keys(brand):
+            domains.setdefault(key, domain)
+    return domains
+
+
 BRAND_DOMAIN_MAP = {
     "adidas": "adidas.com",
     "bonnie jean": "bonniejean.com",
@@ -200,6 +270,7 @@ BRAND_DOMAIN_MAP = {
     "kenneth cole": "kennethcole.com",
     "lee": "lee.com",
     BRAND_ALIAS_LEVIS: "levi.com",
+    "lucky brand": "luckybrand.com",
     "michael kors": "michaelkors.com",
     "nautica": "nautica.com",
     "nike": "nike.com",
@@ -211,7 +282,9 @@ BRAND_DOMAIN_MAP = {
     BRAND_ALIAS_TOMMY_BAHAMA: "tommybahama.com",
     "tommy hilfiger": "tommy.com",
     "under armour": "underarmour.com",
+    "wrangler": "wrangler.com",
 }
+BRAND_DOMAIN_MAP = {**_load_brand_domain_file(_BELK_BRAND_URLS_FILE), **BRAND_DOMAIN_MAP}
 
 PRIVATE_LABEL_BRANDS = {
     "belk",
@@ -287,11 +360,14 @@ SOURCE_TYPE_AUTHORITY_BONUS = {
 }
 
 MATCH_SCORE_WEIGHTS = {
-    "title_similarity": 0.34,
-    "brand_match": 0.24,
-    "identifier_match": 0.25,
-    "price_band": 0.05,
-    "source_authority": 0.12,
+    "title_similarity": 0.22,
+    "brand_match": 0.18,
+    "gtin_match": 0.22,
+    "sku_match": 0.08,
+    "mpn_or_style_match": 0.12,
+    "shopping_product_group": 0.06,
+    "price_band": 0.04,
+    "source_authority": 0.08,
 }
 
 PRODUCT_INTELLIGENCE_PROMPT_REGISTRY = {
@@ -323,13 +399,14 @@ class ProductIntelligenceSettings(BaseSettings):
         ),
     )
     max_source_products: int = 10
-    max_candidates_per_product: int = 2
-    discovery_pool_multiplier: int = 1
+    max_candidates_per_product: int = 4
+    discovery_pool_multiplier: int = 2
     max_urls_per_result_domain: int = 1
     search_timeout_seconds: float = 20.0
     search_delay_ms: int = 800
     google_native_max_results: int = 10
     google_native_max_queries_per_product: int = 2
+    serpapi_immersive_products_per_query: int = 2
     candidate_poll_seconds: float = 30.0
     candidate_poll_interval_seconds: float = 2.0
     confidence_threshold: float = 0.4
@@ -356,6 +433,9 @@ class ProductIntelligenceSettings(BaseSettings):
         self.google_native_max_results = max(1, int(self.google_native_max_results))
         self.google_native_max_queries_per_product = max(
             1, int(self.google_native_max_queries_per_product)
+        )
+        self.serpapi_immersive_products_per_query = max(
+            0, int(self.serpapi_immersive_products_per_query)
         )
         self.candidate_poll_seconds = max(0.0, float(self.candidate_poll_seconds))
         self.candidate_poll_interval_seconds = max(

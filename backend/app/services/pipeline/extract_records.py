@@ -133,16 +133,6 @@ def extract_records(
                 )
                 if shaped.get("title") and shaped.get("url"):
                     adapter_rows.append(shaped)
-        listing_rows = extract_listing_records(
-            html,
-            page_url,
-            normalized_surface,
-            max_records=max_records,
-            artifacts=artifacts,
-            selector_rules=selector_rules,
-            network_payloads=network_payloads,
-            record_dom_observed_selectors=record_dom_observed_selectors,
-        )
         network_rows = extract_listing_rows_from_network(
             network_payloads,
             page_url=page_url,
@@ -153,11 +143,31 @@ def extract_records(
             adapter_rows,
             network_payloads=network_payloads,
         )
+        adapter_rows = _finalize_listing_rows(adapter_rows)
+        adapter_fast_rows = _adapter_listing_rows_if_sufficient(
+            adapter_rows,
+            page_url=page_url,
+            surface=normalized_surface,
+            max_records=max_records,
+            artifacts=artifacts,
+            browser_diagnostics=browser_diagnostics,
+        )
+        if adapter_fast_rows:
+            return adapter_fast_rows
+        listing_rows = extract_listing_records(
+            html,
+            page_url,
+            normalized_surface,
+            max_records=max_records,
+            artifacts=artifacts,
+            selector_rules=selector_rules,
+            network_payloads=network_payloads,
+            record_dom_observed_selectors=record_dom_observed_selectors,
+        )
         backfill_listing_rows_from_network(
             listing_rows,
             network_payloads=network_payloads,
         )
-        adapter_rows = _finalize_listing_rows(adapter_rows)
         listing_rows = _finalize_listing_rows(listing_rows)
         network_rows = _finalize_listing_rows(network_rows)
         if (
@@ -253,6 +263,44 @@ def _finalize_listing_rows(rows: list[dict]) -> list[dict[str, Any]]:
         for row in rows
         if isinstance(row, dict)
     ]
+
+
+def _adapter_listing_rows_if_sufficient(
+    adapter_rows: list[dict[str, Any]],
+    *,
+    page_url: str,
+    surface: str,
+    max_records: int,
+    artifacts: dict[str, object] | None,
+    browser_diagnostics: dict[str, object] | None,
+) -> list[dict[str, Any]]:
+    min_items = max(1, int(crawler_runtime_settings.listing_min_items))
+    if len(adapter_rows) < min_items:
+        return []
+    candidate_rows = best_listing_candidate_set(
+        [("adapter", adapter_rows)],
+        page_url=page_url,
+        surface=surface,
+        max_records=max_records,
+        title_is_noise=is_title_noise,
+        url_is_structural=listing_url_is_structural,
+        detail_like_url=lambda candidate_url: listing_detail_like_path(
+            candidate_url,
+            is_job=str(surface or "").startswith("job_"),
+        ),
+    )[:max_records]
+    if len(candidate_rows) < min_items:
+        return []
+    gated_rows = apply_listing_integrity_gate(
+        candidate_rows,
+        page_url=page_url,
+        surface=surface,
+        artifacts=artifacts,
+    )
+    propagate_listing_integrity_to_diagnostics(artifacts, browser_diagnostics)
+    if len(gated_rows) < min_items:
+        return []
+    return gated_rows
 
 
 def _postprocess_detail_records(

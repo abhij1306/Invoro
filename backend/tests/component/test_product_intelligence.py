@@ -25,14 +25,18 @@ from app.services.product_intelligence.discovery import (
     google_native_blocked,
     google_native_session,
     parse_google_native_results,
+    parse_serpapi_immersive_results,
+    parse_serpapi_shopping_results,
     build_search_queries,
     classify_source_type,
     discover_candidates,
 )
+from app.services.product_intelligence import discovery as discovery_module
 from app.services.product_intelligence.matching import (
     build_search_result_intelligence,
     extract_product_snapshot,
     extract_search_result_snapshot,
+    is_private_label,
     normalize_brand,
     score_candidate,
 )
@@ -59,10 +63,41 @@ def test_product_intelligence_query_excludes_source_and_uses_identifier() -> Non
     )
 
     assert queries
-    assert "site:levi.com" in queries[0]
-    assert all("-site:belk.com" in query for query in queries)
+    assert "site:levi.com" in " ".join(queries)
+    assert all("belk.com" not in query for query in queries)
     assert any("levi's" in query for query in queries)
+    assert any("04511-2406" in query for query in queries)
     assert len(queries) <= 5
+
+
+@pytest.mark.component
+def test_product_intelligence_query_strips_repeated_brand_and_targets_brand_domain() -> None:
+    queries = build_search_queries(
+        {
+            "brand": "Wrangler�",
+            "title": "Wrangler� Relaxed Bootcut Jeans",
+            "url": "https://www.belk.com/p/wrangler--relaxed-bootcut-jeans-/3200040112342570.html",
+        },
+        source_domain_value="belk.com",
+    )
+
+    assert queries[0] == "wrangler relaxed bootcut jeans site:wrangler.com"
+    assert queries[1] == "wrangler relaxed bootcut jeans"
+    assert "wrangler wrangler" not in " ".join(queries)
+
+
+@pytest.mark.component
+def test_product_intelligence_query_targets_configured_belk_brand_domains() -> None:
+    queries = build_search_queries(
+        {
+            "brand": "Baggallini",
+            "title": "Modern Everywhere Bag",
+        },
+        source_domain_value="belk.com",
+    )
+
+    assert queries[0] == "baggallini modern everywhere bag site:baggallini.com"
+    assert all("belk.com" not in query for query in queries)
 
 
 @pytest.mark.component
@@ -78,8 +113,9 @@ def test_product_intelligence_query_keeps_brand_in_all_queries_when_brand_exists
 
     assert queries
     assert any("mamaearth" in query for query in queries)
-    assert all("-site:myntra.com" in query for query in queries)
-    assert queries[0] == 'mamaearth vit c daily glow cream 150g 20510856 -site:myntra.com'
+    assert all("myntra.com" not in query for query in queries)
+    assert queries[0] == 'mamaearth vit c daily glow cream 150g'
+    assert queries[1] == 'mamaearth vit c daily glow cream 150g 20510856'
     assert len(queries) <= 5
 
 
@@ -95,7 +131,8 @@ def test_product_intelligence_query_prefers_clean_brand_query_before_buy_for_agg
     )
 
     assert queries
-    assert queries[0] == 'asaya even evermore cream 50g 31145778 -site:flipkart.com'
+    assert queries[0] == 'asaya even evermore cream 50g'
+    assert queries[1] == 'asaya even evermore cream 50g 31145778'
     assert len(queries) <= 4
 
 
@@ -136,6 +173,33 @@ def test_product_intelligence_scorer_returns_breakdown() -> None:
     assert result["score"] >= 0.7
     assert result["reasons"]["brand_match"] is True
     assert result["reasons"]["identifier_match"] is True
+    assert result["reasons"]["sku_match"] is True
+    assert result["reasons"]["mpn_or_style_match"] is False
+    assert result["reasons"]["gtin_match"] is False
+
+
+@pytest.mark.component
+def test_product_intelligence_barcode_match_can_reach_high_confidence() -> None:
+    result = score_candidate(
+        source={
+            "title": "Levi's 511 Slim Fit Stretch Jeans",
+            "brand": "Levis",
+            "gtin": "00194500874886",
+            "price": 59.99,
+        },
+        candidate={
+            "title": "Levi's Men's 511 Slim Fit Stretch Jeans",
+            "brand": "Levi's",
+            "barcode": "00194500874886",
+            "price": 58.0,
+        },
+        source_type="brand_dtc",
+    )
+
+    assert result["score"] >= 0.85
+    assert result["label"] == "high"
+    assert result["reasons"]["gtin_match"] is True
+    assert result["reasons"]["identifier_match"] is True
 
 
 @pytest.mark.component
@@ -158,6 +222,76 @@ def test_product_intelligence_scorer_parses_european_price_formats() -> None:
     )
 
     assert result["reasons"]["price_band_match"] is True
+
+
+@pytest.mark.component
+def test_product_intelligence_scorer_uses_shopping_evidence_without_image() -> None:
+    intelligence = build_search_result_intelligence(
+        source={
+            "title": "Crown & Ivy Floral Midi Dress",
+            "brand": "Crown & Ivy",
+            "sku": "1804101ABC",
+            "price": 49.99,
+        },
+        candidate_payload={
+            "provider": "serpapi_shopping",
+            "title": "Crown & Ivy Floral Midi Dress",
+            "source": "Macy's",
+            "price": "$50.00",
+            "extracted_price": 50.0,
+            "product_id": "shopping-product-id",
+            "product_link": "https://www.google.com/search?ibp=oshop&q=dress",
+        },
+        candidate_url="https://www.macys.com/p/crown-ivy-floral-midi-dress/123.html",
+        candidate_domain="macys.com",
+        source_type="retailer",
+    )
+
+    reasons = intelligence["score_reasons"]
+    assert reasons["shopping_product_group"] is True
+    assert reasons["brand_match"] is True
+    assert reasons["price_band_match"] is True
+    assert "image" not in reasons
+
+
+@pytest.mark.component
+def test_product_intelligence_scorer_keeps_title_only_uncertain() -> None:
+    result = score_candidate(
+        source={"title": "Floral Midi Dress", "brand": "", "price": 49.99},
+        candidate={"title": "Floral Midi Dress", "brand": "", "price": None},
+        source_type="unknown",
+    )
+
+    assert result["score"] < 0.4
+    assert result["label"] == "uncertain"
+    assert result["reasons"]["identifier_match"] is False
+
+
+@pytest.mark.component
+def test_product_intelligence_uses_source_brand_when_candidate_title_mentions_it() -> None:
+    intelligence = build_search_result_intelligence(
+        source={
+            "title": "Wrangler Relaxed Bootcut Jeans",
+            "brand": "Wrangler�",
+            "price": 50.0,
+        },
+        candidate_payload={
+            "provider": "serpapi_immersive",
+            "title": "Wrangler Men's Relaxed Fit Bootcut Jeans - Light Indigo 42x30",
+            "source": "Target",
+            "price": "$29.99",
+            "product_id": "7366383223444725599",
+            "product_link": "https://www.google.com/search?ibp=oshop&q=wrangler",
+        },
+        candidate_url="https://www.target.com/p/wrangler-men-relaxed-fit-bootcut-jeans/-/A-94371457",
+        candidate_domain="target.com",
+        source_type="retailer",
+    )
+
+    assert intelligence["canonical_record"]["brand"] == "wrangler"
+    assert intelligence["canonical_record"]["normalized_brand"] == "wrangler"
+    assert intelligence["score_reasons"]["brand_match"] is True
+    assert intelligence["confidence_label"] == "low"
 
 
 @pytest.mark.component
@@ -220,6 +354,27 @@ def test_product_intelligence_query_uses_brand_and_currency_inferred_from_belk_s
     assert snapshot["currency"] == "USD"
     assert queries
     assert 'modern southern home' in queries[0]
+
+
+@pytest.mark.component
+def test_product_intelligence_infers_belk_brand_from_registry() -> None:
+    snapshot = extract_product_snapshot(
+        {
+            "url": "https://www.belk.com/p/crown-ivy-floral-midi-dress/1804101ABC.html",
+            "title": "Floral Midi Dress",
+            "product_id": "1804101ABC",
+        }
+    )
+
+    assert snapshot["brand"] == "Crown & Ivy"
+    assert snapshot["sku"] == "1804101ABC"
+    assert is_private_label(snapshot["brand"]) is True
+
+
+@pytest.mark.component
+def test_product_intelligence_excludes_belk_exclusive_aliases() -> None:
+    assert is_private_label("Ocean + Coast") is True
+    assert is_private_label("goodness & grace") is True
 
 
 @pytest.mark.component
@@ -963,6 +1118,185 @@ async def test_product_intelligence_discovery_preserves_serpapi_payload(monkeypa
     assert candidates[0].payload["snippet"] == "Official product page"
 
 
+@pytest.mark.component
+def test_product_intelligence_parses_serpapi_shopping_payload() -> None:
+    results = parse_serpapi_shopping_results(
+        {
+            "shopping_results": [
+                {
+                    "position": 1,
+                    "title": "Crown & Ivy Floral Midi Dress",
+                    "source": "Belk",
+                    "link": "https://www.example.com/p/crown-ivy-floral-midi-dress/123.html",
+                    "product_id": "987654321",
+                    "product_link": "https://www.google.com/search?ibp=oshop&q=dress",
+                    "serpapi_immersive_product_api": "https://serpapi.com/search.json?engine=google_immersive_product&page_token=abc",
+                    "price": "$49.99",
+                    "extracted_price": 49.99,
+                    "thumbnail": "https://example.com/image.jpg",
+                    "rating": 4.8,
+                    "reviews": 27,
+                    "delivery": "Free delivery",
+                }
+            ]
+        }
+    )
+
+    assert results[0].url == "https://www.example.com/p/crown-ivy-floral-midi-dress/123.html"
+    assert results[0].payload["provider"] == "serpapi_shopping"
+    assert results[0].payload["product_id"] == "987654321"
+    assert results[0].payload["extracted_price"] == 49.99
+    assert results[0].payload["thumbnail"] == "https://example.com/image.jpg"
+
+
+@pytest.mark.component
+def test_product_intelligence_parses_serpapi_immersive_store_links() -> None:
+    results = parse_serpapi_immersive_results(
+        {
+            "product_results": {
+                "title": "Levi's 511 Slim Fit Jeans",
+                "product_id": "immersive-product-id",
+                "description": "Slim fit jeans.",
+                "thumbnails": ["https://example.com/image.jpg"],
+                "stores": [
+                    {
+                        "name": "Levi's",
+                        "title": "Levi's 511 Slim Fit Jeans",
+                        "link": "https://www.levi.com/p/04511.html",
+                        "price": "$69.50",
+                        "extracted_price": 69.5,
+                        "shipping": "Free shipping",
+                    }
+                ],
+            }
+        },
+        parent={
+            "product_id": "shopping-product-id",
+            "product_link": "https://www.google.com/search?ibp=oshop&q=levi",
+        },
+        limit=5,
+    )
+
+    assert results[0].url == "https://www.levi.com/p/04511.html"
+    assert results[0].payload["provider"] == "serpapi_immersive"
+    assert results[0].payload["product_id"] == "immersive-product-id"
+    assert results[0].payload["product_link"] == "https://www.google.com/search?ibp=oshop&q=levi"
+    assert results[0].payload["extracted_price"] == 69.5
+
+
+@pytest.mark.asyncio
+@pytest.mark.component
+async def test_product_intelligence_serpapi_searches_shopping_then_organic(monkeypatch) -> None:
+    engines: list[str] = []
+    queries: list[str] = []
+
+    async def fake_engine(query: str, *, engine: str, limit: int | None = None) -> dict[str, object]:
+        del limit
+        engines.append(engine)
+        queries.append(query)
+        if engine == "google_shopping":
+            return {
+                "shopping_results": [
+                    {
+                        "position": 1,
+                        "title": "Levi's 511 Slim Fit Jeans",
+                        "source": "Levi's",
+                        "link": "https://www.levi.com/p/04511.html",
+                        "product_id": "shopping-product-id",
+                    }
+                ]
+            }
+        return {
+            "organic_results": [
+                {
+                    "position": 1,
+                    "title": "Levi's 511 Slim Fit Jeans",
+                    "link": "https://www.macys.com/p/04511.html",
+                    "snippet": "Retailer product page",
+                }
+            ]
+        }
+
+    monkeypatch.setattr(discovery_module, "_search_serpapi_engine", fake_engine)
+
+    results = await discovery_module._search_serpapi(
+        "levi 511 site:levi.com",
+        limit=5,
+    )
+
+    assert engines == ["google_shopping", "google"]
+    assert queries == [
+        "levi 511 site:levi.com",
+        "levi 511 site:levi.com",
+    ]
+    assert [result.payload["provider"] for result in results] == [
+        "serpapi_shopping",
+        "serpapi",
+    ]
+    assert results[0].payload["product_id"] == "shopping-product-id"
+
+
+@pytest.mark.asyncio
+@pytest.mark.component
+async def test_product_intelligence_serpapi_prefers_immersive_before_organic(monkeypatch) -> None:
+    async def fake_engine(query: str, *, engine: str, limit: int | None = None) -> dict[str, object]:
+        del query, limit
+        if engine == "google_shopping":
+            return {
+                "shopping_results": [
+                    {
+                        "position": 1,
+                        "title": "Wrangler Relaxed Bootcut Jeans",
+                        "source": "Wrangler",
+                        "product_id": "shopping-product-id",
+                        "serpapi_immersive_product_api": (
+                            "https://serpapi.com/search.json?engine=google_immersive_product&page_token=abc"
+                        ),
+                    }
+                ]
+            }
+        return {
+            "organic_results": [
+                {
+                    "position": 1,
+                    "title": "Wrangler Jeans Category",
+                    "link": "https://www.wrangler.com/collections/jeans",
+                    "snippet": "Shop jeans.",
+                }
+            ]
+        }
+
+    async def fake_immersive(page_token: str) -> dict[str, object]:
+        assert page_token == "abc"
+        return {
+            "product_results": {
+                "title": "Wrangler Relaxed Bootcut Jeans",
+                "product_id": "shopping-product-id",
+                "stores": [
+                    {
+                        "name": "Wrangler",
+                        "title": "Wrangler Relaxed Bootcut Jeans",
+                        "link": "https://www.wrangler.com/shop/relaxed-bootcut-jeans.html",
+                    }
+                ],
+            }
+        }
+
+    monkeypatch.setattr(discovery_module, "_search_serpapi_engine", fake_engine)
+    monkeypatch.setattr(discovery_module, "_search_serpapi_immersive", fake_immersive)
+
+    results = await discovery_module._search_serpapi(
+        "wrangler relaxed bootcut jeans site:wrangler.com",
+        limit=5,
+    )
+
+    assert [result.payload["provider"] for result in results] == [
+        "serpapi_immersive",
+        "serpapi",
+    ]
+    assert results[0].url == "https://www.wrangler.com/shop/relaxed-bootcut-jeans.html"
+
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_product_intelligence_discovery_passes_pool_limit_to_search(monkeypatch) -> None:
@@ -1216,6 +1550,86 @@ async def test_product_intelligence_discovery_keeps_matching_slug_without_detail
 
     assert [candidate.url for candidate in candidates] == [
         "https://www.levi.com/men/jeans/511-slim-fit-stretch-denim"
+    ]
+
+
+@pytest.mark.asyncio
+@pytest.mark.component
+async def test_product_intelligence_discovery_allows_marketplace_item_ids_when_title_matches() -> None:
+    async def fake_run_query(query: str, limit: int) -> list[SearchResult]:
+        del query, limit
+        return [
+            SearchResult(
+                url="https://www.ebay.com/itm/188098451561",
+                payload={
+                    "provider": "serpapi_immersive",
+                    "title": "Izod Men's Comfort Stretch Blue Denim Jeans",
+                    "source": "eBay",
+                    "product_id": "3501016343738340012",
+                },
+            )
+        ]
+
+    candidates = await discover_candidates(
+        {
+            "brand": "IZOD",
+            "title": "Comfort Stretch Blue Denim Jeans",
+            "sku": "3203394I39JN16",
+            "url": "https://www.belk.com/p/izod-jeans/1.html",
+        },
+        source_domain_value="belk.com",
+        provider="serpapi",
+        allowed_domains=[],
+        excluded_domains=[],
+        max_candidates=1,
+        run_query=fake_run_query,
+    )
+
+    assert [candidate.url for candidate in candidates] == [
+        "https://www.ebay.com/itm/188098451561"
+    ]
+
+
+@pytest.mark.asyncio
+@pytest.mark.component
+async def test_product_intelligence_discovery_rejects_editorial_brand_pages() -> None:
+    async def fake_run_query(query: str, limit: int) -> list[SearchResult]:
+        del query, limit
+        return [
+            SearchResult(
+                url="https://eu.wrangler.com/uk-en/how%20to%20style%20bootcut%20jeans/how-to-wear-bootcut-jeans.html",
+                payload={
+                    "provider": "serpapi",
+                    "title": "How to Wear Bootcut Jeans",
+                    "snippet": "A styling guide from Wrangler.",
+                },
+            ),
+            SearchResult(
+                url="https://www.wrangler.com/browse/relaxed-fit-bootcut-jeans.html",
+                payload={
+                    "provider": "serpapi",
+                    "title": "Relaxed Fit Bootcut Jeans",
+                    "snippet": "Wrangler product page.",
+                },
+            ),
+        ]
+
+    candidates = await discover_candidates(
+        {
+            "brand": "Wrangler�",
+            "title": "Wrangler� Relaxed Bootcut Jeans",
+            "url": "https://www.belk.com/p/wrangler--relaxed-bootcut-jeans-/3200040112342570.html",
+        },
+        source_domain_value="belk.com",
+        provider="serpapi",
+        allowed_domains=[],
+        excluded_domains=[],
+        max_candidates=1,
+        run_query=fake_run_query,
+    )
+
+    assert [candidate.url for candidate in candidates] == [
+        "https://www.wrangler.com/browse/relaxed-fit-bootcut-jeans.html"
     ]
 
 
@@ -1480,9 +1894,75 @@ async def test_product_intelligence_discovery_prefers_row_source_url_for_query_e
     )
 
     assert seen_queries
-    assert all("-site:myntra.com" in query for query in seen_queries)
-    assert all("-site:belk.com" not in query for query in seen_queries)
+    assert all("myntra.com" not in query for query in seen_queries)
+    assert all("belk.com" not in query for query in seen_queries)
     assert response["candidates"][0]["source_url"] == "https://www.myntra.com/shoes/example-item"
+
+
+@pytest.mark.asyncio
+@pytest.mark.component
+async def test_product_intelligence_discovery_uses_product_url_from_listing_record(
+    db_session: AsyncSession,
+    test_user,
+    monkeypatch,
+    create_test_run,
+) -> None:
+    run = await create_test_run(
+        url="https://www.belk.com/men/mens-clothing/jeans/",
+        surface="ecommerce_listing",
+    )
+    record = CrawlRecord(
+        run_id=run.id,
+        source_url="https://www.belk.com/men/mens-clothing/jeans/",
+        data={
+            "brand": "Wrangler�",
+            "title": "Wrangler� Relaxed Bootcut Jeans",
+            "url": "https://www.belk.com/p/wrangler--relaxed-bootcut-jeans-/3200040112342570.html",
+            "price": "39.95",
+        },
+        raw_data={},
+        discovered_data={},
+        source_trace={},
+    )
+    db_session.add(record)
+    await db_session.commit()
+    await db_session.refresh(record)
+
+    seen_queries: list[str] = []
+
+    async def fake_search_results(provider: str, query: str, *, limit: int | None = None) -> list[SearchResult]:
+        del provider, limit
+        seen_queries.append(query)
+        return [
+            SearchResult(
+                url="https://www.wrangler.com/shop/relaxed-bootcut-jeans.html",
+                payload={"provider": "serpapi", "title": "Wrangler Relaxed Bootcut Jeans"},
+            )
+        ]
+
+    monkeypatch.setattr(
+        "app.services.product_intelligence.discovery._search_results",
+        fake_search_results,
+    )
+
+    response = await discover_product_intelligence_candidates(
+        db_session,
+        user=test_user,
+        payload={
+            "source_record_ids": [record.id],
+            "options": {
+                "max_source_products": 1,
+                "max_candidates_per_product": 1,
+                "search_provider": "serpapi",
+            },
+        },
+    )
+
+    assert response["candidates"][0]["source_url"] == (
+        "https://www.belk.com/p/wrangler--relaxed-bootcut-jeans-/3200040112342570.html"
+    )
+    assert response["candidates"][0]["source_price"] == 39.95
+    assert seen_queries[0] == "wrangler relaxed bootcut jeans site:wrangler.com"
 
 
 @pytest.mark.asyncio
@@ -1507,7 +1987,7 @@ async def test_product_intelligence_discovery_reuses_one_query_runner_for_multip
                 return [
                     SearchResult(
                         url=f"https://www.levi.com/p/{token}.html",
-                        payload={"provider": "google_native", "title": f"Result {token}", "price": "$55.00"},
+                        payload={"provider": "google_native", "title": f"Product {token} 511 Jeans", "price": "$55.00"},
                     )
                 ]
 

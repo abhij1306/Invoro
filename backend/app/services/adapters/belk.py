@@ -12,6 +12,7 @@ from app.services.config.extraction_rules import (
     BELK_BRAND_SELECTORS,
     BELK_CARD_TITLE_ATTRS,
     BELK_IMAGE_SELECTORS,
+    BELK_PRODUCT_BARCODE_KEYS,
     BELK_PRICE_SELECTORS,
     BELK_PRODUCT_BRAND_KEYS,
     BELK_PRODUCT_CARD_SELECTORS,
@@ -178,6 +179,12 @@ def _record_from_payload(product: dict[str, Any], *, page_url: str) -> dict[str,
     )
     image = _first_payload_field(product, field_name="image_url", page_url=page_url, keys=BELK_PRODUCT_IMAGE_KEYS)
     url = _first_payload_field(product, field_name="url", page_url=page_url, keys=BELK_PRODUCT_URL_KEYS)
+    barcode = _first_nested_payload_field(
+        product,
+        field_name="barcode",
+        page_url=page_url,
+        keys=BELK_PRODUCT_BARCODE_KEYS,
+    )
     if brand in (None, "", [], {}):
         brand = _infer_belk_brand_from_url(url=str(url or ""), title=title)
     currency = coerce_field_value("currency", product, page_url)
@@ -197,6 +204,8 @@ def _record_from_payload(product: dict[str, Any], *, page_url: str) -> dict[str,
             "original_price": normalize_price(original_price_value, interpret_integral_as_cents=False),
             "currency": currency,
             "image_url": image,
+            "sku_upc": barcode,
+            "barcode": barcode,
             "product_id": _first_payload_field(product, field_name="product_id", page_url=page_url, keys=BELK_PRODUCT_ID_KEYS),
             "url": url,
         }
@@ -290,6 +299,38 @@ def _first_payload_field(
         value = coerce_field_value(field_name, payload.get(key), page_url)
         if value:
             return str(value)
+    return None
+
+
+def _first_nested_payload_field(
+    payload: dict[str, Any],
+    *,
+    field_name: str,
+    page_url: str,
+    keys: tuple[str, ...],
+) -> str | None:
+    direct = _first_payload_field(payload, field_name=field_name, page_url=page_url, keys=keys)
+    if direct:
+        return direct
+    normalized_keys = {str(key).casefold() for key in keys}
+    stack: list[tuple[object, int]] = [(payload, 0)]
+    while stack:
+        node, depth = stack.pop()
+        if depth > 5:
+            continue
+        if isinstance(node, dict):
+            for key, value in node.items():
+                if str(key).casefold() in normalized_keys:
+                    coerced = coerce_field_value(field_name, value, page_url)
+                    if coerced:
+                        return str(coerced)
+                if isinstance(value, (dict, list)):
+                    stack.append((value, depth + 1))
+            continue
+        if isinstance(node, list):
+            for item in node:
+                if isinstance(item, (dict, list)):
+                    stack.append((item, depth + 1))
     return None
 
 

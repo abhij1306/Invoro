@@ -972,7 +972,7 @@ export function CrawlRunScreen({ runId }: Readonly<CrawlRunScreenProps>) {
                       {batchFromResultsLabel}
                     </Button>
                   ) : null}
-                  {!designSystemRun && listingRun && productIntelligenceRecords.length ? (
+                  {!designSystemRun && (listingRun || ecommerceDetailRun) && productIntelligenceRecords.length ? (
                     <Button
                       variant="neutral"
                       type="button"

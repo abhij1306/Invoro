@@ -157,14 +157,15 @@ export function DiscoveryTableLoading({ provider }: Readonly<{ provider: string 
           {providerLabel} is searching product candidates
         </div>
         <div className="text-muted mt-1 max-w-[520px] text-xs leading-5">
-          Querying organic results, removing blocked/source domains, classifying domains, and
-          scoring each result from title, brand, identifiers, price, and source authority.
+          Querying Shopping, store links, and organic fallback, removing blocked/source domains,
+          classifying domains, and scoring each result from title, brand, identifiers, price, and source
+          authority.
         </div>
       </div>
       <div className="grid w-full max-w-[560px] gap-2 text-left sm:grid-cols-3">
-        <DiscoveryLoadingStep label="Search" detail="Provider request active" />
+        <DiscoveryLoadingStep label="Search" detail="Shopping-first request active" />
         <DiscoveryLoadingStep label="Filter" detail="Source domain excluded" />
-        <DiscoveryLoadingStep label="Rank" detail="Brand DTC first" />
+        <DiscoveryLoadingStep label="Rank" detail="Evidence first" />
       </div>
     </div>
   );
@@ -187,7 +188,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function searchProvider(value: unknown): ProductIntelligenceOptions['search_provider'] {
-  return value === 'google_native' || value === 'serpapi' ? value : 'google_native';
+  return value === 'google_native' || value === 'serpapi' ? value : 'serpapi';
 }
 
 function clampInt(value: unknown, min: number, max: number, fallback: number) {

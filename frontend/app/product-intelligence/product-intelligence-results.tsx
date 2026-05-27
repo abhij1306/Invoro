@@ -21,6 +21,9 @@ export function ProductIntelligenceResults({ controller }: ProductIntelligenceRe
       <div className="space-y-4">
         <section className="border-border bg-panel shadow-card overflow-hidden rounded-[var(--radius-xl)] border">
           <ResultsToolbar controller={controller} />
+          {controller.discovery?.candidates.length ? (
+            <ResultsSummary controller={controller} />
+          ) : null}
           <ResultsBody controller={controller} />
         </section>
         {controller.uniqueSelectedUrls.length > 0 ? (
@@ -55,6 +58,26 @@ function ResultsToolbar({ controller }: ProductIntelligenceResultsProps) {
       {controller.discovery?.candidates.length ? <ResultsFilters controller={controller} /> : null}
       <ToolbarActions controller={controller} />
     </header>
+  );
+}
+
+function ResultsSummary({ controller }: ProductIntelligenceResultsProps) {
+  return (
+    <div className="border-divider bg-background-alt/60 grid gap-3 border-b px-4 py-3 sm:grid-cols-4">
+      <SummaryMetric label="Sources" value={controller.discovery?.source_count ?? 0} />
+      <SummaryMetric label="Candidates" value={controller.discovery?.candidate_count ?? 0} />
+      <SummaryMetric label="High confidence" value={controller.confidenceDistribution.high} />
+      <SummaryMetric label="Selected URLs" value={controller.uniqueSelectedUrls.length} />
+    </div>
+  );
+}
+
+function SummaryMetric({ label, value }: { label: string; value: number }) {
+  return (
+    <div>
+      <div className="text-muted type-caption-mono uppercase">{label}</div>
+      <div className="text-foreground type-heading mt-0.5 text-lg font-semibold">{value}</div>
+    </div>
   );
 }
 

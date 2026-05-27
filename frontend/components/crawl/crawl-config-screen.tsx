@@ -2,7 +2,7 @@
 import { Check, Globe, Info, Plus, Shield, SlidersHorizontal, Sparkles } from 'lucide-react';
 import type { Route } from 'next';
 import { useRouter } from 'next/navigation';
-import { startTransition, useEffect, useMemo, useRef, useState } from 'react';
+import { startTransition, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '../../lib/utils';
 import { InlineAlert, PageHeader, SectionHeader, TabBar } from '../ui/patterns';
 import { Badge, Button, Dropdown, Card, Input, Textarea, Toggle, Tooltip } from '../ui/primitives';
@@ -146,10 +146,8 @@ export function CrawlConfigScreen({
   const profileDirtyRef = useRef(false);
   const lastProfileKeyRef = useRef('');
   const lastDomainMemoryKeyRef = useRef('');
-
   const modePickerEnabled = crawlDomain === 'commerce' || crawlDomain === 'jobs';
-  const effectivePdpMode = modePickerEnabled ? pdpMode : 'single';
-  const activeMode = modePickerEnabled && crawlTab === 'category' ? categoryMode : effectivePdpMode;
+  const activeMode = crawlTab === 'category' ? categoryMode : pdpMode;
   const surface = deriveSurface(crawlDomain, crawlTab);
   const autoSurfaceResolution = surface === 'auto' ? resolveAutoSurface(targetUrl, crawlTab) : null;
   const effectiveSurface = autoSurfaceResolution?.surface ?? surface;
@@ -173,7 +171,6 @@ export function CrawlConfigScreen({
   useEffect(() => {
     profileLookupTargetUrlRef.current = profileLookupKey ? targetUrl.trim() : '';
   }, [profileLookupKey, targetUrl]);
-
   useEffect(() => {
     if (bulkPrefillRouteSyncGuardRef.current) {
       if (requestedTab === 'pdp') {
@@ -189,22 +186,15 @@ export function CrawlConfigScreen({
     setCategoryMode((current) => (current === nextCategoryMode ? current : nextCategoryMode));
     setPdpMode((current) => (current === nextPdpMode ? current : nextPdpMode));
   }, [requestedCategoryMode, requestedPdpMode, requestedTab]);
-
   useEffect(() => {
     if (domainTabs.some((tab) => tab.value === crawlTab)) {
       return;
     }
     setCrawlTab(domainTabs[0]?.value ?? 'category');
   }, [crawlDomain, crawlTab, domainTabs]);
-
-  useEffect(() => {
-    if (modePickerEnabled) return;
-    setPdpMode((current) => (current === 'single' ? current : 'single'));
-  }, [modePickerEnabled]);
-
   useEffect(() => {
     const routeMode = crawlTab === 'category' ? requestedCategoryMode : requestedPdpMode;
-    if (requestedTab === crawlTab && routeMode === activeMode) {
+    if (bulkPrefillRouteSyncGuardRef.current || (requestedTab === crawlTab && routeMode === activeMode)) {
       return;
     }
     const nextUrl = `/crawl?module=${crawlTab}&mode=${activeMode}`;
@@ -217,6 +207,12 @@ export function CrawlConfigScreen({
   }, [activeMode, crawlTab, requestedCategoryMode, requestedPdpMode, requestedTab]);
 
   useEffect(() => {
+    if (bulkPrefillRouteSyncGuardRef.current && crawlTab === 'pdp' && pdpMode === 'batch') {
+      bulkPrefillRouteSyncGuardRef.current = false;
+    }
+  }, [crawlTab, pdpMode]);
+
+  useLayoutEffect(() => {
     const stored = window.sessionStorage.getItem(STORAGE_KEYS.BULK_PREFILL);
     if (!stored) {
       return;
@@ -239,13 +235,17 @@ export function CrawlConfigScreen({
         if (Array.isArray(parsed.additional_fields)) {
           setAdditionalFields(uniqueRequestedFields(parsed.additional_fields));
         }
-        router.replace('/crawl?module=pdp&mode=batch' as Route);
+        const nextUrl = '/crawl?module=pdp&mode=batch';
+        const currentUrl = `${window.location.pathname}${window.location.search}`;
+        if (currentUrl !== nextUrl) {
+          window.history.replaceState(null, '', nextUrl);
+        }
       }
     } catch {
     } finally {
       window.sessionStorage.removeItem(STORAGE_KEYS.BULK_PREFILL);
     }
-  }, [router, setValue]);
+  }, [setValue]);
 
   useEffect(() => {
     if (lastProfileKeyRef.current !== profileLookupKey) {
@@ -352,7 +352,7 @@ export function CrawlConfigScreen({
     () => ({
       module: crawlTab,
       domain: crawlDomain,
-      mode: crawlTab === 'category' ? categoryMode : effectivePdpMode,
+      mode: crawlTab === 'category' ? categoryMode : pdpMode,
       target_url: targetUrl,
       bulk_urls: bulkUrls,
       sitemap_domain: categoryMode === 'sitemap' ? sitemapDomain.trim() : undefined,
@@ -380,7 +380,6 @@ export function CrawlConfigScreen({
       crawlTab,
       csvFile,
       maxRecords,
-      effectivePdpMode,
       proxyEnabled,
       proxyInput,
       respectRobotsTxt,
@@ -389,6 +388,7 @@ export function CrawlConfigScreen({
       sitemapMaxUrls,
       smartExtraction,
       targetUrl,
+      pdpMode,
     ],
   );
 
@@ -696,7 +696,6 @@ export function CrawlConfigScreen({
       setSavingDomainMemory(false);
     }
   }
-
   const hasTarget =
     crawlTab === 'category' && categoryMode === 'sitemap'
       ? sitemapDomain.trim().length > 0
@@ -716,7 +715,6 @@ export function CrawlConfigScreen({
         title="Crawl Studio"
         description="Configure and launch crawls across product listings and detail pages."
       />
-
       <form
         className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_380px] xl:items-stretch"
         onSubmit={(event) => void handleSubmit(startCrawl)(event)}
@@ -1244,7 +1242,6 @@ export function CrawlConfigScreen({
                   />
                 </div>
               </section>
-
               <section className={cn(ADVANCED_COLUMN_CLASS, 'xl:px-6')}>
                 <div className={ADVANCED_SECTION_TITLE_CLASS}>
                   <h3>Limits &amp; Locales</h3>
@@ -1379,7 +1376,6 @@ export function CrawlConfigScreen({
                   </div>
                 </div>
               </section>
-
               <section className={cn(ADVANCED_COLUMN_CLASS, 'xl:pl-6')}>
                 <div className={ADVANCED_SECTION_TITLE_CLASS}>
                   <h3>Output &amp; Diagnostics</h3>
