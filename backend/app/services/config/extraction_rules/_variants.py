@@ -78,6 +78,7 @@ VARIANT_OPTION_VALUE_UI_NOISE_PHRASES = (
     "sign in",
     "link your member number",
     "lifetime of benefits",
+    "attribute details",
     "more",
     "necessary",
     "functional",
@@ -262,6 +263,7 @@ SCOPE_SCORE_PRODUCT_CONTEXT_WEIGHT = 1000
 MAX_SELECTOR_MATCHES = 12
 VARIANT_CHOICE_OPTION_SELECTOR = (
     "option, [role='radio'], [role='option'], button, a[href], "
+    "a[class*='swatch' i][title], a[class*='swatch' i][aria-label], "
     "input[type='radio'], input[type='checkbox']"
 )
 VARIANT_CHOICE_OPTION_LIMIT = 80

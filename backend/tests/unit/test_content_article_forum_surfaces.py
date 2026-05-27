@@ -444,6 +444,44 @@ def test_detail_spec_tables_use_field_value_shape() -> None:
 
 
 @pytest.mark.unit
+def test_detail_spec_tables_dedupe_identical_mobile_desktop_copies() -> None:
+    rows = extract_records(
+        """
+        <html><body><main>
+          <h1>Wrangler Jeans</h1>
+          <h2>Size Chart</h2>
+          <table>
+            <tr><th>Alpha</th><th>Size</th><th>Waist</th></tr>
+            <tr><td>XS</td><td>28</td><td>28-29</td></tr>
+            <tr><td>S</td><td>30</td><td>30-31</td></tr>
+          </table>
+          <h2>Size Chart</h2>
+          <table>
+            <tr><th>Alpha</th><th>Size</th><th>Waist</th></tr>
+            <tr><td>XS</td><td>28</td><td>28-29</td></tr>
+            <tr><td>S</td><td>30</td><td>30-31</td></tr>
+          </table>
+        </main></body></html>
+        """,
+        "https://example.com/products/wrangler-jeans",
+        "ecommerce_detail",
+        max_records=5,
+    )
+
+    assert len(rows) == 1
+    assert rows[0]["tables"] == [
+        {
+            "context": "Size Chart",
+            "headers": ["alpha", "size", "waist"],
+            "rows": [
+                {"alpha": "XS", "size": "28", "waist": "28-29"},
+                {"alpha": "S", "size": "30", "waist": "30-31"},
+            ],
+        }
+    ]
+
+
+@pytest.mark.unit
 def test_article_listing_requires_article_signal() -> None:
     rows = extract_records(
         """

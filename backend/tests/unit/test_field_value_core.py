@@ -966,6 +966,14 @@ def test_coerce_color_keeps_valid_color_names() -> None:
 
 
 @pytest.mark.unit
+def test_coerce_color_strips_color_details_suffix() -> None:
+    assert (
+        coerce_field_value("color", "Huxley Color Details", "https://example.com/p")
+        == "Huxley"
+    )
+
+
+@pytest.mark.unit
 def test_coerce_color_rejects_tracking_pixel_classes() -> None:
     assert coerce_field_value("color", "_clck", "https://example.com/p") is None
     assert coerce_field_value("color", "_fbp", "https://example.com/p") is None

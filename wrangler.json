@@ -1,0 +1,1041 @@
+[
+  {
+    "source_url": "https://www.wrangler.com/shop/wrangler-mens-five-star-premium-flex-relaxed-fit-bootcut-jean-98FRZJ.html?dwvar_98FRZJ_color=112316407",
+    "url": "https://www.wrangler.com/shop/wrangler-mens-five-star-premium-flex-relaxed-fit-bootcut-jean-in-huxley-112316407.html",
+    "title": "Wrangler\u00ae Men's Five Star Premium Flex Relaxed Fit Bootcut Jean in Huxley",
+    "brand": "Wrangler",
+    "sku": "112316407",
+    "product_id": "112316407",
+    "price": "24.99",
+    "currency": "USD",
+    "availability": "in_stock",
+    "description": "DENIM STYLE WITH STRETCH.Great for everyday wear, this Five Star Premium Flex Fit Jean with a relaxed fit and bootcut leg opening conveys a casual sense of style. It features flex fabric for a comfortable and easy wear. The relaxed seat and thigh allows these jeans to naturally sit lower on the waist providing a comfortable fit. It's a versatile favorite and pairs well with casual boots.",
+    "category": "MEN > JEANS",
+    "gender": "men",
+    "color": "Huxley",
+    "materials": "78% Cotton, 20% Recycled Cotton, 2% Spandex; 11.25 oz.",
+    "care": "Wash before wearing, machine wash warm with like colors, only non-chlorine bleach when needed, tumble dry low.",
+    "variant_count": 120,
+    "image_url": "https://images.wrangler.com/is/image/Wrangler/112316407-HERO?$SFCC-SMALL$",
+    "additional_images": [
+      "https://images.wrangler.com/is/image/Wrangler/112316407-HERO?$PDP24-LARGE$",
+      "https://images.wrangler.com/is/image/Wrangler/112316407-HERO?$PDP24-XLARGE$",
+      "https://images.wrangler.com/is/image/Wrangler/112316407-ALT1?$PDP24-XLARGE$",
+      "https://images.wrangler.com/is/image/Wrangler/112316407-ALT2?$PDP24-XLARGE$",
+      "https://images.wrangler.com/is/image/Wrangler/112316407-ALT3?$PDP24-XLARGE$",
+      "https://images.wrangler.com/is/image/Wrangler/112316407-ALT4?$PDP24-XLARGE$",
+      "https://images.wrangler.com/is/image/Wrangler/112316407-ALT5?$PDP24-XLARGE$",
+      "https://images.wrangler.com/is/image/Wrangler/112316407-ALT6?$PDP24-XLARGE$",
+      "https://images.wrangler.com/is/image/Wrangler/112316407-ALT7?$PDP24-XLARGE$",
+      "https://images.wrangler.com/is/image/Wrangler/112316407-HERO?$PDP24-XXLARGE$&fit=crop",
+      "https://images.wrangler.com/is/image/Wrangler/112316407-ALT1?$PDP24-XXLARGE$&fit=crop",
+      "https://images.wrangler.com/is/image/Wrangler/112316407-ALT2?$PDP24-XXLARGE$&fit=crop",
+      "https://images.wrangler.com/is/image/Wrangler/112316407-ALT3?$PDP24-XXLARGE$&fit=crop"
+    ],
+    "_field_sources": {
+      "title": [
+        "json_ld",
+        "opengraph",
+        "dom_h1",
+        "dom_selector"
+      ],
+      "image_url": [
+        "json_ld",
+        "opengraph",
+        "dom_images"
+      ],
+      "sku": [
+        "json_ld"
+      ],
+      "description": [
+        "json_ld",
+        "opengraph"
+      ],
+      "brand": [
+        "json_ld"
+      ],
+      "url": [
+        "json_ld",
+        "opengraph"
+      ],
+      "availability": [
+        "json_ld"
+      ],
+      "price": [
+        "json_ld",
+        "dom_selector"
+      ],
+      "currency": [
+        "json_ld"
+      ],
+      "category": [
+        "json_ld_breadcrumb",
+        "dom_breadcrumb"
+      ],
+      "gender": [
+        "json_ld"
+      ],
+      "color": [
+        "dom_selector"
+      ],
+      "size": [
+        "dom_selector"
+      ],
+      "product_id": [
+        "dom_selector"
+      ],
+      "materials": [
+        "dom_selector"
+      ],
+      "care": [
+        "dom_selector"
+      ],
+      "additional_images": [
+        "dom_images"
+      ],
+      "variant_count": [
+        "dom_selector"
+      ],
+      "original_price": [
+        "json_ld"
+      ]
+    },
+    "_source": "json_ld",
+    "_confidence": {
+      "score": 0.9,
+      "level": "high",
+      "present_fields": [
+        "title",
+        "price",
+        "brand",
+        "image_url",
+        "description",
+        "availability",
+        "variants"
+      ],
+      "missing_fields": [],
+      "requested_fields_total": 3,
+      "requested_fields_found_best": 3,
+      "penalties": [],
+      "source_tier": {
+        "dominant": "structured",
+        "coverage": {
+          "structured": 1.0
+        },
+        "reason": "coverage is primarily from JS state or structured metadata"
+      }
+    },
+    "_extraction_tiers": {
+      "completed": [
+        "authoritative",
+        "structured_data",
+        "js_state",
+        "dom"
+      ],
+      "current": "dom",
+      "early_exit": null
+    },
+    "_self_heal": {
+      "enabled": false,
+      "triggered": false,
+      "threshold": 0.55
+    },
+    "tables": [
+      {
+        "context": "Table with sizing measurements for sizing for Alpha Size, Numeric Size, Waist, and Hips",
+        "headers": [
+          "alpha",
+          "size",
+          "waist",
+          "hips"
+        ],
+        "rows": [
+          {
+            "alpha": "XXS",
+            "size": "27",
+            "waist": "27-28",
+            "hips": "33-34"
+          },
+          {
+            "alpha": "XS",
+            "size": "28",
+            "waist": "28-29",
+            "hips": "34-35"
+          },
+          {
+            "alpha": "29",
+            "size": "29-30",
+            "waist": "35-36"
+          },
+          {
+            "alpha": "S",
+            "size": "30",
+            "waist": "30-31",
+            "hips": "36-37"
+          },
+          {
+            "alpha": "31",
+            "size": "31-32",
+            "waist": "37-38"
+          },
+          {
+            "alpha": "M",
+            "size": "32",
+            "waist": "32-33",
+            "hips": "38-39"
+          },
+          {
+            "alpha": "33",
+            "size": "33-34",
+            "waist": "39-40"
+          },
+          {
+            "alpha": "34",
+            "size": "34-35",
+            "waist": "40-41"
+          },
+          {
+            "alpha": "35",
+            "size": "35-36",
+            "waist": "41-42"
+          },
+          {
+            "alpha": "L",
+            "size": "36",
+            "waist": "36-37",
+            "hips": "42-43"
+          },
+          {
+            "alpha": "37",
+            "size": "37-38",
+            "waist": "43-44"
+          },
+          {
+            "alpha": "38",
+            "size": "38-39",
+            "waist": "44-45"
+          },
+          {
+            "alpha": "39",
+            "size": "39-40",
+            "waist": "45-46"
+          },
+          {
+            "alpha": "40",
+            "size": "40-41",
+            "waist": "46-47"
+          },
+          {
+            "alpha": "XL",
+            "size": "42",
+            "waist": "42-43",
+            "hips": "47-48"
+          },
+          {
+            "alpha": "44",
+            "size": "44-45",
+            "waist": "48-49"
+          },
+          {
+            "alpha": "46",
+            "size": "45-46",
+            "waist": "49-50"
+          },
+          {
+            "alpha": "2X",
+            "size": "48",
+            "waist": "47-48",
+            "hips": "50-51"
+          },
+          {
+            "alpha": "50",
+            "size": "49-50",
+            "waist": "51-52"
+          },
+          {
+            "alpha": "3X",
+            "size": "52",
+            "waist": "51-52",
+            "hips": "52-53"
+          },
+          {
+            "alpha": "54",
+            "size": "53-54",
+            "waist": "53-54"
+          },
+          {
+            "alpha": "56",
+            "size": "55-56",
+            "waist": "54-55"
+          },
+          {
+            "alpha": "4X",
+            "size": "58",
+            "waist": "57-58",
+            "hips": "55-56"
+          },
+          {
+            "alpha": "60",
+            "size": "59-60",
+            "waist": "56-57"
+          },
+          {
+            "alpha": "62",
+            "size": "61-62",
+            "waist": "57-58"
+          },
+          {
+            "alpha": "64",
+            "size": "63-64",
+            "waist": "58-59"
+          },
+          {
+            "alpha": "66",
+            "size": "65-66",
+            "waist": "59-60"
+          },
+          {
+            "alpha": "68",
+            "size": "67-68",
+            "waist": "60-61"
+          }
+        ]
+      }
+    ],
+    "variants": [
+      {
+        "color": "Huxley",
+        "size": "28",
+        "availability": "out_of_stock",
+        "stock_quantity": 0,
+        "length": "30"
+      },
+      {
+        "color": "Huxley",
+        "size": "28",
+        "availability": "out_of_stock",
+        "stock_quantity": 0,
+        "length": "32"
+      },
+      {
+        "color": "Huxley",
+        "size": "28",
+        "availability": "out_of_stock",
+        "stock_quantity": 0,
+        "length": "34"
+      },
+      {
+        "color": "Jennings",
+        "size": "28",
+        "availability": "out_of_stock",
+        "stock_quantity": 0,
+        "length": "30"
+      },
+      {
+        "color": "Jennings",
+        "size": "28",
+        "availability": "out_of_stock",
+        "stock_quantity": 0,
+        "length": "32"
+      },
+      {
+        "color": "Jennings",
+        "size": "28",
+        "availability": "out_of_stock",
+        "stock_quantity": 0,
+        "length": "34"
+      },
+      {
+        "color": "Livingston",
+        "size": "28",
+        "availability": "out_of_stock",
+        "stock_quantity": 0,
+        "length": "30"
+      },
+      {
+        "color": "Livingston",
+        "size": "28",
+        "availability": "out_of_stock",
+        "stock_quantity": 0,
+        "length": "32"
+      },
+      {
+        "color": "Livingston",
+        "size": "28",
+        "availability": "out_of_stock",
+        "stock_quantity": 0,
+        "length": "34"
+      },
+      {
+        "color": "Summit",
+        "size": "28",
+        "availability": "out_of_stock",
+        "stock_quantity": 0,
+        "length": "30"
+      },
+      {
+        "color": "Summit",
+        "size": "28",
+        "availability": "out_of_stock",
+        "stock_quantity": 0,
+        "length": "32"
+      },
+      {
+        "color": "Summit",
+        "size": "28",
+        "availability": "out_of_stock",
+        "stock_quantity": 0,
+        "length": "34"
+      },
+      {
+        "color": "Huxley",
+        "size": "29",
+        "availability": "in_stock",
+        "length": "30"
+      },
+      {
+        "color": "Huxley",
+        "size": "29",
+        "availability": "in_stock",
+        "length": "32"
+      },
+      {
+        "color": "Huxley",
+        "size": "29",
+        "availability": "in_stock",
+        "length": "34"
+      },
+      {
+        "color": "Jennings",
+        "size": "29",
+        "availability": "in_stock",
+        "length": "30"
+      },
+      {
+        "color": "Jennings",
+        "size": "29",
+        "availability": "in_stock",
+        "length": "32"
+      },
+      {
+        "color": "Jennings",
+        "size": "29",
+        "availability": "in_stock",
+        "length": "34"
+      },
+      {
+        "color": "Livingston",
+        "size": "29",
+        "availability": "in_stock",
+        "length": "30"
+      },
+      {
+        "color": "Livingston",
+        "size": "29",
+        "availability": "in_stock",
+        "length": "32"
+      },
+      {
+        "color": "Livingston",
+        "size": "29",
+        "availability": "in_stock",
+        "length": "34"
+      },
+      {
+        "color": "Summit",
+        "size": "29",
+        "availability": "in_stock",
+        "length": "30"
+      },
+      {
+        "color": "Summit",
+        "size": "29",
+        "availability": "in_stock",
+        "length": "32"
+      },
+      {
+        "color": "Summit",
+        "size": "29",
+        "availability": "in_stock",
+        "length": "34"
+      },
+      {
+        "color": "Huxley",
+        "size": "30",
+        "availability": "in_stock",
+        "length": "30"
+      },
+      {
+        "color": "Huxley",
+        "size": "30",
+        "availability": "in_stock",
+        "length": "32"
+      },
+      {
+        "color": "Huxley",
+        "size": "30",
+        "availability": "in_stock",
+        "length": "34"
+      },
+      {
+        "color": "Jennings",
+        "size": "30",
+        "availability": "in_stock",
+        "length": "30"
+      },
+      {
+        "color": "Jennings",
+        "size": "30",
+        "availability": "in_stock",
+        "length": "32"
+      },
+      {
+        "color": "Jennings",
+        "size": "30",
+        "availability": "in_stock",
+        "length": "34"
+      },
+      {
+        "color": "Livingston",
+        "size": "30",
+        "availability": "in_stock",
+        "length": "30"
+      },
+      {
+        "color": "Livingston",
+        "size": "30",
+        "availability": "in_stock",
+        "length": "32"
+      },
+      {
+        "color": "Livingston",
+        "size": "30",
+        "availability": "in_stock",
+        "length": "34"
+      },
+      {
+        "color": "Summit",
+        "size": "30",
+        "availability": "in_stock",
+        "length": "30"
+      },
+      {
+        "color": "Summit",
+        "size": "30",
+        "availability": "in_stock",
+        "length": "32"
+      },
+      {
+        "color": "Summit",
+        "size": "30",
+        "availability": "in_stock",
+        "length": "34"
+      },
+      {
+        "color": "Huxley",
+        "size": "32",
+        "availability": "in_stock",
+        "length": "30"
+      },
+      {
+        "color": "Huxley",
+        "size": "32",
+        "availability": "in_stock",
+        "length": "32"
+      },
+      {
+        "color": "Huxley",
+        "size": "32",
+        "availability": "in_stock",
+        "length": "34"
+      },
+      {
+        "color": "Jennings",
+        "size": "32",
+        "availability": "in_stock",
+        "length": "30"
+      },
+      {
+        "color": "Jennings",
+        "size": "32",
+        "availability": "in_stock",
+        "length": "32"
+      },
+      {
+        "color": "Jennings",
+        "size": "32",
+        "availability": "in_stock",
+        "length": "34"
+      },
+      {
+        "color": "Livingston",
+        "size": "32",
+        "availability": "in_stock",
+        "length": "30"
+      },
+      {
+        "color": "Livingston",
+        "size": "32",
+        "availability": "in_stock",
+        "length": "32"
+      },
+      {
+        "color": "Livingston",
+        "size": "32",
+        "availability": "in_stock",
+        "length": "34"
+      },
+      {
+        "color": "Summit",
+        "size": "32",
+        "availability": "in_stock",
+        "length": "30"
+      },
+      {
+        "color": "Summit",
+        "size": "32",
+        "availability": "in_stock",
+        "length": "32"
+      },
+      {
+        "color": "Summit",
+        "size": "32",
+        "availability": "in_stock",
+        "length": "34"
+      },
+      {
+        "color": "Huxley",
+        "size": "34",
+        "availability": "in_stock",
+        "length": "30"
+      },
+      {
+        "color": "Huxley",
+        "size": "34",
+        "availability": "in_stock",
+        "length": "32"
+      },
+      {
+        "color": "Huxley",
+        "size": "34",
+        "availability": "in_stock",
+        "length": "34"
+      },
+      {
+        "color": "Jennings",
+        "size": "34",
+        "availability": "in_stock",
+        "length": "30"
+      },
+      {
+        "color": "Jennings",
+        "size": "34",
+        "availability": "in_stock",
+        "length": "32"
+      },
+      {
+        "color": "Jennings",
+        "size": "34",
+        "availability": "in_stock",
+        "length": "34"
+      },
+      {
+        "color": "Livingston",
+        "size": "34",
+        "availability": "in_stock",
+        "length": "30"
+      },
+      {
+        "color": "Livingston",
+        "size": "34",
+        "availability": "in_stock",
+        "length": "32"
+      },
+      {
+        "color": "Livingston",
+        "size": "34",
+        "availability": "in_stock",
+        "length": "34"
+      },
+      {
+        "color": "Summit",
+        "size": "34",
+        "availability": "in_stock",
+        "length": "30"
+      },
+      {
+        "color": "Summit",
+        "size": "34",
+        "availability": "in_stock",
+        "length": "32"
+      },
+      {
+        "color": "Summit",
+        "size": "34",
+        "availability": "in_stock",
+        "length": "34"
+      },
+      {
+        "color": "Huxley",
+        "size": "36",
+        "availability": "in_stock",
+        "length": "30"
+      },
+      {
+        "color": "Huxley",
+        "size": "36",
+        "availability": "in_stock",
+        "length": "32"
+      },
+      {
+        "color": "Huxley",
+        "size": "36",
+        "availability": "in_stock",
+        "length": "34"
+      },
+      {
+        "color": "Jennings",
+        "size": "36",
+        "availability": "in_stock",
+        "length": "30"
+      },
+      {
+        "color": "Jennings",
+        "size": "36",
+        "availability": "in_stock",
+        "length": "32"
+      },
+      {
+        "color": "Jennings",
+        "size": "36",
+        "availability": "in_stock",
+        "length": "34"
+      },
+      {
+        "color": "Livingston",
+        "size": "36",
+        "availability": "in_stock",
+        "length": "30"
+      },
+      {
+        "color": "Livingston",
+        "size": "36",
+        "availability": "in_stock",
+        "length": "32"
+      },
+      {
+        "color": "Livingston",
+        "size": "36",
+        "availability": "in_stock",
+        "length": "34"
+      },
+      {
+        "color": "Summit",
+        "size": "36",
+        "availability": "in_stock",
+        "length": "30"
+      },
+      {
+        "color": "Summit",
+        "size": "36",
+        "availability": "in_stock",
+        "length": "32"
+      },
+      {
+        "color": "Summit",
+        "size": "36",
+        "availability": "in_stock",
+        "length": "34"
+      },
+      {
+        "color": "Huxley",
+        "size": "38",
+        "availability": "in_stock",
+        "length": "30"
+      },
+      {
+        "color": "Huxley",
+        "size": "38",
+        "availability": "in_stock",
+        "length": "32"
+      },
+      {
+        "color": "Huxley",
+        "size": "38",
+        "availability": "in_stock",
+        "length": "34"
+      },
+      {
+        "color": "Jennings",
+        "size": "38",
+        "availability": "in_stock",
+        "length": "30"
+      },
+      {
+        "color": "Jennings",
+        "size": "38",
+        "availability": "in_stock",
+        "length": "32"
+      },
+      {
+        "color": "Jennings",
+        "size": "38",
+        "availability": "in_stock",
+        "length": "34"
+      },
+      {
+        "color": "Livingston",
+        "size": "38",
+        "availability": "in_stock",
+        "length": "30"
+      },
+      {
+        "color": "Livingston",
+        "size": "38",
+        "availability": "in_stock",
+        "length": "32"
+      },
+      {
+        "color": "Livingston",
+        "size": "38",
+        "availability": "in_stock",
+        "length": "34"
+      },
+      {
+        "color": "Summit",
+        "size": "38",
+        "availability": "in_stock",
+        "length": "30"
+      },
+      {
+        "color": "Summit",
+        "size": "38",
+        "availability": "in_stock",
+        "length": "32"
+      },
+      {
+        "color": "Summit",
+        "size": "38",
+        "availability": "in_stock",
+        "length": "34"
+      },
+      {
+        "color": "Huxley",
+        "size": "40",
+        "availability": "in_stock",
+        "length": "30"
+      },
+      {
+        "color": "Huxley",
+        "size": "40",
+        "availability": "in_stock",
+        "length": "32"
+      },
+      {
+        "color": "Huxley",
+        "size": "40",
+        "availability": "in_stock",
+        "length": "34"
+      },
+      {
+        "color": "Jennings",
+        "size": "40",
+        "availability": "in_stock",
+        "length": "30"
+      },
+      {
+        "color": "Jennings",
+        "size": "40",
+        "availability": "in_stock",
+        "length": "32"
+      },
+      {
+        "color": "Jennings",
+        "size": "40",
+        "availability": "in_stock",
+        "length": "34"
+      },
+      {
+        "color": "Livingston",
+        "size": "40",
+        "availability": "in_stock",
+        "length": "30"
+      },
+      {
+        "color": "Livingston",
+        "size": "40",
+        "availability": "in_stock",
+        "length": "32"
+      },
+      {
+        "color": "Livingston",
+        "size": "40",
+        "availability": "in_stock",
+        "length": "34"
+      },
+      {
+        "color": "Summit",
+        "size": "40",
+        "availability": "in_stock",
+        "length": "30"
+      },
+      {
+        "color": "Summit",
+        "size": "40",
+        "availability": "in_stock",
+        "length": "32"
+      },
+      {
+        "color": "Summit",
+        "size": "40",
+        "availability": "in_stock",
+        "length": "34"
+      },
+      {
+        "color": "Huxley",
+        "size": "42",
+        "availability": "in_stock",
+        "length": "30"
+      },
+      {
+        "color": "Huxley",
+        "size": "42",
+        "availability": "in_stock",
+        "length": "32"
+      },
+      {
+        "color": "Huxley",
+        "size": "42",
+        "availability": "in_stock",
+        "length": "34"
+      },
+      {
+        "color": "Jennings",
+        "size": "42",
+        "availability": "in_stock",
+        "length": "30"
+      },
+      {
+        "color": "Jennings",
+        "size": "42",
+        "availability": "in_stock",
+        "length": "32"
+      },
+      {
+        "color": "Jennings",
+        "size": "42",
+        "availability": "in_stock",
+        "length": "34"
+      },
+      {
+        "color": "Livingston",
+        "size": "42",
+        "availability": "in_stock",
+        "length": "30"
+      },
+      {
+        "color": "Livingston",
+        "size": "42",
+        "availability": "in_stock",
+        "length": "32"
+      },
+      {
+        "color": "Livingston",
+        "size": "42",
+        "availability": "in_stock",
+        "length": "34"
+      },
+      {
+        "color": "Summit",
+        "size": "42",
+        "availability": "in_stock",
+        "length": "30"
+      },
+      {
+        "color": "Summit",
+        "size": "42",
+        "availability": "in_stock",
+        "length": "32"
+      },
+      {
+        "color": "Summit",
+        "size": "42",
+        "availability": "in_stock",
+        "length": "34"
+      },
+      {
+        "color": "Huxley",
+        "size": "44",
+        "availability": "in_stock",
+        "length": "30"
+      },
+      {
+        "color": "Huxley",
+        "size": "44",
+        "availability": "in_stock",
+        "length": "32"
+      },
+      {
+        "color": "Huxley",
+        "size": "44",
+        "availability": "in_stock",
+        "length": "34"
+      },
+      {
+        "color": "Jennings",
+        "size": "44",
+        "availability": "in_stock",
+        "length": "30"
+      },
+      {
+        "color": "Jennings",
+        "size": "44",
+        "availability": "in_stock",
+        "length": "32"
+      },
+      {
+        "color": "Jennings",
+        "size": "44",
+        "availability": "in_stock",
+        "length": "34"
+      },
+      {
+        "color": "Livingston",
+        "size": "44",
+        "availability": "in_stock",
+        "length": "30"
+      },
+      {
+        "color": "Livingston",
+        "size": "44",
+        "availability": "in_stock",
+        "length": "32"
+      },
+      {
+        "color": "Livingston",
+        "size": "44",
+        "availability": "in_stock",
+        "length": "34"
+      },
+      {
+        "color": "Summit",
+        "size": "44",
+        "availability": "in_stock",
+        "length": "30"
+      },
+      {
+        "color": "Summit",
+        "size": "44",
+        "availability": "in_stock",
+        "length": "32"
+      },
+      {
+        "color": "Summit",
+        "size": "44",
+        "availability": "in_stock",
+        "length": "34"
+      }
+    ],
+    "original_price": "24.99"
+  }
+]

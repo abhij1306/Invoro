@@ -16,6 +16,7 @@ from app.services.config.product_intelligence import (
     GOOGLE_NATIVE_HOME_URL,
     PRODUCT_INTELLIGENCE_CANDIDATE_STATUS_CRAWL_QUEUED,
     PRODUCT_INTELLIGENCE_CANDIDATE_STATUS_CRAWL_TIMEOUT,
+    SOURCE_TYPE_BRAND_DTC,
     ProductIntelligenceSettings,
     product_intelligence_settings,
 )
@@ -122,6 +123,24 @@ def test_product_intelligence_query_keeps_brand_in_all_queries_when_brand_exists
     assert queries[0] == 'mamaearth Vit. C Daily Glow Cream 150g "MC150G"'
     assert queries[1] == "mamaearth Vit. C Daily Glow Cream 150g"
     assert len(queries) <= 3
+
+
+@pytest.mark.component
+def test_product_intelligence_dtc_score_does_not_promote_short_subset_titles() -> None:
+    intelligence = score_candidate(
+        source={
+            "title": "Samsung Galaxy S24 Ultra 512GB",
+            "brand": "Samsung",
+        },
+        candidate={
+            "title": "Samsung Galaxy",
+            "brand": "Samsung",
+        },
+        source_type=SOURCE_TYPE_BRAND_DTC,
+    )
+
+    assert intelligence["reasons"]["title_similarity"] < 0.5
+    assert intelligence["score"] < 0.8
 
 
 @pytest.mark.component
@@ -1402,13 +1421,66 @@ async def test_product_intelligence_serpapi_runs_identifier_organic_without_imme
         limit=5,
     )
 
-    assert engines.count("google") == 2
+    assert engines.count("google") == 1
     assert engines.count("google_shopping") == 1
     assert [result.payload["provider"] for result in results] == [
         "serpapi",
         "serpapi_shopping",
     ]
     assert results[0].url == "https://www.wrangler.com/shop/relaxed-bootcut-jeans.html"
+
+
+@pytest.mark.asyncio
+@pytest.mark.component
+async def test_product_intelligence_serpapi_keeps_brand_site_lookup_when_shopping_has_multiple_results(
+    monkeypatch,
+) -> None:
+    engines: list[tuple[str, str]] = []
+
+    async def fake_engine(query: str, *, engine: str, limit: int | None = None) -> dict[str, object]:
+        del limit
+        engines.append((engine, query))
+        if engine == "google_shopping":
+            return {
+                "shopping_results": [
+                    {
+                        "position": 1,
+                        "title": "Levi's 511 Slim Fit Jeans",
+                        "source": "Macy's",
+                        "link": "https://www.macys.com/p/levi-511/1.html",
+                    },
+                    {
+                        "position": 2,
+                        "title": "Levi's 511 Slim Fit Jeans",
+                        "source": "Amazon",
+                        "link": "https://www.amazon.com/levi-511/2.html",
+                    },
+                ]
+            }
+        if query == "levi 511 site:levi.com":
+            return {
+                "organic_results": [
+                    {
+                        "position": 1,
+                        "title": "Levi's 511 Slim Fit Jeans",
+                        "link": "https://www.levi.com/p/04511.html",
+                        "snippet": "Official product page",
+                    }
+                ]
+            }
+        return {"organic_results": []}
+
+    monkeypatch.setattr(discovery_module, "_search_serpapi_engine", fake_engine)
+
+    results = await discovery_module._search_serpapi(
+        "levi 511 site:levi.com",
+        limit=5,
+    )
+
+    assert ("google", "levi 511 site:levi.com") in engines
+    assert ("google", "levi 511") not in engines
+    assert results[0].url == "https://www.levi.com/p/04511.html"
+    assert results[0].payload["provider"] == "serpapi"
 
 
 @pytest.mark.component
@@ -1448,6 +1520,31 @@ def test_product_intelligence_parses_serpapi_immersive_limit_before_about_link()
 
     assert len(results) == 1
     assert results[0].url == "https://www.levi.com/p/04511.html"
+
+
+@pytest.mark.component
+def test_product_intelligence_parses_serpapi_immersive_when_about_payload_is_not_a_dict() -> None:
+    results = parse_serpapi_immersive_results(
+        {
+            "product_results": {
+                "title": "Levi's 511 Slim Fit Jeans",
+                "product_id": "immersive-product-id",
+                "about_the_product": "unexpected",
+                "stores": [
+                    {
+                        "name": "Levi's",
+                        "title": "Levi's 511 Slim Fit Jeans",
+                        "link": "https://www.levi.com/p/04511.html",
+                    }
+                ],
+            }
+        },
+        parent={"product_link": "https://www.google.com/search?ibp=oshop&q=levi"},
+        limit=5,
+    )
+
+    assert len(results) == 1
+    assert results[0].payload["raw"]["product"]["description"] == ""
 
 
 @pytest.mark.asyncio

@@ -11,6 +11,7 @@ __all__ = (
 import logging
 from itertools import product
 from typing import Any
+from urllib.parse import parse_qsl, urlsplit
 
 from bs4 import BeautifulSoup
 
@@ -89,6 +90,12 @@ record_has_rich_existing_variants = (
 )
 
 logger = logging.getLogger(__name__)
+
+_DOM_OPTION_AVAILABILITY_PRIORITY = (
+    "out_of_stock",
+    "limited_stock",
+    "in_stock",
+)
 
 
 def _safe_int_config(value: object, default: int, name: str) -> int:
@@ -205,14 +212,15 @@ def _collect_variant_choice_entries(
             page_url=page_url,
         ):
             continue
-        cleaned = _coerce_variant_option_value(
+        raw_value = _variant_choice_entry_value(
+            container,
+            node,
+            axis_name=coercion_axis,
+            visible_text_cache=visible_text_cache,
+        )
+        cleaned = _resolved_variant_option_value(
             coercion_axis,
-            _variant_choice_entry_value(
-                container,
-                node,
-                axis_name=coercion_axis,
-                visible_text_cache=visible_text_cache,
-            ),
+            raw_value,
             page_url=page_url,
         )
         if not clean_text(cleaned) and coercion_axis == "color":
@@ -256,15 +264,16 @@ def _collect_variant_choice_entries(
         :option_limit
     ]:
         label_node = _variant_input_label(container, input_node)
-        cleaned = _coerce_variant_option_value(
+        raw_value = _variant_choice_entry_value(
+            container,
+            input_node,
+            axis_name=coercion_axis,
+            label_node=label_node,
+            visible_text_cache=visible_text_cache,
+        )
+        cleaned = _resolved_variant_option_value(
             coercion_axis,
-            _variant_choice_entry_value(
-                container,
-                input_node,
-                axis_name=coercion_axis,
-                label_node=label_node,
-                visible_text_cache=visible_text_cache,
-            ),
+            raw_value,
             page_url=page_url,
         )
         if not clean_text(cleaned) and coercion_axis == "color":
@@ -344,6 +353,69 @@ def _variant_choice_entry_value(
     )
 
 
+def _variant_option_value_is_url_like(value: object) -> bool:
+    text = text_or_none(value)
+    if not text:
+        return False
+    lowered = text.strip().lower()
+    return lowered.startswith(("http://", "https://", "/")) or "product-variation?" in lowered
+
+
+def _variant_axis_value_from_option_url(
+    axis_name: str,
+    value: object,
+) -> str:
+    if axis_name not in {"size", "length"}:
+        return ""
+    text = text_or_none(value)
+    if not text:
+        return ""
+    parsed = urlsplit(text)
+    for key, raw_value in parse_qsl(parsed.query, keep_blank_values=False):
+        normalized_key = clean_text(key).casefold()
+        candidate = clean_text(raw_value)
+        if not normalized_key or not candidate:
+            continue
+        if axis_name == "size" and (
+            normalized_key == "size"
+            or normalized_key == "size1"
+            or normalized_key == "waist"
+            or normalized_key.endswith("_size")
+            or normalized_key.endswith("_size1")
+            or normalized_key.endswith("_waist")
+        ):
+            return candidate
+        if axis_name == "length" and (
+            normalized_key == "length"
+            or normalized_key == "size2"
+            or normalized_key == "inseam"
+            or normalized_key.endswith("_length")
+            or normalized_key.endswith("_size2")
+            or normalized_key.endswith("_inseam")
+        ):
+            return candidate
+    return ""
+
+
+def _resolved_variant_option_value(
+    axis_name: str,
+    raw_value: object,
+    *,
+    page_url: str,
+) -> str:
+    cleaned = _coerce_variant_option_value(axis_name, raw_value, page_url=page_url)
+    if _variant_option_value_is_url_like(cleaned or raw_value):
+        derived = _variant_axis_value_from_option_url(
+            axis_name,
+            cleaned or raw_value,
+        )
+        if derived:
+            return _coerce_variant_option_value(axis_name, derived, page_url=page_url)
+        if axis_name in {"size", "length"}:
+            return ""
+    return cleaned
+
+
 def _descendant_image_alt_text(node: Any) -> str:
     if not hasattr(node, "find"):
         return ""
@@ -405,6 +477,56 @@ def _log_url_color_fallback(
     )
 
 
+def _selected_option_metadata(
+    axis_option_metadata: dict[str, dict[str, dict[str, object]]],
+    option_values: dict[str, str],
+) -> list[dict[str, object]]:
+    selected_metadata: list[dict[str, object]] = []
+    for axis_name, value in option_values.items():
+        metadata = axis_option_metadata.get(axis_name, {}).get(clean_text(value), {})
+        if isinstance(metadata, dict) and metadata:
+            selected_metadata.append(metadata)
+    return selected_metadata
+
+
+def _availability_from_selected_options(
+    selected_metadata: list[dict[str, object]],
+) -> str:
+    values = {
+        text_or_none(metadata.get("availability"))
+        for metadata in selected_metadata
+        if isinstance(metadata, dict)
+    }
+    values.discard(None)
+    for candidate in _DOM_OPTION_AVAILABILITY_PRIORITY:
+        if candidate in values:
+            return candidate
+    return ""
+
+
+def _stock_quantity_from_selected_options(
+    selected_metadata: list[dict[str, object]],
+) -> int | None:
+    quantities: list[int] = []
+    for metadata in selected_metadata:
+        if not isinstance(metadata, dict):
+            continue
+        raw_quantity = metadata.get("stock_quantity")
+        if raw_quantity in (None, "", [], {}):
+            continue
+        try:
+            quantities.append(int(str(raw_quantity).strip()))
+        except (TypeError, ValueError):
+            continue
+    if not quantities:
+        return None
+    if any(quantity <= 0 for quantity in quantities):
+        return 0
+    if len(set(quantities)) == 1:
+        return quantities[0]
+    return None
+
+
 def extract_variants_from_dom(
     soup: BeautifulSoup,
     *,
@@ -439,13 +561,13 @@ def extract_variants_from_dom(
             continue
         select_options = list(select.find_all("option"))
         for option_index, option in enumerate(select_options):
-            cleaned_value = _coerce_variant_option_value(
+            raw_value_attr = text_or_none(option.get("value"))
+            cleaned_value = _resolved_variant_option_value(
                 axis_key,
-                option.get_text(" ", strip=True),
+                option.get_text(" ", strip=True) or raw_value_attr,
                 page_url=page_url,
             ) or clean_text(option.get_text(" ", strip=True))
             cleaned_value = _strip_variant_option_value_suffix_noise(cleaned_value)
-            raw_value_attr = text_or_none(option.get("value"))
             if (
                 not cleaned_value
                 or variant_option_value_is_noise(cleaned_value)
@@ -698,6 +820,16 @@ def extract_variants_from_dom(
             }
             for axis_name, value in option_values.items():
                 variant[axis_name] = value
+            selected_metadata = _selected_option_metadata(
+                axis_option_metadata,
+                option_values,
+            )
+            availability = _availability_from_selected_options(selected_metadata)
+            if availability:
+                variant["availability"] = availability
+            stock_quantity = _stock_quantity_from_selected_options(selected_metadata)
+            if stock_quantity is not None:
+                variant["stock_quantity"] = stock_quantity
             combo_metadata = state_combo_targets.get(
                 tuple(sorted(option_values.items())), {}
             )
@@ -709,11 +841,6 @@ def extract_variants_from_dom(
                 option_metadata = axis_option_metadata.get(axis_key, {}).get(
                     str(combo[0]), {}
                 )
-                availability = text_or_none(option_metadata.get("availability"))
-                if availability:
-                    variant["availability"] = availability
-                if option_metadata.get("stock_quantity") not in (None, "", [], {}):
-                    variant["stock_quantity"] = option_metadata.get("stock_quantity")
                 if option_metadata.get("style") not in (None, "", [], {}):
                     variant["style"] = option_metadata.get("style")
                 for key in ("url", "variant_id", "image_url"):

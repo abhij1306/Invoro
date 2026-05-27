@@ -119,10 +119,6 @@ def variant_option_url(
         anchor = label_node.find("a", href=True)
         if anchor is not None:
             candidates.append(anchor)
-    if hasattr(container, "find"):
-        anchor = container.find("a", href=True)
-        if anchor is not None:
-            candidates.append(anchor)
     for candidate in candidates:
         if candidate is None or not hasattr(candidate, "get"):
             continue

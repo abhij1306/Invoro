@@ -79,6 +79,8 @@ VARIANT_CONTAINER_SEMANTIC_TOKENS = (
     "option",
     "selector",
     "swatch",
+    "swatches",
+    "swatchesdisplay",
     "radiogroup",
 )
 VARIANT_PUBLIC_URL_FIELD_NAMES = ("url", "image_url")
@@ -156,9 +158,12 @@ VARIANT_STRONG_OPTION_SELECTOR = (
     "[role='radio'], [role='option'], input[type='radio'], input[type='checkbox'], "
     "[data-option-value], [data-value], [data-variant-id], [data-selected], "
     "[aria-pressed][aria-pressed!=''], button[data-option], button[data-value], "
-    "button[data-variant], [data-testid='swatch' i], [data-testid*='swatch-option' i]"
+    "button[data-variant], a[class*='swatch' i][title], "
+    "a[class*='swatch' i][aria-label], [data-testid='swatch' i], "
+    "[data-testid*='swatch-option' i]"
 )
 VARIANT_WEAK_OPTION_SELECTOR = (
-    "button:not([data-dismiss]):not([type='submit']):not([type='reset']), a[href]"
+    "button:not([data-dismiss]):not([type='submit']):not([type='reset']), "
+    "a[href], a[class*='swatch' i][title], a[class*='swatch' i][aria-label]"
 )
 VARIANT_GROUP_MIN_CONFIDENCE = 0.35

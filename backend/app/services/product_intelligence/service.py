@@ -514,6 +514,9 @@ async def _run_job(session: AsyncSession, job: ProductIntelligenceJob) -> None:
             )
         ).all()
     )
+    
+    candidates_to_poll = []
+    
     async with shared_query_runner(str(options["search_provider"])) as run_query:
         for source in sources[: _option_int(options, "max_source_products", default=product_intelligence_settings.max_source_products)]:
             if source.is_private_label and options["private_label_mode"] == PRIVATE_LABEL_EXCLUDE:
@@ -546,10 +549,20 @@ async def _run_job(session: AsyncSession, job: ProductIntelligenceJob) -> None:
                 )
                 session.add(candidate)
                 await session.flush()
+                
+                # Non-blocking dispatch to queue/background crawler
                 await _create_candidate_crawl(session, job, candidate, options=options)
-                await _poll_candidate_and_score(session, job, candidate)
-                await _update_job_summary(session, job)
-                await session.commit()
+                candidates_to_poll.append(candidate)
+    
+    # Commit changes before entering sequential status checking loops
+    await session.commit()
+
+    # Poll candidates. Background crawls execute concurrently on workers, so resolution is fast
+    for candidate in candidates_to_poll:
+        await _poll_candidate_and_score(session, job, candidate)
+        await _update_job_summary(session, job)
+        await session.commit()
+
     await _score_completed_candidates(session, job)
     job.status = PRODUCT_INTELLIGENCE_JOB_STATUS_COMPLETE
     job.completed_at = datetime.now(UTC)
@@ -934,6 +947,7 @@ def _normalized_options(value: object) -> dict[str, object]:
         "excluded_domains": _string_list(raw.get("excluded_domains")),
         "llm_enrichment_enabled": bool(raw.get("llm_enrichment_enabled")),
     }
+
 
 def _meets_confidence_threshold(
     score: float,

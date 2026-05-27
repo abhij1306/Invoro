@@ -724,15 +724,34 @@ def _clean_materials_pollution(value: object) -> str:
         # composition entries survive.
         and not _MATERIALS_ZERO_PERCENT_PATTERN.search(chunk)
     ]
-    cleaned = " ".join(kept).strip()
+    cleaned = _dedupe_adjacent_material_chunks(" ".join(kept).strip())
     while True:
         parts = cleaned.split(maxsplit=1)
         if (
             not parts
             or parts[0].casefold().strip(":") not in materials_pollution_tokens
         ):
-            return cleaned
+            return _dedupe_adjacent_material_chunks(cleaned)
         cleaned = parts[1] if len(parts) > 1 else ""
+
+
+def _dedupe_adjacent_material_chunks(text: str) -> str:
+    cleaned = clean_text(text)
+    if not cleaned:
+        return ""
+    chunks = [
+        clean_text(chunk)
+        for chunk in re.split(r"(?<=[.;!?])\s+", cleaned)
+        if clean_text(chunk)
+    ]
+    if len(chunks) < 2:
+        return cleaned
+    deduped: list[str] = []
+    for chunk in chunks:
+        if deduped and chunk.casefold() == deduped[-1].casefold():
+            continue
+        deduped.append(chunk)
+    return " ".join(deduped)
 
 
 def detail_long_text_is_numeric_sequence(text: str) -> bool:

@@ -167,10 +167,26 @@ async def discover_candidates(
         max_candidates,
         max_candidates * product_intelligence_settings.discovery_pool_multiplier,
     )
+
+    # In-memory execution cache for deduplication during the lifecycle of this discovery pass
+    query_cache: dict[str, list[SearchResult]] = {}
+
+    def make_cached_runner(target_runner: QueryRunner) -> QueryRunner:
+        async def cached_run_query(q: str, lim: int) -> list[SearchResult]:
+            normalized_q = " ".join(q.strip().lower().split())
+            if normalized_q in query_cache:
+                logger.info("Product Intelligence cache hit for query: %r", q)
+                return query_cache[normalized_q]
+            res = await target_runner(q, lim)
+            query_cache[normalized_q] = res
+            return res
+        return cached_run_query
+
     if run_query is not None:
+        cached_runner = make_cached_runner(run_query)
         return await _collect_candidates(
             queries=queries,
-            run_query=run_query,
+            run_query=cached_runner,
             product=product,
             source_domain_value=source_domain_value,
             allowed_domains=allowed_domains,
@@ -181,9 +197,10 @@ async def discover_candidates(
     async with shared_query_runner(provider_name) as shared_run_query:
         if shared_run_query is None:
             return []
+        cached_runner = make_cached_runner(shared_run_query)
         return await _collect_candidates(
             queries=queries,
-            run_query=shared_run_query,
+            run_query=cached_runner,
             product=product,
             source_domain_value=source_domain_value,
             allowed_domains=allowed_domains,
@@ -209,6 +226,7 @@ async def _collect_candidates(
     domain_counts: dict[str, int] = {}
     source_domains = _source_excluded_domains(product, source_domain_value)
     source_urls = _source_excluded_urls(product)
+
     for query_order, query in enumerate(queries):
         results = await run_query(query, pool_limit)
         for rank, result in enumerate(results, start=1):
@@ -316,27 +334,31 @@ async def _search_results(provider: str, query: str, *, limit: int | None = None
 async def _search_serpapi(query: str, *, limit: int | None = None) -> list[SearchResult]:
     shopping_query = _shopping_query(query)
     brand_scoped_query = _brand_scoped_query(query)
-    dtc_raw, organic_raw, shopping_raw = await asyncio.gather(
-        _search_serpapi_engine(brand_scoped_query, engine=SERPAPI_ENGINE, limit=limit)
-        if brand_scoped_query
-        else _empty_search_payload(),
-        _search_serpapi_engine(shopping_query, engine=SERPAPI_ENGINE, limit=limit)
-        if shopping_query and _query_has_identifier(query)
-        else _empty_search_payload(),
-        _search_serpapi_engine(shopping_query, engine=SERPAPI_SHOPPING_ENGINE, limit=limit)
-        if shopping_query
-        else _empty_search_payload(),
-    )
-    dtc_results = _parse_serpapi_organic_results(dtc_raw)
-    organic_results = _parse_serpapi_organic_results(organic_raw)
+
+    # 1. Google Shopping is the most precise matching engine. Execute it first.
+    shopping_raw = await _search_serpapi_engine(shopping_query, engine=SERPAPI_SHOPPING_ENGINE, limit=limit)
     shopping_results = _parse_serpapi_shopping_results(shopping_raw)
-    immersive_results = await _expand_serpapi_immersive_results(
-        shopping_raw,
-        limit=limit,
-    )
-    return _dedupe_search_results(
-        [*dtc_results, *organic_results, *immersive_results, *shopping_results]
-    )
+    immersive_results = await _expand_serpapi_immersive_results(shopping_raw, limit=limit)
+
+    dtc_results: list[SearchResult] = []
+    if brand_scoped_query:
+        dtc_raw = await _search_serpapi_engine(
+            brand_scoped_query,
+            engine=SERPAPI_ENGINE,
+            limit=limit,
+        )
+        dtc_results = _parse_serpapi_organic_results(dtc_raw)
+
+    results = _dedupe_search_results([*dtc_results, *immersive_results, *shopping_results])
+
+    # 2. Only fallback to broad organic web searches when brand-site lookup
+    # did not produce a candidate and shopping coverage still looks thin.
+    if len(results) < 2 and not dtc_results:
+        organic_raw = await _search_serpapi_engine(shopping_query, engine=SERPAPI_ENGINE, limit=limit)
+        organic_results = _parse_serpapi_organic_results(organic_raw)
+        results = _dedupe_search_results([*dtc_results, *results, *organic_results])
+
+    return results
 
 
 def _shopping_query(query: str) -> str:
@@ -536,6 +558,18 @@ def _parse_serpapi_immersive_results(
     stores = product.get("stores")
     store_rows = stores if isinstance(stores, list) else []
     results: list[SearchResult] = []
+
+    # Prune product block to prevent heavy recursive variants / video listings duplication inside db entries
+    about_value = product.get("about_the_product")
+    about_data = about_value if isinstance(about_value, dict) else {}
+    pruned_product = {
+        "title": product.get("title"),
+        "brand": product.get("brand"),
+        "rating": product.get("rating"),
+        "reviews": product.get("reviews"),
+        "description": product.get("description") or about_data.get("description") or "",
+    }
+
     for position, store in enumerate(store_rows, start=1):
         if not isinstance(store, dict):
             continue
@@ -560,7 +594,7 @@ def _parse_serpapi_immersive_results(
                     "rating": store.get("rating") or product.get("rating"),
                     "reviews": store.get("reviews") or product.get("reviews"),
                     "delivery": store.get("shipping") or "",
-                    "raw": {"store": store, "product": product, "parent": parent_data},
+                    "raw": {"store": store, "product": pruned_product, "parent": parent_data},
                 },
             )
         )
@@ -585,11 +619,12 @@ def _parse_serpapi_immersive_results(
                         "product_id": product.get("product_id")
                         or parent_data.get(SERPAPI_SHOPPING_PRODUCT_ID_FIELD),
                         "product_link": parent_data.get(SERPAPI_SHOPPING_PRODUCT_LINK_FIELD),
-                        "raw": {"about_the_product": about, "product": product, "parent": parent_data},
+                        "raw": {"about_the_product": about, "product": pruned_product, "parent": parent_data},
                     },
                 )
             )
     return results
+
 
 def _first_shopping_url(item: dict[str, object]) -> str:
     for field in SERPAPI_SHOPPING_LINK_FIELDS:
@@ -615,12 +650,7 @@ def _dedupe_search_results(results: list[SearchResult]) -> list[SearchResult]:
 
 @contextlib.asynccontextmanager
 async def _google_native_session():
-    """Open one real-Chrome page on google.com and reuse it across multiple queries.
-
-    Each query is entered using human-like typing on the Google homepage and
-    submitted via the Enter key, maximizing browser behavior mimicry and avoiding
-    direct URL manipulations that trigger unusual traffic interstitials.
-    """
+    """Open one real-Chrome page on google.com and reuse it across multiple queries."""
     runtime = await get_browser_runtime(browser_engine=GOOGLE_NATIVE_BROWSER_ENGINE)
     blocked = False
 
@@ -713,18 +743,23 @@ def _parse_google_native_results(html: str, *, limit: int) -> list[SearchResult]
     soup = BeautifulSoup(str(html or ""), "html.parser")
     results: list[SearchResult] = []
     seen: set[str] = set()
+
     for anchor in soup.select(GOOGLE_NATIVE_RESULT_LINK_SELECTOR):
         href = str(anchor.get("href") or "").strip()
         url = _google_native_result_url(href)
         if not url or url in seen:
             continue
+
         domain = source_domain(url).removeprefix("www.").lower()
-        if any(_domain_matches(domain, item) for item in GOOGLE_NATIVE_IGNORED_DOMAINS):
+        if any(
+            _domain_matches(domain, item) for item in GOOGLE_NATIVE_IGNORED_DOMAINS
+        ):
             continue
         title = _google_native_anchor_title(anchor, url=url)
         if not title:
             continue
         thumbnail = _google_native_anchor_thumbnail(anchor)
+
         seen.add(url)
         results.append(
             SearchResult(
@@ -741,11 +776,11 @@ def _parse_google_native_results(html: str, *, limit: int) -> list[SearchResult]
         )
         if len(results) >= max(1, int(limit)):
             break
+
     return results
 
 
 def _google_native_anchor_title(anchor, *, url: str) -> str:
-    """Return result title from organic h3, with product-link fallback."""
     heading = anchor.select_one(GOOGLE_NATIVE_TITLE_SELECTOR)
     if heading is not None:
         return clean_text(heading.get_text(" ", strip=True))
@@ -860,8 +895,8 @@ def _descriptive_product_slug(value: str) -> bool:
         return False
     tokens = [
         _normalize_slug_token(token)
-        for token in re.split(r"[^a-z0-9]+", terminal)
-        if token
+        for re_match in re.split(r"[^a-z0-9]+", terminal)
+        if (token := re_match)
     ]
     alpha_tokens = [token for token in tokens if re.search(r"[a-z]", token)]
     distinctive_tokens = [

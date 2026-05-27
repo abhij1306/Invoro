@@ -455,6 +455,7 @@ def _sanitize_option_scalar(field_name: str, value: object) -> str | None:
             ):
                 cleaned = suffix
         cleaned = re.sub(r"^color\s*:\s*", "", cleaned, flags=re.I)
+        cleaned = re.sub(r"\bcolor\s+details\b.*$", "", cleaned, flags=re.I).strip()
         cleaned = re.split(r"\bview as list\b", cleaned, maxsplit=1, flags=re.I)[0]
         cleaned = re.split(
             r"\bsize(?:\s*\([^)]*\))?\b", cleaned, maxsplit=1, flags=re.I

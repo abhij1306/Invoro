@@ -579,7 +579,8 @@ def _variant_group_has_multiple_options(node: Any) -> bool:
         "button, a[href], [role='radio'], [role='option'], input[type='radio'], "
         "input[type='checkbox'], [data-value], [data-option-value], "
         "[data-selected], [aria-selected], [data-state], [data-testid='swatch' i], "
-        "[data-testid*='swatch-option' i], [role='button'][aria-label], option"
+        "[data-testid*='swatch-option' i], [role='button'][aria-label], option, "
+        "a[class*='swatch' i][title], a[class*='swatch' i][aria-label]"
     )
     return len(option_nodes) >= 2
 

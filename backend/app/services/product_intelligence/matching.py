@@ -335,8 +335,29 @@ def _title_similarity(left: str, right: str) -> float:
     right_tokens = _token_set(right)
     if not left_tokens or not right_tokens:
         return 0.0
-    overlap = len(left_tokens & right_tokens) / max(len(left_tokens | right_tokens), 1)
-    sequence = SequenceMatcher(None, " ".join(sorted(left_tokens)), " ".join(sorted(right_tokens))).ratio()
+
+    intersection = left_tokens & right_tokens
+    smaller_size = min(len(left_tokens), len(right_tokens))
+    larger_size = max(len(left_tokens), len(right_tokens))
+    union_size = len(left_tokens | right_tokens)
+
+    # Keep the baseline symmetric so short generic subsets do not look exact.
+    overlap = len(intersection) / union_size if union_size > 0 else 0.0
+    containment = len(intersection) / smaller_size if smaller_size > 0 else 0.0
+    larger_coverage = len(intersection) / larger_size if larger_size > 0 else 0.0
+    size_balance = smaller_size / larger_size if larger_size > 0 else 0.0
+
+    sequence = SequenceMatcher(
+        None,
+        " ".join(sorted(left_tokens)),
+        " ".join(sorted(right_tokens))
+    ).ratio() * size_balance
+
+    # Reward near-complete descriptive expansions, but only when the larger title is
+    # also mostly covered and the overlap carries real specificity.
+    if containment >= 0.85 and larger_coverage >= 0.60 and len(intersection) >= 3:
+        return max(0.80 * containment + 0.20 * larger_coverage, sequence)
+
     return max(overlap, sequence)
 
 

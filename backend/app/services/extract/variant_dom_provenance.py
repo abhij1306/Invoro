@@ -138,6 +138,8 @@ def weak_variant_option_node_allowed(node: Any, *, container: Any, page_url: str
         return True
     if anchor_has_selected_variant_signal(node):
         return True
+    if _anchor_has_inline_variant_option_signal(node, container=container):
+        return True
     role = str(container.get("role") or "").strip().lower() if hasattr(container, "get") else ""
     if role == "radiogroup" and text_or_none(node.get("aria-label")):
         return True
@@ -169,3 +171,30 @@ def anchor_has_selected_variant_signal(node: Any) -> bool:
             probe_parts.append(str(value))
     probe = clean_text(" ".join(probe_parts)).lower()
     return any(token in probe for token in VARIANT_SELECTED_SIGNAL_TOKENS)
+
+
+def _anchor_has_inline_variant_option_signal(node: Any, *, container: Any) -> bool:
+    option_label = text_or_none(
+        node.get("title") or node.get("aria-label")
+    ) or (
+        clean_text(node.get_text(" ", strip=True)) if hasattr(node, "get_text") else None
+    )
+    if not option_label:
+        return False
+    node_probe_parts: list[str] = []
+    for attr_name in ("class", "id", "data-testid", "title", "aria-label"):
+        value = node.get(attr_name) if hasattr(node, "get") else None
+        if isinstance(value, list):
+            node_probe_parts.extend(str(item) for item in value if item)
+        elif value not in (None, "", [], {}):
+            node_probe_parts.append(str(value))
+    container_probe_parts: list[str] = []
+    if hasattr(container, "get"):
+        for attr_name in ("class", "id", "data-option-name", "aria-label"):
+            value = container.get(attr_name)
+            if isinstance(value, list):
+                container_probe_parts.extend(str(item) for item in value if item)
+            elif value not in (None, "", [], {}):
+                container_probe_parts.append(str(value))
+    probe = clean_text(" ".join([*node_probe_parts, *container_probe_parts])).lower()
+    return any(token in probe for token in ("swatch", "size", "color", "colour", "variant"))

@@ -5994,6 +5994,29 @@ def test_build_detail_record_drops_duplicate_specifications_and_materials_ui_lab
 
 
 @pytest.mark.regression
+def test_build_detail_record_dedupes_repeated_material_weight_tail() -> None:
+    record = build_detail_record(
+        "<html><body><main><h1>Wrangler Jeans</h1></main></body></html>",
+        "https://example.com/products/wrangler-jeans",
+        "ecommerce_detail",
+        None,
+        adapter_records=[
+            {
+                "title": "Wrangler Jeans",
+                "materials": (
+                    "78% Cotton, 20% Recycled Cotton, 2% Spandex; "
+                    "11.25 oz. 11.25 oz."
+                ),
+            }
+        ],
+    )
+
+    assert record["materials"] == (
+        "78% Cotton, 20% Recycled Cotton, 2% Spandex; 11.25 oz."
+    )
+
+
+@pytest.mark.regression
 def test_build_detail_record_drops_global_guide_and_glossary_text() -> None:
     record = build_detail_record(
         "<html><body><main><h1>Oxford Shirt</h1></main></body></html>",
@@ -7781,6 +7804,329 @@ def test_extract_ecommerce_detail_prefers_displayvalue_for_variant_sizes() -> No
     ]
     assert "View this product in" not in json.dumps(rows[0]["variants"])
     assert "disable-danger" not in json.dumps(rows[0]["variants"])
+
+
+@pytest.mark.regression
+def test_extract_ecommerce_detail_derives_wrangler_size_length_from_variant_urls() -> None:
+    html = """
+    <html>
+      <body>
+        <main>
+          <h1>Wrangler Five Star Premium Flex Relaxed Fit Bootcut Jean</h1>
+          <fieldset data-option-name="color" class="swatch-attribute color">
+            <legend>Color</legend>
+            <input
+              type="radio"
+              id="color-huxley"
+              name="color"
+              value="/on/demandware.store/Sites-Wrangler-Site/en_US/Product-Variation?dwvar_98FRZJ_color=112316407&pid=112316407&quantity=1"
+              checked
+            />
+            <label for="color-huxley">Huxley</label>
+            <input
+              type="radio"
+              id="color-jennings"
+              name="color"
+              value="/on/demandware.store/Sites-Wrangler-Site/en_US/Product-Variation?dwvar_98FRZJ_color=112373655&pid=112373655&quantity=1"
+            />
+            <label for="color-jennings">Jennings</label>
+          </fieldset>
+          <fieldset data-option-name="size" class="swatch-attribute size">
+            <legend>Size</legend>
+            <input
+              type="radio"
+              id="size-28"
+              name="size"
+              value="https://www.wrangler.com/on/demandware.store/Sites-Wrangler-Site/en_US/Product-Variation?dwvar_112316407_SIZE1=28&dwvar_112316407_color=112316407&pid=112316407&quantity=1"
+            />
+            <label for="size-28"><span class="sr-only">Waist 28</span></label>
+            <input
+              type="radio"
+              id="size-30"
+              name="size"
+              value="https://www.wrangler.com/on/demandware.store/Sites-Wrangler-Site/en_US/Product-Variation?dwvar_112316407_SIZE1=30&dwvar_112316407_color=112316407&pid=112316407&quantity=1"
+            />
+            <label for="size-30"><span class="sr-only">Waist 30</span></label>
+          </fieldset>
+          <fieldset data-option-name="length" class="swatch-attribute length">
+            <legend>Length</legend>
+            <input
+              type="radio"
+              id="length-30"
+              name="length"
+              value="https://www.wrangler.com/on/demandware.store/Sites-Wrangler-Site/en_US/Product-Variation?dwvar_112316407_SIZE2=30&dwvar_112316407_color=112316407&pid=112316407&quantity=1"
+            />
+            <label for="length-30"><span class="sr-only">Inseam 30</span></label>
+            <input
+              type="radio"
+              id="length-32"
+              name="length"
+              value="https://www.wrangler.com/on/demandware.store/Sites-Wrangler-Site/en_US/Product-Variation?dwvar_112316407_SIZE2=32&dwvar_112316407_color=112316407&pid=112316407&quantity=1"
+            />
+            <label for="length-32"><span class="sr-only">Inseam 32</span></label>
+          </fieldset>
+          <fieldset data-option-name="size" class="attribute-details">
+            <legend>Stretch Details</legend>
+            <input type="radio" id="stretch-1" name="stretch-details" />
+            <label for="stretch-1">Some Stretch attribute details</label>
+            <input type="radio" id="stretch-2" name="stretch-details" />
+            <label for="stretch-2">More Stretch attribute details</label>
+          </fieldset>
+        </main>
+      </body>
+    </html>
+    """
+
+    rows = extract_records(
+        html,
+        "https://www.wrangler.com/shop/wrangler-mens-five-star-premium-flex-relaxed-fit-bootcut-jean-98FRZJ.html?dwvar_98FRZJ_color=112316407",
+        "ecommerce_detail",
+        max_records=1,
+        requested_fields=["variants", "color", "size", "length"],
+    )
+
+    assert rows
+    record = rows[0]
+    assert record["variant_count"] == 8
+    assert {(variant["color"], variant["size"], variant["length"]) for variant in record["variants"]} == {
+        ("Huxley", "28", "30"),
+        ("Huxley", "28", "32"),
+        ("Huxley", "30", "30"),
+        ("Huxley", "30", "32"),
+        ("Jennings", "28", "30"),
+        ("Jennings", "28", "32"),
+        ("Jennings", "30", "30"),
+        ("Jennings", "30", "32"),
+    }
+    serialized = json.dumps(record["variants"])
+    assert "Product-Variation" not in serialized
+    assert "attribute details" not in serialized
+
+
+@pytest.mark.regression
+def test_extract_ecommerce_detail_drops_unresolved_url_like_size_values() -> None:
+    html = """
+    <html>
+      <body>
+        <main>
+          <h1>Wrangler Five Star Premium Flex Relaxed Fit Bootcut Jean</h1>
+          <fieldset data-option-name="color" class="swatch-attribute color">
+            <legend>Color</legend>
+            <input type="radio" id="color-huxley" name="color" checked />
+            <label for="color-huxley">Huxley</label>
+            <input type="radio" id="color-jennings" name="color" />
+            <label for="color-jennings">Jennings</label>
+          </fieldset>
+          <fieldset data-option-name="size" class="swatch-attribute size">
+            <legend>Size</legend>
+            <input
+              type="radio"
+              id="size-28"
+              name="size"
+              value="https://www.wrangler.com/on/demandware.store/Sites-Wrangler-Site/en_US/Product-Variation?dwvar_112316407_SIZE1=28&dwvar_112316407_color=112316407&pid=112316407&quantity=1"
+            />
+            <label for="size-28">28</label>
+            <input
+              type="radio"
+              id="size-30"
+              name="size"
+              value="https://www.wrangler.com/on/demandware.store/Sites-Wrangler-Site/en_US/Product-Variation?dwvar_112316407_SIZE1=30&dwvar_112316407_color=112316407&pid=112316407&quantity=1"
+            />
+            <label for="size-30">30</label>
+          </fieldset>
+          <fieldset class="mobile-size-clone">
+            <legend>Size</legend>
+            <input
+              type="radio"
+              id="size-clone-1"
+              name="mobile-size"
+              value="/on/demandware.store/Sites-Wrangler-Site/en_US/Product-Variation?dwvar_98FRZJ_color=112316407&pid=112316407&quantity=1"
+            />
+            <label for="size-clone-1"><span class="sr-only">Select option</span></label>
+            <input
+              type="radio"
+              id="size-clone-2"
+              name="mobile-size"
+              value="/on/demandware.store/Sites-Wrangler-Site/en_US/Product-Variation?dwvar_98FRZJ_color=112373655&pid=112373655&quantity=1"
+            />
+            <label for="size-clone-2"><span class="sr-only">Select option</span></label>
+          </fieldset>
+        </main>
+      </body>
+    </html>
+    """
+
+    rows = extract_records(
+        html,
+        "https://www.wrangler.com/shop/wrangler-mens-five-star-premium-flex-relaxed-fit-bootcut-jean-98FRZJ.html?dwvar_98FRZJ_color=112316407",
+        "ecommerce_detail",
+        max_records=1,
+        requested_fields=["variants", "color", "size"],
+    )
+
+    assert rows
+    record = rows[0]
+    assert record["variant_count"] == 4
+    assert {(variant["color"], variant["size"]) for variant in record["variants"]} == {
+        ("Huxley", "28"),
+        ("Huxley", "30"),
+        ("Jennings", "28"),
+        ("Jennings", "30"),
+    }
+    assert "Product-Variation" not in json.dumps(record["variants"])
+
+
+@pytest.mark.regression
+def test_extract_ecommerce_detail_propagates_multi_axis_dom_option_availability() -> (
+    None
+):
+    html = """
+    <html>
+      <head>
+        <script type="application/ld+json">
+          {
+            "@context": "https://schema.org",
+            "@type": "Product",
+            "name": "Wrangler Five Star Premium Flex Relaxed Fit Bootcut Jean",
+            "offers": {
+              "@type": "Offer",
+              "price": "24.99",
+              "priceCurrency": "USD",
+              "availability": "https://schema.org/InStock"
+            }
+          }
+        </script>
+      </head>
+      <body>
+        <main>
+          <h1>Wrangler Five Star Premium Flex Relaxed Fit Bootcut Jean</h1>
+          <fieldset data-option-name="color" class="swatch-attribute color">
+            <legend>Color</legend>
+            <input type="radio" id="color-huxley" name="color" checked />
+            <label for="color-huxley">Huxley</label>
+            <input type="radio" id="color-jennings" name="color" />
+            <label for="color-jennings">Jennings</label>
+          </fieldset>
+          <fieldset data-option-name="size" class="swatch-attribute size">
+            <legend>Size</legend>
+            <input
+              type="radio"
+              id="size-28"
+              name="size"
+              class="unselectable"
+              aria-label="Unavailable Size 28"
+              value="https://www.wrangler.com/on/demandware.store/Sites-Wrangler-Site/en_US/Product-Variation?dwvar_112316407_SIZE1=28&dwvar_112316407_color=112316407&pid=112316407&quantity=1"
+            />
+            <label for="size-28">28</label>
+            <input
+              type="radio"
+              id="size-30"
+              name="size"
+              aria-label="Select Size 30"
+              value="https://www.wrangler.com/on/demandware.store/Sites-Wrangler-Site/en_US/Product-Variation?dwvar_112316407_SIZE1=30&dwvar_112316407_color=112316407&pid=112316407&quantity=1"
+            />
+            <label for="size-30">30</label>
+          </fieldset>
+          <fieldset data-option-name="length" class="swatch-attribute length">
+            <legend>Length</legend>
+            <input
+              type="radio"
+              id="length-30"
+              name="length"
+              aria-label="Select Length 30"
+              value="https://www.wrangler.com/on/demandware.store/Sites-Wrangler-Site/en_US/Product-Variation?dwvar_112316407_SIZE2=30&dwvar_112316407_color=112316407&pid=112316407&quantity=1"
+            />
+            <label for="length-30">30</label>
+            <input
+              type="radio"
+              id="length-32"
+              name="length"
+              aria-label="Select Length 32"
+              value="https://www.wrangler.com/on/demandware.store/Sites-Wrangler-Site/en_US/Product-Variation?dwvar_112316407_SIZE2=32&dwvar_112316407_color=112316407&pid=112316407&quantity=1"
+            />
+            <label for="length-32">32</label>
+          </fieldset>
+        </main>
+      </body>
+    </html>
+    """
+
+    rows = extract_records(
+        html,
+        "https://www.wrangler.com/shop/wrangler-mens-five-star-premium-flex-relaxed-fit-bootcut-jean-98FRZJ.html?dwvar_98FRZJ_color=112316407",
+        "ecommerce_detail",
+        max_records=1,
+        requested_fields=["variants", "availability"],
+    )
+
+    assert rows
+    record = rows[0]
+    assert record["availability"] == "in_stock"
+    assert record["variant_count"] == 8
+    availability_by_variant = {
+        (variant["color"], variant["size"], variant["length"]): variant.get(
+            "availability"
+        )
+        for variant in record["variants"]
+    }
+    assert availability_by_variant[("Huxley", "28", "30")] == "out_of_stock"
+    assert availability_by_variant[("Jennings", "28", "32")] == "out_of_stock"
+    assert availability_by_variant[("Huxley", "30", "30")] == "in_stock"
+    assert availability_by_variant[("Jennings", "30", "32")] == "in_stock"
+
+
+@pytest.mark.regression
+def test_extract_ecommerce_detail_captures_nautica_swatchanchor_variants() -> None:
+    html = """
+    <html>
+      <body>
+        <main class="pdp-main">
+          <div class="swatches color">
+            <div class="variation__label"></div>
+            <ul class="swatchesdisplay Color">
+              <li><a class="swatchanchor" data-value="420" title="Angel Blue">Angel Blue</a></li>
+              <li><a class="swatchanchor" data-value="279" title="Chino">Chino</a></li>
+            </ul>
+          </div>
+          <div class="swatches size">
+            <div class="variation__label variation__label--size">
+              <span class="label">Size:</span>
+              <span class="value">Select Size</span>
+            </div>
+            <div class="availability"><p class="in-stock-msg">In Stock</p></div>
+            <ul class="swatchesdisplay sizes char2">
+              <li><a class="swatchanchor" title="XS">XS</a></li>
+              <li><a class="swatchanchor" title="S">S</a></li>
+              <li><a class="swatchanchor" title="M">M</a></li>
+            </ul>
+          </div>
+        </main>
+      </body>
+    </html>
+    """
+
+    rows = extract_records(
+        html,
+        "https://www.nautica.com/classic-fit-garment-dyed-polo/KR5815.html",
+        "ecommerce_detail",
+        max_records=1,
+        requested_fields=["variants", "availability"],
+    )
+
+    assert rows
+    record = rows[0]
+    assert record["variant_count"] == 6
+    assert {
+        (variant["color"], variant["size"])
+        for variant in record["variants"]
+    } == {
+        ("Angel Blue", "XS"),
+        ("Angel Blue", "S"),
+        ("Angel Blue", "M"),
+        ("Chino", "XS"),
+        ("Chino", "S"),
+        ("Chino", "M"),
+    }
 
 
 @pytest.mark.regression

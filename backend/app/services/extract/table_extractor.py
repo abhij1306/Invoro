@@ -29,6 +29,7 @@ def extract_tables(
         return []
     root = content_container or soup
     tables: list[dict[str, Any]] = []
+    seen_fingerprints: set[tuple[tuple[str, ...], tuple[tuple[tuple[str, str], ...], ...]]] = set()
     for table in list(root.find_all("table")):
         if key_value_table(table):
             headers = ["field", "value"]
@@ -40,6 +41,12 @@ def extract_tables(
             continue
         if not rows:
             continue
+        fingerprint = _table_fingerprint(headers, rows)
+        if fingerprint in seen_fingerprints:
+            if remove_from_dom:
+                table.decompose()
+            continue
+        seen_fingerprints.add(fingerprint)
         tables.append(
             {
                 "context": _table_context(table, root),
@@ -153,6 +160,20 @@ def _dedupe_repeated_text(value: str) -> str:
     if words[:midpoint] == words[midpoint:]:
         return " ".join(words[:midpoint])
     return value
+
+
+def _table_fingerprint(
+    headers: list[str],
+    rows: list[dict[str, str]],
+) -> tuple[tuple[str, ...], tuple[tuple[tuple[str, str], ...], ...]]:
+    return (
+        tuple(headers),
+        tuple(
+            tuple((key, row[key]) for key in headers if key in row)
+            or tuple(sorted(row.items()))
+            for row in rows
+        ),
+    )
 
 
 def _table_context(table: Tag, root: Tag) -> str:
