@@ -34,8 +34,11 @@ from app.services.config.product_intelligence import (
     SEARCH_SITE_PREFIX,
     SERPAPI_ENGINE,
     SERPAPI_ENGINE_PARAM,
+    SERPAPI_IMMERSIVE_PRODUCT_ENGINE,
     SERPAPI_KEY_PARAM,
     SERPAPI_LINK_FIELD,
+    SERPAPI_MORE_STORES_PARAM,
+    SERPAPI_PAGE_TOKEN_PARAM,
     SERPAPI_ORGANIC_RESULTS_FIELD,
     SERPAPI_POSITION_FIELD,
     SERPAPI_QUERY_PARAM,
@@ -43,6 +46,7 @@ from app.services.config.product_intelligence import (
     SERPAPI_SEARCH_URL,
     SERPAPI_SHOPPING_ENGINE,
     SERPAPI_SHOPPING_IMMERSIVE_API_FIELD,
+    SERPAPI_SHOPPING_IMMERSIVE_TOKEN_FIELD,
     SERPAPI_SHOPPING_LINK_FIELDS,
     SERPAPI_SHOPPING_PRODUCT_ID_FIELD,
     SERPAPI_SHOPPING_PRODUCT_LINK_FIELD,
@@ -326,7 +330,13 @@ async def _search_serpapi(query: str, *, limit: int | None = None) -> list[Searc
     dtc_results = _parse_serpapi_organic_results(dtc_raw)
     organic_results = _parse_serpapi_organic_results(organic_raw)
     shopping_results = _parse_serpapi_shopping_results(shopping_raw)
-    return _dedupe_search_results([*dtc_results, *organic_results, *shopping_results])
+    immersive_results = await _expand_serpapi_immersive_results(
+        shopping_raw,
+        limit=limit,
+    )
+    return _dedupe_search_results(
+        [*dtc_results, *organic_results, *immersive_results, *shopping_results]
+    )
 
 
 def _shopping_query(query: str) -> str:
@@ -381,6 +391,75 @@ async def _search_serpapi_engine(
         logger.warning("Product intelligence SerpAPI discovery failed engine=%s: %s", engine, exc)
         return {}
     return payload if isinstance(payload, dict) else {}
+
+
+async def _expand_serpapi_immersive_results(
+    payload: dict[str, object],
+    *,
+    limit: int | None = None,
+) -> list[SearchResult]:
+    rows = payload.get(SERPAPI_SHOPPING_RESULTS_FIELD)
+    if not isinstance(rows, list):
+        return []
+    max_products = int(product_intelligence_settings.serpapi_immersive_products_per_query)
+    if max_products <= 0:
+        return []
+    results: list[SearchResult] = []
+    for item in rows[:max_products]:
+        if not isinstance(item, dict):
+            continue
+        immersive_payload = await _search_serpapi_immersive_product(item)
+        if not immersive_payload:
+            continue
+        results.extend(
+            _parse_serpapi_immersive_results(
+                immersive_payload,
+                parent=item,
+                limit=limit,
+            )
+        )
+    return results
+
+
+async def _search_serpapi_immersive_product(item: dict[str, object]) -> dict[str, object]:
+    params = _serpapi_immersive_params(item)
+    if not params:
+        return {}
+    try:
+        async with httpx.AsyncClient(timeout=product_intelligence_settings.search_timeout_seconds) as client:
+            response = await client.get(SERPAPI_SEARCH_URL, params=params)
+            response.raise_for_status()
+            payload = response.json()
+    except (httpx.HTTPError, ValueError, OSError) as exc:
+        logger.warning("Product intelligence SerpAPI immersive lookup failed: %s", exc)
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _serpapi_immersive_params(item: dict[str, object]) -> dict[str, str]:
+    api_url = str(item.get(SERPAPI_SHOPPING_IMMERSIVE_API_FIELD) or "").strip()
+    page_token = ""
+    if api_url:
+        try:
+            parsed = urlsplit(api_url)
+        except ValueError:
+            parsed = None
+        if parsed is not None:
+            page_token = parse_qs(parsed.query).get(SERPAPI_PAGE_TOKEN_PARAM, [""])[0]
+    if not page_token:
+        page_token = str(
+            item.get(SERPAPI_SHOPPING_IMMERSIVE_TOKEN_FIELD)
+            or item.get(SERPAPI_PAGE_TOKEN_PARAM)
+            or ""
+        ).strip()
+    if not page_token:
+        return {}
+    return {
+        SERPAPI_ENGINE_PARAM: SERPAPI_IMMERSIVE_PRODUCT_ENGINE,
+        SERPAPI_PAGE_TOKEN_PARAM: page_token,
+        SERPAPI_MORE_STORES_PARAM: "true",
+        SERPAPI_KEY_PARAM: product_intelligence_settings.serpapi_key,
+    }
 
 
 def _parse_serpapi_organic_results(payload: dict[str, object]) -> list[SearchResult]:

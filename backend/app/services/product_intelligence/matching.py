@@ -60,7 +60,9 @@ def extract_product_snapshot(record: object) -> dict[str, object]:
     brand = _first_present(data, SOURCE_BRAND_FIELDS)
     title = _first_present(data, SOURCE_TITLE_FIELDS)
     price_value = _first_present(data, SOURCE_PRICE_FIELDS)
-    if not str(brand or "").strip():
+    if str(brand or "").strip():
+        brand = _canonical_source_brand(brand, source_url=source_url, title=title)
+    else:
         brand = _infer_brand(source_url=source_url, title=title)
     price = _as_float(price_value)
     return {
@@ -194,6 +196,21 @@ def extract_search_result_snapshot(
         "provider": str(merged.get("provider") or "").strip(),
         "raw": data,
     }
+
+
+def _canonical_source_brand(
+    brand: object,
+    *,
+    source_url: object,
+    title: object,
+) -> object:
+    normalized = normalize_brand(brand)
+    if normalized in BRAND_DOMAIN_MAP:
+        return brand
+    known_brand = _infer_known_brand(brand, title, source_url)
+    if known_brand and normalize_brand(known_brand) in BRAND_DOMAIN_MAP:
+        return known_brand
+    return brand
 
 
 def build_search_result_intelligence(

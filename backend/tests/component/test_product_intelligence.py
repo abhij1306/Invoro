@@ -420,6 +420,20 @@ def test_product_intelligence_infers_belk_brand_from_registry() -> None:
 
 
 @pytest.mark.component
+def test_product_intelligence_canonicalizes_overlong_known_brand() -> None:
+    snapshot = extract_product_snapshot(
+        {
+            "brand": "Columbia Big & Tall Tamiami™",
+            "title": "Columbia Big & Tall Tamiami™ II SS Shirt",
+            "url": "https://www.belk.com/p/columbia-big-tall-tamiami-ii-ss-shirt/32054651287053.html",
+        }
+    )
+
+    assert snapshot["brand"] == "columbia"
+    assert snapshot["normalized_brand"] == "columbia"
+
+
+@pytest.mark.component
 def test_product_intelligence_excludes_belk_exclusive_aliases() -> None:
     assert is_private_label("Ocean + Coast") is True
     assert is_private_label("goodness & grace") is True
@@ -1295,6 +1309,59 @@ async def test_product_intelligence_serpapi_searches_brand_organic_then_shopping
     ]
     assert [result.payload["provider"] for result in results] == ["serpapi"]
     assert results[0].url == "https://www.levi.com/p/04511.html"
+
+
+@pytest.mark.asyncio
+@pytest.mark.component
+async def test_product_intelligence_serpapi_expands_immersive_store_links(monkeypatch) -> None:
+    engines: list[str] = []
+
+    async def fake_engine(query: str, *, engine: str, limit: int | None = None) -> dict[str, object]:
+        del query, limit
+        engines.append(engine)
+        if engine == "google_shopping":
+            return {
+                "shopping_results": [
+                    {
+                        "position": 1,
+                        "title": "Columbia Men's Tamiami II Short Sleeve Shirt",
+                        "source": "Columbia Sportswear",
+                        "product_id": "shopping-product-id",
+                        "product_link": "https://www.google.com/search?ibp=oshop&q=columbia",
+                        "serpapi_immersive_product_api": "https://serpapi.com/search.json?engine=google_immersive_product&page_token=abc",
+                    }
+                ]
+            }
+        return {"organic_results": []}
+
+    async def fake_immersive(item: dict[str, object]) -> dict[str, object]:
+        assert item["product_id"] == "shopping-product-id"
+        return {
+            "product_results": {
+                "title": "Columbia Men's Tamiami II Short Sleeve Shirt",
+                "product_id": "immersive-product-id",
+                "stores": [
+                    {
+                        "name": "Columbia Sportswear",
+                        "title": "Men's PFG Tamiami II Short Sleeve Shirt",
+                        "link": "https://www.columbia.com/p/mens-pfg-tamiami-ii-short-sleeve-shirt-big-FM7253.html",
+                    }
+                ],
+            }
+        }
+
+    monkeypatch.setattr(discovery_module, "_search_serpapi_engine", fake_engine)
+    monkeypatch.setattr(discovery_module, "_search_serpapi_immersive_product", fake_immersive)
+
+    results = await discovery_module._search_serpapi(
+        "columbia big tall tamiami II SS Shirt",
+        limit=5,
+    )
+
+    assert engines == ["google_shopping"]
+    assert results[0].url == "https://www.columbia.com/p/mens-pfg-tamiami-ii-short-sleeve-shirt-big-FM7253.html"
+    assert results[0].payload["provider"] == "serpapi_immersive"
+    assert results[0].payload["product_id"] == "immersive-product-id"
 
 
 @pytest.mark.asyncio
