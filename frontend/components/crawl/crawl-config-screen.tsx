@@ -1,10 +1,8 @@
 'use client';
-
 import { Check, Globe, Info, Plus, Shield, SlidersHorizontal, Sparkles } from 'lucide-react';
 import type { Route } from 'next';
 import { useRouter } from 'next/navigation';
 import { startTransition, useEffect, useMemo, useRef, useState } from 'react';
-
 import { cn } from '../../lib/utils';
 import { InlineAlert, PageHeader, SectionHeader, TabBar } from '../ui/patterns';
 import { Badge, Button, Dropdown, Card, Input, Textarea, Toggle, Tooltip } from '../ui/primitives';
@@ -73,17 +71,16 @@ import {
   type TraversalDropdownValue,
 } from './crawl-config-logic';
 import { resolveAutoSurface } from './auto-surface';
+import { CrawlActionButtons } from './crawl-action-buttons';
+import { createDesignCrawlRun } from './design-crawl-submit';
 import { DOMAIN_OPTIONS, DOMAIN_TABS } from './domain-surface-config';
 import * as crawlConfigForm from './use-crawl-config';
-
 type CrawlConfigScreenProps = {
   requestedTab: CrawlTab | null;
   requestedCategoryMode: CategoryMode | null;
   requestedPdpMode: PdpMode | null;
 };
-
-const RUN_SETUP_ROW_CLASS =
-  'grid gap-2 md:grid-cols-[110px_minmax(0,1fr)] md:items-center md:gap-3';
+const RUN_SETUP_ROW_CLASS = 'grid gap-2 md:grid-cols-[110px_minmax(0,1fr)] md:items-center md:gap-3';
 const RUN_SETUP_CONTROL_CLASS = 'flex md:justify-self-end w-full md:w-auto';
 const RUN_SETUP_LABEL_CLASS = 'flex min-w-0 h-[var(--control-height)] items-center gap-3';
 const RUN_SETUP_STACK_CLASS = 'flex flex-col gap-3';
@@ -134,6 +131,7 @@ export function CrawlConfigScreen({
   const [additionalFields, setAdditionalFields] = useState<string[]>([]);
   const [generatingSelectors, setGeneratingSelectors] = useState(false);
   const [savingDomainMemory, setSavingDomainMemory] = useState(false);
+  const [designSubmitting, setDesignSubmitting] = useState(false);
   const [fieldConfigMessage, setFieldConfigMessage] = useState('');
   const [fieldConfigError, setFieldConfigError] = useState('');
   const [fieldRowMessages, setFieldRowMessages] = useState<
@@ -153,8 +151,7 @@ export function CrawlConfigScreen({
   const effectivePdpMode = modePickerEnabled ? pdpMode : 'single';
   const activeMode = modePickerEnabled && crawlTab === 'category' ? categoryMode : effectivePdpMode;
   const surface = deriveSurface(crawlDomain, crawlTab);
-  const autoSurfaceResolution =
-    surface === 'auto' ? resolveAutoSurface(targetUrl, crawlTab) : null;
+  const autoSurfaceResolution = surface === 'auto' ? resolveAutoSurface(targetUrl, crawlTab) : null;
   const effectiveSurface = autoSurfaceResolution?.surface ?? surface;
   const domainTabs = DOMAIN_TABS[crawlDomain];
   const activeTabLabel =
@@ -502,6 +499,22 @@ export function CrawlConfigScreen({
     }
   }
 
+  async function startDesignCrawl() {
+    setConfigError('');
+    setDesignSubmitting(true);
+    try {
+      const response = await createDesignCrawlRun({ targetUrl, config, runProfile });
+      startTransition(() => {
+        router.replace(`/crawl?run_id=${response.run_id}` as Route);
+        router.refresh();
+      });
+    } catch (error) {
+      setConfigError(error instanceof Error ? error.message : 'Unable to launch design crawl.');
+    } finally {
+      setDesignSubmitting(false);
+    }
+  }
+
   function addManualField() {
     setFieldRows((current) => [
       ...current,
@@ -691,7 +704,11 @@ export function CrawlConfigScreen({
         ? targetUrl.trim().length > 0
         : bulkUrls.trim().length > 0 || csvFile !== null;
   const canSubmit =
-    hasTarget && canPreview(config, fieldRows, { runProfile, studioMode }) && !isSubmitting;
+    hasTarget &&
+    canPreview(config, fieldRows, { runProfile, studioMode }) &&
+    !isSubmitting &&
+    !designSubmitting;
+  const canSubmitDesign = targetUrl.trim().length > 0 && !isSubmitting && !designSubmitting;
 
   return (
     <div className="page-stack gap-4">
@@ -764,25 +781,13 @@ export function CrawlConfigScreen({
                   </div>
                 ) : null}
               </div>
-              <Button
-                variant="action"
-                size="sm"
-                type="submit"
-                disabled={!canSubmit}
-                className="min-w-[120px] justify-self-start lg:justify-self-end"
-              >
-                {isSubmitting ? (
-                  <>
-                    <span
-                      className="inline-block size-1.5 animate-pulse rounded-full bg-current opacity-80"
-                      aria-hidden="true"
-                    />
-                    Starting...
-                  </>
-                ) : (
-                  'Start Crawl'
-                )}
-              </Button>
+              <CrawlActionButtons
+                canSubmit={canSubmit}
+                canSubmitDesign={canSubmitDesign}
+                designSubmitting={designSubmitting}
+                isSubmitting={isSubmitting}
+                onDesignCrawl={() => void startDesignCrawl()}
+              />
             </div>
 
             {(crawlTab === 'category' && categoryMode === 'bulk') ||

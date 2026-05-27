@@ -1,5 +1,4 @@
 'use client';
-
 import { useQuery } from '@tanstack/react-query';
 import {
   ArrowRightCircle,
@@ -18,9 +17,7 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
-
 import { HistoryDrawer, type HistoryItem } from '../ui/history-drawer';
-
 import { syntaxHighlightJson } from '../../lib/ui/syntax';
 import {
   DataRegionEmpty,
@@ -81,6 +78,7 @@ import { useCrawlRunStore } from './crawl-run-store';
 import {
   buildMarkdownDocument,
   downloadMarkdown,
+  isDesignSystemRun,
   isMarkdownOutputRun,
   MarkdownOutputPanel,
 } from './markdown-output';
@@ -231,13 +229,16 @@ export function CrawlRunScreen({ runId }: Readonly<CrawlRunScreenProps>) {
     (run.status === 'failed' || run.status === 'proxy_exhausted') &&
     Number(run?.result_summary?.record_count ?? 0) === 0,
   );
-  const showRunLearningTab = Boolean(run?.run_type === 'crawl' && terminal);
   const markdownOutputRun = isMarkdownOutputRun(run);
+  const designSystemRun = isDesignSystemRun(run);
+  const showRunLearningTab = Boolean(run?.run_type === 'crawl' && terminal && !designSystemRun);
   const defaultOutputTab = markdownOutputRun ? 'markdown' : 'table';
   const effectiveOutputTab =
     failedRunWithoutRecords && (outputTab === 'table' || outputTab === 'markdown')
       ? 'logs'
-      : (outputTab === 'learning' && !showRunLearningTab) || outputTab === 'run_config'
+      : designSystemRun && (outputTab === 'json' || outputTab === 'table' || outputTab === 'learning')
+        ? 'markdown'
+        : (outputTab === 'learning' && !showRunLearningTab) || outputTab === 'run_config'
         ? defaultOutputTab
         : markdownOutputRun && outputTab === 'table'
           ? 'markdown'
@@ -960,7 +961,7 @@ export function CrawlRunScreen({ runId }: Readonly<CrawlRunScreenProps>) {
               }
               actions={
                 <>
-                  {listingRun && batchFromResultsUrls.length ? (
+                  {!designSystemRun && listingRun && batchFromResultsUrls.length ? (
                     <Button
                       variant="action"
                       type="button"
@@ -971,7 +972,7 @@ export function CrawlRunScreen({ runId }: Readonly<CrawlRunScreenProps>) {
                       {batchFromResultsLabel}
                     </Button>
                   ) : null}
-                  {listingRun && productIntelligenceRecords.length ? (
+                  {!designSystemRun && listingRun && productIntelligenceRecords.length ? (
                     <Button
                       variant="neutral"
                       type="button"
@@ -982,7 +983,7 @@ export function CrawlRunScreen({ runId }: Readonly<CrawlRunScreenProps>) {
                       {productIntelligenceLabel}
                     </Button>
                   ) : null}
-                  {ecommerceDetailRun && dataEnrichmentRecords.length ? (
+                  {!designSystemRun && ecommerceDetailRun && dataEnrichmentRecords.length ? (
                     <Button
                       variant="action"
                       type="button"
@@ -1002,7 +1003,7 @@ export function CrawlRunScreen({ runId }: Readonly<CrawlRunScreenProps>) {
                       onClick={() => downloadMarkdown(markdownDocument, run)}
                     >
                       <Download className="size-3" />
-                      Markdown
+                      {designSystemRun ? 'design.md' : 'Markdown'}
                     </Button>
                   ) : (
                     <Button
@@ -1015,15 +1016,17 @@ export function CrawlRunScreen({ runId }: Readonly<CrawlRunScreenProps>) {
                       Excel (CSV)
                     </Button>
                   )}
-                  <Button
-                    variant="download"
-                    type="button"
-                    size="sm"
-                    onClick={() => void downloadExport('json')}
-                  >
-                    <Download className="size-3" />
-                    JSON
-                  </Button>
+                  {!designSystemRun ? (
+                    <Button
+                      variant="download"
+                      type="button"
+                      size="sm"
+                      onClick={() => void downloadExport('json')}
+                    >
+                      <Download className="size-3" />
+                      JSON
+                    </Button>
+                  ) : null}
                   <Button
                     variant="neutral"
                     type="button"
@@ -1042,9 +1045,9 @@ export function CrawlRunScreen({ runId }: Readonly<CrawlRunScreenProps>) {
                   onChange={(value) => setOutputTab(value as OutputTabKey)}
                   options={[
                     ...(markdownOutputRun
-                      ? [{ value: 'markdown', label: 'Markdown' }]
+                      ? [{ value: 'markdown', label: designSystemRun ? 'design.md' : 'Markdown' }]
                       : [{ value: 'table', label: `Table (${summary.records})` }]),
-                    { value: 'json', label: 'JSON' },
+                    ...(!designSystemRun ? [{ value: 'json', label: 'JSON' }] : []),
                     { value: 'logs', label: 'Logs' },
                     ...(showRunLearningTab ? [{ value: 'learning', label: 'Learning' }] : []),
                   ]}

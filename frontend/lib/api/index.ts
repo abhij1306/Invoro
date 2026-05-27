@@ -201,6 +201,8 @@ export const api = {
   downloadJson: (runId: number) => apiClient.getBlob(`/api/crawls/${runId}/export/json`),
   exportCsv: (runId: number) => `${getApiBaseUrl()}/api/crawls/${runId}/export/csv`,
   exportJson: (runId: number) => `${getApiBaseUrl()}/api/crawls/${runId}/export/json`,
+  exportDesignMarkdown: (runId: number) =>
+    `${getApiBaseUrl()}/api/crawls/${runId}/export/design.md`,
   getReview: (runId: number) => apiClient.get<ReviewPayload>(`/api/review/${runId}`),
   reviewHtml: (runId: number) => `${getApiBaseUrl()}/api/review/${runId}/artifact-html`,
   saveReview: (runId: number, payload: { selections: ReviewSelection[]; extra_fields: string[] }) =>

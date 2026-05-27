@@ -183,6 +183,14 @@ class _AIDDiscoverabilityAuditPayload(BaseModel):
     error: str = ""
 
 
+class _DesignSystemMarkdownPayload(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    overview: str = ""
+    usage_notes: list[str] = Field(default_factory=list)
+    caveats: list[str] = Field(default_factory=list)
+
+
 _PAYLOAD_ADAPTERS: dict[str, TypeAdapter[Any]] = {
     "direct_record_extraction": TypeAdapter(list[dict[_FieldKey, Any]]),
     "xpath_discovery": TypeAdapter(list[_XPathSelector]),
@@ -199,6 +207,7 @@ _PAYLOAD_ADAPTERS: dict[str, TypeAdapter[Any]] = {
     "data_enrichment_semantic": TypeAdapter(_DataEnrichmentSemanticPayload),
     "ucp_schema_analysis": TypeAdapter(_UCPSchemaAnalysisPayload),
     "aid_discoverability_audit": TypeAdapter(_AIDDiscoverabilityAuditPayload),
+    "design_system_markdown": TypeAdapter(_DesignSystemMarkdownPayload),
 }
 SUPPORTED_TASK_TYPES = tuple(_PAYLOAD_ADAPTERS.keys())
 

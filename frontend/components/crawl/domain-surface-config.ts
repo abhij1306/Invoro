@@ -61,4 +61,5 @@ export const DEFAULT_FIELDS: Record<CrawlSurface, string[]> = {
   article_listing: ['title', 'publication_date', 'author', 'url'],
   article_detail: ['title', 'author', 'publication_date', 'content', 'url'],
   forum_detail: ['title', 'author', 'content', 'reply_count', 'view_count', 'url'],
+  design_system: ['title', 'design_tokens', 'source_urls', 'generation_metadata', 'url'],
 };

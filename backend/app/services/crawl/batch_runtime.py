@@ -23,6 +23,8 @@ from app.services.config.sitemap import (
     SITEMAP_DEFAULT_MAX_URLS,
 )
 from app.services.config.runtime_settings import crawler_runtime_settings
+from app.services.config.design_system import DESIGN_SYSTEM_SURFACE
+from app.services.design_system import process_design_system_run
 from app.services.domain_utils import normalize_domain
 from app.services.acquisition.browser_runtime import get_browser_runtime, patchright_browser_available
 from app.services.pipeline.extraction_loop import process_single_url
@@ -251,6 +253,9 @@ async def process_run(session: AsyncSession, run_id: int) -> None:
         if run is None or run.status_value in TERMINAL_STATUSES:
             return
         await session.refresh(run)
+        if str(run.surface or "").strip().lower() == DESIGN_SYSTEM_SURFACE:
+            await process_design_system_run(session, run)
+            return
         if run.status_value == CrawlStatus.PAUSED:
             return
         if run.status_value == CrawlStatus.PENDING:

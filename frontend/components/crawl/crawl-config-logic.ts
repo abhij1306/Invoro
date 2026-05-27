@@ -236,6 +236,9 @@ export function surfaceLabel(surface: string) {
   if (surface === 'forum_detail') {
     return 'Forum Thread';
   }
+  if (surface === 'design_system') {
+    return 'Design System';
+  }
   return surface;
 }
 

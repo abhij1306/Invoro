@@ -1057,6 +1057,47 @@ describe('CrawlRunScreen', () => {
     );
   });
 
+  it('shows only design.md and logs for design system runs', async () => {
+    apiMock.getCrawl.mockResolvedValue({
+      ...terminalRun(101),
+      url: 'https://example.com/',
+      surface: 'design_system',
+      requested_fields: [],
+      result_summary: {
+        extraction_verdict: 'success',
+        record_count: 1,
+      },
+    });
+    apiMock.getRecords.mockResolvedValue({
+      items: [
+        {
+          ...makeRecord(1),
+          source_url: 'https://example.com/',
+          data: {
+            title: 'Design System',
+            url: 'https://example.com/',
+          },
+          raw_data: {
+            markdown:
+              '---\nversion: alpha\nname: "Example Design System"\ncolors:\n  primary: "#123456"\n---\n\n# DESIGN.md\n\n## Colors\n\n| Token | Value | Guidance |\n|---|---|---|\n| `primary` | `#123456` | Core text. |',
+          },
+        },
+      ],
+      meta: { page: 1, limit: 100, total: 1 },
+    });
+
+    renderRunScreen();
+
+    expect(await screen.findByText('Design Tokens')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'DESIGN.md' })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'design.md' }).length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: 'Logs' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'JSON' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Excel (CSV)' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Table/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Learning' })).not.toBeInTheDocument();
+  });
+
   it('keeps table and exports visible for failed terminal runs with records', async () => {
     apiMock.getCrawl.mockResolvedValue({
       ...terminalRun(101),

@@ -210,6 +210,9 @@ export function inferDomainFromSurface(surface: string | null | undefined): Craw
   if (normalizedSurface === 'forum_detail') {
     return 'forum_thread';
   }
+  if (normalizedSurface === 'design_system') {
+    return 'content';
+  }
   return null;
 }
 

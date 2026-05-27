@@ -45,19 +45,15 @@ def build_report_payload(report: UCPComplianceReport) -> dict[str, Any]:
 
 
 def build_markdown_report(report: UCPComplianceReport) -> str:
-    contract = report.ucp_contract or {}
-    catalog = contract.get("catalog") if isinstance(contract.get("catalog"), dict) else {}
-    structured = (
-        contract.get("structured_markup")
-        if isinstance(contract.get("structured_markup"), dict)
-        else {}
-    )
-    discovery = contract.get("discovery") if isinstance(contract.get("discovery"), dict) else {}
-    product_records = (
-        contract.get("product_records")
-        if isinstance(contract.get("product_records"), list)
-        else []
-    )
+    contract: dict[str, Any] = report.ucp_contract if isinstance(report.ucp_contract, dict) else {}
+    catalog_raw = contract.get("catalog")
+    structured_raw = contract.get("structured_markup")
+    discovery_raw = contract.get("discovery")
+    product_records_raw = contract.get("product_records")
+    catalog: dict[str, Any] = catalog_raw if isinstance(catalog_raw, dict) else {}
+    structured: dict[str, Any] = structured_raw if isinstance(structured_raw, dict) else {}
+    discovery: dict[str, Any] = discovery_raw if isinstance(discovery_raw, dict) else {}
+    product_records: list[Any] = product_records_raw if isinstance(product_records_raw, list) else []
     lines = [
         f"# AI Discoverability Audit Report: {escape_markdown(report.domain, mode='selective')}",
         "",
@@ -67,7 +63,7 @@ def build_markdown_report(report: UCPComplianceReport) -> str:
         f"- Pages crawled: {escape_markdown(catalog.get('pages_crawled', 0))}",
         f"- Product samples reviewed: {escape_markdown(len(product_records))}",
         f"- Finding count: {escape_markdown(len(report.all_findings))}",
-        f"- Reliability rule: uncertain or insufficient-evidence signals are excluded from findings.",
+        "- Reliability rule: uncertain or insufficient-evidence signals are excluded from findings.",
         "",
         "## Scope And Evidence",
         f"- Sampled URLs: {escape_markdown(len(catalog.get('sampled_urls') or []))}",

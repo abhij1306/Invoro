@@ -14,6 +14,7 @@ const MARKDOWN_OUTPUT_SURFACES = new Set([
   'content_detail',
   'article_detail',
   'forum_detail',
+  'design_system',
 ]);
 
 export function isMarkdownOutputRun(run: CrawlRun | undefined): boolean {
@@ -28,6 +29,10 @@ export function isMarkdownOutputRun(run: CrawlRun | undefined): boolean {
     MARKDOWN_OUTPUT_SURFACES.has(resolvedSurface) ||
     run.requested_fields.some((field) => field.toLowerCase() === 'markdown')
   );
+}
+
+export function isDesignSystemRun(run: CrawlRun | undefined): boolean {
+  return String(run?.surface || '').toLowerCase() === 'design_system';
 }
 
 function readRecordString(record: CrawlRecord, field: string): string {
@@ -48,7 +53,8 @@ export function buildMarkdownDocument(records: CrawlRecord[]): string {
       const markdown = recordMarkdown(record);
       if (!markdown) return '';
       const title = readRecordString(record, 'title');
-      if (!title || markdown.trimStart().startsWith('#')) return markdown;
+      const trimmed = markdown.trimStart();
+      if (!title || trimmed.startsWith('#') || trimmed.startsWith('---')) return markdown;
       return `# ${title}\n\n${markdown}`;
     })
     .filter(Boolean);
@@ -56,6 +62,9 @@ export function buildMarkdownDocument(records: CrawlRecord[]): string {
 }
 
 function markdownDownloadName(run: CrawlRun | undefined): string {
+  if (isDesignSystemRun(run)) {
+    return 'design.md';
+  }
   const host = run?.url
     ? getDomain(run.url)
         .replace(/[^a-z0-9.-]+/gi, '-')
@@ -105,7 +114,10 @@ function loadKaTeX(): Promise<any> {
   return katexPromise;
 }
 
-export function MathRenderer({ math, displayMode }: Readonly<{ math: string; displayMode?: boolean }>) {
+export function MathRenderer({
+  math,
+  displayMode,
+}: Readonly<{ math: string; displayMode?: boolean }>) {
   const containerRef = useRef<HTMLSpanElement>(null);
   const [katex, setKatex] = useState<any>(null);
 
@@ -147,7 +159,8 @@ export function MathRenderer({ math, displayMode }: Readonly<{ math: string; dis
 
 function renderInlineMarkdown(text: string): ReactNode[] {
   const nodes: ReactNode[] = [];
-  const pattern = /(\$\$[\s\S]+?\$\$|\$[^$\n]+\$|`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*|_[^_]+_|\[[^\]]+\]\((?:https?:\/\/|\/|#)[^)]+\))/g;
+  const pattern =
+    /(\$\$[\s\S]+?\$\$|\$[^$\n]+\$|`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*|_[^_]+_|\[[^\]]+\]\((?:https?:\/\/|\/|#)[^)]+\))/g;
   let cursor = 0;
   for (const match of text.matchAll(pattern)) {
     const index = match.index ?? 0;
@@ -204,6 +217,20 @@ function renderInlineMarkdown(text: string): ReactNode[] {
   return nodes;
 }
 
+function parseTableRow(line: string): string[] {
+  return line
+    .trim()
+    .replace(/^\|/, '')
+    .replace(/\|$/, '')
+    .split('|')
+    .map((cell) => cell.trim());
+}
+
+function isTableDivider(line: string): boolean {
+  const cells = parseTableRow(line);
+  return cells.length > 0 && cells.every((cell) => /^:?-{3,}:?$/.test(cell));
+}
+
 function MarkdownPreview({ markdown }: Readonly<{ markdown: string }>) {
   const lines = markdown.replace(/\r\n/g, '\n').split('\n');
   const blocks: ReactNode[] = [];
@@ -217,6 +244,31 @@ function MarkdownPreview({ markdown }: Readonly<{ markdown: string }>) {
       continue;
     }
 
+    if (index === 0 && trimmed === '---') {
+      const frontmatter: string[] = [];
+      index += 1;
+      while (index < lines.length && lines[index].trim() !== '---') {
+        frontmatter.push(lines[index]);
+        index += 1;
+      }
+      index += 1;
+      blocks.push(
+        <section
+          key="frontmatter"
+          className="border-border bg-background-alt/60 my-3 overflow-hidden rounded-[var(--radius-md)] border"
+        >
+          <div className="border-border bg-panel flex items-center justify-between border-b px-4 py-2">
+            <div className="type-label text-secondary">Design Tokens</div>
+            <div className="text-secondary font-mono text-[11px]">YAML</div>
+          </div>
+          <pre className="px-4 py-3 text-[12px] leading-relaxed whitespace-pre-wrap">
+            <code className="font-mono">{frontmatter.join('\n')}</code>
+          </pre>
+        </section>,
+      );
+      continue;
+    }
+
     if (trimmed.startsWith('```')) {
       const lang = trimmed.slice(3).trim();
       const code: string[] = [];
@@ -227,15 +279,64 @@ function MarkdownPreview({ markdown }: Readonly<{ markdown: string }>) {
       }
       index += 1;
       blocks.push(
-        <div key={`code-${index}`} className="my-4 overflow-hidden rounded-[var(--radius-md)] border">
+        <div
+          key={`code-${index}`}
+          className="my-4 overflow-hidden rounded-[var(--radius-md)] border"
+        >
           {lang && (
-            <div className="bg-background-alt border-b px-4 py-1.5 font-mono text-[0.75em] text-secondary">
+            <div className="bg-background-alt text-secondary border-b px-4 py-1.5 font-mono text-[0.75em]">
               {lang}
             </div>
           )}
-          <pre className="bg-background-alt overflow-x-auto whitespace-pre px-4 py-3 text-sm leading-relaxed">
+          <pre className="bg-background-alt overflow-x-auto px-4 py-3 text-sm leading-relaxed whitespace-pre">
             <code className="font-mono">{code.join('\n')}</code>
           </pre>
+        </div>,
+      );
+      continue;
+    }
+
+    if (trimmed.startsWith('|') && index + 1 < lines.length && isTableDivider(lines[index + 1])) {
+      const headers = parseTableRow(trimmed);
+      index += 2;
+      const rows: string[][] = [];
+      while (index < lines.length && lines[index].trim().startsWith('|')) {
+        rows.push(parseTableRow(lines[index]));
+        index += 1;
+      }
+      blocks.push(
+        <div
+          key={`table-${index}`}
+          className="border-border my-4 overflow-x-auto rounded-[var(--radius-md)] border"
+        >
+          <table className="w-full min-w-[560px] border-collapse text-sm">
+            <thead className="bg-background-alt text-secondary">
+              <tr>
+                {headers.map((header, headerIndex) => (
+                  <th
+                    key={`${header}-${headerIndex}`}
+                    className="border-border border-b px-3 py-2 text-left font-mono text-[11px] font-semibold tracking-[0.04em] uppercase"
+                  >
+                    {renderInlineMarkdown(header)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, rowIndex) => (
+                <tr key={rowIndex} className="odd:bg-background even:bg-background-alt/40">
+                  {headers.map((header, cellIndex) => (
+                    <td
+                      key={`${header}-${cellIndex}`}
+                      className="border-border/70 text-foreground border-b px-3 py-2 align-top"
+                    >
+                      {renderInlineMarkdown(row[cellIndex] || '')}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>,
       );
       continue;
@@ -355,6 +456,7 @@ function MarkdownPreview({ markdown }: Readonly<{ markdown: string }>) {
         current.startsWith('>') ||
         /^(#{1,6})\s+/.test(current) ||
         /^[-*_]{3,}$/.test(current) ||
+        (current.startsWith('|') && index + 1 < lines.length && isTableDivider(lines[index + 1])) ||
         /^[-*]\s+/.test(current) ||
         /^\d+\.\s+/.test(current)
       ) {
@@ -374,20 +476,67 @@ function MarkdownPreview({ markdown }: Readonly<{ markdown: string }>) {
 }
 
 export function MarkdownOutput({ markdown }: Readonly<{ markdown: string }>) {
+  const [view, setView] = useState<'preview' | 'source'>('preview');
+  const [copied, setCopied] = useState(false);
+  const copyTimeoutRef = useRef<number | undefined>(undefined);
+  const lineCount = markdown ? markdown.replace(/\r\n/g, '\n').split('\n').length : 0;
+
+  useEffect(() => {
+    return () => {
+      if (copyTimeoutRef.current) window.clearTimeout(copyTimeoutRef.current);
+    };
+  }, []);
+
+  function copyMarkdown() {
+    void navigator.clipboard?.writeText(markdown);
+    setCopied(true);
+    if (copyTimeoutRef.current) window.clearTimeout(copyTimeoutRef.current);
+    copyTimeoutRef.current = window.setTimeout(() => setCopied(false), 1400);
+  }
+
   return (
-    <div className="relative min-h-[55vh]">
-      <div className="absolute top-2 right-2 z-10">
-        <Button
-          variant="quiet"
-          type="button"
-          onClick={() => void navigator.clipboard?.writeText(markdown)}
-        >
+    <div className="min-h-[55vh]">
+      <div className="border-border bg-panel sticky top-0 z-10 flex flex-wrap items-center justify-between gap-3 rounded-t-[var(--radius-md)] border border-b-0 px-3 py-2">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            aria-pressed={view === 'preview'}
+            onClick={() => setView('preview')}
+            className={`rounded-[var(--radius-sm)] px-3 py-1.5 text-sm font-medium transition-colors ${
+              view === 'preview'
+                ? 'bg-accent text-accent-fg'
+                : 'text-secondary hover:bg-background-alt hover:text-foreground'
+            }`}
+          >
+            Preview
+          </button>
+          <button
+            type="button"
+            aria-pressed={view === 'source'}
+            onClick={() => setView('source')}
+            className={`rounded-[var(--radius-sm)] px-3 py-1.5 text-sm font-medium transition-colors ${
+              view === 'source'
+                ? 'bg-accent text-accent-fg'
+                : 'text-secondary hover:bg-background-alt hover:text-foreground'
+            }`}
+          >
+            Source
+          </button>
+          <span className="text-secondary font-mono text-[11px]">{lineCount} lines</span>
+        </div>
+        <Button variant="quiet" type="button" onClick={copyMarkdown}>
           <Copy className="size-3.5" />
-          Copy
+          {copied ? 'Copied' : 'Copy'}
         </Button>
       </div>
-      <article className="surface-muted bg-background min-h-[55vh] max-h-[55vh] overflow-y-auto rounded-[var(--radius-md)] border">
-        <MarkdownPreview markdown={markdown} />
+      <article className="surface-muted bg-background max-h-[62vh] min-h-[55vh] overflow-y-auto rounded-b-[var(--radius-md)] border">
+        {view === 'preview' ? (
+          <MarkdownPreview markdown={markdown} />
+        ) : (
+          <pre className="min-h-[55vh] overflow-auto p-4 text-[12px] leading-relaxed whitespace-pre-wrap">
+            <code className="font-mono">{markdown}</code>
+          </pre>
+        )}
       </article>
     </div>
   );

@@ -137,6 +137,34 @@ describe('CrawlConfigScreen bulk prefill', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('launches design crawls from the target URL', async () => {
+    renderConfigScreen();
+
+    enterTargetUrl('https://example.com/');
+    fireEvent.click(screen.getByRole('button', { name: 'Design Crawl' }));
+
+    await waitFor(() => {
+      expect(createCrawlMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          run_type: 'crawl',
+          url: 'https://example.com/',
+          surface: 'design_system',
+          additional_fields: [],
+          settings: expect.objectContaining({
+            llm_enabled: true,
+            respect_robots_txt: expect.any(Boolean),
+            fetch_profile: expect.objectContaining({
+              fetch_mode: 'browser_only',
+              extraction_source: 'rendered_dom_visual',
+              traversal_mode: null,
+            }),
+          }),
+        }),
+      );
+    });
+    expect(replaceMock).toHaveBeenCalledWith('/crawl?run_id=321');
+  });
+
   it('does not expose sitemap controls while auto surface is selected', async () => {
     render(
       <TopBarProvider>

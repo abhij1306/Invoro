@@ -27,6 +27,24 @@ FIELD_ALIASES: dict[str, list[str]] = {
     str(name): list(values)
     for name, values in dict(_STATIC_EXPORTS.get("FIELD_ALIASES") or {}).items()
 }
+CANONICAL_SCHEMAS = {
+    **dict(_STATIC_EXPORTS.get("CANONICAL_SCHEMAS") or {}),
+    "design_system": [
+        "title",
+        "design_tokens",
+        "source_urls",
+        "generation_metadata",
+        "url",
+    ],
+}
+PROMPT_REGISTRY = {
+    **dict(_STATIC_EXPORTS.get("PROMPT_REGISTRY") or {}),
+    "design_system_markdown": {
+        "response_type": "object",
+        "system_file": "design_system_markdown.system.txt",
+        "user_file": "design_system_markdown.user.txt",
+    },
+}
 
 COLOR_FIELD = "color"
 TITLE_FIELD = "title"

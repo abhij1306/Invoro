@@ -41,7 +41,8 @@ export type CrawlSurface =
   | 'automobile_detail'
   | 'article_listing'
   | 'article_detail'
-  | 'forum_detail';
+  | 'forum_detail'
+  | 'design_system';
 
 export type CrawlMode = 'single' | 'sitemap' | 'bulk' | 'batch' | 'csv';
 export type AdvancedCrawlMode = 'scroll' | 'load_more' | 'paginate' | 'view_all';
