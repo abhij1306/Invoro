@@ -1,56 +1,42 @@
 from __future__ import annotations
 
-from app.services.config import ucp_audit as config
+from app.services.config import aid_score as config
 from app.services.ucp_audit.types import UCPFinding, UCPRepairRoadmapItem
 
 _SUB_SKILL_BY_DIMENSION = {
-    config.D_UCP1_ID: "discovery",
-    config.D_UCP2_ID: "capabilities",
-    config.D_UCP3_ID: "transport",
-    config.D_UCP4_ID: "catalog",
-    config.D_UCP5_ID: "cart/checkout",
-    config.D_UCP6_ID: "order/fulfillment",
+    config.D_AID1_ID: "structured markup",
+    config.D_AID2_ID: "catalog completeness",
+    config.D_AID3_ID: "commerce signals",
+    config.D_AID4_ID: "freshness availability",
+    config.D_AID5_ID: "trust proof",
+    config.D_AID6_ID: "local discovery",
 }
 
 _ACTION_BY_CODE = {
-    config.FINDING_MANIFEST_MISSING: "Publish /.well-known/ucp with a UCP shopping profile.",
-    config.FINDING_MANIFEST_INVALID: "Fix the UCP profile shape and declare dev.ucp.shopping.",
-    config.FINDING_MANIFEST_CONTENT_TYPE_INVALID: "Serve the UCP profile with a JSON content type.",
-    config.FINDING_MANIFEST_REDIRECTED: "Serve the canonical well-known UCP path without redirects.",
-    config.FINDING_SIGNING_KEYS_MISSING: (
-        "Add a signing_keys array at the top level of /.well-known/ucp with at least one "
-        "EC or RSA JWK public key. Required fields per JWK spec: kty, kid, alg, use='sig'. "
-        "Used for webhook signature verification per RFC 7797."
-    ),
-    config.FINDING_CACHE_CONTROL_MISSING: (
-        "Add 'Cache-Control: public, max-age=300' (or higher) to the /.well-known/ucp "
-        "response. The UCP spec requires at least 60 seconds to allow platforms to cache the profile."
-    ),
-    config.FINDING_SERVICE_MISSING: "Declare dev.ucp.shopping in the UCP services map.",
-    config.FINDING_SERVICE_INVALID: "Fix malformed UCP service entries and declare valid versions.",
-    config.FINDING_CAPABILITY_MISSING: "Declare all required shopping capabilities.",
-    config.FINDING_CAPABILITY_INVALID: "Fix malformed UCP capability entries and declare valid versions.",
-    config.FINDING_CAPABILITY_VERSION_MISMATCH: (
-        "Align capability versions with the declared dev.ucp.shopping service version."
-    ),
-    config.FINDING_TRANSPORT_MISSING: "Expose a REST, MCP, or embedded UCP transport.",
-    config.FINDING_TRANSPORT_UNREACHABLE: "Make at least one declared UCP transport reachable.",
-    config.FINDING_TRANSPORT_NEGOTIATION_INCOMPLETE: (
-        "Complete MCP/REST negotiation or publish the required agent profile contract."
-    ),
-    config.FINDING_SCHEMA_MISSING: "Attach schema URLs for UCP payload contracts.",
-    config.FINDING_SCHEMA_UNREACHABLE: "Make declared schema URLs reachable as JSON.",
-    config.FINDING_SCHEMA_FIELD_MISSING: "Add required UCP fields to declared JSON schemas.",
-    config.FINDING_CATALOG_CONTRACT_MISSING: (
-        "Expose catalog search and lookup schemas or tools with product and variant payloads."
-    ),
-    config.FINDING_CART_CHECKOUT_CONTRACT_MISSING: (
-        "Expose cart and checkout schemas or tools without relying on rendered storefront UI."
-    ),
-    config.FINDING_ORDER_POLICY_CONTRACT_MISSING: (
-        "Expose order, fulfillment, discount, return, and policy payload schemas."
-    ),
-    config.FINDING_PAYMENT_HANDLER_MISSING: "Declare at least one UCP payment handler.",
+    config.FINDING_AID1_JSONLD_MISSING: "Add Product JSON-LD to sampled product pages.",
+    config.FINDING_AID1_PRODUCT_TYPE_MISSING: "Declare schema.org Product in JSON-LD.",
+    config.FINDING_AID1_OPEN_GRAPH_MISSING: "Add Open Graph product metadata.",
+    config.FINDING_AID1_SCHEMA_INVALID: "Fix malformed JSON-LD blocks.",
+    config.FINDING_AID2_TITLE_MISSING: "Populate product titles in structured and visible page data.",
+    config.FINDING_AID2_PRICE_MISSING: "Expose current product price in structured data and visible page data.",
+    config.FINDING_AID2_DESCRIPTION_SHORT: "Add useful product descriptions of at least 100 characters.",
+    config.FINDING_AID2_IMAGES_MISSING: "Expose primary product images in markup and extraction output.",
+    config.FINDING_AID2_VARIANTS_MISSING: "Expose available size, color, or variant options.",
+    config.FINDING_AID2_IDENTIFIERS_MISSING: "Add SKU, GTIN, MPN, or stable product identifiers.",
+    config.FINDING_AID3_OFFER_MISSING: "Add schema.org Offer blocks with price and currency.",
+    config.FINDING_AID3_PAYMENT_METHODS_MISSING: "Expose payment method signals on product or policy pages.",
+    config.FINDING_AID3_EMI_SIGNAL_MISSING: "Expose EMI or installment payment information when supported.",
+    config.FINDING_AID3_DELIVERY_ETA_MISSING: "Add delivery or shipping ETA signals.",
+    config.FINDING_AID3_RETURN_POLICY_MISSING: "Add return and refund policy signals.",
+    config.FINDING_AID4_AVAILABILITY_MISSING: "Add schema.org availability to offers.",
+    config.FINDING_AID4_PRICE_STALE: "Keep structured prices aligned with visible DOM prices.",
+    config.FINDING_AID4_OUT_OF_STOCK_RATE_HIGH: "Add alternative recommendations or improve stock exposure for unavailable products.",
+    config.FINDING_AID5_RATING_MISSING: "Add aggregateRating structured data where review data exists.",
+    config.FINDING_AID5_REVIEW_COUNT_ZERO: "Ensure aggregateRating includes a non-zero review count when ratings are shown.",
+    config.FINDING_AID5_REVIEW_SCHEMA_INVALID: "Fix malformed review markup.",
+    config.FINDING_AID6_LOCAL_BUSINESS_MISSING: "Add LocalBusiness markup when the merchant has stores or service areas.",
+    config.FINDING_AID6_ROBOTS_BLOCKING_AI: "Review robots.txt rules that block AI crawlers.",
+    config.FINDING_AID6_SITEMAP_MISSING: "Publish sitemap.xml or expose a sitemap index.",
 }
 
 _EFFORT_ONE_HOUR = "1 hour"
@@ -59,44 +45,47 @@ _EFFORT_TWO_TO_FOUR_HOURS = "2-4 hours"
 _EFFORT_ONE_SPRINT = "1 sprint"
 
 _EFFORT_BY_CODE = {
-    config.FINDING_MANIFEST_MISSING: _EFFORT_ONE_HOUR,
-    config.FINDING_MANIFEST_INVALID: _EFFORT_TWO_HOURS,
-    config.FINDING_MANIFEST_CONTENT_TYPE_INVALID: _EFFORT_ONE_HOUR,
-    config.FINDING_MANIFEST_REDIRECTED: _EFFORT_ONE_HOUR,
-    config.FINDING_SIGNING_KEYS_MISSING: _EFFORT_TWO_TO_FOUR_HOURS,
-    config.FINDING_CACHE_CONTROL_MISSING: _EFFORT_ONE_HOUR,
-    config.FINDING_SERVICE_MISSING: _EFFORT_ONE_HOUR,
-    config.FINDING_SERVICE_INVALID: _EFFORT_TWO_HOURS,
-    config.FINDING_CAPABILITY_MISSING: _EFFORT_TWO_TO_FOUR_HOURS,
-    config.FINDING_CAPABILITY_INVALID: _EFFORT_TWO_HOURS,
-    config.FINDING_CAPABILITY_VERSION_MISMATCH: _EFFORT_TWO_HOURS,
-    config.FINDING_TRANSPORT_MISSING: _EFFORT_ONE_SPRINT,
-    config.FINDING_TRANSPORT_UNREACHABLE: _EFFORT_ONE_SPRINT,
-    config.FINDING_TRANSPORT_NEGOTIATION_INCOMPLETE: _EFFORT_ONE_SPRINT,
-    config.FINDING_SCHEMA_MISSING: _EFFORT_TWO_HOURS,
-    config.FINDING_SCHEMA_UNREACHABLE: _EFFORT_TWO_HOURS,
-    config.FINDING_SCHEMA_FIELD_MISSING: _EFFORT_ONE_SPRINT,
-    config.FINDING_CATALOG_CONTRACT_MISSING: _EFFORT_ONE_SPRINT,
-    config.FINDING_CART_CHECKOUT_CONTRACT_MISSING: _EFFORT_ONE_SPRINT,
-    config.FINDING_ORDER_POLICY_CONTRACT_MISSING: _EFFORT_ONE_SPRINT,
-    config.FINDING_PAYMENT_HANDLER_MISSING: _EFFORT_TWO_TO_FOUR_HOURS,
+    config.FINDING_AID1_JSONLD_MISSING: _EFFORT_TWO_HOURS,
+    config.FINDING_AID1_PRODUCT_TYPE_MISSING: _EFFORT_ONE_HOUR,
+    config.FINDING_AID1_OPEN_GRAPH_MISSING: _EFFORT_ONE_HOUR,
+    config.FINDING_AID1_SCHEMA_INVALID: _EFFORT_TWO_HOURS,
+    config.FINDING_AID2_TITLE_MISSING: _EFFORT_ONE_HOUR,
+    config.FINDING_AID2_PRICE_MISSING: _EFFORT_TWO_HOURS,
+    config.FINDING_AID2_DESCRIPTION_SHORT: _EFFORT_TWO_TO_FOUR_HOURS,
+    config.FINDING_AID2_IMAGES_MISSING: _EFFORT_TWO_HOURS,
+    config.FINDING_AID2_VARIANTS_MISSING: _EFFORT_ONE_SPRINT,
+    config.FINDING_AID2_IDENTIFIERS_MISSING: _EFFORT_TWO_TO_FOUR_HOURS,
+    config.FINDING_AID3_OFFER_MISSING: _EFFORT_TWO_HOURS,
+    config.FINDING_AID3_PAYMENT_METHODS_MISSING: _EFFORT_TWO_TO_FOUR_HOURS,
+    config.FINDING_AID3_EMI_SIGNAL_MISSING: _EFFORT_TWO_TO_FOUR_HOURS,
+    config.FINDING_AID3_DELIVERY_ETA_MISSING: _EFFORT_TWO_HOURS,
+    config.FINDING_AID3_RETURN_POLICY_MISSING: _EFFORT_TWO_HOURS,
+    config.FINDING_AID4_AVAILABILITY_MISSING: _EFFORT_TWO_HOURS,
+    config.FINDING_AID4_PRICE_STALE: _EFFORT_TWO_HOURS,
+    config.FINDING_AID4_OUT_OF_STOCK_RATE_HIGH: _EFFORT_ONE_SPRINT,
+    config.FINDING_AID5_RATING_MISSING: _EFFORT_TWO_TO_FOUR_HOURS,
+    config.FINDING_AID5_REVIEW_COUNT_ZERO: _EFFORT_ONE_HOUR,
+    config.FINDING_AID5_REVIEW_SCHEMA_INVALID: _EFFORT_TWO_HOURS,
+    config.FINDING_AID6_LOCAL_BUSINESS_MISSING: _EFFORT_TWO_HOURS,
+    config.FINDING_AID6_ROBOTS_BLOCKING_AI: _EFFORT_ONE_HOUR,
+    config.FINDING_AID6_SITEMAP_MISSING: _EFFORT_ONE_HOUR,
 }
 
 _DIMENSION_ORDER = {
-    config.D_UCP1_ID: 0,
-    config.D_UCP2_ID: 1,
-    config.D_UCP3_ID: 2,
-    config.D_UCP4_ID: 3,
-    config.D_UCP5_ID: 4,
-    config.D_UCP6_ID: 5,
+    config.D_AID1_ID: 0,
+    config.D_AID2_ID: 1,
+    config.D_AID3_ID: 2,
+    config.D_AID4_ID: 3,
+    config.D_AID5_ID: 4,
+    config.D_AID6_ID: 5,
 }
 
 _DEPENDS_ON_BY_DIMENSION = {
-    config.D_UCP2_ID: ["discovery"],
-    config.D_UCP3_ID: ["discovery", "capabilities"],
-    config.D_UCP4_ID: ["discovery", "capabilities", "transport"],
-    config.D_UCP5_ID: ["discovery", "capabilities", "transport"],
-    config.D_UCP6_ID: ["discovery", "capabilities", "transport"],
+    config.D_AID2_ID: ["structured markup"],
+    config.D_AID3_ID: ["structured markup", "catalog completeness"],
+    config.D_AID4_ID: ["structured markup", "catalog completeness"],
+    config.D_AID5_ID: ["structured markup"],
+    config.D_AID6_ID: [],
 }
 
 def build_repair_roadmap(
@@ -118,28 +107,13 @@ def build_repair_roadmap(
             priority=_priority(finding),
             finding_codes=[finding.code],
             action=_action_for(finding),
-            source="UCP Overview and UCP Schema Reference",
+            source="AI Discoverability Score guidance",
             evidence=finding.evidence,
             effort=_EFFORT_BY_CODE.get(finding.code, "review"),
             depends_on=_DEPENDS_ON_BY_DIMENSION.get(finding.dimension_id, []),
         )
         for finding in sorted_findings
     ]
-    if _should_include_shopify_advisory(domain, findings):
-        items.append(
-            UCPRepairRoadmapItem(
-                sub_skill="shop-skill advisory",
-                priority="low",
-                finding_codes=[],
-                action=(
-                    "Use https://shop.app/SKILL.md as Shopify repair guidance for catalog "
-                    "search and checkout affordances; do not count it as UCP compliance."
-                ),
-                source="https://shop.app/SKILL.md",
-                effort="review",
-                depends_on=["cart/checkout"],
-            )
-        )
     return items
 
 
@@ -148,31 +122,19 @@ def _action_for(finding: UCPFinding) -> str:
     if finding.evidence:
         first = finding.evidence[0]
         errors = first.get("errors") if isinstance(first, dict) else []
-        if errors and finding.code in {
-            config.FINDING_MANIFEST_INVALID,
-            config.FINDING_SIGNING_KEYS_MISSING,
-            config.FINDING_SERVICE_INVALID,
-            config.FINDING_CAPABILITY_INVALID,
-        }:
+        if errors and finding.code in {config.FINDING_AID1_SCHEMA_INVALID}:
             detail = "; ".join(str(error) for error in errors[:3])
             return f"{base} Errors: {detail}"
     return base
 
 
 def _priority(finding: UCPFinding) -> str:
-    if finding.severity == config.UCP_FINDING_BLOCKING:
+    if finding.severity == config.AID_FINDING_BLOCKING:
         return "critical"
-    if finding.dimension_id in {config.D_UCP2_ID, config.D_UCP3_ID}:
+    if finding.dimension_id in {config.D_AID2_ID, config.D_AID3_ID, config.D_AID4_ID}:
         return "high"
     return "medium"
 
 
 def _priority_order(priority: str) -> int:
     return {"critical": 0, "high": 1, "medium": 2, "low": 3}.get(priority, 9)
-
-
-def _should_include_shopify_advisory(domain: str, findings: list[UCPFinding]) -> bool:
-    normalized = str(domain or "").lower()
-    if "shopify" in normalized or "myshopify" in normalized:
-        return True
-    return any(finding.dimension_id == config.D_UCP5_ID for finding in findings)

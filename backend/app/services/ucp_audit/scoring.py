@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.services.config import ucp_audit as config
+from app.services.config import aid_score as config
 from app.services.ucp_audit.repair_roadmap import build_repair_roadmap
 from app.services.ucp_audit.types import UCPComplianceReport, UCPDimensionScore
 
@@ -17,21 +17,14 @@ def build_compliance_report(
     d_ucp1_gate_applied = False
     d_ucp3_gate_applied = False
     discovery = next(
-        (item for item in dimension_scores if item.dimension_id == config.D_UCP1_ID),
+        (item for item in dimension_scores if item.dimension_id == config.D_AID1_ID),
         None,
     )
     if discovery is None:
-        raise ValueError(f"Missing required dimension score: {config.D_UCP1_ID}")
+        raise ValueError(f"Missing required dimension score: {config.D_AID1_ID}")
     if discovery.score == 0:
-        overall = min(overall, config.D_UCP1_GATE_MAX_SCORE)
+        overall = min(overall, config.D_AID1_GATE_MAX_SCORE)
         d_ucp1_gate_applied = True
-    transport = next(
-        (item for item in dimension_scores if item.dimension_id == config.D_UCP3_ID),
-        None,
-    )
-    if transport is not None and transport.score == 0:
-        overall = min(overall, config.D_UCP3_GATE_MAX_SCORE)
-        d_ucp3_gate_applied = True
     findings = [
         finding
         for dimension in dimension_scores

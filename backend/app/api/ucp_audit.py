@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Annotated
+from urllib.parse import quote
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from fastapi.responses import JSONResponse, PlainTextResponse
@@ -97,10 +98,14 @@ async def export_markdown(
     user: Annotated[User, Depends(get_current_user)],
 ) -> PlainTextResponse:
     try:
-        await get_ucp_audit_job(session, user=user, job_id=job_id)
+        job = await get_ucp_audit_job(session, user=user, job_id=job_id)
     except LookupError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     report = await get_ucp_audit_report(session, job_id)
     if report is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report not found")
-    return PlainTextResponse(report.markdown_report)
+    filename = f"ai-discoverability-audit-{quote(job.domain)}-{job_id}.md"
+    return PlainTextResponse(
+        report.markdown_report,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

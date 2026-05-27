@@ -1,11 +1,12 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Play, RefreshCcw, Layers, CheckSquare, History, Network } from 'lucide-react';
+import { Download, Play, RefreshCcw, Layers, CheckSquare, History, Network } from 'lucide-react';
 
 import { InlineAlert, PageHeader, TabBar } from '../../components/ui/patterns';
-import { Button, Input, Field } from '../../components/ui/primitives';
+import { Button, Input, Field, Toggle } from '../../components/ui/primitives';
 import { HistoryDrawer, type HistoryItem } from '../../components/ui/history-drawer';
+import { api } from '../../lib/api';
 import {
   UcpContractPanel,
   UcpDimensionTable,
@@ -25,12 +26,12 @@ export default function UcpAuditPage() {
   const description =
     controller.activeJob && controller.report
       ? `${controller.activeJob.domain} · score ${controller.report.overall_score}`
-      : 'Run deterministic UCP compliance checks against ecommerce domains.';
+      : 'Audit product data, crawler access, and optional AI shopping-answer quality.';
 
   const tabOptions = useMemo(
     () => [
-      { value: 'compliance', label: 'Compliance Index', icon: <Layers className="size-3.5" /> },
-      { value: 'contract', label: 'Contract Checks', icon: <Network className="size-3.5" /> },
+      { value: 'compliance', label: 'Score Breakdown', icon: <Layers className="size-3.5" /> },
+      { value: 'contract', label: 'Signal Audit', icon: <Network className="size-3.5" /> },
       { value: 'fix-sequence', label: 'Repair Roadmap', icon: <CheckSquare className="size-3.5" /> },
     ],
     [],
@@ -52,7 +53,7 @@ export default function UcpAuditPage() {
   return (
     <div className="page-stack gap-5">
       <PageHeader
-        title="UCP Audit"
+        title="AI Discoverability Score"
         description={description}
         actions={
           <div className="flex w-full flex-wrap items-center justify-end gap-2">
@@ -71,6 +72,25 @@ export default function UcpAuditPage() {
                 className={cn('size-3', controller.detailQuery.isFetching && 'animate-spin')}
               />
               Refresh
+            </Button>
+            <Button
+              asChild
+              variant="download"
+              size="sm"
+              className={!controller.resolvedJobId || !controller.report ? 'pointer-events-none opacity-50' : ''}
+            >
+              <a
+                href={
+                  controller.resolvedJobId
+                    ? api.exportUcpAuditMarkdown(controller.resolvedJobId)
+                    : '#'
+                }
+                download
+                aria-disabled={!controller.resolvedJobId || !controller.report}
+              >
+                <Download className="size-3" />
+                Export report
+              </a>
             </Button>
             <Button
               type="button"
@@ -94,7 +114,7 @@ export default function UcpAuditPage() {
 
       {/* Horizontal Compact Config Ribbon (Saves huge space) */}
       <section className="border-border bg-panel border-l-accent relative overflow-hidden rounded-[var(--radius-lg)] border border-l-4 p-4 shadow-sm">
-        <div className="grid gap-4 sm:grid-cols-[1fr_140px] sm:items-end">
+        <div className="grid gap-4 lg:grid-cols-[1fr_140px_240px] lg:items-end">
           <Field label="Target Domain" className="w-full">
             <Input
               value={controller.domain}
@@ -120,6 +140,23 @@ export default function UcpAuditPage() {
               className="type-control h-[var(--control-height)]"
             />
           </Field>
+
+          <div className="border-border bg-background/35 flex h-[var(--control-height)] items-center justify-between gap-3 rounded-[var(--radius-md)] border px-3">
+            <div className="min-w-0">
+              <div className="type-label text-secondary">AI reasoning</div>
+              <div className="type-caption text-muted truncate">LLM review per product sample</div>
+            </div>
+            <Toggle
+              checked={Boolean(controller.options.llm_enabled)}
+              ariaLabel="Enable AI reasoning"
+              onChange={(checked) =>
+                controller.setOptions((current) => ({
+                  ...current,
+                  llm_enabled: checked,
+                }))
+              }
+            />
+          </div>
         </div>
       </section>
 
@@ -164,7 +201,7 @@ export default function UcpAuditPage() {
           const matched = controller.historyItems.find((j) => j.id === id);
           if (matched) controller.selectJob(matched);
         }}
-        title="UCP Compliance Audit Runs"
+        title="AI Discoverability Score Runs"
       />
     </div>
   );

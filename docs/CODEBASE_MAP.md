@@ -28,7 +28,7 @@ If a file is not listed, assume it is a helper under a listed owner.
 | `llm.py` | LLM provider catalog, config, connection test, cost log |
 | `product_intelligence.py` | Product matching jobs, source products, candidates, match review |
 | `data_enrichment.py` | On-demand ecommerce detail enrichment jobs and enriched product rows |
-| `ucp_audit.py` | UCP audit job creation, history, detail, and report exports |
+| `ucp_audit.py` | AI Discoverability audit job creation, history, detail, and report exports |
 | `monitors.py` | Product monitor CRUD, run-now dispatch, history/events/snapshot, and exports |
 | `alerts.py` | Agentic Delta Engine alert CRUD, test poll, history, and webhook delivery log |
 | `public_alerts.py` | API-key authenticated `/api/v1/alerts` public alert surface |
@@ -67,7 +67,7 @@ If a file is not listed, assume it is a helper under a listed owner.
 | `ReviewPromotion` | `review.py` | approved review schema snapshot |
 | `ProductIntelligenceJob`, `ProductIntelligenceSourceProduct`, `ProductIntelligenceCandidate`, `ProductIntelligenceMatch` | `product_intelligence.py` | web product matching and price comparison jobs |
 | `DataEnrichmentJob`, `EnrichedProduct` | `data_enrichment.py` | on-demand ecommerce detail enrichment jobs and derived enriched product rows |
-| `UCPAuditJob`, `UCPAuditPageResult`, `UCPAuditReport` | `ucp_audit.py` | persisted UCP compliance audit jobs, sampled page payloads, and report artifacts |
+| `UCPAuditJob`, `UCPAuditPageResult`, `UCPAuditReport` | `ucp_audit.py` | persisted AI Discoverability audit jobs, sampled page payloads, and report artifacts |
 | `MonitorJob`, `MonitorEvent`, `MonitorSnapshot`, `MonitorSnapshotRecord`, `MonitorURLState`, `MonitorWebhookDelivery` | `monitor.py` | recurring crawl monitors, agentic alerts, field-level events, snapshots, URL pre-check state, and webhook delivery logs |
 | `InAppNotification` | `notification.py` | user-visible monitor change alerts and read state |
 | `OrchestrationProject`, `OrchestrationWorkflowRun`, `OrchestrationStepRun` | `orchestration.py` | thin project/workflow shells that reference crawl runs and monitors |
@@ -93,7 +93,7 @@ Public API schemas live in `api_key.py` and `public_api.py`.
 | `crawl/events.py` | WebSocket log emission |
 | `product_intelligence/*` | Product web discovery, candidate crawl orchestration, deterministic match scoring |
 | `data_enrichment/service.py` | On-demand enrichment job orchestration and persistence for ecommerce detail records |
-| `ucp_audit/*` | UCP compliance audit primitives, scoring, reporting, and job orchestration |
+| `ucp_audit/catalog_crawl.py`, `ucp_audit/catalog_checks.py`, `ucp_audit/*` | AI Discoverability catalog sampling, signal checks, scoring, reporting, repair roadmap, and job orchestration; dormant UCP protocol files remain here |
 | `monitor_service.py`, `monitor_scheduler_service.py`, `monitor_async_loop.py`, `monitor_change_detection.py`, `monitor_retention.py`, `monitor_alert_service.py` | Product monitoring CRUD support, due-job scheduling, dev scheduler loop, post-run diffing, retention, and in-app alerts |
 | `alert_service.py`, `monitor_condition.py`, `monitor_webhook_service.py` | Agentic Delta Engine alert wrappers, sandboxed condition evaluation, and webhook dispatch/logging |
 | `orchestration_service.py` | Use-case-first project/workflow sequencer that creates normal crawl runs and monitors |
@@ -256,6 +256,7 @@ Canonical config owners:
 | `config/data_enrichment.py` | data enrichment statuses, limits, and taxonomy file path |
 | `config/monitor_settings.py` | monitor statuses, priorities, scheduler limits, retention limits, and HEAD pre-check constants |
 | `config/public_api.py` | public API key prefixes, envelopes, error codes, rate limits, extraction caps, MCP env names, and static capabilities |
+| `config/aid_score.py` | AI Discoverability dimension IDs, finding codes, weights, crawl limits, and report constants |
 
 ### `mcp/` — local agent tool adapters
 
@@ -327,7 +328,7 @@ All selector memory is scoped by normalized `(domain, surface)`.
 | `app/projects/*` | Project list, UC-1 wizard, workflow overview/status, and price comparison view |
 | `app/product-intelligence/product-intelligence-components.tsx` | Product Intelligence local UI pieces |
 | `app/monitors/*`, `app/alerts/*`, `components/monitors/*` | Monitor and alert list/detail/create UI, monitor/alert forms, events, history chart, snapshot table, webhook delivery log, loading and empty states |
-| `app/ucp-audit/*` | UCP audit operator page, hook, and local report components |
+| `app/ucp-audit/*` | AI Discoverability operator page, hook, and local report components |
 | `components/layout/` | shell, auth, nav, theme, scoped shell CSS modules |
 | `components/ui/button.tsx`, `badge.tsx`, `input.tsx`, `card.tsx`, `metric.tsx`, `table.tsx`, `alert.tsx`, `dialog.tsx` | typed UI primitive owners |
 | `components/ui/primitives.tsx` | compatibility barrel plus dropdown, toggle, tooltip, skeleton, field helpers |

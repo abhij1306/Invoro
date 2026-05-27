@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import Image from 'next/image';
 import Link from 'next/link';
 import type { Route } from 'next';
 import { usePathname, useRouter } from 'next/navigation';
@@ -55,7 +56,7 @@ const navGroups = [
       { href: '/alerts', label: 'Product Alerts', icon: Bell },
       { href: '/data-enrichment', label: 'Data Enrichment', icon: FileChartColumn },
       { href: '/product-intelligence', label: 'Product Intelligence', icon: BrainCircuit },
-      { href: '/ucp-audit', label: 'UCP Audit', icon: ClipboardCheck },
+      { href: '/ucp-audit', label: 'AI Discoverability', icon: ClipboardCheck },
       { href: '/selectors', label: 'Selector Tool', icon: SearchCheck, exactMatch: true },
       { href: '/selectors/manage', label: 'Domain Memory', icon: DatabaseZap },
       { href: '/jobs', label: 'Jobs', icon: BriefcaseBusiness },
@@ -93,7 +94,7 @@ const navItemCount = navGroups.reduce((total, group) => total + group.items.leng
 const resetDialogCopy = {
   title: 'Reset workspace data',
   description:
-    'Delete crawl runs, records, logs, artifacts, runtime cookie files, learned domain memory, saved cookie memory, field feedback, host protection memory, Product Intelligence data, Data Enrichment data, and UCP Audit reports.',
+    'Delete crawl runs, records, logs, artifacts, runtime cookie files, learned domain memory, saved cookie memory, field feedback, host protection memory, Product Intelligence data, Data Enrichment data, and AI Discoverability reports.',
   confirmLabel: 'Reset Workspace Data',
 } as const;
 
@@ -230,23 +231,16 @@ function LogoMark({
   collapsed = false,
   auth = false,
 }: Readonly<{ collapsed?: boolean; auth?: boolean }>) {
-  const iconSize = auth ? 'size-5' : 'size-4';
   const mark = (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      className={cn(iconSize, 'text-inherit')}
+    <Image
+      src="/invoro-logo.svg"
+      className="app-logo-gif"
+      alt=""
+      width={96}
+      height={96}
       aria-hidden="true"
-    >
-      <path
-        d="M17 5H7C5.89543 5 5 5.89543 5 7V17C5 18.1046 5.89543 19 7 19H17"
-        stroke="currentColor"
-        strokeWidth="3"
-        strokeLinecap="square"
-      />
-      <rect x="14" y="10" width="4" height="4" fill="currentColor" />
-    </svg>
+      draggable={false}
+    />
   );
 
   if (collapsed) {
@@ -660,8 +654,8 @@ function getFallbackHeader(pathname: string): TopBarState {
     };
   if (pathname.startsWith('/ucp-audit'))
     return {
-      title: 'UCP Audit',
-      description: 'Audit agent-readable commerce compliance for a domain.',
+      title: 'AI Discoverability Score',
+      description: 'Audit catalog signals for AI-readable commerce discovery.',
     };
   if (pathname.startsWith('/runs/'))
     return {

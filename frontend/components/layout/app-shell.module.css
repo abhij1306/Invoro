@@ -74,20 +74,29 @@
 }
 
 :global(.app-logo-mark) {
-  width: 26px;
-  height: 26px;
+  width: 30px;
+  height: 30px;
   border-radius: var(--radius-md);
-  background: linear-gradient(135deg, var(--accent), var(--accent-text));
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
   color: var(--logo-mark-fg, var(--bg-panel));
   display: grid;
   place-items: center;
   flex-shrink: 0;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 28%, transparent);
 }
 
 :global(.app-logo-mark-large) {
-  width: 32px;
-  height: 32px;
+  width: 38px;
+  height: 38px;
   border-radius: var(--radius-sm);
+}
+
+:global(.app-logo-gif) {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
 }
 
 :global(.app-logo-copy) {
@@ -97,9 +106,9 @@
 }
 
 :global(.app-logo-title) {
-  font-size: var(--text-base);
+  font-size: var(--text-lg);
   font-weight: var(--weight-bold);
-  letter-spacing: var(--tracking-normal);
+  letter-spacing: 0;
   color: var(--text-primary);
 }
 

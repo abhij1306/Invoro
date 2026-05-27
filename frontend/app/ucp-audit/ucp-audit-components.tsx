@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { type ReactNode, useMemo, useState } from 'react';
 import { AlertTriangle, Check, CheckSquare, Download, ShieldAlert, Sparkles } from 'lucide-react';
 
 import { DataRegionEmpty, DataRegionLoading, TableSurface } from '../../components/ui/patterns';
@@ -17,35 +17,35 @@ import { cn } from '../../lib/utils';
 import type { UcpAuditJob, UcpAuditReport } from '../../lib/api/types';
 
 const DIMENSION_META: Record<string, { label: string; subtitle: string; desc: string }> = {
-  'D-UCP1': {
-    label: 'Discovery Profile',
-    subtitle: '/.well-known/ucp',
-    desc: 'Checks whether the store publishes a valid UCP discovery profile.',
+  'D-AID1': {
+    label: 'Structured Markup',
+    subtitle: 'Product JSON-LD',
+    desc: 'Checks Product JSON-LD, Open Graph product tags, and JSON-LD parse quality.',
   },
-  'D-UCP2': {
-    label: 'Services & Capabilities',
-    subtitle: 'Declared contract map',
-    desc: 'Checks dev.ucp.shopping plus catalog, cart, checkout, order, fulfillment, and discount capabilities.',
+  'D-AID2': {
+    label: 'Catalog Completeness',
+    subtitle: 'Product field coverage',
+    desc: 'Checks title, description, price, images, variants, identifiers, and brand coverage.',
   },
-  'D-UCP3': {
-    label: 'Transport Negotiation',
-    subtitle: 'REST / MCP / embedded',
-    desc: 'Probes declared transports and treats profile-required MCP responses as partial negotiation.',
+  'D-AID3': {
+    label: 'Commerce Signals',
+    subtitle: 'Offer and policy cues',
+    desc: 'Checks structured offers, payment methods, EMI, delivery, and return signals.',
   },
-  'D-UCP4': {
-    label: 'Catalog Contract',
-    subtitle: 'Search and lookup payloads',
-    desc: 'Validates catalog search and lookup declarations and schema availability.',
+  'D-AID4': {
+    label: 'Freshness & Availability',
+    subtitle: 'Stock and price alignment',
+    desc: 'Checks availability, price freshness, and sampled out-of-stock rate.',
   },
-  'D-UCP5': {
-    label: 'Cart & Checkout Contract',
-    subtitle: 'Cart and checkout shapes',
-    desc: 'Validates cart and checkout payload contracts without executing state-changing flows.',
+  'D-AID5': {
+    label: 'Trust & Social Proof',
+    subtitle: 'Rating and review markup',
+    desc: 'Checks aggregate ratings, review counts, and review schema shape.',
   },
-  'D-UCP6': {
-    label: 'Order & Policy Contract',
-    subtitle: 'Order, fulfillment, payment',
-    desc: 'Validates order, fulfillment, discount, and payment-handler coverage.',
+  'D-AID6': {
+    label: 'Local & Discovery',
+    subtitle: 'Robots and sitemap signals',
+    desc: 'Checks LocalBusiness markup, AI crawler robots rules, and sitemap availability.',
   },
 };
 
@@ -59,145 +59,236 @@ const FINDING_COPY: Record<
     impact: 'critical' | 'high' | 'medium';
   }
 > = {
-  manifest_missing: {
-    description: 'No UCP discovery profile was found at /.well-known/ucp.',
-    fix: 'Publish a valid UCP discovery profile at /.well-known/ucp.',
-    effort: '1 hour',
-    action: 'Publish discovery profile',
-    impact: 'critical',
-  },
-  manifest_invalid: {
-    description: 'The UCP discovery profile has structural errors.',
-    fix: 'Fix missing UCP objects, version fields, or malformed service declarations.',
+  AID1_JSONLD_MISSING: {
+    description: 'No JSON-LD structured data was detected on sampled product pages.',
+    fix: 'Add schema.org Product JSON-LD to product pages.',
     effort: '2 hours',
-    action: 'Fix discovery profile',
+    action: 'Add Product JSON-LD',
     impact: 'critical',
   },
-  manifest_redirected: {
-    description: 'The UCP profile did not resolve at the canonical well-known path.',
-    fix: 'Serve /.well-known/ucp directly without redirect hops.',
+  AID1_PRODUCT_TYPE_MISSING: {
+    description: 'JSON-LD is present, but Product type is missing.',
+    fix: 'Declare @type Product in product JSON-LD.',
     effort: '1 hour',
-    action: 'Remove discovery redirect',
+    action: 'Declare Product type',
+    impact: 'critical',
+  },
+  AID1_OPEN_GRAPH_MISSING: {
+    description: 'No Open Graph product signal was detected.',
+    fix: 'Add product Open Graph metadata.',
+    effort: '1 hour',
+    action: 'Add OG product tags',
     impact: 'medium',
   },
-  signing_keys_missing: {
-    description: 'The UCP profile is missing usable top-level signing keys.',
-    fix: "Add a top-level signing_keys array with at least one public JWK using use='sig'.",
+  AID1_SCHEMA_INVALID: {
+    description: 'One or more JSON-LD blocks could not be parsed.',
+    fix: 'Fix malformed JSON-LD syntax.',
+    effort: '2 hours',
+    action: 'Fix JSON-LD',
+    impact: 'medium',
+  },
+  AID2_TITLE_MISSING: {
+    description: 'Product title is missing on sampled pages.',
+    fix: 'Expose product title in visible and structured data.',
+    effort: '1 hour',
+    action: 'Add titles',
+    impact: 'critical',
+  },
+  AID2_PRICE_MISSING: {
+    description: 'Product price is missing on sampled pages.',
+    fix: 'Expose current price in page markup and extraction output.',
+    effort: '2 hours',
+    action: 'Add prices',
+    impact: 'critical',
+  },
+  AID2_DESCRIPTION_SHORT: {
+    description: 'Product description is missing or too short.',
+    fix: 'Add useful product descriptions of at least 100 characters.',
     effort: '2-4 hours',
-    action: 'Add signing keys',
-    impact: 'medium',
-  },
-  cache_control_missing: {
-    description: 'The discovery profile response is missing required cache headers.',
-    fix: 'Serve Cache-Control: public, max-age=300 or another public max-age of at least 60 seconds.',
-    effort: '1 hour',
-    action: 'Add cache headers',
-    impact: 'medium',
-  },
-  service_missing: {
-    description: 'Required UCP shopping service is not declared.',
-    fix: 'Add dev.ucp.shopping to the UCP services map.',
-    effort: '1 hour',
-    action: 'Declare shopping service',
-    impact: 'critical',
-  },
-  service_invalid: {
-    description: 'One or more UCP service entries are malformed.',
-    fix: 'Add required service version, transport, endpoint, schema, and spec fields.',
-    effort: '2 hours',
-    action: 'Fix service entries',
+    action: 'Improve descriptions',
     impact: 'high',
   },
-  capability_missing: {
-    description: 'Required UCP shopping capabilities are missing.',
-    fix: 'Declare catalog, cart, checkout, order, fulfillment, and discount capabilities.',
+  AID2_IMAGES_MISSING: {
+    description: 'Product images are missing.',
+    fix: 'Expose primary image URLs in markup.',
+    effort: '2 hours',
+    action: 'Add images',
+    impact: 'high',
+  },
+  AID2_VARIANTS_MISSING: {
+    description: 'Variant, size, or color data is missing.',
+    fix: 'Expose available variant choices.',
+    effort: '1 sprint',
+    action: 'Add variants',
+    impact: 'high',
+  },
+  AID2_IDENTIFIERS_MISSING: {
+    description: 'SKU, GTIN, or MPN is missing.',
+    fix: 'Add stable product identifiers.',
     effort: '2-4 hours',
-    action: 'Declare missing capabilities',
-    impact: 'high',
-  },
-  capability_invalid: {
-    description: 'One or more UCP capability entries are malformed.',
-    fix: 'Add required capability version, schema, and spec fields.',
-    effort: '2 hours',
-    action: 'Fix capability entries',
-    impact: 'high',
-  },
-  capability_version_mismatch: {
-    description: 'Capability versions do not match the shopping service version.',
-    fix: 'Align capability versions with dev.ucp.shopping so capability intersection succeeds.',
-    effort: '2 hours',
-    action: 'Align capability versions',
+    action: 'Add identifiers',
     impact: 'medium',
   },
-  transport_missing: {
-    description: 'No REST, MCP, or embedded UCP transport was declared.',
-    fix: 'Expose at least one supported UCP transport endpoint or embedded contract.',
-    effort: '1 sprint',
-    action: 'Expose transport',
+  AID3_OFFER_MISSING: {
+    description: 'No schema.org Offer block was detected.',
+    fix: 'Add Offer structured data with price and currency.',
+    effort: '2 hours',
+    action: 'Add offers',
     impact: 'critical',
   },
-  transport_unreachable: {
-    description: 'No declared UCP transport is reachable.',
-    fix: 'Make at least one REST, MCP, A2A, or embedded transport reachable from the public web.',
-    effort: '1 sprint',
-    action: 'Fix transport reachability',
-    impact: 'critical',
-  },
-  transport_negotiation_incomplete: {
-    description: 'A transport is reachable but did not complete full negotiation.',
-    fix: 'Complete MCP/REST negotiation or publish the required agent profile contract.',
-    effort: '1 sprint',
-    action: 'Complete transport negotiation',
-    impact: 'high',
-  },
-  schema_missing: {
-    description: 'Declared UCP payload schemas are incomplete.',
-    fix: 'Attach schema URLs for all shopping payload contracts.',
-    effort: '2 hours',
-    action: 'Add schema declarations',
-    impact: 'high',
-  },
-  schema_unreachable: {
-    description: 'One or more declared UCP schemas could not be fetched as JSON.',
-    fix: 'Make declared schema URLs public and JSON-readable.',
-    effort: '2 hours',
-    action: 'Fix schema URLs',
-    impact: 'high',
-  },
-  schema_field_missing: {
-    description: 'Declared schemas are missing required UCP payload fields.',
-    fix: 'Add the missing fields to the relevant JSON Schema or OpenAPI component.',
-    effort: '1 sprint',
-    action: 'Add schema fields',
-    impact: 'high',
-  },
-  catalog_contract_missing: {
-    description: 'Catalog search or lookup payload contracts are incomplete.',
-    fix: 'Expose catalog search and lookup schemas or MCP tools.',
-    effort: '1 sprint',
-    action: 'Repair catalog contract',
-    impact: 'high',
-  },
-  cart_checkout_contract_missing: {
-    description: 'Cart or checkout payload contracts are incomplete.',
-    fix: 'Expose cart and checkout schemas or tools without relying on storefront UI.',
-    effort: '1 sprint',
-    action: 'Repair cart and checkout contract',
-    impact: 'high',
-  },
-  order_policy_contract_missing: {
-    description: 'Order, fulfillment, discount, or policy payload contracts are incomplete.',
-    fix: 'Expose order, fulfillment, discount, return, and policy payload schemas.',
-    effort: '1 sprint',
-    action: 'Repair order and policy contract',
-    impact: 'medium',
-  },
-  payment_handler_missing: {
-    description: 'No UCP payment handler was declared.',
-    fix: 'Declare a UCP payment handler such as Google Pay or Shopify card handling.',
+  AID3_PAYMENT_METHODS_MISSING: {
+    description: 'No payment method signal was detected.',
+    fix: 'Expose supported payment methods.',
     effort: '2-4 hours',
-    action: 'Declare payment handler',
+    action: 'Add payment signals',
+    impact: 'high',
+  },
+  AID3_EMI_SIGNAL_MISSING: {
+    description: 'No EMI or installment signal was detected.',
+    fix: 'Expose installment options when supported.',
+    effort: '2-4 hours',
+    action: 'Add EMI signals',
     impact: 'medium',
+  },
+  AID3_DELIVERY_ETA_MISSING: {
+    description: 'No delivery ETA signal was detected.',
+    fix: 'Expose delivery or shipping timing.',
+    effort: '2 hours',
+    action: 'Add delivery signals',
+    impact: 'medium',
+  },
+  AID3_RETURN_POLICY_MISSING: {
+    description: 'No return policy signal was detected.',
+    fix: 'Expose return and refund policy details.',
+    effort: '2 hours',
+    action: 'Add return policy',
+    impact: 'medium',
+  },
+  AID4_AVAILABILITY_MISSING: {
+    description: 'No schema.org availability signal was detected.',
+    fix: 'Add availability to Offer structured data.',
+    effort: '2 hours',
+    action: 'Add availability',
+    impact: 'critical',
+  },
+  AID4_PRICE_STALE: {
+    description: 'Structured price diverges from visible price by more than 5%.',
+    fix: 'Keep structured price aligned with visible DOM price.',
+    effort: '2 hours',
+    action: 'Fix price freshness',
+    impact: 'high',
+  },
+  AID4_OUT_OF_STOCK_RATE_HIGH: {
+    description: 'More than 30% of sampled pages look out of stock.',
+    fix: 'Expose alternatives or improve stock state coverage.',
+    effort: '1 sprint',
+    action: 'Improve stock signals',
+    impact: 'medium',
+  },
+  AID5_RATING_MISSING: {
+    description: 'No aggregateRating was detected in structured data.',
+    fix: 'Add aggregateRating when review data exists.',
+    effort: '2-4 hours',
+    action: 'Add ratings',
+    impact: 'medium',
+  },
+  AID5_REVIEW_COUNT_ZERO: {
+    description: 'Rating is present but review count is zero.',
+    fix: 'Set reviewCount or ratingCount to the displayed review count.',
+    effort: '1 hour',
+    action: 'Fix review count',
+    impact: 'medium',
+  },
+  AID5_REVIEW_SCHEMA_INVALID: {
+    description: 'Review markup is malformed.',
+    fix: 'Fix review author and rating fields.',
+    effort: '2 hours',
+    action: 'Fix reviews',
+    impact: 'medium',
+  },
+  AID6_LOCAL_BUSINESS_MISSING: {
+    description: 'No LocalBusiness markup was detected.',
+    fix: 'Add LocalBusiness markup for stores or service areas.',
+    effort: '2 hours',
+    action: 'Add local markup',
+    impact: 'medium',
+  },
+  AID6_ROBOTS_BLOCKING_AI: {
+    description: 'robots.txt blocks one or more AI crawlers.',
+    fix: 'Review GPTBot and PerplexityBot robots directives.',
+    effort: '1 hour',
+    action: 'Review robots.txt',
+    impact: 'high',
+  },
+  AID6_SITEMAP_MISSING: {
+    description: 'No sitemap.xml was detected.',
+    fix: 'Publish sitemap.xml or a sitemap index.',
+    effort: '1 hour',
+    action: 'Add sitemap',
+    impact: 'medium',
+  },
+  AID_LLM_IDENTITY_UNCLEAR: {
+    description: 'AI review could not clearly identify the product purpose and attributes.',
+    fix: 'Add plain-language product type, use case, material, fit, and audience details.',
+    effort: '2-4 hours',
+    action: 'Clarify product identity',
+    impact: 'high',
+  },
+  AID_LLM_VARIANTS_MISSING: {
+    description: 'AI review could not infer variant choices from page evidence.',
+    fix: 'Expose size, color, fit, and material choices in visible text and structured data.',
+    effort: '1 sprint',
+    action: 'Clarify variants',
+    impact: 'high',
+  },
+  AID_LLM_VARIANTS_UNRESOLVABLE: {
+    description: 'AI review found variant information but could not resolve available choices.',
+    fix: 'Make variant labels, availability, and selected-state text explicit for each option.',
+    effort: '1 sprint',
+    action: 'Resolve variant choices',
+    impact: 'high',
+  },
+  AID_LLM_DESCRIPTION_FLUFF: {
+    description: 'AI review judged the description as marketing-heavy and low on product facts.',
+    fix: 'Add concrete details such as material, fit, dimensions, use case, care, and constraints.',
+    effort: '2-4 hours',
+    action: 'Replace vague copy',
+    impact: 'high',
+  },
+  AID_LLM_DESCRIPTION_SHORT: {
+    description: 'AI review found too little description evidence to answer buyer questions.',
+    fix: 'Add a fuller product description with category-specific attributes and buyer guidance.',
+    effort: '2-4 hours',
+    action: 'Expand description',
+    impact: 'high',
+  },
+  AID_LLM_INTENT_UNANSWERABLE: {
+    description: 'AI review found shopper questions that the page evidence cannot answer.',
+    fix: 'Add buyer-facing answers for occasion, fit, care, delivery, and comparison questions.',
+    effort: '2-4 hours',
+    action: 'Answer shopper intent',
+    impact: 'critical',
+  },
+  AID_LLM_COHERENCE_CONTRADICTION: {
+    description: 'AI review found conflicting page signals.',
+    fix: 'Align JSON-LD, Open Graph, DOM text, and extracted product fields.',
+    effort: '2 hours',
+    action: 'Fix signal conflicts',
+    impact: 'high',
+  },
+  AID_LLM_COHERENCE_INCOMPLETE: {
+    description: 'AI review found the product story incomplete across page signals.',
+    fix: 'Fill missing facts consistently across DOM, structured data, Open Graph, and extracted records.',
+    effort: '2-4 hours',
+    action: 'Complete signal story',
+    impact: 'medium',
+  },
+  AID_LLM_RECOMMENDATION_LOW_CONFIDENCE: {
+    description: 'AI review would not confidently recommend this product for a specific need.',
+    fix: 'Add concrete benefits, supported use cases, audience, constraints, and comparison cues.',
+    effort: '2-4 hours',
+    action: 'Raise recommendation confidence',
+    impact: 'high',
   },
 };
 
@@ -227,6 +318,38 @@ type ContractTransport = {
 };
 
 type UcpContract = {
+  catalog?: {
+    domain?: string;
+    pages_crawled?: number;
+    sampled_urls?: string[];
+    crawl_errors?: string[];
+  };
+  structured_markup?: {
+    product_jsonld_count?: number;
+    jsonld_block_count?: number;
+    jsonld_parse_errors?: string[];
+    open_graph?: Record<string, string>;
+  };
+  product_records?: Array<Record<string, unknown>>;
+  discovery?: {
+    robots_directives?: Record<string, string[]>;
+    sitemap_found?: boolean;
+  };
+  ai_assessment?: {
+    enabled?: boolean;
+    results?: Array<{
+      url?: string;
+      findings?: Array<Record<string, unknown>>;
+      simulated_queries?: Array<{ query?: string; answerable?: boolean; gap?: string }>;
+      llm_provider?: string;
+      llm_model?: string;
+      error?: string;
+    }>;
+    contradictions?: Array<{
+      url?: string;
+      flags?: Array<Record<string, unknown>>;
+    }>;
+  };
   manifest?: {
     found?: boolean;
     valid?: boolean;
@@ -271,9 +394,7 @@ export function UcpScoreSummary({
   const blocking = findings.filter((finding) => finding.severity === 'blocking').length;
   const warnings = findings.filter((finding) => finding.severity !== 'blocking').length;
   const gateApplied = Boolean(report?.report_json?.d_ucp1_gate_applied);
-  const transportGateApplied = Boolean(report?.report_json?.d_ucp3_gate_applied);
   const dUcp1GateMax = Number(report?.report_json?.d_ucp1_gate_max_score ?? 30);
-  const dUcp3GateMax = Number(report?.report_json?.d_ucp3_gate_max_score ?? 45);
 
   return (
     <section className="border-border bg-panel overflow-hidden rounded-[var(--radius-lg)] border shadow-sm">
@@ -281,7 +402,7 @@ export function UcpScoreSummary({
         <div className="border-divider bg-background/30 relative flex flex-col items-center justify-center border-b p-6 lg:border-r lg:border-b-0">
           <div className="absolute inset-x-0 top-3 flex items-center justify-center gap-1.5">
             <Sparkles className="text-accent size-3 animate-pulse" />
-            <span className="type-label-mono text-muted">UCP PROTOCOL INDEX</span>
+            <span className="type-label-mono text-muted">AI DISCOVERABILITY SCORE</span>
           </div>
           {loading && !report ? (
             <LoadingScoreRing size={156} />
@@ -305,24 +426,10 @@ export function UcpScoreSummary({
               <ShieldAlert className="size-4 shrink-0" />
               <div className="leading-snug">
                 <p className="type-subheading text-danger">
-                  Discovery blocked - overall score capped at {dUcp1GateMax}.
+                  Structured markup blocked - overall score capped at {dUcp1GateMax}.
                 </p>
                 <p className="type-caption text-danger/75 mt-0.5">
-                  Publish /.well-known/ucp before other dimensions are evaluated.
-                </p>
-              </div>
-            </div>
-          ) : null}
-
-          {transportGateApplied ? (
-            <div className="border-danger/30 bg-danger/5 text-danger mb-4 flex items-center gap-2.5 rounded-[var(--radius-md)] border px-3 py-2.5">
-              <ShieldAlert className="size-4 shrink-0" />
-              <div className="leading-snug">
-                <p className="type-subheading text-danger">
-                  Transport blocked - overall score capped at {dUcp3GateMax}.
-                </p>
-                <p className="type-caption text-danger/75 mt-0.5">
-                  Make one declared REST, MCP, or embedded transport reachable.
+                  Add Product JSON-LD before other signals can fully count.
                 </p>
               </div>
             </div>
@@ -333,13 +440,13 @@ export function UcpScoreSummary({
               <DimensionScoreCard
                 key={dimension.dimension_id}
                 dimension={dimension}
-                blocked={gateApplied && dimension.dimension_id !== 'D-UCP1'}
+                blocked={gateApplied && dimension.dimension_id !== 'D-AID1'}
               />
             )) ?? (
               <div className="col-span-full py-8">
                 <DataRegionEmpty
                   title="Awaiting audit"
-                  description="Supply a target domain and launch a UCP protocol audit."
+                  description="Supply a target domain and launch an AI discoverability audit."
                 />
               </div>
             )}
@@ -366,9 +473,9 @@ export function UcpDimensionTable({
     <TableSurface contentClassName="min-h-[280px]">
       <header className="border-divider bg-background/25 flex items-center justify-between gap-3 border-b px-4 py-3">
         <div>
-          <h2 className="type-label-mono text-muted">UCP PROTOCOL DIMENSIONS</h2>
+          <h2 className="type-label-mono text-muted">AI DISCOVERABILITY DIMENSIONS</h2>
           <p className="type-caption text-muted mt-0.5">
-            Compliance measured against discovery, services, transport, and payload contracts.
+            Score measured against structured markup, catalog completeness, commerce, freshness, trust, and discovery signals.
           </p>
         </div>
         {report ? (
@@ -447,7 +554,7 @@ export function UcpDimensionTable({
                     <div className="border-success-border bg-success-bg text-success-text flex w-full max-w-[760px] items-center gap-2.5 rounded-[var(--radius-md)] border p-3.5">
                       <Check className="text-success-text size-4 shrink-0" />
                       <span className="type-subheading text-success-text font-medium">
-                        Protocol contract is present for this dimension.
+                        Required AI discoverability signals are present for this dimension.
                       </span>
                     </div>
                   )}
@@ -458,8 +565,8 @@ export function UcpDimensionTable({
         </div>
       ) : (
         <DataRegionEmpty
-          title="Ready for protocol audit"
-          description="Run an audit to inspect the UCP contract."
+          title="Ready for signal audit"
+          description="Run an audit to inspect catalog discoverability signals."
         />
       )}
     </TableSurface>
@@ -468,100 +575,157 @@ export function UcpDimensionTable({
 
 export function UcpContractPanel({ report }: Readonly<{ report: UcpAuditReport | null }>) {
   const contract = getContract(report);
-  const schemas = contract.schemas ?? [];
+  const catalog = contract.catalog ?? {};
+  const markup = contract.structured_markup ?? {};
+  const discovery = contract.discovery ?? {};
+  const productRecords = contract.product_records ?? [];
+  const aiAssessment = contract.ai_assessment ?? {};
+  const aiResults = aiAssessment.results ?? [];
+  const unansweredQueries = aiResults.flatMap((result) =>
+    (result.simulated_queries ?? []).filter((query) => !query.answerable),
+  );
+  const quality = productSampleQuality(productRecords);
 
   return (
     <TableSurface>
       <header className="border-divider bg-background/25 flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
         <div>
-          <h2 className="type-label-mono text-muted">UCP CONTRACT CHECKS</h2>
+          <h2 className="type-label-mono text-muted">SIGNAL AUDIT</h2>
           <p className="type-caption text-muted mt-0.5">
-            Discovery profile and payload schema validation.
+            Catalog crawl, structured markup, and AI crawler discovery signals.
           </p>
         </div>
-        {contract.manifest ? (
-          <Badge tone={contract.manifest.valid ? 'success' : 'danger'}>
-            profile {contract.manifest.valid ? 'valid' : 'invalid'}
+        {report ? (
+          <Badge tone={productRecords.length ? 'success' : 'warning'}>
+            {productRecords.length} product samples
           </Badge>
         ) : null}
       </header>
 
       {report ? (
         <div className="grid gap-5 p-4">
-          <ManifestSummary contract={contract} findings={report.findings} />
-          <TransportSummary transports={contract.transports ?? []} />
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <ManifestFact
+              label="Pages crawled"
+              value={formatUnknownText(catalog.pages_crawled, '0')}
+              tone={Number(catalog.pages_crawled ?? 0) > 0 ? 'success' : 'danger'}
+            />
+            <ManifestFact
+              label="Product JSON-LD"
+              value={formatUnknownText(markup.product_jsonld_count, '0')}
+              tone={Number(markup.product_jsonld_count ?? 0) > 0 ? 'success' : 'danger'}
+            />
+            <ManifestFact
+              label="Sitemap"
+              value={discovery.sitemap_found ? 'found' : 'missing'}
+              tone={discovery.sitemap_found ? 'success' : 'warning'}
+            />
+            <ManifestFact
+              label="Crawl errors"
+              value={formatUnknownText(catalog.crawl_errors?.length ?? 0)}
+              tone={catalog.crawl_errors?.length ? 'warning' : 'success'}
+            />
+          </div>
+
+          <SignalSection title="BRAND READINESS">
+            <div className="grid gap-3 md:grid-cols-3">
+              <SignalMetric
+                label="Core fields"
+                value={`${quality.coreReady}/${productRecords.length || 0}`}
+                tone={quality.coreReady === productRecords.length && productRecords.length ? 'success' : 'warning'}
+              />
+              <SignalMetric
+                label="Variant clarity"
+                value={`${quality.variantReady}/${productRecords.length || 0}`}
+                tone={quality.variantReady === productRecords.length && productRecords.length ? 'success' : 'warning'}
+              />
+              <SignalMetric
+                label="AI unanswered queries"
+                value={formatUnknownText(unansweredQueries.length, '0')}
+                tone={unansweredQueries.length ? 'warning' : 'success'}
+              />
+            </div>
+          </SignalSection>
+
+          <SignalSection title="SAMPLED URLS">
+            <SampledUrlList urls={catalog.sampled_urls ?? []} />
+          </SignalSection>
+
+          <SignalSection title="STRUCTURED MARKUP">
+            <div className="grid gap-3 lg:grid-cols-[220px_220px_1fr]">
+              <SignalMetric
+                label="JSON-LD blocks"
+                value={formatUnknownText(markup.jsonld_block_count, '0')}
+                tone={Number(markup.jsonld_block_count ?? 0) > 0 ? 'success' : 'warning'}
+              />
+              <SignalMetric
+                label="Product JSON-LD"
+                value={formatUnknownText(markup.product_jsonld_count, '0')}
+                tone={Number(markup.product_jsonld_count ?? 0) > 0 ? 'success' : 'danger'}
+              />
+              <OpenGraphSummary tags={markup.open_graph ?? {}} />
+            </div>
+            {markup.jsonld_parse_errors?.length ? (
+              <div className="mt-3">
+                <EvidenceChips
+                  evidence={markup.jsonld_parse_errors.map((error) => ({ jsonld_error: error }))}
+                />
+              </div>
+            ) : null}
+          </SignalSection>
+
+          <SignalSection title="ROBOTS DIRECTIVES">
+            <RobotsSummary directives={discovery.robots_directives ?? {}} />
+          </SignalSection>
+
+          <AiAssessmentSummary assessment={aiAssessment} />
+
           <div>
-            <h3 className="type-label-mono text-muted mb-2">SCHEMA MATRIX</h3>
-            <div className="overflow-x-auto">
-              {schemas.length ? (
-                <Table className="min-w-[980px]">
+            <h3 className="type-label-mono text-muted mb-2">PRODUCT SAMPLE MATRIX</h3>
+            {productRecords.length ? (
+              <div className="overflow-x-auto">
+                <Table className="min-w-[760px]">
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Schema</TableHead>
-                      <TableHead>Result</TableHead>
-                      <TableHead>Coverage</TableHead>
-                      <TableHead>Missing</TableHead>
-                      <TableHead>LLM / Error</TableHead>
+                      <TableHead>URL</TableHead>
+                      <TableHead>Title</TableHead>
+                      <TableHead>Price</TableHead>
+                      <TableHead>Brand</TableHead>
+                      <TableHead>AI-ready fields</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {schemas.map((schema, index) => (
-                      <TableRow key={`${schema.url ?? 'schema'}-${index}`}>
-                        <TableCell className="max-w-[320px] py-3 align-top">
-                          <div className="font-mono text-xs text-foreground break-all">
-                            {schema.url}
-                          </div>
-                          {schema.title ? (
-                            <div className="type-caption text-muted mt-1 break-words">
-                              {schema.title}
-                            </div>
-                          ) : null}
+                    {productRecords.map((record, index) => (
+                      <TableRow key={`${formatUnknownText(record.source_url, 'sample')}-${index}`}>
+                        <TableCell className="font-mono text-xs">
+                          <span title={formatUnknownText(record.source_url, '-')}>
+                            {compactUrl(formatUnknownText(record.source_url, '-'))}
+                          </span>
                         </TableCell>
-                        <TableCell className="w-[120px] py-3 align-top">
-                          <Badge
-                            tone={
-                              schema.reachable && schema.valid_json && schema.schema_valid
-                                ? 'success'
-                                : 'danger'
-                            }
-                          >
-                            {schema.reachable && schema.valid_json && schema.schema_valid
-                              ? 'schema'
-                              : 'bad'}
-                          </Badge>
-                          {schema.status_code ? (
-                            <div className="type-caption-mono text-muted mt-1">
-                              {schema.status_code}
-                            </div>
-                          ) : null}
-                        </TableCell>
-                        <TableCell className="min-w-[360px] py-3 align-top">
-                          <SchemaCoverageCell schema={schema} />
-                        </TableCell>
-                        <TableCell className="min-w-[220px] py-3 align-top">
-                          <SchemaMissingCell schema={schema} />
-                        </TableCell>
-                        <TableCell className="type-caption max-w-[260px] py-3 align-top">
-                          <SchemaAnalysisText schema={schema} />
+                        <TableCell>{formatUnknownText(record.title ?? record.name, '-')}</TableCell>
+                        <TableCell>{formatUnknownText(record.price, '-')}</TableCell>
+                        <TableCell>{formatUnknownText(record.brand, '-')}</TableCell>
+                        <TableCell>
+                          <FieldCoverageChips record={record} />
                         </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
-              ) : (
-                <DataRegionEmpty
-                  title="No schema declarations"
-                  description="The manifest did not expose payload schema URLs."
-                />
-              )}
-            </div>
+              </div>
+            ) : (
+              <DataRegionEmpty
+                title="No product samples"
+                description="The crawl did not extract product records."
+              />
+            )}
           </div>
         </div>
       ) : (
         <div className="py-8">
           <DataRegionEmpty
-            title="No contract payload"
-            description="Run an audit to inspect the UCP contract."
+            title="No signal payload"
+            description="Run an audit to inspect catalog discoverability signals."
           />
         </div>
       )}
@@ -594,12 +758,12 @@ export function UcpFixSequence({ report }: Readonly<{ report: UcpAuditReport | n
       return `- [${checked}] ${index + 1}. [${item.subSkill}] ${item.action} (${item.priority}, ${item.effort})\n   Source: ${item.source}${evidenceBlock}`;
     });
     const domain = formatUnknownText(report?.report_json?.domain, 'Audit Store');
-    const content = `# UCP Repair Roadmap\n\nTarget Domain: ${domain}\nOverall Compliance: ${report?.overall_score ?? 0}/100\n\n${lines.join('\n\n')}\n`;
+    const content = `# AI Discoverability Repair Roadmap\n\nTarget Domain: ${domain}\nOverall Score: ${report?.overall_score ?? 0}/100\n\n${lines.join('\n\n')}\n`;
     const blob = new Blob([content], { type: 'text/markdown' });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = url;
-    anchor.download = `ucp-repair-roadmap-${report?.job_id ?? 'audit'}.md`;
+    anchor.download = `aid-repair-roadmap-${report?.job_id ?? 'audit'}.md`;
     anchor.click();
     URL.revokeObjectURL(url);
   }
@@ -610,7 +774,7 @@ export function UcpFixSequence({ report }: Readonly<{ report: UcpAuditReport | n
         <div>
           <h2 className="type-label-mono text-muted">REPAIR ROADMAP</h2>
           <p className="type-caption text-muted mt-0.5">
-            Grouped by UCP and Shopify repair sub-skills.
+            Grouped by AI discoverability repair area.
           </p>
         </div>
         <Button
@@ -706,7 +870,7 @@ export function UcpFixSequence({ report }: Readonly<{ report: UcpAuditReport | n
         <div className="py-8">
           <DataRegionEmpty
             title="No repair items"
-            description="No UCP gaps were emitted for this run."
+            description="No AI discoverability gaps were emitted for this run."
           />
         </div>
       )}
@@ -953,6 +1117,223 @@ function SchemaAnalysisText({
   return <span className="text-muted">-</span>;
 }
 
+function AiAssessmentSummary({
+  assessment,
+}: Readonly<{ assessment: NonNullable<UcpContract['ai_assessment']> }>) {
+  const results = assessment.results ?? [];
+  const errorCount = results.filter((result) => result.error).length;
+  const queries = results.flatMap((result) => result.simulated_queries ?? []);
+  const contradictions = assessment.contradictions ?? [];
+
+  if (!assessment.enabled && !results.length && !contradictions.length) {
+    return (
+      <SignalSection title="AI REASONING">
+        <DataRegionEmpty
+          title="AI reasoning not run"
+          description="Enable AI reasoning before starting an audit to test shopper-query answerability."
+        />
+      </SignalSection>
+    );
+  }
+
+  return (
+    <SignalSection title="AI REASONING">
+      <div className="grid gap-3 lg:grid-cols-[1fr_1fr]">
+        <div className="grid gap-2">
+          <div className="type-label text-secondary">Shopper-query simulation</div>
+          {queries.length ? (
+            queries.slice(0, 6).map((query, index) => (
+              <div
+                key={`${query.query}-${index}`}
+                className="border-border bg-panel rounded-[var(--radius-md)] border p-3"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <p className="type-body-sm text-foreground">{query.query}</p>
+                  <Badge tone={query.answerable ? 'success' : 'warning'}>
+                    {query.answerable ? 'answerable' : 'gap'}
+                  </Badge>
+                </div>
+                {query.gap ? <p className="type-caption text-muted mt-1">{query.gap}</p> : null}
+              </div>
+            ))
+          ) : (
+            <p className="type-caption text-muted">No simulated queries returned.</p>
+          )}
+        </div>
+
+        <div className="grid gap-2">
+          <div className="type-label text-secondary">Cross-signal conflicts</div>
+          {contradictions.length ? (
+            contradictions.map((row, index) => (
+              <div
+                key={`${row.url}-${index}`}
+                className="border-warning/40 bg-warning/5 rounded-[var(--radius-md)] border p-3"
+              >
+                <div className="type-caption-mono text-muted mb-2">{compactUrl(formatUnknownText(row.url, '-'))}</div>
+                <EvidenceChips evidence={(row.flags ?? []) as Array<Record<string, unknown>>} />
+              </div>
+            ))
+          ) : (
+            <div className="border-success-border bg-success-bg rounded-[var(--radius-md)] border p-3">
+              <p className="type-caption text-success-text">No deterministic conflicts found.</p>
+            </div>
+          )}
+          {errorCount ? (
+            <div className="border-warning/40 bg-warning/5 rounded-[var(--radius-md)] border p-3">
+              <p className="type-caption text-muted">
+                AI reasoning was unavailable for {errorCount} product sample{errorCount === 1 ? '' : 's'}.
+              </p>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </SignalSection>
+  );
+}
+
+function SignalSection({
+  title,
+  children,
+}: Readonly<{ title: string; children: ReactNode }>) {
+  return (
+    <section className="border-border bg-background/20 rounded-[var(--radius-md)] border p-3.5">
+      <h3 className="type-label-mono text-muted mb-3">{title}</h3>
+      {children}
+    </section>
+  );
+}
+
+function SignalMetric({
+  label,
+  value,
+  tone,
+}: Readonly<{ label: string; value: string; tone: string }>) {
+  return (
+    <div className="border-border bg-panel rounded-[var(--radius-md)] border p-3">
+      <div className="type-label text-secondary">{label}</div>
+      <div
+        className={cn(
+          'mt-2 font-mono text-2xl font-semibold tabular-nums',
+          tone === 'success' && 'text-success',
+          tone === 'warning' && 'text-warning',
+          tone === 'danger' && 'text-danger',
+        )}
+      >
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function SampledUrlList({ urls }: Readonly<{ urls: string[] }>) {
+  if (!urls.length) {
+    return <DataRegionEmpty title="No sampled URLs" description="The crawl did not return URL samples." />;
+  }
+  return (
+    <ol className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+      {urls.map((url, index) => (
+        <li
+          key={`${url}-${index}`}
+          className="border-border bg-panel flex min-w-0 items-center gap-2 rounded-[var(--radius-md)] border px-3 py-2.5"
+        >
+          <span className="bg-background border-border text-muted grid size-6 shrink-0 place-items-center rounded border font-mono text-[11px]">
+            {index + 1}
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="font-mono text-xs text-foreground truncate" title={url}>
+              {compactUrl(url)}
+            </div>
+            <div className="type-caption text-muted mt-0.5">{urlRole(url, index)}</div>
+          </div>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function OpenGraphSummary({ tags }: Readonly<{ tags: Record<string, string> }>) {
+  const entries = Object.entries(tags)
+    .filter(([, value]) => formatUnknownText(value).trim())
+    .slice(0, 6);
+  if (!entries.length) {
+    return (
+      <div className="border-border bg-panel rounded-[var(--radius-md)] border p-3">
+        <div className="type-label text-secondary">Open Graph</div>
+        <div className="type-caption text-muted mt-2">No product tags found</div>
+      </div>
+    );
+  }
+  return (
+    <div className="border-border bg-panel min-w-0 rounded-[var(--radius-md)] border p-3">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <span className="type-label text-secondary">Open Graph</span>
+        <Badge tone="success">{entries.length} tags</Badge>
+      </div>
+      <div className="grid gap-1.5 sm:grid-cols-2">
+        {entries.map(([key, value]) => (
+          <div key={key} className="min-w-0">
+            <div className="type-caption-mono text-muted">{key}</div>
+            <div className="type-caption text-foreground truncate" title={formatUnknownText(value)}>
+              {shortText(formatUnknownText(value), 72)}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function RobotsSummary({
+  directives,
+}: Readonly<{ directives: Record<string, string[]> }>) {
+  const rows = ['gptbot', 'perplexitybot'].map((agent) => {
+    const disallows = directives[agent] ?? directives[agent.toLowerCase()] ?? [];
+    const blocked = disallows.some((rule) => String(rule).trim() === '/');
+    return { agent, blocked, ruleCount: disallows.length };
+  });
+  const totalRules = Object.values(directives).reduce((sum, rules) => sum + rules.length, 0);
+  return (
+    <div className="grid gap-3 md:grid-cols-[1fr_1fr_180px]">
+      {rows.map((row) => (
+        <div key={row.agent} className="border-border bg-panel rounded-[var(--radius-md)] border p-3">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <span className="font-mono text-xs text-foreground">{row.agent}</span>
+            <Badge tone={row.blocked ? 'danger' : 'success'}>
+              {row.blocked ? 'blocked' : 'allowed'}
+            </Badge>
+          </div>
+          <div className="type-caption text-muted">{row.ruleCount} disallow rules</div>
+        </div>
+      ))}
+      <div className="border-border bg-panel rounded-[var(--radius-md)] border p-3">
+        <div className="type-label text-secondary">Total rules</div>
+        <div className="mt-2 font-mono text-2xl font-semibold text-foreground tabular-nums">
+          {totalRules}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FieldCoverageChips({ record }: Readonly<{ record: Record<string, unknown> }>) {
+  const checks = [
+    ['title', Boolean(formatUnknownText(record.title ?? record.name))],
+    ['price', Boolean(formatUnknownText(record.price))],
+    ['description', formatUnknownText(record.description).length >= 100],
+    ['image', Boolean(formatUnknownText(record.image_url ?? record.image ?? record.images))],
+    ['variant', Boolean(formatUnknownText(record.variants ?? record.size ?? record.color))],
+  ];
+  return (
+    <div className="flex max-w-[280px] flex-wrap gap-1">
+      {checks.map(([label, ok]) => (
+        <Badge key={String(label)} tone={ok ? 'success' : 'warning'} className="font-mono lowercase">
+          {String(label)}
+        </Badge>
+      ))}
+    </div>
+  );
+}
+
 function EvidenceChips({ evidence }: Readonly<{ evidence: Array<Record<string, unknown>> }>) {
   const lines = evidenceToLines(evidence);
   if (!lines.length) return null;
@@ -987,6 +1368,23 @@ function evidenceToLines(evidence: Array<Record<string, unknown>> = []): string[
     .slice(0, 12);
 }
 
+function productSampleQuality(records: Array<Record<string, unknown>>) {
+  return records.reduce<{ coreReady: number; variantReady: number }>(
+    (summary, record) => {
+      const hasTitle = Boolean(formatUnknownText(record.title ?? record.name));
+      const hasPrice = Boolean(formatUnknownText(record.price));
+      const hasDescription = formatUnknownText(record.description).length >= 100;
+      const hasImage = Boolean(formatUnknownText(record.image_url ?? record.image ?? record.images));
+      const hasVariant = Boolean(formatUnknownText(record.variants ?? record.size ?? record.color));
+      return {
+        coreReady: summary.coreReady + (hasTitle && hasPrice && hasDescription && hasImage ? 1 : 0),
+        variantReady: summary.variantReady + (hasVariant ? 1 : 0),
+      };
+    },
+    { coreReady: 0, variantReady: 0 },
+  );
+}
+
 function findingsForCodes(findings: Array<Record<string, unknown>>, codes: string[]) {
   return findings
     .filter((finding) => codes.includes(formatUnknownText(finding.code)))
@@ -1017,6 +1415,27 @@ function formatUnknownText(value: unknown, fallback = ''): string {
   } catch {
     return fallback;
   }
+}
+
+function compactUrl(value: string): string {
+  try {
+    const parsed = new URL(value);
+    const path = parsed.pathname === '/' ? '/' : parsed.pathname.replace(/\/$/, '');
+    return `${parsed.hostname}${path}`;
+  } catch {
+    return shortText(value, 96);
+  }
+}
+
+function urlRole(url: string, index: number): string {
+  if (index === 0) return 'entry page';
+  if (/\/(?:products?|p)\//i.test(url)) return 'product page';
+  return 'sample page';
+}
+
+function shortText(value: string, maxLength: number): string {
+  if (value.length <= maxLength) return value;
+  return `${value.slice(0, Math.max(0, maxLength - 1))}...`;
 }
 
 function DimensionScoreCard({
@@ -1182,7 +1601,7 @@ function normalizeFinding(finding: Record<string, unknown>, index: number): Norm
   const dimension = formatUnknownText(finding.dimension_id ?? finding.dimension);
   const copy = FINDING_COPY[code] ?? {
     description: formatUnknownText(finding.message, code),
-    fix: 'Inspect the exported UCP contract payload and repair the declared service contract.',
+    fix: 'Inspect the exported signal payload and repair the missing catalog signal.',
     effort: 'review',
     action: `Resolve ${code}`,
     impact: 'medium' as const,
@@ -1213,13 +1632,13 @@ function getRoadmap(report: UcpAuditReport | null) {
   if (Array.isArray(raw) && raw.length) {
     return raw.map((item, index) => {
       const roadmap = item;
-      const subSkill = formatUnknownText(roadmap.sub_skill, 'ucp');
+      const subSkill = formatUnknownText(roadmap.sub_skill, 'aid');
       return {
         id: `${subSkill}-${index}`,
         subSkill,
         priority: formatUnknownText(roadmap.priority, 'medium'),
-        action: formatUnknownText(roadmap.action, 'Repair UCP contract'),
-        source: formatUnknownText(roadmap.source, 'UCP Overview and UCP Schema Reference'),
+        action: formatUnknownText(roadmap.action, 'Repair AI discoverability signal'),
+        source: formatUnknownText(roadmap.source, 'AI Discoverability Score guidance'),
         evidence: Array.isArray(roadmap.evidence)
           ? (roadmap.evidence as Array<Record<string, unknown>>)
           : [],
@@ -1237,7 +1656,7 @@ function getRoadmap(report: UcpAuditReport | null) {
       subSkill: normalized.dimension,
       priority: normalized.impact,
       action: normalized.action,
-      source: 'UCP Overview and UCP Schema Reference',
+      source: 'AI Discoverability Score guidance',
       evidence: normalized.evidence,
       effort: normalized.effort,
       dependsOn: [],

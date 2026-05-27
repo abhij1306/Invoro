@@ -12,7 +12,7 @@
 
 </div>
 
-Invoro extracts structured data from ecommerce, job, automobile, content, article, forum-thread, and tabular targets. It prefers deterministic evidence first: platform adapters, structured sources, JS state, network payloads, and DOM selectors. LLM calls are optional backfill only.
+Invoro extracts structured data from ecommerce, job, content, article, forum-thread, and tabular targets. It prefers deterministic evidence first: platform adapters, structured sources, JS state, network payloads, and DOM selectors. LLM calls are optional backfill only.
 
 ## Features
 
@@ -20,7 +20,7 @@ Invoro extracts structured data from ecommerce, job, automobile, content, articl
 | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | HTTP-first acquisition | Starts with `curl-cffi`, escalates to Patchright/Playwright only when blocking, hydration, or browser-only content requires it.                     |
 | Tiered extraction      | Runs `adapter -> structured source -> JS state -> DOM -> confidence scoring -> optional LLM gap fill`.                                              |
-| Surface-aware crawling | Supports ecommerce, jobs, automobiles, content pages, article feeds/pages, forum threads, and tabular surfaces.                                     |
+| Surface-aware crawling | Supports ecommerce, jobs, content pages, article feeds/pages, forum threads, and tabular surfaces.                                     |
 | Domain memory          | Stores reusable run profiles, cookie state, learned selectors, acquisition evidence, and field feedback by normalized `(domain, surface)`.          |
 | Review workflow        | Lets operators inspect crawl records, artifact HTML, selector candidates, field winners, and promote domain selectors.                              |
 | Exports                | Produces JSON, CSV, artifact bundles, and Discoverist-style exports from persisted crawl records.                                                   |

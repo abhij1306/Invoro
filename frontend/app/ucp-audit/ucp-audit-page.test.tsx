@@ -156,7 +156,7 @@ describe('UcpAuditPage', () => {
     expect(apiMock.createUcpAuditJob).not.toHaveBeenCalled();
   });
 
-  it('renders evidence, schema fields, transport details, and gate caps', () => {
+  it('renders evidence, product samples, signal details, and gate caps', () => {
     const report = sampleReport();
 
     render(
@@ -167,21 +167,39 @@ describe('UcpAuditPage', () => {
       </>,
     );
 
-    expect(screen.getByText(/Discovery blocked - overall score capped at 30/i)).toBeInTheDocument();
-    expect(screen.getByText(/Transport blocked - overall score capped at 45/i)).toBeInTheDocument();
-    expect(screen.getByText('missing_schema_fields: price')).toBeInTheDocument();
+    expect(
+      screen.getByText(/Structured markup blocked - overall score capped at 30/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText('structured_price: 100')).toBeInTheDocument();
     expect(screen.getAllByText('1 sprint').length).toBeGreaterThan(0);
-    expect(screen.getByText('SCHEMA MATRIX')).toBeInTheDocument();
-    expect(screen.getByText('DISCOVERY PROFILE')).toBeInTheDocument();
-    expect(screen.getByText('Signing keys')).toBeInTheDocument();
-    expect(screen.getByText('missing or invalid')).toBeInTheDocument();
-    expect(screen.getByText('Cache-Control')).toBeInTheDocument();
-    expect(screen.getByText('needs header')).toBeInTheDocument();
-    expect(screen.getByText('TRANSPORTS')).toBeInTheDocument();
-    expect(screen.getAllByText('profile required').length).toBeGreaterThan(0);
-    expect(screen.getByText('Catalog')).toBeInTheDocument();
-    expect(screen.getByText('price')).toBeInTheDocument();
-    expect(screen.getByText('Add missing price.')).toBeInTheDocument();
+    expect(screen.getByText('SIGNAL AUDIT')).toBeInTheDocument();
+    expect(screen.getByText('STRUCTURED MARKUP')).toBeInTheDocument();
+    expect(screen.getByText('PRODUCT SAMPLE MATRIX')).toBeInTheDocument();
+    expect(screen.getAllByText('Product JSON-LD').length).toBeGreaterThan(0);
+    expect(screen.getByText('Sitemap')).toBeInTheDocument();
+    expect(screen.getAllByText('example.com/p/1').length).toBeGreaterThan(0);
+    expect(screen.getByText('product page')).toBeInTheDocument();
+    expect(screen.getByText('gptbot')).toBeInTheDocument();
+    expect(screen.getByText('blocked')).toBeInTheDocument();
+    expect(screen.getByText('Widget')).toBeInTheDocument();
+  });
+
+  it('shows full markdown export link for completed reports', async () => {
+    apiMock.listUcpAuditJobs.mockResolvedValue([sampleJob()]);
+    apiMock.getUcpAuditJob.mockResolvedValue({
+      job: sampleJob(),
+      page_results: [],
+      report: sampleReport(),
+    });
+
+    renderShellPage();
+
+    const link = await screen.findByRole('link', { name: /export report/i });
+
+    await waitFor(() => {
+      expect(link).toHaveAttribute('href', '/api/ucp-audit/jobs/101/export.md');
+    });
+    expect(link).toHaveAttribute('download');
   });
 
   it('exports roadmap evidence', async () => {
@@ -196,7 +214,7 @@ describe('UcpAuditPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /export roadmap/i }));
 
     const blob = createObjectURL.mock.calls[0][0] as Blob;
-    await expect(blob.text()).resolves.toContain('missing_schema_fields: price');
+    await expect(blob.text()).resolves.toContain('structured_price: 100');
     expect(click).toHaveBeenCalled();
 
     createObjectURL.mockRestore();
@@ -226,166 +244,128 @@ function sampleReport() {
     overall_score: 30,
     dimension_scores: [
       {
-        dimension_id: 'D-UCP1',
+        dimension_id: 'D-AID1',
         score: 80,
         status: 'warning',
         weight: 0.2,
         findings: [
           {
-            code: 'signing_keys_missing',
-            dimension_id: 'D-UCP1',
+            code: 'AID1_OPEN_GRAPH_MISSING',
+            dimension_id: 'D-AID1',
             severity: 'warning',
-            message: 'signing_keys array is missing or empty.',
-            evidence: [{ errors: ['Missing required array: signing_keys'] }],
-          },
-          {
-            code: 'cache_control_missing',
-            dimension_id: 'D-UCP1',
-            severity: 'warning',
-            message: 'UCP discovery profile response lacks required cache headers.',
-            evidence: [
-              {
-                errors: ['Missing Cache-Control header (spec requires public, max-age >= 60)'],
-              },
-            ],
+            message: 'No Open Graph product signal was detected.',
+            evidence: [{ product_jsonld: 1 }],
           },
         ],
       },
       {
-        dimension_id: 'D-UCP3',
+        dimension_id: 'D-AID4',
         score: 70,
         status: 'warning',
         weight: 0.15,
         findings: [
           {
-            code: 'transport_negotiation_incomplete',
-            dimension_id: 'D-UCP3',
+            code: 'AID4_PRICE_STALE',
+            dimension_id: 'D-AID4',
             severity: 'warning',
-            message: 'At least one reachable transport did not complete full negotiation.',
+            message: 'Structured price diverges from visible price by more than 5%.',
             evidence: [
               {
-                transport: 'mcp',
-                endpoint: 'https://example.com/ucp',
-                profile_required: true,
+                url: 'https://example.com/p/1',
+                structured_price: 100,
+                dom_price: 120,
               },
             ],
           },
         ],
       },
       {
-        dimension_id: 'D-UCP4',
+        dimension_id: 'D-AID2',
         score: 60,
         status: 'warning',
         weight: 0.15,
         findings: [
           {
-            code: 'catalog_contract_missing',
-            dimension_id: 'D-UCP4',
+            code: 'AID2_VARIANTS_MISSING',
+            dimension_id: 'D-AID2',
             severity: 'warning',
-            message: 'Catalog contract incomplete.',
-            evidence: [{ missing_schema_fields: ['price'] }],
+            message: 'Variant, size, or color data is missing.',
+            evidence: [{ missing_fields: ['variants'] }],
           },
         ],
       },
     ],
     findings: [
       {
-        code: 'signing_keys_missing',
-        dimension_id: 'D-UCP1',
+        code: 'AID1_OPEN_GRAPH_MISSING',
+        dimension_id: 'D-AID1',
         severity: 'warning',
-        message: 'signing_keys array is missing or empty.',
-        evidence: [{ errors: ['Missing required array: signing_keys'] }],
+        message: 'No Open Graph product signal was detected.',
+        evidence: [{ product_jsonld: 1 }],
       },
       {
-        code: 'cache_control_missing',
-        dimension_id: 'D-UCP1',
+        code: 'AID4_PRICE_STALE',
+        dimension_id: 'D-AID4',
         severity: 'warning',
-        message: 'UCP discovery profile response lacks required cache headers.',
+        message: 'Structured price diverges from visible price by more than 5%.',
         evidence: [
           {
-            errors: ['Missing Cache-Control header (spec requires public, max-age >= 60)'],
+            url: 'https://example.com/p/1',
+            structured_price: 100,
+            dom_price: 120,
           },
         ],
       },
       {
-        code: 'transport_negotiation_incomplete',
-        dimension_id: 'D-UCP3',
+        code: 'AID2_VARIANTS_MISSING',
+        dimension_id: 'D-AID2',
         severity: 'warning',
-        message: 'At least one reachable transport did not complete full negotiation.',
-        evidence: [
-          {
-            transport: 'mcp',
-            endpoint: 'https://example.com/ucp',
-            profile_required: true,
-          },
-        ],
-      },
-      {
-        code: 'catalog_contract_missing',
-        dimension_id: 'D-UCP4',
-        severity: 'warning',
-        message: 'Catalog contract incomplete.',
-        evidence: [{ missing_schema_fields: ['price'] }],
+        message: 'Variant, size, or color data is missing.',
+        evidence: [{ missing_fields: ['variants'] }],
       },
     ],
     report_json: {
       domain: 'example.com',
       d_ucp1_gate_applied: true,
       d_ucp1_gate_max_score: 30,
-      d_ucp3_gate_applied: true,
-      d_ucp3_gate_max_score: 45,
+      d_ucp3_gate_applied: false,
+      d_ucp3_gate_max_score: 0,
       ucp_contract: {
-        manifest: {
-          found: true,
-          valid: true,
-          target_version: '2026-04-08',
-          selected_version: '2026-04-08',
-          version_source: 'current',
-          final_url: 'https://example.com/.well-known/ucp',
+        catalog: {
+          domain: 'example.com',
+          pages_crawled: 2,
+          sampled_urls: ['https://example.com', 'https://example.com/p/1'],
+          crawl_errors: [],
         },
-        services: ['dev.ucp.shopping'],
-        capabilities: ['dev.ucp.shopping.catalog.search'],
-        transports: [
+        structured_markup: {
+          product_jsonld_count: 1,
+          jsonld_block_count: 1,
+          jsonld_parse_errors: [],
+          open_graph: { '@type': 'product' },
+        },
+        product_records: [
           {
-            service: 'dev.ucp.shopping',
-            transport: 'mcp',
-            endpoint: 'https://example.com/ucp',
-            reachable: true,
-            negotiated: false,
-            profile_required: true,
-            status_code: 404,
-            error: 'profile required',
+            source_url: 'https://example.com/p/1',
+            title: 'Widget',
+            price: '120',
+            brand: 'Example',
           },
         ],
-        schemas: [
-          {
-            url: 'https://example.com/catalog.schema.json',
-            reachable: true,
-            valid_json: true,
-            schema_valid: true,
-            field_results: {
-              catalog: {
-                product_id: true,
-                title: true,
-                price: false,
-                currency: true,
-                availability: true,
-              },
-            },
-            llm_analysis: { summary: 'Add missing price.' },
-          },
-        ],
+        discovery: {
+          robots_directives: { gptbot: ['/'] },
+          sitemap_found: true,
+        },
       },
       repair_roadmap: [
         {
-          sub_skill: 'catalog',
+          sub_skill: 'freshness availability',
           priority: 'high',
-          finding_codes: ['catalog_contract_missing'],
-          action: 'Repair catalog contract',
-          source: 'UCP Overview and UCP Schema Reference',
-          evidence: [{ missing_schema_fields: ['price'] }],
+          finding_codes: ['AID4_PRICE_STALE'],
+          action: 'Keep structured prices aligned with visible DOM prices.',
+          source: 'AI Discoverability Score guidance',
+          evidence: [{ structured_price: 100, dom_price: 120 }],
           effort: '1 sprint',
-          depends_on: ['discovery', 'capabilities', 'transport'],
+          depends_on: ['structured markup', 'catalog completeness'],
         },
       ],
     },
