@@ -90,9 +90,7 @@ export function detailToDiscovery(
     }
     sourcesById.set(source.id, { source, index });
   });
-  const matchesByCandidateId = new Map(
-    detail.matches.map((match) => [match.candidate_id, match]),
-  );
+  const matchesByCandidateId = new Map(detail.matches.map((match) => [match.candidate_id, match]));
   const candidates = detail.candidates.map((candidate) => {
     const sourceEntry = sourcesById.get(candidate.source_product_id);
     const source = sourceEntry?.source;

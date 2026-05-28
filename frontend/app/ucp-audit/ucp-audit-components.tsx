@@ -475,7 +475,8 @@ export function UcpDimensionTable({
         <div>
           <h2 className="type-label-mono text-muted">AI DISCOVERABILITY DIMENSIONS</h2>
           <p className="type-caption text-muted mt-0.5">
-            Score measured against structured markup, catalog completeness, commerce, freshness, trust, and discovery signals.
+            Score measured against structured markup, catalog completeness, commerce, freshness,
+            trust, and discovery signals.
           </p>
         </div>
         {report ? (
@@ -504,7 +505,7 @@ export function UcpDimensionTable({
               >
                 <div className="lg:border-divider/40 flex flex-col justify-start border-b pr-4 pb-4 lg:border-r lg:border-b-0 lg:pb-0">
                   <div className="mb-2 flex items-center gap-2">
-                    <span className="font-mono text-xs text-foreground bg-background border-border/80 rounded border px-2 py-0.5">
+                    <span className="text-foreground bg-background border-border/80 rounded border px-2 py-0.5 font-mono text-xs">
                       {dimension.dimension_id}
                     </span>
                     <Badge tone={badgeTone(dimension.status)} className="scale-90">
@@ -543,7 +544,9 @@ export function UcpDimensionTable({
                               <Badge tone="neutral" className="font-mono lowercase">
                                 {finding.effort}
                               </Badge>
-                              <span className="font-sans text-xs font-medium text-secondary">{finding.action}</span>
+                              <span className="text-secondary font-sans text-xs font-medium">
+                                {finding.action}
+                              </span>
                             </div>
                             <EvidenceChips evidence={finding.evidence} />
                           </div>
@@ -632,12 +635,20 @@ export function UcpContractPanel({ report }: Readonly<{ report: UcpAuditReport |
               <SignalMetric
                 label="Core fields"
                 value={`${quality.coreReady}/${productRecords.length || 0}`}
-                tone={quality.coreReady === productRecords.length && productRecords.length ? 'success' : 'warning'}
+                tone={
+                  quality.coreReady === productRecords.length && productRecords.length
+                    ? 'success'
+                    : 'warning'
+                }
               />
               <SignalMetric
                 label="Variant clarity"
                 value={`${quality.variantReady}/${productRecords.length || 0}`}
-                tone={quality.variantReady === productRecords.length && productRecords.length ? 'success' : 'warning'}
+                tone={
+                  quality.variantReady === productRecords.length && productRecords.length
+                    ? 'success'
+                    : 'warning'
+                }
               />
               <SignalMetric
                 label="AI unanswered queries"
@@ -840,8 +851,8 @@ export function UcpFixSequence({ report }: Readonly<{ report: UcpAuditReport | n
                         isChecked && 'text-muted line-through',
                       )}
                     >
-                      <span className="font-mono text-xs text-secondary">{index + 1}.</span>
-                      <span className="font-mono text-xs bg-background border-border text-foreground font-medium rounded border px-1.5 py-0.5">
+                      <span className="text-secondary font-mono text-xs">{index + 1}.</span>
+                      <span className="bg-background border-border text-foreground rounded border px-1.5 py-0.5 font-mono text-xs font-medium">
                         {item.subSkill}
                       </span>
                       <span>{item.action}</span>
@@ -852,7 +863,7 @@ export function UcpFixSequence({ report }: Readonly<{ report: UcpAuditReport | n
                         {item.effort}
                       </Badge>
                       {item.dependsOn.length ? (
-                        <span className="font-mono text-xs text-muted">
+                        <span className="text-muted font-mono text-xs">
                           Depends: {item.dependsOn.join(', ')}
                         </span>
                       ) : null}
@@ -952,7 +963,9 @@ function ManifestFact({
         <span className="type-label text-secondary">{label}</span>
         <Badge tone={badgeTone(tone)}>{value}</Badge>
       </div>
-      {detail ? <div className="font-mono text-xs text-foreground mt-1 break-all">{detail}</div> : null}
+      {detail ? (
+        <div className="text-foreground mt-1 font-mono text-xs break-all">{detail}</div>
+      ) : null}
     </div>
   );
 }
@@ -998,7 +1011,7 @@ function TransportSummary({ transports }: Readonly<{ transports: ContractTranspo
               return (
                 <TableRow key={`${transport.transport ?? 'transport'}-${index}`}>
                   <TableCell className="py-3 align-top">
-                    <div className="font-mono text-xs text-foreground">
+                    <div className="text-foreground font-mono text-xs">
                       {(transport.transport ?? 'unknown').toUpperCase()}
                     </div>
                     {transport.service ? (
@@ -1008,17 +1021,19 @@ function TransportSummary({ transports }: Readonly<{ transports: ContractTranspo
                   <TableCell className="py-3 align-top">
                     <Badge tone={negotiationTone}>{negotiationLabel}</Badge>
                     {transport.status_code ? (
-                      <div className="font-mono text-xs text-muted mt-1">
+                      <div className="text-muted mt-1 font-mono text-xs">
                         HTTP {transport.status_code}
                       </div>
                     ) : null}
                   </TableCell>
                   <TableCell className="max-w-[300px] py-3 align-top">
-                    <div className="font-mono text-xs text-foreground break-all">
+                    <div className="text-foreground font-mono text-xs break-all">
                       {transport.endpoint || '-'}
                     </div>
                   </TableCell>
-                  <TableCell className="type-caption max-w-[320px] py-3 align-top break-words">{detail}</TableCell>
+                  <TableCell className="type-caption max-w-[320px] py-3 align-top break-words">
+                    {detail}
+                  </TableCell>
                 </TableRow>
               );
             })}
@@ -1059,7 +1074,12 @@ function SchemaGroupSummary({
     <div className="border-border bg-background-alt/30 rounded px-2.5 py-2">
       <div className="mb-1 flex items-center justify-between gap-2">
         <span className="type-label text-secondary">{SCHEMA_GROUP_LABELS[group] ?? group}</span>
-        <span className={cn('font-mono text-xs font-semibold', complete ? 'text-success' : 'text-danger')}>
+        <span
+          className={cn(
+            'font-mono text-xs font-semibold',
+            complete ? 'text-success' : 'text-danger',
+          )}
+        >
           {present}/{total}
         </span>
       </div>
@@ -1084,7 +1104,7 @@ function SchemaMissingCell({
     )
     .filter((field, index, fields) => fields.indexOf(field) === index);
   if (!missing.length) {
-    return <span className="font-mono text-xs text-success font-medium">Complete</span>;
+    return <span className="text-success font-mono text-xs font-medium">Complete</span>;
   }
   return (
     <div className="flex max-w-[260px] flex-wrap gap-1">
@@ -1169,7 +1189,9 @@ function AiAssessmentSummary({
                 key={`${row.url}-${index}`}
                 className="border-warning/40 bg-warning/5 rounded-[var(--radius-md)] border p-3"
               >
-                <div className="type-caption-mono text-muted mb-2">{compactUrl(formatUnknownText(row.url, '-'))}</div>
+                <div className="type-caption-mono text-muted mb-2">
+                  {compactUrl(formatUnknownText(row.url, '-'))}
+                </div>
                 <EvidenceChips evidence={(row.flags ?? []) as Array<Record<string, unknown>>} />
               </div>
             ))
@@ -1181,7 +1203,8 @@ function AiAssessmentSummary({
           {errorCount ? (
             <div className="border-warning/40 bg-warning/5 rounded-[var(--radius-md)] border p-3">
               <p className="type-caption text-muted">
-                AI reasoning was unavailable for {errorCount} product sample{errorCount === 1 ? '' : 's'}.
+                AI reasoning was unavailable for {errorCount} product sample
+                {errorCount === 1 ? '' : 's'}.
               </p>
             </div>
           ) : null}
@@ -1191,10 +1214,7 @@ function AiAssessmentSummary({
   );
 }
 
-function SignalSection({
-  title,
-  children,
-}: Readonly<{ title: string; children: ReactNode }>) {
+function SignalSection({ title, children }: Readonly<{ title: string; children: ReactNode }>) {
   return (
     <section className="border-border bg-background/20 rounded-[var(--radius-md)] border p-3.5">
       <h3 className="type-label-mono text-muted mb-3">{title}</h3>
@@ -1227,7 +1247,12 @@ function SignalMetric({
 
 function SampledUrlList({ urls }: Readonly<{ urls: string[] }>) {
   if (!urls.length) {
-    return <DataRegionEmpty title="No sampled URLs" description="The crawl did not return URL samples." />;
+    return (
+      <DataRegionEmpty
+        title="No sampled URLs"
+        description="The crawl did not return URL samples."
+      />
+    );
   }
   return (
     <ol className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
@@ -1240,7 +1265,7 @@ function SampledUrlList({ urls }: Readonly<{ urls: string[] }>) {
             {index + 1}
           </span>
           <div className="min-w-0 flex-1">
-            <div className="font-mono text-xs text-foreground truncate" title={url}>
+            <div className="text-foreground truncate font-mono text-xs" title={url}>
               {compactUrl(url)}
             </div>
             <div className="type-caption text-muted mt-0.5">{urlRole(url, index)}</div>
@@ -1283,9 +1308,7 @@ function OpenGraphSummary({ tags }: Readonly<{ tags: Record<string, string> }>) 
   );
 }
 
-function RobotsSummary({
-  directives,
-}: Readonly<{ directives: Record<string, string[]> }>) {
+function RobotsSummary({ directives }: Readonly<{ directives: Record<string, string[]> }>) {
   const rows = ['gptbot', 'perplexitybot'].map((agent) => {
     const disallows = directives[agent] ?? directives[agent.toLowerCase()] ?? [];
     const blocked = disallows.some((rule) => String(rule).trim() === '/');
@@ -1295,9 +1318,12 @@ function RobotsSummary({
   return (
     <div className="grid gap-3 md:grid-cols-[1fr_1fr_180px]">
       {rows.map((row) => (
-        <div key={row.agent} className="border-border bg-panel rounded-[var(--radius-md)] border p-3">
+        <div
+          key={row.agent}
+          className="border-border bg-panel rounded-[var(--radius-md)] border p-3"
+        >
           <div className="mb-2 flex items-center justify-between gap-2">
-            <span className="font-mono text-xs text-foreground">{row.agent}</span>
+            <span className="text-foreground font-mono text-xs">{row.agent}</span>
             <Badge tone={row.blocked ? 'danger' : 'success'}>
               {row.blocked ? 'blocked' : 'allowed'}
             </Badge>
@@ -1307,7 +1333,7 @@ function RobotsSummary({
       ))}
       <div className="border-border bg-panel rounded-[var(--radius-md)] border p-3">
         <div className="type-label text-secondary">Total rules</div>
-        <div className="mt-2 font-mono text-2xl font-semibold text-foreground tabular-nums">
+        <div className="text-foreground mt-2 font-mono text-2xl font-semibold tabular-nums">
           {totalRules}
         </div>
       </div>
@@ -1326,7 +1352,11 @@ function FieldCoverageChips({ record }: Readonly<{ record: Record<string, unknow
   return (
     <div className="flex max-w-[280px] flex-wrap gap-1">
       {checks.map(([label, ok]) => (
-        <Badge key={String(label)} tone={ok ? 'success' : 'warning'} className="font-mono lowercase">
+        <Badge
+          key={String(label)}
+          tone={ok ? 'success' : 'warning'}
+          className="font-mono lowercase"
+        >
           {String(label)}
         </Badge>
       ))}
@@ -1342,7 +1372,7 @@ function EvidenceChips({ evidence }: Readonly<{ evidence: Array<Record<string, u
       {lines.map((line, index) => (
         <code
           key={`${line}-${index}`}
-          className="font-mono text-xs text-foreground bg-background-alt/80 border-border/80 rounded border px-1.5 py-0.5"
+          className="text-foreground bg-background-alt/80 border-border/80 rounded border px-1.5 py-0.5 font-mono text-xs"
         >
           {line}
         </code>
@@ -1374,7 +1404,9 @@ function productSampleQuality(records: Array<Record<string, unknown>>) {
       const hasTitle = Boolean(formatUnknownText(record.title ?? record.name));
       const hasPrice = Boolean(formatUnknownText(record.price));
       const hasDescription = formatUnknownText(record.description).length >= 100;
-      const hasImage = Boolean(formatUnknownText(record.image_url ?? record.image ?? record.images));
+      const hasImage = Boolean(
+        formatUnknownText(record.image_url ?? record.image ?? record.images),
+      );
       const hasVariant = Boolean(formatUnknownText(record.variants ?? record.size ?? record.color));
       return {
         coreReady: summary.coreReady + (hasTitle && hasPrice && hasDescription && hasImage ? 1 : 0),
@@ -1453,7 +1485,7 @@ function DimensionScoreCard({
   return (
     <Card
       className={cn(
-        'relative flex min-h-[160px] flex-col justify-between p-5 hover:border-accent/60 hover:scale-[1.02] hover:shadow-md duration-300 ease-out bg-panel border-border rounded-[var(--radius-lg)] border',
+        'hover:border-accent/60 bg-panel border-border relative flex min-h-[160px] flex-col justify-between rounded-[var(--radius-lg)] border p-5 duration-300 ease-out hover:scale-[1.02] hover:shadow-md',
         blocked && 'pointer-events-none opacity-35 select-none',
       )}
     >
@@ -1489,9 +1521,15 @@ function SummaryRow({
   value,
   tone,
 }: Readonly<{ label: string; value: string | number; tone: string }>) {
-  const badgeToneVal = (tone === 'success' || tone === 'warning' || tone === 'danger' || tone === 'neutral' || tone === 'accent' || tone === 'info')
-    ? tone
-    : 'neutral';
+  const badgeToneVal =
+    tone === 'success' ||
+    tone === 'warning' ||
+    tone === 'danger' ||
+    tone === 'neutral' ||
+    tone === 'accent' ||
+    tone === 'info'
+      ? tone
+      : 'neutral';
 
   return (
     <div className="border-border/40 flex items-center justify-between border-b pb-1.5">
@@ -1562,7 +1600,7 @@ function ScoreRing({
       <div className="absolute text-center select-none">
         <div
           className={cn(
-            'text-foreground tabular-nums font-semibold',
+            'text-foreground font-semibold tabular-nums',
             compact ? 'type-display-sm' : 'type-display',
           )}
         >

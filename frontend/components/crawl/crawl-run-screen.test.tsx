@@ -282,7 +282,7 @@ describe('CrawlRunScreen', () => {
     if (originalUserAgentDescriptor) {
       Object.defineProperty(window.navigator, 'userAgent', originalUserAgentDescriptor);
     } else {
-      delete (window.navigator as Navigator & { userAgent?: string }).userAgent;
+      Reflect.deleteProperty(window.navigator as Navigator & Record<string, unknown>, 'userAgent');
     }
     vi.useRealTimers();
     vi.unstubAllGlobals();
@@ -415,8 +415,7 @@ describe('CrawlRunScreen', () => {
       JSON.parse(window.sessionStorage.getItem('product-intelligence-prefill-v1') || '{}'),
     ).toMatchObject({
       source_run_id: 101,
-      source_domain:
-        'https://www.belk.com/p/levi-s-511-slim-fit-stretch-jeans/32009271204401.html',
+      source_domain: 'https://www.belk.com/p/levi-s-511-slim-fit-stretch-jeans/32009271204401.html',
       records: [
         {
           id: 1,

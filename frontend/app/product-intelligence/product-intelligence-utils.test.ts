@@ -81,7 +81,19 @@ describe('product intelligence utils', () => {
 
     const discovery = detailToDiscovery(detail);
 
-    expect(candidateConfidence(discovery.candidates[0])).toBe(0.72);
-    expect(discovery.candidates[0].intelligence.score_reasons).toEqual({ brand_match: true });
+    const firstCandidate = discovery.candidates[0];
+
+    expect(firstCandidate).toBeDefined();
+    if (!firstCandidate) {
+      throw new Error('Expected first Product Intelligence candidate');
+    }
+    const intelligence = firstCandidate.intelligence;
+    expect(intelligence).toBeDefined();
+    if (!intelligence) {
+      throw new Error('Expected Product Intelligence candidate intelligence');
+    }
+
+    expect(candidateConfidence(firstCandidate)).toBe(0.72);
+    expect(intelligence.score_reasons).toEqual({ brand_match: true });
   });
 });

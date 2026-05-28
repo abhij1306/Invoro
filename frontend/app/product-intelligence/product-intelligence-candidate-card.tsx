@@ -40,10 +40,7 @@ export function CandidateGroupSection({
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span
-              className="type-body text-foreground truncate"
-              title={group.sourceTitle}
-            >
+            <span className="type-body text-foreground truncate" title={group.sourceTitle}>
               {group.sourceTitle}
             </span>
             <Badge tone="neutral" className="h-4 px-1.5 opacity-70">
@@ -110,14 +107,14 @@ function CandidateCard({
   return (
     <div
       className={cn(
-        'group/card border-border bg-panel hover:border-accent/40 relative flex flex-col justify-between rounded-[var(--radius-md)] border p-3 transition-all hover:shadow-card',
+        'group/card border-border bg-panel hover:border-accent/40 hover:shadow-card relative flex flex-col justify-between rounded-[var(--radius-md)] border p-3 transition-all',
         selected && 'border-accent/60 bg-accent-soft shadow-card',
       )}
     >
       <div className="flex flex-col">
         <CandidateImage imageUrl={imageUrl} title={title}>
           <div className="absolute top-2 left-2 z-10">
-            <label className="focus-within:ring-accent/25 flex size-6 cursor-pointer items-center justify-center rounded-md border border-transparent bg-transparent transition-[border-color,box-shadow] hover:border-border-strong focus-within:ring-2">
+            <label className="focus-within:ring-accent/25 hover:border-border-strong flex size-6 cursor-pointer items-center justify-center rounded-md border border-transparent bg-transparent transition-[border-color,box-shadow] focus-within:ring-2">
               <input
                 type="checkbox"
                 checked={selected}
@@ -133,7 +130,7 @@ function CandidateCard({
                   'flex size-4 items-center justify-center rounded border shadow-xs transition-colors',
                   selected
                     ? 'bg-accent border-accent text-accent-fg'
-                    : 'border-border-strong bg-transparent text-transparent hover:border-accent',
+                    : 'border-border-strong hover:border-accent bg-transparent text-transparent',
                 )}
               >
                 {selected ? <Check className="size-3 stroke-[3]" /> : null}
@@ -147,9 +144,7 @@ function CandidateCard({
 
         <div className="mt-3 flex min-w-0 flex-col">
           {brand && brand !== '--' ? (
-            <div className="type-label text-muted truncate">
-              {brand}
-            </div>
+            <div className="type-label text-muted truncate">{brand}</div>
           ) : null}
           <a
             href={candidate.url}
@@ -207,7 +202,7 @@ function CandidateImage({
   children?: React.ReactNode;
 }) {
   return (
-    <div className="border-divider relative aspect-square w-full shrink-0 overflow-hidden rounded-[var(--radius-md)] border bg-white p-1.5 shadow-xs transition-shadow hover:shadow-card">
+    <div className="border-divider hover:shadow-card relative aspect-square w-full shrink-0 overflow-hidden rounded-[var(--radius-md)] border bg-white p-1.5 shadow-xs transition-shadow">
       {imageUrl ? (
         <ExternalCandidateImage
           src={imageUrl}
@@ -215,7 +210,7 @@ function CandidateImage({
           className="size-full object-contain mix-blend-multiply transition-transform duration-300 group-hover/card:scale-[1.03]"
         />
       ) : (
-        <div className="text-muted/30 flex size-full items-center justify-center bg-background-alt/20">
+        <div className="text-muted/30 bg-background-alt/20 flex size-full items-center justify-center">
           <ImageOff className="size-8" />
         </div>
       )}
@@ -233,7 +228,7 @@ function ConfidenceBadge({ score }: { score: number }) {
           ? 'bg-success border-success'
           : score >= 0.4
             ? 'bg-warning border-warning'
-            : 'bg-zinc-500 border-zinc-500 dark:bg-zinc-600 dark:border-zinc-600',
+            : 'border-zinc-500 bg-zinc-500 dark:border-zinc-600 dark:bg-zinc-600',
       )}
     >
       {Math.round(score * 100)}%

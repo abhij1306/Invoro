@@ -85,9 +85,7 @@ import {
 import { useLiveClock, useTerminalRecordSync, useTerminalSync } from './use-run-polling';
 import { useRunWorkspace } from './use-run-workspace';
 
-type CrawlRunScreenProps = {
-  runId: number;
-};
+type CrawlRunScreenProps = { runId: number };
 
 function llmTouchedFieldNames(record: CrawlRecord): string[] {
   const raw =
@@ -236,15 +234,16 @@ export function CrawlRunScreen({ runId }: Readonly<CrawlRunScreenProps>) {
   const effectiveOutputTab =
     failedRunWithoutRecords && (outputTab === 'table' || outputTab === 'markdown')
       ? 'logs'
-      : designSystemRun && (outputTab === 'json' || outputTab === 'table' || outputTab === 'learning')
+      : designSystemRun &&
+          (outputTab === 'json' || outputTab === 'table' || outputTab === 'learning')
         ? 'markdown'
         : (outputTab === 'learning' && !showRunLearningTab) || outputTab === 'run_config'
-        ? defaultOutputTab
-        : markdownOutputRun && outputTab === 'table'
-          ? 'markdown'
-          : !markdownOutputRun && outputTab === 'markdown'
-            ? 'table'
-            : outputTab;
+          ? defaultOutputTab
+          : markdownOutputRun && outputTab === 'table'
+            ? 'markdown'
+            : !markdownOutputRun && outputTab === 'markdown'
+              ? 'table'
+              : outputTab;
   const shouldFetchTableRecords = Boolean(run) && effectiveOutputTab === 'table';
   const shouldFetchJsonRecords =
     Boolean(run) && (effectiveOutputTab === 'json' || effectiveOutputTab === 'markdown');
@@ -972,7 +971,9 @@ export function CrawlRunScreen({ runId }: Readonly<CrawlRunScreenProps>) {
                       {batchFromResultsLabel}
                     </Button>
                   ) : null}
-                  {!designSystemRun && (listingRun || ecommerceDetailRun) && productIntelligenceRecords.length ? (
+                  {!designSystemRun &&
+                  (listingRun || ecommerceDetailRun) &&
+                  productIntelligenceRecords.length ? (
                     <Button
                       variant="neutral"
                       type="button"

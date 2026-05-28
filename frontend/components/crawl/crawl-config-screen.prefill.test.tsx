@@ -106,10 +106,7 @@ describe('CrawlConfigScreen bulk prefill', () => {
     expect(screen.getByLabelText('Bulk URLs input')).toHaveValue(
       'https://jobs.example.com/posting/1',
     );
-    expect(screen.getByRole('button', { name: 'Batch' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
+    expect(screen.getByRole('button', { name: 'Batch' })).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('keeps pdp batch prefill active for non-picker domains', async () => {

@@ -9,8 +9,23 @@ export type AutoSurfaceResolution = {
 
 const ARTICLE_HOSTS = new Set(['codeforces.com']);
 const ARTICLE_DETAIL_TOKENS = ['/blog/entry/', '/article/', '/post/'];
-const ARTICLE_TOKENS = ['/blog/', '/blog/entry/', '/article/', '/articles/', '/news/', '/post/', '/posts/'];
-const FORUM_TOKENS = ['/thread/', '/threads/', '/forum/', '/forums/', '/discussion/', '/questions/'];
+const ARTICLE_TOKENS = [
+  '/blog/',
+  '/blog/entry/',
+  '/article/',
+  '/articles/',
+  '/news/',
+  '/post/',
+  '/posts/',
+];
+const FORUM_TOKENS = [
+  '/thread/',
+  '/threads/',
+  '/forum/',
+  '/forums/',
+  '/discussion/',
+  '/questions/',
+];
 const JOB_TOKENS = ['/job/', '/jobs/', '/careers/', '/positions/', '/openings/'];
 const ECOMMERCE_LISTING_TOKENS = [
   '/collections/',
@@ -45,15 +60,24 @@ export function resolveAutoSurface(url: string, module: CrawlTab): AutoSurfaceRe
   }
   const { host, path } = parsed;
   const evidence = ['requested_surface:auto'];
-  if (hasAny(path, ARTICLE_TOKENS) || (ARTICLE_HOSTS.has(host) && hasAny(path, ARTICLE_DETAIL_TOKENS))) {
+  if (
+    hasAny(path, ARTICLE_TOKENS) ||
+    (ARTICLE_HOSTS.has(host) && hasAny(path, ARTICLE_DETAIL_TOKENS))
+  ) {
     return {
       surface: 'article_detail',
       confidence: 0.9,
       evidence: [...evidence, 'article_detail_url_signal'],
     };
   }
-  if (FORUM_TOKENS.some((token) => host.includes(token.replaceAll('/', '')) || path.includes(token))) {
-    return { surface: 'forum_detail', confidence: 0.7, evidence: [...evidence, 'forum_url_signal'] };
+  if (
+    FORUM_TOKENS.some((token) => host.includes(token.replaceAll('/', '')) || path.includes(token))
+  ) {
+    return {
+      surface: 'forum_detail',
+      confidence: 0.7,
+      evidence: [...evidence, 'forum_url_signal'],
+    };
   }
   if (hasAny(path, JOB_TOKENS)) {
     return {
@@ -93,7 +117,10 @@ function parseHttpUrl(value: string): { host: string; path: string } | null {
     if (!['http:', 'https:'].includes(parsed.protocol)) {
       return null;
     }
-    return { host: parsed.hostname.replace(/^www\./, '').toLowerCase(), path: parsed.pathname.toLowerCase() };
+    return {
+      host: parsed.hostname.replace(/^www\./, '').toLowerCase(),
+      path: parsed.pathname.toLowerCase(),
+    };
   } catch {
     return null;
   }

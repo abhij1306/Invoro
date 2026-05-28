@@ -12,7 +12,7 @@ const monitor: MonitorJob = {
   surface: 'ecommerce_detail',
   tracked_fields: ['price'],
   schedule_interval_hours: 1,
-  priority: 'normal',
+  priority: 'background',
   retention_days: 30,
   status: 'active',
   settings: {},

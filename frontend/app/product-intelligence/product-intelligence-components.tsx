@@ -158,8 +158,8 @@ export function DiscoveryTableLoading({ provider }: Readonly<{ provider: string 
         </div>
         <div className="text-muted mt-1 max-w-[520px] text-xs leading-5">
           Querying Shopping, store links, and organic fallback, removing blocked/source domains,
-          classifying domains, and scoring each result from title, brand, identifiers, price, and source
-          authority.
+          classifying domains, and scoring each result from title, brand, identifiers, price, and
+          source authority.
         </div>
       </div>
       <div className="grid w-full max-w-[560px] gap-2 text-left sm:grid-cols-3">

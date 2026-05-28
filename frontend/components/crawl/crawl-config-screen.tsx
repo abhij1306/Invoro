@@ -80,7 +80,8 @@ type CrawlConfigScreenProps = {
   requestedCategoryMode: CategoryMode | null;
   requestedPdpMode: PdpMode | null;
 };
-const RUN_SETUP_ROW_CLASS = 'grid gap-2 md:grid-cols-[110px_minmax(0,1fr)] md:items-center md:gap-3';
+const RUN_SETUP_ROW_CLASS =
+  'grid gap-2 md:grid-cols-[110px_minmax(0,1fr)] md:items-center md:gap-3';
 const RUN_SETUP_CONTROL_CLASS = 'flex md:justify-self-end w-full md:w-auto';
 const RUN_SETUP_LABEL_CLASS = 'flex min-w-0 h-[var(--control-height)] items-center gap-3';
 const RUN_SETUP_STACK_CLASS = 'flex flex-col gap-3';
@@ -194,7 +195,10 @@ export function CrawlConfigScreen({
   }, [crawlDomain, crawlTab, domainTabs]);
   useEffect(() => {
     const routeMode = crawlTab === 'category' ? requestedCategoryMode : requestedPdpMode;
-    if (bulkPrefillRouteSyncGuardRef.current || (requestedTab === crawlTab && routeMode === activeMode)) {
+    if (
+      bulkPrefillRouteSyncGuardRef.current ||
+      (requestedTab === crawlTab && routeMode === activeMode)
+    ) {
       return;
     }
     const nextUrl = `/crawl?module=${crawlTab}&mode=${activeMode}`;

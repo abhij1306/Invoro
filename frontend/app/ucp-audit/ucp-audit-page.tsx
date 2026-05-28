@@ -32,7 +32,11 @@ export default function UcpAuditPage() {
     () => [
       { value: 'compliance', label: 'Score Breakdown', icon: <Layers className="size-3.5" /> },
       { value: 'contract', label: 'Signal Audit', icon: <Network className="size-3.5" /> },
-      { value: 'fix-sequence', label: 'Repair Roadmap', icon: <CheckSquare className="size-3.5" /> },
+      {
+        value: 'fix-sequence',
+        label: 'Repair Roadmap',
+        icon: <CheckSquare className="size-3.5" />,
+      },
     ],
     [],
   );
@@ -77,7 +81,11 @@ export default function UcpAuditPage() {
               asChild
               variant="download"
               size="sm"
-              className={!controller.resolvedJobId || !controller.report ? 'pointer-events-none opacity-50' : ''}
+              className={
+                !controller.resolvedJobId || !controller.report
+                  ? 'pointer-events-none opacity-50'
+                  : ''
+              }
             >
               <a
                 href={

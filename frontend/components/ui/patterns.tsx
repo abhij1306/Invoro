@@ -131,8 +131,14 @@ export function TabBar({
   fullWidth?: boolean;
 }>) {
   const padX = compact
-    ? (size === 'sm' ? 'px-2' : 'px-2.5')
-    : (size === 'lg' ? 'px-4' : size === 'sm' ? 'px-2.5' : 'px-3');
+    ? size === 'sm'
+      ? 'px-2'
+      : 'px-2.5'
+    : size === 'lg'
+      ? 'px-4'
+      : size === 'sm'
+        ? 'px-2.5'
+        : 'px-3';
 
   const heightClass =
     size === 'lg'
@@ -160,7 +166,7 @@ export function TabBar({
             aria-pressed={value === option.value}
             onClick={() => onChange(option.value)}
             className={cn(
-              'type-control font-sans tracking-normal relative -mb-px inline-flex shrink-0 items-center justify-center whitespace-nowrap transition-all',
+              'type-control relative -mb-px inline-flex shrink-0 items-center justify-center font-sans tracking-normal whitespace-nowrap transition-all',
               fullWidth && 'flex-1',
               padX,
               value === option.value
@@ -187,7 +193,7 @@ export function TabBar({
       className={cn(
         'border-border bg-background-alt inline-flex items-center gap-0.5 rounded-[var(--radius-md)] border p-0.5 shadow-none transition-all',
         heightClass,
-        fullWidth && 'w-full flex',
+        fullWidth && 'flex w-full',
         className,
       )}
     >
@@ -198,7 +204,7 @@ export function TabBar({
           aria-pressed={value === option.value}
           onClick={() => onChange(option.value)}
           className={cn(
-            'type-control font-sans tracking-normal relative z-10 inline-flex h-full min-w-[72px] shrink-0 items-center justify-center rounded-[var(--radius-sm)] text-sm whitespace-nowrap transition-[background-color,color,border-color,box-shadow] duration-150 ease-out select-none',
+            'type-control relative z-10 inline-flex h-full min-w-[72px] shrink-0 items-center justify-center rounded-[var(--radius-sm)] font-sans text-sm tracking-normal whitespace-nowrap transition-[background-color,color,border-color,box-shadow] duration-150 ease-out select-none',
             fullWidth && 'flex-1',
             padX,
             value === option.value
