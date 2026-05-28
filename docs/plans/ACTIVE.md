@@ -1,9 +1,9 @@
 # Active Plan
 
-**Current:** None
-**Status:** IDLE
-**Started:** —
-**Last slice completed:** Product Intelligence Belk Detail Integration — Slice 4 — Scoring Integration and Verification
+**Current:** Playground — Replace Projects Feature → `docs/plans/playground-replace-projects-plan.md`
+**Status:** IN PROGRESS
+**Started:** 2026-05-28
+**Last slice completed:** —
 
 ## Queue
 1. Agentic Delta Engine (BLOCKED - full backend verify has unrelated pre-existing failures) → `docs/plans/agentic-delta-engine-plan.md`

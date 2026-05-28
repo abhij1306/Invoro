@@ -46,14 +46,7 @@ import type {
   LlmConnectionTestResponse,
   LlmCostLogRecord,
   InAppNotification,
-  OrchestrationProject,
-  OrchestrationProjectCreatePayload,
-  OrchestrationPromotePayload,
-  OrchestrationPromoteResponse,
-  OrchestrationTemplate,
-  OrchestrationWorkflow,
-  OrchestrationWorkflowCreatePayload,
-  PriceComparisonResponse,
+  PlaygroundSessionResponse,
 } from './types';
 
 function withQuery(path: string, query: URLSearchParams) {
@@ -325,36 +318,39 @@ export const api = {
     apiClient.post<LlmConnectionTestResponse>('/api/llm/test-connection', payload),
   listLlmCostLog: () => apiClient.get<LlmCostLogRecord[]>('/api/llm/cost-log'),
   listJobs: () => apiClient.get<ActiveJob[]>('/api/jobs/active'),
-  listOrchestrationProjects: () =>
-    apiClient.get<OrchestrationProject[]>('/api/orchestration/projects'),
-  createOrchestrationProject: (payload: OrchestrationProjectCreatePayload) =>
-    apiClient.post<OrchestrationProject>('/api/orchestration/projects', payload),
-  getOrchestrationProject: (projectId: number) =>
-    apiClient.get<OrchestrationProject>(`/api/orchestration/projects/${projectId}`),
-  deleteOrchestrationProject: (projectId: number) =>
-    apiClient.delete<void>(`/api/orchestration/projects/${projectId}`),
-  listOrchestrationTemplates: () =>
-    apiClient.get<OrchestrationTemplate[]>('/api/orchestration/templates'),
-  createOrchestrationWorkflow: (payload: OrchestrationWorkflowCreatePayload) =>
-    apiClient.post<OrchestrationWorkflow>('/api/orchestration/workflows', payload),
-  listOrchestrationWorkflows: (projectId: number) => {
-    const query = new URLSearchParams();
-    query.set('project_id', String(projectId));
-    return apiClient.get<OrchestrationWorkflow[]>(withQuery('/api/orchestration/workflows', query));
-  },
-  getOrchestrationWorkflow: (workflowId: number) =>
-    apiClient.get<OrchestrationWorkflow>(`/api/orchestration/workflows/${workflowId}`),
-  getOrchestrationWorkflowStatus: (workflowId: number) =>
-    apiClient.get<OrchestrationWorkflow>(`/api/orchestration/workflows/${workflowId}/status`),
-  promoteOrchestrationWorkflow: (workflowId: number, payload: OrchestrationPromotePayload) =>
-    apiClient.post<OrchestrationPromoteResponse>(
-      `/api/orchestration/workflows/${workflowId}/promote`,
+
+  // Playground
+  createPlaygroundSession: (payload: { url: string }) =>
+    apiClient.post<PlaygroundSessionResponse>('/api/playground/sessions', payload),
+  listPlaygroundSessions: () =>
+    apiClient.get<PlaygroundSessionResponse[]>('/api/playground/sessions'),
+  getPlaygroundSession: (sessionId: number) =>
+    apiClient.get<PlaygroundSessionResponse>(`/api/playground/sessions/${sessionId}`),
+  playgroundDiscover: (sessionId: number) =>
+    apiClient.post<{ session_id: number; state: string; run_id: number; message: string }>(
+      `/api/playground/sessions/${sessionId}/discover`,
+      {},
+    ),
+  playgroundSelect: (sessionId: number, payload: { urls: string[] }) =>
+    apiClient.post<PlaygroundSessionResponse>(
+      `/api/playground/sessions/${sessionId}/select`,
       payload,
     ),
-  getPriceComparison: (workflowId: number) =>
-    apiClient.get<PriceComparisonResponse>(
-      `/api/orchestration/workflows/${workflowId}/results/price-comparison`,
+  playgroundExtract: (sessionId: number) =>
+    apiClient.post<{ session_id: number; state: string; run_id: number; url_count: number }>(
+      `/api/playground/sessions/${sessionId}/extract`,
+      {},
     ),
+  playgroundPipeline: (
+    sessionId: number,
+    options: { enrich: boolean; compare: boolean; monitor: boolean; audit: boolean },
+  ) =>
+    apiClient.post<{ session_id: number; state: string; launched: Record<string, unknown> }>(
+      `/api/playground/sessions/${sessionId}/pipeline`,
+      options,
+    ),
+  playgroundResults: (sessionId: number) =>
+    apiClient.get<Record<string, unknown>>(`/api/playground/sessions/${sessionId}/results`),
 };
 
 // Named exports for easier consumption in components

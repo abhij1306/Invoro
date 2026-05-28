@@ -5,7 +5,7 @@ import { TopBarProvider } from '../layout/top-bar-context';
 import { PageHeader, RunSummaryChips } from './patterns';
 
 vi.mock('next/navigation', () => ({
-  usePathname: () => '/projects/1',
+  usePathname: () => '/playground',
 }));
 
 describe('RunSummaryChips', () => {

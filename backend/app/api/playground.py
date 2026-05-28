@@ -1,0 +1,235 @@
+"""Playground API — guided pipeline for non-technical users."""
+from __future__ import annotations
+
+from typing import Annotated
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.dependencies import get_current_user, get_db
+from app.models.user import User
+from app.schemas.playground import (
+    PlaygroundDiscoverResponse,
+    PlaygroundExtractResponse,
+    PlaygroundPipelineRequest,
+    PlaygroundPipelineResponse,
+    PlaygroundSelectRequest,
+    PlaygroundSessionCreate,
+    PlaygroundSessionResponse,
+)
+from app.services.playground_service import (
+    create_session,
+    get_results,
+    get_session,
+    list_sessions,
+    select_products,
+    start_discover,
+    start_extract,
+    start_pipeline,
+)
+
+router = APIRouter(prefix="/api/playground", tags=["playground"])
+
+
+@router.post("/sessions", status_code=status.HTTP_201_CREATED)
+async def playground_create_session(
+    payload: PlaygroundSessionCreate,
+    session: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+) -> PlaygroundSessionResponse:
+    """Create a new playground session with a starting URL."""
+    try:
+        playground = await create_session(session, user=user, url=payload.url)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
+    await session.commit()
+    return PlaygroundSessionResponse(
+        id=playground.id,
+        input_url=playground.input_url,
+        state=playground.state,
+        step_data=playground.step_data,
+        created_at=playground.created_at,
+        updated_at=playground.updated_at,
+    )
+
+
+@router.get("/sessions")
+async def playground_list_sessions(
+    session: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+    limit: Annotated[int, Query(ge=1, le=50)] = 20,
+) -> list[PlaygroundSessionResponse]:
+    """List recent playground sessions."""
+    items = await list_sessions(session, user=user, limit=limit)
+    return [
+        PlaygroundSessionResponse(
+            id=item.id,
+            input_url=item.input_url,
+            state=item.state,
+            step_data=item.step_data,
+            created_at=item.created_at,
+            updated_at=item.updated_at,
+        )
+        for item in items
+    ]
+
+
+@router.get("/sessions/{session_id}")
+async def playground_get_session(
+    session_id: int,
+    session: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+) -> PlaygroundSessionResponse:
+    """Get playground session state."""
+    try:
+        playground = await get_session(session, session_id=session_id, user=user)
+    except LookupError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
+    return PlaygroundSessionResponse(
+        id=playground.id,
+        input_url=playground.input_url,
+        state=playground.state,
+        step_data=playground.step_data,
+        created_at=playground.created_at,
+        updated_at=playground.updated_at,
+    )
+
+
+@router.post("/sessions/{session_id}/discover")
+async def playground_discover(
+    session_id: int,
+    session: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+) -> PlaygroundDiscoverResponse:
+    """Start discovery crawl to find products/categories."""
+    try:
+        playground = await get_session(session, session_id=session_id, user=user)
+        run_id = await start_discover(session, playground=playground, user=user)
+    except LookupError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
+    await session.commit()
+    return PlaygroundDiscoverResponse(
+        session_id=playground.id,
+        state=playground.state,
+        run_id=run_id,
+        message="Discovery crawl started — poll session for results.",
+    )
+
+
+@router.post("/sessions/{session_id}/select")
+async def playground_select(
+    session_id: int,
+    payload: PlaygroundSelectRequest,
+    session: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+) -> PlaygroundSessionResponse:
+    """Select products to extract (max 50)."""
+    try:
+        playground = await get_session(session, session_id=session_id, user=user)
+        await select_products(session, playground=playground, urls=payload.urls)
+    except LookupError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
+    await session.commit()
+    return PlaygroundSessionResponse(
+        id=playground.id,
+        input_url=playground.input_url,
+        state=playground.state,
+        step_data=playground.step_data,
+        created_at=playground.created_at,
+        updated_at=playground.updated_at,
+    )
+
+
+@router.post("/sessions/{session_id}/extract")
+async def playground_extract(
+    session_id: int,
+    session: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+) -> PlaygroundExtractResponse:
+    """Start PDP extraction for selected products."""
+    try:
+        playground = await get_session(session, session_id=session_id, user=user)
+        run_id = await start_extract(session, playground=playground, user=user)
+    except LookupError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
+    await session.commit()
+    url_count = len(playground.step_data.get("selected_urls", []))
+    return PlaygroundExtractResponse(
+        session_id=playground.id,
+        state=playground.state,
+        run_id=run_id,
+        url_count=url_count,
+    )
+
+
+@router.post("/sessions/{session_id}/pipeline")
+async def playground_pipeline(
+    session_id: int,
+    payload: PlaygroundPipelineRequest,
+    session: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+) -> PlaygroundPipelineResponse:
+    """Run selected downstream operations (enrich, compare, monitor, audit)."""
+    try:
+        playground = await get_session(session, session_id=session_id, user=user)
+        launched = await start_pipeline(
+            session,
+            playground=playground,
+            user=user,
+            enrich=payload.enrich,
+            compare=payload.compare,
+            monitor=payload.monitor,
+            audit=payload.audit,
+        )
+    except LookupError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
+    await session.commit()
+    return PlaygroundPipelineResponse(
+        session_id=playground.id,
+        state=playground.state,
+        launched=launched,
+    )
+
+
+@router.get("/sessions/{session_id}/results")
+async def playground_results(
+    session_id: int,
+    session: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+) -> dict:
+    """Get aggregated results from all pipeline steps."""
+    try:
+        playground = await get_session(session, session_id=session_id, user=user)
+    except LookupError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
+    return await get_results(session, playground=playground)
