@@ -89,6 +89,7 @@ async def playground_get_session(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
         ) from exc
+    await session.commit()
     return PlaygroundSessionResponse(
         id=playground.id,
         input_url=playground.input_url,
@@ -232,4 +233,5 @@ async def playground_results(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
         ) from exc
+    await session.commit()
     return await get_results(session, playground=playground)

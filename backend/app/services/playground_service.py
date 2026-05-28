@@ -1,4 +1,4 @@
-"""Playground session orchestration service.
+"""Playground session service.
 
 Coordinates existing crawl, enrichment, product intelligence, alert,
 and UCP audit services into a guided pipeline for non-technical users.
@@ -11,9 +11,11 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.crawl_run import CrawlRecord, CrawlRun
 from app.models.playground import PlaygroundSession
 from app.models.user import User
 from app.services.crawl.ingestion_service import create_crawl_run_from_payload
+from app.services.crawl.state import TERMINAL_STATUSES
 
 logger = logging.getLogger(__name__)
 
@@ -60,10 +62,12 @@ async def get_session(
     session_id: int,
     user: User,
 ) -> PlaygroundSession:
-    """Get a playground session, enforcing ownership."""
+    """Get a playground session, enforcing ownership. Auto-advances state if crawl completed."""
     playground = await session.get(PlaygroundSession, session_id)
     if playground is None or playground.user_id != user.id:
         raise LookupError("Session not found")
+    # Auto-advance if waiting for a crawl to complete
+    await _auto_advance(session, playground)
     return playground
 
 
@@ -310,6 +314,88 @@ async def get_results(
             results["steps"][key] = step_data[key]
 
     return results
+
+
+async def _auto_advance(
+    session: AsyncSession,
+    playground: PlaygroundSession,
+) -> None:
+    """Check if underlying crawl runs finished and advance the session state."""
+    step_data = dict(playground.step_data)
+
+    if playground.state == "discovering":
+        run_id = step_data.get("discover", {}).get("run_id")
+        if run_id:
+            run = await session.get(CrawlRun, run_id)
+            if run and run.status in {s.value for s in TERMINAL_STATUSES}:
+                # Pull discovered product URLs from the crawl records
+                products = await _extract_discovered_products(session, run_id)
+                step_data["discover"] = {
+                    **step_data.get("discover", {}),
+                    "status": "completed",
+                    "products": products[:200],
+                    "total_found": len(products),
+                }
+                playground.state = "discovered"
+                playground.step_data = step_data
+                await session.flush()
+
+    elif playground.state == "extracting":
+        run_id = step_data.get("extract", {}).get("run_id")
+        if run_id:
+            run = await session.get(CrawlRun, run_id)
+            if run and run.status in {s.value for s in TERMINAL_STATUSES}:
+                step_data["extract"] = {
+                    **step_data.get("extract", {}),
+                    "status": "completed",
+                }
+                playground.state = "extracted"
+                playground.step_data = step_data
+                await session.flush()
+
+    elif playground.state == "running_pipeline":
+        # Check if all launched pipeline jobs are done
+        all_done = True
+        for key in ("enrich", "compare", "audit"):
+            info = step_data.get(key, {})
+            if info and info.get("status") == "running":
+                all_done = False
+                break
+        if all_done:
+            playground.state = "complete"
+            playground.step_data = step_data
+            await session.flush()
+
+
+async def _extract_discovered_products(
+    session: AsyncSession,
+    run_id: int,
+) -> list[dict[str, Any]]:
+    """Pull product data from crawl records for the discovery run."""
+    rows = await session.scalars(
+        select(CrawlRecord)
+        .where(CrawlRecord.run_id == run_id)
+        .limit(200)
+    )
+    products = []
+    for record in rows.all():
+        data = record.data or {}
+        product_url = (
+            data.get("url")
+            or data.get("product_url")
+            or data.get("detail_url")
+            or data.get("canonical_url")
+            or record.source_url
+        )
+        if product_url:
+            products.append({
+                "url": str(product_url),
+                "title": str(data.get("title") or ""),
+                "brand": str(data.get("brand") or ""),
+                "price": str(data.get("price") or ""),
+                "image": str(data.get("image") or data.get("image_url") or ""),
+            })
+    return products
 
 
 def _require_state(playground: PlaygroundSession, expected: str) -> None:
