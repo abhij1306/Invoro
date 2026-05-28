@@ -373,13 +373,18 @@ export default function PlaygroundPage() {
                         <TableRow
                           key={product.url}
                           className="cursor-pointer"
-                          onClick={() => toggleProduct(product.url)}
+                          onClick={(e) => {
+                            // Avoid double-toggle when clicking the checkbox itself
+                            if ((e.target as HTMLElement).tagName === 'INPUT') return;
+                            toggleProduct(product.url);
+                          }}
                         >
                           <TableCell>
                             <input
                               type="checkbox"
                               checked={selectedUrls.has(product.url)}
                               onChange={() => toggleProduct(product.url)}
+                              onClick={(e) => e.stopPropagation()}
                               className="size-4 rounded"
                             />
                           </TableCell>
