@@ -25,6 +25,10 @@ def test_absolute_url_repairs_relative_and_bare_host_values() -> None:
         "https://cdn.example.com"
     )
     assert absolute_url("https://example.com", "") == ""
+    assert absolute_url(
+        "https://www.carhartt.com/en-eu/c/men/t-shirts/short-sleeved/eum3000076",
+        "en-eu/p/irvine-relaxed-truck-t-shirt/107455",
+    ) == "https://www.carhartt.com/en-eu/p/irvine-relaxed-truck-t-shirt/107455"
 
 
 @pytest.mark.unit

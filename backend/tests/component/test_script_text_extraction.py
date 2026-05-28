@@ -36,6 +36,29 @@ def test_harvest_js_state_objects_reads_next_data_script_by_id() -> None:
 
 
 @pytest.mark.component
+def test_harvest_js_state_objects_reads_ng_state_script_by_id() -> None:
+    html = """
+    <html>
+      <head>
+        <script id="ng-state" type="application/json">
+          {"cx-state":{"product":{"details":{"entities":{"107455":{"details":{"value":{"name":"Selector Widget","code":"107455"}}}}}}}}
+        </script>
+      </head>
+      <body></body>
+    </html>
+    """
+
+    state_objects = harvest_js_state_objects(
+        BeautifulSoup(html, "html.parser"),
+        html,
+    )
+
+    assert state_objects["__NG_STATE__"]["cx-state"]["product"]["details"]["entities"][
+        "107455"
+    ]["details"]["value"]["name"] == "Selector Widget"
+
+
+@pytest.mark.component
 def test_parse_embedded_json_extracts_inline_script_assignment_payloads() -> None:
     html = """
     <html>

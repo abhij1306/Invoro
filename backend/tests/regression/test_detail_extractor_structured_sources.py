@@ -8467,6 +8467,64 @@ def test_extract_detail_recovers_ssense_next_f_size_variants_from_artifact() -> 
 
 
 @pytest.mark.regression
+def test_extract_detail_recovers_carhartt_ng_state_variant_matrix_rows_from_artifact() -> None:
+    html = read_optional_artifact_text("artifacts/runs/11/pages/9d986b49e5c2fb5d.html")
+    rows = extract_records(
+        html,
+        "https://www.carhartt.com/en-eu/p/irvine-relaxed-truck-t-shirt/107455",
+        "ecommerce_detail",
+        max_records=1,
+        requested_fields=["variants", "price", "currency", "availability"],
+    )
+
+    record = rows[0]
+    assert record["price"] == "32.99"
+    assert record["currency"] == "EUR"
+    assert record["variant_count"] >= 5
+    assert {variant.get("size") for variant in record["variants"]} >= {
+        "S",
+        "M",
+        "L",
+        "XL",
+        "2XL",
+    }
+    assert all(
+        variant.get("sku")
+        and isinstance(variant.get("stock_quantity"), int)
+        and variant.get("stock_quantity") > 0
+        and variant.get("length") == "REG"
+        for variant in record["variants"]
+    )
+
+
+@pytest.mark.regression
+def test_extract_detail_recovers_llbean_dom_size_variants_from_artifact() -> None:
+    html = read_optional_artifact_text("artifacts/runs/13/pages/0e49fd0d4e316b84.html")
+    rows = extract_records(
+        html,
+        "https://global.llbean.com/llb/shop/1000010103.html?cgid=20010166&page=Performance-Pima-Short-Sleeve-Polo-Mens-Tall&showReviews=true",
+        "ecommerce_detail",
+        max_records=1,
+        requested_fields=["variants", "price", "currency"],
+    )
+
+    record = rows[0]
+    assert record["price"] == "7400.00"
+    assert record["currency"] == "INR"
+    assert record["variant_count"] == 4
+    assert {variant.get("size") for variant in record["variants"]} == {
+        "Small",
+        "X-Large",
+        "XX-Large",
+        "XXX-Large",
+    }
+    assert all(
+        "dwvar_1000010103_size=" in str(variant.get("url") or "")
+        for variant in record["variants"]
+    )
+
+
+@pytest.mark.regression
 def test_extract_detail_recovers_patagonia_boldmetrics_variants_from_artifact() -> None:
     html = read_optional_artifact_text("artifacts/runs/1/pages/72d532d622b8051e.html")
     rows = extract_records(

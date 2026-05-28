@@ -553,7 +553,8 @@
             "INITIAL_STATE",
             "__PRELOADED_STATE__",
             "__NUXT__",
-            "__NUXT_DATA__"
+            "__NUXT_DATA__",
+            "__NG_STATE__"
           ],
           "root_paths": {
             "__NEXT_DATA__": [
@@ -679,6 +680,14 @@
               ],
               [
                 "product"
+              ]
+            ],
+            "__NG_STATE__": [
+              [
+                "cx-state",
+                "product",
+                "details",
+                "entities"
               ]
             ]
           },

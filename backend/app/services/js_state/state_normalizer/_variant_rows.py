@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.services.config.variant_policy import PUBLIC_VARIANT_AXIS_FIELDS
+
 from ._common import *
 from ._variant_mapping import _option_names, _variant_axis_raw_value
 
@@ -29,6 +31,8 @@ def _product_variant_rows(product: dict[str, Any]) -> list[dict[str, Any]]:
                 )
             rows.append(row)
     rows.extend(_nested_choice_item_variant_rows(product))
+    if not rows:
+        rows.extend(_variant_matrix_rows(product))
     if not rows:
         rows.extend(_mapped_size_variant_rows(product))
     if not rows:
@@ -191,3 +195,174 @@ def _backfill_single_axis_variant_context(
     color = text_or_none(product.get("color") or product.get("colour"))
     if color:
         variant["color"] = color
+
+
+def _variant_matrix_rows(product: dict[str, Any]) -> list[dict[str, Any]]:
+    matrix = as_list(product.get("variantMatrix"))
+    if not matrix:
+        return []
+    axis_hints = _classification_axis_hints(product)
+    rows: list[dict[str, Any]] = []
+    for node in matrix:
+        if not isinstance(node, dict):
+            continue
+        _collect_variant_matrix_rows(
+            node,
+            rows=rows,
+            axis_hints=axis_hints,
+            option_values={},
+        )
+    deduped: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+    for row in rows:
+        row_key = (
+            text_or_none(row.get("id")) or "",
+            text_or_none(row.get("url")) or "",
+        )
+        if row_key in seen:
+            continue
+        seen.add(row_key)
+        deduped.append(row)
+    return deduped
+
+
+def _collect_variant_matrix_rows(
+    node: dict[str, Any],
+    *,
+    rows: list[dict[str, Any]],
+    axis_hints: list[tuple[str, frozenset[str]]],
+    option_values: dict[str, str],
+) -> None:
+    current_option_values = dict(option_values)
+    axis_key, axis_value = _variant_matrix_axis_value(
+        node,
+        axis_hints=axis_hints,
+        option_values=current_option_values,
+    )
+    if axis_key and axis_value:
+        current_option_values.setdefault(axis_key, axis_value)
+    children = [child for child in as_list(node.get("elements")) if isinstance(child, dict)]
+    variant_option = node.get("variantOption")
+    if (node.get("isLeaf") or not children) and isinstance(variant_option, dict):
+        row = _variant_matrix_row(
+            variant_option,
+            option_values=current_option_values,
+        )
+        if row:
+            rows.append(row)
+        return
+    for child in children:
+        _collect_variant_matrix_rows(
+            child,
+            rows=rows,
+            axis_hints=axis_hints,
+            option_values=current_option_values,
+        )
+
+
+def _variant_matrix_row(
+    variant_option: dict[str, Any],
+    *,
+    option_values: dict[str, str],
+) -> dict[str, Any] | None:
+    row: dict[str, Any] = dict(option_values)
+    code = text_or_none(variant_option.get("code"))
+    if code:
+        row["id"] = code
+        row["sku"] = code
+    url = text_or_none(variant_option.get("url"))
+    if url:
+        row["url"] = url
+    price_data = variant_option.get("priceData")
+    if isinstance(price_data, dict):
+        value = price_data.get("value")
+        if value not in (None, "", [], {}):
+            row["price"] = value
+        currency = text_or_none(price_data.get("currencyIso"))
+        if currency:
+            row["currency"] = currency
+    stock = variant_option.get("stock")
+    if isinstance(stock, dict):
+        stock_level = stock.get("stockLevel")
+        if stock_level not in (None, "", [], {}):
+            try:
+                row["stock_quantity"] = int(str(stock_level).strip())
+            except (TypeError, ValueError):
+                pass
+        status = text_or_none(stock.get("stockLevelStatus"))
+        if status:
+            lowered = status.casefold()
+            if lowered == "instock":
+                row["availability"] = "in_stock"
+            elif lowered == "outofstock":
+                row["availability"] = "out_of_stock"
+    return row if any(value for key, value in row.items() if key in PUBLIC_VARIANT_AXIS_FIELDS) else None
+
+
+def _variant_matrix_axis_value(
+    node: dict[str, Any],
+    *,
+    axis_hints: list[tuple[str, frozenset[str]]],
+    option_values: dict[str, str],
+) -> tuple[str | None, str | None]:
+    value_category = node.get("variantValueCategory")
+    if not isinstance(value_category, dict):
+        return None, None
+    raw_value = text_or_none(value_category.get("name")) or text_or_none(
+        value_category.get("label")
+    )
+    if not raw_value:
+        return None, None
+    parent_category = node.get("parentVariantCategory")
+    axis_candidates = [
+        text_or_none(parent_category.get("name")) if isinstance(parent_category, dict) else None,
+        text_or_none(value_category.get("label")),
+        text_or_none(value_category.get("description")),
+    ]
+    for candidate in axis_candidates:
+        axis_key = normalized_variant_axis_key(candidate)
+        if axis_key in PUBLIC_VARIANT_AXIS_FIELDS and axis_key not in option_values:
+            return axis_key, raw_value
+    normalized_value = clean_text(raw_value).casefold()
+    for axis_key, values in axis_hints:
+        if axis_key in option_values:
+            continue
+        if normalized_value in values:
+            return axis_key, raw_value
+    return None, None
+
+
+def _classification_axis_hints(product: dict[str, Any]) -> list[tuple[str, frozenset[str]]]:
+    hints: list[tuple[str, frozenset[str]]] = []
+    for classification in as_list(product.get("classifications")):
+        if not isinstance(classification, dict):
+            continue
+        for feature in as_list(classification.get("features")):
+            if not isinstance(feature, dict):
+                continue
+            axis_key = _classification_feature_axis_key(feature)
+            if not axis_key:
+                continue
+            values = frozenset(
+                clean_text(feature_value.get("value")).casefold()
+                for feature_value in as_list(feature.get("featureValues"))
+                if isinstance(feature_value, dict)
+                if clean_text(feature_value.get("value"))
+            )
+            if values:
+                hints.append((axis_key, values))
+    return hints
+
+
+def _classification_feature_axis_key(feature: dict[str, Any]) -> str | None:
+    for raw_name in (
+        feature.get("name"),
+        feature.get("code"),
+    ):
+        cleaned = clean_text(raw_name).casefold()
+        if not cleaned:
+            continue
+        for axis_key in ("color", "size", "length", "fit"):
+            if axis_key in cleaned:
+                return axis_key
+    return None

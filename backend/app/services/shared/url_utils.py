@@ -54,7 +54,36 @@ def absolute_url(base_url: str, candidate: object) -> str:
         return urljoin(base_url, text)
     if _BARE_HOST_URL_RE.fullmatch(text):
         return f"https://{text}"
+    origin_relative = _origin_relative_url(base_url, text)
+    if origin_relative:
+        return origin_relative
     return urljoin(base_url, text)
+
+
+def _origin_relative_url(base_url: str, candidate: str) -> str:
+    parsed_base = urlparse(base_url)
+    if not parsed_base.scheme or not parsed_base.netloc:
+        return ""
+    base_segments = [segment for segment in parsed_base.path.split("/") if segment]
+    candidate_segments = [segment for segment in candidate.split("/") if segment]
+    if (
+        not base_segments
+        or len(candidate_segments) < 2
+        or base_segments[0] != candidate_segments[0]
+        or not _looks_like_locale_segment(candidate_segments[0])
+    ):
+        return ""
+    origin = f"{parsed_base.scheme}://{parsed_base.netloc}/"
+    return urljoin(origin, candidate)
+
+
+def _looks_like_locale_segment(value: str) -> bool:
+    cleaned = str(value or "").strip().lower()
+    if len(cleaned) == 2 and cleaned.isalpha():
+        return True
+    if len(cleaned) == 5 and cleaned[2] == "-":
+        return cleaned[:2].isalpha() and cleaned[3:].isalpha()
+    return False
 
 
 def _clean_url_text(value: object) -> str:

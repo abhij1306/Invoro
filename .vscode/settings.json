@@ -14,9 +14,7 @@
     "./backend"
   ],
   "python.envFile": "${workspaceFolder}/.env",
-  "snyk.advanced.autoSelectOrganization": true,
-  "snyk.advanced.authenticationMethod": "Personal Access Token",
-  "sonarlint.connectedMode.project": {
+    "sonarlint.connectedMode.project": {
     "connectionId": "http-127-0-0-1-9000",
     "projectKey": "pre-poc-ai-crawler-local"
   },
@@ -24,5 +22,5 @@
     "./backend"
   ],
   "kiroAgent.configureMCP": "Disabled",
-  "coderabbit.agentType": "Clipboard",  
+  "coderabbit.agentType": "Clipboard"
 }

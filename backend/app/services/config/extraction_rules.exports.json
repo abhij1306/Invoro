@@ -6209,7 +6209,7 @@
       "widget"
     ]
   },
-  "VARIANT_CHOICE_GROUP_SELECTOR": "[data-option-name], [class*='swatch' i], [class*='color-selector' i], [class*='size-selector' i], [data-testid*='swatch' i], [data-qa-action='select-color'], [data-qa-action*='size-selector'], [class*='product-option' i], fieldset, [role='radiogroup'], [class*='option-group' i], [class*='variant-wrapper' i]",
+  "VARIANT_CHOICE_GROUP_SELECTOR": "[data-option-name], [data-attr-name], [data-attr], [class*='swatch' i], [class*='color-selector' i], [class*='size-selector' i], [data-testid*='swatch' i], [data-qa-action='select-color'], [data-qa-action*='size-selector'], [class*='product-option' i], fieldset, [role='radiogroup'], [class*='option-group' i], [class*='variant-wrapper' i]",
   "VARIANT_COLOR_HINT_WORDS": {
     "__type__": "tuple",
     "items": [
@@ -6324,7 +6324,8 @@
     "__next_data__": "__NEXT_DATA__",
     "__nuxt_data__": "__NUXT_DATA__",
     "__state__": "__STATE__",
-    "mobify-data": "__MOBIFY_DATA__"
+    "mobify-data": "__MOBIFY_DATA__",
+    "ng-state": "__NG_STATE__"
   },
   "VARIANT_OPTION_VALUE_NOISE_TOKENS": {
     "__type__": "frozenset",

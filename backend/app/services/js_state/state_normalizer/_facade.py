@@ -113,6 +113,10 @@ def _extract_product_payloads_from_normalized(
             candidate = path_value(normalized_payload, root_path)
             if _looks_like_product_payload(candidate):
                 products.append((dict(candidate), extractor))
+                continue
+            products.extend(
+                (product, extractor) for product in _find_product_payloads(candidate)
+            )
     try:
         marketplace_choice_products = extract_marketplace_choice_products(
             normalized_payload
