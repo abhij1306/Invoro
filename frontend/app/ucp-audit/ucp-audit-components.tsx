@@ -1,6 +1,6 @@
 'use client';
 
-import { type ReactNode, useEffect, useMemo, useState } from 'react';
+import { type ReactNode, useMemo, useState } from 'react';
 import { AlertTriangle, Check, CheckSquare, Download, ShieldAlert, Sparkles } from 'lucide-react';
 
 import { DataRegionEmpty, DataRegionLoading, TableSurface } from '../../components/ui/patterns';
@@ -767,18 +767,22 @@ export function UcpFixSequence({ report }: Readonly<{ report: UcpAuditReport | n
   });
 
   // Re-sync from localStorage when the audit report (and storageKey) changes.
-  useEffect(() => {
+  // Uses the derive-state-from-prop pattern instead of setState-in-effect so
+  // we don't cascade an extra render when the storageKey hasn't changed.
+  const [prevStorageKey, setPrevStorageKey] = useState(storageKey);
+  if (storageKey !== prevStorageKey) {
+    setPrevStorageKey(storageKey);
     if (!storageKey || typeof globalThis.window === 'undefined') {
       setDone({});
-      return;
+    } else {
+      try {
+        const stored = globalThis.window.localStorage.getItem(storageKey);
+        setDone(stored ? (JSON.parse(stored) as Record<string, boolean>) : {});
+      } catch {
+        setDone({});
+      }
     }
-    try {
-      const stored = globalThis.window.localStorage.getItem(storageKey);
-      setDone(stored ? (JSON.parse(stored) as Record<string, boolean>) : {});
-    } catch {
-      setDone({});
-    }
-  }, [storageKey]);
+  }
   const doneCount = roadmap.filter((item) => done[item.id]).length;
   const progressPercent = roadmap.length ? Math.round((doneCount / roadmap.length) * 100) : 0;
 

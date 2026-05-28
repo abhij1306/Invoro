@@ -297,21 +297,28 @@ def _apply_runtime_policy_defaults(
     runtime_policy: Mapping[str, object] | None,
 ) -> AcquisitionPolicy:
     active_policy = dict(runtime_policy or {})
-    runtime_locality = active_policy.get("locality_profile")
-    runtime_context_profile = active_policy.get("browser_context_profile")
-    has_runtime_locality = isinstance(runtime_locality, Mapping) and bool(runtime_locality)
-    has_runtime_context_profile = isinstance(runtime_context_profile, Mapping) and bool(
-        runtime_context_profile
+    raw_runtime_locality = active_policy.get("locality_profile")
+    raw_runtime_context_profile = active_policy.get("browser_context_profile")
+    runtime_locality: Mapping[str, object] | None = (
+        raw_runtime_locality
+        if isinstance(raw_runtime_locality, Mapping) and raw_runtime_locality
+        else None
     )
-    if not has_runtime_locality and not has_runtime_context_profile:
+    runtime_context_profile: Mapping[str, object] | None = (
+        raw_runtime_context_profile
+        if isinstance(raw_runtime_context_profile, Mapping)
+        and raw_runtime_context_profile
+        else None
+    )
+    if runtime_locality is None and runtime_context_profile is None:
         return policy
     explicit_locality = dict(policy.locality_profile)
     merged_context_profile = _merge_context_profiles(
-        runtime_context_profile if has_runtime_context_profile else None,
+        runtime_context_profile,
         explicit_locality.get("browser_context_profile"),
     )
     merged_locality = _merge_locality(
-        runtime_locality if has_runtime_locality else None,
+        runtime_locality,
         explicit_locality,
         merged_context_profile=merged_context_profile,
     )

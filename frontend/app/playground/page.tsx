@@ -236,13 +236,17 @@ export default function PlaygroundPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.state, sessionId]);
 
-  // Reset url selection across stages so a sitemap pick doesn't bleed into
-  // the products picker that follows it.
-  useEffect(() => {
+  // Reset url selection when the session transitions into a stage with a
+  // fresh picker (sitemap or discovered). Using the "derive state from prop"
+  // pattern instead of a setState-in-effect avoids cascading renders flagged
+  // by react-hooks/set-state-in-effect.
+  const [prevSelectionStage, setPrevSelectionStage] = useState(session?.state);
+  if (session?.state !== prevSelectionStage) {
+    setPrevSelectionStage(session?.state);
     if (session?.state === 'sitemap_listed' || session?.state === 'discovered') {
       setSelectedUrls(new Set());
     }
-  }, [session?.state]);
+  }
 
   // ─── Derived data ────────────────────────────────────────────────────────
 
@@ -707,7 +711,17 @@ function ActivityLogPanel({
   });
 
   // Live elapsed clock so the UI never looks frozen even with no log activity.
-  const startMs = useMemo(() => (startedAt ? Date.parse(startedAt) : Date.now()), [startedAt]);
+  // Date.now / Date.parse are impure, so we initialize via lazy useState and
+  // resync when startedAt changes (derive-from-prop pattern). useMemo would
+  // be flagged by react-hooks/purity for calling impure functions.
+  const computeStartMs = (value: string | undefined): number =>
+    value ? Date.parse(value) : Date.now();
+  const [startMs, setStartMs] = useState(() => computeStartMs(startedAt));
+  const [prevStartedAt, setPrevStartedAt] = useState(startedAt);
+  if (startedAt !== prevStartedAt) {
+    setPrevStartedAt(startedAt);
+    setStartMs(computeStartMs(startedAt));
+  }
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const id = window.setInterval(() => setNow(Date.now()), 1000);

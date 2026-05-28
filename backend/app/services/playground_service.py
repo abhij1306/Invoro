@@ -422,13 +422,13 @@ async def start_pipeline(
                 run_data_enrichment_job,
             )
             try:
-                job = await create_data_enrichment_job(
+                enrich_job = await create_data_enrichment_job(
                     session,
                     user=user,
                     payload={"source_record_ids": source_record_ids},
                 )
-                launched["enrich"] = {"job_id": job.id, "status": "running"}
-                dispatch_specs.append((run_data_enrichment_job, job.id))
+                launched["enrich"] = {"job_id": enrich_job.id, "status": "running"}
+                dispatch_specs.append((run_data_enrichment_job, enrich_job.id))
             except Exception as exc:
                 logger.error("Pipeline enrich failed: %s", exc, exc_info=True)
                 launched["enrich"] = {
@@ -451,13 +451,13 @@ async def start_pipeline(
                 run_product_intelligence_job,
             )
             try:
-                job = await create_product_intelligence_job(
+                compare_job = await create_product_intelligence_job(
                     session,
                     user=user,
                     payload={"source_record_ids": source_record_ids},
                 )
-                launched["compare"] = {"job_id": job.id, "status": "running"}
-                dispatch_specs.append((run_product_intelligence_job, job.id))
+                launched["compare"] = {"job_id": compare_job.id, "status": "running"}
+                dispatch_specs.append((run_product_intelligence_job, compare_job.id))
             except Exception as exc:
                 logger.error("Pipeline compare failed: %s", exc, exc_info=True)
                 launched["compare"] = {
@@ -512,13 +512,13 @@ async def start_pipeline(
             run_ucp_audit_job,
         )
         try:
-            job = await create_ucp_audit_job(
+            audit_job = await create_ucp_audit_job(
                 session,
                 user=user,
                 payload={"domain": playground.input_url},
             )
-            launched["audit"] = {"job_id": job.id, "status": "running"}
-            dispatch_specs.append((run_ucp_audit_job, job.id))
+            launched["audit"] = {"job_id": audit_job.id, "status": "running"}
+            dispatch_specs.append((run_ucp_audit_job, audit_job.id))
         except Exception as exc:
             logger.error("Pipeline audit failed: %s", exc, exc_info=True)
             launched["audit"] = {
