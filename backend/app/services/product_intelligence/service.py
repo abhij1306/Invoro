@@ -910,6 +910,8 @@ async def _load_source_rows(
 def _row_from_record(record: CrawlRecord) -> dict[str, object]:
     data = dict(record.data or {})
     data.setdefault("source_url", record.source_url)
+    # Prefer data["url"] (canonical extraction URL) over record.source_url (original crawl URL).
+    # data["source_url"] is populated above for downstream consumers but not used here.
     source_url = str(data.get("url") or record.source_url or "").strip()
     return {
         "source_record_id": record.id,

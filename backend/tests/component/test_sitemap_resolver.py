@@ -6,6 +6,7 @@ import pytest
 from app.services.crawl.sitemap_resolver import (
     _normalize_sitemap_url,
     resolve_category_urls_from_sitemap,
+    resolve_category_urls_from_sitemap_result,
 )
 from app.services.url_safety import SecurityError, ValidatedTarget
 
@@ -442,3 +443,109 @@ async def test_resolver_rejects_unsafe_discovered_urls(
 
     with pytest.raises(SecurityError):
         await resolve_category_urls_from_sitemap("example.com", "collections", 500)
+
+
+@pytest.mark.asyncio
+@pytest.mark.component
+async def test_resolver_falls_back_to_homepage_links_when_sitemap_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root_sitemap_url = "https://example.com/sitemap.xml"
+    locale_sitemap_url = "https://example.com/en/sitemap.xml"
+    homepage_url = "https://example.com/en"
+    fake_client = _FakeClient(
+        {
+            root_sitemap_url: _xml_response(root_sitemap_url, "missing", 404),
+            locale_sitemap_url: _xml_response(locale_sitemap_url, "missing", 404),
+            homepage_url: httpx.Response(
+                200,
+                text="""
+                <html><body>
+                  <nav>
+                    <a href="/en/women">Women</a>
+                    <a href="/en/men">Men</a>
+                  </nav>
+                  <main>
+                    <a href="/en/products/cotton-tee-123">Cotton Tee</a>
+                  </main>
+                  <a href="/en/cart">Cart</a>
+                  <a href="https://external.example.com/elsewhere">External</a>
+                </body></html>
+                """,
+                request=httpx.Request("GET", homepage_url),
+            ),
+        }
+    )
+    monkeypatch.setattr(
+        "app.services.crawl.sitemap_resolver.httpx.AsyncClient",
+        lambda **kwargs: fake_client,
+    )
+    monkeypatch.setattr(
+        "app.services.crawl.sitemap_resolver.validate_public_target",
+        _valid_target,
+    )
+
+    result = await resolve_category_urls_from_sitemap_result(
+        "https://example.com/en",
+        allow_homepage_fallback=True,
+    )
+
+    assert result.source == "homepage"
+    assert result.urls == [
+        "https://example.com/en/women",
+        "https://example.com/en/men",
+        "https://example.com/en/products/cotton-tee-123",
+    ]
+    assert fake_client.requested_urls == [
+        root_sitemap_url,
+        locale_sitemap_url,
+        homepage_url,
+    ]
+
+
+@pytest.mark.asyncio
+@pytest.mark.component
+async def test_resolver_homepage_fallback_does_not_hard_filter_by_keyword(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sitemap_url = "https://example.com/sitemap.xml"
+    homepage_url = "https://example.com"
+    fake_client = _FakeClient(
+        {
+            sitemap_url: _xml_response(sitemap_url, "missing", 404),
+            homepage_url: httpx.Response(
+                200,
+                text="""
+                <html><body>
+                  <nav>
+                    <a href="/women">Women</a>
+                    <a href="/shop/sale">Sale</a>
+                  </nav>
+                  <a href="/products/widget-123">Widget</a>
+                </body></html>
+                """,
+                request=httpx.Request("GET", homepage_url),
+            ),
+        }
+    )
+    monkeypatch.setattr(
+        "app.services.crawl.sitemap_resolver.httpx.AsyncClient",
+        lambda **kwargs: fake_client,
+    )
+    monkeypatch.setattr(
+        "app.services.crawl.sitemap_resolver.validate_public_target",
+        _valid_target,
+    )
+
+    urls = await resolve_category_urls_from_sitemap(
+        "example.com",
+        "collections",
+        5,
+        allow_homepage_fallback=True,
+    )
+
+    assert urls == [
+        "https://example.com/shop/sale",
+        "https://example.com/women",
+        "https://example.com/products/widget-123",
+    ]

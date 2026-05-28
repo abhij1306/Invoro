@@ -23,6 +23,10 @@ def belk_exclusive_brand_keys() -> frozenset[str]:
     return frozenset(key for key, _ in _load_brand_entries(_BELK_EXCLUSIVE_BRANDS_FILE))
 
 
+# Minimum length for compact (spaceless) brand matching to avoid false positives.
+_MIN_COMPACT_MATCH_LENGTH = 5
+
+
 def infer_belk_brand(*values: object) -> str:
     haystack = _registry_key(" ".join(str(value or "") for value in values))
     if not haystack:
@@ -35,9 +39,9 @@ def infer_belk_brand(*values: object) -> str:
             return display
         compact_key = key.replace(" ", "")
         compact_no_and_key = no_and_key.replace(" ", "")
-        if len(compact_key) >= 5 and compact_key in compact:
+        if len(compact_key) >= _MIN_COMPACT_MATCH_LENGTH and compact_key in compact:
             return display
-        if len(compact_no_and_key) >= 5 and compact_no_and_key in compact:
+        if len(compact_no_and_key) >= _MIN_COMPACT_MATCH_LENGTH and compact_no_and_key in compact:
             return display
     return ""
 

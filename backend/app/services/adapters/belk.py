@@ -468,6 +468,15 @@ def _first_payload_field(
     return None
 
 
+_BARCODE_SEARCH_MAX_DEPTH = 5
+
+
+def _looks_like_barcode(value: str) -> bool:
+    """Validate a coerced value looks like a barcode (8-14 digits)."""
+    normalized = str(value or "").strip()
+    return normalized.isdigit() and 8 <= len(normalized) <= 14
+
+
 def _first_nested_payload_field(
     payload: dict[str, Any],
     *,
@@ -482,13 +491,13 @@ def _first_nested_payload_field(
     stack: list[tuple[object, int]] = [(payload, 0)]
     while stack:
         node, depth = stack.pop()
-        if depth > 5:
+        if depth > _BARCODE_SEARCH_MAX_DEPTH:
             continue
         if isinstance(node, dict):
             for key, value in node.items():
                 if str(key).casefold() in normalized_keys:
                     coerced = coerce_field_value(field_name, value, page_url)
-                    if coerced:
+                    if coerced and _looks_like_barcode(str(coerced)):
                         return str(coerced)
                 if isinstance(value, (dict, list)):
                     stack.append((value, depth + 1))

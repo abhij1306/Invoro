@@ -187,6 +187,8 @@ def extract_search_result_snapshot(
         "sku": str(_first_present(merged, ("sku",)) or "").strip(),
         "mpn": str(_first_present(merged, ("mpn", "model", "model_number", "part_number")) or "").strip(),
         "gtin": str(_first_present(merged, ("gtin", "barcode", "sku_upc", "upc", "ean")) or "").strip(),
+        # "product_id" is intentionally included as a fallback for style identification
+        # and is distinct from the standalone "product_id" metadata field extracted below.
         "style": str(_first_present(merged, ("style", "style_id", "product_id")) or "").strip(),
         "availability": str(merged.get("availability") or "").strip(),
         "snippet": str(merged.get("snippet") or "").strip(),

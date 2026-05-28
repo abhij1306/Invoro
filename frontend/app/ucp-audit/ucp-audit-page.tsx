@@ -77,29 +77,19 @@ export default function UcpAuditPage() {
               />
               Refresh
             </Button>
-            <Button
-              asChild
-              variant="download"
-              size="sm"
-              className={
-                !controller.resolvedJobId || !controller.report
-                  ? 'pointer-events-none opacity-50'
-                  : ''
-              }
-            >
-              <a
-                href={
-                  controller.resolvedJobId
-                    ? api.exportUcpAuditMarkdown(controller.resolvedJobId)
-                    : '#'
-                }
-                download
-                aria-disabled={!controller.resolvedJobId || !controller.report}
-              >
+            {controller.resolvedJobId && controller.report ? (
+              <Button asChild variant="download" size="sm">
+                <a href={api.exportUcpAuditMarkdown(controller.resolvedJobId)} download>
+                  <Download className="size-3" />
+                  Export report
+                </a>
+              </Button>
+            ) : (
+              <Button variant="download" size="sm" disabled>
                 <Download className="size-3" />
                 Export report
-              </a>
-            </Button>
+              </Button>
+            )}
             <Button
               type="button"
               variant="action"

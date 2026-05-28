@@ -254,3 +254,136 @@ async def test_monitor_alert_creates_unread_notification(db_session, test_user):
     assert row.monitor_id == monitor.id
     assert row.event_count == 1
     assert row.read is False
+
+
+@pytest.mark.asyncio
+@pytest.mark.component
+async def test_monitor_pre_check_unchanged_detection(monkeypatch):
+    """Second call with same hash should detect no change."""
+
+    class _FakeClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_args):
+            return None
+
+        async def head(self, url: str):
+            return httpx.Response(403, headers={"Cf-Mitigated": "challenge"})
+
+    async def _fake_hash(_client, url: str):
+        return "stable-hash"
+
+    monkeypatch.setattr(
+        "app.services.monitor_scheduler_service.httpx.AsyncClient",
+        lambda **_kwargs: _FakeClient(),
+    )
+    monkeypatch.setattr(
+        "app.services.monitor_scheduler_service._stream_content_hash",
+        _fake_hash,
+    )
+    state = SimpleNamespace(
+        last_etag=None,
+        last_modified=None,
+        last_content_hash=None,
+        last_checked_at=None,
+        last_changed_at=None,
+        consecutive_unchanged_count=0,
+    )
+
+    # First call — changed because no prior hash
+    changed = await MonitorSchedulerService().pre_check_url("https://example.com/", state)
+    assert changed is True
+    assert state.last_content_hash == "stable-hash"
+
+    # Second call — same hash, should be unchanged
+    changed = await MonitorSchedulerService().pre_check_url("https://example.com/", state)
+    assert changed is False
+    assert state.consecutive_unchanged_count == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.component
+async def test_monitor_pre_check_status_only_fallback(monkeypatch):
+    """Non-Cf-Mitigated 405/429 should fall back to _stream_content_hash."""
+
+    class _FakeClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_args):
+            return None
+
+        async def head(self, url: str):
+            return httpx.Response(405)
+
+    hash_calls: list[str] = []
+
+    async def _fake_hash(_client, url: str):
+        hash_calls.append(url)
+        return "fallback-hash"
+
+    monkeypatch.setattr(
+        "app.services.monitor_scheduler_service.httpx.AsyncClient",
+        lambda **_kwargs: _FakeClient(),
+    )
+    monkeypatch.setattr(
+        "app.services.monitor_scheduler_service._stream_content_hash",
+        _fake_hash,
+    )
+    state = SimpleNamespace(
+        last_etag=None,
+        last_modified=None,
+        last_content_hash=None,
+        last_checked_at=None,
+        last_changed_at=None,
+        consecutive_unchanged_count=0,
+    )
+
+    changed = await MonitorSchedulerService().pre_check_url("https://example.com/", state)
+    assert changed is True
+    assert state.last_content_hash == "fallback-hash"
+    assert hash_calls == ["https://example.com/"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.component
+async def test_monitor_pre_check_none_hash_no_overwrite(monkeypatch):
+    """When _stream_content_hash returns None, treat as no-change and don't overwrite hash."""
+
+    class _FakeClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_args):
+            return None
+
+        async def head(self, url: str):
+            return httpx.Response(403, headers={"Cf-Mitigated": "challenge"})
+
+    async def _fake_hash(_client, url: str):
+        return None
+
+    monkeypatch.setattr(
+        "app.services.monitor_scheduler_service.httpx.AsyncClient",
+        lambda **_kwargs: _FakeClient(),
+    )
+    monkeypatch.setattr(
+        "app.services.monitor_scheduler_service._stream_content_hash",
+        _fake_hash,
+    )
+    state = SimpleNamespace(
+        last_etag=None,
+        last_modified=None,
+        last_content_hash="existing-hash",
+        last_checked_at=None,
+        last_changed_at=None,
+        consecutive_unchanged_count=0,
+    )
+
+    changed = await MonitorSchedulerService().pre_check_url("https://example.com/", state)
+    # None hash with existing prior hash => treat as unchanged
+    assert changed is False
+    # Should not overwrite existing hash
+    assert state.last_content_hash == "existing-hash"
+    assert state.consecutive_unchanged_count == 1

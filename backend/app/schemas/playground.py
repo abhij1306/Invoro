@@ -43,14 +43,28 @@ class PlaygroundSessionResponse(BaseModel):
 class PlaygroundDiscoverResponse(BaseModel):
     session_id: int
     state: str
-    run_id: int
+    stage: str  # "sitemap" | "listing" | "detail"
+    run_id: int | None = None
+    sitemap_url_count: int | None = None
     message: str
+
+
+class PlaygroundSelectCategoryRequest(BaseModel):
+    """User picks one or more category URLs from the sitemap result."""
+    url: str | None = None
+    urls: list[str] = Field(default_factory=list, max_length=50)
+
+    def selected_urls(self) -> list[str]:
+        selected = [item.strip() for item in self.urls if item and item.strip()]
+        if self.url and self.url.strip():
+            selected.insert(0, self.url.strip())
+        return list(dict.fromkeys(selected))
 
 
 class PlaygroundExtractResponse(BaseModel):
     session_id: int
     state: str
-    run_id: int
+    run_ids: list[int]
     url_count: int
 
 

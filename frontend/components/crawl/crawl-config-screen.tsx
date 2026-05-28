@@ -150,7 +150,10 @@ export function CrawlConfigScreen({
   const modePickerEnabled = crawlDomain === 'commerce' || crawlDomain === 'jobs';
   const activeMode = crawlTab === 'category' ? categoryMode : pdpMode;
   const surface = deriveSurface(crawlDomain, crawlTab);
-  const autoSurfaceResolution = surface === 'auto' ? resolveAutoSurface(targetUrl, crawlTab) : null;
+  const autoSurfaceResolution = useMemo(
+    () => (surface === 'auto' ? resolveAutoSurface(targetUrl, crawlTab) : null),
+    [targetUrl, crawlTab, surface],
+  );
   const effectiveSurface = autoSurfaceResolution?.surface ?? surface;
   const domainTabs = DOMAIN_TABS[crawlDomain];
   const activeTabLabel =

@@ -17,7 +17,7 @@ class FetchRuntimeContext:
     max_pages: int
     max_scrolls: int
     max_records: int | None
-    on_event: object | None
+    on_event: Any | None
     browser_reason: str | None
     requested_fields: list[str]
     listing_recovery_mode: str | None

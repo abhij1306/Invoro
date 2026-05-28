@@ -264,6 +264,33 @@ async def acquire(request: AcquisitionRequest) -> AcquisitionResult:
     return acquisition_result
 
 
+def _merge_context_profiles(
+    runtime_context: Mapping[str, object] | None,
+    explicit_context: object,
+) -> dict[str, object]:
+    """Merge browser_context_profile: explicit values override runtime."""
+    merged = dict(cast(Mapping[str, object], runtime_context)) if isinstance(runtime_context, Mapping) and runtime_context else {}
+    if isinstance(explicit_context, Mapping):
+        merged.update(dict(explicit_context))
+    return merged
+
+
+def _merge_locality(
+    runtime_locality: Mapping[str, object] | None,
+    explicit_locality: dict[str, object],
+    *,
+    merged_context_profile: dict[str, object],
+) -> dict[str, object]:
+    """Merge locality: remove browser_context_profile from explicit before merge, inject back."""
+    merged = dict(cast(Mapping[str, object], runtime_locality)) if isinstance(runtime_locality, Mapping) and runtime_locality else {}
+    explicit_without_context = dict(explicit_locality)
+    explicit_without_context.pop("browser_context_profile", None)
+    merged.update(explicit_without_context)
+    if merged_context_profile:
+        merged["browser_context_profile"] = merged_context_profile
+    return merged
+
+
 def _apply_runtime_policy_defaults(
     policy: AcquisitionPolicy,
     *,
@@ -278,25 +305,16 @@ def _apply_runtime_policy_defaults(
     )
     if not has_runtime_locality and not has_runtime_context_profile:
         return policy
-    merged_locality = (
-        dict(cast(Mapping[str, object], runtime_locality))
-        if has_runtime_locality
-        else {}
-    )
     explicit_locality = dict(policy.locality_profile)
-    explicit_context_profile = explicit_locality.get("browser_context_profile")
-    explicit_locality_without_context = dict(explicit_locality)
-    explicit_locality_without_context.pop("browser_context_profile", None)
-    merged_context_profile = (
-        dict(cast(Mapping[str, object], runtime_context_profile))
-        if has_runtime_context_profile
-        else {}
+    merged_context_profile = _merge_context_profiles(
+        runtime_context_profile if has_runtime_context_profile else None,
+        explicit_locality.get("browser_context_profile"),
     )
-    if isinstance(explicit_context_profile, Mapping):
-        merged_context_profile.update(dict(explicit_context_profile))
-    merged_locality.update(explicit_locality_without_context)
-    if merged_context_profile:
-        merged_locality["browser_context_profile"] = merged_context_profile
+    merged_locality = _merge_locality(
+        runtime_locality if has_runtime_locality else None,
+        explicit_locality,
+        merged_context_profile=merged_context_profile,
+    )
     if merged_locality == dict(policy.locality_profile):
         return policy
     return policy.with_updates(locality_profile=merged_locality)

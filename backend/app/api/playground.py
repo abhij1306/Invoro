@@ -13,6 +13,7 @@ from app.schemas.playground import (
     PlaygroundExtractResponse,
     PlaygroundPipelineRequest,
     PlaygroundPipelineResponse,
+    PlaygroundSelectCategoryRequest,
     PlaygroundSelectRequest,
     PlaygroundSessionCreate,
     PlaygroundSessionResponse,
@@ -22,6 +23,7 @@ from app.services.playground_service import (
     get_results,
     get_session,
     list_sessions,
+    select_category,
     select_products,
     start_discover,
     start_extract,
@@ -29,6 +31,17 @@ from app.services.playground_service import (
 )
 
 router = APIRouter(prefix="/api/playground", tags=["playground"])
+
+
+def _session_response(playground) -> PlaygroundSessionResponse:
+    return PlaygroundSessionResponse(
+        id=playground.id,
+        input_url=playground.input_url,
+        state=playground.state,
+        step_data=playground.step_data,
+        created_at=playground.created_at,
+        updated_at=playground.updated_at,
+    )
 
 
 @router.post("/sessions", status_code=status.HTTP_201_CREATED)
@@ -44,14 +57,7 @@ async def playground_create_session(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
         ) from exc
-    response = PlaygroundSessionResponse(
-        id=playground.id,
-        input_url=playground.input_url,
-        state=playground.state,
-        step_data=playground.step_data,
-        created_at=playground.created_at,
-        updated_at=playground.updated_at,
-    )
+    response = _session_response(playground)
     await session.commit()
     return response
 
@@ -65,14 +71,7 @@ async def playground_list_sessions(
     """List recent playground sessions."""
     items = await list_sessions(session, user=user, limit=limit)
     return [
-        PlaygroundSessionResponse(
-            id=item.id,
-            input_url=item.input_url,
-            state=item.state,
-            step_data=item.step_data,
-            created_at=item.created_at,
-            updated_at=item.updated_at,
-        )
+        _session_response(item)
         for item in items
     ]
 
@@ -90,14 +89,7 @@ async def playground_get_session(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
         ) from exc
-    response = PlaygroundSessionResponse(
-        id=playground.id,
-        input_url=playground.input_url,
-        state=playground.state,
-        step_data=playground.step_data,
-        created_at=playground.created_at,
-        updated_at=playground.updated_at,
-    )
+    response = _session_response(playground)
     await session.commit()
     return response
 
@@ -108,10 +100,10 @@ async def playground_discover(
     session: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[User, Depends(get_current_user)],
 ) -> PlaygroundDiscoverResponse:
-    """Start discovery crawl to find products/categories."""
+    """Route the input URL into the right entry stage (sitemap, listing, or detail)."""
     try:
         playground = await get_session(session, session_id=session_id, user=user)
-        run_id = await start_discover(session, playground=playground, user=user)
+        result = await start_discover(session, playground=playground, user=user)
     except LookupError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
@@ -120,12 +112,53 @@ async def playground_discover(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
         ) from exc
+    stage = str(result.get("stage", ""))
+    if stage == "sitemap":
+        message = (
+            f"Sitemap returned {result.get('url_count', 0)} URL(s) — pick a category to crawl."
+        )
+    elif stage == "detail":
+        message = "Detail URL detected — extracting directly."
+    else:
+        message = "Category crawl started — poll session for results."
     response = PlaygroundDiscoverResponse(
         session_id=playground.id,
         state=playground.state,
-        run_id=run_id,
-        message="Discovery crawl started — poll session for results.",
+        stage=stage,
+        run_id=result.get("run_id") if isinstance(result.get("run_id"), int) else None,
+        sitemap_url_count=result.get("url_count") if stage == "sitemap" else None,
+        message=message,
     )
+    await session.commit()
+    return response
+
+
+@router.post("/sessions/{session_id}/select-category")
+async def playground_select_category(
+    session_id: int,
+    payload: PlaygroundSelectCategoryRequest,
+    session: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+) -> PlaygroundSessionResponse:
+    """User picked a category URL from the sitemap; start a category crawl."""
+    try:
+        playground = await get_session(session, session_id=session_id, user=user)
+        await select_category(
+            session,
+            playground=playground,
+            user=user,
+            urls=payload.selected_urls(),
+        )
+    except LookupError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
+    await session.refresh(playground)
+    response = _session_response(playground)
     await session.commit()
     return response
 
@@ -149,14 +182,8 @@ async def playground_select(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
         ) from exc
-    response = PlaygroundSessionResponse(
-        id=playground.id,
-        input_url=playground.input_url,
-        state=playground.state,
-        step_data=playground.step_data,
-        created_at=playground.created_at,
-        updated_at=playground.updated_at,
-    )
+    await session.refresh(playground)
+    response = _session_response(playground)
     await session.commit()
     return response
 
@@ -170,7 +197,7 @@ async def playground_extract(
     """Start PDP extraction for selected products."""
     try:
         playground = await get_session(session, session_id=session_id, user=user)
-        run_id = await start_extract(session, playground=playground, user=user)
+        run_ids = await start_extract(session, playground=playground, user=user)
     except LookupError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
@@ -183,7 +210,7 @@ async def playground_extract(
     response = PlaygroundExtractResponse(
         session_id=playground.id,
         state=playground.state,
-        run_id=run_id,
+        run_ids=run_ids,
         url_count=url_count,
     )
     await session.commit()

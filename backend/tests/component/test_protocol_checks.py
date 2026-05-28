@@ -6,6 +6,9 @@ import httpx
 from app.services.config.ucp_audit import (
     D_UCP1_ID,
     D_UCP3_ID,
+    D_UCP4_ID,
+    D_UCP5_ID,
+    D_UCP6_ID,
     FINDING_MANIFEST_INVALID,
     FINDING_SIGNING_KEYS_MISSING,
     FINDING_TRANSPORT_NEGOTIATION_INCOMPLETE,
@@ -248,9 +251,9 @@ def test_contract_dimensions_validate_payload_schema_groups() -> None:
     dimensions = build_protocol_dimensions(manifest, [], schema_probes)
     scores = {item.dimension_id: item.score for item in dimensions}
 
-    assert scores["D-UCP4"] == 100
-    assert scores["D-UCP5"] == 100
-    assert scores["D-UCP6"] == 100
+    assert scores[D_UCP4_ID] == 100
+    assert scores[D_UCP5_ID] == 100
+    assert scores[D_UCP6_ID] == 100
 
 
 @pytest.mark.component
@@ -426,7 +429,7 @@ def test_schema_url_keywords_do_not_score_without_fields() -> None:
     dimensions = build_protocol_dimensions(manifest, [], schema_probes)
     scores = {item.dimension_id: item.score for item in dimensions}
 
-    assert scores["D-UCP4"] == 60
+    assert scores[D_UCP4_ID] == 60
 
 
 @pytest.mark.component
@@ -570,6 +573,113 @@ async def test_probe_mcp_sends_ucp_agent_header(monkeypatch: pytest.MonkeyPatch)
     await protocol_checks._probe_mcp(service="dev.ucp.shopping", endpoint=endpoint)
 
     assert "UCP-Agent" in fake_client.post_headers
+
+
+@pytest.mark.component
+def test_summarize_tool_schemas_redacts_raw_payload_fields() -> None:
+    summaries = protocol_checks._summarize_tool_schemas(
+        [
+            {
+                "name": "catalog.search",
+                "type": "function",
+                "description": "internal prompt text",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {"query": {"type": "string"}},
+                    "required": ["query"],
+                    "$defs": {"query": {"type": "string"}},
+                },
+                "outputSchema": {
+                    "type": "object",
+                    "properties": {"items": {"type": "array"}},
+                },
+            }
+        ]
+    )
+
+    assert len(summaries) == 1
+    assert summaries[0] == {
+        "name": "catalog.search",
+        "type": "function",
+        "schema_size": summaries[0]["schema_size"],
+        "input_schema": {
+            "valid": True,
+            "type": "object",
+            "property_count": 1,
+            "required_count": 1,
+            "has_items": False,
+            "has_refs": True,
+            "has_composition": False,
+        },
+        "output_schema": {
+            "valid": True,
+            "type": "object",
+            "property_count": 1,
+            "required_count": 0,
+            "has_items": False,
+            "has_refs": False,
+            "has_composition": False,
+        },
+        "redacted_field_count": 1,
+    }
+
+
+@pytest.mark.asyncio
+@pytest.mark.component
+async def test_probe_mcp_persists_redacted_tool_schema_summaries(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    endpoint = "https://example.com/mcp"
+    fake_client = DummyAsyncClient(
+        post_resp=_response(
+            "POST",
+            endpoint,
+            200,
+            {
+                "jsonrpc": "2.0",
+                "id": "ucp-audit-tools-list",
+                "result": {
+                    "tools": [
+                        {
+                            "name": "catalog",
+                            "type": "function",
+                            "description": "secret internal text",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {"sku": {"type": "string"}},
+                                "required": ["sku"],
+                            },
+                        }
+                    ]
+                },
+            },
+        )
+    )
+    monkeypatch.setattr(
+        "app.services.ucp_audit.protocol_checks.build_async_http_client",
+        lambda **kwargs: fake_client,
+    )
+
+    probe = await protocol_checks._probe_mcp(service="dev.ucp.shopping", endpoint=endpoint)
+
+    assert probe.tool_names == ["catalog"]
+    assert probe.tool_schemas == [
+        {
+            "name": "catalog",
+            "type": "function",
+            "schema_size": probe.tool_schemas[0]["schema_size"],
+            "input_schema": {
+                "valid": True,
+                "type": "object",
+                "property_count": 1,
+                "required_count": 1,
+                "has_items": False,
+                "has_refs": False,
+                "has_composition": False,
+            },
+            "redacted_field_count": 1,
+        }
+    ]
 
 
 @pytest.mark.asyncio

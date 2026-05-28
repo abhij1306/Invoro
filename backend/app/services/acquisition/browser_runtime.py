@@ -656,7 +656,7 @@ async def browser_fetch(
                     browser_binary=runtime_binary,
                 )
                 persist_storage_state = _browser_storage_state_is_persistable(
-                    blocked=bool(finalized["blocked"]),
+                    blocked=bool(finalized.get("blocked")),
                     finalized_diagnostics=finalized_diagnostics,
                 )
                 mark_storage_state_persist_policy(

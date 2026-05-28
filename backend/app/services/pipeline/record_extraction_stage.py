@@ -235,6 +235,9 @@ def _positive_int(value: object) -> int:
     if isinstance(value, int):
         return max(0, value)
     if isinstance(value, float):
+        import math
+        if not math.isfinite(value):
+            return 0
         return max(0, int(value))
     if not isinstance(value, (str, bytes, bytearray)):
         return 0

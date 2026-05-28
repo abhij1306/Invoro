@@ -630,7 +630,8 @@ function getFallbackHeader(pathname: string): TopBarState {
   if (pathname.startsWith('/playground'))
     return {
       title: 'Playground',
-      description: 'Explore any domain — discover, extract, enrich, compare, and monitor from one place.',
+      description:
+        'Explore any domain — discover, extract, enrich, compare, and monitor from one place.',
     };
   if (pathname.startsWith('/data-enrichment'))
     return {

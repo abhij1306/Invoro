@@ -92,7 +92,7 @@
   border-radius: var(--radius-sm);
 }
 
-:global(.app-logo-gif) {
+:global(.app-logo-image) {
   width: 100%;
   height: 100%;
   display: block;

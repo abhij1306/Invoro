@@ -1216,6 +1216,61 @@ def test_map_js_state_to_fields_keeps_ambiguous_availability_neutral() -> None:
 
 
 @pytest.mark.unit
+def test_map_js_state_to_fields_drops_transport_only_variant_matrix_rows() -> None:
+    mapped = map_js_state_to_fields(
+        {
+            "__INITIAL_STATE__": {
+                "product": {
+                    "name": "Relaxed Tee",
+                    "price": "32.99",
+                    "variantMatrix": [
+                        {
+                            "isLeaf": True,
+                            "variantValueCategory": {"name": "M"},
+                            "parentVariantCategory": {"name": "Size"},
+                            "variantOption": {
+                                "code": "tee-m",
+                                "url": "/products/relaxed-tee?size=m",
+                                "priceData": {"value": "32.99", "currencyIso": "USD"},
+                                "stock": {
+                                    "stockLevel": 4,
+                                    "stockLevelStatus": "inStock",
+                                },
+                            },
+                        },
+                        {
+                            "isLeaf": True,
+                            "variantOption": {
+                                "code": "tee-orphan",
+                                "url": "/products/relaxed-tee?size=unknown",
+                                "priceData": {"value": "32.99", "currencyIso": "USD"},
+                                "stock": {
+                                    "stockLevel": 2,
+                                    "stockLevelStatus": "inStock",
+                                },
+                            },
+                        },
+                    ],
+                }
+            }
+        },
+        surface="ecommerce_detail",
+        page_url="https://store.example.com/products/relaxed-tee?size=m",
+    )
+
+    assert mapped["variant_count"] == 1
+    assert mapped["size"] == "M"
+    assert len(mapped["variants"]) == 1
+    assert mapped["variants"][0]["size"] == "M"
+    assert mapped["variants"][0]["sku"] == "tee-m"
+    assert mapped["variants"][0]["price"] == "32.99"
+    assert mapped["variants"][0]["currency"] == "USD"
+    assert mapped["variants"][0]["url"] == "/products/relaxed-tee?size=m"
+    assert mapped["variants"][0]["availability"] == "in_stock"
+    assert mapped["variants"][0]["stock_quantity"] == 4
+
+
+@pytest.mark.unit
 def test_job_detail_mappers_keep_shared_html_section_behavior() -> None:
     description_html = (
         "<p>Lead platform delivery.</p>"

@@ -103,13 +103,19 @@ function RunRow({
 
       {/* Status */}
       <TableCell>
-        <Badge
-          tone={runExecutionTone(run.status, run.result_summary)}
-          flat={isSubduedStatus(run.status)}
-          className="text-sm font-medium tracking-normal"
-        >
-          {runExecutionLabel(run.status, run.result_summary)}
-        </Badge>
+        {run.status === 'failed' ? (
+          <span className="text-danger text-sm font-medium">
+            {runExecutionLabel(run.status, run.result_summary)}
+          </span>
+        ) : (
+          <Badge
+            tone={runExecutionTone(run.status, run.result_summary)}
+            flat={isSubduedStatus(run.status)}
+            className="text-sm font-medium tracking-normal normal-case"
+          >
+            {runExecutionLabel(run.status, run.result_summary)}
+          </Badge>
+        )}
       </TableCell>
 
       {/* Records */}
@@ -293,12 +299,12 @@ export default function RunsPage() {
             >
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[30%]">Run</TableHead>
-                  <TableHead className="w-[10%]">Type</TableHead>
-                  <TableHead className="w-[12%]">Status</TableHead>
-                  <TableHead className="w-[8%] text-right">Records</TableHead>
-                  <TableHead className="w-[15%] text-right">Started</TableHead>
-                  <TableHead className="w-[25%] text-right">Actions</TableHead>
+                  <TableHead className="w-[28%] whitespace-nowrap">Run</TableHead>
+                  <TableHead className="w-[10%] whitespace-nowrap">Type</TableHead>
+                  <TableHead className="w-[12%] whitespace-nowrap">Status</TableHead>
+                  <TableHead className="w-[10%] text-right whitespace-nowrap">Records</TableHead>
+                  <TableHead className="w-[15%] text-right whitespace-nowrap">Started</TableHead>
+                  <TableHead className="w-[25%] text-right whitespace-nowrap">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

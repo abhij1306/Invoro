@@ -1,86 +1,137 @@
 ---
-version: "1.2"
-name: "Invoro Refresh Console"
+version: "2.0"
+name: "Invoro Design System v2"
 description: >
-  Operator-first crawler workspace using the Invoro Refresh visual system:
-  compact professional controls, quiet light surfaces, Feedonomics-style blue
-  accent, and preserved dark theme colors. This spec changes visual treatment
-  only; it does not change page structure, feature behavior, or font families.
-colors:
-  light-canvas: "#fafbfc"
-  light-alt: "#f4f6f9"
-  light-surface: "#ffffff"
-  light-sidebar: "#fbfcfd"
-  light-sunken: "#f7f8fa"
-  light-border: "#e7ebef"
-  light-border-strong: "#d5dae1"
-  light-border-subtle: "#eef1f4"
-  light-divider: "#edf0f3"
-  light-text-primary: "#0a1220"
-  light-text-secondary: "#3d475a"
-  light-text-muted: "#6b7487"
-  light-text-faint: "#98a0b0"
-  light-accent: "#1f6fd6"
-  light-accent-hover: "#195fb8"
-  light-accent-soft: "rgba(31,111,214,.1)"
-  light-accent-soft-2: "rgba(31,111,214,.05)"
-  light-accent-border: "rgba(31,111,214,.28)"
-
-  dark-canvas: "#09090b"
-  dark-alt: "#121214"
-  dark-panel: "#18181b"
-  dark-elevated: "#242427"
-  dark-border: "#27272a"
-  dark-border-strong: "#3f3f46"
-  dark-text-primary: "#f4f4f5"
-  dark-text-secondary: "#a1a1aa"
-  dark-text-muted: "#a1a1aa"
-  dark-accent: "#4c84c8"
-  dark-accent-hover: "#76a6df"
-
+  Canonical frontend design system mirrored from frontend/app/globals.css.
+  Warm stone light theme, warm charcoal dark theme, rust accent, 4px grid,
+  retained font stack, shared component primitives, and WCAG-aware motion and
+  contrast rules.
+themes:
+  light:
+    background-base: "#f2f0ec"
+    background-alt: "#e7e4de"
+    background-panel: "#faf8f4"
+    background-elevated: "#ffffff"
+    background-well: "#dad6cf"
+    border-subtle: "#e2dfd8"
+    border: "#cdc8c0"
+    border-strong: "#b0a89f"
+    text-primary: "#1a1815"
+    text-secondary: "#443d36"
+    text-muted: "#68614f"
+    text-subtle: "#948d7e"
+    accent: "#c2410c"
+    accent-hover: "#9a3412"
+    accent-text: "#9a3412"
+  dark:
+    background-base: "#0d0c0a"
+    background-alt: "#131110"
+    background-panel: "#1a1714"
+    background-elevated: "#222019"
+    background-well: "#2b2822"
+    border-subtle: "#201d18"
+    border: "#2c2820"
+    border-strong: "#413b32"
+    text-primary: "#f0ebe0"
+    text-secondary: "#c0b6ab"
+    text-muted: "#a5998a"
+    text-subtle: "#78706a"
+    accent: "#c2410c"
+    accent-hover: "#d9581e"
+    accent-text: "#ffa875"
+semantic:
+  success:
+    light: "#059669 on #ecfdf5"
+    dark: "#34d399"
+  warning:
+    light: "#d97706 on #fffbeb"
+    dark: "#fbbf24"
+  danger:
+    light: "#dc2626 on #fef2f2"
+    dark: "#f87171"
+  info:
+    light: "#2563eb on #eff6ff"
+    dark: "#60a5fa"
+fonts:
+  primary: "Public Sans"
+  display: "Bricolage Grotesque"
+  mono: "JetBrains Mono"
 typography:
-  font-policy: "Do not change families. Use current app sans and mono tokens."
+  scale:
+    "2xs": "11px"
+    xs: "12px"
+    sm: "14px"
+    base: "15px"
+    lg: "18px"
+    xl: "22px"
+    "2xl": "30px"
   display:
-    fontSize: "28px"
-    fontWeight: "650"
-    lineHeight: "1"
-    letterSpacing: "-0.03em"
-  page-title:
-    fontSize: "28px"
-    fontWeight: "650"
-    lineHeight: "1.1"
-    letterSpacing: "-0.02em"
-  section-title:
-    fontSize: "18px"
-    fontWeight: "600"
-    lineHeight: "1.25"
-    letterSpacing: "-0.01em"
+    family: "display"
+    size: "30px"
+    weight: "700"
+    line-height: "1"
+    letter-spacing: "-0.03em"
+  heading-1:
+    family: "display"
+    size: "30px"
+    weight: "700"
+    line-height: "1.1"
+  heading-2:
+    family: "display"
+    size: "22px"
+    weight: "600"
+    line-height: "1.2"
+  heading-3:
+    family: "display"
+    size: "18px"
+    weight: "600"
+    line-height: "1.3"
   body:
-    fontSize: "14px"
-    fontWeight: "400"
-    lineHeight: "1.5"
+    family: "primary"
+    size: "15px"
+    weight: "400"
+    line-height: "1.55"
   body-sm:
-    fontSize: "13px"
-    fontWeight: "400"
-    lineHeight: "1.45"
+    family: "primary"
+    size: "14px"
+    weight: "400"
+    line-height: "1.55"
   label:
-    fontSize: "11px"
-    fontWeight: "600"
-    lineHeight: "1.4"
-    letterSpacing: "0.06em"
-
+    family: "primary"
+    size: "11px"
+    weight: "600"
+    line-height: "1.35"
+    letter-spacing: "0.06em"
+    casing: "uppercase"
+  metric:
+    family: "mono"
+    weight: "700"
+    line-height: "1"
+    letter-spacing: "-0.025em"
 spacing:
   base: "4px"
+  steps:
+    1: "4px"
+    2: "8px"
+    3: "12px"
+    4: "16px"
+    5: "20px"
+    6: "24px"
+    7: "28px"
+    8: "32px"
+    10: "40px"
+    12: "48px"
+    14: "56px"
+    16: "64px"
+    20: "80px"
+  content-gutter: "32px desktop, 16px at <=480px"
+  card-padding: "20px"
+  control-height-sm: "28px"
   control-height: "32px"
-  control-height-sm: "26px"
   control-height-lg: "36px"
-  page-gutter: "32px desktop, 24px compact, 16px mobile"
-  section-gap: "20px"
-  card-padding: "18px"
-  table-header-height: "40px"
+  table-header-height: "38px"
   table-row-height: "44px"
-
-rounded:
+radius:
   xs: "3px"
   sm: "5px"
   md: "7px"
@@ -88,67 +139,136 @@ rounded:
   xl: "14px"
   "2xl": "20px"
   full: "9999px"
-
 components:
   buttons:
-    primary: "filled accent, white text, 32px height, 7px radius, medium weight"
-    secondary: "surface background, strong border, subtle shadow"
-    ghost: "transparent, muted text, neutral hover wash"
-    destructive: "surface background with danger text and danger border"
-  tabs:
-    segmented: "sunken surface with 2px padding, active item on surface with 1px border"
-    underline: "divider baseline with 2px accent indicator on active tab"
-  cards:
-    default: "surface background, 1px border, 10px radius, subtle shadow only when raised"
+    base: "36px default shell, semibold 14px text, inset highlight, xs shadow"
+    action: "solid rust fill"
+    download: "elevated secondary surface with accent-text foreground"
+    destructive: "panel/elevated surface with danger border"
+    neutral: "stone neutral surface"
+    quiet: "transparent ghost with accent-subtle hover"
+    topbar: "transparent shell action"
+    link: "inline accent text link"
+  segmented:
+    root: "sunken mixed background, 1px border, inset depth"
+    workspace-tabs: "rounded segmented tabs with accent-tinted active state"
+  alerts:
+    base: "md radius, 12px x 16px padding, no shadow"
+  code:
+    block: "alt surface, bordered, mono, wrapped"
+    terminal: "panel surface, mono, 320px max height"
+    json-dark: "always dark VS Code style syntax palette"
   tables:
-    header: "sunken background, 10px-11px uppercase labels, sticky when table scrolls"
-    rows: "44px rhythm, divider lines, subtle sunken hover background"
+    compact: "38px headers, 44px rows, uppercase headers, light-mode outer border"
+    commerce: "sticky header, 44px image rhythm, mono price/url values"
   metrics:
-    label: "11px uppercase muted label"
-    value: "tabular numeric display, 28px, weight 650"
+    pulse-strip: "4-column grid, 2-column on small screens, top accent reveal on hover"
+  skeleton:
+    shimmer: "2.2s linear sweep"
+accessibility:
+  focus: "2.5px accent focus outline and tokenized focus ring"
+  reduced-motion: "collapse animation and transition duration to 1ms"
+  forced-colors: "explicit focus outline and button border support"
+  print: "remove decorative motion/skeleton treatments"
+compatibility:
+  tailwind: "Uses @theme inline token bridge for Tailwind v4 utilities"
+  aliases: "Deprecated backward-compat token aliases still exist; prefer canonical names"
 ---
 
 # Overview
 
-Invoro uses a compact operator console style. The visual goal is professional density: clear hierarchy, predictable controls, and quiet data surfaces. This migration adopts the Invoro Refresh reference from `C:\Users\abhij\Downloads\CrawlerAI` while preserving existing application behavior and page arrangement.
+`frontend/app/globals.css` is source of truth. This file defines Invoro Design System v2. Old blue light-theme refresh spec is stale. Current system uses warm stone surfaces, rust accent, shared tokens, and same theme logic in both raw CSS and Tailwind utility bridge.
 
-The app keeps its current font-family tokens. Only size, weight, color, hierarchy, spacing, component treatment, and light-theme palette change.
+# Theme Model
 
-# Color System
+Light theme is warm stone:
 
-Light mode uses a cool off-white canvas (`#fafbfc`), white surfaces, subtle gray borders, and one primary blue accent (`#1f6fd6`). Accent should appear on primary actions, active navigation, focused controls, selected tabs, progress, and key status emphasis.
+- `bg-base` `#f2f0ec`
+- `bg-alt` `#e7e4de`
+- `bg-panel` `#faf8f4`
+- `bg-elevated` `#ffffff`
+- `bg-well` `#dad6cf`
 
-Dark mode colors are intentionally preserved from the current app. Do not retune dark surfaces, dark borders, dark text, or dark accent during this visual migration.
+Dark theme is warm charcoal:
+
+- `bg-base` `#0d0c0a`
+- `bg-alt` `#131110`
+- `bg-panel` `#1a1714`
+- `bg-elevated` `#222019`
+- `bg-well` `#2b2822`
+
+Accent stays rust in both themes. Primary token is `--accent: #c2410c`. Use accent for active state, primary action, selected tabs, focus cues, and visual emphasis. Use semantic status tokens for success, warning, danger, and info. Do not hardcode alternate status colors in page code.
 
 # Typography
 
-Use the existing sans token for product UI and the existing mono token for technical values. Do not introduce or import a new font family.
+Three font families are active and intentional:
 
-Headings use tighter line height and medium-to-semibold weights. Body text stays compact at 13px-14px for dense operator screens. Numeric values, run IDs, URLs, logs, code, and tabular metrics use tabular figures and the mono token where the existing component already treats them as technical data.
+- `Public Sans` for product UI and body copy
+- `Bricolage Grotesque` for display and heading hierarchy
+- `JetBrains Mono` for metrics, prices, ids, logs, URLs, and code
 
-# Layout
+Type system has four tiers:
 
-Spacing follows a 4px grid with a denser control rhythm:
+- `T1 Display`: bold display and KPI values
+- `T2 Heading`: page and section titles in display face
+- `T3 Body`: readable operator text and controls
+- `T4 Label`: uppercase tracked labels, captions, column headers
 
-- Default controls: 32px high.
-- Small controls: 26px high.
-- Large controls: 36px high.
-- Table rows: 44px.
-- Table headers: 40px.
-- Page content max width remains 1440px.
-- Existing page layout and element order must not change.
+Canonical scale:
 
-# Components
+- `11px`, `12px`, `14px`, `15px`, `18px`, `22px`, `30px`
 
-Buttons, inputs, tabs, cards, metrics, and tables should inherit from shared primitives first. Page-level hardcoded styling should be removed when a shared primitive can own it.
+Use mono with tabular numerals for technical values. Body copy stays in sans. Headings and subheadings use display font.
 
-Cards and panels use borders and subtle shadows instead of heavy gradients. Tables use sticky, quiet headers and a soft hover wash. Tabs use either segmented controls or underline tabs from the shared `TabBar` primitive.
+# Spacing And Shape
 
-# Migration Rules
+System runs on strict 4px grid. Canonical spacing tokens are `4, 8, 12, 16, 20, 24, 28, 32, 40, 48, 56, 64, 80`.
 
-- No feature changes.
-- No page arrangement changes.
-- No font family changes.
-- Do not change dark theme color values.
-- Replace hardcoded visual values with tokens where practical.
-- Keep dynamic inline styles only for true runtime values such as progress width, virtualized spacer height, and measured tooltip positions.
+Core rhythm:
+
+- Content gutter: `32px`, reduced to `16px` on very small screens
+- Card padding: `20px`
+- Control heights: `28px`, `32px`, `36px`
+- Table header height: `38px`
+- Table row height: `44px`
+
+Canonical radii:
+
+- `3px`, `5px`, `7px`, `10px`, `14px`, `20px`, `9999px`
+
+# Component Primitives
+
+Prefer shared primitives over page-local styling.
+
+- Buttons: use `.ui-button` with surface modifiers. Default button shell is 36px high, semibold, lightly inset, and token-driven.
+- Segmented controls: use `.segmented-root` or `.workspace-tabs`. Active tabs use accent-tinted fill and accent-border cues.
+- Alerts: use `.alert-surface` plus semantic variant.
+- Code blocks: use `.code-block`. Crawl terminal uses `.crawl-terminal` and keeps mono context. JSON dark blocks stay VS Code dark regardless of app theme.
+- Tables: use `.compact-data-table` for shared data tables. Commerce table extends same rhythm with sticky headers and fixed image cell sizing.
+- Metrics: use `.metric-pulse-*` strip for dashboard KPI cards.
+- Skeletons: use shimmer loader token set, not ad hoc gray boxes.
+
+# Motion And Accessibility
+
+Motion is small and purposeful:
+
+- `fade-in`
+- `dropdown-in`
+- `dropdown-in-up`
+- `spin`
+- stagger delays up to `250ms`
+
+Accessibility rules are built into globals:
+
+- keyboard focus uses accent outline and tokenized focus ring
+- reduced motion collapses animation and transition timing to `1ms`
+- forced-colors mode adds strong visible outlines and button borders
+- print strips decorative animation and skeleton visuals
+
+# Implementation Rules
+
+- Treat `frontend/app/globals.css` as canonical design token source.
+- Prefer canonical token names such as `--bg-panel`, `--btn-primary-bg`, `--table-row-height`.
+- Backward-compat aliases still exist, but new code should not depend on deprecated names.
+- Use Tailwind utilities only through bridged tokens when possible.
+- Do not reintroduce old blue palette, old light-only spec, or "preserve old dark theme" assumptions. Both light and dark themes are now explicitly defined in the system.

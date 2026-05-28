@@ -1129,6 +1129,15 @@ def _align_identity_to_locality(
     )
 
 
+def _resolve_permission_values(raw_permissions: object, settings: object) -> tuple[object, ...]:
+    """Resolve browser context permission values from profile or runtime settings."""
+    if raw_permissions == "__use_default__":
+        return tuple(getattr(settings, "browser_context_permissions", None) or ())
+    if isinstance(raw_permissions, (list, tuple)):
+        return tuple(raw_permissions)
+    return ()
+
+
 def _playwright_context_options_from_identity(
     identity: BrowserIdentity,
     *,
@@ -1165,13 +1174,7 @@ def _playwright_context_options_from_identity(
     if color_scheme is not None:
         options["color_scheme"] = color_scheme
     raw_permissions = context_profile.get("permissions", "__use_default__")
-    permission_values = (
-        tuple(crawler_runtime_settings.browser_context_permissions or ())
-        if raw_permissions == "__use_default__"
-        else tuple(raw_permissions)
-        if isinstance(raw_permissions, (list, tuple))
-        else ()
-    )
+    permission_values = _resolve_permission_values(raw_permissions, crawler_runtime_settings)
     permissions = [
         str(value or "").strip()
         for value in permission_values

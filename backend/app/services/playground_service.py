@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import logging
 from typing import Any
+from urllib.parse import urlparse
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,13 +21,17 @@ from app.services.config.aid_score import (
 )
 from app.services.config.data_enrichment import (
     DATA_ENRICHMENT_JOB_TERMINAL_STATUSES,
+    ECOMMERCE_DETAIL_SURFACE,
 )
+from app.services.config.monitor_settings import MONITOR_PRIORITY_BACKGROUND
 from app.services.config.product_intelligence import (
     PRODUCT_INTELLIGENCE_JOB_STATUS_COMPLETE,
     PRODUCT_INTELLIGENCE_JOB_STATUS_FAILED,
 )
 from app.services.crawl.ingestion_service import create_crawl_run_from_payload
+from app.services.crawl.sitemap_resolver import resolve_category_urls_from_sitemap_result
 from app.services.crawl.state import TERMINAL_STATUSES
+from app.services.surface_resolver import resolve_auto_surface
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +47,8 @@ _ENRICH_TERMINAL_STATUSES = set(DATA_ENRICHMENT_JOB_TERMINAL_STATUSES)
 
 # State machine transitions
 VALID_TRANSITIONS = {
-    "created": ["discovering"],
+    "created": ["sitemap_listed", "discovering", "extracting"],
+    "sitemap_listed": ["discovering"],
     "discovering": ["discovered"],
     "discovered": ["extracting"],
     "extracting": ["extracted"],
@@ -51,6 +57,39 @@ VALID_TRANSITIONS = {
 }
 
 MAX_PRODUCTS = 50
+SITEMAP_DISPLAY_LIMIT = 100
+
+
+def _classify_input_url(url: str) -> str:
+    """Decide which playground entry stage applies for the given URL.
+
+    Returns one of ``"sitemap"`` (homepage / domain root),
+    ``"listing"`` (category, search, shop), or ``"detail"`` (PDP, article).
+    Pure URL inspection — relies on the existing ``resolve_auto_surface``
+    helper for surface classification.
+    """
+    parsed = urlparse(url)
+    path = (parsed.path or "").strip("/")
+    # Domain root or trivially shallow path (no slugs) → sitemap stage.
+    if not path:
+        return "sitemap"
+    resolution = resolve_auto_surface(url=url)
+    surface = resolution.surface
+    # Low-confidence fallback content_detail on a shallow path such as
+    # `/en`, `/us`, or `/en-us` is usually a locale-root homepage, not a
+    # real detail page. Treat it like sitemap entry so orchestration can
+    # expand into categories or products instead of extracting the root URL.
+    if (
+        surface == "content_detail"
+        and resolution.confidence < 0.5
+        and path.count("/") == 0
+    ):
+        return "sitemap"
+    if surface.endswith("_detail"):
+        return "detail"
+    if surface.endswith("_listing"):
+        return "listing"
+    return "listing"
 
 
 async def create_session(
@@ -90,9 +129,16 @@ async def get_session(
         raise LookupError("Session not found")
     # Ensure step_data is loaded before auto-advance to avoid lazy reload issues
     _ = playground.step_data
+    state_before = playground.state
+    step_data_before = playground.step_data
     await _auto_advance(session, playground)
-    # Refresh server-computed columns (updated_at) after any flush to avoid MissingGreenlet
-    await session.refresh(playground)
+    # Only flush + refresh when auto-advance actually mutated the row.
+    # Calling refresh on an unchanged row can trigger an implicit flush in
+    # async sessions and surface a MissingGreenlet error during the reload
+    # of server-computed columns (updated_at).
+    if playground.state != state_before or playground.step_data != step_data_before:
+        await session.flush()
+        await session.refresh(playground)
     return playground
 
 
@@ -117,27 +163,151 @@ async def start_discover(
     *,
     playground: PlaygroundSession,
     user: User,
-) -> int:
-    """Kick off a listing/category crawl to discover products."""
+) -> dict[str, Any]:
+    """Route the input URL into the right entry stage.
+
+    Three entry points, all driven by existing services:
+
+    - ``sitemap``: homepage / domain root → fetch the sitemap and surface
+      category URLs for the user to pick from. Sets state ``sitemap_listed``.
+    - ``listing``: category / search URL → start a standard crawl on it
+      (run_type=crawl, surface=auto). Sets state ``discovering``.
+    - ``detail``: PDP / article URL → start a standard crawl directly
+      against the URL and skip discover/select. Sets state ``extracting``.
+
+    Returns a small payload describing what was started so the API layer
+    can return useful info to the client.
+    """
     _require_state(playground, "created")
+
+    classification = _classify_input_url(playground.input_url)
+    step_data = dict(playground.step_data or {})
+
+    if classification == "sitemap":
+        sitemap_source: str
+        sitemap_error: str | None = None
+        try:
+            sitemap_resolution = await resolve_category_urls_from_sitemap_result(
+                domain=playground.input_url,
+                allow_homepage_fallback=True,
+            )
+            sitemap_urls = sitemap_resolution.urls
+            sitemap_source = sitemap_resolution.source
+        except Exception as exc:
+            logger.warning(
+                "Sitemap fetch failed for %s: %s", playground.input_url, exc
+            )
+            sitemap_urls = []
+            sitemap_source = "failed"
+            sitemap_error = type(exc).__name__
+        # Limit what we expose to the user; everything else stays in step_data.
+        step_data["sitemap"] = {
+            "status": "completed",
+            "source": sitemap_source,
+            "urls": sitemap_urls[:SITEMAP_DISPLAY_LIMIT],
+            "total_found": len(sitemap_urls),
+        }
+        if sitemap_error:
+            step_data["sitemap"]["error"] = sitemap_error
+        playground.state = "sitemap_listed"
+        playground.step_data = step_data
+        await session.flush()
+        return {"stage": "sitemap", "url_count": len(sitemap_urls)}
+
+    if classification == "detail":
+        # Treat the URL as the only product to extract — same crawl call
+        # Crawl Studio uses for a single PDP.
+        run = await create_crawl_run_from_payload(
+            session,
+            user.id,
+            {
+                "run_type": "crawl",
+                "url": playground.input_url,
+                "surface": "auto",
+                "settings": {"playground_session_id": playground.id},
+            },
+        )
+        step_data["selected_urls"] = [playground.input_url]
+        step_data["extract"] = {
+            "run_id": run.id,
+            "run_ids": [run.id],
+            "status": "running",
+            "url_count": 1,
+            "skipped_discover": True,
+        }
+        playground.state = "extracting"
+        playground.step_data = step_data
+        await session.flush()
+        return {"stage": "detail", "run_id": run.id}
+
+    # Listing / category crawl — standard call shape.
+    run = await create_crawl_run_from_payload(
+        session,
+        user.id,
+        {
+            "run_type": "crawl",
+            "url": playground.input_url,
+            "surface": "auto",
+            "settings": {"playground_session_id": playground.id},
+        },
+    )
+    step_data["discover"] = {"run_id": run.id, "status": "running"}
+    playground.state = "discovering"
+    playground.step_data = step_data
+    await session.flush()
+    return {"stage": "listing", "run_id": run.id}
+
+
+async def select_category(
+    session: AsyncSession,
+    *,
+    playground: PlaygroundSession,
+    user: User,
+    urls: list[str],
+) -> int:
+    """User picked one or more categories from the sitemap. Start crawl.
+
+    Same call shape as the listing branch of ``start_discover``.
+    """
+    _require_state(playground, "sitemap_listed")
+    normalized_urls = [url.strip() for url in urls if url and url.strip()]
+    if not normalized_urls:
+        raise ValueError("category URL is required")
+    if len(normalized_urls) > MAX_PRODUCTS:
+        raise ValueError(f"Maximum {MAX_PRODUCTS} category URLs per session")
+    unique_urls = list(dict.fromkeys(normalized_urls))
+    detail_urls, discover_urls = _partition_playground_urls(unique_urls)
+    if detail_urls and not discover_urls:
+        run_ids = await _launch_extract_runs(
+            session,
+            playground=playground,
+            user=user,
+            urls=detail_urls,
+            skipped_discover=True,
+        )
+        return run_ids[0]
+
+    run_type = "batch" if len(discover_urls) > 1 else "crawl"
 
     run = await create_crawl_run_from_payload(
         session,
         user.id,
         {
-            "run_type": "single",
-            "url": playground.input_url,
-            "surface": "ecommerce_listing",
+            "run_type": run_type,
+            "url": discover_urls[0],
+            "urls": discover_urls if len(discover_urls) > 1 else None,
+            "surface": "auto",
             "settings": {"playground_session_id": playground.id},
-            "requested_fields": ["url", "title", "brand", "price", "image"],
         },
     )
-
+    step_data = dict(playground.step_data or {})
+    step_data["selected_category_url"] = discover_urls[0]
+    step_data["selected_category_urls"] = discover_urls
+    if detail_urls:
+        step_data["seed_detail_urls"] = detail_urls
+    step_data["discover"] = {"run_id": run.id, "status": "running"}
     playground.state = "discovering"
-    playground.step_data = {
-        **(playground.step_data or {}),
-        "discover": {"run_id": run.id, "status": "running"},
-    }
+    playground.step_data = step_data
     await session.flush()
     return run.id
 
@@ -189,39 +359,24 @@ async def start_extract(
     *,
     playground: PlaygroundSession,
     user: User,
-) -> int:
-    """Kick off PDP crawl for selected products."""
+) -> list[int]:
+    """Kick off PDP crawls for selected products.
+
+    One standard ``run_type=crawl`` run per URL — same call shape Crawl
+    Studio uses for a single product. The orchestrator just dispatches
+    them in parallel; nothing else.
+    """
     _require_state(playground, "discovered")
 
     urls = (playground.step_data or {}).get("selected_urls", [])
     if not urls:
         raise ValueError("No products selected — call select first")
-
-    run = await create_crawl_run_from_payload(
+    return await _launch_extract_runs(
         session,
-        user.id,
-        {
-            "run_type": "batch",
-            "url": urls[0],
-            "urls": urls,
-            "surface": "ecommerce_detail",
-            "settings": {
-                "playground_session_id": playground.id,
-                "urls": urls,
-            },
-            "requested_fields": [
-                "title", "price", "was_price", "brand",
-                "availability", "image", "description",
-            ],
-        },
+        playground=playground,
+        user=user,
+        urls=urls,
     )
-
-    playground.state = "extracting"
-    step_data = dict(playground.step_data or {})
-    step_data["extract"] = {"run_id": run.id, "status": "running", "url_count": len(urls)}
-    playground.step_data = step_data
-    await session.flush()
-    return run.id
 
 
 async def start_pipeline(
@@ -251,14 +406,15 @@ async def start_pipeline(
     launched: dict[str, Any] = {}
     dispatch_specs: list[tuple[Any, int]] = []
     step_data = dict(playground.step_data or {})
-    extract_run_id = step_data.get("extract", {}).get("run_id")
+    extract_run_ids = _extract_run_ids(step_data)
+    source_record_ids = await _extract_record_ids(session, extract_run_ids)
 
     if enrich:
-        if not extract_run_id:
+        if not source_record_ids:
             launched["enrich"] = {
                 "job_id": None,
                 "status": "failed",
-                "error": "No extraction run available",
+                "error": "No extracted records available",
             }
         else:
             from app.services.data_enrichment.service import (
@@ -269,7 +425,7 @@ async def start_pipeline(
                 job = await create_data_enrichment_job(
                     session,
                     user=user,
-                    payload={"source_run_id": extract_run_id},
+                    payload={"source_record_ids": source_record_ids},
                 )
                 launched["enrich"] = {"job_id": job.id, "status": "running"}
                 dispatch_specs.append((run_data_enrichment_job, job.id))
@@ -283,11 +439,11 @@ async def start_pipeline(
         step_data["enrich"] = launched["enrich"]
 
     if compare:
-        if not extract_run_id:
+        if not source_record_ids:
             launched["compare"] = {
                 "job_id": None,
                 "status": "failed",
-                "error": "No extraction run available",
+                "error": "No extracted records available",
             }
         else:
             from app.services.product_intelligence.service import (
@@ -298,7 +454,7 @@ async def start_pipeline(
                 job = await create_product_intelligence_job(
                     session,
                     user=user,
-                    payload={"source_run_id": extract_run_id},
+                    payload={"source_record_ids": source_record_ids},
                 )
                 launched["compare"] = {"job_id": job.id, "status": "running"}
                 dispatch_specs.append((run_product_intelligence_job, job.id))
@@ -313,27 +469,41 @@ async def start_pipeline(
 
     if monitor:
         selected_urls = step_data.get("selected_urls", [])
-        from app.schemas.alert import AlertCreate
-        from app.services.alert_service import create_alert
-        try:
-            alert_payload = AlertCreate(
-                url=selected_urls[0] if selected_urls else playground.input_url,
-                target_fields=["price", "availability"],
-            )
-            monitor_obj, _run_id = await create_alert(
-                session, user=user, payload=alert_payload
-            )
+        from app.services.monitor_service import create_monitor
+
+        if not selected_urls:
             launched["monitor"] = {
-                "alert_id": monitor_obj.id,
-                "status": "created",
-            }
-        except Exception as exc:
-            logger.error("Pipeline monitor failed: %s", exc, exc_info=True)
-            launched["monitor"] = {
-                "alert_id": None,
+                "monitor_id": None,
                 "status": "failed",
-                "error": str(exc),
+                "error": "No extracted URLs available",
             }
+        else:
+            try:
+                monitor_obj = await create_monitor(
+                    session,
+                    user=user,
+                    payload={
+                        "name": f"Playground monitor for {urlparse(selected_urls[0]).netloc or 'selected products'}",
+                        "urls": selected_urls,
+                        "surface": ECOMMERCE_DETAIL_SURFACE,
+                        "tracked_fields": ["price", "availability"],
+                        "requested_fields": ["price", "availability"],
+                        "schedule_interval_hours": 24,
+                        "priority": MONITOR_PRIORITY_BACKGROUND,
+                    },
+                )
+                launched["monitor"] = {
+                    "monitor_id": monitor_obj.id,
+                    "status": "created",
+                    "url_count": len(selected_urls),
+                }
+            except Exception as exc:
+                logger.error("Pipeline monitor failed: %s", exc, exc_info=True)
+                launched["monitor"] = {
+                    "monitor_id": None,
+                    "status": "failed",
+                    "error": str(exc),
+                }
         step_data["monitor"] = launched["monitor"]
 
     if audit:
@@ -396,10 +566,14 @@ async def get_results(
     # Extraction results — fetch records from the crawl run
     extract = step_data.get("extract", {})
     if extract:
+        records = await _extract_records(session, _extract_run_ids(step_data))
         results["steps"]["extract"] = {
             "status": extract.get("status"),
             "run_id": extract.get("run_id"),
+            "run_ids": _extract_run_ids(step_data),
             "url_count": extract.get("url_count", 0),
+            "record_count": len(records),
+            "records": records,
         }
 
     # Pipeline results
@@ -424,6 +598,7 @@ async def _auto_advance(
             if run and run.status in {s.value for s in TERMINAL_STATUSES}:
                 # Pull discovered product URLs from the crawl records
                 products = await _extract_discovered_products(session, run_id)
+                products = _merge_seed_detail_products(step_data, products)
                 step_data["discover"] = {
                     **step_data.get("discover", {}),
                     "status": "completed",
@@ -434,12 +609,29 @@ async def _auto_advance(
                 playground.step_data = step_data
 
     elif playground.state == "extracting":
-        run_id = step_data.get("extract", {}).get("run_id")
-        if run_id:
-            run = await session.get(CrawlRun, run_id)
-            if run and run.status in {s.value for s in TERMINAL_STATUSES}:
+        extract_info = step_data.get("extract", {}) or {}
+        extract_runs = await _resolve_extract_runs(
+            session,
+            playground=playground,
+            step_data=step_data,
+        )
+        resolved_run_ids = [int(run.id) for run in extract_runs]
+        if resolved_run_ids:
+            step_data["extract"] = {
+                **extract_info,
+                "run_id": resolved_run_ids[0],
+                "run_ids": resolved_run_ids,
+            }
+            extract_info = step_data["extract"]
+        expected_run_count = _expected_extract_run_count(step_data)
+        if resolved_run_ids and len(resolved_run_ids) >= expected_run_count:
+            terminal = {s.value for s in TERMINAL_STATUSES}
+            statuses = [str(run.status) for run in extract_runs]
+            # All resolved session-owned runs must reach a terminal status
+            # before we transition.
+            if all(status in terminal for status in statuses):
                 step_data["extract"] = {
-                    **step_data.get("extract", {}),
+                    **extract_info,
                     "status": "completed",
                 }
                 playground.state = "extracted"
@@ -569,6 +761,187 @@ async def _extract_discovered_products(
                 "image": str(data.get("image") or data.get("image_url") or ""),
             })
     return products
+
+
+async def _launch_extract_runs(
+    session: AsyncSession,
+    *,
+    playground: PlaygroundSession,
+    user: User,
+    urls: list[str],
+    skipped_discover: bool = False,
+) -> list[int]:
+    run_ids: list[int] = []
+    for product_url in urls:
+        run = await create_crawl_run_from_payload(
+            session,
+            user.id,
+            {
+                "run_type": "crawl",
+                "url": product_url,
+                "surface": "auto",
+                "settings": {"playground_session_id": playground.id},
+            },
+        )
+        run_ids.append(run.id)
+
+    playground.state = "extracting"
+    step_data = dict(playground.step_data or {})
+    step_data["selected_urls"] = list(urls)
+    step_data["extract"] = {
+        "run_id": run_ids[0],
+        "run_ids": run_ids,
+        "status": "running",
+        "url_count": len(urls),
+        "skipped_discover": skipped_discover,
+    }
+    playground.step_data = step_data
+    await session.flush()
+    return run_ids
+
+
+def _partition_playground_urls(urls: list[str]) -> tuple[list[str], list[str]]:
+    detail_urls: list[str] = []
+    discover_urls: list[str] = []
+    for url in urls:
+        if _classify_input_url(url) == "detail":
+            detail_urls.append(url)
+        else:
+            discover_urls.append(url)
+    return detail_urls, discover_urls
+
+
+def _merge_seed_detail_products(
+    step_data: dict[str, Any],
+    discovered_products: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    merged: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for seed_url in step_data.get("seed_detail_urls", []) or []:
+        normalized = str(seed_url or "").strip()
+        if not normalized or normalized in seen:
+            continue
+        merged.append({"url": normalized, "title": "", "brand": "", "price": "", "image": ""})
+        seen.add(normalized)
+    for product in discovered_products:
+        normalized = str(product.get("url") or "").strip()
+        if not normalized or normalized in seen:
+            continue
+        merged.append(product)
+        seen.add(normalized)
+    return merged
+
+
+def _extract_run_ids(step_data: dict[str, Any]) -> list[int]:
+    extract = step_data.get("extract", {}) or {}
+    raw_run_ids = extract.get("run_ids")
+    if isinstance(raw_run_ids, list):
+        run_ids = [
+            run_id
+            for run_id in raw_run_ids
+            if isinstance(run_id, int) and run_id > 0
+        ]
+        if run_ids:
+            return run_ids
+    run_id = extract.get("run_id")
+    if isinstance(run_id, int) and run_id > 0:
+        return [run_id]
+    return []
+
+
+async def _extract_record_ids(
+    session: AsyncSession,
+    run_ids: list[int],
+) -> list[int]:
+    if not run_ids:
+        return []
+    rows = await session.scalars(
+        select(CrawlRecord.id)
+        .where(CrawlRecord.run_id.in_(run_ids))
+        .order_by(CrawlRecord.run_id.asc(), CrawlRecord.id.asc())
+    )
+    return [int(record_id) for record_id in rows.all() if record_id is not None]
+
+
+async def _extract_records(
+    session: AsyncSession,
+    run_ids: list[int],
+) -> list[dict[str, Any]]:
+    if not run_ids:
+        return []
+    rows = await session.scalars(
+        select(CrawlRecord)
+        .where(CrawlRecord.run_id.in_(run_ids))
+        .order_by(CrawlRecord.run_id.asc(), CrawlRecord.id.asc())
+    )
+    records: list[dict[str, Any]] = []
+    for record in rows.all():
+        records.append(
+            {
+                "id": int(record.id),
+                "run_id": int(record.run_id),
+                "source_url": str(record.source_url),
+                "data": dict(record.data or {}),
+            }
+        )
+    return records
+
+
+def _extract_selected_urls(step_data: dict[str, Any]) -> list[str]:
+    selected_urls = step_data.get("selected_urls")
+    if not isinstance(selected_urls, list):
+        return []
+    return [
+        url.strip()
+        for url in selected_urls
+        if isinstance(url, str) and url.strip()
+    ]
+
+
+def _expected_extract_run_count(step_data: dict[str, Any]) -> int:
+    extract = step_data.get("extract", {}) or {}
+    url_count = extract.get("url_count")
+    expected = max(
+        len(_extract_selected_urls(step_data)),
+        url_count if isinstance(url_count, int) and url_count > 0 else 0,
+    )
+    if expected > 0:
+        return expected
+    run_ids = _extract_run_ids(step_data)
+    return len(run_ids)
+
+
+async def _resolve_extract_runs(
+    session: AsyncSession,
+    *,
+    playground: PlaygroundSession,
+    step_data: dict[str, Any],
+) -> list[CrawlRun]:
+    resolved: dict[int, CrawlRun] = {}
+    for run_id in _extract_run_ids(step_data):
+        run = await session.get(CrawlRun, run_id)
+        if run is not None:
+            resolved[int(run.id)] = run
+
+    selected_urls = _extract_selected_urls(step_data)
+    if selected_urls:
+        rows = await session.scalars(
+            select(CrawlRun)
+            .where(
+                CrawlRun.user_id == playground.user_id,
+                CrawlRun.run_type == "crawl",
+                CrawlRun.url.in_(selected_urls),
+                CrawlRun.created_at >= playground.created_at,
+            )
+            .order_by(CrawlRun.id.asc())
+        )
+        for run in rows.all():
+            settings = run.settings if isinstance(run.settings, dict) else {}
+            if settings.get("playground_session_id") != playground.id:
+                continue
+            resolved.setdefault(int(run.id), run)
+
+    return [resolved[run_id] for run_id in sorted(resolved)]
 
 
 def _require_state(playground: PlaygroundSession, expected: str) -> None:

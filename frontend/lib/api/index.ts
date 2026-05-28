@@ -58,13 +58,15 @@ function withQuery(path: string, query: URLSearchParams) {
 export type PlaygroundDiscoverApiResponse = {
   session_id: number;
   state: string;
-  run_id: number;
+  stage: 'sitemap' | 'listing' | 'detail';
+  run_id: number | null;
+  sitemap_url_count: number | null;
   message: string;
 };
 export type PlaygroundExtractApiResponse = {
   session_id: number;
   state: string;
-  run_id: number;
+  run_ids: number[];
   url_count: number;
 };
 export type PlaygroundPipelineApiResponse = {
@@ -353,6 +355,11 @@ export const api = {
   playgroundSelect: (sessionId: number, payload: { urls: string[] }) =>
     apiClient.post<PlaygroundSessionResponse>(
       `/api/playground/sessions/${sessionId}/select`,
+      payload,
+    ),
+  playgroundSelectCategory: (sessionId: number, payload: { url?: string; urls?: string[] }) =>
+    apiClient.post<PlaygroundSessionResponse>(
+      `/api/playground/sessions/${sessionId}/select-category`,
       payload,
     ),
   playgroundExtract: (sessionId: number) =>

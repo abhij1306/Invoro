@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  AlertTriangle,
   ArrowRight,
   CheckCircle2,
   Circle,
@@ -11,7 +12,7 @@ import {
   Play,
   Search,
 } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
   DataRegionEmpty,
@@ -38,6 +39,7 @@ import { cn } from '../../lib/utils';
 
 type SessionState =
   | 'created'
+  | 'sitemap_listed'
   | 'discovering'
   | 'discovered'
   | 'extracting'
@@ -55,6 +57,13 @@ type DiscoveredProduct = {
   image?: string;
 };
 
+type ExtractedRecord = {
+  id: number;
+  run_id: number;
+  source_url: string;
+  data: Record<string, unknown>;
+};
+
 // ─── Steps ───────────────────────────────────────────────────────────────────
 
 const STEPS = [
@@ -68,7 +77,7 @@ const STEPS = [
 function stepIndex(state: SessionState): number {
   switch (state) {
     case 'created':
-      return 0;
+    case 'sitemap_listed':
     case 'discovering':
       return 0;
     case 'discovered':
@@ -78,7 +87,6 @@ function stepIndex(state: SessionState): number {
     case 'extracted':
       return 3;
     case 'running_pipeline':
-      return 4;
     case 'complete':
       return 4;
     default:
@@ -125,6 +133,23 @@ export default function PlaygroundPage() {
 
   const session = sessionQuery.data as PlaygroundSession | undefined;
   const currentStep = session ? stepIndex(session.state as SessionState) : -1;
+  const hasResultsState = session
+    ? session.state === 'extracted' ||
+      session.state === 'running_pipeline' ||
+      session.state === 'complete'
+    : false;
+
+  const resultsQuery = useQuery({
+    queryKey: ['playground-results', sessionId],
+    queryFn: () => api.playgroundResults(sessionId!),
+    enabled: sessionId !== null && hasResultsState,
+    refetchInterval: () => {
+      if (session?.state === 'running_pipeline') return 3000;
+      const audit = session?.step_data?.audit as Record<string, unknown> | undefined;
+      if (audit?.status === 'running') return 3000;
+      return false;
+    },
+  });
 
   // ─── Mutations ───────────────────────────────────────────────────────────
 
@@ -155,6 +180,13 @@ export default function PlaygroundPage() {
     onError: (err: Error) => setError(err.message),
   });
 
+  const selectCategory = useMutation({
+    mutationFn: ({ sid, categoryUrls }: { sid: number; categoryUrls: string[] }) =>
+      api.playgroundSelectCategory(sid, { urls: categoryUrls }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['playground-session', sessionId] }),
+    onError: (err: Error) => setError(err.message),
+  });
+
   const startExtract = useMutation({
     mutationFn: (sid: number) => api.playgroundExtract(sid),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['playground-session', sessionId] }),
@@ -177,20 +209,10 @@ export default function PlaygroundPage() {
     createSession.mutate(trimmed);
   }, [url, createSession]);
 
-  const handleDiscover = useCallback(() => {
-    if (!sessionId) return;
-    startDiscover.mutate(sessionId);
-  }, [sessionId, startDiscover]);
-
   const handleSelect = useCallback(() => {
     if (!sessionId || selectedUrls.size === 0) return;
     selectProducts.mutate({ sid: sessionId, urls: Array.from(selectedUrls) });
   }, [sessionId, selectedUrls, selectProducts]);
-
-  const handleExtract = useCallback(() => {
-    if (!sessionId) return;
-    startExtract.mutate(sessionId);
-  }, [sessionId, startExtract]);
 
   const handlePipeline = useCallback(() => {
     if (!sessionId) return;
@@ -214,6 +236,14 @@ export default function PlaygroundPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.state, sessionId]);
 
+  // Reset url selection across stages so a sitemap pick doesn't bleed into
+  // the products picker that follows it.
+  useEffect(() => {
+    if (session?.state === 'sitemap_listed' || session?.state === 'discovered') {
+      setSelectedUrls(new Set());
+    }
+  }, [session?.state]);
+
   // ─── Derived data ────────────────────────────────────────────────────────
 
   const discoveredProducts: DiscoveredProduct[] = (() => {
@@ -224,6 +254,60 @@ export default function PlaygroundPage() {
     }
     return [];
   })();
+
+  const sitemapUrls: string[] = (() => {
+    const sitemap = session?.step_data?.sitemap;
+    if (sitemap && typeof sitemap === 'object' && 'urls' in sitemap) {
+      const urls = (sitemap as Record<string, unknown>).urls;
+      return Array.isArray(urls) ? (urls as string[]) : [];
+    }
+    return [];
+  })();
+
+  const sitemapSource = (() => {
+    const sitemap = session?.step_data?.sitemap;
+    if (sitemap && typeof sitemap === 'object' && 'source' in sitemap) {
+      const source = (sitemap as Record<string, unknown>).source;
+      return source === 'homepage' ? 'homepage' : 'sitemap';
+    }
+    return 'sitemap';
+  })();
+
+  const resultsSteps = (() => {
+    const payload = resultsQuery.data;
+    if (payload && typeof payload === 'object' && 'steps' in payload) {
+      const steps = (payload as Record<string, unknown>).steps;
+      return steps && typeof steps === 'object' ? (steps as Record<string, unknown>) : undefined;
+    }
+    return undefined;
+  })();
+
+  const extractedRecords: ExtractedRecord[] = (() => {
+    const extract = resultsSteps?.extract;
+    if (extract && typeof extract === 'object' && 'records' in extract) {
+      const records = (extract as Record<string, unknown>).records;
+      return Array.isArray(records) ? (records as ExtractedRecord[]) : [];
+    }
+    return [];
+  })();
+
+  const extractedRunIds: number[] = (() => {
+    const extract = resultsSteps?.extract;
+    if (extract && typeof extract === 'object' && 'run_ids' in extract) {
+      const runIds = (extract as Record<string, unknown>).run_ids;
+      return Array.isArray(runIds)
+        ? runIds.filter((value): value is number => typeof value === 'number')
+        : [];
+    }
+    return [];
+  })();
+
+  const hasPipelineActivity = Boolean(
+    session?.step_data?.enrich ||
+    session?.step_data?.compare ||
+    session?.step_data?.monitor ||
+    session?.step_data?.audit,
+  );
 
   const toggleProduct = (productUrl: string) => {
     setSelectedUrls((prev) => {
@@ -276,7 +360,7 @@ export default function PlaygroundPage() {
                 onChange={(e) => setUrl(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleStart()}
                 placeholder="https://www.example.com/category/shoes"
-                className="border-divider flex-1 rounded-md border bg-[var(--bg-panel)] px-3 py-2 text-sm focus-ring"
+                className="border-divider focus-ring flex-1 rounded-md border bg-[var(--bg-panel)] px-3 py-2 text-sm"
               />
               <Button onClick={handleStart} disabled={createSession.isPending || !url.trim()}>
                 {createSession.isPending ? (
@@ -298,7 +382,7 @@ export default function PlaygroundPage() {
             {STEPS.map((step, idx) => (
               <div key={step.id} className="flex items-center gap-1.5">
                 {idx < currentStep ? (
-                  <CheckCircle2 className="size-4 text-success" />
+                  <CheckCircle2 className="text-success size-4" />
                 ) : idx === currentStep ? (
                   <Circle className="size-4 fill-[var(--accent)] text-[var(--accent)]" />
                 ) : (
@@ -320,283 +404,214 @@ export default function PlaygroundPage() {
 
           {/* ─── Step: Discovering ──────────────────────────────────────── */}
           {(session.state === 'discovering' || session.state === 'created') && (
-            <SurfacePanel>
-              <div className="flex items-center gap-3 p-6">
-                <Loader2 className="size-5 animate-spin text-[var(--accent)]" />
-                <div>
-                  <p className="font-medium">Discovering products...</p>
-                  <p className="text-muted text-sm">
-                    Crawling <span className="font-mono">{session.input_url}</span> to find available
-                    products.
-                  </p>
-                </div>
-              </div>
-            </SurfacePanel>
+            <ActivityLogPanel
+              title="Discovering products"
+              subtitle={
+                <>
+                  Crawling <span className="font-mono">{session.input_url}</span> to find available
+                  products.
+                </>
+              }
+              runId={
+                (session.step_data?.discover as Record<string, unknown>)?.run_id as
+                  | number
+                  | undefined
+              }
+              startedAt={session.created_at}
+              phase="discover"
+            />
+          )}
+
+          {/* ─── Step: Sitemap → pick a category ────────────────────────── */}
+          {session.state === 'sitemap_listed' && (
+            <PickerPanel
+              mode="multi"
+              title={`URLs from ${sitemapSource === 'homepage' ? 'homepage' : 'sitemap'} (${sitemapUrls.length})`}
+              description={
+                sitemapSource === 'homepage'
+                  ? 'Sitemap was unavailable, so these links were inferred from the homepage. Pick one or more URLs to crawl.'
+                  : 'Pick one or more category, collection, or section URLs to crawl.'
+              }
+              items={sitemapUrls.map((u) => ({ url: u }))}
+              selected={selectedUrls}
+              onToggle={toggleProduct}
+              onSelectAll={() => setSelectedUrls(new Set(sitemapUrls.slice(0, 50)))}
+              onConfirm={() => {
+                const categoryUrls = Array.from(selectedUrls);
+                if (sessionId && categoryUrls.length > 0) {
+                  selectCategory.mutate({ sid: sessionId, categoryUrls });
+                }
+              }}
+              confirmLabel={
+                selectedUrls.size === 0
+                  ? 'Pick URL(s)'
+                  : `Crawl ${selectedUrls.size} URL${selectedUrls.size === 1 ? '' : 's'}`
+              }
+              confirmDisabled={selectedUrls.size === 0 || selectCategory.isPending}
+              isLoading={selectCategory.isPending}
+              emptyTitle="No homepage or sitemap links found"
+              emptyDescription={`Couldn't pull useful links from sitemap or homepage for ${session.input_url}. Try a category or product URL directly.`}
+            />
           )}
 
           {/* ─── Step: Select Products ─────────────────────────────────── */}
           {session.state === 'discovered' && (
-            <SurfacePanel>
-              <div className="border-divider flex items-center justify-between border-b px-4 py-3">
-                <div>
-                  <p className="type-label m-0">
-                    Products Found ({discoveredProducts.length})
-                  </p>
-                  <p className="text-muted m-0 text-sm">
-                    Select up to 50 products to extract detailed data from.
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <Button size="sm" variant="ghost" onClick={selectAll}>
-                    Select All (max 50)
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={async () => {
-                      handleSelect();
-                    }}
-                    disabled={selectedUrls.size === 0 || selectProducts.isPending}
-                  >
-                    <Play className="size-3.5" />
-                    Extract {selectedUrls.size} Products
-                  </Button>
-                </div>
-              </div>
-              <TableSurface>
-                {discoveredProducts.length === 0 ? (
-                  <DataRegionEmpty
-                    title="No products found"
-                    description="The crawl didn't find product links on this page. Try a different URL."
-                  />
-                ) : (
-                  <Table className="compact-data-table">
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-[40px]">{''}</TableHead>
-                        <TableHead>Product</TableHead>
-                        <TableHead className="w-[120px]">Brand</TableHead>
-                        <TableHead className="w-[100px]">Price</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {discoveredProducts.slice(0, 50).map((product) => (
-                        <TableRow
-                          key={product.url}
-                          className="cursor-pointer"
-                          onClick={(e) => {
-                            // Avoid double-toggle when clicking the checkbox itself
-                            if ((e.target as HTMLElement).tagName === 'INPUT') return;
-                            toggleProduct(product.url);
-                          }}
-                        >
-                          <TableCell>
-                            <input
-                              type="checkbox"
-                              checked={selectedUrls.has(product.url)}
-                              onChange={() => toggleProduct(product.url)}
-                              onClick={(e) => e.stopPropagation()}
-                              className="size-4 rounded"
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <div className="min-w-0">
-                              <p className="m-0 truncate font-medium text-sm">
-                                {product.title || product.url}
-                              </p>
-                              <p className="text-muted m-0 truncate text-xs font-mono">
-                                {product.url}
-                              </p>
-                            </div>
-                          </TableCell>
-                          <TableCell className="truncate text-sm">
-                            {product.brand || '-'}
-                          </TableCell>
-                          <TableCell className="text-sm">{product.price || '-'}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
-              </TableSurface>
-            </SurfacePanel>
+            <PickerPanel
+              mode="multi"
+              title={`Products Found (${discoveredProducts.length})`}
+              description="Select up to 50 products to extract detailed data from."
+              items={discoveredProducts}
+              selected={selectedUrls}
+              onToggle={toggleProduct}
+              onSelectAll={selectAll}
+              onConfirm={handleSelect}
+              confirmLabel={`Extract ${selectedUrls.size} Product${selectedUrls.size === 1 ? '' : 's'}`}
+              confirmDisabled={selectedUrls.size === 0 || selectProducts.isPending}
+              isLoading={selectProducts.isPending}
+              emptyTitle="No products found"
+              emptyDescription="The crawl didn't find product links on this page. Try a different URL."
+            />
           )}
 
           {/* ─── Step: Extracting ──────────────────────────────────────── */}
           {session.state === 'extracting' && (
-            <SurfacePanel>
-              <div className="flex items-center gap-3 p-6">
-                <Loader2 className="size-5 animate-spin text-[var(--accent)]" />
-                <div>
-                  <p className="font-medium">Extracting product details...</p>
-                  <p className="text-muted text-sm">
-                    Crawling{' '}
-                    {String((session.step_data?.extract as Record<string, unknown>)?.url_count ?? '?')}{' '}
-                    product pages for structured data.
-                  </p>
-                </div>
-              </div>
-            </SurfacePanel>
+            <ActivityLogPanel
+              title="Extracting product details"
+              subtitle={
+                <>
+                  Crawling{' '}
+                  {String(
+                    (session.step_data?.extract as Record<string, unknown>)?.url_count ?? '?',
+                  )}{' '}
+                  product pages for structured data.
+                </>
+              }
+              runId={
+                (session.step_data?.extract as Record<string, unknown>)?.run_id as
+                  | number
+                  | undefined
+              }
+              startedAt={session.updated_at}
+              phase="extract"
+            />
           )}
 
           {/* ─── Step: Pipeline Selection ──────────────────────────────── */}
           {session.state === 'extracted' && (
             <>
-              <ExtractedDataPreview
-                runId={(session.step_data?.extract as Record<string, unknown>)?.run_id as number | undefined}
-              />
+              <ExtractedDataPreview records={extractedRecords} isLoading={resultsQuery.isPending} />
               <SurfacePanel>
-              <div className="border-divider border-b px-4 py-3">
-                <p className="type-label m-0">Extraction Complete</p>
-                <p className="text-muted m-0 text-sm">
-                  Choose what to do with the extracted data.
-                </p>
-              </div>
-              <div className="grid gap-4 p-6 sm:grid-cols-2">
-                <label className="border-divider flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition hover:bg-[var(--bg-alt)]">
-                  <input
-                    type="checkbox"
-                    checked={pipelineOptions.enrich}
-                    onChange={(e) =>
-                      setPipelineOptions((prev) => ({ ...prev, enrich: e.target.checked }))
+                <div className="border-divider border-b px-4 py-3">
+                  <p className="type-label m-0">Extraction Complete</p>
+                  <p className="text-muted m-0 text-sm">
+                    Choose what to do with the extracted data.
+                  </p>
+                </div>
+                <div className="grid gap-4 p-6 sm:grid-cols-2">
+                  <label className="border-divider flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition hover:bg-[var(--bg-alt)]">
+                    <input
+                      type="checkbox"
+                      checked={pipelineOptions.enrich}
+                      onChange={(e) =>
+                        setPipelineOptions((prev) => ({ ...prev, enrich: e.target.checked }))
+                      }
+                      className="mt-0.5 size-4 rounded"
+                    />
+                    <div>
+                      <p className="m-0 text-sm font-medium">Enrich Data</p>
+                      <p className="text-muted m-0 text-xs">
+                        Fill missing brand, category, and product attributes.
+                      </p>
+                    </div>
+                  </label>
+                  <label className="border-divider flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition hover:bg-[var(--bg-alt)]">
+                    <input
+                      type="checkbox"
+                      checked={pipelineOptions.compare}
+                      onChange={(e) =>
+                        setPipelineOptions((prev) => ({ ...prev, compare: e.target.checked }))
+                      }
+                      className="mt-0.5 size-4 rounded"
+                    />
+                    <div>
+                      <p className="m-0 text-sm font-medium">Product Intelligence</p>
+                      <p className="text-muted m-0 text-xs">
+                        Find competitor prices on Google, Amazon, Flipkart.
+                      </p>
+                    </div>
+                  </label>
+                  <label className="border-divider flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition hover:bg-[var(--bg-alt)]">
+                    <input
+                      type="checkbox"
+                      checked={pipelineOptions.monitor}
+                      onChange={(e) =>
+                        setPipelineOptions((prev) => ({ ...prev, monitor: e.target.checked }))
+                      }
+                      className="mt-0.5 size-4 rounded"
+                    />
+                    <div>
+                      <p className="m-0 text-sm font-medium">Create Monitor</p>
+                      <p className="text-muted m-0 text-xs">
+                        Watch for price and availability changes on these products.
+                      </p>
+                    </div>
+                  </label>
+                  <label className="border-divider flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition hover:bg-[var(--bg-alt)]">
+                    <input
+                      type="checkbox"
+                      checked={pipelineOptions.audit}
+                      onChange={(e) =>
+                        setPipelineOptions((prev) => ({ ...prev, audit: e.target.checked }))
+                      }
+                      className="mt-0.5 size-4 rounded"
+                    />
+                    <div>
+                      <p className="m-0 text-sm font-medium">AI Audit</p>
+                      <p className="text-muted m-0 text-xs">
+                        Check AI discoverability score for the source domain.
+                      </p>
+                      <Badge tone="info" className="mt-1">
+                        Independent — runs on input URL
+                      </Badge>
+                    </div>
+                  </label>
+                </div>
+                <div className="border-divider flex justify-end border-t px-4 py-3">
+                  <Button
+                    onClick={handlePipeline}
+                    disabled={
+                      runPipeline.isPending ||
+                      (!pipelineOptions.enrich &&
+                        !pipelineOptions.compare &&
+                        !pipelineOptions.monitor &&
+                        !pipelineOptions.audit)
                     }
-                    className="mt-0.5 size-4 rounded"
-                  />
-                  <div>
-                    <p className="m-0 font-medium text-sm">Enrich Data</p>
-                    <p className="text-muted m-0 text-xs">
-                      Fill missing brand, category, and product attributes.
-                    </p>
-                  </div>
-                </label>
-                <label className="border-divider flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition hover:bg-[var(--bg-alt)]">
-                  <input
-                    type="checkbox"
-                    checked={pipelineOptions.compare}
-                    onChange={(e) =>
-                      setPipelineOptions((prev) => ({ ...prev, compare: e.target.checked }))
-                    }
-                    className="mt-0.5 size-4 rounded"
-                  />
-                  <div>
-                    <p className="m-0 font-medium text-sm">Product Intelligence</p>
-                    <p className="text-muted m-0 text-xs">
-                      Find competitor prices on Google, Amazon, Flipkart.
-                    </p>
-                  </div>
-                </label>
-                <label className="border-divider flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition hover:bg-[var(--bg-alt)]">
-                  <input
-                    type="checkbox"
-                    checked={pipelineOptions.monitor}
-                    onChange={(e) =>
-                      setPipelineOptions((prev) => ({ ...prev, monitor: e.target.checked }))
-                    }
-                    className="mt-0.5 size-4 rounded"
-                  />
-                  <div>
-                    <p className="m-0 font-medium text-sm">Create Monitor</p>
-                    <p className="text-muted m-0 text-xs">
-                      Watch for price and availability changes on these products.
-                    </p>
-                  </div>
-                </label>
-                <label className="border-divider flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition hover:bg-[var(--bg-alt)]">
-                  <input
-                    type="checkbox"
-                    checked={pipelineOptions.audit}
-                    onChange={(e) =>
-                      setPipelineOptions((prev) => ({ ...prev, audit: e.target.checked }))
-                    }
-                    className="mt-0.5 size-4 rounded"
-                  />
-                  <div>
-                    <p className="m-0 font-medium text-sm">AI Audit</p>
-                    <p className="text-muted m-0 text-xs">
-                      Check AI discoverability score for the source domain.
-                    </p>
-                    <Badge tone="info" className="mt-1">
-                      Independent — runs on input URL
-                    </Badge>
-                  </div>
-                </label>
-              </div>
-              <div className="border-divider flex justify-end border-t px-4 py-3">
-                <Button
-                  onClick={handlePipeline}
-                  disabled={
-                    runPipeline.isPending ||
-                    (!pipelineOptions.enrich &&
-                      !pipelineOptions.compare &&
-                      !pipelineOptions.monitor &&
-                      !pipelineOptions.audit)
-                  }
-                >
-                  {runPipeline.isPending ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <Play className="size-4" />
-                  )}
-                  Run Pipeline
-                </Button>
-              </div>
-            </SurfacePanel>
+                  >
+                    {runPipeline.isPending ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <Play className="size-4" />
+                    )}
+                    Run Pipeline
+                  </Button>
+                </div>
+              </SurfacePanel>
+              {hasPipelineActivity && (
+                <PipelineResultsPanel session={session} extractedRunIds={extractedRunIds} />
+              )}
             </>
           )}
 
           {/* ─── Step: Pipeline Running / Results ──────────────────────── */}
           {(session.state === 'running_pipeline' || session.state === 'complete') && (
-            <SurfacePanel>
-              <div className="border-divider border-b px-4 py-3">
-                <p className="type-label m-0">Pipeline Results</p>
-                <p className="text-muted m-0 text-sm">
-                  {session.state === 'running_pipeline'
-                    ? 'Operations in progress...'
-                    : 'All operations complete.'}
-                </p>
-              </div>
-              <div className="space-y-3 p-4">
-                <PipelineStepCard
-                  label="Enrichment"
-                  stepData={session.step_data?.enrich as Record<string, unknown> | undefined}
-                />
-                <PipelineStepCard
-                  label="Product Intelligence"
-                  stepData={session.step_data?.compare as Record<string, unknown> | undefined}
-                />
-                <PipelineStepCard
-                  label="Monitor"
-                  stepData={session.step_data?.monitor as Record<string, unknown> | undefined}
-                />
-                <PipelineStepCard
-                  label="AI Audit"
-                  stepData={session.step_data?.audit as Record<string, unknown> | undefined}
-                />
-              </div>
-              <div className="border-divider flex gap-2 border-t px-4 py-3">
-                <Button size="sm" variant="ghost" onClick={handleReset}>
-                  Start New Session
-                </Button>
-                {(() => {
-                  const extract = session.step_data?.extract;
-                  const runId =
-                    extract && typeof extract === 'object' && 'run_id' in extract
-                      ? (extract as Record<string, unknown>).run_id
-                      : undefined;
-                  return runId ? (
-                    <Button size="sm" variant="action" asChild>
-                      <a
-                        href={`/runs?run_id=${String(runId)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        <ExternalLink className="size-3.5" />
-                        View Run
-                      </a>
-                    </Button>
-                  ) : null;
-                })()}
-              </div>
-            </SurfacePanel>
+            <>
+              <ExtractedDataPreview records={extractedRecords} isLoading={resultsQuery.isPending} />
+              <PipelineResultsPanel
+                session={session}
+                extractedRunIds={extractedRunIds}
+                onReset={handleReset}
+              />
+            </>
           )}
         </>
       )}
@@ -605,6 +620,313 @@ export default function PlaygroundPage() {
 }
 
 // ─── Sub-Components ────────────────────────────────────────────────────────────
+
+// Phase = which step's logs we're showing. Used to seed milestone copy.
+type ActivityPhase = 'discover' | 'extract';
+
+type ActivityEntry = {
+  key: string;
+  text: string;
+  status: 'done' | 'active' | 'pending';
+  timestamp?: string;
+};
+
+// Map raw backend log messages to short, human-friendly lines.
+// Returns null to drop noisy entries.
+function humanizeLogMessage(raw: string): string | null {
+  const msg = raw.trim();
+  if (!msg) return null;
+
+  // Skip framework/internal noise
+  if (/^\[corr:/i.test(msg)) return null;
+  if (/^\[ROBOTS\]/i.test(msg) && /No robots\.txt/i.test(msg)) return null;
+  if (/listing_escalation_skipped/i.test(msg)) return null;
+
+  // Friendly rewrites for common signals
+  if (/Resolved \d+ seed URL/i.test(msg)) {
+    const m = msg.match(/Resolved (\d+) seed URL/i);
+    return m ? `Resolved ${m[1]} target URL${m[1] === '1' ? '' : 's'}` : 'Resolved target URLs';
+  }
+  if (/Starting crawl run/i.test(msg)) return 'Connecting to target site';
+  if (/Launched .* browser/i.test(msg)) return 'Launching browser engine';
+  if (/Rotating proxy profile detected/i.test(msg)) return 'Rotating proxy profile';
+  if (/Page loaded in \d+ms/i.test(msg)) {
+    const m = msg.match(/Page loaded in (\d+)ms/i);
+    return m ? `Page loaded (${m[1]}ms)` : 'Page loaded';
+  }
+  if (/Acquired payload via/i.test(msg)) return 'Fetched page content';
+  if (/HTTP transport fallback/i.test(msg)) return 'Retrying with alternate transport';
+  if (/Escalating to browser/i.test(msg)) return 'Escalating to full browser render';
+  if (/Traversal complete/i.test(msg)) return 'Finished page traversal';
+  if (/scroll|load_more|paginate/i.test(msg) && /traversal|listing/i.test(msg)) {
+    return 'Discovered pagination pattern';
+  }
+  if (/Normalized \d+ record/i.test(msg)) {
+    const m = msg.match(/Normalized (\d+) record/i);
+    return m ? `Parsed ${m[1]} record${m[1] === '1' ? '' : 's'}` : 'Parsing records';
+  }
+  if (/Persisted \d+ record/i.test(msg)) {
+    const m = msg.match(/Persisted (\d+) record/i);
+    return m ? `Saved ${m[1]} record${m[1] === '1' ? '' : 's'}` : 'Saving records';
+  }
+  if (/Extracted \d+ records/i.test(msg)) {
+    const m = msg.match(/Extracted (\d+) records using ([\w-]+)/i);
+    return m ? `Extracted ${m[1]} record${m[1] === '1' ? '' : 's'} (${m[2]})` : 'Extracted records';
+  }
+  if (/Pipeline finished/i.test(msg)) {
+    const m = msg.match(/Pipeline finished\. (\d+) records/i);
+    return m ? `Run complete (${m[1]} record${m[1] === '1' ? '' : 's'})` : 'Run complete';
+  }
+  if (/Stopped after reaching max_records/i.test(msg)) return 'Reached record limit';
+  if (/retrying browser render/i.test(msg)) return 'Retrying with browser render';
+
+  // Fall back to the raw message, trimmed for length.
+  if (msg.length > 120) return `${msg.slice(0, 117)}…`;
+  return msg;
+}
+
+function ActivityLogPanel({
+  title,
+  subtitle,
+  runId,
+  startedAt,
+  phase,
+}: {
+  title: string;
+  subtitle: React.ReactNode;
+  runId?: number;
+  startedAt?: string;
+  phase: ActivityPhase;
+}) {
+  // Poll backend logs for this run while the panel is mounted.
+  const logsQuery = useQuery({
+    queryKey: ['playground-crawl-logs', runId],
+    queryFn: () => api.getCrawlLogs(runId!, { limit: 200 }),
+    enabled: runId !== undefined && runId !== null,
+    refetchInterval: 2000,
+  });
+
+  // Live elapsed clock so the UI never looks frozen even with no log activity.
+  const startMs = useMemo(() => (startedAt ? Date.parse(startedAt) : Date.now()), [startedAt]);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+  const elapsedSec = Math.max(0, Math.floor((now - startMs) / 1000));
+  const slow = elapsedSec >= 30;
+  const stalled = elapsedSec >= 90;
+
+  // Build the rendered entries: a small set of seeded milestones followed by
+  // humanized real backend logs. Earlier entries are marked done; the last
+  // one becomes the active spinner row.
+  const entries: ActivityEntry[] = useMemo(() => {
+    const seeded: ActivityEntry[] =
+      phase === 'discover'
+        ? [
+            { key: 'seed-init', text: 'Session started', status: 'done' },
+            { key: 'seed-resolve', text: 'Resolving target URL', status: 'done' },
+          ]
+        : [
+            { key: 'seed-init', text: 'Extraction job created', status: 'done' },
+            { key: 'seed-batch', text: 'Queued selected pages', status: 'done' },
+          ];
+
+    const rawLogs = logsQuery.data ?? [];
+    const seen = new Set<string>();
+    const fromLogs: ActivityEntry[] = [];
+    for (const log of rawLogs) {
+      const text = humanizeLogMessage(log.message);
+      if (!text) continue;
+      // Dedupe consecutive identical lines (e.g. repeated page-loaded events).
+      if (seen.has(text)) continue;
+      seen.add(text);
+      fromLogs.push({
+        key: `log-${log.id}`,
+        text,
+        status: 'done',
+        timestamp: log.created_at,
+      });
+    }
+
+    const all = [...seeded, ...fromLogs];
+
+    // The last visible entry is the one currently in flight; everything
+    // before it is done. We always show an active row to keep the spinner
+    // alive — derive it from the most recent log if we have one, otherwise
+    // fall back to a generic phase message.
+    const activeText = phase === 'discover' ? 'Parsing response' : 'Parsing extracted data';
+    if (all.length === 0) {
+      all.push({ key: 'active-fallback', text: activeText, status: 'active' });
+    } else {
+      // Promote the last entry to active.
+      const last = all[all.length - 1];
+      all[all.length - 1] = { ...last, status: 'active' };
+    }
+    return all;
+  }, [logsQuery.data, phase]);
+
+  const elapsedLabel =
+    elapsedSec < 60 ? `${elapsedSec}s` : `${Math.floor(elapsedSec / 60)}m ${elapsedSec % 60}s`;
+
+  return (
+    <SurfacePanel>
+      <div className="border-divider flex items-center justify-between gap-3 border-b px-4 py-3">
+        <div className="flex items-center gap-3">
+          <Loader2 className="size-5 animate-spin text-[var(--accent)]" />
+          <div>
+            <p className="m-0 font-medium">{title}</p>
+            <p className="text-muted m-0 text-sm">{subtitle}</p>
+          </div>
+        </div>
+        <span className="text-muted font-mono text-xs">{elapsedLabel}</span>
+      </div>
+      <ul className="space-y-2 px-6 py-4 text-sm">
+        {entries.map((entry) => (
+          <li key={entry.key} className="flex items-start gap-2">
+            {entry.status === 'done' && (
+              <CheckCircle2 className="text-success mt-0.5 size-4 shrink-0" />
+            )}
+            {entry.status === 'active' && (
+              <Loader2 className="mt-0.5 size-4 shrink-0 animate-spin text-[var(--accent)]" />
+            )}
+            {entry.status === 'pending' && <Circle className="text-muted mt-0.5 size-4 shrink-0" />}
+            <span className={cn(entry.status === 'pending' && 'text-muted')}>{entry.text}</span>
+          </li>
+        ))}
+      </ul>
+      {slow && (
+        <div className="border-divider flex items-start gap-2 border-t px-6 py-3 text-xs">
+          <AlertTriangle
+            className={cn('mt-0.5 size-4 shrink-0', stalled ? 'text-danger' : 'text-warning')}
+          />
+          <span className="text-muted">
+            {stalled
+              ? 'This is taking longer than usual. The site may have heavy bot defenses or the page may be slow to render. You can keep waiting or start a new session with a different URL.'
+              : 'Still working. Some sites with strong bot protection take longer to crawl.'}
+          </span>
+        </div>
+      )}
+    </SurfacePanel>
+  );
+}
+
+function PickerPanel({
+  mode,
+  title,
+  description,
+  items,
+  selected,
+  onToggle,
+  onSelectAll,
+  onConfirm,
+  confirmLabel,
+  confirmDisabled,
+  isLoading,
+  emptyTitle,
+  emptyDescription,
+}: {
+  mode: 'single' | 'multi';
+  title: string;
+  description: string;
+  items: DiscoveredProduct[];
+  selected: Set<string>;
+  onToggle: (url: string) => void;
+  onSelectAll?: () => void;
+  onConfirm: () => void;
+  confirmLabel: string;
+  confirmDisabled: boolean;
+  isLoading: boolean;
+  emptyTitle: string;
+  emptyDescription: string;
+}) {
+  const showBrandPrice = items.some((item) => item.brand || item.price || item.title);
+  return (
+    <SurfacePanel>
+      <div className="border-divider flex items-center justify-between border-b px-4 py-3">
+        <div>
+          <p className="type-label m-0">{title}</p>
+          <p className="text-muted m-0 text-sm">{description}</p>
+        </div>
+        <div className="flex gap-2">
+          {mode === 'multi' && onSelectAll && items.length > 0 && (
+            <Button size="sm" variant="ghost" onClick={onSelectAll}>
+              Select All (max 50)
+            </Button>
+          )}
+          <Button size="sm" onClick={onConfirm} disabled={confirmDisabled}>
+            {isLoading ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <Play className="size-3.5" />
+            )}
+            {confirmLabel}
+          </Button>
+        </div>
+      </div>
+      <TableSurface>
+        {items.length === 0 ? (
+          <DataRegionEmpty title={emptyTitle} description={emptyDescription} />
+        ) : (
+          <Table className="compact-data-table">
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[40px]">{''}</TableHead>
+                <TableHead>{showBrandPrice ? 'Product' : 'URL'}</TableHead>
+                {showBrandPrice && (
+                  <>
+                    <TableHead className="w-[120px]">Brand</TableHead>
+                    <TableHead className="w-[100px]">Price</TableHead>
+                  </>
+                )}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {items.slice(0, 50).map((item) => {
+                const isChecked = selected.has(item.url);
+                return (
+                  <TableRow
+                    key={item.url}
+                    className="cursor-pointer"
+                    onClick={(e) => {
+                      if ((e.target as HTMLElement).tagName === 'INPUT') return;
+                      onToggle(item.url);
+                    }}
+                  >
+                    <TableCell>
+                      <input
+                        type={mode === 'single' ? 'radio' : 'checkbox'}
+                        name={mode === 'single' ? 'picker-single' : undefined}
+                        checked={isChecked}
+                        onChange={() => onToggle(item.url)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="size-4 rounded"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <div className="min-w-0">
+                        <p className="m-0 truncate text-sm font-medium">{item.title || item.url}</p>
+                        {item.title && (
+                          <p className="text-muted m-0 truncate font-mono text-xs">{item.url}</p>
+                        )}
+                      </div>
+                    </TableCell>
+                    {showBrandPrice && (
+                      <>
+                        <TableCell className="truncate text-sm">{item.brand || '-'}</TableCell>
+                        <TableCell className="text-sm">{item.price || '-'}</TableCell>
+                      </>
+                    )}
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        )}
+      </TableSurface>
+    </SurfacePanel>
+  );
+}
 
 function PipelineStepCard({
   label,
@@ -620,29 +942,28 @@ function PipelineStepCard({
     <div className="border-divider flex items-center justify-between rounded-md border px-4 py-3">
       <div className="flex items-center gap-2">
         {status === 'running' && <Loader2 className="size-4 animate-spin text-[var(--accent)]" />}
-        {status === 'completed' && <CheckCircle2 className="size-4 text-success" />}
+        {status === 'completed' && <CheckCircle2 className="text-success size-4" />}
         {status === 'created' && <Circle className="text-muted size-4" />}
-        {status === 'failed' && <Circle className="size-4 text-danger" />}
-        <span className="font-medium text-sm">{label}</span>
+        {status === 'failed' && <Circle className="text-danger size-4" />}
+        <span className="text-sm font-medium">{label}</span>
       </div>
-      <Badge tone={status === 'running' ? 'info' : status === 'failed' ? 'danger' : 'neutral'}>
-        {status}
-      </Badge>
+      {status !== 'failed' && (
+        <Badge tone={status === 'running' ? 'info' : 'neutral'}>
+          {status ? status.charAt(0).toUpperCase() + status.slice(1) : status}
+        </Badge>
+      )}
     </div>
   );
 }
 
-function ExtractedDataPreview({ runId }: { runId?: number }) {
-  const recordsQuery = useQuery({
-    queryKey: ['playground-extract-records', runId],
-    queryFn: () => api.getRecords(runId!, { limit: 20 }),
-    enabled: runId !== undefined && runId !== null,
-  });
-
-  const records = recordsQuery.data?.items ?? [];
-
-  if (!runId) return null;
-  if (recordsQuery.isPending) {
+function ExtractedDataPreview({
+  records,
+  isLoading,
+}: {
+  records: ExtractedRecord[];
+  isLoading: boolean;
+}) {
+  if (isLoading) {
     return (
       <SurfacePanel>
         <div className="p-4">
@@ -656,7 +977,10 @@ function ExtractedDataPreview({ runId }: { runId?: number }) {
     return (
       <SurfacePanel>
         <div className="p-4">
-          <DataRegionEmpty title="No records extracted" description="The crawl completed but produced no structured records." />
+          <DataRegionEmpty
+            title="No records extracted"
+            description="The crawl completed but produced no structured records."
+          />
         </div>
       </SurfacePanel>
     );
@@ -670,7 +994,7 @@ function ExtractedDataPreview({ runId }: { runId?: number }) {
       <div className="border-divider flex items-center justify-between border-b px-4 py-3">
         <div>
           <p className="type-label m-0">Extracted Data ({records.length} records)</p>
-          <p className="text-muted m-0 text-sm">Preview of extracted product data.</p>
+          <p className="text-muted m-0 text-sm">Preview across all extracted product pages.</p>
         </div>
       </div>
       <TableSurface>
@@ -695,6 +1019,68 @@ function ExtractedDataPreview({ runId }: { runId?: number }) {
           </TableBody>
         </Table>
       </TableSurface>
+    </SurfacePanel>
+  );
+}
+
+function PipelineResultsPanel({
+  session,
+  extractedRunIds,
+  onReset,
+}: {
+  session: PlaygroundSession;
+  extractedRunIds: number[];
+  onReset?: () => void;
+}) {
+  const isRunning = session.state === 'running_pipeline';
+
+  return (
+    <SurfacePanel>
+      <div className="border-divider border-b px-4 py-3">
+        <p className="type-label m-0">Pipeline Results</p>
+        <p className="text-muted m-0 text-sm">
+          {isRunning ? 'Operations in progress...' : 'Latest downstream job state.'}
+        </p>
+      </div>
+      <div className="space-y-3 p-4">
+        <PipelineStepCard
+          label="Enrichment"
+          stepData={session.step_data?.enrich as Record<string, unknown> | undefined}
+        />
+        <PipelineStepCard
+          label="Product Intelligence"
+          stepData={session.step_data?.compare as Record<string, unknown> | undefined}
+        />
+        <PipelineStepCard
+          label="Monitor"
+          stepData={session.step_data?.monitor as Record<string, unknown> | undefined}
+        />
+        <PipelineStepCard
+          label="AI Audit"
+          stepData={session.step_data?.audit as Record<string, unknown> | undefined}
+        />
+      </div>
+      {(onReset || extractedRunIds.length > 0) && (
+        <div className="border-divider flex gap-2 border-t px-4 py-3">
+          {onReset && (
+            <Button size="sm" variant="ghost" onClick={onReset}>
+              Start New Session
+            </Button>
+          )}
+          {extractedRunIds[0] ? (
+            <Button size="sm" variant="action" asChild>
+              <a
+                href={`/runs?run_id=${String(extractedRunIds[0])}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <ExternalLink className="size-3.5" />
+                View Run
+              </a>
+            </Button>
+          ) : null}
+        </div>
+      )}
     </SurfacePanel>
   );
 }

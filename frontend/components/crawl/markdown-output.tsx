@@ -272,12 +272,20 @@ function MarkdownPreview({ markdown }: Readonly<{ markdown: string }>) {
     if (trimmed.startsWith('```')) {
       const lang = trimmed.slice(3).trim();
       const code: string[] = [];
+      const startIndex = index;
+      const maxCodeLines = 500;
       index += 1;
-      while (index < lines.length && !lines[index].trim().startsWith('```')) {
+      while (
+        index < lines.length &&
+        !lines[index].trim().startsWith('```') &&
+        index - startIndex < maxCodeLines
+      ) {
         code.push(lines[index]);
         index += 1;
       }
-      index += 1;
+      if (index < lines.length && lines[index].trim().startsWith('```')) {
+        index += 1;
+      }
       blocks.push(
         <div
           key={`code-${index}`}
@@ -487,8 +495,25 @@ export function MarkdownOutput({ markdown }: Readonly<{ markdown: string }>) {
     };
   }, []);
 
+  function _fallbackCopy(text: string) {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textarea);
+  }
+
   function copyMarkdown() {
-    void navigator.clipboard?.writeText(markdown);
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(markdown).catch(() => {
+        _fallbackCopy(markdown);
+      });
+    } else {
+      _fallbackCopy(markdown);
+    }
     setCopied(true);
     if (copyTimeoutRef.current) window.clearTimeout(copyTimeoutRef.current);
     copyTimeoutRef.current = window.setTimeout(() => setCopied(false), 1400);

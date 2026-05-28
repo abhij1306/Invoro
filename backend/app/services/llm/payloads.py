@@ -161,7 +161,7 @@ class _AIDRubricFindingPayload(BaseModel):
 
     dimension: str = ""
     verdict: Literal["PASS", "PARTIAL", "FAIL", "INSUFFICIENT_EVIDENCE"]
-    evidence_quote: str | None = ""
+    evidence_quote: str | None = None
     finding_code: str = ""
     recommendation: str = ""
 
