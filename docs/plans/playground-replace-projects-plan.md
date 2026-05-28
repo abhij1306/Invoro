@@ -169,9 +169,9 @@ Each step internally calls existing services without modification. Session store
 
 ## Doc Updates Required
 
-- [ ] `docs/CODEBASE_MAP.md` — remove orchestration files, add playground files
-- [ ] `docs/frontend-architecture.md` — update page listing (projects → playground)
-- [ ] `docs/backend-architecture.md` — add playground session API section
+- [x] `docs/CODEBASE_MAP.md` — remove orchestration files, add playground files
+- [x] `docs/frontend-architecture.md` — update page listing (projects → playground)
+- [x] `docs/backend-architecture.md` — add playground session API section
 
 ## Notes
 

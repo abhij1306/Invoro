@@ -54,6 +54,25 @@ function withQuery(path: string, query: URLSearchParams) {
   return queryString ? `${path}?${queryString}` : path;
 }
 
+// Playground API response types
+export type PlaygroundDiscoverApiResponse = {
+  session_id: number;
+  state: string;
+  run_id: number;
+  message: string;
+};
+export type PlaygroundExtractApiResponse = {
+  session_id: number;
+  state: string;
+  run_id: number;
+  url_count: number;
+};
+export type PlaygroundPipelineApiResponse = {
+  session_id: number;
+  state: string;
+  launched: Record<string, unknown>;
+};
+
 export const api = {
   register: (email: string, password: string) =>
     apiClient.post<User>('/api/auth/register', { email, password }),
@@ -327,7 +346,7 @@ export const api = {
   getPlaygroundSession: (sessionId: number) =>
     apiClient.get<PlaygroundSessionResponse>(`/api/playground/sessions/${sessionId}`),
   playgroundDiscover: (sessionId: number) =>
-    apiClient.post<{ session_id: number; state: string; run_id: number; message: string }>(
+    apiClient.post<PlaygroundDiscoverApiResponse>(
       `/api/playground/sessions/${sessionId}/discover`,
       {},
     ),
@@ -337,7 +356,7 @@ export const api = {
       payload,
     ),
   playgroundExtract: (sessionId: number) =>
-    apiClient.post<{ session_id: number; state: string; run_id: number; url_count: number }>(
+    apiClient.post<PlaygroundExtractApiResponse>(
       `/api/playground/sessions/${sessionId}/extract`,
       {},
     ),
@@ -345,7 +364,7 @@ export const api = {
     sessionId: number,
     options: { enrich: boolean; compare: boolean; monitor: boolean; audit: boolean },
   ) =>
-    apiClient.post<{ session_id: number; state: string; launched: Record<string, unknown> }>(
+    apiClient.post<PlaygroundPipelineApiResponse>(
       `/api/playground/sessions/${sessionId}/pipeline`,
       options,
     ),

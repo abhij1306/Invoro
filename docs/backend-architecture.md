@@ -49,7 +49,7 @@ Routers registered in `backend/app/main.py`:
 - `/api/monitors`
 - `/api/alerts`
 - `/api/v1/alerts`
-- `/api/orchestration`
+- `/api/playground`
 - `/api/health`
 - `/api/metrics`
 
@@ -65,7 +65,7 @@ Important route groups:
 - `api/monitors.py`: monitor CRUD, run-now dispatch, event/history/current-snapshot lookup, and JSON/CSV exports
 - `api/alerts.py`: console-auth Agentic Delta Engine alert CRUD, immediate test poll, delta history, and webhook delivery log
 - `api/public_alerts.py`: API-key authenticated `/api/v1/alerts` envelope endpoints for agent callers
-- `api/orchestration.py`: project shells, static workflow templates, workflow launch/status, monitor promotion, and price-comparison views over normal crawl records
+- `api/playground.py`: guided playground session creation/list/detail plus discover/select/extract/pipeline/results routes over normal crawl, enrichment, PI, monitor, and audit systems
 
 Domain-recipe routes live under `api/crawl_domain.py`:
 
@@ -177,7 +177,7 @@ Primary files:
 - `pipeline/runtime_helpers.py`
 - `data_enrichment/service.py`
 - `monitor_service.py`, `monitor_scheduler_service.py`, `monitor_async_loop.py`, `monitor_change_detection.py`, `monitor_retention.py`
-- `orchestration_service.py`
+- `playground_service.py`
 - `data_enrichment/deterministic.py`
 - `data_enrichment/shopify_catalog.py`
 
@@ -207,7 +207,7 @@ Current live behavior:
 - Product Monitoring is a recurring crawl orchestration layer: `MonitorJob` rows store URL sets, schedule interval, priority, tracked fields, retention, and crawl settings; scheduler drivers call `MonitorSchedulerService.check_due_jobs()`; monitor runs are normal `CrawlRun` rows tagged with `settings.monitor_id`; `MonitorChangeDetectionService` diffs completed run records against the latest snapshot; `monitor_alert_service.py` creates in-app notifications for tracked field changes; retention purges monitor snapshots/events only.
 - Agentic Delta Engine alerts extend Product Monitoring instead of creating a second engine: single-URL ecommerce alerts are `MonitorJob` rows with `poll_interval_seconds`, `condition`, `webhook_url`, `last_known_values`, and delivery state; condition evaluation is sandboxed in `monitor_condition.py`; webhook attempts are stored in `MonitorWebhookDelivery`; the MCP stdio wrapper in `app/mcp/alert_server.py` is a thin client over `/api/v1/alerts`.
 - Public API v1 is a lightweight FastAPI surface under `/api/v1` for Railway-style single-process deployment. API keys are dashboard-owned rows in `ApiKey`; public auth and rate limits are keyed by API key, not client IP. `POST /api/v1/extract` creates a normal single-URL crawl and runs one URL inline with HTTP-only settings, disabled LLM/browser/traversal/screenshots/network capture, and a capped timeout; public `surface="auto"` resolves to an internal concrete surface before run creation, while `ecommerce`, `content`, `article`, and `forum_thread` map to existing internal surfaces. Batch extraction remains deferred with structured `WORKER_REQUIRED`. Product alerts are active under `/api/v1/alerts` and reuse monitor-owned crawl runs, snapshots, events, and webhook delivery logs; stale `/api/v1/watches` routes are not registered. `GET /api/v1/domains/{domain}` reads existing `DomainMemory`, `DomainRunProfile`, and recent crawl rows without probing the target. `app/mcp_server/*` is a stateless FastMCP wrapper over `/api/v1` and does not import crawl services.
-- Orchestration is a use-case-first sequencing layer: `OrchestrationProject` groups business context, `OrchestrationWorkflowRun` stores resolved versioned template config, and `OrchestrationStepRun` links steps to normal `CrawlRun` rows. The MVP template is `competitive_pricing_snapshot`, which launches listing first, starts detail from completed listing record URLs, renders comparison rows from detail records, and promotes to normal `MonitorJob` rows. It does not implement extraction or mutate pipeline behavior.
+- Playground is the guided session layer: `PlaygroundSession` stores input URL, session state, selected URLs, and downstream run/job ids inside `step_data`. Discover and extract create normal crawl runs; enrich, compare, monitor, and audit launch their existing subsystems. Playground does not implement extraction or duplicate extracted data.
 - Scheduler driver split is explicit: `SCHEDULER_DRIVER=dev` starts `AsyncSchedulerLoop` from FastAPI lifespan with no Celery Beat; `SCHEDULER_DRIVER=celery` registers Celery Beat tasks `monitor.check_due_jobs` and `monitor.purge_expired_snapshots`.
 
 ### 6.3 Acquisition and browser runtime
@@ -519,9 +519,7 @@ Primary models:
 - `LLMConfig`
 - `LLMCostLog`
 - `DomainMemory`
-- `OrchestrationProject`
-- `OrchestrationWorkflowRun`
-- `OrchestrationStepRun`
+- `PlaygroundSession`
 
 Notable current schema direction:
 
@@ -530,7 +528,7 @@ Notable current schema direction:
 - URL identity keys on records
 - enrichment status metadata on crawl records, with derived enrichment data stored separately in `enriched_products`
 - AI Discoverability audit report storage separated from crawl records, with JSON/Markdown artifacts in `ucp_audit_reports`; report JSON now carries sampled catalog crawl metadata, D-AID1 gate caps, structured markup signals, product sample summaries, robots/sitemap discovery signals, and evidence-backed repair roadmap items
-- orchestration project/workflow/step shells store references and resolved config only; extracted data stays in `crawl_records`, recurring state stays in monitor tables
+- playground sessions store step state and references only; extracted data stays in `crawl_records`, derived enrichment data stays in `enriched_products`, and recurring state stays in monitor tables
 - domain-memory storage
 - split crawl-data reset versus domain-memory reset, so destructive cleanup no longer wipes learned selectors/profiles/cookies by default
 

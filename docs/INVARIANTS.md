@@ -288,20 +288,18 @@ HEAD pre-check is conservative. If HEAD, validator comparison, or fallback hashi
 
 ---
 
-## 12. Orchestration — Sequencing Only
+## 12. Playground — Sequencing Only
 
-**Rule:** Orchestration maps business goals to existing crawl and monitor primitives. It stores thin project/workflow/step shells and resolved template config. It must not implement extraction, add a parallel data store for extracted rows, or hide the underlying crawl run.
+**Rule:** Playground maps one user-entered URL to existing crawl, enrichment, Product Intelligence, monitor/alert, and audit primitives. It stores a thin `PlaygroundSession` shell with session state plus referenced run/job ids inside `step_data`. It must not implement extraction, add a parallel data store for extracted rows, or hide the underlying crawl run or downstream job.
 
-The workflow runner creates normal `CrawlRun` rows and links them from `OrchestrationStepRun.run_id`. A continuation to recurring tracking creates a normal `MonitorJob`. Result views read existing `CrawlRecord.data`.
-
-The intent endpoint is propose-only. It may return a prefilled config, but `requires_user_confirmation` must stay true and it must not dispatch a run.
+The playground flow creates normal `CrawlRun` rows for discover/extract, launches existing downstream subsystems for enrich/compare/monitor/audit, and reads existing result stores (`crawl_records`, enrichment rows, PI jobs, alerts, audit reports) for result views.
 
 **VIOLATION signatures:**
-- Orchestration code parses HTML, repairs fields, or changes extraction ranking.
-- Workflow result tables store extracted product rows outside `crawl_records`.
-- A workflow silently enables `llm_enabled`, rewrites `surface`, changes traversal intent, or injects a proxy profile without user-visible resolved config.
-- `/api/orchestration/intent` creates a project, workflow, crawl run, monitor, alert, or export.
-- A project view omits the crawl run ID or Crawl Studio route for the underlying run.
+- Playground code parses HTML, repairs fields, or changes extraction ranking.
+- Playground stores extracted product rows outside existing crawl/enrichment/PI/audit stores.
+- A playground step silently enables `llm_enabled`, rewrites `surface`, changes traversal intent, or injects a proxy profile without user-visible config.
+- `/api/playground/*` launches a bespoke extraction path instead of creating/reading normal subsystem records.
+- A playground result view omits the underlying crawl run id or downstream job/alert id.
 
 ---
 

@@ -1,4 +1,4 @@
-"""Drop orchestration tables (projects feature removed).
+"""Drop legacy projects/workflow tables.
 
 Revision ID: 0007
 Revises: 0006
@@ -20,5 +20,5 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    # Orchestration tables removed permanently; no downgrade path.
+    # Legacy projects/workflow tables removed permanently; no downgrade path.
     pass

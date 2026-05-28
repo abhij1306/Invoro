@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_current_user, get_db
@@ -44,8 +44,7 @@ async def playground_create_session(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
         ) from exc
-    await session.commit()
-    return PlaygroundSessionResponse(
+    response = PlaygroundSessionResponse(
         id=playground.id,
         input_url=playground.input_url,
         state=playground.state,
@@ -53,6 +52,8 @@ async def playground_create_session(
         created_at=playground.created_at,
         updated_at=playground.updated_at,
     )
+    await session.commit()
+    return response
 
 
 @router.get("/sessions")
@@ -89,8 +90,7 @@ async def playground_get_session(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
         ) from exc
-    await session.commit()
-    return PlaygroundSessionResponse(
+    response = PlaygroundSessionResponse(
         id=playground.id,
         input_url=playground.input_url,
         state=playground.state,
@@ -98,6 +98,8 @@ async def playground_get_session(
         created_at=playground.created_at,
         updated_at=playground.updated_at,
     )
+    await session.commit()
+    return response
 
 
 @router.post("/sessions/{session_id}/discover")
@@ -118,13 +120,14 @@ async def playground_discover(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
         ) from exc
-    await session.commit()
-    return PlaygroundDiscoverResponse(
+    response = PlaygroundDiscoverResponse(
         session_id=playground.id,
         state=playground.state,
         run_id=run_id,
         message="Discovery crawl started — poll session for results.",
     )
+    await session.commit()
+    return response
 
 
 @router.post("/sessions/{session_id}/select")
@@ -146,8 +149,7 @@ async def playground_select(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
         ) from exc
-    await session.commit()
-    return PlaygroundSessionResponse(
+    response = PlaygroundSessionResponse(
         id=playground.id,
         input_url=playground.input_url,
         state=playground.state,
@@ -155,6 +157,8 @@ async def playground_select(
         created_at=playground.created_at,
         updated_at=playground.updated_at,
     )
+    await session.commit()
+    return response
 
 
 @router.post("/sessions/{session_id}/extract")
@@ -175,27 +179,29 @@ async def playground_extract(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
         ) from exc
-    await session.commit()
     url_count = len(playground.step_data.get("selected_urls", []))
-    return PlaygroundExtractResponse(
+    response = PlaygroundExtractResponse(
         session_id=playground.id,
         state=playground.state,
         run_id=run_id,
         url_count=url_count,
     )
+    await session.commit()
+    return response
 
 
 @router.post("/sessions/{session_id}/pipeline")
 async def playground_pipeline(
     session_id: int,
     payload: PlaygroundPipelineRequest,
+    background_tasks: BackgroundTasks,
     session: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[User, Depends(get_current_user)],
 ) -> PlaygroundPipelineResponse:
     """Run selected downstream operations (enrich, compare, monitor, audit)."""
     try:
         playground = await get_session(session, session_id=session_id, user=user)
-        launched = await start_pipeline(
+        launched, dispatch_specs = await start_pipeline(
             session,
             playground=playground,
             user=user,
@@ -212,12 +218,17 @@ async def playground_pipeline(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
         ) from exc
-    await session.commit()
-    return PlaygroundPipelineResponse(
+    response = PlaygroundPipelineResponse(
         session_id=playground.id,
         state=playground.state,
         launched=launched,
     )
+    await session.commit()
+    # Dispatch the background runners after commit so the worker can find
+    # the freshly-created job rows.
+    for runner, job_id in dispatch_specs:
+        background_tasks.add_task(runner, job_id)
+    return response
 
 
 @router.get("/sessions/{session_id}/results")
@@ -233,5 +244,6 @@ async def playground_results(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
         ) from exc
+    results = await get_results(session, playground=playground)
     await session.commit()
-    return await get_results(session, playground=playground)
+    return results

@@ -14,10 +14,31 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.crawl_run import CrawlRecord, CrawlRun
 from app.models.playground import PlaygroundSession
 from app.models.user import User
+from app.services.config.aid_score import (
+    AID_AUDIT_JOB_STATUS_COMPLETE,
+    AID_AUDIT_JOB_STATUS_FAILED,
+)
+from app.services.config.data_enrichment import (
+    DATA_ENRICHMENT_JOB_TERMINAL_STATUSES,
+)
+from app.services.config.product_intelligence import (
+    PRODUCT_INTELLIGENCE_JOB_STATUS_COMPLETE,
+    PRODUCT_INTELLIGENCE_JOB_STATUS_FAILED,
+)
 from app.services.crawl.ingestion_service import create_crawl_run_from_payload
 from app.services.crawl.state import TERMINAL_STATUSES
 
 logger = logging.getLogger(__name__)
+
+_AUDIT_TERMINAL_STATUSES = {
+    AID_AUDIT_JOB_STATUS_COMPLETE,
+    AID_AUDIT_JOB_STATUS_FAILED,
+}
+_PI_TERMINAL_STATUSES = {
+    PRODUCT_INTELLIGENCE_JOB_STATUS_COMPLETE,
+    PRODUCT_INTELLIGENCE_JOB_STATUS_FAILED,
+}
+_ENRICH_TERMINAL_STATUSES = set(DATA_ENRICHMENT_JOB_TERMINAL_STATUSES)
 
 # State machine transitions
 VALID_TRANSITIONS = {
@@ -53,6 +74,7 @@ async def create_session(
     )
     session.add(playground)
     await session.flush()
+    await session.refresh(playground)
     return playground
 
 
@@ -69,6 +91,8 @@ async def get_session(
     # Ensure step_data is loaded before auto-advance to avoid lazy reload issues
     _ = playground.step_data
     await _auto_advance(session, playground)
+    # Refresh server-computed columns (updated_at) after any flush to avoid MissingGreenlet
+    await session.refresh(playground)
     return playground
 
 
@@ -111,7 +135,7 @@ async def start_discover(
 
     playground.state = "discovering"
     playground.step_data = {
-        **playground.step_data,
+        **(playground.step_data or {}),
         "discover": {"run_id": run.id, "status": "running"},
     }
     await session.flush()
@@ -128,7 +152,7 @@ async def complete_discover(
     _require_state(playground, "discovering")
 
     playground.state = "discovered"
-    step_data = dict(playground.step_data)
+    step_data = dict(playground.step_data or {})
     step_data["discover"] = {
         **step_data.get("discover", {}),
         "status": "completed",
@@ -153,7 +177,7 @@ async def select_products(
     if not urls:
         raise ValueError("Select at least one product")
 
-    step_data = dict(playground.step_data)
+    step_data = dict(playground.step_data or {})
     step_data["selected_urls"] = urls
     playground.step_data = step_data
     await session.flush()
@@ -169,7 +193,7 @@ async def start_extract(
     """Kick off PDP crawl for selected products."""
     _require_state(playground, "discovered")
 
-    urls = playground.step_data.get("selected_urls", [])
+    urls = (playground.step_data or {}).get("selected_urls", [])
     if not urls:
         raise ValueError("No products selected — call select first")
 
@@ -193,7 +217,7 @@ async def start_extract(
     )
 
     playground.state = "extracting"
-    step_data = dict(playground.step_data)
+    step_data = dict(playground.step_data or {})
     step_data["extract"] = {"run_id": run.id, "status": "running", "url_count": len(urls)}
     playground.step_data = step_data
     await session.flush()
@@ -209,86 +233,139 @@ async def start_pipeline(
     compare: bool = False,
     monitor: bool = False,
     audit: bool = False,
-) -> dict[str, Any]:
-    """Launch selected downstream operations in parallel where possible."""
-    _require_state(playground, "extracted")
+) -> tuple[dict[str, Any], list[tuple[Any, int]]]:
+    """Launch selected downstream operations in parallel where possible.
+
+    Returns a tuple of (launched_summary, dispatch_specs). The caller is
+    expected to enqueue each ``(runner, job_id)`` spec via FastAPI
+    ``BackgroundTasks`` so the underlying service workers actually run.
+    """
+    # Audit only needs the input URL; allow it from any post-creation state.
+    # Other ops require completed extraction.
+    needs_extracted = bool(enrich or compare or monitor)
+    if needs_extracted:
+        _require_state(playground, "extracted")
+    elif playground.state == "created":
+        raise ValueError("Session not started — call discover first")
 
     launched: dict[str, Any] = {}
-    step_data = dict(playground.step_data)
+    dispatch_specs: list[tuple[Any, int]] = []
+    step_data = dict(playground.step_data or {})
     extract_run_id = step_data.get("extract", {}).get("run_id")
 
-    if enrich and extract_run_id:
-        from app.services.data_enrichment.service import (
-            create_data_enrichment_job,
-            run_data_enrichment_job,
-        )
-        try:
-            job = await create_data_enrichment_job(
-                session,
-                user=user,
-                payload={"source_run_id": extract_run_id},
+    if enrich:
+        if not extract_run_id:
+            launched["enrich"] = {
+                "job_id": None,
+                "status": "failed",
+                "error": "No extraction run available",
+            }
+        else:
+            from app.services.data_enrichment.service import (
+                create_data_enrichment_job,
+                run_data_enrichment_job,
             )
-            launched["enrich"] = {"job_id": job.id, "status": "running"}
-        except Exception as exc:
-            logger.error("Pipeline enrich failed: %s", exc, exc_info=True)
-            launched["enrich"] = {"job_id": None, "status": "failed", "error": str(exc)}
-        step_data["enrich"] = launched.get("enrich", {})
+            try:
+                job = await create_data_enrichment_job(
+                    session,
+                    user=user,
+                    payload={"source_run_id": extract_run_id},
+                )
+                launched["enrich"] = {"job_id": job.id, "status": "running"}
+                dispatch_specs.append((run_data_enrichment_job, job.id))
+            except Exception as exc:
+                logger.error("Pipeline enrich failed: %s", exc, exc_info=True)
+                launched["enrich"] = {
+                    "job_id": None,
+                    "status": "failed",
+                    "error": str(exc),
+                }
+        step_data["enrich"] = launched["enrich"]
 
-    if compare and extract_run_id:
-        from app.services.product_intelligence.service import (
-            create_product_intelligence_job,
-            run_product_intelligence_job,
-        )
-        try:
-            job = await create_product_intelligence_job(
-                session,
-                user=user,
-                payload={"run_id": extract_run_id},
+    if compare:
+        if not extract_run_id:
+            launched["compare"] = {
+                "job_id": None,
+                "status": "failed",
+                "error": "No extraction run available",
+            }
+        else:
+            from app.services.product_intelligence.service import (
+                create_product_intelligence_job,
+                run_product_intelligence_job,
             )
-            launched["compare"] = {"job_id": job.id, "status": "running"}
-        except Exception as exc:
-            logger.error("Pipeline compare failed: %s", exc, exc_info=True)
-            launched["compare"] = {"job_id": None, "status": "failed", "error": str(exc)}
-        step_data["compare"] = launched.get("compare", {})
+            try:
+                job = await create_product_intelligence_job(
+                    session,
+                    user=user,
+                    payload={"source_run_id": extract_run_id},
+                )
+                launched["compare"] = {"job_id": job.id, "status": "running"}
+                dispatch_specs.append((run_product_intelligence_job, job.id))
+            except Exception as exc:
+                logger.error("Pipeline compare failed: %s", exc, exc_info=True)
+                launched["compare"] = {
+                    "job_id": None,
+                    "status": "failed",
+                    "error": str(exc),
+                }
+        step_data["compare"] = launched["compare"]
 
     if monitor:
         selected_urls = step_data.get("selected_urls", [])
-        from app.services.alert_service import create_alert
         from app.schemas.alert import AlertCreate
+        from app.services.alert_service import create_alert
         try:
             alert_payload = AlertCreate(
-                name=f"Playground Monitor — {playground.input_url}",
                 url=selected_urls[0] if selected_urls else playground.input_url,
-                urls=selected_urls or [playground.input_url],
-                tracked_fields=["price", "availability"],
+                target_fields=["price", "availability"],
             )
             monitor_obj, _run_id = await create_alert(
                 session, user=user, payload=alert_payload
             )
-            launched["monitor"] = {"alert_id": monitor_obj.id, "status": "created"}
+            launched["monitor"] = {
+                "alert_id": monitor_obj.id,
+                "status": "created",
+            }
         except Exception as exc:
             logger.error("Pipeline monitor failed: %s", exc, exc_info=True)
-            launched["monitor"] = {"job_id": None, "status": "failed", "error": str(exc)}
-        step_data["monitor"] = launched.get("monitor", {})
+            launched["monitor"] = {
+                "alert_id": None,
+                "status": "failed",
+                "error": str(exc),
+            }
+        step_data["monitor"] = launched["monitor"]
 
     if audit:
-        from app.services.ucp_audit.service import create_ucp_audit_job
+        from app.services.ucp_audit.service import (
+            create_ucp_audit_job,
+            run_ucp_audit_job,
+        )
         try:
             job = await create_ucp_audit_job(
                 session,
                 user=user,
-                payload={"url": playground.input_url},
+                payload={"domain": playground.input_url},
             )
             launched["audit"] = {"job_id": job.id, "status": "running"}
+            dispatch_specs.append((run_ucp_audit_job, job.id))
         except Exception as exc:
             logger.error("Pipeline audit failed: %s", exc, exc_info=True)
-            launched["audit"] = {"job_id": None, "status": "failed", "error": str(exc)}
-        step_data["audit"] = launched.get("audit", {})
+            launched["audit"] = {
+                "job_id": None,
+                "status": "failed",
+                "error": str(exc),
+            }
+        step_data["audit"] = launched["audit"]
 
-    playground.state = "running_pipeline"
+    # Only transition to running_pipeline when there is actual extraction work
+    # to track. Audit-only sessions stay in their current state but still
+    # surface results via step_data.
+    if needs_extracted:
+        playground.state = "running_pipeline"
     playground.step_data = step_data
     await session.flush()
-    return launched
+    return launched, dispatch_specs
 
 
 async def get_results(
@@ -297,7 +374,7 @@ async def get_results(
     playground: PlaygroundSession,
 ) -> dict[str, Any]:
     """Aggregate results from all pipeline steps."""
-    step_data = dict(playground.step_data)
+    step_data = dict(playground.step_data or {})
     results: dict[str, Any] = {
         "state": playground.state,
         "input_url": playground.input_url,
@@ -337,7 +414,7 @@ async def _auto_advance(
     session: AsyncSession,
     playground: PlaygroundSession,
 ) -> None:
-    """Check if underlying crawl runs finished and advance the session state."""
+    """Check if underlying crawl runs / pipeline jobs finished and advance state."""
     step_data = dict(playground.step_data or {})
 
     if playground.state == "discovering":
@@ -369,16 +446,98 @@ async def _auto_advance(
                 playground.step_data = step_data
 
     elif playground.state == "running_pipeline":
-        # Check if all launched pipeline jobs are done
+        # Refresh the live status of each launched downstream job and decide
+        # if the whole pipeline is done.
+        mutated = False
+        for key, refresher in (
+            ("enrich", _refresh_enrich_status),
+            ("compare", _refresh_compare_status),
+            ("audit", _refresh_audit_status),
+        ):
+            info = step_data.get(key)
+            if not info or not isinstance(info, dict):
+                continue
+            updated = await refresher(session, info)
+            if updated is not None and updated != info:
+                step_data[key] = updated
+                mutated = True
+
+        # Pipeline is done once no tracked job is still in a non-terminal state.
         all_done = True
         for key in ("enrich", "compare", "audit"):
             info = step_data.get(key, {})
-            if info and info.get("status") == "running":
+            if isinstance(info, dict) and info.get("status") == "running":
                 all_done = False
                 break
         if all_done:
             playground.state = "complete"
+            mutated = True
+        if mutated:
             playground.step_data = step_data
+
+    # Audit can be launched standalone (independent of extraction). Refresh
+    # its status whenever it exists, regardless of the session state.
+    if playground.state != "running_pipeline":
+        audit_info = step_data.get("audit")
+        if isinstance(audit_info, dict) and audit_info.get("status") == "running":
+            updated = await _refresh_audit_status(session, audit_info)
+            if updated is not None and updated != audit_info:
+                step_data["audit"] = updated
+                playground.step_data = step_data
+
+
+async def _refresh_enrich_status(
+    session: AsyncSession,
+    info: dict[str, Any],
+) -> dict[str, Any] | None:
+    job_id = info.get("job_id")
+    if not isinstance(job_id, int):
+        return None
+    from app.models.data_enrichment import DataEnrichmentJob
+
+    job = await session.get(DataEnrichmentJob, job_id)
+    if job is None:
+        return None
+    status = str(job.status or "").strip().lower()
+    if status in _ENRICH_TERMINAL_STATUSES:
+        return {**info, "status": status}
+    return None
+
+
+async def _refresh_compare_status(
+    session: AsyncSession,
+    info: dict[str, Any],
+) -> dict[str, Any] | None:
+    job_id = info.get("job_id")
+    if not isinstance(job_id, int):
+        return None
+    from app.models.product_intelligence import ProductIntelligenceJob
+
+    job = await session.get(ProductIntelligenceJob, job_id)
+    if job is None:
+        return None
+    status = str(job.status or "").strip().lower()
+    if status in _PI_TERMINAL_STATUSES:
+        return {**info, "status": status}
+    return None
+
+
+async def _refresh_audit_status(
+    session: AsyncSession,
+    info: dict[str, Any],
+) -> dict[str, Any] | None:
+    job_id = info.get("job_id")
+    if not isinstance(job_id, int):
+        return None
+    from app.models.ucp_audit import UCPAuditJob
+
+    job = await session.get(UCPAuditJob, job_id)
+    if job is None:
+        return None
+    status = str(job.status or "").strip().lower()
+    if status in _AUDIT_TERMINAL_STATUSES:
+        return {**info, "status": status}
+    return None
 
 
 async def _extract_discovered_products(

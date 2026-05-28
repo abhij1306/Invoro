@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from sqlalchemy import Boolean, DateTime, Integer, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
 
@@ -25,4 +25,8 @@ class User(Base):
         DateTime(timezone=True),
         default=lambda: datetime.now(UTC),
         onupdate=lambda: datetime.now(UTC),
+    )
+
+    playground_sessions: Mapped[list["PlaygroundSession"]] = relationship(  # noqa: F821
+        "PlaygroundSession", back_populates="user", cascade="all, delete-orphan"
     )

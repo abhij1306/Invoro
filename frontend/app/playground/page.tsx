@@ -108,8 +108,15 @@ export default function PlaygroundPage() {
     queryFn: () => api.getPlaygroundSession(sessionId!),
     enabled: sessionId !== null,
     refetchInterval: (query) => {
-      const state = query.state.data?.state;
+      const data = query.state.data;
+      const state = data?.state;
       if (state === 'discovering' || state === 'extracting' || state === 'running_pipeline') {
+        return 3000;
+      }
+      // Audit can run independently while the session stays in `extracted`.
+      // Keep polling while the audit job is still in flight.
+      const audit = data?.step_data?.audit as Record<string, unknown> | undefined;
+      if (audit && audit.status === 'running') {
         return 3000;
       }
       return false;
@@ -117,7 +124,7 @@ export default function PlaygroundPage() {
   });
 
   const session = sessionQuery.data as PlaygroundSession | undefined;
-  const currentStep = session ? stepIndex(session.state) : -1;
+  const currentStep = session ? stepIndex(session.state as SessionState) : -1;
 
   // ─── Mutations ───────────────────────────────────────────────────────────
 
