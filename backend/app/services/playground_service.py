@@ -66,7 +66,8 @@ async def get_session(
     playground = await session.get(PlaygroundSession, session_id)
     if playground is None or playground.user_id != user.id:
         raise LookupError("Session not found")
-    # Auto-advance if waiting for a crawl to complete
+    # Ensure step_data is loaded before auto-advance to avoid lazy reload issues
+    _ = playground.step_data
     await _auto_advance(session, playground)
     return playground
 
@@ -124,12 +125,14 @@ async def complete_discover(
     products: list[dict[str, Any]],
 ) -> None:
     """Mark discovery complete with found products (called by crawl completion hook or poll)."""
+    _require_state(playground, "discovering")
+
     playground.state = "discovered"
     step_data = dict(playground.step_data)
     step_data["discover"] = {
         **step_data.get("discover", {}),
         "status": "completed",
-        "products": products[:200],  # cap stored results
+        "products": products[:MAX_PRODUCTS],
         "total_found": len(products),
     }
     playground.step_data = step_data
@@ -219,54 +222,68 @@ async def start_pipeline(
             create_data_enrichment_job,
             run_data_enrichment_job,
         )
-        job = await create_data_enrichment_job(
-            session,
-            user=user,
-            payload={"run_id": extract_run_id},
-        )
-        launched["enrich"] = {"job_id": job.id, "status": "running"}
-        # Fire async — background task would be better but keeping it simple
-        # In production this would use BackgroundTasks
-        step_data["enrich"] = launched["enrich"]
+        try:
+            job = await create_data_enrichment_job(
+                session,
+                user=user,
+                payload={"source_run_id": extract_run_id},
+            )
+            launched["enrich"] = {"job_id": job.id, "status": "running"}
+        except Exception as exc:
+            logger.error("Pipeline enrich failed: %s", exc, exc_info=True)
+            launched["enrich"] = {"job_id": None, "status": "failed", "error": str(exc)}
+        step_data["enrich"] = launched.get("enrich", {})
 
     if compare and extract_run_id:
         from app.services.product_intelligence.service import (
             create_product_intelligence_job,
             run_product_intelligence_job,
         )
-        job = await create_product_intelligence_job(
-            session,
-            user=user,
-            payload={"run_id": extract_run_id},
-        )
-        launched["compare"] = {"job_id": job.id, "status": "running"}
-        step_data["compare"] = launched["compare"]
+        try:
+            job = await create_product_intelligence_job(
+                session,
+                user=user,
+                payload={"run_id": extract_run_id},
+            )
+            launched["compare"] = {"job_id": job.id, "status": "running"}
+        except Exception as exc:
+            logger.error("Pipeline compare failed: %s", exc, exc_info=True)
+            launched["compare"] = {"job_id": None, "status": "failed", "error": str(exc)}
+        step_data["compare"] = launched.get("compare", {})
 
     if monitor:
         selected_urls = step_data.get("selected_urls", [])
         from app.services.alert_service import create_alert
         from app.schemas.alert import AlertCreate
-        alert_payload = AlertCreate(
-            name=f"Playground Monitor — {playground.input_url}",
-            url=selected_urls[0] if selected_urls else playground.input_url,
-            urls=selected_urls or [playground.input_url],
-            tracked_fields=["price", "availability"],
-        )
-        monitor_obj, _run_id = await create_alert(
-            session, user=user, payload=alert_payload
-        )
-        launched["monitor"] = {"alert_id": monitor_obj.id, "status": "created"}
-        step_data["monitor"] = launched["monitor"]
+        try:
+            alert_payload = AlertCreate(
+                name=f"Playground Monitor — {playground.input_url}",
+                url=selected_urls[0] if selected_urls else playground.input_url,
+                urls=selected_urls or [playground.input_url],
+                tracked_fields=["price", "availability"],
+            )
+            monitor_obj, _run_id = await create_alert(
+                session, user=user, payload=alert_payload
+            )
+            launched["monitor"] = {"alert_id": monitor_obj.id, "status": "created"}
+        except Exception as exc:
+            logger.error("Pipeline monitor failed: %s", exc, exc_info=True)
+            launched["monitor"] = {"job_id": None, "status": "failed", "error": str(exc)}
+        step_data["monitor"] = launched.get("monitor", {})
 
     if audit:
         from app.services.ucp_audit.service import create_ucp_audit_job
-        job = await create_ucp_audit_job(
-            session,
-            user=user,
-            payload={"url": playground.input_url},
-        )
-        launched["audit"] = {"job_id": job.id, "status": "running"}
-        step_data["audit"] = launched["audit"]
+        try:
+            job = await create_ucp_audit_job(
+                session,
+                user=user,
+                payload={"url": playground.input_url},
+            )
+            launched["audit"] = {"job_id": job.id, "status": "running"}
+        except Exception as exc:
+            logger.error("Pipeline audit failed: %s", exc, exc_info=True)
+            launched["audit"] = {"job_id": None, "status": "failed", "error": str(exc)}
+        step_data["audit"] = launched.get("audit", {})
 
     playground.state = "running_pipeline"
     playground.step_data = step_data
@@ -321,7 +338,7 @@ async def _auto_advance(
     playground: PlaygroundSession,
 ) -> None:
     """Check if underlying crawl runs finished and advance the session state."""
-    step_data = dict(playground.step_data)
+    step_data = dict(playground.step_data or {})
 
     if playground.state == "discovering":
         run_id = step_data.get("discover", {}).get("run_id")
@@ -333,12 +350,11 @@ async def _auto_advance(
                 step_data["discover"] = {
                     **step_data.get("discover", {}),
                     "status": "completed",
-                    "products": products[:200],
+                    "products": products[:MAX_PRODUCTS],
                     "total_found": len(products),
                 }
                 playground.state = "discovered"
                 playground.step_data = step_data
-                await session.flush()
 
     elif playground.state == "extracting":
         run_id = step_data.get("extract", {}).get("run_id")
@@ -351,7 +367,6 @@ async def _auto_advance(
                 }
                 playground.state = "extracted"
                 playground.step_data = step_data
-                await session.flush()
 
     elif playground.state == "running_pipeline":
         # Check if all launched pipeline jobs are done
@@ -364,7 +379,6 @@ async def _auto_advance(
         if all_done:
             playground.state = "complete"
             playground.step_data = step_data
-            await session.flush()
 
 
 async def _extract_discovered_products(
@@ -375,7 +389,7 @@ async def _extract_discovered_products(
     rows = await session.scalars(
         select(CrawlRecord)
         .where(CrawlRecord.run_id == run_id)
-        .limit(200)
+        .limit(MAX_PRODUCTS)
     )
     products = []
     for record in rows.all():

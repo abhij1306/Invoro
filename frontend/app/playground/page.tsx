@@ -31,6 +31,7 @@ import {
   TableRow,
 } from '../../components/ui/table';
 import { api } from '../../lib/api';
+import type { PlaygroundSessionResponse } from '../../lib/api/types';
 import { cn } from '../../lib/utils';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -44,14 +45,7 @@ type SessionState =
   | 'running_pipeline'
   | 'complete';
 
-type PlaygroundSession = {
-  id: number;
-  input_url: string;
-  state: SessionState;
-  step_data: Record<string, unknown>;
-  created_at: string;
-  updated_at: string;
-};
+type PlaygroundSession = PlaygroundSessionResponse;
 
 type DiscoveredProduct = {
   url: string;
@@ -146,7 +140,11 @@ export default function PlaygroundPage() {
   const selectProducts = useMutation({
     mutationFn: ({ sid, urls }: { sid: number; urls: string[] }) =>
       api.playgroundSelect(sid, { urls }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['playground-session', sessionId] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['playground-session', sessionId] });
+      // Auto-start extraction after successful selection
+      if (sessionId) startExtract.mutate(sessionId);
+    },
     onError: (err: Error) => setError(err.message),
   });
 
@@ -201,6 +199,7 @@ export default function PlaygroundPage() {
   }, []);
 
   // Auto-start discovery after session creation
+  // startDiscover omitted from deps: React Query mutation objects are referentially stable
   useEffect(() => {
     if (session?.state === 'created' && sessionId && !startDiscover.isPending) {
       startDiscover.mutate(sessionId);
@@ -210,8 +209,14 @@ export default function PlaygroundPage() {
 
   // ─── Derived data ────────────────────────────────────────────────────────
 
-  const discoveredProducts: DiscoveredProduct[] =
-    (session?.step_data?.discover as Record<string, unknown>)?.products as DiscoveredProduct[] ?? [];
+  const discoveredProducts: DiscoveredProduct[] = (() => {
+    const discover = session?.step_data?.discover;
+    if (discover && typeof discover === 'object' && 'products' in discover) {
+      const products = (discover as Record<string, unknown>).products;
+      return Array.isArray(products) ? (products as DiscoveredProduct[]) : [];
+    }
+    return [];
+  })();
 
   const toggleProduct = (productUrl: string) => {
     setSelectedUrls((prev) => {
@@ -340,10 +345,8 @@ export default function PlaygroundPage() {
                   </Button>
                   <Button
                     size="sm"
-                    onClick={() => {
+                    onClick={async () => {
                       handleSelect();
-                      // After selection, immediately start extraction
-                      setTimeout(() => handleExtract(), 500);
                     }}
                     disabled={selectedUrls.size === 0 || selectProducts.isPending}
                   >
@@ -369,7 +372,7 @@ export default function PlaygroundPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {discoveredProducts.slice(0, 100).map((product) => (
+                      {discoveredProducts.slice(0, 50).map((product) => (
                         <TableRow
                           key={product.url}
                           className="cursor-pointer"
@@ -430,7 +433,11 @@ export default function PlaygroundPage() {
 
           {/* ─── Step: Pipeline Selection ──────────────────────────────── */}
           {session.state === 'extracted' && (
-            <SurfacePanel>
+            <>
+              <ExtractedDataPreview
+                runId={(session.step_data?.extract as Record<string, unknown>)?.run_id as number | undefined}
+              />
+              <SurfacePanel>
               <div className="border-divider border-b px-4 py-3">
                 <p className="type-label m-0">Extraction Complete</p>
                 <p className="text-muted m-0 text-sm">
@@ -526,6 +533,7 @@ export default function PlaygroundPage() {
                 </Button>
               </div>
             </SurfacePanel>
+            </>
           )}
 
           {/* ─── Step: Pipeline Running / Results ──────────────────────── */}
@@ -561,13 +569,16 @@ export default function PlaygroundPage() {
                 <Button size="sm" variant="ghost" onClick={handleReset}>
                   Start New Session
                 </Button>
-                {Boolean(
-                  session.step_data?.extract &&
-                    (session.step_data.extract as Record<string, unknown>).run_id,
-                ) && (
+                {(() => {
+                  const extract = session.step_data?.extract;
+                  const runId =
+                    extract && typeof extract === 'object' && 'run_id' in extract
+                      ? (extract as Record<string, unknown>).run_id
+                      : undefined;
+                  return runId ? (
                     <Button size="sm" variant="action" asChild>
                       <a
-                        href={`/runs?run_id=${String((session.step_data.extract as Record<string, unknown>).run_id)}`}
+                        href={`/runs?run_id=${String(runId)}`}
                         target="_blank"
                         rel="noopener noreferrer"
                       >
@@ -575,7 +586,8 @@ export default function PlaygroundPage() {
                         View Run
                       </a>
                     </Button>
-                  )}
+                  ) : null;
+                })()}
               </div>
             </SurfacePanel>
           )}
@@ -602,7 +614,7 @@ function PipelineStepCard({
       <div className="flex items-center gap-2">
         {status === 'running' && <Loader2 className="size-4 animate-spin text-[var(--accent)]" />}
         {status === 'completed' && <CheckCircle2 className="size-4 text-success" />}
-        {status === 'created' && <CheckCircle2 className="size-4 text-success" />}
+        {status === 'created' && <Circle className="text-muted size-4" />}
         {status === 'failed' && <Circle className="size-4 text-danger" />}
         <span className="font-medium text-sm">{label}</span>
       </div>
@@ -610,5 +622,72 @@ function PipelineStepCard({
         {status}
       </Badge>
     </div>
+  );
+}
+
+function ExtractedDataPreview({ runId }: { runId?: number }) {
+  const recordsQuery = useQuery({
+    queryKey: ['playground-extract-records', runId],
+    queryFn: () => api.getRecords(runId!, { limit: 20 }),
+    enabled: runId !== undefined && runId !== null,
+  });
+
+  const records = recordsQuery.data?.items ?? [];
+
+  if (!runId) return null;
+  if (recordsQuery.isPending) {
+    return (
+      <SurfacePanel>
+        <div className="p-4">
+          <DataRegionLoading count={3} />
+        </div>
+      </SurfacePanel>
+    );
+  }
+
+  if (records.length === 0) {
+    return (
+      <SurfacePanel>
+        <div className="p-4">
+          <DataRegionEmpty title="No records extracted" description="The crawl completed but produced no structured records." />
+        </div>
+      </SurfacePanel>
+    );
+  }
+
+  // Get field names from first record
+  const fieldNames = Object.keys(records[0]?.data ?? {}).slice(0, 6);
+
+  return (
+    <SurfacePanel>
+      <div className="border-divider flex items-center justify-between border-b px-4 py-3">
+        <div>
+          <p className="type-label m-0">Extracted Data ({records.length} records)</p>
+          <p className="text-muted m-0 text-sm">Preview of extracted product data.</p>
+        </div>
+      </div>
+      <TableSurface>
+        <Table className="compact-data-table">
+          <TableHeader>
+            <TableRow>
+              {fieldNames.map((field) => (
+                <TableHead key={field}>{field}</TableHead>
+              ))}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {records.slice(0, 10).map((record) => (
+              <TableRow key={record.id}>
+                {fieldNames.map((field) => (
+                  <TableCell key={field} className="max-w-[200px] truncate text-sm">
+                    {String((record.data as Record<string, unknown>)?.[field] ?? '-')}
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableSurface>
+    </SurfacePanel>
   );
 }
