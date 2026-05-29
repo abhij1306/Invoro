@@ -3104,7 +3104,11 @@ async def test_run_browser_attempts_caps_patchright_probe_timeout_for_vendor_blo
     result = await crawl_fetch_runtime._run_browser_attempts(
         context,
         reason="vendor-block:datadome",
-        host_policy=HostProtectionPolicy(host="example.com"),
+        host_policy=HostProtectionPolicy(
+            host="example.com",
+            patchright_blocked=True,
+            prefer_browser=True,
+        ),
     )
 
     assert result.browser_diagnostics["browser_engine"] == "real_chrome"
@@ -3112,6 +3116,93 @@ async def test_run_browser_attempts_caps_patchright_probe_timeout_for_vendor_blo
     assert browser_calls[0][1] == pytest.approx(12.0, abs=0.05)
     assert browser_calls[1][0] == "real_chrome"
     assert browser_calls[1][1] < 30.0
+
+
+@pytest.mark.asyncio
+@pytest.mark.component
+async def test_run_browser_attempts_skips_patchright_probe_cap_for_fresh_host(
+    monkeypatch: pytest.MonkeyPatch,
+    patch_settings,
+) -> None:
+    """Fresh hosts (no durable patchright failure memory) must get the full
+    URL budget, not the short probe-cap. Otherwise patchright runs are
+    truncated mid-load on first contact with cloudflare/akamai-protected
+    pages and misclassified as blocked.
+    """
+    patch_settings(browser_vendor_block_probe_timeout_seconds=12.0)
+    browser_calls: list[tuple[str, float]] = []
+    context = crawl_fetch_runtime._FetchRuntimeContext(
+        url="https://example.com/products/widget",
+        resolved_timeout=30.0,
+        deadline_monotonic=time.perf_counter() + 30.0,
+        run_id=None,
+        surface="ecommerce_detail",
+        traversal_mode=None,
+        max_pages=1,
+        max_scrolls=1,
+        max_records=None,
+        on_event=None,
+        browser_reason=None,
+        requested_fields=[],
+        listing_recovery_mode=None,
+        proxies=[None],
+        proxy_profile={},
+        traversal_required=False,
+        fetch_mode="browser_only",
+        runtime_policy={},
+        host_memory_ttl_seconds=crawl_fetch_runtime.crawler_runtime_settings.coerce_host_memory_ttl_seconds(
+            None
+        ),
+    )
+
+    @_as_async
+    def _fake_browser_fetch(url: str, browser_timeout: float, **kwargs):
+        del url
+        engine = str(kwargs.get("browser_engine") or "")
+        browser_calls.append((engine, browser_timeout))
+        return PageFetchResult(
+            url="https://example.com/products/widget",
+            final_url="https://example.com/products/widget",
+            html="<html><body><h1>Rendered</h1></body></html>",
+            status_code=200,
+            method="browser",
+            blocked=False,
+            browser_diagnostics={"browser_engine": engine},
+        )
+
+    monkeypatch.setattr(crawl_fetch_runtime, "_browser_fetch", _fake_browser_fetch)
+    monkeypatch.setattr(
+        crawl_fetch_runtime,
+        "_browser_engine_attempts",
+        lambda **_kwargs: ["patchright", "real_chrome"],
+    )
+    monkeypatch.setattr(crawl_fetch_runtime, "wait_for_host_slot", AsyncMock())
+    monkeypatch.setattr(crawl_fetch_runtime, "note_host_hard_block", AsyncMock())
+    fresh_policy = HostProtectionPolicy(host="example.com")
+    monkeypatch.setattr(
+        crawl_fetch_runtime,
+        "_load_host_protection_policy_compat",
+        AsyncMock(return_value=fresh_policy),
+    )
+    monkeypatch.setattr(
+        crawl_fetch_runtime.crawler_runtime_settings,
+        "browser_post_block_cooldown_ms",
+        0,
+    )
+
+    result = await crawl_fetch_runtime._run_browser_attempts(
+        context,
+        reason="vendor-block:cloudflare",
+        host_policy=fresh_policy,
+    )
+
+    assert result.browser_diagnostics["browser_engine"] == "patchright"
+    # Fresh host with no patchright failure memory must run patchright with
+    # the full remaining URL budget, not capped at probe timeout (12s).
+    assert browser_calls[0][0] == "patchright"
+    assert browser_calls[0][1] > 12.5
+    # Real Chrome must not be called when patchright succeeds.
+    assert len(browser_calls) == 1
 
 
 @pytest.mark.asyncio

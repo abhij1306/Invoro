@@ -77,6 +77,9 @@ from app.services.config.extraction_rules import (
     DETAIL_LONG_TEXT_UI_TAIL_MIN_PRODUCT_WORDS,
     DETAIL_MATERIALS_POLLUTION_TOKENS,
     DETAIL_MATERIALS_ZERO_PERCENT_PATTERN,
+    DETAIL_MATERIALS_COMPOSITION_PATTERN,
+    DETAIL_MATERIALS_EDITORIAL_HEAD_THRESHOLD,
+    DETAIL_MATERIALS_EDITORIAL_LENGTH_THRESHOLD,
     DETAIL_NOISE_PREFIXES,
     DETAIL_TITLE_DIMENSION_SIZE_PATTERN,
     DETAIL_TRACKING_TOKEN_PATTERN,
@@ -710,6 +713,15 @@ def _clean_materials_pollution(value: object) -> str:
         pattern.search(text) for pattern in long_text_disclaimer_patterns
     ):
         return ""
+    # Editorial / glossary blocks (e.g. Todd Snyder seersucker page) sneak
+    # into materials when the DOM selector pulls a description accordion.
+    # Real fabric composition leads with a percent token within the first
+    # ~200 characters. When the head of a long string lacks a composition
+    # pattern but the tail contains one, keep only the trailing composition.
+    composition_repaired = _materials_extract_trailing_composition(text)
+    if composition_repaired is not None:
+        text = composition_repaired
+    text = _materials_trim_to_first_specifics(text)
     chunks = [
         clean_text(chunk)
         for chunk in re.split(r"(?<=[.!?])\s+|\s+:\s+|\n+", text)
@@ -733,6 +745,67 @@ def _clean_materials_pollution(value: object) -> str:
         ):
             return _dedupe_adjacent_material_chunks(cleaned)
         cleaned = parts[1] if len(parts) > 1 else ""
+
+
+_MATERIALS_COMPOSITION_PATTERN = re.compile(
+    str(DETAIL_MATERIALS_COMPOSITION_PATTERN),
+    re.I,
+)
+_materials_editorial_head_len = int(DETAIL_MATERIALS_EDITORIAL_HEAD_THRESHOLD)
+_materials_editorial_min_len = int(DETAIL_MATERIALS_EDITORIAL_LENGTH_THRESHOLD)
+
+
+def _materials_extract_trailing_composition(text: str) -> str | None:
+    """Salvage trailing fabric composition from an editorial-prefixed block.
+
+    Real composition starts with a percent token (``97% Cotton, 3% Elastane``).
+    When the first ~200 chars lack any composition pattern but the full
+    string is long and ends with one or more composition entries, replace
+    the value with just the trailing composition slice.
+
+    Returns the trimmed composition text, or ``None`` when no salvage is
+    needed (head already has composition, or no composition at all).
+    """
+    if len(text) <= _materials_editorial_min_len:
+        return None
+    head = text[:_materials_editorial_head_len]
+    if _MATERIALS_COMPOSITION_PATTERN.search(head):
+        return None
+    matches = list(_MATERIALS_COMPOSITION_PATTERN.finditer(text))
+    if not matches:
+        # No composition anywhere — drop the editorial block entirely.
+        return ""
+    first = matches[0]
+    return text[first.start() :].strip() or ""
+
+
+_MATERIALS_HEAD_TRIM_TERMINATORS_RE = re.compile(
+    r"\b(?:Made\s+in|Garment\s+Made\s+in|Fabric\s+(?:From|Made\s+in)|"
+    r"Dry\s+Clean(?:\s+Only)?|Machine\s+Wash|Hand\s+Wash|Wash\s+Cold|"
+    r"Tumble\s+Dry|Do\s+Not\s+Bleach)\b[^.]{0,80}\.",
+    re.I,
+)
+
+
+def _materials_trim_to_first_specifics(text: str) -> str:
+    """When a long materials field starts with composition + care/origin
+    info but trails into a glossary of unrelated fabrics, keep only the
+    first composition+origin sentences.
+
+    Heuristic: locate the FIRST occurrence of a care/origin terminator
+    (``Made in X.``, ``Dry Clean Only.``, ``Machine Wash.`` etc.); cut
+    just after that period. If none is found within the first 400 chars,
+    fall back to the original text.
+    """
+    if len(text) <= 200:
+        return text
+    if not _MATERIALS_COMPOSITION_PATTERN.match(text):
+        return text
+    match = _MATERIALS_HEAD_TRIM_TERMINATORS_RE.search(text[:400])
+    if match is None:
+        return text
+    cut = text[: match.end()].strip()
+    return cut or text
 
 
 def _dedupe_adjacent_material_chunks(text: str) -> str:

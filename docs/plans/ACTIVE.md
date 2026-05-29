@@ -1,14 +1,15 @@
 # Active Plan
 
-**Current:** Playground — Replace Projects Feature → `docs/plans/playground-replace-projects-plan.md`
+**Current:** Extraction Wrong-Data Fixes (94URLs Audit) → `docs/plans/extraction-wrong-data-fixes-plan.md`
 **Status:** IN PROGRESS
 **Started:** 2026-05-28
-**Last slice completed:** —
+**Last slice completed:** Slice 1 — URL-suffix-as-color hydration guard (DEC-0001)
 
 ## Queue
-1. Agentic Delta Engine (BLOCKED - full backend verify has unrelated pre-existing failures) → `docs/plans/agentic-delta-engine-plan.md`
-2. Job Aggregation Pipeline → `docs/plans/job-aggregation-pipeline-plan.md`
-3. Phase 2 (Webhooks, Email, Multi-Tenant, Job Enrichment, Scale) → `docs/plans/phase-2-plan.md`
+1. Playground — Replace Projects Feature → `docs/plans/playground-replace-projects-plan.md`
+2. Agentic Delta Engine (BLOCKED - full backend verify has unrelated pre-existing failures) → `docs/plans/agentic-delta-engine-plan.md`
+3. Job Aggregation Pipeline → `docs/plans/job-aggregation-pipeline-plan.md`
+4. Phase 2 (Webhooks, Email, Multi-Tenant, Job Enrichment, Scale) → `docs/plans/phase-2-plan.md`
 
 ## Previous
 - Product Intelligence Belk Detail Integration (DONE; focused backend/frontend checks passed) → `docs/plans/product-intelligence-belk-detail-integration-plan.md`

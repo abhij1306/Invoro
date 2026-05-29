@@ -59,6 +59,7 @@ def finalize_candidate_value(field_name: str, values: list[object]) -> object | 
         return "\n".join(rows) if rows else None
     if field_name in LONG_TEXT_FIELDS:
         text_rows: list[str] = []
+        lowered_rows: list[str] = []
         text_seen: set[str] = set()
         for value in values:
             text = coerce_text(value)
@@ -67,10 +68,33 @@ def finalize_candidate_value(field_name: str, values: list[object]) -> object | 
             lowered = text.lower()
             if lowered in text_seen:
                 continue
+            # Dedupe descriptions that are identical except for a short
+            # trailing variant/color suffix. Do not collapse unrelated long
+            # text just because it shares an opening boilerplate paragraph.
+            if any(
+                _long_text_differs_only_by_short_suffix(lowered, kept_lowered)
+                for kept_lowered in lowered_rows
+            ):
+                continue
             text_seen.add(lowered)
+            lowered_rows.append(lowered)
             text_rows.append(text)
         return "\n\n".join(text_rows) if text_rows else None
     return values[0]
+
+
+def _long_text_differs_only_by_short_suffix(left: str, right: str) -> bool:
+    if len(left) < 200 or len(right) < 200:
+        return False
+    shared = 0
+    limit = min(len(left), len(right))
+    while shared < limit and left[shared] == right[shared]:
+        shared += 1
+    if shared < 200:
+        return False
+    left_tail = left[shared:].strip()
+    right_tail = right[shared:].strip()
+    return max(len(left_tail), len(right_tail)) <= 160
 
 
 def _deep_merge_structured_dict(

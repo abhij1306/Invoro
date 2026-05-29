@@ -11,6 +11,7 @@ from app.services.config.extraction_rules import (
 from app.services.extract.variant_normalization import size_color_extraction
 from app.services.shared.field_coerce import clean_text
 from app.services.shared.url_utils import (
+    clean_color_tokens,
     terminal_text,
     title_preserving_acronyms,
     title_tokens,
@@ -193,7 +194,21 @@ def _record_url_suffix_after_title(record: dict[str, Any]) -> str:
     suffix_tokens = terminal_parts[len(title_parts) :]
     if not suffix_tokens or len(suffix_tokens) > 4:
         return ""
-    return title_preserving_acronyms(" ".join(suffix_tokens))
+    # Drop digit-only and structural tokens (e.g. "html", numeric product IDs).
+    cleaned_tokens = clean_color_tokens(suffix_tokens)
+    if not cleaned_tokens:
+        return ""
+    # SKU/style codes mix letters and digits inside a single token
+    # (e.g. ``cl28517s``, ``vn000e9tbpg``). Real color slugs are
+    # alphabetic words such as ``tuke-river`` or ``natural-black``.
+    if any(_token_looks_like_code(token) for token in cleaned_tokens):
+        return ""
+    return title_preserving_acronyms(" ".join(cleaned_tokens))
+
+
+def _token_looks_like_code(token: str) -> bool:
+    """Mixed letter+digit single-token codes are SKUs/style codes, not color words."""
+    return bool(re.search(r"[A-Za-z]", token) and re.search(r"\d", token))
 
 
 hydrate_variant_axes = _hydrate_variant_axes

@@ -193,6 +193,8 @@ PLACEHOLDER_IMAGE_URL_PATTERNS = (
     "blank.gif",
     "transparent.gif",
     "clear.gif",
+    # Shopify storefront "no image" placeholder asset (e.g. Glossier).
+    "shopifycloud/storefront/assets/no-image",
 )
 IMAGE_PATH_TOKENS = (
     "/image/",

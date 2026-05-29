@@ -55,3 +55,47 @@ These are comments left during a code review. Please review all issues and provi
    Lines: 213-213
 
 Validate the correctness of each issue sequentially. For each issue that is correct, implement a fix. Please make the fixes concise and address all issues comprehensively and don't impact anything else.
+
+These are comments left during a code review. Please review all issues and provide fixes.
+
+1. logic error: Refreshing the session before commit can return stale state in the response.
+   Path: backend/app/api/playground.py
+   Lines: 160-160
+
+2. type error: Changing discover to assume a mapping return value can break the endpoint if the service still returns a scalar.
+   Path: backend/app/api/playground.py
+   Lines: 115-115
+
+3. logic error: Explicit browser context overrides can be dropped during policy merge.
+   Path: backend/app/services/acquisition/acquirer.py
+   Lines: 267-267
+
+4. logic error: Default browser permissions are dropped because the helper reads a setting that does not exist on the runtime config object.
+   Path: backend/app/services/acquisition/browser_identity.py
+   Lines: 1132-1132
+
+5. logic error: Barcode extraction now silently discards valid non-purely-numeric identifiers.
+   Path: backend/app/services/adapters/belk.py
+   Lines: 474-474
+
+6. logic error: Homepage fallback is effectively disabled because the code checks the wrong place for auto-surface evidence.
+   Path: backend/app/services/crawl/batch_runtime.py
+   Lines: 73-73
+
+7. logic error: Homepage fallback can violate the requested URL limit.
+   Path: backend/app/services/crawl/sitemap_resolver.py
+   Lines: 143-143
+
+8. integration bug: _AIDRubricFindingPayload.evidence_quote now defaults to None.
+   Path: backend/app/services/llm/payloads.py
+   Lines: 164-164
+
+9. logic error: Skipping the `last_content_hash` update on unknown content can preserve stale hash state.
+   Path: backend/app/services/monitor_scheduler_service.py
+   Lines: 67-67
+
+10. possible bug: Non-finite numeric diagnostic values can still crash integer parsing.
+   Path: backend/app/services/pipeline/record_extraction_stage.py
+   Lines: 244-244
+
+Validate the correctness of each issue sequentially. For each issue that is correct, implement a fix. Please make the fixes concise and address all issues comprehensively and don't impact anything else.

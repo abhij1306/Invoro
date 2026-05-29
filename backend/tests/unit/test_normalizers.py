@@ -733,6 +733,67 @@ def test_hydrate_variant_size_from_precompiled_sku_suffix_pattern(
 
 
 @pytest.mark.unit
+def test_record_url_suffix_after_title_rejects_non_color_suffix_tokens() -> None:
+    """SKU codes, product IDs, and structural tokens must not become color values.
+
+    Regression: phase-eight URLs like
+    ``/product/lucinda-spot-midi-dress-10015500806.html`` were producing
+    ``"10015500806 Html"`` as the inferred shared variant color. URL suffix
+    tokens that are pure digits/``html`` get filtered, and any single
+    alphanumeric token with an embedded digit is treated as a SKU/style code.
+    """
+    # Numeric product id + .html suffix (Phase Eight pattern).
+    assert (
+        hydration._record_url_suffix_after_title(
+            {
+                "title": "Lucinda Spot Midi Dress",
+                "url": "https://www.phase-eight.com/product/lucinda-spot-midi-dress-10015500806.html",
+            }
+        )
+        == ""
+    )
+    # SKU-style alphanumeric trailing token (savannahs/Pavlova pattern).
+    assert (
+        hydration._record_url_suffix_after_title(
+            {
+                "title": "Pavlova 100 Lace Up Blush Satin Boots",
+                "url": "https://savannahs.com/products/pavlova-100-lace-up-blush-satin-boots-cl28517s",
+            }
+        )
+        == ""
+    )
+    # Genuine alphabetic color slug is still preserved (Allbirds Tuke River).
+    assert (
+        hydration._record_url_suffix_after_title(
+            {
+                "title": "Men's Wool Runner",
+                "url": "https://www.allbirds.com/products/mens-wool-runners-tuke-river",
+            }
+        )
+        == "Tuke River"
+    )
+
+
+@pytest.mark.unit
+def test_infer_shared_variant_color_skips_when_url_suffix_is_not_a_color() -> None:
+    """End-to-end: variants without color stay clean when URL suffix is a code."""
+    record = {
+        "title": "Lucinda Spot Midi Dress",
+        "url": "https://www.phase-eight.com/product/lucinda-spot-midi-dress-10015500806.html",
+        "variants": [
+            {"size": "UK 06"},
+            {"size": "UK 08"},
+            {"size": "UK 10"},
+        ],
+    }
+
+    hydration._hydrate_variant_axes(record)
+
+    for variant in record["variants"]:
+        assert "color" not in variant or not variant["color"]
+
+
+@pytest.mark.unit
 def test_sanitize_variant_axes_normalizes_mixed_case_axis_keys() -> None:
     record = {
         "variants": [
