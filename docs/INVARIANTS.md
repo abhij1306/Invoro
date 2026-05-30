@@ -161,15 +161,17 @@ Browser-driver disconnects are URL-local failures. If a shared browser dies duri
 
 **Patchright runs headless bundled Chromium, and headless leaks must be masked. This is a hard contract.**
 
-The primary browser engine is the `patchright` package launched as **headless bundled Chromium** (`chromium.launch(headless=...)`, `--headless=new`, `playwright_headless=True` in Docker/Celery). It is NOT launched in Patchright's documented "best practice" mode (`channel="chrome"`, headful, persistent context). That distinction drives the identity contract:
+- The primary engine is `patchright` launched as headless bundled Chromium (`chromium.launch(headless=...)`, `--headless=new`, `playwright_headless=True`), NOT Patchright's headful `channel="chrome"` best-practice mode.
+- Headless Chromium leaks a `HeadlessChrome` UA token and no `sec-ch-ua` hints; PX/Akamai/DataDome block it on sight (observed: Belk `403` `px-captcha`). `build_playwright_context_spec` MUST rewrite the UA to plain `Chrome` and emit coherent `sec-ch-ua` headers.
+- This is UA normalization for an engine that is genuinely Chrome, not synthetic fingerprint forgery. Patchright's "no fingerprint injection" guidance applies only to headful `channel="chrome"`; do not cite it to drop the mask while still headless.
+- Fingerprint coherence is mandatory: the UA OS token, `sec-ch-ua-platform`, and native `navigator.platform` MUST agree, keyed off the host OS (Windows dev vs Linux Docker), never hardcoded.
+- Do not reintroduce `browserforge` or JS init-script identity shaping. Shape only via context options (UA, client-hint headers, locale/timezone, permissions).
+- Real Chrome (headful, native context) is exempt: it already reports a clean UA.
 
-- Headless bundled Chromium advertises a `HeadlessChrome` UA token and ships **no** `sec-ch-ua` client hints. PerimeterX, Akamai, and DataDome block that token on sight (observed: instant `403` + `px-captcha` on Belk). Therefore `build_playwright_context_spec` MUST normalize the UA to plain `Chrome` and emit coherent `sec-ch-ua` headers. This is UA normalization for an engine that is genuinely Chrome, not synthetic fingerprint forgery.
-- Patchright's "use Chrome without fingerprint injection" guidance applies ONLY to its headful `channel="chrome"` setup. Do not cite it to justify removing the headless UA mask while the engine still runs headless. Removing the mask is the regression that broke Belk and every PX/Akamai/DataDome commerce target.
-- **Fingerprint coherence is mandatory.** The UA OS token, the `sec-ch-ua-platform` header, and the engine's native `navigator.platform` MUST all agree. Identity is keyed off the **host OS** the browser runs on (Windows dev box vs Linux Docker in prod), never a hardcoded value. A Windows UA on a Linux host is an incoherent fingerprint and a violation.
-- Do not reintroduce `browserforge` or JS init-script fingerprint injection. Patchright avoids `Runtime.enable`; injected page scripts are a detection surface. Identity shaping is limited to context options (UA, client-hint headers, locale/timezone, permissions) — no `add_init_script` identity patching.
-- Real Chrome (`channel="chrome"`, headful, native context via `NATIVE_REAL_CHROME_CONTEXT_OPTIONS`) is the exception: it does NOT get the de-headless UA, because headful real Chrome reports a clean UA already.
+**Origin warmup is best-effort and strictly non-fatal.**
 
-**Origin warmup is best-effort and strictly non-fatal.** Warmup seeds origin cookies for detail surfaces via the bounded challenge loop, but a blocked or challenge-shell origin during warmup MUST NOT raise or abort the fetch. The main navigation runs its own challenge loop and owns the blocked verdict for the URL. Warmup is budget-capped (`origin_warmup_max_budget_ratio`) so it cannot consume the navigation time budget.
+- Warmup seeds detail-surface origin cookies via the bounded challenge loop, but a blocked/challenge-shell origin MUST NOT raise or abort the fetch; the main navigation owns the blocked verdict.
+- Warmup is budget-capped (`origin_warmup_max_budget_ratio`) so it cannot consume the navigation time budget.
 
 **VIOLATION signatures (patchright/identity):**
 - Context options expose a `HeadlessChrome` UA token to a live site
