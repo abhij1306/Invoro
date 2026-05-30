@@ -20,6 +20,7 @@ from app.services.config.extraction_rules import (
 from app.services.extract.detail.price.parsing import (
     decimal_is_cent_magnitude_copy,
     detail_currency_from_html,
+    detail_current_price_currency_from_html,
     detail_jsonld_price_bundle,
     detail_original_price_from_html,
     detail_price_decimal,
@@ -68,6 +69,28 @@ def backfill_detail_price_from_html(
         selectors=DETAIL_CURRENT_PRICE_SELECTORS,
         currency=preliminary_currency,
     )
+    visible_price_currency = (
+        detail_current_price_currency_from_html(soup) if visible_price else None
+    )
+    if visible_price_currency and text_or_none(record.get("currency")) not in (
+        None,
+        visible_price_currency,
+    ):
+        current_price = record.get("price")
+        if (
+            current_price in (None, "", [], {})
+            or detail_price_decimal(current_price) == detail_price_decimal(visible_price)
+            or _should_override_record_price_from_dom(
+                record=record,
+                dom_price=visible_price,
+                record_price_is_low_signal=record_price_is_low_signal,
+            )
+        ):
+            record["currency"] = visible_price_currency
+            append_record_field_source(record, "currency", "dom_text")
+    if visible_price_currency and html_currency and visible_price_currency != html_currency:
+        html_currency = visible_price_currency
+        jsonld_price_bundle = (None, None, None)
     html_currency_conflicts_with_host = _html_currency_conflicts_with_strong_host_hint(
         html_currency=html_currency,
         expected_currency=expected_currency,

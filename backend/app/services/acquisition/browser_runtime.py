@@ -18,7 +18,7 @@ from app.services.acquisition.browser_capture import (
 from app.services.acquisition.browser_detail import (
     expand_all_interactive_elements,
     expand_interactive_elements_via_accessibility,
-    accessibility_expand_candidates,
+    accessibility_expand_candidates,  # noqa: F401  re-exported for callers/tests
     expand_detail_content_if_needed,
     detail_expansion_keywords,
     interactive_candidate_snapshot,
@@ -70,7 +70,6 @@ from app.services.acquisition.browser_recovery import (
 from app.services.acquisition.browser_stage_runner import (
     run_browser_stage as _run_browser_stage,
 )
-from app.services.acquisition import browser_pool as _browser_pool
 from app.services.acquisition.browser_pool import (
     SharedBrowserRuntime,
     block_unneeded_route as _block_unneeded_route,

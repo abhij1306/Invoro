@@ -804,6 +804,8 @@ def _materials_trim_to_first_specifics(text: str) -> str:
     match = _MATERIALS_HEAD_TRIM_TERMINATORS_RE.search(text[:400])
     if match is None:
         return text
+    if any(item.start() > match.end() for item in _MATERIALS_COMPOSITION_PATTERN.finditer(text)):
+        return text
     cut = text[: match.end()].strip()
     return cut or text
 

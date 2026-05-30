@@ -1,12 +1,16 @@
 # Active Plan
 
-**Current:** Extraction Wrong-Data Fixes (94URLs Audit) → `docs/plans/extraction-wrong-data-fixes-plan.md`
-**Status:** IN PROGRESS
-**Started:** 2026-05-28
-**Last slice completed:** Slice 1 — URL-suffix-as-color hydration guard (DEC-0001)
+**Current:** Belk React PDP Extraction Fixes (Multi-Variant, No LLM) → `docs/plans/belk-react-pdp-extraction-plan.md`
+**Status:** COMPLETE (2026-05-30; full backend suite `pytest tests -q` = 1166 passed)
+**Last slice completed:** Slice 3 (full verify) — Slices 1–3 all DONE
 
 ## Queue
-1. Playground — Replace Projects Feature → `docs/plans/playground-replace-projects-plan.md`
+1. Image-hash matching investigation (Tier 4) — spike, not yet started
+2. Extraction Wrong-Data Fixes (94URLs Audit) → `docs/plans/extraction-wrong-data-fixes-plan.md`
+3. Playground — Replace Projects Feature → `docs/plans/playground-replace-projects-plan.md`
+
+## Previous
+- Belk Product Discovery Recall (UPC-First, No LLM) (DONE; live-verified on real products + full suite) → `docs/plans/belk-product-discovery-recall-plan.md`
 2. Agentic Delta Engine (BLOCKED - full backend verify has unrelated pre-existing failures) → `docs/plans/agentic-delta-engine-plan.md`
 3. Job Aggregation Pipeline → `docs/plans/job-aggregation-pipeline-plan.md`
 4. Phase 2 (Webhooks, Email, Multi-Tenant, Job Enrichment, Scale) → `docs/plans/phase-2-plan.md`

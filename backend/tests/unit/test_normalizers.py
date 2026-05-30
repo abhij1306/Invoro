@@ -101,6 +101,14 @@ def test_normalize_decimal_price_rejects_negative_values() -> None:
 
 
 @pytest.mark.unit
+def test_normalize_decimal_price_rejects_structured_types() -> None:
+    assert normalize_decimal_price({"key": "val"}) is None
+    assert normalize_decimal_price([100, 200]) is None
+    assert normalize_decimal_price(("100",)) is None
+    assert normalize_decimal_price({100, 200}) is None
+
+
+@pytest.mark.unit
 def test_variant_payload_limit_accepts_explicit_max_rows() -> None:
     record = {
         "variants": [
@@ -1154,3 +1162,36 @@ def test_normalize_variant_record_keeps_parent_scalar_size_without_variants() ->
 
     assert record["size"] == "0.035 oz / 0.99 g"
     assert record["color"] == "209 Mocha Latte - soft mocha brown matte"
+
+
+@pytest.mark.unit
+def test_variant_choice_container_is_overbroad() -> None:
+    from app.services.extract.variant_choice_traversal import _variant_choice_container_is_overbroad
+    # A container with both color and size inputs is overbroad
+    html = """
+    <div class="overbroad-parent">
+        <div class="color-section">
+            <input type="radio" name="color-option" data-option-name="color" value="Black">
+            <input type="radio" name="color-option" data-option-name="color" value="Cognac">
+        </div>
+        <div class="size-section">
+            <input type="radio" name="size-option" data-option-name="size" value="7M">
+            <input type="radio" name="size-option" data-option-name="size" value="8M">
+        </div>
+    </div>
+    """
+    soup = BeautifulSoup(html, "html.parser")
+    container = soup.find(class_="overbroad-parent")
+    assert _variant_choice_container_is_overbroad(container) is True
+
+    # A container with only one option name/axis is not overbroad
+    html_fine = """
+    <div class="fine-parent">
+        <input type="radio" name="color-option" data-option-name="color" value="Black">
+        <input type="radio" name="color-option" data-option-name="color" value="Cognac">
+    </div>
+    """
+    soup_fine = BeautifulSoup(html_fine, "html.parser")
+    container_fine = soup_fine.find(class_="fine-parent")
+    assert _variant_choice_container_is_overbroad(container_fine) is False
+

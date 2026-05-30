@@ -298,6 +298,11 @@ def _clean_detail_category_path(
     )
     for part in parts:
         cleaned = clean_text(part.strip(strip_chars))
+        if not cleaned_parts:
+            cleaned = _strip_embedded_root_suffix_from_category_head(
+                cleaned,
+                page_url=page_url,
+            )
         lowered = cleaned.casefold()
         if (
             not cleaned
@@ -324,6 +329,31 @@ def _clean_detail_category_path(
         )
     ]
     return " > ".join(cleaned_parts)
+
+
+def _strip_embedded_root_suffix_from_category_head(
+    value: object,
+    *,
+    page_url: str,
+) -> str:
+    text = clean_text(value)
+    match = re.fullmatch(
+        r"(?i)(men|mens|men's|women|womens|women's|kids|boys|girls)\s+(home|shop|store)",
+        text,
+    )
+    if not match:
+        return text
+    suffix = match.group(2)
+    if not detail_breadcrumb_is_root_label(suffix, page_url=page_url):
+        return text
+    head = match.group(1)
+    canonical = {
+        "mens": "Men",
+        "men's": "Men",
+        "womens": "Women",
+        "women's": "Women",
+    }.get(head.casefold())
+    return canonical or head[:1].upper() + head[1:]
 
 
 def _category_part_matches_identity(part: object, identity: str) -> bool:

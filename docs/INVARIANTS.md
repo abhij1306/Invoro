@@ -167,6 +167,7 @@ Browser-driver disconnects are URL-local failures. If a shared browser dies duri
 - Origin warmup is non-fatal and budget-capped (`origin_warmup_max_budget_ratio`): a blocked/challenge-shell origin MUST NOT raise or abort; the main navigation owns the blocked verdict.
 - Challenge recovery re-checks for clear immediately after challenge activity (activity is ~2s; providers often clear during it) to avoid a needless engine escalation on an already-usable page.
 - A terminal hard block (title/strong "Access Denied" evidence, no active challenge or challenge-element markers) never clears by waiting; the recovery loop exits early and skips the retry-goto so real-Chrome escalation is not delayed by the full challenge budget.
+- Challenge recovery MUST re-read and re-classify the live DOM on every poll. It may not gate the clear-check on a provider cookie (e.g. Akamai `_abck`): a provider shell (Akamai/DataDome/PerimeterX) clears by swapping in real content, so the re-read HTML is the source of truth. Gating the re-check on a cookie that never appears in-page makes Patchright miss an already-usable page and wastes the whole challenge budget before a needless real-Chrome escalation. A missing provider cookie is at most a hint, never a reason to skip the DOM re-check.
 
 **Usable content beats provider noise. This is a hard contract.**
 If browser diagnostics report `browser_outcome == "usable_content"`, provider telemetry such as `provider:*`,

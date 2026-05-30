@@ -76,6 +76,35 @@ def test_product_intelligence_query_uses_mpn_not_source_domain_or_sku() -> None:
 
 
 @pytest.mark.component
+def test_product_intelligence_query_prefers_upc_over_mpn_as_identifier() -> None:
+    # When the source product carries a UPC/GTIN, it must be the identifier
+    # appended to the brand+title and brand-site queries (strongest match
+    # signal), with the MPN/SKU-like token no longer used as the appended id.
+    queries = build_search_queries(
+        {
+            "brand": "Levis",
+            "title": "Men 511 Slim Fit Jeans",
+            "gtin": "0655772019097",
+            "mpn": "04511-2406",
+            "sku": "BELK-ONLY-123",
+        },
+        source_domain_value="belk.com",
+    )
+
+    assert queries
+    # Standalone quoted GTIN stays the first, highest-precision query.
+    assert queries[0] == '"0655772019097"'
+    # The UPC, not the MPN, is appended to the brand-site and brand+title queries.
+    assert 'site:levi.com "0655772019097"' in queries
+    assert any(
+        query.startswith("levi's Men 511 Slim Fit Jeans") and "0655772019097" in query
+        for query in queries
+    )
+    assert all("04511-2406" not in query for query in queries)
+    assert all("BELK-ONLY-123" not in query for query in queries)
+
+
+@pytest.mark.component
 def test_product_intelligence_query_strips_repeated_brand_and_targets_brand_domain() -> None:
     queries = build_search_queries(
         {
@@ -220,6 +249,52 @@ def test_product_intelligence_query_preserves_possessives_in_title_phrases() -> 
 
 
 @pytest.mark.component
+def test_product_intelligence_variant_spec_mismatch_caps_score() -> None:
+    # Source is a 4-in-1; candidate is a 3-in-1 variant of the same product line.
+    # Both titles state the spec, values differ -> flagged and capped below auto-accept.
+    result = score_candidate(
+        source={
+            "title": "Ninja Crispi 4-in-1 Portable Glass Air Fryer",
+            "brand": "Ninja",
+            "price": 159.99,
+        },
+        candidate={
+            "title": "Ninja Crispi 3-in-1 Glass Air Fryer Portable",
+            "brand": "Ninja",
+            "price": 149.99,
+        },
+        source_type="marketplace",
+    )
+
+    assert result["reasons"]["variant_mismatch"] is True
+    assert result["score"] <= 0.62
+    assert result["label"] != "high"
+
+
+@pytest.mark.component
+def test_product_intelligence_brand_title_match_reaches_high_without_identifier() -> None:
+    # Search payloads rarely carry a UPC; a brand-exact + strong-title retailer match
+    # must still reach the auto-accept (high) band.
+    result = score_candidate(
+        source={
+            "title": "Ninja Crispi 4-in-1 Portable Glass Air Fryer Cooking System",
+            "brand": "Ninja",
+            "price": 159.99,
+        },
+        candidate={
+            "title": "Ninja Crispi 4-in-1 Portable Glass Air Fryer Cooking System",
+            "brand": "Ninja",
+            "price": 159.99,
+        },
+        source_type="retailer",
+    )
+
+    assert result["score"] >= 0.85
+    assert result["label"] == "high"
+    assert result["reasons"]["variant_mismatch"] is False
+
+
+@pytest.mark.component
 def test_product_intelligence_scorer_returns_breakdown() -> None:
     result = score_candidate(
         source={
@@ -237,12 +312,15 @@ def test_product_intelligence_scorer_returns_breakdown() -> None:
         source_type="brand_dtc",
     )
 
+    # Belk SKU is no longer a scoring signal; this brand-DTC + title match still
+    # scores high via the brand-DTC floor (brand's own listing always ranks top).
     assert result["score"] >= 0.7
     assert result["reasons"]["brand_match"] is True
-    assert result["reasons"]["identifier_match"] is True
-    assert result["reasons"]["sku_match"] is True
-    assert result["reasons"]["mpn_or_style_match"] is False
+    # identifier_match is now GTIN-only; SKU/MPN/style are not identifiers for scoring.
+    assert result["reasons"]["identifier_match"] is False
     assert result["reasons"]["gtin_match"] is False
+    assert "sku_match" not in result["reasons"]
+    assert "mpn_or_style_match" not in result["reasons"]
 
 
 @pytest.mark.component
@@ -322,10 +400,26 @@ def test_product_intelligence_scorer_uses_shopping_evidence_without_image() -> N
 
 
 @pytest.mark.component
-def test_product_intelligence_scorer_keeps_title_only_uncertain() -> None:
+def test_product_intelligence_scorer_keeps_title_only_low_without_brand() -> None:
+    # No brand match means no confidence floor fires: a title-only match is driven
+    # purely by title-similarity weight and can never reach the auto-accept band.
     result = score_candidate(
         source={"title": "Floral Midi Dress", "brand": "", "price": 49.99},
         candidate={"title": "Floral Midi Dress", "brand": "", "price": None},
+        source_type="unknown",
+    )
+
+    assert result["score"] < 0.6
+    assert result["label"] in {"low", "uncertain"}
+    assert result["reasons"]["brand_match"] is False
+    assert result["reasons"]["identifier_match"] is False
+
+
+@pytest.mark.component
+def test_product_intelligence_scorer_keeps_weak_title_only_uncertain() -> None:
+    result = score_candidate(
+        source={"title": "Floral Midi Dress", "brand": "", "price": 49.99},
+        candidate={"title": "Striped Maxi Skirt", "brand": "", "price": None},
         source_type="unknown",
     )
 
@@ -1579,11 +1673,14 @@ async def test_product_intelligence_discovery_passes_pool_limit_to_search(monkey
 
 @pytest.mark.asyncio
 @pytest.mark.component
-async def test_product_intelligence_discovery_spreads_result_domains(monkeypatch) -> None:
+async def test_product_intelligence_discovery_keeps_multiple_listings_per_domain(monkeypatch) -> None:
+    # A product can be listed by multiple third-party sellers on one marketplace,
+    # so discovery must keep more than one distinct listing per domain (bounded only
+    # by the user's max_candidates request), not collapse to one per domain.
     async def fake_search_results(provider: str, query: str, *, limit: int | None = None) -> list[SearchResult]:
         return [
-            SearchResult(url="https://www.levi.com/p/1.html", payload={"title": "Levi 511"}),
-            SearchResult(url="https://www.levi.com/p/2.html", payload={"title": "Levi 511 sale"}),
+            SearchResult(url="https://www.ebay.com/itm/1", payload={"title": "Levi 511"}),
+            SearchResult(url="https://www.ebay.com/itm/2", payload={"title": "Levi 511 sale"}),
             SearchResult(url="https://www.macys.com/p/1.html", payload={"title": "Levi 511"}),
         ]
 
@@ -1596,16 +1693,20 @@ async def test_product_intelligence_discovery_spreads_result_domains(monkeypatch
         {
             "brand": "Levis",
             "title": "Men 511 Slim Fit Jeans",
-            "sku": "04511",
         },
         source_domain_value="belk.com",
         provider="serpapi",
         allowed_domains=[],
         excluded_domains=[],
-        max_candidates=2,
+        max_candidates=5,
     )
 
-    assert [candidate.domain for candidate in candidates] == ["levi.com", "macys.com"]
+    domains = sorted(candidate.domain for candidate in candidates)
+    # Both eBay third-party listings survive alongside the macys listing.
+    assert domains == ["ebay.com", "ebay.com", "macys.com"]
+    urls = {candidate.url for candidate in candidates}
+    assert "https://www.ebay.com/itm/1" in urls
+    assert "https://www.ebay.com/itm/2" in urls
 
 
 @pytest.mark.asyncio

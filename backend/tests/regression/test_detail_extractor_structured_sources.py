@@ -24,6 +24,9 @@ from app.services.extract.detail.images.cleanup import (
 from app.services.extract.detail.assembly.final_cleanup import (
     repair_ecommerce_detail_record_quality,
 )
+from app.services.extract.detail.assembly.record_sanitization import (
+    sanitize_detail_placeholder_scalars,
+)
 from app.services.extract.detail.variants.pruning import (
     sanitize_variant_row,
 )
@@ -75,6 +78,43 @@ def test_reconcile_detail_currency_with_url_tracks_nested_currency_sources() -> 
     assert record["variants"][0]["currency"] == "USD"
     assert "url_currency_hint" in record["_field_sources"]["selected_variant.currency"]
     assert "url_currency_hint" in record["_field_sources"]["variants[0].currency"]
+
+
+@pytest.mark.regression
+def test_extract_detail_prefers_visible_price_symbol_over_region_path_currency() -> None:
+    html = """
+    <html>
+      <head>
+        <script type="application/ld+json">
+        {
+          "@context": "https://schema.org",
+          "@type": "Product",
+          "name": "leather disco biker jacket",
+          "brand": {"@type": "Brand", "name": "Philipp Plein"},
+          "offers": {"price": "13880", "priceCurrency": "INR"}
+        }
+        </script>
+      </head>
+      <body>
+        <main>
+          <h1>Philipp Plein</h1>
+          <p>leather disco biker jacket</p>
+          <div data-testid="price">$13,880</div>
+        </main>
+      </body>
+    </html>
+    """
+
+    rows = extract_records(
+        html,
+        "https://www.farfetch.com/in/shopping/men/philipp-plein-leather-disco-biker-jacket-item-18497263.aspx",
+        "ecommerce_detail",
+        max_records=1,
+        requested_fields=["title", "brand", "price", "currency"],
+    )
+
+    assert rows[0]["price"] == "13880.00"
+    assert rows[0]["currency"] == "USD"
 
 
 @pytest.mark.regression
@@ -5925,6 +5965,22 @@ def test_build_detail_record_rejects_audit_artifact_candidates_before_selection(
     assert "price" not in record
     assert "description" not in record
     assert "variants" not in record
+
+
+@pytest.mark.regression
+def test_build_detail_record_strips_embedded_home_suffix_from_category_head() -> None:
+    record = {
+        "title": "leather disco biker jacket",
+        "brand": "Philipp Plein",
+        "category": "Men Home > Philipp Plein > Clothing > Leather Jackets",
+    }
+
+    sanitize_detail_placeholder_scalars(
+        record,
+        identity_url="https://www.farfetch.com/in/shopping/men/philipp-plein-leather-disco-biker-jacket-item-18497263.aspx",
+    )
+
+    assert record["category"] == "Men > Philipp Plein > Clothing > Leather Jackets"
 
 
 @pytest.mark.regression

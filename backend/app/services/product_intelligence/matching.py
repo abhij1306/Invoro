@@ -12,7 +12,17 @@ from app.services.config.product_intelligence import (
     DEFAULT_SCORE_LABEL_LOW,
     DEFAULT_SCORE_LABEL_MEDIUM,
     DEFAULT_SCORE_LABEL_UNCERTAIN,
+    MATCH_DTC_MIN_TITLE_SIM,
+    MATCH_SCORE_FLOOR_BRAND_DTC,
+    MATCH_SCORE_FLOOR_BRAND_TITLE_HIGH,
+    MATCH_SCORE_FLOOR_BRAND_TITLE_MEDIUM,
+    MATCH_SCORE_FLOOR_BRAND_TITLE_PRICE_HIGH,
+    MATCH_SCORE_FLOOR_GTIN,
     MATCH_SCORE_WEIGHTS,
+    MATCH_TITLE_SIM_HIGH,
+    MATCH_TITLE_SIM_MEDIUM,
+    MATCH_VARIANT_MISMATCH_PENALTY,
+    MATCH_VARIANT_MISMATCH_SCORE_CAP,
     PRIVATE_LABEL_BRANDS,
     SOURCE_AVAILABILITY_FIELDS,
     SOURCE_BRAND_FIELDS,
@@ -27,6 +37,9 @@ from app.services.config.product_intelligence import (
     SOURCE_TYPE_AUTHORITY_BONUS,
     SOURCE_TYPE_BRAND_DTC,
     SOURCE_URL_FIELDS,
+    VARIANT_SPEC_N_IN_ONE_PATTERN,
+    VARIANT_SPEC_NUMBER_UNIT_PATTERN,
+    VARIANT_SPEC_UNIT_ALIASES,
     product_intelligence_settings,
 )
 from app.services.product_intelligence.brand_registry import (
@@ -108,21 +121,14 @@ def score_candidate(
         score += MATCH_SCORE_WEIGHTS["gtin_match"]
     reasons["gtin_match"] = gtin_match
 
-    sku_match = _sku_match(source, candidate)
-    if sku_match:
-        score += MATCH_SCORE_WEIGHTS["sku_match"]
-    reasons["sku_match"] = sku_match
-
-    mpn_or_style_match = _mpn_or_style_match(source, candidate)
-    if mpn_or_style_match:
-        score += MATCH_SCORE_WEIGHTS["mpn_or_style_match"]
-    reasons["mpn_or_style_match"] = mpn_or_style_match
-
+    # Belk SKU/style/product_id are internal identifiers with no relevance to external
+    # retailers or Google/SerpAPI, so they are intentionally not scored. Confidence is
+    # driven by brand-exact + title similarity, price band, and source authority.
     shopping_product_group = _shopping_product_group(candidate)
     if shopping_product_group:
         score += MATCH_SCORE_WEIGHTS["shopping_product_group"]
     reasons["shopping_product_group"] = shopping_product_group
-    reasons["identifier_match"] = bool(gtin_match or sku_match or mpn_or_style_match)
+    reasons["identifier_match"] = bool(gtin_match)
 
     price_match = _price_within_band(source.get("price"), candidate.get("price"))
     if price_match:
@@ -140,14 +146,32 @@ def score_candidate(
     score += authority_bonus
     reasons["source_authority_bonus"] = round(authority_bonus, 4)
 
+    variant_mismatch = _variant_spec_mismatch(source_title, candidate_title)
+    if variant_mismatch:
+        score -= MATCH_VARIANT_MISMATCH_PENALTY
+    reasons["variant_mismatch"] = variant_mismatch
+
+    # Confidence floors. Search results almost never expose a UPC, so a brand-exact
+    # match with strong title similarity is the real high-confidence signal.
     if gtin_match and brand_match and title_similarity >= 0.45:
-        score = max(score, 0.88)
-    elif gtin_match and title_similarity >= 0.55:
-        score = max(score, 0.78)
-    elif (sku_match or mpn_or_style_match) and brand_match and title_similarity >= 0.45:
-        score = max(score, 0.72)
-    elif source_type == SOURCE_TYPE_BRAND_DTC and brand_match and title_similarity >= 0.50:
-        score = max(score, 0.80)
+        score = max(score, MATCH_SCORE_FLOOR_GTIN)
+    elif source_type == SOURCE_TYPE_BRAND_DTC and brand_match and title_similarity >= MATCH_DTC_MIN_TITLE_SIM:
+        # Brand's own listing always ranks highest.
+        score = max(score, MATCH_SCORE_FLOOR_BRAND_DTC)
+    elif not variant_mismatch and brand_match and title_similarity >= MATCH_TITLE_SIM_HIGH:
+        floor = (
+            MATCH_SCORE_FLOOR_BRAND_TITLE_PRICE_HIGH
+            if price_match
+            else MATCH_SCORE_FLOOR_BRAND_TITLE_HIGH
+        )
+        score = max(score, floor)
+    elif not variant_mismatch and brand_match and title_similarity >= MATCH_TITLE_SIM_MEDIUM:
+        score = max(score, MATCH_SCORE_FLOOR_BRAND_TITLE_MEDIUM)
+
+    # A detected wrong-variant match must not sit in the auto-accept band.
+    if variant_mismatch:
+        score = min(score, MATCH_VARIANT_MISMATCH_SCORE_CAP)
+
     final_score = round(min(max(score, 0.0), 1.0), 4)
     return {
         "score": final_score,
@@ -371,10 +395,6 @@ def _token_set(value: object) -> set[str]:
     }
 
 
-def _sku_match(source: dict[str, object], candidate: dict[str, object]) -> bool:
-    return _field_match(source, candidate, ("sku",))
-
-
 def _gtin_match(source: dict[str, object], candidate: dict[str, object]) -> bool:
     keys = ("gtin", "barcode", "sku_upc", "upc", "ean")
     source_values = {_identity_value(source.get(key)) for key in keys}
@@ -384,20 +404,41 @@ def _gtin_match(source: dict[str, object], candidate: dict[str, object]) -> bool
     return bool(source_values and candidate_values and source_values & candidate_values)
 
 
-def _mpn_or_style_match(source: dict[str, object], candidate: dict[str, object]) -> bool:
-    return _field_match(source, candidate, ("mpn", "style", "model", "product_id"))
+_VARIANT_SPEC_NUMBER_UNIT_RE = re.compile(VARIANT_SPEC_NUMBER_UNIT_PATTERN, re.I)
+_VARIANT_SPEC_N_IN_ONE_RE = re.compile(VARIANT_SPEC_N_IN_ONE_PATTERN, re.I)
 
 
-def _field_match(
-    source: dict[str, object],
-    candidate: dict[str, object],
-    keys: tuple[str, ...],
-) -> bool:
-    for key in keys:
-        left = _identity_value(source.get(key))
-        right = _identity_value(candidate.get(key))
-        if left and right and left == right:
+def _variant_specs(title: object) -> tuple[set[tuple[str, str]], set[str]]:
+    text = str(title or "").casefold()
+    unit_specs: set[tuple[str, str]] = set()
+    for number, unit in _VARIANT_SPEC_NUMBER_UNIT_RE.findall(text):
+        canonical_unit = VARIANT_SPEC_UNIT_ALIASES.get(unit, unit)
+        normalized_number = number.rstrip("0").rstrip(".") if "." in number else number
+        unit_specs.add((normalized_number, canonical_unit))
+    n_in_one = {match for match in _VARIANT_SPEC_N_IN_ONE_RE.findall(text)}
+    return unit_specs, n_in_one
+
+
+def _variant_spec_mismatch(source_title: object, candidate_title: object) -> bool:
+    """Deterministic variant guard.
+
+    When both titles explicitly state the same spec dimension (a capacity unit such
+    as oz/qt/cup, or an "N-in-1" descriptor) and the stated values differ, the
+    candidate is a different variant of the product. Only fires when both sides
+    declare the dimension, so a silent candidate is never penalized.
+    """
+    source_units, source_n = _variant_specs(source_title)
+    candidate_units, candidate_n = _variant_specs(candidate_title)
+
+    source_unit_by_kind = {unit: number for number, unit in source_units}
+    candidate_unit_by_kind = {unit: number for number, unit in candidate_units}
+    for unit, source_number in source_unit_by_kind.items():
+        candidate_number = candidate_unit_by_kind.get(unit)
+        if candidate_number is not None and candidate_number != source_number:
             return True
+
+    if source_n and candidate_n and not (source_n & candidate_n):
+        return True
     return False
 
 

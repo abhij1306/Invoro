@@ -48,22 +48,17 @@ async def recover_browser_challenge(
     ):
         return response
 
-    providers = {
-        str(provider).strip().lower()
-        for provider in classification.provider_hits or []
-        if str(provider).strip()
-    }
     wait_started_at = time.perf_counter()
     poll_ms = max(100, int(challenge_poll_interval_ms))
     deadline = wait_started_at + max_wait_seconds
+    terminal_hard_block = False
 
     async def _check_cleared() -> Any | None:
-        # Akamai needs its `_abck` cookie set before re-reading; other providers
-        # (DataDome/PerimeterX) clear by swapping the shell for real content.
-        if "akamai" in providers and not await _page_has_cookie(
-            page, url=url, name="_abck"
-        ):
-            return None
+        # Re-read the DOM and re-classify on every poll. A provider shell
+        # (Akamai/DataDome/PerimeterX) clears by swapping in real content, so
+        # the HTML check is the source of truth; we must not gate it on a
+        # provider cookie or a page that has already swapped to product
+        # content would be ignored until the budget is exhausted.
         html = await get_page_html(page)
         classification = await classify_blocked_page(
             html, _recovered_html_status_code(status_code)
@@ -80,7 +75,6 @@ async def recover_browser_challenge(
         terminal_hard_block = _is_terminal_hard_block(classification)
         return None
 
-    terminal_hard_block = False
     while time.perf_counter() < deadline:
         recovered = await _check_cleared()
         if recovered is not None:
@@ -514,23 +508,3 @@ async def capture_rendered_listing_fragments(
     return [
         str(item).strip() for item in snapshot[: int(limit)] if str(item or "").strip()
     ]
-
-
-async def _page_has_cookie(page: Any, *, url: str, name: str) -> bool:
-    context = getattr(page, "context", None)
-    cookies_fn = getattr(context, "cookies", None)
-    if cookies_fn is None:
-        return False
-    try:
-        cookies = await cookies_fn([url])
-    except Exception:
-        # Some context implementations (CDP-backed, patched) only accept
-        # the no-argument form of cookies(). Fall back to retrieve all cookies.
-        try:
-            cookies = await cookies_fn()
-        except Exception:
-            return False
-    for cookie in cookies or []:
-        if str(cookie.get("name") or "").strip() == str(name).strip():
-            return True
-    return False

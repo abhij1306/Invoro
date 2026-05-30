@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-import concurrent.futures
 import sys
-import threading
 import time
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
@@ -15,7 +13,6 @@ from patchright.async_api import Error as PlaywrightError
 from app.services.fetch import fetch_context as crawl_fetch_runtime
 from app.services.acquisition import (
     browser_capture,
-    browser_identity,
     runtime as acquisition_runtime,
 )
 from app.services.acquisition.host_protection_memory import HostProtectionPolicy

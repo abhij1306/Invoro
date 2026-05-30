@@ -21,6 +21,18 @@ BELK_PRODUCT_BARCODE_KEYS = (
     "gtin14",
     "ean",
 )
+# Belk React PDP `utag_data` per-SKU parallel arrays. Each index is one sellable
+# variant; arrays are positionally aligned (sku_id[i] <-> sku_upc[i] <-> ...).
+BELK_SKU_ARRAY_ID_KEY = "sku_id"
+BELK_SKU_ARRAY_UPC_KEY = "sku_upc"
+BELK_SKU_ARRAY_PRICE_KEY = "sku_price"
+BELK_SKU_ARRAY_ORIGINAL_PRICE_KEY = "sku_original_price"
+BELK_SKU_ARRAY_INVENTORY_KEY = "sku_inventory"
+BELK_SKU_ARRAY_OUT_OF_STOCK_KEY = "sku_out_of_stock"
+BELK_SKU_ARRAY_IMAGE_KEY = "sku_image_url"
+# Variant objects elsewhere in the RSC payload carry the size/color labels and a
+# `variantId` that joins to the `sku_id` array.
+BELK_VARIANT_ID_KEYS = ("variantId", "variant_id", "id")
 FEATURE_SECTION_SELECTORS = (
     "[data-section='features']",
     ".features",
@@ -382,6 +394,14 @@ VARIANT_SIZE_VALUE_PATTERNS = tuple(
             r"^\d+(?:\.\d+)?/\d+(?:\.\d+)?\s+us\s+\(\d+\s+eu\)$",
             r"^(?:xxxs|xxs|xs|s|m|l|xl|xxl|xxxl|[2-6]xl)\s*\(?(?:\d{1,3}(?:\s*[-–]\s*\d{1,3})?)\)?$",
             r"^(?:xxxs|xxs|xs|s|m|l|xl|xxl|xxxl|[2-6]xl)\s*/\s*(?:xxxs|xxs|xs|s|m|l|xl|xxl|xxxl|[2-6]xl)$",
+            # Numeric footwear size with a trailing US/EU width code (e.g. 10M,
+            # 8.5W, 11.5XW, 9N, 7D). Width codes use the standard letter system
+            # (AAAA..EEEE, [2-6]E) plus narrow/medium/wide abbreviations. Apparel
+            # band+cup sizes (32A, 34DD) match the same shape and are also sizes.
+            r"^(?:(?:eu|uk|us)[-\s]?)?\d{1,2}(?:\.\d+)?\s?"
+            r"(?:aaaa|aaa|aa|eeee|eee|ee|xxw|xw|ww|[2-6]e|n|m|w|a|b|c|d|e|dd|ddd)$",
+            # Waist x inseam pant sizing (e.g. 32x30, 34 x 32).
+            r"^\d{2}(?:\.\d+)?\s?[x×]\s?\d{2}(?:\.\d+)?$",
         )
     )
 )

@@ -1529,6 +1529,58 @@ async def test_belk_adapter_extracts_nested_state_brand_price_and_currency() -> 
 
 @pytest.mark.asyncio
 @pytest.mark.regression
+async def test_belk_adapter_extracts_upc_from_listwrapped_utag_data_detail() -> None:
+    # Belk PDPs expose the UPC under `sku_upc` inside a Tealium `utag_data` object
+    # carried by the Next.js __next_f RSC payload, where every value is a
+    # single-element list. The adapter must unwrap those lists, recognize the
+    # analytics object as a product, and surface the UPC as `barcode` (not leak
+    # list literals into title and not drop the UPC).
+    import json as _json
+
+    utag = {
+        "utag_data": {
+            "product_image_url": [
+                "https://belk.scene7.com/is/image/Belk?layer=0&src=8100339_TM1ECBL_A_001&"
+            ],
+            "product_name": ["Egg Cooker"],
+            "product_brand": ["Toastmaster"],
+            "product_price": ["13.95"],
+            "product_original_price": ["34.00"],
+            "product_id": ["8100339TM1ECBL"],
+            "product_url": [
+                "https://www.belk.com/p/toastmaster-egg-cooker/8100339TM1ECBL.html"
+            ],
+            "sku_id": ["0438684935095"],
+            "sku_upc": ["0655772019097"],
+            "sku_price": ["13.95"],
+        }
+    }
+    chunk = _json.dumps("3:" + _json.dumps(utag, separators=(",", ":")))
+    html = (
+        "<html><body><script>self.__next_f.push([1,"
+        + chunk
+        + "])</script></body></html>"
+    )
+
+    result = await BelkAdapter().extract(
+        "https://www.belk.com/p/toastmaster-egg-cooker/8100339TM1ECBL.html",
+        html,
+        "ecommerce_detail",
+    )
+
+    assert len(result.records) == 1
+    record = result.records[0]
+    assert record["title"] == "Egg Cooker"
+    assert record["brand"] == "Toastmaster"
+    # The UPC (sku_upc), not the sku_id, must win as the barcode identifier.
+    assert record["barcode"] == "0655772019097"
+    assert record["url"] == (
+        "https://www.belk.com/p/toastmaster-egg-cooker/8100339TM1ECBL.html"
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.regression
 async def test_belk_adapter_prefers_real_currency_fields_over_scalar_price_text() -> (
     None
 ):
@@ -1685,6 +1737,70 @@ async def test_belk_adapter_extracts_detail_variants_with_color_and_size() -> No
             "stock_quantity": 0,
         },
     ]
+
+
+@pytest.mark.asyncio
+@pytest.mark.regression
+async def test_belk_adapter_maps_per_variant_upc_from_utag_sku_arrays() -> None:
+    # Belk's React PDP utag_data exposes per-SKU parallel arrays (one entry per
+    # variant). Each variant must carry its own UPC as `barcode`, joined to the
+    # size label via variantId == sku_id, and the product barcode is the first
+    # in-stock variant UPC.
+    import json as _json
+
+    utag = {
+        "utag_data": {
+            "product_name": ["Charged Commit TR Sneakers"],
+            "product_brand": ["Under Armour"],
+            "product_id": ["39003106007140"],
+            "product_color": ["Blue"],
+            "product_url": [
+                "https://www.belk.com/p/under-armour-charged-commit-tr-sneakers/39003106007140.html"
+            ],
+            "product_price": ["64.00"],
+            "sku_id": ["0480069328350", "0480069328459"],
+            "sku_upc": ["0198633940142", "0198633940517"],
+            "sku_price": ["64.00", "64.00"],
+            "sku_inventory": ["21", "0"],
+            "sku_out_of_stock": [False, True],
+        }
+    }
+    variant_objects = [
+        {"variantId": "0480069328350", "color": "289475425516",
+         "size": {"sizeId": "50500_10M", "sizeName": "10M"}},
+        {"variantId": "0480069328459", "color": "011475425516",
+         "size": {"sizeId": "50460_7.5M", "sizeName": "7.5M"}},
+    ]
+    # Embed both the utag analytics object and the variant objects in one __next_f chunk.
+    payload = {"utag": utag["utag_data"], "variants": variant_objects}
+    inner = "3:" + _json.dumps({"utag_data": utag["utag_data"], "v": variant_objects},
+                               separators=(",", ":"))
+    chunk = _json.dumps(inner)
+    html = (
+        "<html><body><script>self.__next_f.push([1,"
+        + chunk
+        + "])</script></body></html>"
+    )
+
+    result = await BelkAdapter().extract(
+        "https://www.belk.com/p/under-armour-charged-commit-tr-sneakers/39003106007140.html",
+        html,
+        "ecommerce_detail",
+    )
+
+    assert len(result.records) == 1
+    record = result.records[0]
+    assert record["title"] == "Charged Commit TR Sneakers"
+    assert record["product_id"] == "39003106007140"
+    # Product barcode is the first in-stock variant UPC.
+    assert record["barcode"] == "0198633940142"
+    variants = record["variants"]
+    assert isinstance(variants, list) and len(variants) == 2
+    by_size = {v.get("size"): v for v in variants}
+    assert by_size["10M"]["barcode"] == "0198633940142"
+    assert by_size["10M"]["availability"] == "in_stock"
+    assert by_size["7.5M"]["barcode"] == "0198633940517"
+    assert by_size["7.5M"]["availability"] == "out_of_stock"
 
 
 @pytest.mark.asyncio

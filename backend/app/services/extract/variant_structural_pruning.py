@@ -15,6 +15,7 @@ import re
 from collections.abc import Callable
 from itertools import combinations
 from typing import Any
+from urllib.parse import urlsplit
 
 from app.services.config.extraction_rules import (
     DETAIL_CROSS_PRODUCT_TEXT_GENERIC_TOKENS,
@@ -127,7 +128,11 @@ _PRODUCT_HANDLE_RE = re.compile(r"/products/([a-z0-9][a-z0-9-]+)", re.I)
 def _shopify_product_handle(url: str) -> str:
     if not url:
         return ""
-    match = _PRODUCT_HANDLE_RE.search(url)
+    # Match only within the URL path segment so a `/products/<slug>` that
+    # merely appears in a query string or redirect target is not treated as
+    # the product handle (which would prune legitimate same-product variants).
+    path = urlsplit(url).path
+    match = _PRODUCT_HANDLE_RE.search(path)
     return match.group(1).strip("-").lower() if match else ""
 
 

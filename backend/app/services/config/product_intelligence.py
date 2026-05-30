@@ -360,14 +360,56 @@ SOURCE_TYPE_AUTHORITY_BONUS = {
 }
 
 MATCH_SCORE_WEIGHTS = {
-    "title_similarity": 0.22,
-    "brand_match": 0.15,
-    "gtin_match": 0.22,
-    "sku_match": 0.08,
-    "mpn_or_style_match": 0.12,
-    "shopping_product_group": 0.06,
-    "price_band": 0.04,
+    "title_similarity": 0.45,
+    "brand_match": 0.25,
+    "gtin_match": 0.25,
+    "shopping_product_group": 0.04,
+    "price_band": 0.05,
     "source_authority": 0.18,
+}
+
+# Confidence floors and thresholds. Search-result payloads (SerpAPI/Google) almost
+# never carry a UPC/GTIN, and Belk SKU/style numbers are meaningless to external
+# retailers, so confidence is driven by brand-exact + title similarity (+ price and
+# source authority). These floors guarantee a brand-exact + strong-title match lands
+# in the correct band regardless of additive-weight drift.
+MATCH_TITLE_SIM_HIGH = 0.90
+MATCH_TITLE_SIM_MEDIUM = 0.75
+MATCH_DTC_MIN_TITLE_SIM = 0.50
+MATCH_SCORE_FLOOR_GTIN = 0.92
+MATCH_SCORE_FLOOR_BRAND_DTC = 0.90
+MATCH_SCORE_FLOOR_BRAND_TITLE_HIGH = 0.85
+MATCH_SCORE_FLOOR_BRAND_TITLE_PRICE_HIGH = 0.88
+MATCH_SCORE_FLOOR_BRAND_TITLE_MEDIUM = 0.65
+
+# Variant / spec mismatch (deterministic, no LLM). When source and candidate titles
+# BOTH explicitly state a comparable spec (capacity unit or "N-in-1") and the values
+# differ, the candidate is a different variant of the product: apply a penalty and
+# block promotion into the auto-accept band so a wrong-spec listing ranks below the
+# true match.
+MATCH_VARIANT_MISMATCH_PENALTY = 0.15
+MATCH_VARIANT_MISMATCH_SCORE_CAP = 0.62
+VARIANT_SPEC_NUMBER_UNIT_PATTERN = (
+    r"(\d+(?:\.\d+)?)\s*-?\s*"
+    r"(oz|ounce|ounces|qt|quart|quarts|cup|cups|l|liter|liters|ml|gal|gallon|"
+    r"in|inch|inches|ft|pc|pcs|piece|pieces|pack|count|ct)\b"
+)
+VARIANT_SPEC_N_IN_ONE_PATTERN = r"(\d+)\s*-?\s*in\s*-?\s*1\b"
+VARIANT_SPEC_UNIT_ALIASES = {
+    "ounce": "oz",
+    "ounces": "oz",
+    "quart": "qt",
+    "quarts": "qt",
+    "cups": "cup",
+    "liter": "l",
+    "liters": "l",
+    "gallon": "gal",
+    "inch": "in",
+    "inches": "in",
+    "pcs": "pc",
+    "piece": "pc",
+    "pieces": "pc",
+    "count": "ct",
 }
 
 PRODUCT_INTELLIGENCE_PROMPT_REGISTRY = {
@@ -399,9 +441,9 @@ class ProductIntelligenceSettings(BaseSettings):
         ),
     )
     max_source_products: int = 10
-    max_candidates_per_product: int = 4
-    discovery_pool_multiplier: int = 2
-    max_urls_per_result_domain: int = 1
+    max_candidates_per_product: int = 15
+    discovery_pool_multiplier: int = 4
+    max_urls_per_result_domain: int = 25
     search_timeout_seconds: float = 20.0
     search_delay_ms: int = 800
     google_native_max_results: int = 10

@@ -364,7 +364,7 @@ export default function PlaygroundPage() {
                 onChange={(e) => setUrl(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleStart()}
                 placeholder="https://www.example.com/category/shoes"
-                className="border-divider focus-ring flex-1 rounded-md border bg-[var(--bg-panel)] px-3 py-2 text-sm"
+                className="border-divider focus-ring bg-panel flex-1 rounded-md border px-3 py-2 text-sm"
               />
               <Button onClick={handleStart} disabled={createSession.isPending || !url.trim()}>
                 {createSession.isPending ? (
@@ -388,14 +388,14 @@ export default function PlaygroundPage() {
                 {idx < currentStep ? (
                   <CheckCircle2 className="text-success size-4" />
                 ) : idx === currentStep ? (
-                  <Circle className="size-4 fill-[var(--accent)] text-[var(--accent)]" />
+                  <Circle className="text-accent size-4 fill-[var(--accent)]" />
                 ) : (
                   <Circle className="text-muted size-4" />
                 )}
                 <span
                   className={cn(
                     'font-medium',
-                    idx === currentStep && 'text-[var(--accent-text)]',
+                    idx === currentStep && 'text-accent',
                     idx > currentStep && 'text-muted',
                   )}
                 >
@@ -512,7 +512,7 @@ export default function PlaygroundPage() {
                   </p>
                 </div>
                 <div className="grid gap-4 p-6 sm:grid-cols-2">
-                  <label className="border-divider flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition hover:bg-[var(--bg-alt)]">
+                  <label className="border-divider hover:bg-background-alt flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition">
                     <input
                       type="checkbox"
                       checked={pipelineOptions.enrich}
@@ -528,7 +528,7 @@ export default function PlaygroundPage() {
                       </p>
                     </div>
                   </label>
-                  <label className="border-divider flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition hover:bg-[var(--bg-alt)]">
+                  <label className="border-divider hover:bg-background-alt flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition">
                     <input
                       type="checkbox"
                       checked={pipelineOptions.compare}
@@ -544,7 +544,7 @@ export default function PlaygroundPage() {
                       </p>
                     </div>
                   </label>
-                  <label className="border-divider flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition hover:bg-[var(--bg-alt)]">
+                  <label className="border-divider hover:bg-background-alt flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition">
                     <input
                       type="checkbox"
                       checked={pipelineOptions.monitor}
@@ -560,7 +560,7 @@ export default function PlaygroundPage() {
                       </p>
                     </div>
                   </label>
-                  <label className="border-divider flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition hover:bg-[var(--bg-alt)]">
+                  <label className="border-divider hover:bg-background-alt flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition">
                     <input
                       type="checkbox"
                       checked={pipelineOptions.audit}
@@ -787,7 +787,7 @@ function ActivityLogPanel({
     <SurfacePanel>
       <div className="border-divider flex items-center justify-between gap-3 border-b px-4 py-3">
         <div className="flex items-center gap-3">
-          <Loader2 className="size-5 animate-spin text-[var(--accent)]" />
+          <Loader2 className="text-accent size-5 animate-spin" />
           <div>
             <p className="m-0 font-medium">{title}</p>
             <p className="text-muted m-0 text-sm">{subtitle}</p>
@@ -802,7 +802,7 @@ function ActivityLogPanel({
               <CheckCircle2 className="text-success mt-0.5 size-4 shrink-0" />
             )}
             {entry.status === 'active' && (
-              <Loader2 className="mt-0.5 size-4 shrink-0 animate-spin text-[var(--accent)]" />
+              <Loader2 className="text-accent mt-0.5 size-4 shrink-0 animate-spin" />
             )}
             {entry.status === 'pending' && <Circle className="text-muted mt-0.5 size-4 shrink-0" />}
             <span className={cn(entry.status === 'pending' && 'text-muted')}>{entry.text}</span>
@@ -955,7 +955,7 @@ function PipelineStepCard({
   return (
     <div className="border-divider flex items-center justify-between rounded-md border px-4 py-3">
       <div className="flex items-center gap-2">
-        {status === 'running' && <Loader2 className="size-4 animate-spin text-[var(--accent)]" />}
+        {status === 'running' && <Loader2 className="text-accent size-4 animate-spin" />}
         {status === 'completed' && <CheckCircle2 className="text-success size-4" />}
         {status === 'created' && <Circle className="text-muted size-4" />}
         {status === 'failed' && <Circle className="text-danger size-4" />}

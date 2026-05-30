@@ -125,6 +125,10 @@ def build_search_queries(
     queries: list[str] = []
     gtin = _identity_field(product, "gtin")
     mpn = _query_identifier_value(product)
+    # Prefer the UPC/GTIN as the identifier appended to brand+title queries; the
+    # SKU/MPN-like token is only a fallback when no UPC is present. The UPC is the
+    # strongest single matching signal and is GTIN-indexed by Google Shopping.
+    query_identifier = gtin or mpn
     brand_domain = BRAND_DOMAIN_MAP.get(brand)
     brand_site = f"{SEARCH_SITE_PREFIX}{brand_domain}" if brand_domain else ""
 
@@ -132,13 +136,13 @@ def build_search_queries(
         queries.append(_quoted(gtin))
 
     if brand and title and brand_site:
-        if mpn:
-            queries.append(_join_query_parts(brand_site, _quoted(mpn)))
+        if query_identifier:
+            queries.append(_join_query_parts(brand_site, _quoted(query_identifier)))
         queries.append(_join_query_parts(brand_site, brand_query, title))
 
     if brand and title:
-        if mpn:
-            queries.append(_join_query_parts(brand_query, title, _quoted(mpn)))
+        if query_identifier:
+            queries.append(_join_query_parts(brand_query, title, _quoted(query_identifier)))
         queries.append(_join_query_parts(brand_query, title))
 
     if title and not brand:

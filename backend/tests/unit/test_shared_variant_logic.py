@@ -18,12 +18,19 @@ from app.services.extract.variant_axis import (
     variant_axis_name_is_semantic,
 )
 from app.services.extract.variant_identity_merge import (
+    axis_values_are_mislabeled_duplicate,
     resolve_variants,
 )
 from app.services.extract.variant_option_value import (
     variant_option_value_is_noise,
 )
-from app.services.extract.detail.variants.dom_extraction import extract_variants_from_dom
+from app.services.extract.variant_choice_traversal import (
+    infer_variant_group_name_from_values,
+)
+from app.services.extract.detail.variants.dom_extraction import (
+    backfill_variants_from_dom_if_missing,
+    extract_variants_from_dom,
+)
 
 variant_choice_container_for_input = (
     variant_choice_traversal._variant_choice_container_for_input
@@ -922,3 +929,129 @@ def testvariant_choice_container_for_input_avoids_css_select_scans() -> None:
     node = parent.children[0]
 
     assert variant_choice_container_for_input(node, axis_name="size") is parent
+
+
+@pytest.mark.parametrize(
+    "value",
+    ["10M", "8.5M", "7.5M", "11.5XW", "9W", "9N", "7D", "32A", "34DD", "32x30"],
+)
+@pytest.mark.unit
+def test_unlabeled_numeric_size_values_infer_size_not_color(value: str) -> None:
+    """Numeric/size-shaped option values (incl. footwear width codes and
+    waist x inseam) classify as size, never color."""
+    values = [value, "10M", "11M", "12M"]
+    assert infer_variant_group_name_from_values(values) == "size"
+
+
+@pytest.mark.unit
+def test_unlabeled_shoe_size_group_classifies_as_size_not_color() -> None:
+    """An unlabeled option group (no accessible axis name) whose values are
+    footwear sizes must resolve to a single `size` axis, not `color`.
+
+    Reproduces the Belk React PDP bug where size radio values like 10M / 8.5M
+    were defaulted to color, corrupting variants for any site whose size
+    radiogroup has no accessible axis name.
+    """
+    sizes = ["7M", "7.5M", "8M", "8.5M", "9M", "10M", "10.5M", "11M"]
+    radios = "".join(
+        f'<label for="opt-{s}">{s}'
+        f'<button role="radio" id="opt-{s}" value="50500_{s}"></button></label>'
+        for s in sizes
+    )
+    soup = BeautifulSoup(
+        f"""
+        <main><section class="product-detail">
+          <div role="radiogroup" class="grid gap-3">{radios}</div>
+        </section></main>
+        """,
+        "html.parser",
+    )
+
+    record = extract_variants_from_dom(
+        soup,
+        page_url="https://www.example.com/p/sneaker/123.html",
+    )
+
+    variants = [row for row in record.get("variants", []) if isinstance(row, dict)]
+    assert variants
+    assert {row.get("size") for row in variants if row.get("size")} == set(sizes)
+    assert all("color" not in row for row in variants)
+
+
+@pytest.mark.unit
+def test_axis_values_are_mislabeled_duplicate_detects_same_axis() -> None:
+    """The same value set under two axis names is a mislabeled duplicate."""
+    sizes = ["7M", "8M", "9M", "10M"]
+    assert axis_values_are_mislabeled_duplicate(sizes, list(sizes)) is True
+    # Genuinely independent axes do not overlap.
+    assert (
+        axis_values_are_mislabeled_duplicate(["Red", "Blue"], ["S", "M", "L"]) is False
+    )
+    # Empty axes are never duplicates.
+    assert axis_values_are_mislabeled_duplicate([], ["S"]) is False
+
+
+@pytest.mark.unit
+def test_resolve_variants_does_not_explode_mislabeled_duplicate_axis() -> None:
+    """A single real axis mislabeled as two (color == size value set) must not
+    fabricate a Cartesian product."""
+    sizes = ["7M", "8M", "9M", "10M"]
+    axes = {"size": list(sizes), "color": list(sizes)}
+    variants = [
+        {"option_values": {"size": s}, "size": s, "sku": f"SKU-{s}"} for s in sizes
+    ]
+
+    resolved = resolve_variants(axes, variants)
+
+    assert len(resolved) == len(sizes)
+    assert {row.get("size") for row in resolved} == set(sizes)
+    assert all(not row.get("color") for row in resolved)
+
+
+@pytest.mark.unit
+def test_single_axis_source_not_exploded_by_mislabeled_dom_axis() -> None:
+    """A single-axis (size) source carrying its own transport fields must not be
+    exploded into a Cartesian product when the DOM mislabels the same values as
+    a second axis."""
+    sizes = ["7", "7.5", "8", "8.5", "9", "9.5", "10"]
+    record = {
+        "variants": [
+            {
+                "size": s,
+                "option_values": {"size": s},
+                "sku": f"SKU{i}",
+                "barcode": f"0000000001{i:03d}",
+                "price": "90.00",
+                "availability": "in_stock",
+            }
+            for i, s in enumerate(sizes)
+        ],
+        "variant_count": len(sizes),
+        "price": "90.00",
+        "currency": "USD",
+        "availability": "in_stock",
+    }
+    buttons = "".join(f'<button aria-label="{s}">{s}</button>' for s in sizes)
+    soup = BeautifulSoup(
+        f"""
+        <main><section class="product-detail">
+          <div class="color-selector"><span>Color</span>{buttons}</div>
+        </section></main>
+        """,
+        "html.parser",
+    )
+
+    backfill_variants_from_dom_if_missing(
+        record,
+        soup=soup,
+        page_url="https://www.example.com/p/shoe/123.html",
+    )
+
+    variants = [row for row in record.get("variants", []) if isinstance(row, dict)]
+    assert len(variants) == len(sizes)
+    assert {row.get("size") for row in variants if row.get("size")} == set(sizes)
+    # Barcodes survive; no phantom color×size cross-product rows.
+    assert {row.get("barcode") for row in variants if row.get("barcode")} == {
+        f"0000000001{i:03d}" for i in range(len(sizes))
+    }
+    assert all(not row.get("color") for row in variants)

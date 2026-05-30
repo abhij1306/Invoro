@@ -6,6 +6,7 @@ import re
 
 from app.services.config.field_mappings import (
     AVAILABILITY_FIELD,
+    BARCODE_FIELD,
     COLOR_FIELD,
     CURRENCY_FIELD,
     IMAGE_URL_FIELD,
@@ -158,6 +159,7 @@ FLAT_VARIANT_KEYS: tuple[str, ...] = (
     SIZE_FIELD,
     "style",
     SKU_FIELD,
+    BARCODE_FIELD,
     PRICE_FIELD,
     CURRENCY_FIELD,
     URL_FIELD,
