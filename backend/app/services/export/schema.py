@@ -50,6 +50,7 @@ class ExtractionTrace(BaseModel):
     semantic: dict[str, Any] = Field(default_factory=dict)
     rejected_public_fields: dict[str, Any] = Field(default_factory=dict)
     dom_skip: dict[str, Any] = Field(default_factory=dict)
+    completed_tiers: list[str] = Field(default_factory=list)
 
 
 class ExportRecord(BaseModel):
@@ -79,6 +80,15 @@ class ExportRecord(BaseModel):
         parsed = urlparse(str(record_url))
         if parsed.scheme not in {"http", "https"} or not parsed.netloc:
             raise ValueError("record url must be an absolute http(s) URL")
+
+
+def _completed_tiers_list(value: object) -> list[str]:
+    if not isinstance(value, dict):
+        return []
+    completed = value.get("completed")
+    if not isinstance(completed, list):
+        return []
+    return [str(item) for item in completed if str(item or "").strip()]
 
 
 def build_source_trace(
@@ -129,6 +139,7 @@ def build_source_trace(
             "semantic": mapping_or_empty(record.get("_semantic")),
             "rejected_public_fields": rejected_public_fields,
             "dom_skip": mapping_or_empty(record.get("_dom_skip_decision")),
+            "completed_tiers": _completed_tiers_list(record.get("_extraction_tiers")),
         },
         "field_discovery": field_discovery,
     }

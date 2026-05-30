@@ -171,20 +171,24 @@ drift flag codes are declared here for Slice 5. Never raises into the pipeline (
 `audit_run_complete`).
 
 ### Slice 5: Execution baseline in DomainRunProfile (self-healing loop)
-**Status:** TODO
+**Status:** DONE
 **Files:**
-- `backend/app/services/crawl/profile/*` (extend run-profile normalize/merge/persist)
-- `backend/app/models/domain_memory.py` (only if a new JSON column/sub-key is needed; prefer
-  reusing existing profile JSON)
-- `backend/app/services/observability/run_audit.py` (compare current run vs baseline; emit drift flags)
-- `backend/app/services/config/observability.py` (drift thresholds, timing-band tolerance)
-**What:** Store the expected execution signature per normalized `(domain, surface)`: tiers used,
-high-value fields normally found, engine, phase-timing band, normal verdict. Update it after each
-audited run. Drift (lost field, engine change, newly-skipped tier, timing breach, verdict
-regression) becomes a flag. Scoped strictly by `(domain, surface)` per INVARIANT Rule 9. Read/write
-of baseline only; never rewrites acquisition contracts or selectors.
-**Verify:** Two runs same domain/surface: first seeds baseline, second with an injected regression
-flags drift; `pytest tests/services/crawl/profile -q` + `pytest tests/services/observability -q`.
+- new `backend/app/services/observability/baseline.py` (per-(domain,surface) baseline store + drift compare)
+- `backend/app/services/observability/run_audit.py` (derive observation, compare, roll baseline, emit drift flags)
+- `backend/app/services/export/schema.py` (surface `completed_tiers` into persisted `source_trace.extraction`)
+**Verify:** DONE — `pytest tests/services/observability -q` = 47 passed; ruff + mypy clean;
+`build_source_trace` exercised directly to confirm `dom_skip` + `completed_tiers` pass ExportRecord
+validation.
+**Done notes:** Baseline is stored as a dedicated JSON artifact per (domain, surface) under
+`artifacts/observability/baselines/` — NOT in `DomainRunProfile.profile`, because
+`normalize_domain_run_profile` re-normalizes that dict to a fixed schema and drops unknown keys
+(would wipe the baseline on the next contract save). The dedicated artifact keeps the loop fully
+observability-owned, needs no migration, and stays `(domain,surface)`-scoped per Rule 9. Baseline
+seeds on first sample, then intersects tiers/fields (what *normally* appears) and rolls a mean
+acquire-time band; drift is only flagged after `BASELINE_MIN_SAMPLES`. Drift flags: lost field
+(Rule 9), missing tier (Rule 3), engine change (Rule 9), verdict regression (Rule 14), timing breach
+(Rule 6). `audit_run_complete` passes `update_baselines=True` (only the real run-complete path rolls
+the baseline; pure flag-building does not write). Observe-only.
 
 > Slices 1–5 are Phase 1 (trace + honest artifacts + audit + baseline). Slices 6–8 are Phase 2
 > (LLM diagnosis, frontend, full verification). Phase 2 starts only after Phase 1 is verified.

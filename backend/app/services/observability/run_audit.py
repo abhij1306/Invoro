@@ -37,7 +37,14 @@ from app.services.config.audit_rules import (
     FLAG_USABLE_CONTENT_BUT_BLOCKED,
 )
 from app.services.db_utils import mapping_or_empty
+from app.services.domain_utils import normalize_domain
 from app.services.field_policy import repair_target_fields_for_surface
+from app.services.observability.baseline import (
+    build_observation,
+    compare_to_baseline,
+    load_baseline,
+    update_baseline,
+)
 from app.services.pipeline.run_complete_callbacks import register_run_complete_callback
 
 logger = logging.getLogger(__name__)
@@ -71,14 +78,23 @@ async def audit_run_complete(run_id: int) -> None:
                 .scalars()
                 .all()
             )
-            flags = build_run_flags(run, list(records))
+            flags = build_run_flags(run, list(records), update_baselines=True)
             _write_flags(run_id, flags)
     except Exception:
         logger.exception("Run audit failed for run=%s", run_id)
 
 
-def build_run_flags(run: CrawlRun, records: list[CrawlRecord]) -> list[dict[str, Any]]:
-    """Pure-ish flag builder (DB objects in, flag dicts out). No mutation."""
+def build_run_flags(
+    run: CrawlRun,
+    records: list[CrawlRecord],
+    *,
+    update_baselines: bool = False,
+) -> list[dict[str, Any]]:
+    """Pure-ish flag builder (DB objects in, flag dicts out). No record mutation.
+
+    When ``update_baselines`` is True, the per-(domain, surface) execution
+    baseline is compared and rolled forward (the self-healing learning loop).
+    """
     surface = str(getattr(run, "surface", "") or "").strip().lower()
     summary = mapping_or_empty(getattr(run, "result_summary", {}))
     verdict = str(summary.get("extraction_verdict") or "").strip().lower()
@@ -105,7 +121,106 @@ def build_run_flags(run: CrawlRun, records: list[CrawlRecord]) -> list[dict[str,
     # Run-level acquisition flags from the per-URL trace artifacts.
     flags.extend(_audit_traces(run_id=int(getattr(run, "id", 0) or 0), verdict=verdict))
 
+    # Baseline drift (the self-healing loop), scoped by (domain, surface).
+    flags.extend(
+        _audit_baseline_drift(
+            run,
+            records,
+            surface=surface,
+            verdict=verdict,
+            high_value=high_value,
+            update_baselines=update_baselines,
+        )
+    )
+
     return flags
+
+
+def _audit_baseline_drift(
+    run: CrawlRun,
+    records: list[CrawlRecord],
+    *,
+    surface: str,
+    verdict: str,
+    high_value: list[str],
+    update_baselines: bool,
+) -> list[dict[str, Any]]:
+    domain = _run_domain(run, records)
+    if not domain or not surface:
+        return []
+    observation = build_observation(
+        completed_tiers=_observed_tiers(records),
+        fields_present=_observed_high_value_fields(records, high_value),
+        engine=_observed_engine(records),
+        total_acquire_ms=_observed_total_acquire_ms(int(getattr(run, "id", 0) or 0)),
+        verdict=verdict,
+    )
+    baseline = load_baseline(domain, surface)
+    flags = compare_to_baseline(baseline, observation)
+    if update_baselines:
+        update_baseline(domain, surface, observation)
+    return flags
+
+
+def _run_domain(run: CrawlRun, records: list[CrawlRecord]) -> str:
+    for record in records:
+        domain = normalize_domain(str(getattr(record, "source_url", "") or ""))
+        if domain:
+            return domain
+    return normalize_domain(str(getattr(run, "url", "") or ""))
+
+
+def _observed_tiers(records: list[CrawlRecord]) -> list[str]:
+    for record in records:
+        source_trace = mapping_or_empty(getattr(record, "source_trace", {}))
+        extraction = mapping_or_empty(source_trace.get("extraction"))
+        tiers = extraction.get("completed_tiers")
+        if isinstance(tiers, list) and tiers:
+            return [str(t) for t in tiers]
+    return []
+
+
+def _observed_high_value_fields(
+    records: list[CrawlRecord],
+    high_value: list[str],
+) -> list[str]:
+    present: set[str] = set()
+    high_value_set = set(high_value)
+    for record in records:
+        data = mapping_or_empty(getattr(record, "data", {}))
+        for field_name in high_value_set:
+            if data.get(field_name) not in (None, "", [], {}):
+                present.add(field_name)
+    return sorted(present)
+
+
+def _observed_engine(records: list[CrawlRecord]) -> str:
+    for record in records:
+        source_trace = mapping_or_empty(getattr(record, "source_trace", {}))
+        acquisition = mapping_or_empty(source_trace.get("acquisition"))
+        diagnostics = mapping_or_empty(acquisition.get("browser_diagnostics"))
+        engine = str(diagnostics.get("browser_engine") or "").strip().lower()
+        if engine:
+            return engine
+        method = str(acquisition.get("method") or "").strip().lower()
+        if method and method != "browser":
+            return method
+    return ""
+
+
+def _observed_total_acquire_ms(run_id: int) -> int | None:
+    pages_dir = _run_pages_dir(run_id)
+    if not pages_dir.is_dir():
+        return None
+    for browser_path in sorted(pages_dir.glob("*.browser.json")):
+        diagnostics = _read_json(browser_path)
+        if not isinstance(diagnostics, dict):
+            continue
+        timings = mapping_or_empty(diagnostics.get("phase_timings_ms"))
+        total = timings.get("total")
+        if isinstance(total, (int, float)):
+            return int(total)
+    return None
 
 
 def _audit_record(
