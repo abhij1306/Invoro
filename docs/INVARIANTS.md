@@ -159,26 +159,27 @@ Diagnostics controls are user controls. If `diagnostics_profile.capture_screensh
 
 Browser-driver disconnects are URL-local failures. If a shared browser dies during `new_context`, page bootstrap, or content serialization, the runtime may recycle that browser once, but `_batch_runtime.py` must keep the failure scoped to the current URL and continue the batch.
 
-**Patchright runs headless bundled Chromium, and headless leaks must be masked. This is a hard contract.**
+**Patchright runs headless bundled Chromium; headless leaks must be masked.**
 
-- The primary engine is `patchright` launched as headless bundled Chromium (`chromium.launch(headless=...)`, `--headless=new`, `playwright_headless=True`), NOT Patchright's headful `channel="chrome"` best-practice mode.
-- Headless Chromium leaks a `HeadlessChrome` UA token and no `sec-ch-ua` hints; PX/Akamai/DataDome block it on sight (observed: Belk `403` `px-captcha`). `build_playwright_context_spec` MUST rewrite the UA to plain `Chrome` and emit coherent `sec-ch-ua` headers.
-- This is UA normalization for an engine that is genuinely Chrome, not synthetic fingerprint forgery. Patchright's "no fingerprint injection" guidance applies only to headful `channel="chrome"`; do not cite it to drop the mask while still headless.
-- Fingerprint coherence is mandatory: the UA OS token, `sec-ch-ua-platform`, and native `navigator.platform` MUST agree, keyed off the host OS (Windows dev vs Linux Docker), never hardcoded.
-- Do not reintroduce `browserforge` or JS init-script identity shaping. Shape only via context options (UA, client-hint headers, locale/timezone, permissions).
-- Real Chrome (headful, native context) is exempt: it already reports a clean UA.
+- Primary engine is `patchright` as headless bundled Chromium (`--headless=new`, `playwright_headless=True`), not Patchright's headful `channel="chrome"` mode.
+- Headless Chromium leaks a `HeadlessChrome` UA token with no `sec-ch-ua` hints; PX/Akamai/DataDome block it on sight.
+- `build_playwright_context_spec` MUST rewrite the UA to plain `Chrome` and emit coherent `sec-ch-ua` headers. This is UA normalization, not fingerprint forgery.
+- Patchright's "no fingerprint injection" guidance applies only to headful `channel="chrome"`; it does not justify dropping the mask while headless.
+- UA OS token, `sec-ch-ua-platform`, and native `navigator.platform` MUST agree, keyed off host OS, never hardcoded.
+- No `browserforge`, no JS init-script identity shaping. Shape only via context options.
+- Real Chrome (headful, native context) is exempt; it already reports a clean UA.
 
 **Origin warmup is best-effort and strictly non-fatal.**
 
-- Warmup seeds detail-surface origin cookies via the bounded challenge loop, but a blocked/challenge-shell origin MUST NOT raise or abort the fetch; the main navigation owns the blocked verdict.
-- Warmup is budget-capped (`origin_warmup_max_budget_ratio`) so it cannot consume the navigation time budget.
+- A blocked/challenge-shell origin during warmup MUST NOT raise or abort the fetch; the main navigation owns the blocked verdict.
+- Warmup is budget-capped (`origin_warmup_max_budget_ratio`) and cannot consume the navigation budget.
 
 **VIOLATION signatures (patchright/identity):**
 - Context options expose a `HeadlessChrome` UA token to a live site
-- UA OS string, `sec-ch-ua-platform`, and native `navigator.platform` disagree (e.g. Windows UA on Linux Docker)
+- UA OS string, `sec-ch-ua-platform`, and native `navigator.platform` disagree
 - `browserforge` or a JS init-script is reintroduced to shape identity
-- Origin warmup raises/aborts the fetch on a blocked classification instead of staying non-fatal
-- The de-headless UA mask is removed by citing Patchright "no fingerprint injection" guidance while the engine still launches headless
+- Origin warmup raises/aborts on a blocked classification
+- The de-headless UA mask is removed while the engine still launches headless
 
 **Usable content beats provider noise. This is a hard contract.**
 If browser diagnostics report `browser_outcome == "usable_content"`, provider telemetry such as `provider:*`,
