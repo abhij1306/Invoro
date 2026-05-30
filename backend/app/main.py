@@ -90,6 +90,7 @@ from app.services.config.public_api import (
 )
 from app.services.monitor_async_loop import AsyncSchedulerLoop
 from app.services.monitor_change_detection import ensure_monitor_change_detection_registered
+from app.services.observability.run_audit import ensure_run_audit_registered
 from app.services.monitor_scheduler_service import MonitorSchedulerService
 
 logger = logging.getLogger("app")
@@ -128,6 +129,7 @@ async def lifespan(fastapi_app: FastAPI):
                 recovered,
             )
     ensure_monitor_change_detection_registered()
+    ensure_run_audit_registered()
     crawler_state = _crawler_app_state(fastapi_app)
     if settings.scheduler_driver == SCHEDULER_DRIVER_DEV:
         scheduler_loop = AsyncSchedulerLoop(

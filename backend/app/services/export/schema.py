@@ -49,6 +49,7 @@ class ExtractionTrace(BaseModel):
     review_bucket: list[dict[str, Any]] = Field(default_factory=list)
     semantic: dict[str, Any] = Field(default_factory=dict)
     rejected_public_fields: dict[str, Any] = Field(default_factory=dict)
+    dom_skip: dict[str, Any] = Field(default_factory=dict)
 
 
 class ExportRecord(BaseModel):
@@ -127,6 +128,7 @@ def build_source_trace(
             "review_bucket": _object_list(record.get("_review_bucket")),
             "semantic": mapping_or_empty(record.get("_semantic")),
             "rejected_public_fields": rejected_public_fields,
+            "dom_skip": mapping_or_empty(record.get("_dom_skip_decision")),
         },
         "field_discovery": field_discovery,
     }

@@ -3,7 +3,7 @@
 **Current:** Self-Healing Observability & Run-Audit Layer → `docs/plans/self-healing-observability-plan.md`
 **Status:** IN PROGRESS
 **Started:** 2026-05-30
-**Last slice completed:** Slice 3 — Instrument extraction pipeline (DONE; obs tests 28 passed)
+**Last slice completed:** Slice 4 — From-scratch audit engine + flags.json (DONE; obs tests 37 passed)
 
 ## Queue
 1. Extraction Wrong-Data Fixes (94URLs Audit) → `docs/plans/extraction-wrong-data-fixes-plan.md`

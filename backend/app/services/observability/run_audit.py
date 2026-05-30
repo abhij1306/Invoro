@@ -1,0 +1,270 @@
+"""From-scratch run auditor (read-only).
+
+Runs at ``on_run_complete`` for every finished run. Reads the per-URL RunTrace
+artifacts, the persisted records, and the run summary, applies deterministic
+symptom rules grounded in INVARIANTS.md, and writes
+``artifacts/runs/<id>/audit/flags.json``. Each flag points at the owning file
+from CODEBASE_MAP plus an evidence reference into the trace.
+
+Hard contract: observe-only. This module never mutates records, verdicts,
+selector memory, domain contracts, or any extraction state. It only reads and
+writes its own audit artifact.
+
+This is written from scratch and does NOT build on
+``backend/run_json_issue_audit.py`` (that script is retired; at most a secondary
+record-quality input later).
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+from pathlib import Path
+from typing import Any
+
+from sqlalchemy import select
+
+from app.core.config import settings
+from app.core.database import SessionLocal
+from app.models.crawl_run import CrawlRecord, CrawlRun
+from app.services.config import observability as obs_config
+from app.services.config.audit_rules import (
+    AUDIT_RULES,
+    AUDIT_SCHEMA_VERSION,
+    FLAG_DOM_SKIPPED_WITH_VARIANT_CUES,
+    FLAG_HIGH_VALUE_FIELD_MISSING,
+    FLAG_LISTING_SINGLE_METADATA_RECORD,
+    FLAG_USABLE_CONTENT_BUT_BLOCKED,
+)
+from app.services.db_utils import mapping_or_empty
+from app.services.field_policy import repair_target_fields_for_surface
+from app.services.pipeline.run_complete_callbacks import register_run_complete_callback
+
+logger = logging.getLogger(__name__)
+
+_CALLBACK_KEY = "observability_run_audit"
+
+# Verdicts that mean the URL was effectively blocked (no usable content owed).
+_BLOCKED_VERDICTS = frozenset({"blocked"})
+# Page-metadata-ish keys that signal a fake single-row listing result.
+_METADATA_ONLY_KEYS = frozenset({"title", "description", "url", "source_url", "brand"})
+
+
+def ensure_run_audit_registered() -> None:
+    """Register the auditor as a run-complete callback (idempotent)."""
+    register_run_complete_callback(audit_run_complete, key=_CALLBACK_KEY)
+
+
+async def audit_run_complete(run_id: int) -> None:
+    """Run-complete entry point. Never raises into the pipeline."""
+    try:
+        async with SessionLocal() as session:
+            run = await session.get(CrawlRun, run_id)
+            if run is None:
+                return
+            records = (
+                (
+                    await session.execute(
+                        select(CrawlRecord).where(CrawlRecord.run_id == run_id)
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            flags = build_run_flags(run, list(records))
+            _write_flags(run_id, flags)
+    except Exception:
+        logger.exception("Run audit failed for run=%s", run_id)
+
+
+def build_run_flags(run: CrawlRun, records: list[CrawlRecord]) -> list[dict[str, Any]]:
+    """Pure-ish flag builder (DB objects in, flag dicts out). No mutation."""
+    surface = str(getattr(run, "surface", "") or "").strip().lower()
+    summary = mapping_or_empty(getattr(run, "result_summary", {}))
+    verdict = str(summary.get("extraction_verdict") or "").strip().lower()
+    requested_fields = list(getattr(run, "requested_fields", []) or [])
+    high_value = _high_value_fields(surface, requested_fields)
+
+    flags: list[dict[str, Any]] = []
+
+    # Listing produced exactly one metadata-only row -> Rule 7.
+    if "listing" in surface and len(records) == 1:
+        record_data = mapping_or_empty(getattr(records[0], "data", {}))
+        if _looks_like_metadata_only(record_data):
+            flags.append(
+                _flag(
+                    FLAG_LISTING_SINGLE_METADATA_RECORD,
+                    evidence={"record_keys": sorted(record_data.keys())},
+                    url=getattr(records[0], "source_url", ""),
+                )
+            )
+
+    for record in records:
+        flags.extend(_audit_record(record, surface=surface, high_value=high_value))
+
+    # Run-level acquisition flags from the per-URL trace artifacts.
+    flags.extend(_audit_traces(run_id=int(getattr(run, "id", 0) or 0), verdict=verdict))
+
+    return flags
+
+
+def _audit_record(
+    record: CrawlRecord,
+    *,
+    surface: str,
+    high_value: list[str],
+) -> list[dict[str, Any]]:
+    flags: list[dict[str, Any]] = []
+    data = mapping_or_empty(getattr(record, "data", {}))
+    source_trace = mapping_or_empty(getattr(record, "source_trace", {}))
+    extraction = mapping_or_empty(source_trace.get("extraction"))
+    url = str(getattr(record, "source_url", "") or "")
+
+    # Missing high-value field with no recorded diagnostic.
+    missing = [
+        field_name
+        for field_name in high_value
+        if data.get(field_name) in (None, "", [], {})
+    ]
+    field_discovery_missing = source_trace.get("field_discovery_missing")
+    diagnosed = set(field_discovery_missing) if isinstance(field_discovery_missing, list) else set()
+    undiagnosed_missing = [field_name for field_name in missing if field_name not in diagnosed]
+    if undiagnosed_missing:
+        flags.append(
+            _flag(
+                FLAG_HIGH_VALUE_FIELD_MISSING,
+                evidence={"missing_fields": undiagnosed_missing},
+                url=url,
+            )
+        )
+
+    # DOM skipped while variants missing and variant cues present -> Rule 3.
+    if "detail" in surface and data.get("variants") in (None, "", [], {}):
+        skip = mapping_or_empty(extraction.get("dom_skip"))
+        if bool(skip.get("dom_skipped")) and _has_variant_cues(data):
+            flags.append(
+                _flag(
+                    FLAG_DOM_SKIPPED_WITH_VARIANT_CUES,
+                    evidence={
+                        "confidence": skip.get("confidence"),
+                        "threshold": skip.get("threshold"),
+                        "reason": skip.get("reason"),
+                    },
+                    url=url,
+                )
+            )
+    return flags
+
+
+def _audit_traces(*, run_id: int, verdict: str) -> list[dict[str, Any]]:
+    flags: list[dict[str, Any]] = []
+    pages_dir = _run_pages_dir(run_id)
+    if not pages_dir.is_dir():
+        return flags
+    for browser_path in sorted(pages_dir.glob("*.browser.json")):
+        diagnostics = _read_json(browser_path)
+        if not isinstance(diagnostics, dict):
+            continue
+        outcome = str(diagnostics.get("browser_outcome") or "").strip().lower()
+        host_outcome = mapping_or_empty(diagnostics.get("host_outcome"))
+        blocked = bool(host_outcome.get("blocked")) or verdict in _BLOCKED_VERDICTS
+        # usable_content but the run/host says blocked -> Rule 6 contradiction.
+        if outcome == "usable_content" and blocked:
+            flags.append(
+                _flag(
+                    FLAG_USABLE_CONTENT_BUT_BLOCKED,
+                    evidence={
+                        "browser_outcome": outcome,
+                        "host_result": host_outcome.get("result"),
+                        "verdict": verdict,
+                    },
+                    url=str(diagnostics.get("final_url") or ""),
+                )
+            )
+    return flags
+
+
+def _flag(code: str, *, evidence: dict[str, Any], url: str = "") -> dict[str, Any]:
+    rule = AUDIT_RULES.get(code, {})
+    flag: dict[str, Any] = {
+        "code": code,
+        "severity": rule.get("severity", obs_config.FLAG_SEVERITY_MEDIUM),
+        "symptom": rule.get("symptom", code),
+        "invariant": rule.get("invariant", ""),
+        "owner": rule.get("owner", ""),
+    }
+    if url:
+        flag["url"] = url
+    if evidence:
+        flag["evidence"] = evidence
+    return flag
+
+
+def _high_value_fields(surface: str, requested_fields: list[str]) -> list[str]:
+    resolved = repair_target_fields_for_surface(surface, requested_fields)
+    if resolved:
+        return resolved
+    return list(obs_config.HIGH_VALUE_FIELD_FLOOR)
+
+
+def _looks_like_metadata_only(data: dict[str, Any]) -> bool:
+    populated = {
+        key
+        for key, value in data.items()
+        if not str(key).startswith("_") and value not in (None, "", [], {})
+    }
+    if not populated:
+        return False
+    return populated <= _METADATA_ONLY_KEYS
+
+
+def _has_variant_cues(data: dict[str, Any]) -> bool:
+    for key in ("available_sizes", "option_values", "variant_axes", "size", "color"):
+        if data.get(key) not in (None, "", [], {}):
+            return True
+    return False
+
+
+def _run_audit_dir(run_id: int) -> Path:
+    return Path(settings.artifacts_dir) / "runs" / str(max(int(run_id or 0), 0)) / obs_config.AUDIT_ARTIFACT_SUBDIR
+
+
+def _run_pages_dir(run_id: int) -> Path:
+    return Path(settings.artifacts_dir) / "runs" / str(max(int(run_id or 0), 0)) / "pages"
+
+
+def _read_json(path: Path) -> Any:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        logger.debug("Could not read audit input %s", path, exc_info=True)
+        return None
+
+
+def _write_flags(run_id: int, flags: list[dict[str, Any]]) -> str:
+    audit_dir = _run_audit_dir(run_id)
+    audit_dir.mkdir(parents=True, exist_ok=True)
+    severity_counts: dict[str, int] = {}
+    for flag in flags:
+        severity = str(flag.get("severity", "")) or "unknown"
+        severity_counts[severity] = severity_counts.get(severity, 0) + 1
+    payload = {
+        "schema_version": AUDIT_SCHEMA_VERSION,
+        "run_id": int(run_id or 0),
+        "flag_count": len(flags),
+        "severity_counts": dict(sorted(severity_counts.items())),
+        "flags": flags,
+    }
+    path = audit_dir / obs_config.FLAGS_FILENAME
+    path.write_text(
+        json.dumps(payload, ensure_ascii=True, indent=2, sort_keys=True),
+        encoding="utf-8",
+    )
+    return str(path)
+
+
+__all__ = [
+    "audit_run_complete",
+    "build_run_flags",
+    "ensure_run_audit_registered",
+]

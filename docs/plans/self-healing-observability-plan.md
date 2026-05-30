@@ -150,22 +150,25 @@ llm/*, matching.py, several tests) and introduced a pre-existing `variant_count`
 stashing). Only observability-owned files were staged/committed.
 
 ### Slice 4: From-scratch audit engine + flags.json (auto, every run)
-**Status:** TODO
+**Status:** DONE
 **Files:**
 - new `backend/app/services/observability/run_audit.py` (anomaly -> root-cause -> owner mapping)
-- new `backend/app/services/config/audit_rules.py` (symptom->INVARIANT-rule->owning-file table,
-  severities; sourced from INVARIANTS.md + CODEBASE_MAP — config, not service code, per Rule 1)
-- `backend/app/services/pipeline/run_complete_callbacks.py` is unchanged; register the auditor like
-  monitors do (new `register_*` call from the audit module)
-**What:** New auditor reads `run_trace.json` (+ optionally record-quality signals) and emits
-`artifacts/runs/<id>/audit/flags.json`. Each flag: symptom, violated INVARIANT rule id, owning file
-from CODEBASE_MAP, severity, evidence ref into the trace. Deterministic rules first (e.g. "price
-missing + variant DOM cues present + DOM tier skipped at confidence X < threshold Y -> INVARIANT
-Rule 3 -> `extract/detail/assembly/tiers.py`"; "usable_content but blocked=true -> Rule 6";
-"listing run, 1 record of page metadata -> Rule 7"). Registered at `on_run_complete`; runs for
-every finished run. Read-only.
-**Verify:** Replay a known-bad run (e.g. run 33 family) and a known-good run; bad run produces
-actionable flags with correct owner files, good run produces none; `pytest tests/services/observability -q`.
+- new `backend/app/services/config/audit_rules.py` (symptom->INVARIANT-rule->owning-file table)
+- `backend/app/services/export/schema.py` (surface `dom_skip` into persisted `source_trace.extraction`)
+- `backend/app/tasks.py` + `backend/app/main.py` (register auditor at both run-complete entry points)
+**Verify:** DONE — `pytest tests/services/observability -q` = 37 passed; source_trace/export tests
+= 36 passed; run-complete/monitoring/tasks tests = 15 passed; ruff + mypy clean on my files.
+**Done notes:** `audit_run_complete` registered via `register_run_complete_callback` (same hook as
+monitors) in BOTH `tasks.py` (Celery) and `main.py` (startup). `build_run_flags` is observe-only:
+reads run summary verdict, persisted records (`data` + `source_trace`), and per-URL
+`*.browser.json` artifacts; writes `runs/<id>/audit/flags.json`. Implemented flags:
+DOM-skipped-with-variant-cues (Rule 3 — reads `source_trace.extraction.dom_skip`, which Slice 4
+adds to `build_source_trace`), usable_content-but-blocked (Rule 6), listing-single-metadata-record
+(Rule 7), high-value-field-missing (Rule 3, suppressed when `field_discovery_missing` diagnoses it).
+Each flag carries code/severity/symptom/invariant/owner(+url+evidence). `FLAG_DETAIL_ON_LISTING_SEED`
+declared in config but not yet wired (rejection reason not surfaced to audit) — deferred. Baseline
+drift flag codes are declared here for Slice 5. Never raises into the pipeline (broad guard in
+`audit_run_complete`).
 
 ### Slice 5: Execution baseline in DomainRunProfile (self-healing loop)
 **Status:** TODO
