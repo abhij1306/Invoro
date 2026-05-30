@@ -1772,7 +1772,6 @@ async def test_belk_adapter_maps_per_variant_upc_from_utag_sku_arrays() -> None:
          "size": {"sizeId": "50460_7.5M", "sizeName": "7.5M"}},
     ]
     # Embed both the utag analytics object and the variant objects in one __next_f chunk.
-    payload = {"utag": utag["utag_data"], "variants": variant_objects}
     inner = "3:" + _json.dumps({"utag_data": utag["utag_data"], "v": variant_objects},
                                separators=(",", ":"))
     chunk = _json.dumps(inner)
