@@ -3,7 +3,7 @@
 **Current:** Self-Healing Observability & Run-Audit Layer → `docs/plans/self-healing-observability-plan.md`
 **Status:** IN PROGRESS
 **Started:** 2026-05-30
-**Last slice completed:** Slice 5 — Execution baseline + drift flags (Phase 1 DONE; obs tests 47 passed)
+**Last slice completed:** Slice 6 — Observe-only LLM run diagnosis (DONE; obs tests 53 passed)
 
 ## Queue
 1. Extraction Wrong-Data Fixes (94URLs Audit) → `docs/plans/extraction-wrong-data-fixes-plan.md`

@@ -194,23 +194,22 @@ the baseline; pure flag-building does not write). Observe-only.
 > (LLM diagnosis, frontend, full verification). Phase 2 starts only after Phase 1 is verified.
 
 ### Slice 6 (Phase 2): LLM page-rebuild / "explain this run" diagnosis — observe-only
-**Status:** TODO
+**Status:** DONE
 **Files:**
 - new `backend/app/services/observability/run_llm_diagnosis.py`
-- `backend/app/services/observability/run_audit.py` (invoke diagnosis only on flagged runs)
-- `backend/app/services/config/observability.py` (diagnosis gating, token budget, prompt-task id)
-- reuse `backend/app/services/llm/*` task + prompt + cost-logging plumbing; do not fork it
-**What:** On flagged runs only, and only when `llm_enabled=True` AND active config allows it, feed
-the RunTrace + relevant HTML/artifact slices to an LLM "rebuild the page / explain provenance" task
-that returns a human-readable account: where each high-value field came from, why a field is
-missing, and which flagged root cause is most likely. Output is attached to the run's audit folder
-(e.g. `audit/llm_diagnosis.json`) and referenced from `flags.json`. This is the underutilized-LLM
-ask. Hard constraint (INVARIANT Rule 6 + Rule 10): diagnosis is observe-only — it must not write
-extraction fields, change verdicts, mutate `CrawlRecord.data`, selector memory, or the baseline.
-LLM failure/disabled is recorded as a diagnostic, never a hard error.
-**Verify:** Flagged run with `llm_enabled=True` produces `llm_diagnosis.json` referenced from flags;
-with `llm_enabled=False` it records "diagnosis skipped: llm_disabled" and emits nothing else;
-`pytest tests/services/observability -q` + `pytest tests/services/llm -q`.
+- `backend/app/services/observability/run_audit.py` (`_maybe_diagnose` invokes diagnosis on flagged runs)
+- `backend/app/services/llm/payloads.py` (`run_diagnosis` payload adapter)
+- `backend/app/services/config/field_mappings.py` (`run_diagnosis` prompt registry entry)
+- new `backend/app/data/prompts/run_diagnosis.system.txt` + `.user.txt`
+**Verify:** DONE — `pytest tests/services/observability -q` = 53 passed; ruff + mypy clean; payload
+adapter + prompt resolution verified directly (the concurrent agent's broken `celery_app.py` blocks
+full `app.tasks` import, so LLM-suite collection is currently broken by THEIR change, not mine).
+**Done notes:** Reuses `run_prompt_task` (no forked client). Gated by `diagnosis_enabled` =
+`llm_enabled` AND `has_llm_config_snapshot`, and only runs when flags exist. Returns a status dict
+embedded in `flags.json` (`llm_diagnosis`) and writes `runs/<id>/audit/llm_diagnosis.json`.
+Observe-only: never writes records/verdicts/baseline. LLM disabled -> `{"status":"skipped",
+"reason":"llm_disabled"}`; provider error -> `{"status":"unavailable"}`; never raises into the audit
+path. New `_RunDiagnosisPayload` forbids extra keys.
 
 ### Slice 7 (Phase 2): Frontend "Run Trace" tab (trace graph + flags)
 **Status:** TODO

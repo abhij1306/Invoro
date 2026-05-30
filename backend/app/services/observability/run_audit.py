@@ -79,9 +79,39 @@ async def audit_run_complete(run_id: int) -> None:
                 .all()
             )
             flags = build_run_flags(run, list(records), update_baselines=True)
-            _write_flags(run_id, flags)
+            diagnosis = await _maybe_diagnose(session, run, list(records), flags)
+            _write_flags(run_id, flags, diagnosis_status=diagnosis)
     except Exception:
         logger.exception("Run audit failed for run=%s", run_id)
+
+
+async def _maybe_diagnose(
+    session,
+    run: CrawlRun,
+    records: list[CrawlRecord],
+    flags: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    """Run the observe-only LLM diagnosis on flagged runs; write its artifact.
+
+    Returns a small status dict to embed in flags.json, or None when not run.
+    Never raises into the audit path.
+    """
+    if not flags:
+        return None
+    try:
+        from app.services.observability.run_llm_diagnosis import (
+            diagnose_run,
+            write_diagnosis,
+        )
+
+        diagnosis = await diagnose_run(session, run, records, flags)
+        if diagnosis.get("status") == "skipped":
+            return {"status": "skipped", "reason": diagnosis.get("reason")}
+        path = write_diagnosis(int(getattr(run, "id", 0) or 0), diagnosis)
+        return {"status": diagnosis.get("status"), "artifact": path}
+    except Exception:
+        logger.exception("LLM diagnosis failed for run=%s", getattr(run, "id", None))
+        return {"status": "error"}
 
 
 def build_run_flags(
@@ -356,7 +386,12 @@ def _read_json(path: Path) -> Any:
         return None
 
 
-def _write_flags(run_id: int, flags: list[dict[str, Any]]) -> str:
+def _write_flags(
+    run_id: int,
+    flags: list[dict[str, Any]],
+    *,
+    diagnosis_status: dict[str, Any] | None = None,
+) -> str:
     audit_dir = _run_audit_dir(run_id)
     audit_dir.mkdir(parents=True, exist_ok=True)
     severity_counts: dict[str, int] = {}
@@ -370,6 +405,8 @@ def _write_flags(run_id: int, flags: list[dict[str, Any]]) -> str:
         "severity_counts": dict(sorted(severity_counts.items())),
         "flags": flags,
     }
+    if diagnosis_status is not None:
+        payload["llm_diagnosis"] = diagnosis_status
     path = audit_dir / obs_config.FLAGS_FILENAME
     path.write_text(
         json.dumps(payload, ensure_ascii=True, indent=2, sort_keys=True),
