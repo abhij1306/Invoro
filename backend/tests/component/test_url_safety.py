@@ -121,3 +121,24 @@ async def test_validate_proxy_endpoint_uses_proxy_resolution_label(
 
     with pytest.raises(ValueError, match="Proxy host could not be resolved"):
         await url_safety.validate_proxy_endpoint("http://proxy.example:8080")
+
+@pytest.mark.asyncio
+@pytest.mark.component
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://127.0.0.1/",
+        "http://10.0.0.5/",
+        "http://169.254.169.254/latest/meta-data",
+        "http://169.254.1.1/",
+        "http://[::1]/",
+        "http://[fc00::1]/",
+        "http://[fe80::1]/",
+    ],
+)
+async def test_validate_public_target_rejects_private_and_metadata_ranges(
+    url: str,
+) -> None:
+    with pytest.raises(url_safety.SecurityError):
+        await url_safety.validate_public_target(url)
+
