@@ -212,18 +212,23 @@ Observe-only: never writes records/verdicts/baseline. LLM disabled -> `{"status"
 path. New `_RunDiagnosisPayload` forbids extra keys.
 
 ### Slice 7 (Phase 2): Frontend "Run Trace" tab (trace graph + flags)
-**Status:** TODO
+**Status:** DONE
 **Files:**
-- `frontend/app/*` (new run-trace route/tab) + `frontend/components/*` local components
-- `frontend/lib/api/*` (read-only client methods for trace/flags/diagnosis)
-- new read-only backend route under `backend/app/api/*` to serve `run_trace.json` / `flags.json` /
-  `llm_diagnosis.json` for a run (owner: route handler only, per CODEBASE_MAP api/ rules)
-**What:** Visualize the run as a graph (url -> stage -> tier -> field -> source) with flags overlaid
-and the LLM diagnosis (when present) shown inline. Read-only view; no controls that mutate runs.
-Follow existing UI primitive/pattern owners; respect the token-escape and crawl-architecture lint
-guards.
-**Verify:** `cd frontend; npm run lint; npm run test`; Playwright smoke renders the new tab for a
-run that has flags.
+- new `backend/app/api/observability.py` (read-only `GET /api/runs/{id}/observability`, access-checked)
+- new `backend/app/services/observability/artifact_reader.py` (reads flags/traces/diagnosis)
+- `backend/app/main.py` (register `observability_router`)
+- new `frontend/app/run-trace/page.tsx` + `run-trace-page.tsx`
+- `frontend/lib/api/types.ts` + `index.ts` (RunObservability types + `getRunObservability`)
+- `frontend/components/layout/app-shell.tsx` (nav entry + page title)
+**Verify:** DONE — backend ruff + mypy clean; `pytest tests/services/observability -q` = 56 passed
+(incl. artifact_reader tests); frontend `tsc --noEmit` clean; eslint clean on my files; prettier
+formatted. (The repo-wide `npm run lint` fails only on the concurrent agent's oversized
+`crawl-config-screen.tsx`, not my files.)
+**Done notes:** Route is read-only and access-checked via `require_accessible_run` (404 on
+denied/missing). `artifact_reader` reads `flags.json`, all `*.trace.json`, and `llm_diagnosis.json`;
+missing artifacts yield empty view (no error) so pre-feature runs render partially. Page is a
+read-only lookup (enter run id -> flags + per-URL traces + LLM diagnosis); no run-mutating controls.
+Used existing UI primitives (`Badge` tone, `InlineAlert` message/tone, `Card`, `PageHeader`).
 
 ### Slice 8 (Phase 2): Full-suite verification — tests + mypy + ruff + prettier
 **Status:** TODO

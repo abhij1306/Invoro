@@ -30,6 +30,7 @@ from app.api.jobs import router as jobs_router
 from app.api.llm import router as llm_router
 from app.api.monitors import router as monitors_router
 from app.api.notifications import router as notifications_router
+from app.api.observability import router as observability_router
 from app.api.product_intelligence import router as product_intelligence_router
 from app.api.playground import router as playground_router
 from app.api.public_alerts import router as public_alerts_router
@@ -560,5 +561,6 @@ for router in [
     public_alerts_router,
     notifications_router,
     ucp_audit_router,
+    observability_router,
 ]:
     app.include_router(router)
