@@ -161,25 +161,10 @@ Browser-driver disconnects are URL-local failures. If a shared browser dies duri
 
 **Patchright runs headless bundled Chromium; headless leaks must be masked.**
 
-- Primary engine is `patchright` as headless bundled Chromium (`--headless=new`, `playwright_headless=True`), not Patchright's headful `channel="chrome"` mode.
-- Headless Chromium leaks a `HeadlessChrome` UA token with no `sec-ch-ua` hints; PX/Akamai/DataDome block it on sight.
-- `build_playwright_context_spec` MUST rewrite the UA to plain `Chrome` and emit coherent `sec-ch-ua` headers. This is UA normalization, not fingerprint forgery.
-- Patchright's "no fingerprint injection" guidance applies only to headful `channel="chrome"`; it does not justify dropping the mask while headless.
-- UA OS token, `sec-ch-ua-platform`, and native `navigator.platform` MUST agree, keyed off host OS, never hardcoded.
-- No `browserforge`, no JS init-script identity shaping. Shape only via context options.
-- Real Chrome (headful, native context) is exempt; it already reports a clean UA.
-
-**Origin warmup is best-effort and strictly non-fatal.**
-
-- A blocked/challenge-shell origin during warmup MUST NOT raise or abort the fetch; the main navigation owns the blocked verdict.
-- Warmup is budget-capped (`origin_warmup_max_budget_ratio`) and cannot consume the navigation budget.
-
-**VIOLATION signatures (patchright/identity):**
-- Context options expose a `HeadlessChrome` UA token to a live site
-- UA OS string, `sec-ch-ua-platform`, and native `navigator.platform` disagree
-- `browserforge` or a JS init-script is reintroduced to shape identity
-- Origin warmup raises/aborts on a blocked classification
-- The de-headless UA mask is removed while the engine still launches headless
+- Engine is `patchright` headless bundled Chromium (`--headless=new`), not Patchright's headful `channel="chrome"` mode. Headless leaks a `HeadlessChrome` UA token with no `sec-ch-ua` hints, which PX/Akamai/DataDome block on sight.
+- `build_playwright_context_spec` MUST rewrite the UA to plain `Chrome` with coherent `sec-ch-ua` headers. UA OS token, `sec-ch-ua-platform`, and native `navigator.platform` MUST agree, keyed off host OS. Real Chrome (headful, native context) is exempt.
+- No `browserforge`, no JS init-script shaping. Patchright's "no fingerprint injection" guidance applies only to headful `channel="chrome"` and never justifies dropping the mask while headless.
+- Origin warmup is non-fatal and budget-capped (`origin_warmup_max_budget_ratio`): a blocked/challenge-shell origin MUST NOT raise or abort; the main navigation owns the blocked verdict.
 
 **Usable content beats provider noise. This is a hard contract.**
 If browser diagnostics report `browser_outcome == "usable_content"`, provider telemetry such as `provider:*`,
