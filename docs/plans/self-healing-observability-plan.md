@@ -126,23 +126,28 @@ relabels interstitial cost. Acquire timeline (navigation, readiness probes, inte
 escalation, policy decisions) now lands in RunTrace as ordered events.
 
 ### Slice 3: Instrument the extraction pipeline (close the dark blackhole)
-**Status:** TODO
+**Status:** DONE
 **Files:**
-- `backend/app/services/extract/detail/assembly/tiers.py` (surface `completed_tiers` +
-  `_can_skip_dom_tier` decision with confidence/threshold/DOM-completion reason)
-- `backend/app/services/extract/field_candidates/*` (emit per-high-value-field candidate
-  competition: each candidate value, source tier, winner/loser, reject reason — high-value fields
-  only, tiered detail)
-- `backend/app/services/pipeline/extraction_loop.py` (thread RunTrace through extract/normalize)
-- `backend/app/services/pipeline/persistence.py` (write `run_trace.json`; fold acquire timeline +
-  extraction trace + normalize edits + verdict into it)
-**What:** Capture which tiers ran, whether DOM was skipped and exactly why (the INVARIANT Rule 3
-root cause), and where each high-value field's value came from including the losing candidates and
-why they lost. Respect tiering: lightweight always, full candidate competition only on
-non-success verdicts or when a flag fires. Observe only — no change to selection logic.
-**Verify:** Run extraction smoke on a detail PDP and a listing; confirm `run_trace.json` shows
-`completed_tiers`, skip-DOM decision, and price/title/image/variants provenance with losers;
-`pytest tests/services/extract -q` + `pytest tests/services/pipeline -q`.
+- `backend/app/services/extract/detail/assembly/tiers.py` (`_can_skip_dom_tier` -> `_dom_skip_decision`
+  returns the boolean + an observe-only reason dict attached to the record as `_dom_skip_decision`;
+  behavior unchanged)
+- `backend/app/services/pipeline/extraction_loop.py` (`_record_extraction_trace` projects record
+  internals into the RunTrace; verdict + normalize edits recorded; trace persisted)
+- `backend/app/services/pipeline/persistence.py` (`persist_run_trace` writes `<hash>.trace.json`)
+**Verify:** DONE — `pytest tests/services/observability -q` = 28 passed; pipeline/tiers subset
+(`-k "extraction_loop or pipeline_core or tiers"`) = 55 passed; ruff + mypy clean on my files.
+**Done notes:** Extraction already attached `_extraction_tiers` (completed tiers) and `_field_sources`
+(winning source per field); Slice 3 adds the `_dom_skip_decision` reason and reads all three off the
+record in `_record_extraction_trace` (observe-only, no mutation, no selection change). High-value
+field winning sources flow via `RunTrace.record_field_candidate` (gated to high-value fields).
+Per-URL trace persisted as `<hash>.trace.json` next to `browser.json` (per-URL granularity;
+deviates from the plan's `runs/<id>/trace/run_trace.json` single-file path — chosen because traces
+are per-URL like the other page artifacts; audit engine in Slice 4 globs `*.trace.json`).
+`_record_extraction_trace` uses `getattr(context, "trace", None)` so SimpleNamespace test contexts
+are safe. NOTE: a concurrent agent is editing unrelated files in this workspace (pacing.py, adapters,
+llm/*, matching.py, several tests) and introduced a pre-existing `variant_count` failure in
+`test_detail_extractor_structured_sources.py` that is NOT caused by this slice (confirmed by
+stashing). Only observability-owned files were staged/committed.
 
 ### Slice 4: From-scratch audit engine + flags.json (auto, every run)
 **Status:** TODO

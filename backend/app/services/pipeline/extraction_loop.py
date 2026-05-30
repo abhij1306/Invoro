@@ -64,7 +64,7 @@ from .retry import (
     retry_low_quality_extraction_with_browser as _retry_low_quality_extraction_with_browser,
     retry_patchright_detail_rejection_with_real_chrome as _retry_patchright_detail_rejection_with_real_chrome,
 )
-from .persistence import persist_acquisition_artifacts, persist_extracted_records
+from .persistence import persist_acquisition_artifacts, persist_extracted_records, persist_run_trace
 from .record_extraction_stage import (
     _best_adapter_result,
     _extract_records_for_acquisition,
@@ -440,6 +440,7 @@ async def _run_extraction_stage(
     )
     if _is_content_detail_surface(context.surface):
         await _log_extraction_outcome(context, acquisition_result, records)
+        _record_extraction_trace(context, records)
         return _ExtractedURLStage(fetched=fetched, records=records)
     records, selector_rules = await _retry_low_quality_extraction_with_browser(
         context,
@@ -492,7 +493,68 @@ async def _run_extraction_stage(
             "warning",
             f"Rejected detail extraction for {context.url}: {rejection_reason}{guidance}",
         )
+    _record_extraction_trace(context, records)
     return _ExtractedURLStage(fetched=fetched, records=records)
+
+
+def _record_extraction_trace(
+    context: _URLProcessingContext,
+    records: list[dict[str, object]],
+) -> None:
+    """Project extraction internals into the RunTrace (observe-only).
+
+    Closes the extraction blackhole: tier execution (`_extraction_tiers`), the
+    skip-DOM decision (`_dom_skip_decision`), and per-high-value-field winning
+    source (`_field_sources`) become first-class trace data. No-op when tracing
+    is disabled. Reads only fields the extractor already attaches; never mutates
+    the record or changes selection.
+    """
+    trace = getattr(context, "trace", None)
+    if trace is None:
+        return
+    primary = next(
+        (record for record in records if isinstance(record, dict)),
+        None,
+    )
+    if primary is None:
+        return
+
+    tiers = mapping_or_empty(primary.get("_extraction_tiers"))
+    completed = tiers.get("completed")
+    if isinstance(completed, list):
+        trace.record_completed_tiers([str(item) for item in completed])
+        dom_in_completed = any(
+            str(item).strip().lower() == obs_config.EXTRACTION_TIER_DOM
+            for item in completed
+        )
+    else:
+        dom_in_completed = False
+
+    skip_decision = mapping_or_empty(primary.get("_dom_skip_decision"))
+    if skip_decision:
+        trace.record_skip_dom_decision(
+            dom_skipped=bool(skip_decision.get("dom_skipped", not dom_in_completed)),
+            confidence=_as_float(skip_decision.get("confidence")),
+            threshold=_as_float(skip_decision.get("threshold")),
+            dom_completion_reason=str(skip_decision.get("reason") or "") or None,
+        )
+
+    field_sources = mapping_or_empty(primary.get("_field_sources"))
+    for field_name, sources in field_sources.items():
+        source_list = sources if isinstance(sources, list) else [sources]
+        winning_source = next(
+            (str(item) for item in source_list if str(item or "").strip()),
+            "",
+        )
+        if not winning_source:
+            continue
+        value = primary.get(field_name)
+        trace.record_field_candidate(
+            str(field_name),
+            source=winning_source,
+            won=True,
+            value_preview="" if value in (None, "", [], {}) else str(value),
+        )
 
 
 def _is_content_detail_surface(surface: str) -> bool:
@@ -523,6 +585,11 @@ async def _run_normalization_stage(
         )
         normalized_records.append(normalized_record)
         if validation_errors:
+            for validation_error in validation_errors:
+                context.trace.record_normalize_edit(
+                    field_name=f"record_{index}",
+                    reason=str(validation_error),
+                )
             await _log_pipeline_event(
                 context,
                 "warning",
@@ -692,6 +759,12 @@ async def _run_persistence_stage(
         and persisted_count == 0
     ):
         verdict = VERDICT_LISTING_FAILED
+    context.trace.record_verdict(verdict)
+    await persist_run_trace(
+        run_id=context.run.id,
+        source_url=acquisition_result.final_url,
+        trace=context.trace,
+    )
     await _update_acquisition_contract_memory(
         context,
         acquisition_result=acquisition_result,
@@ -727,5 +800,14 @@ def _as_int(value: object) -> int | None:
         return None
     try:
         return int(float(value))  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+
+
+def _as_float(value: object) -> float | None:
+    if value in (None, ""):
+        return None
+    try:
+        return float(value)  # type: ignore[arg-type]
     except (TypeError, ValueError):
         return None
