@@ -11,6 +11,8 @@ from app.services.config.adapter_runtime_settings import adapter_runtime_setting
 from app.services.config.extraction_rules import (
     BELK_BRAND_SELECTORS,
     BELK_CARD_TITLE_ATTRS,
+    BELK_COLOR_MAP_KEY,
+    BELK_COLOR_NAME_KEYS,
     BELK_IMAGE_SELECTORS,
     BELK_PRODUCT_BARCODE_KEYS,
     BELK_PRICE_SELECTORS,
@@ -22,9 +24,17 @@ from app.services.config.extraction_rules import (
     BELK_PRODUCT_PRICE_KEYS,
     BELK_PRODUCT_TITLE_KEYS,
     BELK_PRODUCT_URL_KEYS,
+    BELK_SKU_ARRAY_ID_KEY,
+    BELK_SKU_ARRAY_IMAGE_KEY,
+    BELK_SKU_ARRAY_INVENTORY_KEY,
+    BELK_SKU_ARRAY_ORIGINAL_PRICE_KEY,
+    BELK_SKU_ARRAY_OUT_OF_STOCK_KEY,
+    BELK_SKU_ARRAY_PRICE_KEY,
+    BELK_SKU_ARRAY_UPC_KEY,
     BELK_TITLE_MAX_CHARS,
     BELK_TITLE_MIN_CHARS,
     BELK_TITLE_SELECTORS,
+    BELK_VARIANT_ID_KEYS,
     LISTING_BRAND_MAX_WORDS,
 )
 from app.services.extract.listing_candidate_ranking import looks_like_utility_title
@@ -127,14 +137,89 @@ def _extract_detail_record(page_url: str, html: str) -> dict[str, Any] | None:
 def _state_product_index(page_url: str, html: str) -> dict[str, dict[str, Any]]:
     index: dict[str, dict[str, Any]] = {}
     for root in harvest_js_state_objects(None, html).values():
+        variant_objects = _collect_variant_objects(root)
+        color_name_by_code = _collect_color_name_map(root)
         for product in _walk_product_payloads(root):
-            record = _record_from_payload(product, page_url=page_url)
+            record = _record_from_payload(
+                product,
+                page_url=page_url,
+                variant_objects=variant_objects,
+                color_name_by_code=color_name_by_code,
+            )
             url = str(record.get("url") or "")
             if url:
                 index[url] = record
             if len(index) >= adapter_runtime_settings.belk_max_products:
                 return index
     return index
+
+
+def _collect_color_name_map(root: object) -> dict[str, str]:
+    """Map Belk numeric color codes to display names from the RSC `colors` dict.
+
+    Belk's `colorSizeMap` exposes ``colors`` as ``{code: {"name": "Tan", ...}}``
+    where ``code`` is the value each variant object carries under ``color``.
+    Multi-colorway PDPs list several codes; this lets every variant resolve its
+    own colorway name instead of leaking the raw numeric code.
+    """
+    color_names: dict[str, str] = {}
+
+    def visit(node: object, depth: int) -> None:
+        if depth > 60:
+            return
+        if isinstance(node, dict):
+            color_map = node.get(BELK_COLOR_MAP_KEY)
+            if isinstance(color_map, dict):
+                for code, value in color_map.items():
+                    code_text = clean_text(code)
+                    if not code_text or code_text in color_names:
+                        continue
+                    name = _color_name_from_entry(value)
+                    if name:
+                        color_names[code_text] = name
+            for child in node.values():
+                if isinstance(child, (dict, list)):
+                    visit(child, depth + 1)
+        elif isinstance(node, list):
+            for child in node:
+                if isinstance(child, (dict, list)):
+                    visit(child, depth + 1)
+
+    visit(root, 0)
+    return color_names
+
+
+def _color_name_from_entry(value: object) -> str | None:
+    if not isinstance(value, dict):
+        return None
+    for key in BELK_COLOR_NAME_KEYS:
+        name = clean_text(value.get(key))
+        if name:
+            return name
+    return None
+
+
+def _collect_variant_objects(root: object) -> list[dict[str, Any]]:
+    """Collect Belk variant objects (variantId + size/color) from an RSC state tree."""
+    found: list[dict[str, Any]] = []
+
+    def visit(node: object, depth: int) -> None:
+        if depth > 60 or len(found) >= adapter_runtime_settings.belk_max_products:
+            return
+        if isinstance(node, dict):
+            keys = {str(k) for k in node.keys()}
+            if (keys & set(BELK_VARIANT_ID_KEYS)) and "size" in keys:
+                found.append(node)
+            for child in node.values():
+                if isinstance(child, (dict, list)):
+                    visit(child, depth + 1)
+        elif isinstance(node, list):
+            for child in node:
+                if isinstance(child, (dict, list)):
+                    visit(child, depth + 1)
+
+    visit(root, 0)
+    return found
 
 
 def _walk_product_payloads(value: object) -> list[dict[str, Any]]:
@@ -171,7 +256,7 @@ def _looks_like_product_payload(payload: dict[str, Any]) -> bool:
     )
 
 
-def _record_from_payload(product: dict[str, Any], *, page_url: str) -> dict[str, Any]:
+def _record_from_payload(product: dict[str, Any], *, page_url: str, variant_objects: list[dict[str, Any]] | None = None, color_name_by_code: dict[str, str] | None = None) -> dict[str, Any]:
     title = _first_payload_field(product, field_name="title", page_url=page_url, keys=BELK_PRODUCT_TITLE_KEYS)
     brand = _first_payload_field(product, field_name="brand", page_url=page_url, keys=BELK_PRODUCT_BRAND_KEYS)
     price_value = _first_payload_field(product, field_name="price", page_url=page_url, keys=BELK_PRODUCT_PRICE_KEYS)
@@ -183,12 +268,24 @@ def _record_from_payload(product: dict[str, Any], *, page_url: str) -> dict[str,
     )
     image = _first_payload_field(product, field_name="image_url", page_url=page_url, keys=BELK_PRODUCT_IMAGE_KEYS)
     url = _first_payload_field(product, field_name="url", page_url=page_url, keys=BELK_PRODUCT_URL_KEYS)
-    barcode = _first_nested_payload_field(
+    # Belk's React PDP `utag_data` exposes per-SKU parallel arrays (sku_id[i] <-> sku_upc[i] <-> ...).
+    # Build variant rows from those arrays joined to the variant objects, and take the
+    # product-level barcode from the selected/first in-stock variant UPC.
+    sku_variants = _variants_from_sku_arrays(
         product,
-        field_name="barcode",
         page_url=page_url,
-        keys=BELK_PRODUCT_BARCODE_KEYS,
+        variant_objects=variant_objects or [],
+        color_name_by_code=color_name_by_code or {},
     )
+    if sku_variants:
+        barcode = _primary_variant_barcode(sku_variants)
+    else:
+        barcode = _first_nested_payload_field(
+            product,
+            field_name="barcode",
+            page_url=page_url,
+            keys=BELK_PRODUCT_BARCODE_KEYS,
+        )
     if brand in (None, "", [], {}):
         brand = _infer_belk_brand_from_url(url=str(url or ""), title=title)
     currency = coerce_field_value("currency", product, page_url)
@@ -200,7 +297,7 @@ def _record_from_payload(product: dict[str, Any], *, page_url: str) -> dict[str,
             currency = coerce_field_value("currency", nested_value, page_url)
             if currency not in (None, "", [], {}):
                 break
-    variants = _variants_from_payload(
+    variants = sku_variants or _variants_from_payload(
         product,
         page_url=page_url,
         product_url=str(url or page_url or ""),
@@ -454,6 +551,20 @@ def _finalize_adapter_record(record: dict[str, Any], *, surface: str) -> dict[st
     return finalize_record(shaped, surface=surface)
 
 
+def _unwrap_single_element(value: Any) -> Any:
+    """Unwrap single-element-list values used by Belk's `utag_data` analytics payload.
+
+    Belk PDPs expose product fields (including the UPC under `sku_upc`) inside a
+    Tealium `utag_data` object where every scalar is wrapped in a one-item list,
+    e.g. ``"sku_upc": ["0655772019097"]``. Coercion does not unwrap these, so the
+    UPC was dropped and titles leaked as ``"['...']"``. Unwrap only the exact
+    single-scalar-list shape; leave dicts and multi-element lists untouched.
+    """
+    if isinstance(value, list) and len(value) == 1 and not isinstance(value[0], (dict, list)):
+        return value[0]
+    return value
+
+
 def _first_payload_field(
     payload: dict[str, Any],
     *,
@@ -462,10 +573,19 @@ def _first_payload_field(
     keys: tuple[str, ...],
 ) -> str | None:
     for key in keys:
-        value = coerce_field_value(field_name, payload.get(key), page_url)
+        value = coerce_field_value(field_name, _unwrap_single_element(payload.get(key)), page_url)
         if value:
             return str(value)
     return None
+
+
+_BARCODE_SEARCH_MAX_DEPTH = 5
+
+
+def _looks_like_barcode(value: str) -> bool:
+    """Validate a coerced value looks like a barcode (8-14 digits)."""
+    normalized = str(value or "").strip()
+    return normalized.isdigit() and 8 <= len(normalized) <= 14
 
 
 def _first_nested_payload_field(
@@ -482,13 +602,15 @@ def _first_nested_payload_field(
     stack: list[tuple[object, int]] = [(payload, 0)]
     while stack:
         node, depth = stack.pop()
-        if depth > 5:
+        if depth > _BARCODE_SEARCH_MAX_DEPTH:
             continue
         if isinstance(node, dict):
             for key, value in node.items():
                 if str(key).casefold() in normalized_keys:
-                    coerced = coerce_field_value(field_name, value, page_url)
-                    if coerced:
+                    coerced = coerce_field_value(
+                        field_name, _unwrap_single_element(value), page_url
+                    )
+                    if coerced and _looks_like_barcode(str(coerced)):
                         return str(coerced)
                 if isinstance(value, (dict, list)):
                     stack.append((value, depth + 1))
@@ -634,3 +756,142 @@ def _attr(node: Any, name: str) -> str:
 
 def _srcset_first(value: object) -> str:
     return str(value or "").split(",", 1)[0].strip().split(" ", 1)[0].strip()
+
+
+def _sku_array(product: dict[str, Any], key: str) -> list[Any]:
+    value = product.get(key)
+    return value if isinstance(value, list) else []
+
+
+def _variant_objects_by_id(variant_objects: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    index: dict[str, dict[str, Any]] = {}
+    for obj in variant_objects:
+        if not isinstance(obj, dict):
+            continue
+        for key in BELK_VARIANT_ID_KEYS:
+            vid = clean_text(obj.get(key))
+            if vid:
+                index.setdefault(vid, obj)
+                break
+    return index
+
+
+def _variant_size_label(obj: dict[str, Any]) -> str | None:
+    size = obj.get("size")
+    if isinstance(size, dict):
+        label = clean_text(size.get("sizeName") or size.get("label") or size.get("name"))
+        if label:
+            return label
+    return clean_text(obj.get("size")) if not isinstance(obj.get("size"), dict) else None
+
+
+def _variant_color_label(
+    obj: dict[str, Any],
+    color_name_by_code: dict[str, str],
+) -> str | None:
+    """Resolve a variant object's color to its display name.
+
+    The variant object's ``color`` is Belk's numeric color code; the human name
+    lives in the RSC ``colors`` map. Fall back to a non-numeric ``color`` value
+    if one is already a label, but never leak a raw numeric code.
+    """
+    raw_color = obj.get("color")
+    if isinstance(raw_color, dict):
+        label = clean_text(
+            raw_color.get("name") or raw_color.get("label") or raw_color.get("colorName")
+        )
+        return label or None
+    code = clean_text(raw_color)
+    if not code:
+        return None
+    mapped = clean_text(color_name_by_code.get(code))
+    if mapped:
+        return mapped
+    # A bare numeric code with no map entry is not a usable colorway label.
+    return None if code.isdigit() else code
+
+
+def _variants_from_sku_arrays(
+    product: dict[str, Any],
+    *,
+    page_url: str,
+    variant_objects: list[dict[str, Any]],
+    color_name_by_code: dict[str, str] | None = None,
+) -> list[dict[str, object]] | None:
+    """Build variant rows from Belk's per-SKU parallel `utag_data` arrays.
+
+    Each array index is one sellable SKU; arrays are positionally aligned. Each
+    variant row gets its own UPC (`barcode`), price, availability, and image. Size
+    and color labels are joined from the variant objects via `variantId == sku_id`.
+    Each variant object carries a numeric color code that resolves to a display
+    name via `color_name_by_code` (the RSC `colors` map), so multi-colorway PDPs
+    keep each variant's own colorway.
+    """
+    sku_ids = _sku_array(product, BELK_SKU_ARRAY_ID_KEY)
+    sku_upcs = _sku_array(product, BELK_SKU_ARRAY_UPC_KEY)
+    if not sku_ids or not sku_upcs:
+        return None
+    prices = _sku_array(product, BELK_SKU_ARRAY_PRICE_KEY)
+    original_prices = _sku_array(product, BELK_SKU_ARRAY_ORIGINAL_PRICE_KEY)
+    inventories = _sku_array(product, BELK_SKU_ARRAY_INVENTORY_KEY)
+    out_of_stock = _sku_array(product, BELK_SKU_ARRAY_OUT_OF_STOCK_KEY)
+    images = _sku_array(product, BELK_SKU_ARRAY_IMAGE_KEY)
+    objects_by_id = _variant_objects_by_id(variant_objects)
+
+    def at(seq: list[Any], i: int) -> Any:
+        return seq[i] if i < len(seq) else None
+
+    rows: list[dict[str, object]] = []
+    for index, sku_id in enumerate(sku_ids):
+        sku_id_text = clean_text(sku_id)
+        upc = clean_text(at(sku_upcs, index))
+        if not upc or not _looks_like_barcode(upc):
+            continue
+        row: dict[str, object] = {"barcode": upc}
+        if sku_id_text:
+            row["sku"] = sku_id_text
+        price = normalize_price(at(prices, index), interpret_integral_as_cents=False)
+        if price is not None:
+            row["price"] = price
+        original_price = normalize_price(at(original_prices, index), interpret_integral_as_cents=False)
+        if original_price is not None:
+            row["original_price"] = original_price
+        oos = at(out_of_stock, index)
+        if isinstance(oos, bool):
+            row["availability"] = "out_of_stock" if oos else "in_stock"
+        inv = at(inventories, index)
+        try:
+            inv_int = int(str(inv).strip())
+            row["stock_quantity"] = inv_int
+            row.setdefault("availability", "in_stock" if inv_int > 0 else "out_of_stock")
+        except (TypeError, ValueError):
+            pass
+        image_value = clean_text(at(images, index))
+        if image_value:
+            row["image_url"] = absolute_url(page_url, image_value)
+        obj = objects_by_id.get(sku_id_text) if sku_id_text else None
+        if isinstance(obj, dict):
+            size_label = _variant_size_label(obj)
+            if size_label:
+                row["size"] = size_label
+            color_label = _variant_color_label(obj, color_name_by_code or {})
+            if color_label:
+                row["color"] = color_label
+        rows.append(row)
+    if not rows:
+        return None
+    return flatten_variants_for_public_output(rows, page_url=page_url)
+
+
+def _primary_variant_barcode(variants: list[dict[str, object]]) -> str | None:
+    """Pick the product-level UPC: first in-stock variant, else first variant."""
+    for variant in variants:
+        if str(variant.get("availability") or "").strip() == "in_stock":
+            barcode = clean_text(variant.get("barcode"))
+            if barcode:
+                return barcode
+    for variant in variants:
+        barcode = clean_text(variant.get("barcode"))
+        if barcode:
+            return barcode
+    return None

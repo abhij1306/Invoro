@@ -174,6 +174,11 @@ def _detail_image_candidate_is_usable(url: str, *, identity_url: str) -> bool:
         return False
     if _detail_image_url_is_extensionless_transform(path):
         return False
+    if _detail_image_url_looks_like_pdp_link(path, lowered):
+        # Walmart additional_images pulled in PDP URLs (no image extension,
+        # path contains a product-segment like ``/ip/``). Treat those as
+        # page links, not image assets, regardless of host.
+        return False
     if (
         same_site(identity_url, url)
         and _detail_url_looks_like_product(url)
@@ -201,6 +206,30 @@ def _detail_image_candidate_is_usable(url: str, *, identity_url: str) -> bool:
     return True
 
 
+_PDP_PATH_SEGMENT_RE = re.compile(
+    r"/(?:ip|p|pd|dp|product|products|item|items|itm|shop)(?:/|$)",
+    re.I,
+)
+
+
+def _detail_image_url_looks_like_pdp_link(path: str, lowered_url: str) -> bool:
+    """A URL with no image extension whose path includes a PDP segment is a
+    page link, not an image asset.
+
+    Examples flagged:
+      ``https://www.walmart.com/ip/Apple-AirPods-…/HEX``  → /ip/ + no extension
+      ``https://example.com/products/widget``             → /products/ + no extension
+    Examples NOT flagged:
+      ``https://i5.walmartimages.com/asr/…jpeg``           → has .jpeg
+      ``https://example.com/cdn/products/widget.jpg``     → image-asset path token
+    """
+    if re.search(r"\.(?:avif|gif|jpe?g|png|svg|tiff?|webp)(?:$|\?)", lowered_url):
+        return False
+    if _detail_path_looks_like_image_asset(path, lowered_url):
+        return False
+    return _PDP_PATH_SEGMENT_RE.search(path) is not None
+
+
 def _detail_image_url_is_extensionless_transform(path: str) -> bool:
     filename = unquote(str(path or "").rsplit("/", 1)[-1])
     if re.search(r"\.(?:avif|gif|jpe?g|png|svg|tiff?|webp)$", filename, re.I):
@@ -225,6 +254,14 @@ def detail_image_matches_primary_family(
         return True
     primary_tokens = _detail_image_family_tokens(primary_image)
     candidate_tokens = _detail_image_family_tokens(url)
+    # Reject when both filenames carry long alphabetic distinguishing tokens
+    # that share a prefix but disagree on the tail (different colorway slugs
+    # under the same family code, e.g. ``therockerjetblack`` vs
+    # ``therockerfalcon``).
+    if _detail_image_family_tokens_disagree_on_colorway(
+        primary_tokens, candidate_tokens
+    ):
+        return False
     if primary_tokens and candidate_tokens and primary_tokens & candidate_tokens:
         return True
     title_tokens = _semantic_detail_identity_tokens(title)
@@ -239,6 +276,60 @@ def detail_image_matches_primary_family(
     if primary_code and candidate_code and primary_code == candidate_code:
         return True
     return not primary_tokens and not title_tokens
+
+
+def _detail_image_family_tokens_disagree_on_colorway(
+    primary_tokens: set[str],
+    candidate_tokens: set[str],
+) -> bool:
+    """Detect distinct colorway slugs sharing a common model prefix.
+
+    Kith / Shopify product image filenames use ``ST40002-02000TheRockerJetBlack``
+    vs ``ST40002-91000TheRockerFalcon``. Tokenization yields long alphabetic
+    fragments (``02000therockerjetblack`` / ``91000therockerfalcon``) that
+    share a prefix (``therockerjetblack`` / ``therockerfalcon`` share
+    ``therocker``) but disagree on the tail. Treat such pairs as cross-
+    colorway leakage.
+    """
+    if not primary_tokens or not candidate_tokens:
+        return False
+    primary_long = {token for token in primary_tokens if len(token) >= 10}
+    candidate_long = {token for token in candidate_tokens if len(token) >= 10}
+    if not primary_long or not candidate_long:
+        return False
+    # Skip when there is a literal long-token match — same colorway.
+    if primary_long & candidate_long:
+        return False
+    for primary_token in primary_long:
+        if not primary_token.isalnum() or not any(c.isalpha() for c in primary_token):
+            continue
+        primary_alpha_tail = primary_token.lstrip("0123456789")
+        if len(primary_alpha_tail) < 6:
+            continue
+        for candidate_token in candidate_long:
+            if not candidate_token.isalnum() or not any(
+                c.isalpha() for c in candidate_token
+            ):
+                continue
+            candidate_alpha_tail = candidate_token.lstrip("0123456789")
+            if len(candidate_alpha_tail) < 6:
+                continue
+            shared = _shared_prefix_length(primary_alpha_tail, candidate_alpha_tail)
+            if (
+                shared >= 6
+                and shared
+                < min(len(primary_alpha_tail), len(candidate_alpha_tail))
+            ):
+                return True
+    return False
+
+
+def _shared_prefix_length(left: str, right: str) -> int:
+    limit = min(len(left), len(right))
+    index = 0
+    while index < limit and left[index] == right[index]:
+        index += 1
+    return index
 
 
 def _detail_image_title_from_url(url: str) -> str | None:

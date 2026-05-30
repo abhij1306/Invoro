@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.services.fetch import fetch_context as crawl_fetch_runtime
 
 from app.models.domain_memory import DomainCookieMemory
-from app.services.acquisition import browser_identity
+from app.services.acquisition import browser_identity, browser_storage_state
 from app.services.acquisition import browser_proxy_bridge
 from app.services.acquisition import cookie_store
 from app.services.acquisition import host_protection_memory
@@ -74,48 +74,6 @@ def test_chromium_browser_binary_is_labeled_chromium() -> None:
         "chromium",
     )
 
-
-def _make_fingerprint(
-    *,
-    screen: dict[str, object] | None = None,
-    navigator: dict[str, object] | None = None,
-    headers: dict[str, str] | None = None,
-):
-    default_user_agent = (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/145.0.0.0 Safari/537.36"
-    )
-    navigator_data = {
-        "userAgent": default_user_agent,
-        "language": "en-US",
-        "maxTouchPoints": 0,
-        "userAgentData": {
-            "brands": [{"brand": "Google Chrome", "version": "145"}],
-            "mobile": False,
-        },
-        **dict(navigator or {}),
-    }
-    screen_data = {
-        "width": 1440,
-        "height": 900,
-        "devicePixelRatio": 2,
-        **dict(screen or {}),
-    }
-    header_data = {
-        "User-Agent": navigator_data["userAgent"],
-        "Accept": "text/html",
-        "Accept-Language": "en-US;q=1.0",
-        "sec-ch-ua": '"Google Chrome";v="145"',
-        "Accept-Encoding": "gzip, br",
-        "Sec-Fetch-Mode": "navigate",
-        **dict(headers or {}),
-    }
-    return SimpleNamespace(
-        screen=SimpleNamespace(**screen_data),
-        navigator=SimpleNamespace(**navigator_data),
-        headers=header_data,
-    )
 
 
 @pytest.mark.component
@@ -203,39 +161,6 @@ def test_listing_signals_detect_list_item_type() -> None:
     assert has_extractable_listing_signals(html) is True
 
 
-@pytest.mark.component
-def test_build_playwright_context_options_uses_generated_identity(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    fingerprint = _make_fingerprint()
-
-    monkeypatch.setattr(
-        browser_identity,
-        "_FINGERPRINT_GENERATOR",
-        SimpleNamespace(generate=lambda: fingerprint),
-    )
-    monkeypatch.setattr(
-        browser_identity, "_get_localzone_name", lambda: "America/New_York"
-    )
-
-    options = browser_identity.build_playwright_context_options()
-
-    assert options["user_agent"].endswith("Chrome/145.0.0.0 Safari/537.36")
-    assert options["viewport"] == {"width": 1440, "height": 800}
-    assert options["locale"] == "en-US"
-    assert options["device_scale_factor"] == 2.0
-    assert options["has_touch"] is False
-    assert options["is_mobile"] is False
-    assert options["extra_http_headers"] == {
-        "Accept": "text/html",
-        "Accept-Language": "en-US;q=1.0",
-        "sec-ch-ua": (
-            '"Not:A-Brand";v="99", "Google Chrome";v="145", "Chromium";v="145"'
-        ),
-        "sec-ch-ua-mobile": "?0",
-        "sec-ch-ua-platform": '"Windows"',
-    }
-
 
 @pytest.mark.component
 def test_acquisition_package_exports_runtime_expand_function() -> None:
@@ -246,177 +171,6 @@ def test_acquisition_package_exports_runtime_expand_function() -> None:
         is acquisition_browser_runtime.expand_all_interactive_elements
     )
 
-
-@pytest.mark.component
-def test_resolve_timezone_id_prefers_explicit_locality_timezone() -> None:
-    assert (
-        browser_identity._resolve_timezone_id(
-            {
-                "geo_country": "US",
-                "timezone_id": "Asia/Calcutta",
-            }
-        )
-        == "Asia/Kolkata"
-    )
-
-
-@pytest.mark.component
-def test_create_browser_identity_keeps_desktop_viewport_shorter_than_screen(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    fingerprint = _make_fingerprint(
-        screen={"devicePixelRatio": 1.5},
-        headers={"User-Agent": "", "sec-ch-ua": ""},
-    )
-
-    monkeypatch.setattr(
-        browser_identity,
-        "_FINGERPRINT_GENERATOR",
-        SimpleNamespace(generate=lambda: fingerprint),
-    )
-
-    identity = browser_identity.create_browser_identity()
-
-    assert identity.viewport == {"width": 1440, "height": 800}
-    assert identity.raw_fingerprint is not None
-    assert identity.raw_fingerprint.screen.innerHeight == 800
-    assert identity.raw_fingerprint.screen.height == 900
-    assert identity.raw_fingerprint.screen.outerHeight == 888
-    assert identity.raw_fingerprint.screen.availHeight == 800
-
-
-@pytest.mark.component
-def test_create_browser_identity_keeps_outer_height_below_screen_when_frame_saturates(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    fingerprint = _make_fingerprint(
-        screen={
-            "width": 1366,
-            "height": 768,
-            "availWidth": 1366,
-            "availHeight": 728,
-            "devicePixelRatio": 1,
-        },
-        navigator={"userAgentData": {"brands": [], "mobile": False}},
-        headers={"User-Agent": "", "sec-ch-ua": ""},
-    )
-
-    monkeypatch.setattr(
-        browser_identity,
-        "_FINGERPRINT_GENERATOR",
-        SimpleNamespace(generate=lambda: fingerprint),
-    )
-
-    identity = browser_identity.create_browser_identity()
-
-    assert identity.viewport == {"width": 1366, "height": 728}
-    assert identity.raw_fingerprint is not None
-    assert identity.raw_fingerprint.screen.outerHeight == 767
-
-
-@pytest.mark.component
-def test_create_browser_identity_aligns_runtime_hardware_to_host(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    fingerprint = _make_fingerprint(
-        screen={"devicePixelRatio": 1.25},
-        navigator={
-            "hardwareConcurrency": 20,
-            "deviceMemory": 4,
-            "userAgentData": {"brands": [], "mobile": False},
-        },
-        headers={"User-Agent": "", "sec-ch-ua": ""},
-    )
-
-    monkeypatch.setattr(
-        browser_identity,
-        "_FINGERPRINT_GENERATOR",
-        SimpleNamespace(generate=lambda: fingerprint),
-    )
-    monkeypatch.setattr(browser_identity._os, "cpu_count", lambda: 12)
-    monkeypatch.setattr(
-        browser_identity,
-        "_host_total_memory_bytes",
-        lambda: 16 * 1024**3,
-    )
-
-    identity = browser_identity.create_browser_identity()
-
-    assert identity.raw_fingerprint is not None
-    assert identity.raw_fingerprint.navigator.hardwareConcurrency == 12
-    assert identity.raw_fingerprint.navigator.deviceMemory == 8.0
-
-
-@pytest.mark.component
-def test_create_browser_identity_aligns_platform_to_user_agent(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    fingerprint = _make_fingerprint(
-        screen={"devicePixelRatio": 1.25},
-        navigator={
-            "platform": "Linux x86_64",
-            "userAgentData": {
-                "brands": [{"brand": "Google Chrome", "version": "145"}],
-                "mobile": False,
-                "platform": "Linux",
-            },
-        },
-        headers={"sec-ch-ua-platform": '"Linux"'},
-    )
-
-    monkeypatch.setattr(
-        browser_identity,
-        "_FINGERPRINT_GENERATOR",
-        SimpleNamespace(generate=lambda: fingerprint),
-    )
-
-    identity = browser_identity.create_browser_identity()
-
-    assert identity.raw_fingerprint is not None
-    assert identity.raw_fingerprint.navigator.platform == "Win32"
-    assert identity.raw_fingerprint.navigator.userAgentData["platform"] == "Windows"
-    assert identity.extra_http_headers["sec-ch-ua-platform"] == '"Windows"'
-    assert "sec-ch-ua-platform-version" not in identity.extra_http_headers
-    assert "sec-ch-ua-bitness" not in identity.extra_http_headers
-
-
-@pytest.mark.component
-def test_build_playwright_context_options_prefers_available_screen_height(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    fingerprint = SimpleNamespace(
-        screen=SimpleNamespace(
-            width=1536,
-            height=864,
-            availWidth=1536,
-            availHeight=816,
-            devicePixelRatio=1.25,
-        ),
-        navigator=SimpleNamespace(
-            userAgent=(
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/145.0.0.0 Safari/537.36"
-            ),
-            language="en-US",
-            maxTouchPoints=0,
-            userAgentData={
-                "brands": [{"brand": "Google Chrome", "version": "145"}],
-                "mobile": False,
-            },
-        ),
-        headers={"Accept": "text/html"},
-    )
-
-    monkeypatch.setattr(
-        browser_identity,
-        "_FINGERPRINT_GENERATOR",
-        SimpleNamespace(generate=lambda: fingerprint),
-    )
-
-    options = browser_identity.build_playwright_context_options()
-
-    assert options["viewport"] == {"width": 1536, "height": 816}
 
 
 @pytest.mark.component
@@ -465,387 +219,6 @@ def test_normalize_domain_handles_domain_only_input() -> None:
 def test_normalize_domain_strips_credentials_without_password() -> None:
     assert normalize_domain("https://user@example.com/path") == "example.com"
 
-
-@pytest.mark.component
-def test_build_playwright_context_options_keeps_security_invariants(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    fingerprint = SimpleNamespace(
-        screen=SimpleNamespace(width=1280, height=720, devicePixelRatio=1),
-        navigator=SimpleNamespace(
-            userAgent="Mozilla/5.0 MobileTest/145.0",
-            language="en-US",
-            maxTouchPoints=5,
-            userAgentData={"mobile": True},
-        ),
-        headers={"User-Agent": "Mozilla/5.0 MobileTest/145.0"},
-    )
-
-    monkeypatch.setattr(
-        browser_identity,
-        "_FINGERPRINT_GENERATOR",
-        SimpleNamespace(generate=lambda: fingerprint),
-    )
-
-    options = browser_identity.build_playwright_context_options()
-
-    assert options["service_workers"] == "block"
-    assert options["bypass_csp"] is False
-    assert options["permissions"] == ["geolocation"]
-    assert options["has_touch"] is True
-    assert options["is_mobile"] is True
-
-
-@pytest.mark.component
-def test_build_playwright_context_options_disables_touch_for_desktop_identities(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    fingerprint = SimpleNamespace(
-        screen=SimpleNamespace(width=1536, height=864, devicePixelRatio=1),
-        navigator=SimpleNamespace(
-            userAgent=(
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/145.0.0.0 Safari/537.36"
-            ),
-            language="en-US",
-            maxTouchPoints=5,
-            userAgentData={"mobile": False},
-        ),
-        headers={"Accept": "text/html"},
-    )
-
-    monkeypatch.setattr(
-        browser_identity,
-        "_FINGERPRINT_GENERATOR",
-        SimpleNamespace(generate=lambda: fingerprint),
-    )
-
-    options = browser_identity.build_playwright_context_options()
-
-    assert options["is_mobile"] is False
-    assert options["has_touch"] is False
-
-
-@pytest.mark.component
-def test_build_playwright_context_options_repairs_incoherent_client_hints_after_retry_budget(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    bad_fingerprint = SimpleNamespace(
-        screen=SimpleNamespace(width=1366, height=768, devicePixelRatio=1),
-        navigator=SimpleNamespace(
-            userAgent=(
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/145.0.0.0 Safari/537.36"
-            ),
-            language="en-US",
-            maxTouchPoints=0,
-            userAgentData={
-                "brands": [{"brand": "Brave", "version": "130"}],
-                "mobile": False,
-                "platform": "Windows",
-                "uaFullVersion": "130.0.0.0",
-            },
-        ),
-        headers={
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/145.0.0.0 Safari/537.36"
-            ),
-            "Accept": "text/html",
-            "sec-ch-ua": '"Brave";v="130"',
-            "sec-ch-ua-mobile": "?0",
-            "sec-ch-ua-platform": '"Windows"',
-        },
-    )
-    attempts = {"count": 0}
-
-    def _generate():
-        attempts["count"] += 1
-        return bad_fingerprint
-
-    monkeypatch.setattr(
-        browser_identity,
-        "_FINGERPRINT_GENERATOR",
-        SimpleNamespace(generate=_generate),
-    )
-
-    options = browser_identity.build_playwright_context_options()
-
-    assert attempts["count"] == 3
-    assert options["user_agent"].endswith("Chrome/145.0.0.0 Safari/537.36")
-    assert options["extra_http_headers"]["sec-ch-ua"] == (
-        '"Not:A-Brand";v="99", "Google Chrome";v="145", "Chromium";v="145"'
-    )
-    assert options["extra_http_headers"]["sec-ch-ua-mobile"] == "?0"
-    assert options["extra_http_headers"]["sec-ch-ua-platform"] == '"Windows"'
-    assert "sec-ch-ua-platform-version" not in options["extra_http_headers"]
-    assert "sec-ch-ua-bitness" not in options["extra_http_headers"]
-
-
-@pytest.mark.component
-def test_build_playwright_context_options_replaces_malformed_client_hints_without_rejecting_fingerprint(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    fingerprint = SimpleNamespace(
-        screen=SimpleNamespace(width=1366, height=768, devicePixelRatio=1),
-        navigator=SimpleNamespace(
-            userAgent=(
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/145.0.0.0 Safari/537.36"
-            ),
-            language="en-US",
-            maxTouchPoints=0,
-            userAgentData={
-                "brands": [{"brand": "Google Chrome", "version": "145"}],
-                "mobile": False,
-                "platform": "Windows",
-                "uaFullVersion": "145.0.0.0",
-            },
-        ),
-        headers={
-            "Accept": "text/html",
-            "Accept-Language": "en-US;q=1.0",
-            "sec-ch-ua": '"Google Chrome";v="145", "Chromium";v="145", "Not(A:Brand";v="99"',
-            "sec-ch-ua-mobile": "?0",
-            "sec-ch-ua-platform": '"Windows"',
-        },
-    )
-
-    monkeypatch.setattr(
-        browser_identity,
-        "_FINGERPRINT_GENERATOR",
-        SimpleNamespace(generate=lambda: fingerprint),
-    )
-    monkeypatch.setattr(
-        browser_identity, "_get_localzone_name", lambda: "America/New_York"
-    )
-
-    options = browser_identity.build_playwright_context_options()
-
-    assert options["extra_http_headers"]["Accept-Language"] == "en-US;q=1.0"
-    assert options["extra_http_headers"]["sec-ch-ua"] == (
-        '"Not:A-Brand";v="99", "Google Chrome";v="145", "Chromium";v="145"'
-    )
-    assert options["extra_http_headers"]["sec-ch-ua-mobile"] == "?0"
-    assert options["extra_http_headers"]["sec-ch-ua-platform"] == '"Windows"'
-    assert "sec-ch-ua-platform-version" not in options["extra_http_headers"]
-    assert "sec-ch-ua-bitness" not in options["extra_http_headers"]
-
-
-@pytest.mark.component
-def test_build_playwright_context_options_uses_configured_min_chrome_version(
-    monkeypatch: pytest.MonkeyPatch,
-    patch_settings,
-) -> None:
-    patch_settings(browser_identity_min_chrome_version=130)
-    fingerprint = _make_fingerprint(
-        screen={"width": 1366, "height": 768, "devicePixelRatio": 1},
-        navigator={
-            "userAgent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/129.0.0.0 Safari/537.36"
-            ),
-            "userAgentData": {
-                "brands": [{"brand": "Google Chrome", "version": "129"}],
-                "mobile": False,
-                "platform": "Windows",
-                "uaFullVersion": "129.0.0.0",
-            },
-        },
-        headers={"User-Agent": "", "sec-ch-ua": ""},
-    )
-    attempts = {"count": 0}
-
-    def _generate():
-        attempts["count"] += 1
-        return fingerprint
-
-    monkeypatch.setattr(
-        browser_identity,
-        "_FINGERPRINT_GENERATOR",
-        SimpleNamespace(generate=_generate),
-    )
-
-    options = browser_identity.build_playwright_context_options()
-
-    assert attempts["count"] == 3
-    assert options["user_agent"].endswith("Chrome/129.0.0.0 Safari/537.36")
-    assert options["extra_http_headers"]["sec-ch-ua"] == (
-        '"Not:A-Brand";v="99", "Google Chrome";v="129", "Chromium";v="129"'
-    )
-
-
-@pytest.mark.component
-def test_build_playwright_context_options_aligns_user_agent_to_browser_major() -> None:
-    identity = browser_identity.BrowserIdentity(
-        user_agent=(
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/125.0.0.0 Safari/537.36"
-        ),
-        viewport={"width": 1366, "height": 768},
-        extra_http_headers={
-            "Accept": "text/html",
-            "Accept-Language": "en-US;q=1.0",
-            "sec-ch-ua": '"Not:A-Brand";v="99", "Google Chrome";v="125", "Chromium";v="125"',
-            "sec-ch-ua-mobile": "?0",
-            "sec-ch-ua-platform": '"Windows"',
-        },
-        locale="en-US",
-        device_scale_factor=1.0,
-        has_touch=False,
-        is_mobile=False,
-    )
-
-    options = browser_identity.build_playwright_context_options(
-        identity=identity,
-        browser_major_version=145,
-    )
-
-    assert options["user_agent"].endswith("Chrome/145.0.0.0 Safari/537.36")
-    assert options["extra_http_headers"]["sec-ch-ua"] == (
-        '"Not:A-Brand";v="99", "Google Chrome";v="145", "Chromium";v="145"'
-    )
-
-
-@pytest.mark.component
-def test_build_playwright_context_options_drops_stale_client_hint_headers() -> None:
-    identity = browser_identity.BrowserIdentity(
-        user_agent=(
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/125.0.0.0 Safari/537.36"
-        ),
-        viewport={"width": 1366, "height": 768},
-        extra_http_headers={
-            "Accept": "text/html",
-            "sec-ch-ua": '"Not:A-Brand";v="99", "Google Chrome";v="125", "Chromium";v="125"',
-            "sec-ch-ua-full-version": '"125.0.0.0"',
-            "sec-ch-ua-platform": '"Windows"',
-        },
-        locale="en-US",
-        device_scale_factor=1.0,
-        has_touch=False,
-        is_mobile=False,
-    )
-
-    options = browser_identity.build_playwright_context_options(
-        identity=identity,
-        browser_major_version=145,
-    )
-
-    assert "sec-ch-ua-full-version" not in options["extra_http_headers"]
-    assert options["extra_http_headers"]["sec-ch-ua"] == (
-        '"Not:A-Brand";v="99", "Google Chrome";v="145", "Chromium";v="145"'
-    )
-
-
-@pytest.mark.component
-def test_align_raw_fingerprint_to_browser_major_falls_back_to_safe_shallow_copy(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    raw_fingerprint = SimpleNamespace(
-        navigator=SimpleNamespace(
-            userAgent=(
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/125.0.0.0 Safari/537.36"
-            ),
-            userAgentData={
-                "brands": [{"brand": "Google Chrome", "version": "125"}],
-                "mobile": False,
-                "platform": "Windows",
-            },
-        ),
-        headers={
-            "Accept": "text/html",
-            "sec-ch-ua": '"Google Chrome";v="125", "Chromium";v="125"',
-            "sec-ch-ua-platform": '"Windows"',
-        },
-    )
-
-    def _raise_deepcopy(_value, _memo=None):
-        raise RuntimeError("deepcopy boom")
-
-    monkeypatch.setattr(browser_identity._copy, "deepcopy", _raise_deepcopy)
-
-    aligned = browser_identity._align_raw_fingerprint_to_browser_major(
-        raw_fingerprint,
-        browser_major_version=145,
-        is_mobile=False,
-    )
-
-    assert aligned is not raw_fingerprint
-    assert raw_fingerprint.navigator.userAgent.endswith(
-        "Chrome/125.0.0.0 Safari/537.36"
-    )
-    assert aligned.navigator.userAgent.endswith("Chrome/145.0.0.0 Safari/537.36")
-    assert raw_fingerprint.headers["sec-ch-ua"] == (
-        '"Google Chrome";v="125", "Chromium";v="125"'
-    )
-    assert aligned.headers["sec-ch-ua"] == (
-        '"Not:A-Brand";v="99", "Google Chrome";v="145", "Chromium";v="145"'
-    )
-
-
-@pytest.mark.component
-def test_align_raw_fingerprint_to_browser_major_returns_original_when_navigator_missing() -> (
-    None
-):
-    raw_fingerprint = SimpleNamespace(
-        navigator=None,
-        headers={"sec-ch-ua": '"Google Chrome";v="125", "Chromium";v="125"'},
-    )
-
-    aligned = browser_identity._align_raw_fingerprint_to_browser_major(
-        raw_fingerprint,
-        browser_major_version=145,
-        is_mobile=False,
-    )
-
-    assert aligned is raw_fingerprint
-
-
-@pytest.mark.component
-def test_align_raw_fingerprint_to_user_agent_platform_keeps_original_when_clone_fails(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    raw_fingerprint = SimpleNamespace(
-        navigator=SimpleNamespace(
-            userAgent=(
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/125.0.0.0 Safari/537.36"
-            ),
-            platform="Linux x86_64",
-            userAgentData={"platform": "Linux"},
-        ),
-        headers={"sec-ch-ua-platform": '"Linux"'},
-    )
-
-    monkeypatch.setattr(
-        browser_identity._copy,
-        "deepcopy",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("deepcopy boom")),
-    )
-    monkeypatch.setattr(
-        browser_identity._copy,
-        "copy",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("copy boom")),
-    )
-
-    aligned = browser_identity._align_raw_fingerprint_to_user_agent_platform(
-        raw_fingerprint
-    )
-
-    assert aligned is raw_fingerprint
-    assert raw_fingerprint.navigator.platform == "Linux x86_64"
-    assert raw_fingerprint.navigator.userAgentData["platform"] == "Linux"
 
 
 @pytest.mark.asyncio
@@ -949,60 +322,6 @@ async def test_socks5_auth_bridge_start_is_singleflight(
     assert start_calls == 1
 
 
-@pytest.mark.component
-def test_build_playwright_context_spec_does_not_generate_init_script() -> None:
-    spec = browser_identity.build_playwright_context_spec(
-        identity=browser_identity.BrowserIdentity(
-            user_agent=(
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/145.0.0.0 Safari/537.36"
-            ),
-            viewport={"width": 1366, "height": 768},
-            extra_http_headers={"Accept-Language": "en-US,en;q=0.9"},
-            locale="en-US",
-            device_scale_factor=1.0,
-            has_touch=False,
-            is_mobile=False,
-            raw_fingerprint=None,
-        )
-    )
-
-    assert spec.init_script is None
-
-
-@pytest.mark.component
-def test_build_playwright_context_spec_applies_browser_context_profile_overrides() -> (
-    None
-):
-    spec = browser_identity.build_playwright_context_spec(
-        identity=browser_identity.BrowserIdentity(
-            user_agent=(
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/145.0.0.0 Safari/537.36"
-            ),
-            viewport={"width": 1366, "height": 768},
-            extra_http_headers={"Accept-Language": "en-US,en;q=0.9"},
-            locale="en-US",
-            device_scale_factor=1.0,
-            has_touch=False,
-            is_mobile=False,
-            raw_fingerprint=None,
-        ),
-        locality_profile={
-            "browser_context_profile": {
-                "service_workers": "allow",
-                "permissions": [],
-                "color_scheme": None,
-            }
-        },
-    )
-
-    assert spec.context_options["service_workers"] == "allow"
-    assert "permissions" not in spec.context_options
-    assert "color_scheme" not in spec.context_options
-
 
 @pytest.mark.component
 def test_browser_storage_state_persist_policy_rejects_challenge_shell_without_ready_probe() -> (
@@ -1024,370 +343,6 @@ def test_browser_storage_state_persist_policy_rejects_challenge_shell_without_re
         is False
     )
 
-
-@pytest.mark.component
-def test_shared_browser_runtime_build_context_spec_uses_real_builder(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(
-        browser_identity,
-        "browser_identity_for_run",
-        lambda run_id=None: browser_identity.BrowserIdentity(
-            user_agent=(
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/145.0.0.0 Safari/537.36"
-            ),
-            viewport={"width": 1366, "height": 768},
-            extra_http_headers={"Accept-Language": "en-US,en;q=0.9"},
-            locale="en-US",
-            device_scale_factor=1.0,
-            has_touch=False,
-            is_mobile=False,
-            raw_fingerprint=None,
-        ),
-    )
-
-    runtime = crawl_fetch_runtime.SharedBrowserRuntime(max_contexts=1)
-
-    spec = runtime._build_context_spec(run_id=123)
-
-    assert spec.init_script is None
-    assert spec.context_options["user_agent"].endswith("Chrome/145.0.0.0 Safari/537.36")
-
-
-@pytest.mark.component
-def test_playwright_identity_seed_is_stable_and_changes_with_identity() -> None:
-    base_identity = browser_identity.BrowserIdentity(
-        user_agent=(
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/145.0.0.0 Safari/537.36"
-        ),
-        viewport={"width": 1366, "height": 768},
-        extra_http_headers={"Accept-Language": "en-US,en;q=0.9"},
-        locale="en-US",
-        device_scale_factor=1.0,
-        has_touch=False,
-        is_mobile=False,
-        raw_fingerprint=SimpleNamespace(
-            navigator=SimpleNamespace(
-                hardwareConcurrency=8,
-                deviceMemory=8,
-            )
-        ),
-    )
-    changed_identity = browser_identity.BrowserIdentity(
-        user_agent=base_identity.user_agent,
-        viewport={"width": 1440, "height": 900},
-        extra_http_headers=base_identity.extra_http_headers,
-        locale=base_identity.locale,
-        device_scale_factor=base_identity.device_scale_factor,
-        has_touch=base_identity.has_touch,
-        is_mobile=base_identity.is_mobile,
-        raw_fingerprint=base_identity.raw_fingerprint,
-    )
-
-    first_seed = browser_identity._playwright_identity_seed(base_identity)
-    second_seed = browser_identity._playwright_identity_seed(base_identity)
-    changed_seed = browser_identity._playwright_identity_seed(changed_identity)
-
-    assert first_seed == second_seed
-    assert first_seed != changed_seed
-
-
-@pytest.mark.component
-def test_build_playwright_context_options_aligns_auto_locality_to_system_timezone(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    fingerprint = SimpleNamespace(
-        screen=SimpleNamespace(width=1440, height=900, devicePixelRatio=2),
-        navigator=SimpleNamespace(
-            userAgent=(
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/145.0.0.0 Safari/537.36"
-            ),
-            language="en-US",
-            maxTouchPoints=0,
-            userAgentData={
-                "brands": [{"brand": "Google Chrome", "version": "145"}],
-                "mobile": False,
-            },
-        ),
-        headers={"Accept": "text/html"},
-    )
-
-    monkeypatch.setattr(
-        browser_identity,
-        "_FINGERPRINT_GENERATOR",
-        SimpleNamespace(generate=lambda: fingerprint),
-    )
-    monkeypatch.setattr(
-        browser_identity, "_get_localzone_name", lambda: "Asia/Calcutta"
-    )
-
-    options = browser_identity.build_playwright_context_options(
-        locality_profile={"geo_country": "auto", "language_hint": None}
-    )
-
-    assert options["locale"] == "en-IN"
-    assert options["timezone_id"] == "Asia/Kolkata"
-    assert options["extra_http_headers"]["Accept-Language"] == "en-IN,en;q=0.9"
-
-
-@pytest.mark.component
-def test_build_playwright_context_options_prefers_explicit_locality_profile(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    fingerprint = SimpleNamespace(
-        screen=SimpleNamespace(width=1440, height=900, devicePixelRatio=1),
-        navigator=SimpleNamespace(
-            userAgent=(
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/145.0.0.0 Safari/537.36"
-            ),
-            language="en-US",
-            maxTouchPoints=0,
-            userAgentData={"brands": [], "mobile": False},
-        ),
-        headers={"Accept": "text/html"},
-    )
-
-    monkeypatch.setattr(
-        browser_identity,
-        "_FINGERPRINT_GENERATOR",
-        SimpleNamespace(generate=lambda: fingerprint),
-    )
-    monkeypatch.setattr(
-        browser_identity, "_get_localzone_name", lambda: "America/New_York"
-    )
-
-    options = browser_identity.build_playwright_context_options(
-        locality_profile={
-            "geo_country": "IN",
-            "language_hint": "en-IN",
-        }
-    )
-
-    assert options["locale"] == "en-IN"
-    assert options["timezone_id"] == "Asia/Kolkata"
-    assert options["extra_http_headers"]["Accept-Language"] == "en-IN,en;q=0.9"
-
-
-@pytest.mark.component
-def test_build_playwright_context_options_uses_first_country_timezone_when_multiple_exist(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    fingerprint = SimpleNamespace(
-        screen=SimpleNamespace(width=1440, height=900, devicePixelRatio=1),
-        navigator=SimpleNamespace(
-            userAgent=(
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/145.0.0.0 Safari/537.36"
-            ),
-            language="en-US",
-            maxTouchPoints=0,
-            userAgentData={"brands": [], "mobile": False},
-        ),
-        headers={"Accept": "text/html"},
-    )
-
-    monkeypatch.setattr(
-        browser_identity,
-        "_FINGERPRINT_GENERATOR",
-        SimpleNamespace(generate=lambda: fingerprint),
-    )
-    monkeypatch.setattr(browser_identity, "_get_localzone_name", lambda: "Asia/Kolkata")
-
-    options = browser_identity.build_playwright_context_options(
-        locality_profile={
-            "geo_country": "US",
-            "language_hint": "en-US",
-        }
-    )
-
-    assert options["timezone_id"] == "America/New_York"
-
-
-@pytest.mark.component
-def test_normalize_timezone_id_rejects_invalid_timezone() -> None:
-    assert browser_identity._normalize_timezone_id("Not/AZone") is None
-    assert browser_identity._normalize_timezone_id("Asia/Calcutta") == "Asia/Kolkata"
-
-
-@pytest.mark.component
-def test_fingerprint_generator_rebuilds_when_runtime_settings_change(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    constructed: list[tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]]] = []
-
-    class _FakeGenerator:
-        def __init__(self, *, browser, os, device, locale) -> None:
-            del os
-            constructed.append((tuple(browser), tuple(device), tuple(locale)))
-
-        def generate(self):
-            return SimpleNamespace(
-                screen=SimpleNamespace(width=1280, height=720, devicePixelRatio=1),
-                navigator=SimpleNamespace(
-                    userAgent="Mozilla/5.0 Chrome/145.0.0.0",
-                    language="en-US",
-                    maxTouchPoints=0,
-                    userAgentData={"brands": [], "mobile": False},
-                ),
-                headers={"Accept": "text/html"},
-            )
-
-    monkeypatch.setattr(browser_identity, "FingerprintGenerator", _FakeGenerator)
-    monkeypatch.setattr(browser_identity, "_FINGERPRINT_GENERATOR", None)
-    monkeypatch.setattr(browser_identity, "_FINGERPRINT_GENERATOR_CONFIG", None)
-    monkeypatch.setattr(
-        browser_identity.crawler_runtime_settings,
-        "fingerprint_browser",
-        ["chrome"],
-    )
-    monkeypatch.setattr(
-        browser_identity.crawler_runtime_settings,
-        "fingerprint_device",
-        ["desktop"],
-    )
-    monkeypatch.setattr(
-        browser_identity.crawler_runtime_settings,
-        "fingerprint_locale",
-        ["en-US"],
-    )
-
-    browser_identity._fingerprint_generator()
-    monkeypatch.setattr(
-        browser_identity.crawler_runtime_settings,
-        "fingerprint_browser",
-        ["firefox"],
-    )
-    browser_identity._fingerprint_generator()
-
-    assert constructed == [
-        (("chrome",), ("desktop",), ("en-US",)),
-        (("firefox",), ("desktop",), ("en-US",)),
-    ]
-
-
-@pytest.mark.component
-def test_fingerprint_generator_normalizes_default_string_settings(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    constructed: list[tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]]] = []
-
-    class _FakeGenerator:
-        def __init__(self, *, browser, os, device, locale) -> None:
-            del os
-            constructed.append((tuple(browser), tuple(device), tuple(locale)))
-
-        def generate(self):
-            return SimpleNamespace(
-                screen=SimpleNamespace(width=1280, height=720, devicePixelRatio=1),
-                navigator=SimpleNamespace(
-                    userAgent="Mozilla/5.0 Chrome/145.0.0.0",
-                    language="en-US",
-                    maxTouchPoints=0,
-                    userAgentData={"brands": [], "mobile": False},
-                ),
-                headers={"Accept": "text/html"},
-            )
-
-    monkeypatch.setattr(browser_identity, "FingerprintGenerator", _FakeGenerator)
-    monkeypatch.setattr(browser_identity, "_FINGERPRINT_GENERATOR", None)
-    monkeypatch.setattr(browser_identity, "_FINGERPRINT_GENERATOR_CONFIG", None)
-    monkeypatch.setattr(
-        browser_identity.crawler_runtime_settings,
-        "fingerprint_browser",
-        "chrome",
-    )
-    monkeypatch.setattr(
-        browser_identity.crawler_runtime_settings,
-        "fingerprint_device",
-        "desktop",
-    )
-    monkeypatch.setattr(
-        browser_identity.crawler_runtime_settings,
-        "fingerprint_locale",
-        "en-US",
-    )
-
-    browser_identity._fingerprint_generator()
-
-    assert constructed == [(("chrome",), ("desktop",), ("en-US",))]
-
-
-@pytest.mark.component
-def test_fingerprint_generator_ignores_mapping_settings(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    constructed: list[tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]]] = []
-
-    class _FakeGenerator:
-        def __init__(self, *, browser, os, device, locale) -> None:
-            del os
-            constructed.append((tuple(browser), tuple(device), tuple(locale)))
-
-        def generate(self):
-            return SimpleNamespace(
-                screen=SimpleNamespace(width=1280, height=720, devicePixelRatio=1),
-                navigator=SimpleNamespace(
-                    userAgent="Mozilla/5.0 Chrome/145.0.0.0",
-                    language="en-US",
-                    maxTouchPoints=0,
-                    userAgentData={"brands": [], "mobile": False},
-                ),
-                headers={"Accept": "text/html"},
-            )
-
-    monkeypatch.setattr(browser_identity, "FingerprintGenerator", _FakeGenerator)
-    monkeypatch.setattr(browser_identity, "_FINGERPRINT_GENERATOR", None)
-    monkeypatch.setattr(browser_identity, "_FINGERPRINT_GENERATOR_CONFIG", None)
-    monkeypatch.setattr(
-        browser_identity.crawler_runtime_settings,
-        "fingerprint_browser",
-        {"chrome": True},
-    )
-    monkeypatch.setattr(
-        browser_identity.crawler_runtime_settings,
-        "fingerprint_device",
-        {"desktop": True},
-    )
-    monkeypatch.setattr(
-        browser_identity.crawler_runtime_settings,
-        "fingerprint_locale",
-        {"en-US": True},
-    )
-
-    browser_identity._fingerprint_generator()
-
-    assert constructed == [((), (), ())]
-
-
-@pytest.mark.component
-def test_coherent_sec_ch_headers_accepts_tuple_brand_entries() -> None:
-    headers = browser_identity._coherent_sec_ch_headers(
-        {
-            "brands": (
-                {"brand": "Chromium", "version": "145"},
-                {"brand": "Google Chrome", "version": "145"},
-            ),
-            "mobile": False,
-            "platform": "Windows",
-            "platformVersion": "15.0.0",
-            "bitness": "64",
-        }
-    )
-
-    assert headers["sec-ch-ua"] == ('"Chromium";v="145", "Google Chrome";v="145"')
-    assert headers["sec-ch-ua-mobile"] == "?0"
-    assert headers["sec-ch-ua-platform"] == '"Windows"'
-    assert "sec-ch-ua-platform-version" not in headers
-    assert "sec-ch-ua-bitness" not in headers
 
 
 @pytest.mark.asyncio
@@ -1623,7 +578,7 @@ async def test_shared_browser_runtime_passes_generated_context_options(
     runtime._playwright = object()
 
     monkeypatch.setattr(
-        acquisition_browser_runtime,
+        acquisition_browser_pool,
         "build_playwright_context_spec",
         lambda **_: _context_spec(
             {
@@ -1656,7 +611,7 @@ async def test_shared_browser_runtime_passes_generated_context_options(
             "bypass_csp": False,
         }
     ]
-    assert routed_patterns == ["**/*"]
+    assert routed_patterns == []
 
 
 @pytest.mark.asyncio
@@ -1686,12 +641,12 @@ async def test_shared_browser_runtime_uses_native_context_for_real_chrome(
             return FakeContext()
 
     monkeypatch.setattr(
-        acquisition_browser_runtime,
+        acquisition_browser_pool,
         "_resolve_browser_binary",
         lambda _engine: ("C:/Chrome/chrome.exe", "C:/Chrome/chrome.exe"),
     )
     monkeypatch.setattr(
-        acquisition_browser_runtime,
+        acquisition_browser_pool,
         "build_playwright_context_spec",
         lambda **_: _context_spec({"user_agent": "Mozilla/5.0 Runtime/145.0"}),
     )
@@ -1744,7 +699,7 @@ async def test_shared_browser_runtime_skips_init_script_by_default(
     runtime._playwright = object()
 
     monkeypatch.setattr(
-        acquisition_browser_runtime,
+        acquisition_browser_pool,
         "build_playwright_context_spec",
         lambda **_: _context_spec(init_script="window.__browserforge = true;"),
     )
@@ -1812,11 +767,11 @@ async def test_shared_browser_runtime_uses_socks5_auth_bridge_and_keeps_context_
             bridge_close_calls.append("closed")
 
     monkeypatch.setattr(
-        acquisition_browser_runtime,
+        acquisition_browser_pool,
         "build_playwright_context_spec",
         lambda **_: _context_spec(),
     )
-    monkeypatch.setattr(acquisition_browser_runtime, "Socks5AuthBridge", FakeBridge)
+    monkeypatch.setattr(acquisition_browser_pool, "Socks5AuthBridge", FakeBridge)
     monkeypatch.setattr(
         "patchright.async_api.async_playwright",
         lambda: FakePlaywrightManager(),
@@ -1834,7 +789,6 @@ async def test_shared_browser_runtime_uses_socks5_auth_bridge_and_keeps_context_
         {
             "headless": False,
             "args": [
-                "--disable-blink-features=AutomationControlled",
                 "--disable-features=IsolateOrigins,site-per-process",
                 "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
                 "--window-size=1920,1080",
@@ -1843,7 +797,6 @@ async def test_shared_browser_runtime_uses_socks5_auth_bridge_and_keeps_context_
                 "--disable-client-side-phishing-detection",
                 "--disable-domain-reliability",
                 "--disable-sync",
-                "--disable-component-update",
                 "--no-first-run",
                 "--headless=new",
             ],
@@ -1900,7 +853,7 @@ async def test_shared_browser_runtime_launches_http_proxy_directly(
             return FakePlaywrightInstance()
 
     monkeypatch.setattr(
-        acquisition_browser_runtime,
+        acquisition_browser_pool,
         "build_playwright_context_spec",
         lambda **_: _context_spec(),
     )
@@ -1927,7 +880,6 @@ async def test_shared_browser_runtime_launches_http_proxy_directly(
         {
             "headless": False,
             "args": [
-                "--disable-blink-features=AutomationControlled",
                 "--disable-features=IsolateOrigins,site-per-process",
                 "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
                 "--window-size=1920,1080",
@@ -1936,7 +888,6 @@ async def test_shared_browser_runtime_launches_http_proxy_directly(
                 "--disable-client-side-phishing-detection",
                 "--disable-domain-reliability",
                 "--disable-sync",
-                "--disable-component-update",
                 "--no-first-run",
                 "--headless=new",
             ],
@@ -1991,12 +942,12 @@ async def test_shared_browser_runtime_launches_real_chrome_headful_for_fallback(
             return FakePlaywrightInstance()
 
     monkeypatch.setattr(
-        acquisition_browser_runtime,
+        acquisition_browser_pool,
         "build_playwright_context_spec",
         lambda **_: _context_spec(),
     )
     monkeypatch.setattr(
-        acquisition_browser_runtime,
+        acquisition_browser_pool,
         "_resolve_browser_binary",
         lambda _engine: ("C:/Chrome/chrome.exe", "C:/Chrome/chrome.exe"),
     )
@@ -2006,7 +957,7 @@ async def test_shared_browser_runtime_launches_real_chrome_headful_for_fallback(
         True,
     )
     monkeypatch.setattr(
-        acquisition_browser_runtime,
+        acquisition_browser_pool,
         "REAL_CHROME_IGNORE_DEFAULT_ARGS",
         ("--enable-automation", "--remote-debugging-pipe"),
     )
@@ -2027,7 +978,6 @@ async def test_shared_browser_runtime_launches_real_chrome_headful_for_fallback(
         {
             "headless": False,
             "args": [
-                "--disable-blink-features=AutomationControlled",
                 "--disable-features=IsolateOrigins,site-per-process",
                 "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
                 "--window-size=1920,1080",
@@ -2036,7 +986,6 @@ async def test_shared_browser_runtime_launches_real_chrome_headful_for_fallback(
                 "--disable-client-side-phishing-detection",
                 "--disable-domain-reliability",
                 "--disable-sync",
-                "--disable-component-update",
                 "--no-first-run",
             ],
             "executable_path": "C:/Chrome/chrome.exe",
@@ -2189,7 +1138,7 @@ async def test_shared_browser_runtime_reuses_run_storage_state(
     runtime._playwright = object()
 
     monkeypatch.setattr(
-        acquisition_browser_runtime,
+        acquisition_browser_pool,
         "build_playwright_context_spec",
         lambda **_: _context_spec(),
     )
@@ -2320,7 +1269,7 @@ async def test_shared_browser_runtime_skips_storage_state_reuse_when_disallowed(
     runtime._playwright = object()
 
     monkeypatch.setattr(
-        acquisition_browser_runtime,
+        acquisition_browser_pool,
         "build_playwright_context_spec",
         lambda **_: _context_spec(),
     )
@@ -2388,7 +1337,7 @@ async def test_shared_browser_runtime_skips_domain_storage_for_proxied_runtime_b
     runtime._playwright = object()
 
     monkeypatch.setattr(
-        acquisition_browser_runtime,
+        acquisition_browser_pool,
         "build_playwright_context_spec",
         lambda **_: _context_spec(),
     )
@@ -2465,7 +1414,7 @@ async def test_shared_browser_runtime_suppresses_storage_state_persist_failures(
     runtime._playwright = object()
 
     monkeypatch.setattr(
-        acquisition_browser_runtime,
+        acquisition_browser_pool,
         "build_playwright_context_spec",
         lambda **_: _context_spec(),
     )
@@ -2536,7 +1485,7 @@ async def test_shared_browser_runtime_bounds_hung_context_cleanup(
     runtime._playwright = object()
 
     monkeypatch.setattr(
-        acquisition_browser_runtime,
+        acquisition_browser_pool,
         "build_playwright_context_spec",
         lambda **_: _context_spec(),
     )
@@ -2647,7 +1596,7 @@ async def test_persist_context_storage_state_normalizes_domain_before_persist(
         _persist_domain,
     )
 
-    await acquisition_browser_runtime.persist_context_storage_state(
+    await browser_storage_state.persist_context_storage_state(
         FakeContext(),
         run_id=None,
         domain="  example.com  ",
@@ -2689,7 +1638,7 @@ async def test_persist_context_storage_state_skips_domain_persist_when_disallowe
         _persist_domain,
     )
 
-    await acquisition_browser_runtime.persist_context_storage_state(
+    await browser_storage_state.persist_context_storage_state(
         FakeContext(),
         run_id=None,
         domain="example.com",
@@ -2732,7 +1681,7 @@ async def test_persist_context_storage_state_skips_run_persist_when_disallowed(
         _persist_run,
     )
 
-    await acquisition_browser_runtime.persist_context_storage_state(
+    await browser_storage_state.persist_context_storage_state(
         FakeContext(),
         run_id=77,
         domain=None,
@@ -2774,7 +1723,7 @@ async def test_shared_browser_runtime_snapshot_tracks_queue_without_private_sema
     runtime._playwright = object()
 
     monkeypatch.setattr(
-        acquisition_browser_runtime,
+        acquisition_browser_pool,
         "build_playwright_context_spec",
         lambda **_: _context_spec(),
     )
@@ -2863,7 +1812,7 @@ async def test_shared_browser_runtime_recycles_browser_without_deadlocking(
     runtime._total_contexts_created = 1
 
     monkeypatch.setattr(
-        acquisition_browser_runtime,
+        acquisition_browser_pool,
         "build_playwright_context_spec",
         lambda **_: _context_spec(),
     )
@@ -2957,12 +1906,12 @@ async def test_acquisition_shared_browser_runtime_recycles_after_driver_closed_o
     runtime._browser_launched_at = 1.0
 
     monkeypatch.setattr(
-        acquisition_browser_runtime,
+        acquisition_browser_pool,
         "build_playwright_context_spec",
         lambda **_: _context_spec(),
     )
     monkeypatch.setattr(
-        acquisition_browser_runtime,
+        acquisition_browser_pool,
         "_patchright_async_playwright_factory",
         lambda: lambda: FakePlaywrightManager(),
     )
@@ -3221,8 +2170,9 @@ async def test_browser_pool_skip_evicts_runtime_reused_after_candidate_snapshot(
 
 
 @pytest.mark.component
-def test_browser_launch_args_keep_component_updates_disabled() -> None:
-    assert "--disable-component-update" in crawler_runtime_settings.browser_launch_args
+def test_browser_launch_args_exclude_detectable_flags() -> None:
+    assert "--disable-component-update" not in crawler_runtime_settings.browser_launch_args
+    assert "--disable-blink-features=AutomationControlled" not in crawler_runtime_settings.browser_launch_args
 
 
 @pytest.mark.asyncio
@@ -3918,3 +2868,45 @@ async def test_load_storage_state_for_domain_drops_origin_shell_when_local_stora
         ],
         "origins": [],
     }
+
+
+# ---------------------------------------------------------------------------
+# Native-context verification tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.component
+class TestNativeContextContract:
+    """Verify that the native browser identity emits a clean Playwright context."""
+
+    def test_native_context_deheadlessifies_user_agent(self) -> None:
+        # Headless Chromium leaks a "HeadlessChrome" UA token that bot-defense
+        # vendors block on sight. The context UA must present as plain Chrome.
+        opts = browser_identity.build_playwright_context_options(
+            browser_major_version=145
+        )
+        user_agent = str(opts.get("user_agent") or "")
+        assert "HeadlessChrome" not in user_agent
+        assert "Chrome/145" in user_agent
+
+    def test_native_context_emits_coherent_client_hints(self) -> None:
+        opts = browser_identity.build_playwright_context_options(
+            browser_major_version=145
+        )
+        headers = opts.get("extra_http_headers") or {}
+        assert headers.get("sec-ch-ua-mobile") == "?0"
+        assert "Google Chrome" in str(headers.get("sec-ch-ua") or "")
+        assert '"145"' in str(headers.get("sec-ch-ua") or "")
+
+    def test_native_context_uses_no_viewport_true(self) -> None:
+        opts = browser_identity.build_playwright_context_options()
+        assert opts.get("no_viewport") is True
+
+    def test_native_context_has_no_init_script(self) -> None:
+        spec = browser_identity.build_playwright_context_spec()
+        assert spec.init_script is None
+
+    def test_clear_browser_identity_cache_is_noop(self) -> None:
+        # Must not raise; return value is None.
+        result = browser_identity.clear_browser_identity_cache()
+        assert result is None

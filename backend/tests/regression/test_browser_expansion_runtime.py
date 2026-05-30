@@ -23,6 +23,7 @@ from app.services.acquisition import (
 from app.services.acquisition.browser_capture import BrowserNetworkCapture
 from app.services.acquisition import (
     browser_page_flow,
+    browser_pool,
     browser_readiness,
     browser_runtime,
 )
@@ -1285,8 +1286,11 @@ async def test_browser_fetch_closes_unexpected_popup_pages() -> None:
 async def test_browser_fetch_recovers_direct_navigation_challenge(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    # A transient (non-terminal) challenge shell: no "Access Denied" title/strong
+    # evidence, so it is NOT a terminal hard block and the recovery loop must keep
+    # polling until the shell swaps to usable content (INVARIANTS §6).
     page = _FakeExpansionPage(
-        base_html="<html><head><title>Access Denied</title></head><body>Access Denied</body></html>",
+        base_html="<html><head><title>Just a moment...</title></head><body><div id='challenge'>Verifying your browser...</div></body></html>",
         wait_html_sequence=[
             """
             <html>
@@ -1317,15 +1321,24 @@ async def test_browser_fetch_recovers_direct_navigation_challenge(
     async def _classify_blocked_page(html: str, status_code: int):
         await _async_checkpoint()
         lowered = html.lower()
+        challenged = "verifying your browser" in lowered or "just a moment" in lowered
         return SimpleNamespace(
-            blocked=int(status_code or 0) == 403 and "access denied" in lowered,
-            evidence=["title:access denied"] if "access denied" in lowered else [],
-            provider_hits=[],
-            challenge_element_hits=[],
+            blocked=challenged,
+            evidence=["provider:datadome"] if challenged else [],
+            provider_hits=["datadome"] if challenged else [],
+            active_provider_hits=["datadome"] if challenged else [],
+            title_matches=[],
+            strong_hits=[],
+            challenge_element_hits=["#challenge"] if challenged else [],
         )
 
     monkeypatch.setattr(
         browser_runtime,
+        "classify_blocked_page_async",
+        _classify_blocked_page,
+    )
+    monkeypatch.setattr(
+        browser_page_flow,
         "classify_blocked_page_async",
         _classify_blocked_page,
     )
@@ -4497,7 +4510,10 @@ async def test_recover_browser_challenge_runs_for_real_chrome() -> None:
 
     assert result is original_response
     assert result.browser_recovered_status == 200
-    assert page.wait_calls == 1
+    # The recovery loop re-checks for clear at the top of the first poll
+    # iteration (before waiting), so a challenge that clears immediately needs
+    # no wait_for_timeout and no retry-goto.
+    assert page.wait_calls == 0
     assert page.goto_calls == 0
 
 
@@ -4553,6 +4569,76 @@ async def test_recover_browser_challenge_waits_on_provider_low_content_shell() -
     )
 
     assert result is original_response
+    assert page.wait_calls == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.regression
+async def test_recover_browser_challenge_clears_akamai_shell_without_cookie() -> None:
+    """Lock INVARIANTS §6: challenge recovery re-reads the DOM every poll and
+    never gates the clear-check on a provider cookie.
+
+    Models an Akamai provider shell on a page that exposes no cookie API (so a
+    cookie-based gate could never observe `_abck`). The shell swaps to real
+    product content after one wait. Patchright must recognize the cleared page
+    in-place and must NOT fall through to the retry-goto (which is the path that
+    would otherwise trigger a needless real-Chrome escalation). Reintroducing the
+    old `_abck` cookie gate would make this spin until the budget is exhausted.
+    """
+    original_response = SimpleNamespace(
+        status=200, headers={"content-type": "text/html"}
+    )
+
+    class _Page:
+        # No `context` attribute on purpose: a cookie-gated check can never pass.
+        def __init__(self) -> None:
+            self.mouse = None
+            self.wait_calls = 0
+            self.html = "<html><body>akamai shell</body></html>"
+
+        async def wait_for_timeout(self, _timeout: int) -> None:
+            await _async_checkpoint()
+            self.wait_calls += 1
+            self.html = (
+                "<html><body><h1>Widget Prime</h1><span>$12.00</span>"
+                "<button>Add to cart</button></body></html>"
+            )
+
+        async def goto(self, *_args, **_kwargs):
+            await _async_checkpoint()
+            raise AssertionError(
+                "in-place wait recovery must clear before the retry-goto / escalation"
+            )
+
+    page = _Page()
+
+    async def _get_page_html(active_page: Any) -> str:
+        await _async_checkpoint()
+        return active_page.html
+
+    async def _classify_blocked_page(html: str, _status_code: int):
+        await _async_checkpoint()
+        return SimpleNamespace(blocked=False, provider_hits=["akamai"])
+
+    result = await browser_recovery.recover_browser_challenge(
+        page,
+        url="https://example.com/products/widget",
+        response=original_response,
+        browser_engine="patchright",
+        timeout_seconds=5,
+        phase_timings_ms={},
+        challenge_wait_max_seconds=1,
+        challenge_poll_interval_ms=100,
+        navigation_timeout_ms=1000,
+        elapsed_ms=lambda _started_at: 0,
+        classify_blocked_page=_classify_blocked_page,
+        get_page_html=_get_page_html,
+        looks_like_low_content_shell=lambda html, **_kwargs: "akamai shell" in html,
+    )
+
+    assert result is original_response
+    # Exactly one wait swaps the shell to real content; the next poll's DOM
+    # re-read clears it in-place. No retry-goto, no escalation.
     assert page.wait_calls == 1
 
 
@@ -5257,10 +5343,10 @@ def test_browser_runtime_snapshot_uses_capacity_fallback_for_pooled_runtimes(
             return None
 
     monkeypatch.setattr(
-        browser_runtime._BROWSER_POOL, "direct", {"direct": _FakeRuntime()}
+        browser_pool._BROWSER_POOL, "direct", {"direct": _FakeRuntime()}
     )
     monkeypatch.setattr(
-        browser_runtime._BROWSER_POOL, "proxied", {"proxy": _FakeRuntime()}
+        browser_pool._BROWSER_POOL, "proxied", {"proxy": _FakeRuntime()}
     )
 
     snapshot = browser_runtime.browser_runtime_snapshot()

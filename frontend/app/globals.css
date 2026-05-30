@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    Invoro — Design System v2
    Clean token hierarchy · 4px grid · WCAG 2.1 AA
-   Fonts retained: Public Sans · Bricolage Grotesque · JetBrains Mono
+   Fonts retained: Public Sans · Bricolage Grotesque · Ubuntu Mono
    ═══════════════════════════════════════════════════════════════════════════ */
 
 @import 'tailwindcss';
@@ -112,7 +112,7 @@
   --font-display-family:
     var(--font-display-source, 'Bricolage Grotesque'), 'Bricolage Grotesque', system-ui, sans-serif;
   --font-mono-family:
-    var(--font-mono-source, 'JetBrains Mono'), 'JetBrains Mono', ui-monospace, monospace;
+    var(--font-mono-source, 'Ubuntu Mono'), 'Ubuntu Mono', ui-monospace, monospace;
 
   /* ── Surfaces */
   --bg-base: #f2f0ec;
@@ -219,8 +219,8 @@
   --tracking-widest: 0.1em;
 
   /* ── Mono type settings */
-  --font-mono-size: 0.8125rem; /* 13px */
-  --font-mono-size-sm: 0.6875rem; /* 11px */
+  --font-mono-size: 0.875rem; /* 14px */
+  --font-mono-size-sm: 0.75rem; /* 12px */
   --font-mono-line-height: 1.55;
 
   /* ── Spacing — strict 4px grid */
@@ -742,6 +742,18 @@ samp {
   font-synthesis: none;
   font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
+}
+
+/* Mono text rendered via Tailwind size utilities tends to look smaller than
+   matching sans-serif at the same px size. Bump mono one notch when paired
+   with text-xs / text-2xs so URLs, timestamps, and JSON keys stay readable. */
+.font-mono.text-xs,
+.font-mono .text-xs {
+  font-size: var(--font-mono-size); /* 14px */
+}
+.font-mono.text-2xs,
+.font-mono .text-2xs {
+  font-size: var(--font-mono-size-sm); /* 12px */
 }
 
 /* ── Form elements inherit font */

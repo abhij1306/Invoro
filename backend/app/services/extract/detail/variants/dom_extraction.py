@@ -64,6 +64,7 @@ from app.services.extract.variant_choice_traversal import (
     variant_dom_cues_present,
 )
 from app.services.extract.variant_identity_merge import (
+    axis_values_are_mislabeled_duplicate,
     merge_variant_pair,
     resolve_variants,
     split_variant_axes,
@@ -1043,13 +1044,57 @@ def _variant_axes_present(variants: list[dict[str, Any]]) -> set[str]:
     }
 
 
+def _variant_axis_values(variants: list[dict[str, Any]]) -> dict[str, list[str]]:
+    axis_values: dict[str, list[str]] = {}
+    for row in variants:
+        if not isinstance(row, dict):
+            continue
+        for axis in public_variant_axis_fields:
+            value = text_or_none(row.get(axis))
+            if not value:
+                continue
+            bucket = axis_values.setdefault(axis, [])
+            if value not in bucket:
+                bucket.append(value)
+    return axis_values
+
+
+def _real_new_dom_axes(
+    existing_variants: list[dict[str, Any]],
+    dom_variant_rows: list[dict[str, Any]],
+) -> set[str]:
+    """DOM axes absent from the existing rows that are genuinely new.
+
+    A DOM axis whose value set is really the same single axis as an existing
+    axis under a different name (e.g. shoe sizes mislabeled as `color`) must not
+    count as a new axis; expanding against it fabricates a Cartesian explosion.
+    """
+    existing_axes = _variant_axes_present(existing_variants)
+    dom_axes = _variant_axes_present(dom_variant_rows)
+    candidate_axes = dom_axes - existing_axes
+    if not candidate_axes:
+        return set()
+    existing_axis_values = _variant_axis_values(existing_variants)
+    dom_axis_values = _variant_axis_values(dom_variant_rows)
+    return {
+        dom_axis
+        for dom_axis in candidate_axes
+        if not any(
+            axis_values_are_mislabeled_duplicate(
+                dom_axis_values.get(dom_axis, []),
+                existing_values,
+            )
+            for existing_values in existing_axis_values.values()
+        )
+    }
+
+
 def _dom_variants_add_missing_existing_axis(
     existing_variants: list[dict[str, Any]],
     dom_variant_rows: list[dict[str, Any]],
 ) -> bool:
     existing_axes = _variant_axes_present(existing_variants)
-    dom_axes = _variant_axes_present(dom_variant_rows)
-    return bool(existing_axes and dom_axes - existing_axes)
+    return bool(existing_axes and _real_new_dom_axes(existing_variants, dom_variant_rows))
 
 
 def _expand_existing_variants_with_dom_axes(
@@ -1059,8 +1104,7 @@ def _expand_existing_variants_with_dom_axes(
     if not existing_variants or not dom_variant_rows:
         return []
     existing_axes = _variant_axes_present(existing_variants)
-    dom_axes = _variant_axes_present(dom_variant_rows)
-    missing_dom_axes = dom_axes - existing_axes
+    missing_dom_axes = _real_new_dom_axes(existing_variants, dom_variant_rows)
     if not existing_axes or not missing_dom_axes:
         return []
     if not all(

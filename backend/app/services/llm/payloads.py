@@ -161,9 +161,16 @@ class _AIDRubricFindingPayload(BaseModel):
 
     dimension: str = ""
     verdict: Literal["PASS", "PARTIAL", "FAIL", "INSUFFICIENT_EVIDENCE"]
-    evidence_quote: str | None = ""
+    evidence_quote: str = ""
     finding_code: str = ""
     recommendation: str = ""
+
+    @field_validator("evidence_quote", mode="before")
+    @classmethod
+    def _coerce_null_evidence_quote(cls, value: Any) -> Any:
+        # LLMs sometimes emit an explicit `"evidence_quote": null`; treat it as
+        # an empty string so the whole findings payload does not fail validation.
+        return "" if value is None else value
 
 
 class _AIDSimulatedQueryPayload(BaseModel):

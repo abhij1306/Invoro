@@ -6,6 +6,12 @@ from ._detail import *
 from ._detail_sections import *
 
 VARIANT_SIZE_ALIAS_SUFFIXES = (" us",)
+# When a second variant axis from one source carries (almost) the same value
+# set as an existing axis from another source, the two "axes" are really one
+# axis mislabeled (e.g. shoe sizes captured once as `size` and once as `color`).
+# Merging them as independent axes would fabricate a Cartesian explosion, so the
+# axis is treated as a duplicate when its value overlap meets this ratio.
+VARIANT_MISLABELED_AXIS_MIN_OVERLAP_RATIO = 0.5
 VARIANT_OPTION_VALUE_UI_NOISE_PHRASES = (
     "create an account",
     "sign up",
@@ -193,6 +199,8 @@ PLACEHOLDER_IMAGE_URL_PATTERNS = (
     "blank.gif",
     "transparent.gif",
     "clear.gif",
+    # Shopify storefront "no image" placeholder asset (e.g. Glossier).
+    "shopifycloud/storefront/assets/no-image",
 )
 IMAGE_PATH_TOKENS = (
     "/image/",

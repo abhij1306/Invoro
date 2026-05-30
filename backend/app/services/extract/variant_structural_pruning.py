@@ -2,6 +2,7 @@ from __future__ import annotations
 
 __all__ = (
     "drop_cross_product_variant_rows",
+    "drop_cross_handle_variant_rows",
     "drop_parent_shared_variant_axes",
     "prune_axisless_rows_when_axisful_rows_exist",
     "drop_color_only_rows_when_size_rows_exist",
@@ -14,6 +15,7 @@ import re
 from collections.abc import Callable
 from itertools import combinations
 from typing import Any
+from urllib.parse import urlsplit
 
 from app.services.config.extraction_rules import (
     DETAIL_CROSS_PRODUCT_TEXT_GENERIC_TOKENS,
@@ -71,6 +73,67 @@ def drop_cross_product_variant_rows(
         return
     record.pop("variants", None)
     record.pop("variant_count", None)
+
+
+def drop_cross_handle_variant_rows(record: dict[str, Any]) -> None:
+    """Drop variant rows whose URL points to a different ``/products/<handle>``.
+
+    Some sites (Gymshark, UNTUCKit) expose colorway sibling products as
+    "variants" of the requested product even though each colorway has its
+    own PDP URL. Treat those as cross-product references so each PDP gets
+    a record of its own; do not collapse them as variants of one record.
+
+    No-op when:
+    - record has no ``url`` or no variants,
+    - the ``url`` does not contain a ``/products/<handle>`` segment,
+    - all variant URLs share the same handle as the record (legitimate
+      same-product variant URLs with ``?variant=...`` query strings).
+    """
+    record_url = clean_text(record.get("url"))
+    if not record_url:
+        return
+    record_handle = _shopify_product_handle(record_url)
+    if not record_handle:
+        return
+    variants = record.get("variants")
+    if not isinstance(variants, list) or not variants:
+        return
+    kept: list[dict[str, Any]] = []
+    cross_handle_seen = False
+    for variant in variants:
+        if not isinstance(variant, dict):
+            continue
+        variant_url = clean_text(variant.get("url"))
+        if not variant_url:
+            kept.append(variant)
+            continue
+        variant_handle = _shopify_product_handle(variant_url)
+        if variant_handle and variant_handle != record_handle:
+            cross_handle_seen = True
+            continue
+        kept.append(variant)
+    if not cross_handle_seen:
+        return
+    if kept:
+        record["variants"] = kept
+        record["variant_count"] = len(kept)
+        return
+    record.pop("variants", None)
+    record.pop("variant_count", None)
+
+
+_PRODUCT_HANDLE_RE = re.compile(r"/products/([a-z0-9][a-z0-9-]+)", re.I)
+
+
+def _shopify_product_handle(url: str) -> str:
+    if not url:
+        return ""
+    # Match only within the URL path segment so a `/products/<slug>` that
+    # merely appears in a query string or redirect target is not treated as
+    # the product handle (which would prune legitimate same-product variants).
+    path = urlsplit(url).path
+    match = _PRODUCT_HANDLE_RE.search(path)
+    return match.group(1).strip("-").lower() if match else ""
 
 
 def drop_parent_shared_variant_axes(record: dict[str, Any]) -> None:

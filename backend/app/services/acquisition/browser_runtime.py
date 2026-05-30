@@ -16,14 +16,12 @@ from app.services.acquisition.browser_capture import (
     should_capture_network_payload,
 )
 from app.services.acquisition.browser_detail import (
-    DETAIL_AOM_EXPAND_ROLES,
-    DETAIL_EXPAND_SELECTORS,
-    accessibility_expand_candidates_impl,
-    expand_detail_content_if_needed_impl,
-    expand_all_interactive_elements_impl,
-    expand_interactive_elements_via_accessibility_impl,
+    expand_all_interactive_elements,
+    expand_interactive_elements_via_accessibility,
+    accessibility_expand_candidates,  # noqa: F401  re-exported for callers/tests
+    expand_detail_content_if_needed,
+    detail_expansion_keywords,
     interactive_candidate_snapshot,
-    detail_expansion_keywords as _detail_expansion_keywords_impl,
 )
 from app.services.acquisition.browser_diagnostics import (
     CHROMIUM_BROWSER_ENGINE as _CHROMIUM_BROWSER_ENGINE,
@@ -72,7 +70,6 @@ from app.services.acquisition.browser_recovery import (
 from app.services.acquisition.browser_stage_runner import (
     run_browser_stage as _run_browser_stage,
 )
-from app.services.acquisition import browser_pool as _browser_pool
 from app.services.acquisition.browser_pool import (
     SharedBrowserRuntime,
     block_unneeded_route as _block_unneeded_route,
@@ -87,18 +84,7 @@ from app.services.acquisition.browser_pool import (
     shutdown_browser_runtime_sync as _shutdown_browser_runtime_sync_impl,
     temporary_browser_page,
 )
-from app.services.acquisition.browser_pool import (
-    patchright_async_playwright_factory as _patchright_async_playwright_factory,
-)
-from app.services.acquisition.browser_proxy_bridge import Socks5AuthBridge
 from app.services.acquisition import cookie_store
-from app.services.config.browser_fingerprint_profiles import REAL_CHROME_IGNORE_DEFAULT_ARGS
-from app.services.acquisition.browser_identity import build_playwright_context_spec
-from app.services.acquisition.browser_pool import (
-    browser_pool_state as _BROWSER_POOL,
-    resolve_browser_binary as _resolve_browser_binary,
-)
-from app.services.acquisition.browser_storage_state import persist_context_storage_state
 from app.services.acquisition.dom_runtime import get_page_html
 from app.services.acquisition.runtime import (
     NetworkPayloadReadResult,
@@ -129,19 +115,7 @@ from app.services.domain_utils import normalize_domain
 
 logger = logging.getLogger(__name__)
 
-def _sync_browser_pool_compatibility() -> None:
-    setattr(_browser_pool, "SharedBrowserRuntime", SharedBrowserRuntime)
-    if _browser_pool._BROWSER_POOL is not _BROWSER_POOL:
-        _browser_pool._BROWSER_POOL = _BROWSER_POOL
-    setattr(_browser_pool, "build_playwright_context_spec", build_playwright_context_spec)
-    setattr(_browser_pool, "_resolve_browser_binary", _resolve_browser_binary)
-    setattr(_browser_pool, "persist_context_storage_state", persist_context_storage_state)
-    setattr(_browser_pool, "Socks5AuthBridge", Socks5AuthBridge)
-    setattr(_browser_pool, "REAL_CHROME_IGNORE_DEFAULT_ARGS", REAL_CHROME_IGNORE_DEFAULT_ARGS)
-    setattr(_browser_pool, "_patchright_async_playwright_factory", _patchright_async_playwright_factory)
 
-
-_sync_browser_pool_compatibility()
 
 async def get_browser_runtime(*args, **kwargs):
     return await _get_browser_runtime_impl(*args, **kwargs)
@@ -196,83 +170,6 @@ async def _emit_browser_behavior_activity_bounded(page: Any) -> dict[str, object
         }
 
 
-def detail_expansion_keywords(
-    surface: str,
-    *,
-    requested_fields: list[str] | None = None,
-) -> tuple[str, ...]:
-    return _detail_expansion_keywords_impl(
-        surface,
-        requested_fields=requested_fields,
-    )
-
-async def expand_all_interactive_elements(
-    page: Any,
-    *,
-    surface: str = "",
-    requested_fields: list[str] | None = None,
-    checkpoint: Any = None,
-    max_elapsed_ms: int | None = None,
-) -> dict[str, object]:
-    del checkpoint
-    return await expand_all_interactive_elements_impl(
-        page,
-        surface=surface,
-        requested_fields=requested_fields,
-        detail_expand_selectors=DETAIL_EXPAND_SELECTORS,
-        detail_expansion_keywords=detail_expansion_keywords,
-        interactive_candidate_snapshot=interactive_candidate_snapshot,
-        elapsed_ms=_elapsed_ms,
-        max_elapsed_ms=max_elapsed_ms,
-    )
-
-async def expand_interactive_elements_via_accessibility(
-    page: Any,
-    *,
-    surface: str = "",
-    requested_fields: list[str] | None = None,
-    max_elapsed_ms: int | None = None,
-) -> dict[str, object]:
-    return await expand_interactive_elements_via_accessibility_impl(
-        page,
-        surface=surface,
-        requested_fields=requested_fields,
-        accessibility_expand_candidates=accessibility_expand_candidates,
-        detail_expansion_keywords=detail_expansion_keywords,
-        elapsed_ms=_elapsed_ms,
-        max_elapsed_ms=max_elapsed_ms,
-    )
-
-def accessibility_expand_candidates(
-    snapshot: dict[str, object] | None,
-    *,
-    surface: str,
-    requested_fields: list[str] | None = None,
-) -> list[tuple[str, str]]:
-    return accessibility_expand_candidates_impl(
-        snapshot,
-        surface=surface,
-        requested_fields=requested_fields,
-        aom_expand_roles=set(DETAIL_AOM_EXPAND_ROLES),
-        detail_expansion_keywords=detail_expansion_keywords,
-    )
-
-async def expand_detail_content_if_needed(
-    page: Any,
-    *,
-    surface: str,
-    readiness_probe: dict[str, object],
-    requested_fields: list[str] | None = None,
-) -> dict[str, object]:
-    return await expand_detail_content_if_needed_impl(
-        page,
-        surface=surface,
-        readiness_probe=readiness_probe,
-        requested_fields=requested_fields,
-        expand_all_interactive_elements=expand_all_interactive_elements,
-        probe_browser_readiness=probe_browser_readiness,
-        expand_interactive_elements_via_accessibility=expand_interactive_elements_via_accessibility,
-    )
 
 def _build_payload_capture(*, surface: str) -> _BrowserNetworkCapture:
     return _BrowserNetworkCapture(
@@ -423,6 +320,11 @@ async def browser_fetch(
     payload_capture = None
     popup_guard_registrations: list[tuple[Any, str, Any]] = []
     try:
+        # Time the launch/reuse window (runtime resolve + browser launch + semaphore
+        # acquire + context open + storage-state load). This window precedes
+        # `started_at` below, so without this probe it is invisible in
+        # phase_timings_ms — which is exactly where a slow 2nd-acquisition launch hides.
+        page_acquire_started_at = time.perf_counter()
         runtime, page_context = await _resolve_browser_fetch_page_context(
             proxy=proxy,
             proxied_page_factory=proxied_page_factory,
@@ -434,6 +336,7 @@ async def browser_fetch(
             allow_storage_state=allow_storage_state,
         )
         async with page_context as page:
+            phase_timings_ms["page_acquire"] = _elapsed_ms(page_acquire_started_at)
             (
                 runtime_engine,
                 runtime_binary,
@@ -454,6 +357,11 @@ async def browser_fetch(
             normalized_surface = _normalize_surface(surface)
             payload_capture = _build_payload_capture(surface=normalized_surface)
             payload_capture.attach(page)
+            if not capture_screenshot:
+                # Request filtering is best-effort noise/bandwidth reduction, not an
+                # acquisition gate. A route-install hiccup must not abort the fetch.
+                with suppress(Exception):
+                    await page.route("**/*", _block_unneeded_route)
             traversal_active, readiness_policy, readiness_override = (
                 resolve_browser_fetch_policy_impl(
                     url=url,
@@ -656,7 +564,7 @@ async def browser_fetch(
                     browser_binary=runtime_binary,
                 )
                 persist_storage_state = _browser_storage_state_is_persistable(
-                    blocked=bool(finalized["blocked"]),
+                    blocked=bool(finalized.get("blocked")),
                     finalized_diagnostics=finalized_diagnostics,
                 )
                 mark_storage_state_persist_policy(
@@ -753,11 +661,12 @@ async def _prepare_browser_fetch_launch_context(
     bridge_flag = getattr(runtime, "bridge_used", None) if runtime is not None else None
     runtime_bridge_used = bool(bridge_flag()) if callable(bridge_flag) else False
     skip_origin_warmup = False
-    if (
-        runtime_engine == _REAL_CHROME_BROWSER_ENGINE
-        and allow_storage_state
-        and normalized_domain
-    ):
+    if allow_storage_state and normalized_domain:
+        # Same-domain repeat hits already load saved domain storage state into the
+        # context, so re-running the multi-second origin warmup is redundant. This
+        # skip is engine-agnostic: patchright (the default detail engine) gets the
+        # same reuse benefit real_chrome already had, instead of paying ~7s warmup
+        # on every sequential acquisition in a batch.
         skip_origin_warmup = bool(
             await cookie_store.load_storage_state_for_domain(
                 normalized_domain,
@@ -859,31 +768,38 @@ async def _maybe_warm_origin_before_navigation(
             wait_until="domcontentloaded",
             timeout=warm_budget_ms,
         )
+        elapsed_so_far_ms = _elapsed_ms(started_at)
+        remaining_budget_ms = max(750, warm_budget_ms - elapsed_so_far_ms)
         warm_phase_timings_ms: dict[str, int] = {}
+        # Origin warmup is best-effort and non-fatal (INVARIANTS Rule 6). It runs
+        # the bounded challenge wait/retry loop to seed cookies, but a blocked or
+        # challenge-shell origin must NOT abort the fetch: the main navigation runs
+        # its own challenge loop and owns the blocked verdict for this URL.
         await recover_browser_challenge(
             warm_page,
             url=warm_url,
             response=warm_response,
             browser_engine=browser_engine,
-            timeout_seconds=max(1.0, warm_budget_ms / 1000),
+            timeout_seconds=max(1.0, remaining_budget_ms / 1000),
             phase_timings_ms=warm_phase_timings_ms,
             challenge_wait_max_seconds=min(
                 max(
                     0.0, float(crawler_runtime_settings.challenge_wait_max_seconds or 0)
                 ),
-                max(1.0, warm_budget_ms / 1000),
+                max(1.0, remaining_budget_ms / 1000),
             ),
             challenge_poll_interval_ms=int(
                 crawler_runtime_settings.challenge_poll_interval_ms
             ),
-            navigation_timeout_ms=warm_budget_ms,
+            navigation_timeout_ms=remaining_budget_ms,
             elapsed_ms=_elapsed_ms,
             classify_blocked_page=classify_blocked_page_async,
             get_page_html=get_page_html,
             looks_like_low_content_shell=looks_like_low_content_shell,
         )
         phase_timings_ms["origin_warmup_behavior"] = 0
-        await warm_page.wait_for_timeout(min(warm_pause_ms, warm_budget_ms))
+        remaining_budget_ms = max(0, warm_budget_ms - _elapsed_ms(started_at))
+        await warm_page.wait_for_timeout(min(warm_pause_ms, remaining_budget_ms))
         if warm_phase_timings_ms.get("challenge_wait"):
             phase_timings_ms["origin_warmup_challenge_wait"] = int(
                 warm_phase_timings_ms["challenge_wait"]

@@ -76,6 +76,35 @@ def test_product_intelligence_query_uses_mpn_not_source_domain_or_sku() -> None:
 
 
 @pytest.mark.component
+def test_product_intelligence_query_prefers_upc_over_mpn_as_identifier() -> None:
+    # When the source product carries a UPC/GTIN, it must be the identifier
+    # appended to the brand+title and brand-site queries (strongest match
+    # signal), with the MPN/SKU-like token no longer used as the appended id.
+    queries = build_search_queries(
+        {
+            "brand": "Levis",
+            "title": "Men 511 Slim Fit Jeans",
+            "gtin": "0655772019097",
+            "mpn": "04511-2406",
+            "sku": "BELK-ONLY-123",
+        },
+        source_domain_value="belk.com",
+    )
+
+    assert queries
+    # Standalone quoted GTIN stays the first, highest-precision query.
+    assert queries[0] == '"0655772019097"'
+    # The UPC, not the MPN, is appended to the brand-site and brand+title queries.
+    assert 'site:levi.com "0655772019097"' in queries
+    assert any(
+        query.startswith("levi's Men 511 Slim Fit Jeans") and "0655772019097" in query
+        for query in queries
+    )
+    assert all("04511-2406" not in query for query in queries)
+    assert all("BELK-ONLY-123" not in query for query in queries)
+
+
+@pytest.mark.component
 def test_product_intelligence_query_strips_repeated_brand_and_targets_brand_domain() -> None:
     queries = build_search_queries(
         {
@@ -220,6 +249,52 @@ def test_product_intelligence_query_preserves_possessives_in_title_phrases() -> 
 
 
 @pytest.mark.component
+def test_product_intelligence_variant_spec_mismatch_caps_score() -> None:
+    # Source is a 4-in-1; candidate is a 3-in-1 variant of the same product line.
+    # Both titles state the spec, values differ -> flagged and capped below auto-accept.
+    result = score_candidate(
+        source={
+            "title": "Ninja Crispi 4-in-1 Portable Glass Air Fryer",
+            "brand": "Ninja",
+            "price": 159.99,
+        },
+        candidate={
+            "title": "Ninja Crispi 3-in-1 Glass Air Fryer Portable",
+            "brand": "Ninja",
+            "price": 149.99,
+        },
+        source_type="marketplace",
+    )
+
+    assert result["reasons"]["variant_mismatch"] is True
+    assert result["score"] <= 0.62
+    assert result["label"] != "high"
+
+
+@pytest.mark.component
+def test_product_intelligence_brand_title_match_reaches_high_without_identifier() -> None:
+    # Search payloads rarely carry a UPC; a brand-exact + strong-title retailer match
+    # must still reach the auto-accept (high) band.
+    result = score_candidate(
+        source={
+            "title": "Ninja Crispi 4-in-1 Portable Glass Air Fryer Cooking System",
+            "brand": "Ninja",
+            "price": 159.99,
+        },
+        candidate={
+            "title": "Ninja Crispi 4-in-1 Portable Glass Air Fryer Cooking System",
+            "brand": "Ninja",
+            "price": 159.99,
+        },
+        source_type="retailer",
+    )
+
+    assert result["score"] >= 0.85
+    assert result["label"] == "high"
+    assert result["reasons"]["variant_mismatch"] is False
+
+
+@pytest.mark.component
 def test_product_intelligence_scorer_returns_breakdown() -> None:
     result = score_candidate(
         source={
@@ -237,12 +312,15 @@ def test_product_intelligence_scorer_returns_breakdown() -> None:
         source_type="brand_dtc",
     )
 
+    # Belk SKU is no longer a scoring signal; this brand-DTC + title match still
+    # scores high via the brand-DTC floor (brand's own listing always ranks top).
     assert result["score"] >= 0.7
     assert result["reasons"]["brand_match"] is True
-    assert result["reasons"]["identifier_match"] is True
-    assert result["reasons"]["sku_match"] is True
-    assert result["reasons"]["mpn_or_style_match"] is False
+    # identifier_match is now GTIN-only; SKU/MPN/style are not identifiers for scoring.
+    assert result["reasons"]["identifier_match"] is False
     assert result["reasons"]["gtin_match"] is False
+    assert "sku_match" not in result["reasons"]
+    assert "mpn_or_style_match" not in result["reasons"]
 
 
 @pytest.mark.component
@@ -322,10 +400,26 @@ def test_product_intelligence_scorer_uses_shopping_evidence_without_image() -> N
 
 
 @pytest.mark.component
-def test_product_intelligence_scorer_keeps_title_only_uncertain() -> None:
+def test_product_intelligence_scorer_keeps_title_only_low_without_brand() -> None:
+    # No brand match means no confidence floor fires: a title-only match is driven
+    # purely by title-similarity weight and can never reach the auto-accept band.
     result = score_candidate(
         source={"title": "Floral Midi Dress", "brand": "", "price": 49.99},
         candidate={"title": "Floral Midi Dress", "brand": "", "price": None},
+        source_type="unknown",
+    )
+
+    assert result["score"] < 0.6
+    assert result["label"] in {"low", "uncertain"}
+    assert result["reasons"]["brand_match"] is False
+    assert result["reasons"]["identifier_match"] is False
+
+
+@pytest.mark.component
+def test_product_intelligence_scorer_keeps_weak_title_only_uncertain() -> None:
+    result = score_candidate(
+        source={"title": "Floral Midi Dress", "brand": "", "price": 49.99},
+        candidate={"title": "Striped Maxi Skirt", "brand": "", "price": None},
         source_type="unknown",
     )
 
@@ -358,7 +452,11 @@ def test_product_intelligence_uses_source_brand_when_candidate_title_mentions_it
     assert intelligence["canonical_record"]["brand"] == "wrangler"
     assert intelligence["canonical_record"]["normalized_brand"] == "wrangler"
     assert intelligence["score_reasons"]["brand_match"] is True
-    assert intelligence["confidence_label"] == "low"
+    # Brand-exact + full coverage of the source's distinctive model tokens (relaxed/bootcut/
+    # jeans) is a deterministic model-level match, so this lands in the reviewable medium band
+    # rather than low. match_basis records why.
+    assert intelligence["confidence_label"] == "medium"
+    assert intelligence["score_reasons"]["match_basis"] == "model+brand"
 
 
 @pytest.mark.component
@@ -1579,11 +1677,14 @@ async def test_product_intelligence_discovery_passes_pool_limit_to_search(monkey
 
 @pytest.mark.asyncio
 @pytest.mark.component
-async def test_product_intelligence_discovery_spreads_result_domains(monkeypatch) -> None:
+async def test_product_intelligence_discovery_keeps_multiple_listings_per_domain(monkeypatch) -> None:
+    # A product can be listed by multiple third-party sellers on one marketplace,
+    # so discovery must keep more than one distinct listing per domain (bounded only
+    # by the user's max_candidates request), not collapse to one per domain.
     async def fake_search_results(provider: str, query: str, *, limit: int | None = None) -> list[SearchResult]:
         return [
-            SearchResult(url="https://www.levi.com/p/1.html", payload={"title": "Levi 511"}),
-            SearchResult(url="https://www.levi.com/p/2.html", payload={"title": "Levi 511 sale"}),
+            SearchResult(url="https://www.ebay.com/itm/1", payload={"title": "Levi 511"}),
+            SearchResult(url="https://www.ebay.com/itm/2", payload={"title": "Levi 511 sale"}),
             SearchResult(url="https://www.macys.com/p/1.html", payload={"title": "Levi 511"}),
         ]
 
@@ -1596,16 +1697,20 @@ async def test_product_intelligence_discovery_spreads_result_domains(monkeypatch
         {
             "brand": "Levis",
             "title": "Men 511 Slim Fit Jeans",
-            "sku": "04511",
         },
         source_domain_value="belk.com",
         provider="serpapi",
         allowed_domains=[],
         excluded_domains=[],
-        max_candidates=2,
+        max_candidates=5,
     )
 
-    assert [candidate.domain for candidate in candidates] == ["levi.com", "macys.com"]
+    domains = sorted(candidate.domain for candidate in candidates)
+    # Both eBay third-party listings survive alongside the macys listing.
+    assert domains == ["ebay.com", "ebay.com", "macys.com"]
+    urls = {candidate.url for candidate in candidates}
+    assert "https://www.ebay.com/itm/1" in urls
+    assert "https://www.ebay.com/itm/2" in urls
 
 
 @pytest.mark.asyncio
@@ -2717,3 +2822,153 @@ async def test_product_intelligence_candidate_poll_marks_timeout(
     await poll_candidate_and_score(db_session, job, candidate)
 
     assert candidate.status == PRODUCT_INTELLIGENCE_CANDIDATE_STATUS_CRAWL_TIMEOUT
+
+
+# ---------------------------------------------------------------------------
+# Identity-anchor discovery rework (deterministic style-code + model token)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.component
+def test_manufacturer_style_code_decomposes_composite_sku() -> None:
+    from app.services.product_intelligence.matching import manufacturer_style_code
+
+    # Belk composite SKU = numeric retailer prefix + manufacturer style core.
+    assert manufacturer_style_code("3900462FV5285") == "fv5285"
+    # External listings expose the code bare or with a colorway suffix.
+    assert manufacturer_style_code("Nike Promina FV5285-002 Black/White") == "fv5285"
+    # A pure retailer numeric prefix is not a manufacturer code.
+    assert manufacturer_style_code("3900462") == ""
+    # The GTIN must never be mistaken for a style code.
+    assert manufacturer_style_code("0197600670150", gtin_value="0197600670150") == ""
+
+
+@pytest.mark.component
+def test_score_candidate_style_code_match_reaches_auto_accept() -> None:
+    source = extract_product_snapshot(
+        {
+            "title": "Men's Promina Sneakers",
+            "brand": "Nike\u00ae",
+            "sku": "3900462FV5285",
+            "barcode": "0197600670150",
+            "price": "$49.00",
+            "url": "https://www.belk.com/p/nike-mens-promina-sneakers/3900462FV5285.html",
+        }
+    )
+    candidate = extract_search_result_snapshot(
+        {
+            "title": "Nike Promina Men's Black White Fv5285-002 Walking Comfort Shoes",
+            "source": "eBay",
+            "provider": "serpapi_immersive",
+            "product_id": "x",
+        },
+        url="https://www.ebay.com/itm/123",
+        domain="ebay.com",
+    )
+    result = score_candidate(source=source, candidate=candidate, source_type="marketplace")
+
+    assert result["reasons"]["style_code_match"] is True
+    assert result["reasons"]["match_basis"] == "style_code"
+    assert result["score"] >= 0.90
+    assert result["label"] == "high"
+
+
+@pytest.mark.component
+def test_score_candidate_model_token_brand_is_model_level_match() -> None:
+    # Terse source vs verbose candidate: raw title overlap is low, but brand-exact plus the
+    # distinctive model token ("promina") is a deterministic model-level match.
+    source = extract_product_snapshot(
+        {"title": "Men's Promina Sneakers", "brand": "Nike\u00ae", "sku": "3900462FV5285"}
+    )
+    candidate = extract_search_result_snapshot(
+        {
+            "title": "Nike Promina Men's Walking Shoes (Extra Wide) Black",
+            "source": "DSW",
+            "provider": "serpapi_immersive",
+            "product_id": "y",
+        },
+        url="https://www.dsw.com/product/nike-promina-walking-shoe-mens/582039",
+        domain="dsw.com",
+    )
+    result = score_candidate(source=source, candidate=candidate, source_type="retailer")
+
+    assert result["reasons"]["model_token_match"] is True
+    assert result["reasons"]["match_basis"] == "model+brand"
+    assert result["score"] >= 0.82
+
+
+@pytest.mark.component
+def test_score_candidate_same_brand_different_model_not_promoted() -> None:
+    # Same brand, different model: the distinctive model token does not overlap, so this
+    # must not reach the model-level floor.
+    source = extract_product_snapshot(
+        {"title": "Men's Promina Sneakers", "brand": "Nike\u00ae", "sku": "3900462FV5285"}
+    )
+    candidate = extract_search_result_snapshot(
+        {"title": "Nike Air Force 1 Low Men's Shoes", "source": "Nike", "provider": "serpapi"},
+        url="https://www.nike.com/t/air-force-1-low",
+        domain="nike.com",
+    )
+    result = score_candidate(source=source, candidate=candidate, source_type="brand_dtc")
+
+    assert result["reasons"]["model_token_match"] is False
+    assert result["score"] < 0.82
+
+
+@pytest.mark.component
+def test_score_candidate_truncated_candidate_does_not_self_promote() -> None:
+    # Directional containment: a truncated generic candidate must not match a more specific
+    # source even when they share a family token.
+    source = {"title": "Samsung Galaxy S24 Ultra 512GB", "brand": "Samsung"}
+    candidate = {"title": "Samsung Galaxy", "brand": "Samsung"}
+    result = score_candidate(source=source, candidate=candidate, source_type=SOURCE_TYPE_BRAND_DTC)
+
+    assert result["reasons"]["model_token_match"] is False
+    assert result["score"] < 0.82
+
+
+@pytest.mark.component
+def test_score_candidate_brand_resolved_from_candidate_evidence() -> None:
+    # Brand not in the registry, but the candidate title states it: matching must still fire
+    # via candidate-side evidence (registry only canonicalizes; it does not gate).
+    source = {"title": "Northbound Trail Daypack 25L", "brand": "Northbound", "price": 80.0}
+    candidate = {
+        "title": "Northbound Trail Daypack 25L Olive",
+        "brand": "",
+        "price": 79.0,
+        "description": "Northbound Trail Daypack",
+    }
+    result = score_candidate(source=source, candidate=candidate, source_type="retailer")
+
+    assert result["reasons"]["brand_match"] is True
+    assert result["reasons"].get("brand_from_candidate_evidence") is True
+
+
+@pytest.mark.component
+def test_candidate_dedupe_key_collapses_size_and_color_variants() -> None:
+    from app.services.product_intelligence.discovery import _candidate_dedupe_key
+
+    key_a = _candidate_dedupe_key(
+        "https://www.dsw.com/product/x/582039?size=10&width=Medium&cm_mmc=CSE"
+    )
+    key_b = _candidate_dedupe_key(
+        "https://www.dsw.com/product/x/582039?size=13&activeColor=002"
+    )
+    assert key_a == key_b
+    # Identity-bearing params are preserved, so genuinely different products stay distinct.
+    key_c = _candidate_dedupe_key("https://www.lyst.com/shoes/x/?product=SEECFLM&size=10")
+    key_d = _candidate_dedupe_key("https://www.lyst.com/shoes/x/?product=OTHER&size=11")
+    assert key_c != key_d
+
+
+@pytest.mark.component
+def test_build_search_queries_uses_decomposed_style_core_not_composite_sku() -> None:
+    # Without a GTIN, the appended identifier must be the bare manufacturer code (FV5285),
+    # never the composite Belk SKU (3900462FV5285) which no external retailer indexes.
+    queries = build_search_queries(
+        {"title": "Men's Promina Sneakers", "brand": "Nike", "sku": "3900462FV5285"},
+        source_domain_value="belk.com",
+    )
+    joined = " | ".join(queries).lower()
+    assert "fv5285" in joined
+    assert "3900462fv5285" not in joined

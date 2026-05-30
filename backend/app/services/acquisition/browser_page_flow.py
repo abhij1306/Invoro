@@ -417,6 +417,30 @@ async def settle_browser_page_impl(
             networkidle_skip_reason = "structured_data_present"
         else:
             networkidle_skip_reason = "not_required"
+        # A ready detail page may still have async variant/option XHRs in flight
+        # (e.g. SFCC dwvar product-variation calls) that feed network-payload variant
+        # extraction. Without a settle, capture is a race that only wins when
+        # navigation happened to be slow. Bounded best-effort networkidle wait so
+        # those payloads land before serialization. Detail-only; non-fatal.
+        detail_payload_settle_ms = max(
+            0,
+            int(crawler_runtime_settings.browser_detail_payload_settle_timeout_ms or 0),
+        )
+        if is_detail_surface and detail_payload_settle_ms > 0:
+            detail_payload_settle_started_at = time.perf_counter()
+            try:
+                await page.wait_for_load_state(
+                    "networkidle",
+                    timeout=min(
+                        int(timeout_seconds * 1000),
+                        detail_payload_settle_ms,
+                    ),
+                )
+            except PlaywrightTimeoutError:
+                pass
+            phase_timings_ms["detail_payload_settle"] = elapsed_ms(
+                detail_payload_settle_started_at
+            )
     if not current_probe["is_ready"] and readiness_override is not None:
         readiness_started_at = time.perf_counter()
         readiness_diagnostics = await wait_for_listing_readiness(

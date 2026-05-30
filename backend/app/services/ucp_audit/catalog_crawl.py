@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urljoin, urlparse, urlunparse
@@ -11,6 +12,8 @@ from app.services.config import aid_score as config
 from app.services.fetch.fetch_context import fetch_page
 from app.services.pipeline.extract_records import extract_records
 from app.services.structured_sources import parse_json_ld, parse_opengraph
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -122,21 +125,25 @@ def _listing_detail_urls(
 
 
 def _extract_detail_records(page: object, page_url: str) -> list[dict[str, Any]]:
-    return [
-        record
-        for record in extract_records(
-            str(getattr(page, "html", "") or ""),
-            page_url,
-            "ecommerce_detail",
-            max_records=1,
-            requested_page_url=page_url,
-            network_payloads=list(getattr(page, "network_payloads", []) or []),
-            artifacts=dict(getattr(page, "artifacts", {}) or {}),
-            content_type=str(getattr(page, "content_type", "") or ""),
-            browser_diagnostics=dict(getattr(page, "browser_diagnostics", {}) or {}),
-        )
-        if isinstance(record, dict)
-    ]
+    try:
+        return [
+            record
+            for record in extract_records(
+                str(getattr(page, "html", "") or ""),
+                page_url,
+                "ecommerce_detail",
+                max_records=1,
+                requested_page_url=page_url,
+                network_payloads=list(getattr(page, "network_payloads", []) or []),
+                artifacts=dict(getattr(page, "artifacts", {}) or {}),
+                content_type=str(getattr(page, "content_type", "") or ""),
+                browser_diagnostics=dict(getattr(page, "browser_diagnostics", {}) or {}),
+            )
+            if isinstance(record, dict)
+        ]
+    except Exception as exc:
+        logger.warning("_extract_detail_records failed for %s: %s", page_url, exc, exc_info=True)
+        return []
 
 
 def _product_record(record: dict[str, Any], *, html: str, page_url: str) -> dict[str, Any]:

@@ -49,7 +49,7 @@ const navGroups = [
     label: 'Workspace',
     items: [
       { href: '/dashboard', label: 'Dashboard', icon: Grid2x2 },
-      { href: '/projects', label: 'Projects', icon: FolderKanban },
+      { href: '/playground', label: 'Playground', icon: FolderKanban },
       { href: '/crawl', label: 'Crawl Studio', icon: WandSparkles },
       { href: '/runs', label: 'History', icon: Clock3 },
       { href: '/monitors', label: 'Monitors', icon: Radar },
@@ -234,7 +234,7 @@ function LogoMark({
   const mark = (
     <Image
       src="/invoro-logo.svg"
-      className="app-logo-gif"
+      className="app-logo-image"
       alt=""
       width={96}
       height={96}
@@ -627,10 +627,11 @@ function getFallbackHeader(pathname: string): TopBarState {
       title: 'Crawl Studio',
       description: 'Configure sources, run jobs, and monitor execution.',
     };
-  if (pathname.startsWith('/projects'))
+  if (pathname.startsWith('/playground'))
     return {
-      title: 'Projects',
-      description: 'Goal-based workflows over crawl, monitor, and export primitives.',
+      title: 'Playground',
+      description:
+        'Explore any domain — discover, extract, enrich, compare, and monitor from one place.',
     };
   if (pathname.startsWith('/data-enrichment'))
     return {

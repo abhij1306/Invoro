@@ -212,7 +212,7 @@ export const STAGE_CONFIG: Record<LogStage, LogStageConfig> = {
   },
 };
 
-function StageChip({ stage }: { stage: LogStage }) {
+function StageChip({ stage, showIcon = true }: { stage: LogStage; showIcon?: boolean }) {
   const config = STAGE_CONFIG[stage];
   let Icon = Activity;
   if (stage === 'acquisition') Icon = Globe;
@@ -227,7 +227,7 @@ function StageChip({ stage }: { stage: LogStage }) {
         config.textOnlyClass,
       )}
     >
-      <Icon className="size-3" />
+      {showIcon ? <Icon className="size-3" /> : null}
       <span>{config.label}</span>
     </span>
   );
@@ -1249,7 +1249,7 @@ export const LogTerminal = memo(function LogTerminal({
                                 <IconComponent className={cn('size-3.5', iconStyle.iconCls)} />
                               </div>
                               <div className="flex">
-                                <StageChip stage={row.stage} />
+                                <StageChip stage={row.stage} showIcon={false} />
                               </div>
                               <span className="text-secondary min-w-0 text-xs font-medium break-words">
                                 {!row.createdAt

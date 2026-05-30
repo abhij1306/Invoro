@@ -137,7 +137,47 @@ def coerce_brand_text(value: object) -> str | None:
     if _BARE_HOST_URL_RE.fullmatch(text):
         return None
     cleaned = _BRAND_REGION_SUFFIX_RE.sub("", text).strip()
+    cleaned = _strip_brand_marketing_tagline(cleaned) or cleaned
     return cleaned or text
+
+
+def _strip_brand_marketing_tagline(text: str) -> str | None:
+    """Drop a marketing tagline that follows a clear separator.
+
+    Brand fields sometimes carry a site tagline (e.g. JSON-LD ``Brand.name``
+    such as ``"Gymshark | We Do Gym"``). When the prefix is a short, clean
+    brand-shaped token (1–3 words, alphabetic/digit only, no URL shape) and
+    the suffix is multi-word (a tagline, not a region/storefront token already
+    handled by ``_BRAND_REGION_SUFFIX_RE``), keep only the prefix.
+
+    Conservative: returns ``None`` when the input does not look like a
+    ``brand <sep> tagline`` shape so callers can keep the original text.
+    """
+    if not text:
+        return None
+    match = _BRAND_TAGLINE_SPLIT_RE.match(text)
+    if match is None:
+        return None
+    prefix = clean_text(match.group("prefix"))
+    suffix = clean_text(match.group("suffix"))
+    if not prefix or not suffix:
+        return None
+    prefix_tokens = [token for token in re.split(r"\s+", prefix) if token]
+    suffix_tokens = [token for token in re.split(r"\s+", suffix) if token]
+    if len(prefix_tokens) > LISTING_BRAND_MAX_WORDS:
+        return None
+    if not all(re.fullmatch(r"[A-Za-z0-9&'.\-]+", token) for token in prefix_tokens):
+        return None
+    if not any(re.search(r"[A-Za-z]", token) for token in prefix_tokens):
+        return None
+    if len(suffix_tokens) < 2:
+        return None
+    return prefix
+
+
+_BRAND_TAGLINE_SPLIT_RE = re.compile(
+    r"^(?P<prefix>.+?)\s*[|\u2013\u2014]\s*(?P<suffix>\S.+)$"
+)
 
 
 def coerce_gender(value: object) -> str | None:

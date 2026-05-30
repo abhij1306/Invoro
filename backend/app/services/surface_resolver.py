@@ -157,10 +157,15 @@ def _surface_from_schema_types(soup: BeautifulSoup) -> str:
             if surface:
                 return surface
     for node in soup.select("[itemtype]"):
-        itemtype = str(node.get("itemtype") or "").lower().rsplit("/", maxsplit=1)[-1]
-        surface = config.SURFACE_RESOLVER_HTML_TYPES.get(itemtype)
-        if surface:
-            return surface
+        raw_itemtype = str(node.get("itemtype") or "")
+        for token in raw_itemtype.split():
+            token = token.strip()
+            if not token:
+                continue
+            normalized = token.lower().rsplit("/", maxsplit=1)[-1]
+            surface = config.SURFACE_RESOLVER_HTML_TYPES.get(normalized)
+            if surface:
+                return surface
     return ""
 
 

@@ -80,7 +80,6 @@ from app.services.fetch.browser_policy import (
 )
 from app.services.fetch.types import FetchPageCall, FetchRuntimeContext
 from app.services.shared.url_utils import ensure_scheme
-
 logger = logging.getLogger(__name__)
 
 _FetchRuntimeContext = FetchRuntimeContext
@@ -242,6 +241,7 @@ def _browser_attempt_timeout_seconds(
     browser_engine: str,
     engine_index: int,
     engine_attempts: list[str],
+    host_policy: HostProtectionPolicy | None = None,
 ) -> float:
     remaining_timeout = _remaining_browser_timeout_seconds(context)
     if (
@@ -249,12 +249,36 @@ def _browser_attempt_timeout_seconds(
         and _is_vendor_block_reason(reason)
         and not str(context.forced_browser_engine or "").strip()
         and engine_index < len(engine_attempts)
+        and _patchright_probe_cap_applies(host_policy=host_policy, reason=reason)
     ):
         return min(
             remaining_timeout,
             float(crawler_runtime_settings.browser_vendor_block_probe_timeout_seconds),
         )
     return remaining_timeout
+
+
+def _patchright_probe_cap_applies(
+    *,
+    host_policy: HostProtectionPolicy | None,
+    reason: str,
+) -> bool:
+    """Probe-cap patchright only when host already has durable patchright
+    failure memory for the same vendor. Fresh hosts get the full URL budget
+    so patchright can complete origin warmup, behavior realism, and challenge
+    wait without being truncated and misclassified as blocked.
+    """
+    if host_policy is None:
+        return False
+    if not bool(host_policy.patchright_blocked):
+        return False
+    if not bool(host_policy.prefer_browser):
+        return False
+    expected_vendor = _extract_vendor_from_reason(reason) or ""
+    last_vendor = str(host_policy.last_block_vendor or "").strip().lower()
+    if expected_vendor and last_vendor and expected_vendor != last_vendor:
+        return False
+    return True
 
 
 async def fetch_page(
@@ -528,6 +552,7 @@ async def _run_browser_attempts(
                 browser_engine=browser_engine,
                 engine_index=engine_index,
                 engine_attempts=engine_attempts,
+                host_policy=active_host_policy,
             )
             if remaining_timeout <= 0:
                 raise TimeoutError(
@@ -545,6 +570,7 @@ async def _run_browser_attempts(
                     browser_engine=browser_engine,
                     engine_index=engine_index,
                     engine_attempts=engine_attempts,
+                    host_policy=active_host_policy,
                 )
                 if remaining_timeout <= 0:
                     raise TimeoutError(

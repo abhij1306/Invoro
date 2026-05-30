@@ -84,7 +84,8 @@
       "brandName",
       "brand_name",
       "manufacturer",
-      "vendor"
+      "vendor",
+      "product_brand"
     ]
   },
   "BELK_PRODUCT_CARD_SELECTORS": {
@@ -116,7 +117,8 @@
       "image_url",
       "thumbnail",
       "primaryImage",
-      "primary_image"
+      "primary_image",
+      "product_image_url"
     ]
   },
   "BELK_PRODUCT_ORIGINAL_PRICE_KEYS": {
@@ -127,7 +129,8 @@
       "listPrice",
       "list_price",
       "wasPrice",
-      "was_price"
+      "was_price",
+      "product_original_price"
     ]
   },
   "BELK_PRODUCT_PRICE_KEYS": {
@@ -141,7 +144,8 @@
       "displayPrice",
       "formattedPrice",
       "prices",
-      "offers"
+      "offers",
+      "product_price"
     ]
   },
   "BELK_PRODUCT_TITLE_KEYS": {

@@ -47,7 +47,6 @@ dependencies = [
   "structlog>=25.4.0,<26",
   "urllib3>=2.7.0,<3",
   "uvicorn[standard]>=0.35.0,<1",
-  "browserforge>=1.2.0,<2",
   "extruct>=0.18.0,<1",
   "w3lib>=2.3.1,<3",
 ]

@@ -8,6 +8,9 @@ from app.services.config.variant_policy import PUBLIC_VARIANT_AXIS_FIELDS
 from ._common import *
 from ._variant_mapping import _option_names, _variant_axis_raw_value
 
+_MATRIX_AXIS_FIELDS = frozenset(PUBLIC_VARIANT_AXIS_FIELDS)
+
+
 def _product_variant_rows(product: dict[str, Any]) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for key in JS_STATE_PRODUCT_VARIANT_LIST_KEYS:
@@ -296,7 +299,13 @@ def _variant_matrix_row(
                 row["availability"] = "in_stock"
             elif lowered == "outofstock":
                 row["availability"] = "out_of_stock"
-    return row if any(value for key, value in row.items() if key in PUBLIC_VARIANT_AXIS_FIELDS) else None
+    # Variant-matrix rows without any public axis value are transport-only blobs.
+    # They are ambiguous in public output even when they carry sku/url/price.
+    return (
+        row
+        if any(value for key, value in row.items() if key in _MATRIX_AXIS_FIELDS)
+        else None
+    )
 
 
 def _variant_matrix_axis_value(

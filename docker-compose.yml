@@ -1,17 +1,19 @@
 services:
+  # NOTE: DB credentials default to dev values. Production/staging must supply
+  # secure overrides via environment, .env, or docker-compose.override.yml / CI secrets.
   db:
     image: postgres:15-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_DB: crawlerai
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ${POSTGRES_DB:-crawlerai}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     ports:
       - "5432:5432"
     volumes:
       - pg_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d crawlerai"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-crawlerai}"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -40,7 +42,7 @@ services:
       - .env
     environment: &backend_env
       APP_ENV: development
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/crawlerai
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-crawlerai}
       REDIS_URL: redis://redis:6379/0
       REDIS_STATE_ENABLED: "false"
       CELERY_DISPATCH_ENABLED: "true"

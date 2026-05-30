@@ -694,15 +694,18 @@ async def test_process_batch_run_resolves_urls_from_sitemap_settings(
             },
         },
     )
-    resolved_inputs: list[tuple[str, str, int]] = []
+    resolved_inputs: list[tuple[str, str, int, bool]] = []
     processed_urls: list[str] = []
 
     async def _fake_resolve_category_urls_from_sitemap(
         domain: str,
         filter_keyword: str,
         max_urls: int,
+        allow_homepage_fallback: bool = False,
     ) -> list[str]:
-        resolved_inputs.append((domain, filter_keyword, max_urls))
+        resolved_inputs.append(
+            (domain, filter_keyword, max_urls, allow_homepage_fallback)
+        )
         return [
             "https://example.com/collections/a",
             "https://example.com/collections/b",
@@ -731,7 +734,7 @@ async def test_process_batch_run_resolves_urls_from_sitemap_settings(
     await process_run(db_session, run.id)
     await db_session.refresh(run)
 
-    assert resolved_inputs == [("example.com", "collections", 2)]
+    assert resolved_inputs == [("example.com", "collections", 2, False)]
     assert processed_urls == [
         "https://example.com/collections/a",
         "https://example.com/collections/b",
@@ -766,8 +769,9 @@ async def test_process_batch_run_defaults_bad_sitemap_max_urls(
         domain: str,
         filter_keyword: str,
         max_urls: int,
+        allow_homepage_fallback: bool = False,
     ) -> list[str]:
-        del domain, filter_keyword
+        del domain, filter_keyword, allow_homepage_fallback
         resolved_inputs.append(max_urls)
         return ["https://example.com/collections/a"]
 
@@ -815,8 +819,9 @@ async def test_process_batch_run_marks_failed_when_sitemap_resolution_fails(
         domain: str,
         filter_keyword: str,
         max_urls: int,
+        allow_homepage_fallback: bool = False,
     ) -> list[str]:
-        del domain, filter_keyword, max_urls
+        del domain, filter_keyword, max_urls, allow_homepage_fallback
         raise ValueError(
             "Sitemap fetch failed: https://example.com/sitemap.xml returned HTTP 503"
         )
@@ -844,6 +849,56 @@ async def test_process_batch_run_marks_failed_when_sitemap_resolution_fails(
     assert logs == [
         "ValueError: Sitemap fetch failed: https://example.com/sitemap.xml returned HTTP 503"
     ]
+
+
+@pytest.mark.asyncio
+@pytest.mark.regression
+async def test_process_batch_run_enables_homepage_fallback_for_auto_surface(
+    db_session: AsyncSession,
+    test_user,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run = await create_crawl_run(
+        db_session,
+        test_user.id,
+        {
+            "run_type": "batch",
+            "surface": "auto",
+            "url": "https://example.com",
+            "settings": {
+                "sitemap_domain": "example.com",
+            },
+        },
+    )
+    resolved_flags: list[bool] = []
+
+    async def _fake_resolve_category_urls_from_sitemap(
+        domain: str,
+        filter_keyword: str,
+        max_urls: int,
+        allow_homepage_fallback: bool = False,
+    ) -> list[str]:
+        del domain, filter_keyword, max_urls
+        resolved_flags.append(allow_homepage_fallback)
+        return ["https://example.com/women"]
+
+    async def _fake_process_single_url(*args, **kwargs):
+        del args, kwargs
+        return URLProcessingResult(records=[], verdict="success")
+
+    monkeypatch.setattr(
+        "app.services.crawl.batch_runtime.resolve_category_urls_from_sitemap",
+        _fake_resolve_category_urls_from_sitemap,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        "app.services.crawl.batch_runtime.process_single_url",
+        _fake_process_single_url,
+    )
+
+    await process_run(db_session, run.id)
+
+    assert resolved_flags == [True]
 
 
 @pytest.mark.asyncio

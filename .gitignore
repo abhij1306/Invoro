@@ -69,3 +69,6 @@ test-sites-issues/
 zyte/**/*.json
 zyte/**/*.md
 zyte/**/__pycache__/
+
+# Agent scratch files (commit messages, etc.)
+.git_commit_msg.tmp

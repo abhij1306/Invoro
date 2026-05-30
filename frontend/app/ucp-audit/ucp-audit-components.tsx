@@ -290,6 +290,13 @@ const FINDING_COPY: Record<
     action: 'Raise recommendation confidence',
     impact: 'high',
   },
+  AID_LLM_INSUFFICIENT_EVIDENCE: {
+    description: 'AI review could not gather sufficient evidence to evaluate this dimension.',
+    fix: 'Ensure page markup exposes enough structured and visible content for AI evaluation.',
+    effort: '2-4 hours',
+    action: 'Improve page evidence',
+    impact: 'medium',
+  },
 };
 
 type NormalizedFinding = {
@@ -747,7 +754,35 @@ export function UcpContractPanel({ report }: Readonly<{ report: UcpAuditReport |
 export function UcpFixSequence({ report }: Readonly<{ report: UcpAuditReport | null }>) {
   const roadmap = useMemo(() => getRoadmap(report), [report]);
   const storageKey = report?.job_id ? `ucp-fix-sequence-${report.job_id}` : null;
-  const [done, setDone] = useState<Record<string, boolean>>({});
+  const [done, setDone] = useState<Record<string, boolean>>(() => {
+    if (storageKey && typeof globalThis.window !== 'undefined') {
+      try {
+        const stored = globalThis.window.localStorage.getItem(storageKey);
+        if (stored) return JSON.parse(stored) as Record<string, boolean>;
+      } catch {
+        // Ignore invalid JSON
+      }
+    }
+    return {};
+  });
+
+  // Re-sync from localStorage when the audit report (and storageKey) changes.
+  // Uses the derive-state-from-prop pattern instead of setState-in-effect so
+  // we don't cascade an extra render when the storageKey hasn't changed.
+  const [prevStorageKey, setPrevStorageKey] = useState(storageKey);
+  if (storageKey !== prevStorageKey) {
+    setPrevStorageKey(storageKey);
+    if (!storageKey || typeof globalThis.window === 'undefined') {
+      setDone({});
+    } else {
+      try {
+        const stored = globalThis.window.localStorage.getItem(storageKey);
+        setDone(stored ? (JSON.parse(stored) as Record<string, boolean>) : {});
+      } catch {
+        setDone({});
+      }
+    }
+  }
   const doneCount = roadmap.filter((item) => done[item.id]).length;
   const progressPercent = roadmap.length ? Math.round((doneCount / roadmap.length) * 100) : 0;
 

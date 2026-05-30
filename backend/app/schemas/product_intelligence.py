@@ -18,7 +18,7 @@ class ProductIntelligenceOptions(BaseModel):
     max_candidates_per_product: int = Field(
         default=2,
         ge=1,
-        le=25,
+        le=100,
         validation_alias=AliasChoices(
             "max_candidates_per_product",
             "max_urls",

@@ -105,12 +105,7 @@ def _apply_llm_findings(
             )
             target.score = max(
                 0,
-                target.score
-                - (
-                    config.AID_LLM_FAIL_PENALTY
-                    if finding.verdict == RubricVerdict.FAIL
-                    else config.AID_LLM_PARTIAL_PENALTY
-                ),
+                target.score - config.AID_LLM_FAIL_PENALTY,
             )
             target.status = _status_for(target.score, target.findings)
 
@@ -188,7 +183,7 @@ def _markup_dimension(result: CatalogCrawlResult) -> UCPDimensionScore:
         score = 0
     elif not _has_product_og(result):
         score -= 15
-    if result.jsonld_parse_errors:
+    if product_blocks and result.jsonld_parse_errors:
         score -= 10
     return _dimension(config.D_AID1_ID, score, findings)
 

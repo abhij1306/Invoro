@@ -60,7 +60,7 @@ User/API request
 | ------------- | ---------------------------------------------------------------------------------- |
 | Backend API   | FastAPI, Uvicorn, Pydantic v2, SQLAlchemy 2, asyncpg, Alembic                      |
 | Workers       | Celery, Redis                                                                      |
-| Acquisition   | `curl-cffi`, Patchright/Playwright, BrowserForge                                   |
+| Acquisition   | `curl-cffi`, Patchright/Playwright                                                 |
 | Extraction    | BeautifulSoup4, selectolax, lxml, extruct, JMESPath, glom                          |
 | Frontend      | Next.js 16, React 19, Tailwind CSS v4, Radix UI, TanStack Query, Recharts, Zustand |
 | Testing       | pytest, Vitest, Playwright, MSW                                                    |

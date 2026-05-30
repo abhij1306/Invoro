@@ -167,6 +167,7 @@ async def _probe_mcp(*, service: str, endpoint: str) -> UCPTransportProbe:
         error_text = json.dumps(payload.get("error", payload))[:500].lower()
         profile_required = _profile_required(payload)
         tools = _tool_entries(payload)
+        tool_schemas = _summarize_tool_schemas(tools)
         error_message = _transport_probe_error(
             errors=errors,
             successful=response.status_code < 400,
@@ -182,7 +183,7 @@ async def _probe_mcp(*, service: str, endpoint: str) -> UCPTransportProbe:
             status_code=response.status_code,
             error=error_message,
             tool_names=[str(item.get("name") or "") for item in tools if item.get("name")],
-            tool_schemas=tools,
+            tool_schemas=tool_schemas,
             response_preview=_preview(payload),
         )
     except (httpx.HTTPError, OSError, TimeoutError) as exc:
@@ -730,6 +731,59 @@ def _tool_entries(payload: dict) -> list[dict]:
     if not isinstance(raw_tools, list):
         return []
     return [dict(item) for item in raw_tools if isinstance(item, dict)]
+
+
+_MAX_TOOL_SCHEMAS = 50
+_MAX_TOOL_SCHEMA_BYTES = 2048
+_ALLOWED_TOOL_SCHEMA_FIELDS = {"name", "type", "inputSchema", "outputSchema"}
+
+
+def _summarize_tool_schemas(tools: list[dict]) -> list[dict]:
+    """Limit and redact tool schemas before persisting probe data."""
+    summaries: list[dict] = []
+    for item in tools[:_MAX_TOOL_SCHEMAS]:
+        raw = json.dumps(item, default=str)
+        summary: dict[str, Any] = {
+            "name": str(item.get("name") or ""),
+            "type": str(item.get("type") or ""),
+            "schema_size": len(raw),
+        }
+        input_schema = item.get("inputSchema")
+        if input_schema is not None:
+            summary["input_schema"] = _schema_shape_summary(input_schema)
+        output_schema = item.get("outputSchema")
+        if output_schema is not None:
+            summary["output_schema"] = _schema_shape_summary(output_schema)
+
+        redacted_count = len([key for key in item.keys() if key not in _ALLOWED_TOOL_SCHEMA_FIELDS])
+        if redacted_count:
+            summary["redacted_field_count"] = redacted_count
+        if len(raw) > _MAX_TOOL_SCHEMA_BYTES:
+            summary["truncated"] = True
+        summaries.append(summary)
+    if len(tools) > _MAX_TOOL_SCHEMAS:
+        summaries.append({"truncated": True, "remaining": len(tools) - _MAX_TOOL_SCHEMAS})
+    return summaries
+
+
+def _schema_shape_summary(schema: object) -> dict[str, Any]:
+    if not isinstance(schema, dict):
+        return {"valid": False, "value_type": type(schema).__name__}
+
+    properties = schema.get("properties")
+    required = schema.get("required")
+    return {
+        "valid": True,
+        "type": str(schema.get("type") or ""),
+        "property_count": len(properties) if isinstance(properties, dict) else 0,
+        "required_count": len(required) if isinstance(required, list) else 0,
+        "has_items": "items" in schema,
+        "has_refs": any(key in schema for key in ("$ref", "$defs", "definitions", "components")),
+        "has_composition": any(
+            isinstance(schema.get(key), list) and bool(schema.get(key))
+            for key in ("allOf", "anyOf", "oneOf")
+        ),
+    }
 
 
 def _mcp_conformance_errors(payload: dict, *, expected_id: str) -> list[str]:

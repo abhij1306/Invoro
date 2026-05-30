@@ -70,6 +70,21 @@ def _safe_sitemap_max_urls(value: object) -> int:
         return SITEMAP_DEFAULT_MAX_URLS
 
 
+def _allow_sitemap_homepage_fallback(run: CrawlRun, settings_view) -> bool:
+    requested_surface = str(run.surface or "").strip().lower()
+    if requested_surface == "auto":
+        return True
+    resolution = settings_view.get("surface_resolution")
+    if not isinstance(resolution, dict):
+        return False
+    evidence = resolution.get("evidence")
+    if not isinstance(evidence, list):
+        return False
+    return "requested_surface:auto" in {
+        str(item).strip().lower() for item in evidence if item
+    }
+
+
 async def _resolve_run_urls(run: CrawlRun, settings_view) -> list[str]:
     urls = settings_view.urls()
     if run.run_type == "batch" and urls:
@@ -82,6 +97,9 @@ async def _resolve_run_urls(run: CrawlRun, settings_view) -> list[str]:
             filter_keyword=settings_view.get("sitemap_filter_keyword")
             or SITEMAP_DEFAULT_FILTER_KEYWORD,
             max_urls=_safe_sitemap_max_urls(settings_view.get("sitemap_max_urls")),
+            allow_homepage_fallback=_allow_sitemap_homepage_fallback(
+                run, settings_view
+            ),
         )
     elif run.url:
         url_list = [run.url]

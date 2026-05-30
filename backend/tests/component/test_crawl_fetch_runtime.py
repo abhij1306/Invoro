@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-import concurrent.futures
 import sys
-import threading
 import time
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
@@ -15,7 +13,6 @@ from patchright.async_api import Error as PlaywrightError
 from app.services.fetch import fetch_context as crawl_fetch_runtime
 from app.services.acquisition import (
     browser_capture,
-    browser_identity,
     runtime as acquisition_runtime,
 )
 from app.services.acquisition.host_protection_memory import HostProtectionPolicy
@@ -3104,7 +3101,11 @@ async def test_run_browser_attempts_caps_patchright_probe_timeout_for_vendor_blo
     result = await crawl_fetch_runtime._run_browser_attempts(
         context,
         reason="vendor-block:datadome",
-        host_policy=HostProtectionPolicy(host="example.com"),
+        host_policy=HostProtectionPolicy(
+            host="example.com",
+            patchright_blocked=True,
+            prefer_browser=True,
+        ),
     )
 
     assert result.browser_diagnostics["browser_engine"] == "real_chrome"
@@ -3112,6 +3113,93 @@ async def test_run_browser_attempts_caps_patchright_probe_timeout_for_vendor_blo
     assert browser_calls[0][1] == pytest.approx(12.0, abs=0.05)
     assert browser_calls[1][0] == "real_chrome"
     assert browser_calls[1][1] < 30.0
+
+
+@pytest.mark.asyncio
+@pytest.mark.component
+async def test_run_browser_attempts_skips_patchright_probe_cap_for_fresh_host(
+    monkeypatch: pytest.MonkeyPatch,
+    patch_settings,
+) -> None:
+    """Fresh hosts (no durable patchright failure memory) must get the full
+    URL budget, not the short probe-cap. Otherwise patchright runs are
+    truncated mid-load on first contact with cloudflare/akamai-protected
+    pages and misclassified as blocked.
+    """
+    patch_settings(browser_vendor_block_probe_timeout_seconds=12.0)
+    browser_calls: list[tuple[str, float]] = []
+    context = crawl_fetch_runtime._FetchRuntimeContext(
+        url="https://example.com/products/widget",
+        resolved_timeout=30.0,
+        deadline_monotonic=time.perf_counter() + 30.0,
+        run_id=None,
+        surface="ecommerce_detail",
+        traversal_mode=None,
+        max_pages=1,
+        max_scrolls=1,
+        max_records=None,
+        on_event=None,
+        browser_reason=None,
+        requested_fields=[],
+        listing_recovery_mode=None,
+        proxies=[None],
+        proxy_profile={},
+        traversal_required=False,
+        fetch_mode="browser_only",
+        runtime_policy={},
+        host_memory_ttl_seconds=crawl_fetch_runtime.crawler_runtime_settings.coerce_host_memory_ttl_seconds(
+            None
+        ),
+    )
+
+    @_as_async
+    def _fake_browser_fetch(url: str, browser_timeout: float, **kwargs):
+        del url
+        engine = str(kwargs.get("browser_engine") or "")
+        browser_calls.append((engine, browser_timeout))
+        return PageFetchResult(
+            url="https://example.com/products/widget",
+            final_url="https://example.com/products/widget",
+            html="<html><body><h1>Rendered</h1></body></html>",
+            status_code=200,
+            method="browser",
+            blocked=False,
+            browser_diagnostics={"browser_engine": engine},
+        )
+
+    monkeypatch.setattr(crawl_fetch_runtime, "_browser_fetch", _fake_browser_fetch)
+    monkeypatch.setattr(
+        crawl_fetch_runtime,
+        "_browser_engine_attempts",
+        lambda **_kwargs: ["patchright", "real_chrome"],
+    )
+    monkeypatch.setattr(crawl_fetch_runtime, "wait_for_host_slot", AsyncMock())
+    monkeypatch.setattr(crawl_fetch_runtime, "note_host_hard_block", AsyncMock())
+    fresh_policy = HostProtectionPolicy(host="example.com")
+    monkeypatch.setattr(
+        crawl_fetch_runtime,
+        "_load_host_protection_policy_compat",
+        AsyncMock(return_value=fresh_policy),
+    )
+    monkeypatch.setattr(
+        crawl_fetch_runtime.crawler_runtime_settings,
+        "browser_post_block_cooldown_ms",
+        0,
+    )
+
+    result = await crawl_fetch_runtime._run_browser_attempts(
+        context,
+        reason="vendor-block:cloudflare",
+        host_policy=fresh_policy,
+    )
+
+    assert result.browser_diagnostics["browser_engine"] == "patchright"
+    # Fresh host with no patchright failure memory must run patchright with
+    # the full remaining URL budget, not capped at probe timeout (12s).
+    assert browser_calls[0][0] == "patchright"
+    assert browser_calls[0][1] > 12.5
+    # Real Chrome must not be called when patchright succeeds.
+    assert len(browser_calls) == 1
 
 
 @pytest.mark.asyncio
@@ -3388,119 +3476,3 @@ async def test_reset_fetch_runtime_state_closes_adapter_and_runtime_http_clients
     ]
 
 
-@pytest.mark.component
-def test_build_playwright_context_options_reuses_identity_within_run(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    browser_identity.clear_browser_identity_cache()
-    created = iter(
-        [
-            browser_identity.BrowserIdentity(
-                user_agent="ua-1",
-                viewport={"width": 100, "height": 200},
-                extra_http_headers={"x-test": "1"},
-                locale="en-US",
-                device_scale_factor=1.0,
-                has_touch=False,
-                is_mobile=False,
-            ),
-            browser_identity.BrowserIdentity(
-                user_agent="ua-2",
-                viewport={"width": 101, "height": 201},
-                extra_http_headers={"x-test": "2"},
-                locale="en-US",
-                device_scale_factor=1.0,
-                has_touch=False,
-                is_mobile=False,
-            ),
-        ]
-    )
-    monkeypatch.setattr(
-        browser_identity,
-        "create_browser_identity",
-        lambda: next(created),
-    )
-
-    first = browser_identity.build_playwright_context_options(run_id=101)
-    second = browser_identity.build_playwright_context_options(run_id=101)
-    third = browser_identity.build_playwright_context_options(run_id=202)
-
-    assert first["user_agent"] == "ua-1"
-    assert second["user_agent"] == "ua-1"
-    assert third["user_agent"] == "ua-2"
-    browser_identity.clear_browser_identity_cache()
-
-
-@pytest.mark.component
-def test_browser_identity_for_run_uses_single_creation_under_concurrency(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    browser_identity.clear_browser_identity_cache()
-    created_count = 0
-    creation_lock = threading.Lock()
-
-    def _fake_create() -> browser_identity.BrowserIdentity:
-        nonlocal created_count
-        time.sleep(0.05)
-        with creation_lock:
-            created_count += 1
-            sequence = created_count
-        return browser_identity.BrowserIdentity(
-            user_agent=f"ua-{sequence}",
-            viewport={"width": 100, "height": 200},
-            extra_http_headers={"x-test": str(sequence)},
-            locale="en-US",
-            device_scale_factor=1.0,
-            has_touch=False,
-            is_mobile=False,
-        )
-
-    monkeypatch.setattr(browser_identity, "create_browser_identity", _fake_create)
-
-    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-        identities = list(
-            executor.map(
-                lambda _: browser_identity.browser_identity_for_run(303), range(4)
-            )
-        )
-
-    assert created_count == 1
-    assert {identity.user_agent for identity in identities} == {"ua-1"}
-    browser_identity.clear_browser_identity_cache()
-
-
-@pytest.mark.component
-def test_create_browser_identity_builds_generator_lazily(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    browser_identity.clear_browser_identity_cache()
-    monkeypatch.setattr(browser_identity, "_FINGERPRINT_GENERATOR", None)
-    captured: dict[str, object] = {}
-
-    class _FakeGenerator:
-        def __init__(self, **kwargs) -> None:
-            captured.update(kwargs)
-
-        def generate(self):
-            return SimpleNamespace(
-                screen=SimpleNamespace(width=1280, height=720, devicePixelRatio=1.0),
-                navigator=SimpleNamespace(
-                    userAgent="Mozilla/5.0 Chrome/131.0.0.0",
-                    language="en-US",
-                    maxTouchPoints=0,
-                    userAgentData={"mobile": False, "brands": []},
-                ),
-                headers={"accept-language": "en-US"},
-            )
-
-    monkeypatch.setattr(browser_identity, "FingerprintGenerator", _FakeGenerator)
-    monkeypatch.setattr(
-        browser_identity.crawler_runtime_settings,
-        "fingerprint_locale",
-        "fr-FR",
-    )
-
-    identity = browser_identity.create_browser_identity()
-
-    assert identity.locale == "en-US"
-    assert captured["locale"] == ["fr-FR"]

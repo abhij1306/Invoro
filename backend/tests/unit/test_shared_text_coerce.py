@@ -54,3 +54,30 @@ def test_title_noise_and_slug_tokens() -> None:
     assert not is_title_noise("Cotton Shirt")
     assert slug_tokens("Café au lait") == ["caf", "au", "lait"]
     assert slug_tokens("Cotton-Shirt / Blue") == ["cotton", "shirt", "blue"]
+
+
+@pytest.mark.unit
+def test_coerce_brand_text_strips_marketing_tagline() -> None:
+    """JSON-LD ``Brand.name`` sometimes includes a site tagline (Gymshark
+    serves ``"Gymshark | We Do Gym"``). The trailing tagline must be dropped
+    while real multi-word brands and single-word brands stay intact.
+    """
+    from app.services.shared.field_coerce_text import coerce_brand_text
+
+    # Tagline after pipe is stripped.
+    assert coerce_brand_text("Gymshark | We Do Gym") == "Gymshark"
+    assert coerce_brand_text("Gymshark | We Do Gym.") == "Gymshark"
+    # En-dash and em-dash separators also strip a multi-word tagline.
+    assert (
+        coerce_brand_text("Patagonia \u2013 Sustainable Outdoor") == "Patagonia"
+    )
+    # Region/storefront tokens were already handled by the existing suffix
+    # regex; they keep working.
+    assert coerce_brand_text("Brand | USA") == "Brand"
+    # Real brands without a tagline pass through unchanged.
+    assert coerce_brand_text("Tommy Hilfiger") == "Tommy Hilfiger"
+    assert coerce_brand_text("Nike Inc.") == "Nike Inc."
+    assert coerce_brand_text("Levi's") == "Levi's"
+    # A single-word suffix is not assumed to be a tagline (could be a
+    # legitimate brand-line marker); leave the value alone.
+    assert coerce_brand_text("Gymshark | Single") == "Gymshark | Single"

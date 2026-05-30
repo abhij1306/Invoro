@@ -208,16 +208,53 @@ def _backfill_variant_shared_fields_from_record(record: dict[str, Any]) -> None:
     if not isinstance(variants, list) or not variants:
         return
     fallback_image = record.get("image_url")
+    record_color = clean_text(record.get("color"))
+    fallback_image_key = _image_url_normalize_key(fallback_image)
     for variant in variants:
         if not isinstance(variant, dict):
             continue
-        if fallback_image not in (None, "", [], {}) and variant.get("image_url") in (
+        variant_color = clean_text(variant.get("color"))
+        # Drop pre-existing variant images that match the parent image but
+        # represent a different colorway. Source upstreams (Shopify swatch
+        # blocks, network listings) sometimes paint the current PDP image
+        # onto every sibling colorway, leaving misleading data.
+        existing_variant_image = variant.get("image_url")
+        if (
+            existing_variant_image
+            and fallback_image_key
+            and _image_url_normalize_key(existing_variant_image) == fallback_image_key
+            and record_color
+            and variant_color
+            and variant_color.casefold() != record_color.casefold()
+        ):
+            variant.pop("image_url", None)
+            existing_variant_image = None
+        if fallback_image not in (None, "", [], {}) and existing_variant_image in (
             None,
             "",
             [],
             {},
         ):
+            # Do not paint the parent image onto a variant that represents a
+            # different colorway. Otherwise consumers see (e.g.) the Yellow
+            # PDP image attached to Black/Brown variants on FashionNova.
+            if (
+                record_color
+                and variant_color
+                and variant_color.casefold() != record_color.casefold()
+            ):
+                continue
             variant["image_url"] = fallback_image
+
+
+def _image_url_normalize_key(url: object) -> str:
+    """Strip query string and fragment so two image URLs that differ only by
+    CDN resize params (``&width=...``, ``&crop=...``) compare equal."""
+    text = clean_text(url)
+    if not text:
+        return ""
+    base = text.split("?", 1)[0].split("#", 1)[0]
+    return base.casefold()
 
 
 backfill_parent_scalar_axes_from_variants = _backfill_parent_scalar_axes_from_variants

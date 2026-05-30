@@ -24,8 +24,12 @@ const FORUM_TOKENS = [
   '/forum/',
   '/forums/',
   '/discussion/',
+  '/discussions/',
   '/questions/',
+  '/answers/',
+  '/comments/',
 ];
+const FORUM_HOST_TOKENS = ['forum', 'discuss', 'community'];
 const JOB_TOKENS = ['/job/', '/jobs/', '/careers/', '/positions/', '/openings/'];
 const ECOMMERCE_LISTING_TOKENS = [
   '/collections/',
@@ -71,7 +75,8 @@ export function resolveAutoSurface(url: string, module: CrawlTab): AutoSurfaceRe
     };
   }
   if (
-    FORUM_TOKENS.some((token) => host.includes(token.replaceAll('/', '')) || path.includes(token))
+    FORUM_HOST_TOKENS.some((token) => host.includes(token)) ||
+    FORUM_TOKENS.some((token) => path.includes(token))
   ) {
     return {
       surface: 'forum_detail',

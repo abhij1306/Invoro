@@ -65,6 +65,25 @@ def test_placeholder_images_are_rejected() -> None:
 
 
 @pytest.mark.unit
+def test_shopify_no_image_storefront_asset_is_rejected() -> None:
+    """Shopify renders a `no-image-*` placeholder GIF inside JSON-LD when the
+    real product image is only available via og:image / DOM. Reject the
+    placeholder so a valid image candidate can win.
+    """
+    glossier_no_image = (
+        "https://www.glossier.com/cdn/shopifycloud/storefront/assets/"
+        "no-image-2048-a2addb12_348x.gif"
+    )
+    assert is_placeholder_image_url(glossier_no_image)
+    # Real Shopify CDN product images must still pass.
+    real_shopify_cdn = (
+        "https://cdn.shopify.com/s/files/1/0939/9055/1893/files/"
+        "DIME2SP2542BLK-1.jpg?v=1745568172"
+    )
+    assert not is_placeholder_image_url(real_shopify_cdn)
+
+
+@pytest.mark.unit
 def test_identity_token_does_not_singularize_double_s_words() -> None:
     assert identity_token("dress") == "dress"
     assert identity_token("glass") == "glass"

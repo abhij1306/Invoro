@@ -3,6 +3,7 @@ from __future__ import annotations
 __all__ = (
     "decimal_is_cent_magnitude_copy",
     "detail_currency_from_html",
+    "detail_current_price_currency_from_html",
     "detail_jsonld_price_bundle",
     "detail_original_price_from_html",
     "detail_price_decimal",
@@ -150,6 +151,18 @@ def detail_currency_from_html(
         if match is not None:
             return text_or_none(match.group("currency"))
     for selector in (*DETAIL_CURRENT_PRICE_SELECTORS, *DETAIL_ORIGINAL_PRICE_SELECTORS):
+        for node in soup.select(selector):
+            raw_value = node.get("aria-label") if hasattr(node, "get") else None
+            if raw_value in (None, "", [], {}):
+                raw_value = node.get_text(" ", strip=True)
+            currency = extract_currency_code(raw_value)
+            if currency:
+                return currency
+    return None
+
+
+def detail_current_price_currency_from_html(soup: BeautifulSoup) -> str | None:
+    for selector in DETAIL_CURRENT_PRICE_SELECTORS:
         for node in soup.select(selector):
             raw_value = node.get("aria-label") if hasattr(node, "get") else None
             if raw_value in (None, "", [], {}):

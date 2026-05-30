@@ -29,7 +29,7 @@ Invoro backend is a crawl execution, extraction, review, and export system with:
 - Cache/runtime state: Redis
 - HTTP: `httpx` plus `curl_cffi`
 - Browser: Playwright
-- Parsing: BeautifulSoup, `glom`, `jmespath`, `lxml`, `extruct`, `browserforge`, `w3lib`
+- Parsing: BeautifulSoup, `glom`, `jmespath`, `lxml`, `extruct`, `w3lib`
 
 ## 3. Registered API Surface
 
@@ -49,7 +49,7 @@ Routers registered in `backend/app/main.py`:
 - `/api/monitors`
 - `/api/alerts`
 - `/api/v1/alerts`
-- `/api/orchestration`
+- `/api/playground`
 - `/api/health`
 - `/api/metrics`
 
@@ -65,7 +65,7 @@ Important route groups:
 - `api/monitors.py`: monitor CRUD, run-now dispatch, event/history/current-snapshot lookup, and JSON/CSV exports
 - `api/alerts.py`: console-auth Agentic Delta Engine alert CRUD, immediate test poll, delta history, and webhook delivery log
 - `api/public_alerts.py`: API-key authenticated `/api/v1/alerts` envelope endpoints for agent callers
-- `api/orchestration.py`: project shells, static workflow templates, workflow launch/status, monitor promotion, and price-comparison views over normal crawl records
+- `api/playground.py`: guided playground session creation/list/detail plus discover/select/extract/pipeline/results routes over normal crawl, enrichment, PI, monitor, and audit systems
 
 Domain-recipe routes live under `api/crawl_domain.py`:
 
@@ -177,7 +177,7 @@ Primary files:
 - `pipeline/runtime_helpers.py`
 - `data_enrichment/service.py`
 - `monitor_service.py`, `monitor_scheduler_service.py`, `monitor_async_loop.py`, `monitor_change_detection.py`, `monitor_retention.py`
-- `orchestration_service.py`
+- `playground_service.py`
 - `data_enrichment/deterministic.py`
 - `data_enrichment/shopify_catalog.py`
 
@@ -207,7 +207,7 @@ Current live behavior:
 - Product Monitoring is a recurring crawl orchestration layer: `MonitorJob` rows store URL sets, schedule interval, priority, tracked fields, retention, and crawl settings; scheduler drivers call `MonitorSchedulerService.check_due_jobs()`; monitor runs are normal `CrawlRun` rows tagged with `settings.monitor_id`; `MonitorChangeDetectionService` diffs completed run records against the latest snapshot; `monitor_alert_service.py` creates in-app notifications for tracked field changes; retention purges monitor snapshots/events only.
 - Agentic Delta Engine alerts extend Product Monitoring instead of creating a second engine: single-URL ecommerce alerts are `MonitorJob` rows with `poll_interval_seconds`, `condition`, `webhook_url`, `last_known_values`, and delivery state; condition evaluation is sandboxed in `monitor_condition.py`; webhook attempts are stored in `MonitorWebhookDelivery`; the MCP stdio wrapper in `app/mcp/alert_server.py` is a thin client over `/api/v1/alerts`.
 - Public API v1 is a lightweight FastAPI surface under `/api/v1` for Railway-style single-process deployment. API keys are dashboard-owned rows in `ApiKey`; public auth and rate limits are keyed by API key, not client IP. `POST /api/v1/extract` creates a normal single-URL crawl and runs one URL inline with HTTP-only settings, disabled LLM/browser/traversal/screenshots/network capture, and a capped timeout; public `surface="auto"` resolves to an internal concrete surface before run creation, while `ecommerce`, `content`, `article`, and `forum_thread` map to existing internal surfaces. Batch extraction remains deferred with structured `WORKER_REQUIRED`. Product alerts are active under `/api/v1/alerts` and reuse monitor-owned crawl runs, snapshots, events, and webhook delivery logs; stale `/api/v1/watches` routes are not registered. `GET /api/v1/domains/{domain}` reads existing `DomainMemory`, `DomainRunProfile`, and recent crawl rows without probing the target. `app/mcp_server/*` is a stateless FastMCP wrapper over `/api/v1` and does not import crawl services.
-- Orchestration is a use-case-first sequencing layer: `OrchestrationProject` groups business context, `OrchestrationWorkflowRun` stores resolved versioned template config, and `OrchestrationStepRun` links steps to normal `CrawlRun` rows. The MVP template is `competitive_pricing_snapshot`, which launches listing first, starts detail from completed listing record URLs, renders comparison rows from detail records, and promotes to normal `MonitorJob` rows. It does not implement extraction or mutate pipeline behavior.
+- Playground is the guided session layer: `PlaygroundSession` stores input URL, session state, selected URLs, and downstream run/job ids inside `step_data`. Discover and extract create normal crawl runs; enrich, compare, monitor, and audit launch their existing subsystems. Playground does not implement extraction or duplicate extracted data.
 - Scheduler driver split is explicit: `SCHEDULER_DRIVER=dev` starts `AsyncSchedulerLoop` from FastAPI lifespan with no Celery Beat; `SCHEDULER_DRIVER=celery` registers Celery Beat tasks `monitor.check_due_jobs` and `monitor.purge_expired_snapshots`.
 
 ### 6.3 Acquisition and browser runtime
@@ -254,7 +254,7 @@ Current live behavior:
 - fetch results carry headers, blocked state, browser diagnostics, transient browser artifacts, and network payload metadata
 - callers pass an explicit `AcquisitionPolicy`; `acquirer.py` translates that policy to `crawl_fetch_runtime.fetch_page` knobs so raw fetch-runtime controls stay inside acquisition
 - browser runtime is pooled and exposes runtime snapshots
-- `browserforge`-backed context identity is active
+- browser context identity is a minimal, host-OS-coherent UA de-headlessification (no `browserforge`, no fingerprint generator): `build_playwright_context_spec` rewrites the headless `HeadlessChrome` UA token to plain `Chrome` and emits matching `sec-ch-ua` client hints keyed off the host OS, because the engine runs headless bundled Chromium (see `docs/INVARIANTS.md` Rule 6, "Patchright runs headless bundled Chromium")
 - browser fetch uses `patchright` as the primary acquisition engine. There is no legacy `playwright-stealth` stack and no silent generic Chromium fallback. Explicit `real_chrome` remains an escalation lane for protected ecommerce detail pages and Product Intelligence native Google discovery when `C:\Program Files\Google\Chrome\Application\chrome.exe` (or `CRAWLER_RUNTIME_BROWSER_REAL_CHROME_EXECUTABLE_PATH`) is available.
 - `run_browser_surface_probe.py` is the canonical browser-surface verification harness for acquisition changes. It runs through the same shared browser runtime as crawls and writes timestamped `browser_surface_probe` artifacts with direct JS baseline, Sannysoft/Pixelscan/CreepJS extracted values, consensus drift, connection source metadata, and normalized findings. Report summary/Markdown rendering lives in `browser_surface_probe/report_rendering.py`.
 - the browser-surface probe treats `window.chrome.runtime` as healthy when its type is `object`, and its `isTrusted` behavioral smoke now uses real Playwright mouse input against a temporary overlay target instead of JS-dispatched synthetic events, so probe findings reflect actual runtime leaks instead of expected DOM-event semantics
@@ -305,9 +305,8 @@ Current live behavior:
 - once sanitized engine-scoped `real_chrome` domain state exists, later real-Chrome fetches skip origin warmup and go straight to the target URL
 - real Chrome is not challenge-exempt: if warmup or the direct PDP nav lands on a challenge shell, acquisition runs the same bounded challenge wait/activity/retry loop before returning a blocked verdict
 - browser contexts accept a per-fetch `proxy` for rotated-proxy traversal; `temporary_browser_page` is a thin wrapper over `SharedBrowserRuntime.page(proxy=...)`
-- `browser_identity` is host-OS-locked via `browserforge`, with a small regeneration loop to reject fingerprints whose UA tokens disagree with the OS
-- browser identity also normalizes exposed runtime hardware upstream: `hardwareConcurrency` is clamped to host-consistent values, `deviceMemory` is bucketed like Chrome, and page JS sees the same values as the generated context identity.
-- browser acquisition no longer injects custom init scripts into Patchright contexts; identity shaping is limited to context options, headers, locale/timezone alignment, and engine-native behavior so we do not reintroduce script-surface blockers
+- `browser_identity` is host-OS-coherent: the de-headlessified UA OS token, the `sec-ch-ua-platform` header, and the engine's native `navigator.platform` all agree, keyed off the host OS the browser runs on (Windows dev box vs Linux Docker in prod). There is no synthetic fingerprint generation and no UA-vs-OS regeneration loop; the engine is genuinely Chrome, so only the headless token is normalized.
+- browser acquisition no longer injects custom init scripts into Patchright contexts; identity shaping is limited to context options, headers, locale/timezone alignment, and engine-native behavior so we do not reintroduce script-surface blockers. Real Chrome (headful, native context) is exempt from de-headlessification because it already reports a clean UA.
 - browser runtime settings are split by concern: `runtime_settings.py` owns tunables/launch args, and `browser_fingerprint_profiles.py` owns static browser identity/profile constants
 - blocked-page escalation is now two-pronged: vendor-specific response headers (DataDome, Cloudflare, Akamai, PerimeterX, Sucuri, ...) classified via `classify_block_from_headers` short-circuit into the browser and mark the host vendor-blocked so sibling fetchers skip further HTTP attempts; HTML heuristics continue to catch vendor-silent blocks
 - `is_non_retryable_http_status` keeps `401` out of browser escalation (auth walls) while still escalating `403`/`429` challenges, and `classify_blocked_page` emits typed `BlockPageClassification` outcomes (`auth_wall`, `rate_limited`, `challenge_page`, ...) distinct from network failures
@@ -519,9 +518,7 @@ Primary models:
 - `LLMConfig`
 - `LLMCostLog`
 - `DomainMemory`
-- `OrchestrationProject`
-- `OrchestrationWorkflowRun`
-- `OrchestrationStepRun`
+- `PlaygroundSession`
 
 Notable current schema direction:
 
@@ -530,7 +527,7 @@ Notable current schema direction:
 - URL identity keys on records
 - enrichment status metadata on crawl records, with derived enrichment data stored separately in `enriched_products`
 - AI Discoverability audit report storage separated from crawl records, with JSON/Markdown artifacts in `ucp_audit_reports`; report JSON now carries sampled catalog crawl metadata, D-AID1 gate caps, structured markup signals, product sample summaries, robots/sitemap discovery signals, and evidence-backed repair roadmap items
-- orchestration project/workflow/step shells store references and resolved config only; extracted data stays in `crawl_records`, recurring state stays in monitor tables
+- playground sessions store step state and references only; extracted data stays in `crawl_records`, derived enrichment data stays in `enriched_products`, and recurring state stays in monitor tables
 - domain-memory storage
 - split crawl-data reset versus domain-memory reset, so destructive cleanup no longer wipes learned selectors/profiles/cookies by default
 
@@ -571,7 +568,7 @@ Implemented from recent extraction/audit work:
 
 - extruct-backed microdata + Open Graph support
 - generic network payload specs
-- browserforge identity restoration
+- host-OS-coherent headless UA de-headlessification (replaces browserforge identity)
 - URL tracking-param stripping
 - Nuxt data revival
 - selector self-heal + domain memory

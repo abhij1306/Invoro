@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 
 from app.services.acquisition import browser_identity
+from app.services.acquisition import browser_pool as acquisition_browser_pool
 from app.services.acquisition import browser_runtime as acquisition_browser_runtime
 import run_browser_surface_probe as probe
 
@@ -463,7 +464,7 @@ async def test_build_report_ignores_runtime_page_init_script_path(
         return runtime
 
     monkeypatch.setattr(
-        acquisition_browser_runtime,
+        acquisition_browser_pool,
         "build_playwright_context_spec",
         lambda **_: browser_identity.PlaywrightContextSpec(
             context_options={

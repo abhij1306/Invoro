@@ -1,6 +1,6 @@
 # Frontend Architecture
 
-> Last updated: 2026-05-19
+> Last updated: 2026-05-28
 
 This document describes the live frontend structure, what it actually calls in the backend, and the remaining client/backend drift that should stay visible.
 
@@ -29,9 +29,7 @@ App routes under `frontend/app`:
 - `/login`
 - `/register`
 - `/dashboard`
-- `/projects`
-- `/projects/new`
-- `/projects/[id]`
+- `/playground`
 - `/crawl`
 - `/crawl/category`
 - `/crawl/pdp`
@@ -159,6 +157,7 @@ Important live data features:
 
 Primary files:
 
+- `app/playground/page.tsx`
 - `app/dashboard/page.tsx`
 - `app/runs/page.tsx`
 - `app/monitors/*`
@@ -169,6 +168,7 @@ Primary files:
 
 Responsibilities:
 
+- guided playground flow for URL intake, product discovery, product selection, PDP extraction, pipeline launch, and unified results
 - dashboard metrics and recent runs
 - run history
 - monitor/alert list, creation, detail, event, history, current snapshot inspection, and webhook delivery log
@@ -217,7 +217,7 @@ The frontend currently uses live backend routes for:
 - jobs: `/api/jobs/active`
 - monitors: `/api/monitors`, `/api/monitors/{id}`, `/api/monitors/{id}/run/now`, `/api/monitors/{id}/events`, `/api/monitors/{id}/history`, `/api/monitors/{id}/snapshot/current`
 - alerts: `/api/alerts`, `/api/alerts/{id}`, `/api/alerts/{id}/test`, `/api/alerts/{id}/history`, `/api/alerts/{id}/deliveries`
-- orchestration: `/api/orchestration/projects`, `/api/orchestration/templates`, `/api/orchestration/workflows`, `/api/orchestration/workflows/{id}/status`, `/api/orchestration/workflows/{id}/promote`, `/api/orchestration/workflows/{id}/results/price-comparison`
+- playground: `/api/playground/sessions`, `/api/playground/sessions/{id}`, `/api/playground/sessions/{id}/discover`, `/api/playground/sessions/{id}/select`, `/api/playground/sessions/{id}/extract`, `/api/playground/sessions/{id}/pipeline`, `/api/playground/sessions/{id}/results`
 - notifications: `/api/notifications`, `/api/notifications/unread-count`, `/api/notifications/{id}/read`, `/api/notifications/monitors/{id}/read`
 
 ## 5. Known Client/Backend Drift

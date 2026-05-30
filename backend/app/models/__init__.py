@@ -21,11 +21,7 @@ from app.models.monitor import (
     MonitorWebhookDelivery,
 )
 from app.models.notification import InAppNotification
-from app.models.orchestration import (
-    OrchestrationProject,
-    OrchestrationStepRun,
-    OrchestrationWorkflowRun,
-)
+from app.models.playground import PlaygroundSession
 from app.models.product_intelligence import (
     ProductIntelligenceCandidate,
     ProductIntelligenceJob,
@@ -62,9 +58,7 @@ __all__ = [
     "MonitorURLState",
     "MonitorWebhookDelivery",
     "InAppNotification",
-    "OrchestrationProject",
-    "OrchestrationWorkflowRun",
-    "OrchestrationStepRun",
+    "PlaygroundSession",
     "ReviewPromotion",
     "UCPAuditJob",
     "UCPAuditPageResult",

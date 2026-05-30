@@ -412,6 +412,45 @@ def _join_text_parts(parts: list[str | None], *, separator: str) -> str | None:
     return separator.join(cleaned_parts) if cleaned_parts else None
 
 
+def _color_value_is_opaque_code(value: str) -> bool:
+    """Reject internal swatch/style codes that masquerade as colors.
+
+    Real color values render as human-readable text. Some sources (e.g.
+    Patagonia structured payload ``"color":["SMDB","FGE","OLGG",...]``)
+    expose internal short codes for swatches. The full color names exist
+    elsewhere on the page; the codes pollute the canonical color when
+    the candidate scoring picks the first list element.
+
+    Signature: short (2-5 chars), all upper-case, no separators, AND not a
+    recognized short color word. Lowercase short values can be real DOM color
+    text ("mint", "ecru", "aqua") and must not be dropped here.
+    """
+    text = value.strip()
+    if not text or " " in text or any(sep in text for sep in ("-", "_", "/", ".")):
+        return False
+    if not re.fullmatch(r"[A-Za-z]{2,5}", text):
+        return False
+    if not text.isupper():
+        return False
+    if text.casefold() in _SHORT_COLOR_ALLOWLIST:
+        return False
+    return True
+
+
+_SHORT_COLOR_ALLOWLIST = frozenset(
+    {
+        # short, real color words. Lower-case only is fine; real PDPs use
+        # mixed-case rendering. Keep this list narrow — it only protects
+        # genuinely human-readable short forms.
+        "red", "tan", "navy", "blue", "pink", "gold", "lime", "teal",
+        "gray", "grey", "black", "white", "green", "ivory", "khaki",
+        "olive", "rose", "wine", "rust", "sand", "snow", "cyan",
+        "plum", "ruby", "lilac", "coral", "azure", "beige", "amber",
+        "denim", "ochre", "mocha", "mauve", "stone", "stoun",
+    }
+)
+
+
 def _sanitize_option_scalar(field_name: str, value: object) -> str | None:
     text = coerce_text(value)
     if not text:
@@ -443,6 +482,8 @@ def _sanitize_option_scalar(field_name: str, value: object) -> str | None:
         if _SMALL_NUMERIC_RE.fullmatch(cleaned):
             return None
         if _TRACKING_PIXEL_RE.fullmatch(cleaned):
+            return None
+        if _color_value_is_opaque_code(cleaned):
             return None
         match = re.fullmatch(r"select\s+(.+?)\s+color", cleaned, flags=re.I)
         if match is not None:
@@ -709,10 +750,24 @@ def coerce_field_value(field_name: str, value: object, page_url: str) -> object 
     if field_name == "gender":
         return coerce_gender(value)
     if field_name in OPTION_SCALAR_FIELDS:
+        scalar_input: object = value
+        if field_name == "color" and isinstance(value, list):
+            # Filter out opaque internal swatch codes before picking the first
+            # candidate. Real human-readable colors elsewhere in the list
+            # should win over codes like "SMDB"/"OLGG".
+            filtered = [
+                item
+                for item in value
+                if not (
+                    isinstance(item, str) and _color_value_is_opaque_code(item)
+                )
+            ]
+            if filtered:
+                scalar_input = filtered
         return _sanitize_option_scalar(
             field_name,
             coerce_structured_scalar(
-                value,
+                scalar_input,
                 keys=(field_name, "name", "title", "label", "value", "text"),
             ),
         )

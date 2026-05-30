@@ -9,13 +9,17 @@ __all__ = (
     "variant_row_richness",
     "merge_variant_pair",
     "merge_variant_rows",
+    "axis_values_are_mislabeled_duplicate",
 )
 
 import itertools
 import logging
 from typing import Any
 
-from app.services.config.extraction_rules import VARIANT_SIZE_ALIAS_SUFFIXES
+from app.services.config.extraction_rules import (
+    VARIANT_MISLABELED_AXIS_MIN_OVERLAP_RATIO,
+    VARIANT_SIZE_ALIAS_SUFFIXES,
+)
 from app.services.extract.variant_axis import (
     normalized_variant_axis_key,
     variant_axis_allowed_single_tokens,
@@ -29,6 +33,56 @@ _variant_size_alias_suffixes = tuple(
     for token in tuple(VARIANT_SIZE_ALIAS_SUFFIXES or ())
     if str(token).strip()
 )
+try:
+    _variant_mislabeled_axis_min_overlap_ratio = float(
+        VARIANT_MISLABELED_AXIS_MIN_OVERLAP_RATIO
+    )
+except (TypeError, ValueError):
+    _variant_mislabeled_axis_min_overlap_ratio = 0.5
+
+
+def _normalized_axis_value_set(values: object) -> set[str]:
+    if isinstance(values, (list, tuple, set, frozenset)):
+        raw_values = list(values)
+    elif values in (None, "", [], {}):
+        raw_values = []
+    else:
+        raw_values = [values]
+    normalized: set[str] = set()
+    for value in raw_values:
+        cleaned = clean_text(value).casefold()
+        if cleaned:
+            normalized.add(cleaned)
+    return normalized
+
+
+def axis_values_are_mislabeled_duplicate(
+    values_a: object,
+    values_b: object,
+    *,
+    min_overlap_ratio: float | None = None,
+) -> bool:
+    """Return True when two axis value sets are really one axis mislabeled.
+
+    Generic guard: a real second axis multiplies the variant matrix, but when a
+    second axis (often from a different source) carries (almost) the same value
+    set as an existing axis, the two "axes" are the same single axis under two
+    names. Treating them as independent fabricates a Cartesian explosion.
+    """
+    set_a = _normalized_axis_value_set(values_a)
+    set_b = _normalized_axis_value_set(values_b)
+    if not set_a or not set_b:
+        return False
+    ratio = (
+        _variant_mislabeled_axis_min_overlap_ratio
+        if min_overlap_ratio is None
+        else min_overlap_ratio
+    )
+    overlap = len(set_a & set_b)
+    if not overlap:
+        return False
+    smaller = min(len(set_a), len(set_b))
+    return overlap / smaller >= ratio
 
 def split_variant_axes(
     axes: dict[str, list[str]],
@@ -64,6 +118,63 @@ def split_variant_axes(
     return selectable, single_value_attributes
 
 
+def _collapse_mislabeled_duplicate_axes(
+    options_matrix: dict[str, list[str]],
+    variants: list[dict[str, Any]],
+) -> dict[str, list[str]]:
+    """Drop a matrix axis that is the same single axis mislabeled under two names.
+
+    Two axes whose value sets substantially overlap are not independent
+    dimensions; multiplying them fabricates phantom combinations. Keep the axis
+    that the variant rows actually carry inside `option_values` (the real one)
+    and drop the duplicate so the Cartesian product cannot explode.
+    """
+    keys = list(options_matrix.keys())
+    if len(keys) < 2:
+        return options_matrix
+    option_value_axis_counts: dict[str, int] = {key: 0 for key in keys}
+    for variant in variants:
+        option_values = variant.get("option_values")
+        if not isinstance(option_values, dict):
+            continue
+        for key in keys:
+            if text_or_none(option_values.get(key)):
+                option_value_axis_counts[key] += 1
+    dropped: set[str] = set()
+    for index, key_a in enumerate(keys):
+        if key_a in dropped:
+            continue
+        for key_b in keys[index + 1 :]:
+            if key_b in dropped:
+                continue
+            if not axis_values_are_mislabeled_duplicate(
+                options_matrix.get(key_a, []),
+                options_matrix.get(key_b, []),
+            ):
+                continue
+            # Keep the axis the variant rows actually populate; on a tie keep the
+            # axis with more distinct values, then the first-declared axis.
+            if option_value_axis_counts[key_a] != option_value_axis_counts[key_b]:
+                weaker = (
+                    key_b
+                    if option_value_axis_counts[key_a]
+                    >= option_value_axis_counts[key_b]
+                    else key_a
+                )
+            elif len(options_matrix.get(key_a, [])) >= len(
+                options_matrix.get(key_b, [])
+            ):
+                weaker = key_b
+            else:
+                weaker = key_a
+            dropped.add(weaker)
+            if weaker == key_a:
+                break
+    if not dropped:
+        return options_matrix
+    return {key: values for key, values in options_matrix.items() if key not in dropped}
+
+
 def resolve_variants(
     options_matrix: dict[str, list[str]],
     variants: list[dict[str, Any]],
@@ -72,6 +183,7 @@ def resolve_variants(
     if not options_matrix or not variants:
         return list(variants)
 
+    options_matrix = _collapse_mislabeled_duplicate_axes(options_matrix, variants)
     keys = list(options_matrix.keys())
     if not keys:
         return list(variants)

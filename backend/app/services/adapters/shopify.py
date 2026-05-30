@@ -283,7 +283,12 @@ class ShopifyAdapter(BaseAdapter):
                 return prefix
         if any(token in tokens for token in ("mist", "fragrance", "scent")) and len(tokens) > 3:
             return "-".join(tokens[:-2])
-        return "-".join(tokens[:-1])
+        # Without at least one true sibling handle on the page, the last
+        # handle token is most likely a SKU/style code or a category word,
+        # not a color. Returning a fabricated family-prefix here causes the
+        # adapter to invent ``color`` from the SKU tail (e.g. Dime
+        # ``dime2sp2542blk`` or Pura Vida ``bracelet``). Refuse to guess.
+        return ""
 
     def _linked_group_axis(self, group: object) -> str:
         if not hasattr(group, "get"):

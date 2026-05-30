@@ -159,6 +159,16 @@ Diagnostics controls are user controls. If `diagnostics_profile.capture_screensh
 
 Browser-driver disconnects are URL-local failures. If a shared browser dies during `new_context`, page bootstrap, or content serialization, the runtime may recycle that browser once, but `_batch_runtime.py` must keep the failure scoped to the current URL and continue the batch.
 
+**Patchright runs headless bundled Chromium; headless leaks must be masked.**
+
+- Engine is `patchright` headless bundled Chromium (`--headless=new`), not Patchright's headful `channel="chrome"` mode. Headless leaks a `HeadlessChrome` UA token with no `sec-ch-ua` hints, which PX/Akamai/DataDome block on sight.
+- `build_playwright_context_spec` MUST rewrite the UA to plain `Chrome` with coherent `sec-ch-ua` headers. UA OS token, `sec-ch-ua-platform`, and native `navigator.platform` MUST agree, keyed off host OS. Real Chrome (headful, native context) is exempt.
+- No `browserforge`, no JS init-script shaping. Patchright's "no fingerprint injection" guidance applies only to headful `channel="chrome"` and never justifies dropping the mask while headless.
+- Origin warmup is non-fatal and budget-capped (`origin_warmup_max_budget_ratio`): a blocked/challenge-shell origin MUST NOT raise or abort; the main navigation owns the blocked verdict.
+- Challenge recovery re-checks for clear immediately after challenge activity (activity is ~2s; providers often clear during it) to avoid a needless engine escalation on an already-usable page.
+- A terminal hard block (title/strong "Access Denied" evidence, no active challenge or challenge-element markers) never clears by waiting; the recovery loop exits early and skips the retry-goto so real-Chrome escalation is not delayed by the full challenge budget.
+- Challenge recovery MUST re-read and re-classify the live DOM on every poll. It may not gate the clear-check on a provider cookie (e.g. Akamai `_abck`): a provider shell (Akamai/DataDome/PerimeterX) clears by swapping in real content, so the re-read HTML is the source of truth. Gating the re-check on a cookie that never appears in-page makes Patchright miss an already-usable page and wastes the whole challenge budget before a needless real-Chrome escalation. A missing provider cookie is at most a hint, never a reason to skip the DOM re-check.
+
 **Usable content beats provider noise. This is a hard contract.**
 If browser diagnostics report `browser_outcome == "usable_content"`, provider telemetry such as `provider:*`,
 `active_provider:*`, `challenge_provider_hits`, vendor headers, Akamai/DataDome/Cloudflare script markers,
@@ -288,20 +298,18 @@ HEAD pre-check is conservative. If HEAD, validator comparison, or fallback hashi
 
 ---
 
-## 12. Orchestration — Sequencing Only
+## 12. Playground — Sequencing Only
 
-**Rule:** Orchestration maps business goals to existing crawl and monitor primitives. It stores thin project/workflow/step shells and resolved template config. It must not implement extraction, add a parallel data store for extracted rows, or hide the underlying crawl run.
+**Rule:** Playground maps one user-entered URL to existing crawl, enrichment, Product Intelligence, monitor/alert, and audit primitives. It stores a thin `PlaygroundSession` shell with session state plus referenced run/job ids inside `step_data`. It must not implement extraction, add a parallel data store for extracted rows, or hide the underlying crawl run or downstream job.
 
-The workflow runner creates normal `CrawlRun` rows and links them from `OrchestrationStepRun.run_id`. A continuation to recurring tracking creates a normal `MonitorJob`. Result views read existing `CrawlRecord.data`.
-
-The intent endpoint is propose-only. It may return a prefilled config, but `requires_user_confirmation` must stay true and it must not dispatch a run.
+The playground flow creates normal `CrawlRun` rows for discover/extract, launches existing downstream subsystems for enrich/compare/monitor/audit, and reads existing result stores (`crawl_records`, enrichment rows, PI jobs, alerts, audit reports) for result views.
 
 **VIOLATION signatures:**
-- Orchestration code parses HTML, repairs fields, or changes extraction ranking.
-- Workflow result tables store extracted product rows outside `crawl_records`.
-- A workflow silently enables `llm_enabled`, rewrites `surface`, changes traversal intent, or injects a proxy profile without user-visible resolved config.
-- `/api/orchestration/intent` creates a project, workflow, crawl run, monitor, alert, or export.
-- A project view omits the crawl run ID or Crawl Studio route for the underlying run.
+- Playground code parses HTML, repairs fields, or changes extraction ranking.
+- Playground stores extracted product rows outside existing crawl/enrichment/PI/audit stores.
+- A playground step silently enables `llm_enabled`, rewrites `surface`, changes traversal intent, or injects a proxy profile without user-visible config.
+- `/api/playground/*` launches a bespoke extraction path instead of creating/reading normal subsystem records.
+- A playground result view omits the underlying crawl run id or downstream job/alert id.
 
 ---
 
@@ -342,3 +350,47 @@ The intent endpoint is propose-only. It may return a prefilled config, but `requ
 - `emit_browser_behavior_activity(page)` is called inside `_google_native_session`.
 - `_quoted` wraps every search token in double quotes.
 - `page.goto` is used for search execution instead of interacting with the search box.
+
+---
+
+## 16. Product Intelligence — Discovery Identity Ladder
+
+**Rule:** Deterministic product matching uses a fixed identity ladder, strongest signal first.
+Owner: `product_intelligence/matching.py` (`score_candidate`) + `product_intelligence/discovery.py`,
+thresholds in `config/product_intelligence.py`. No LLM in the deterministic path (see Rule 10).
+
+Ladder (highest confidence first), with the basis recorded in `score_reasons["match_basis"]`:
+1. **GTIN/UPC exact** — strongest, auto-accept.
+2. **Manufacturer style/model code exact** — GTIN-class. The universal cross-retailer code
+   (e.g. Nike `FV5285`) must be **decomposed** from a composite retailer SKU before comparison.
+   Belk SKUs glue a numeric retailer prefix onto the manufacturer core (`3900462FV5285` → `FV5285`),
+   and external listings expose it bare or with a colorway suffix (`FV5285-002`). Match on the core.
+3. **Brand-DTC own listing** (brand-exact on the brand's own domain).
+4. **Brand-exact + strong title similarity.**
+5. **Brand-exact + distinctive model token** — model-level match. The distinctive model name
+   (brand-stripped, generic-descriptor-stripped, e.g. `promina`) is matched **directionally**
+   (source distinctive tokens must be contained in the candidate) so a truncated generic candidate
+   cannot self-promote.
+6. **Brand-exact + medium title similarity.**
+7. **Title-only** — refinement, never auto-accept.
+
+**Brand resolution is evidence-based, not allowlist-gated.** The brand registry / `BRAND_DOMAIN_MAP`
+only *canonicalizes* aliases. A candidate whose own text states the source brand matches even when the
+brand is absent from the registry. Brand is never fabricated without candidate-side evidence (Rule 6).
+
+**Colorway and size are the SAME model, not a variant mismatch.** The variant-spec guard
+(`_variant_spec_mismatch`) only fires on genuine spec conflicts (capacity unit, "N-in-1"). Footwear/apparel
+color and size differences must stay matchable. Candidate URLs are canonicalized (volatile size/color/
+tracking query params stripped) before dedupe so one listing at N sizes consumes one candidate slot.
+
+**The manufacturer style core and distinctive model token are NOT a site-specific path** (Rule 13): they
+apply to every branded ecommerce target. Raw internal retailer identifiers (a composite SKU string,
+`product_id`, `style_id`) are still never scored as-is — only the decomposed manufacturer core.
+
+**VIOLATION signatures:**
+- Scoring a raw composite retailer SKU string as an identity signal instead of the decomposed core.
+- Gating `brand_match` on registry membership so an obviously-branded candidate cannot match.
+- Treating a colorway/size difference as a wrong-product variant mismatch.
+- A single listing at multiple sizes consuming multiple per-product candidate slots (missing canonical dedupe).
+- Re-introducing image/pHash matching for recall (audited NO-GO: rejects same-model colorways).
+- Adding an LLM call to the deterministic discovery/matching path.

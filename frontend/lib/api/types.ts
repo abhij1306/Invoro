@@ -936,112 +936,11 @@ export interface InAppNotification {
   created_at: string;
 }
 
-export type OrchestrationProject = {
+export type PlaygroundSessionResponse = {
   id: number;
-  user_id: number | null;
-  name: string;
-  description: string;
-  competitors: string[];
-  category: string;
-  tracked_fields: string[];
-  archived: boolean;
+  input_url: string;
+  state: string;
+  step_data: Record<string, unknown>;
   created_at: string;
   updated_at: string;
-};
-
-export type OrchestrationProjectCreatePayload = {
-  name: string;
-  description?: string;
-  competitors?: string[];
-  category?: string;
-  tracked_fields?: string[];
-};
-
-export type OrchestrationTemplate = {
-  id: string;
-  display_name: string;
-  description: string;
-  version: string;
-  intent_inputs: Array<Record<string, unknown>>;
-  pipeline_defaults: Record<string, unknown>;
-  advanced_overrides: string[];
-  steps: Array<Record<string, unknown>>;
-  continuations: Array<Record<string, unknown>>;
-};
-
-export type OrchestrationStepRun = {
-  id: number;
-  workflow_id: number;
-  step_id: string;
-  step_type: string;
-  status: string;
-  run_id: number | null;
-  inputs: Record<string, unknown>;
-  outputs: Record<string, unknown>;
-  error: string | null;
-  created_at: string;
-  updated_at: string;
-};
-
-export type OrchestrationWorkflow = {
-  id: number;
-  user_id: number | null;
-  project_id: number;
-  template_id: string;
-  template_version: string;
-  label: string;
-  status: string;
-  intent_inputs: Record<string, unknown>;
-  advanced_overrides: Record<string, unknown>;
-  pipeline_config: Record<string, unknown>;
-  summary: Record<string, unknown>;
-  monitor_id: number | null;
-  completed_at: string | null;
-  created_at: string;
-  updated_at: string;
-  steps: OrchestrationStepRun[];
-};
-
-export type OrchestrationWorkflowCreatePayload = {
-  template_id: string;
-  project_id: number;
-  label: string;
-  intent_inputs: Record<string, unknown>;
-  advanced_overrides?: Record<string, unknown>;
-};
-
-export type OrchestrationPromotePayload = {
-  schedule_interval_hours?: number;
-  retention_days?: number;
-  priority?: MonitorPriority;
-};
-
-export type OrchestrationPromoteResponse = {
-  workflow_id: number;
-  monitor_id: number;
-  url_count: number;
-  tracked_fields: string[];
-};
-
-export type PriceComparisonRow = {
-  record_id: number;
-  run_id: number;
-  product: string;
-  brand: string;
-  domain: string;
-  price: unknown;
-  was_price: unknown;
-  currency: string | null;
-  availability: string | null;
-  source_url: string;
-};
-
-export type PriceComparisonResponse = {
-  workflow_id: number;
-  project_id: number;
-  detail_run_id: number | null;
-  rows: PriceComparisonRow[];
-  export_csv_url: string | null;
-  export_json_url: string | null;
-  crawl_studio_url: string | null;
 };

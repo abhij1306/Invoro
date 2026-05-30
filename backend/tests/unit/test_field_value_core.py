@@ -979,6 +979,62 @@ def test_coerce_color_rejects_tracking_pixel_classes() -> None:
     assert coerce_field_value("color", "_fbp", "https://example.com/p") is None
 
 
+@pytest.mark.unit
+def test_coerce_color_rejects_internal_swatch_codes() -> None:
+    """JSON-LD ``"color":["SMDB","FGE","OLGG",...]`` exposes internal swatch
+    codes (Patagonia pattern). Real human-readable colors render in mixed
+    case ("Bobcat Brown", "Aquatic Blue"). All-caps short tokens are almost
+    always internal codes and must be rejected so a real value can win.
+    """
+    # Vowel-less consonant clusters and other short all-caps codes are codes.
+    assert coerce_field_value("color", "SMDB", "https://example.com/p") is None
+    assert coerce_field_value("color", "OLGG", "https://example.com/p") is None
+    assert coerce_field_value("color", "BLK", "https://example.com/p") is None
+    assert coerce_field_value("color", "AQT", "https://example.com/p") is None
+    # Mixed-case short colors and longer human-readable values are kept.
+    assert (
+        coerce_field_value("color", "Tan", "https://example.com/p") == "Tan"
+    )
+    assert (
+        coerce_field_value("color", "mint", "https://example.com/p") == "mint"
+    )
+    assert (
+        coerce_field_value("color", "cream", "https://example.com/p") == "cream"
+    )
+    assert (
+        coerce_field_value("color", "Bobcat Brown", "https://example.com/p")
+        == "Bobcat Brown"
+    )
+    assert (
+        coerce_field_value("color", "Aquatic Blue", "https://example.com/p")
+        == "Aquatic Blue"
+    )
+
+
+@pytest.mark.unit
+def test_coerce_color_list_skips_opaque_codes_for_real_value() -> None:
+    """When JSON-LD payload exposes a list of color codes mixed with real
+    names, the first real name should win.
+    """
+    assert (
+        coerce_field_value(
+            "color",
+            ["SMDB", "Bobcat Brown", "OLGG"],
+            "https://example.com/p",
+        )
+        == "Bobcat Brown"
+    )
+    # All codes -> drop entirely so a downstream tier can fill the gap.
+    assert (
+        coerce_field_value(
+            "color",
+            ["SMDB", "OLGG", "BLK"],
+            "https://example.com/p",
+        )
+        is None
+    )
+
+
 @pytest.mark.parametrize(
     "label",
     ["Photos", "Verified Purchases", "Reviews", "Description", "Specifications"],

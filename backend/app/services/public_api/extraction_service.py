@@ -32,6 +32,7 @@ from app.services.pipeline.types import URLProcessingConfig
 from app.services.platform_policy import resolve_platform_runtime_policy
 from app.services.publish import VERDICT_BLOCKED, VERDICT_ERROR, VERDICT_EMPTY
 from app.services.surface_resolver import (
+    SurfaceResolution,
     public_surface_for_internal,
     resolve_public_surface,
 )
@@ -161,7 +162,7 @@ def _validate_url(value: str) -> str:
     return url
 
 
-def _internal_surface(value: str, *, url: str) -> Any:
+def _internal_surface(value: str, *, url: str) -> SurfaceResolution:
     resolution = resolve_public_surface(value, url=url)
     if resolution is None:
         raise PublicApiError(

@@ -64,8 +64,11 @@ class MonitorSchedulerService:
                     content_hash = await _stream_content_hash(client, url)
                     state.last_checked_at = now
                     had_prior_hash = bool(state.last_content_hash)
-                    changed = not had_prior_hash or state.last_content_hash != content_hash
-                    if content_hash is not None:
+                    if content_hash is None:
+                        # Unknown content — treat as changed only if no prior hash exists.
+                        changed = not had_prior_hash
+                    else:
+                        changed = not had_prior_hash or state.last_content_hash != content_hash
                         state.last_content_hash = content_hash
                     if changed:
                         state.last_changed_at = now
