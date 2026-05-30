@@ -207,6 +207,11 @@ class CrawlerRuntimeSettings(BaseSettings):
     browser_navigation_domcontentloaded_timeout_ms: int = 15000
     browser_navigation_optimistic_wait_ms: int = 3000
     browser_spa_implicit_networkidle_timeout_ms: int = 6000
+    # Detail pages whose structured data marks them ready immediately fast-path past
+    # the networkidle wait, so async variant/option XHRs (e.g. SFCC dwvar product
+    # variation calls) can still be in flight when the DOM is serialized. This is a
+    # bounded best-effort settle to let those payloads land for ready detail pages.
+    browser_detail_payload_settle_timeout_ms: int = 4000
     browser_navigation_min_commit_wait_ms: int = 8000
     browser_navigation_min_final_commit_timeout_ms: int = 15000
     browser_vendor_block_probe_timeout_seconds: float = 12.0

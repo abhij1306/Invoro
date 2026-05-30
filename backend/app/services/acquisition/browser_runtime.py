@@ -320,6 +320,11 @@ async def browser_fetch(
     payload_capture = None
     popup_guard_registrations: list[tuple[Any, str, Any]] = []
     try:
+        # Time the launch/reuse window (runtime resolve + browser launch + semaphore
+        # acquire + context open + storage-state load). This window precedes
+        # `started_at` below, so without this probe it is invisible in
+        # phase_timings_ms — which is exactly where a slow 2nd-acquisition launch hides.
+        page_acquire_started_at = time.perf_counter()
         runtime, page_context = await _resolve_browser_fetch_page_context(
             proxy=proxy,
             proxied_page_factory=proxied_page_factory,
@@ -331,6 +336,7 @@ async def browser_fetch(
             allow_storage_state=allow_storage_state,
         )
         async with page_context as page:
+            phase_timings_ms["page_acquire"] = _elapsed_ms(page_acquire_started_at)
             (
                 runtime_engine,
                 runtime_binary,
@@ -655,11 +661,12 @@ async def _prepare_browser_fetch_launch_context(
     bridge_flag = getattr(runtime, "bridge_used", None) if runtime is not None else None
     runtime_bridge_used = bool(bridge_flag()) if callable(bridge_flag) else False
     skip_origin_warmup = False
-    if (
-        runtime_engine == _REAL_CHROME_BROWSER_ENGINE
-        and allow_storage_state
-        and normalized_domain
-    ):
+    if allow_storage_state and normalized_domain:
+        # Same-domain repeat hits already load saved domain storage state into the
+        # context, so re-running the multi-second origin warmup is redundant. This
+        # skip is engine-agnostic: patchright (the default detail engine) gets the
+        # same reuse benefit real_chrome already had, instead of paying ~7s warmup
+        # on every sequential acquisition in a batch.
         skip_origin_warmup = bool(
             await cookie_store.load_storage_state_for_domain(
                 normalized_domain,
