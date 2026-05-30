@@ -57,10 +57,26 @@ async def recover_browser_challenge(
     poll_ms = max(100, int(challenge_poll_interval_ms))
     deadline = wait_started_at + max_wait_seconds
     while time.perf_counter() < deadline:
-        await _emit_challenge_activity(page)
+        checked_via_akamai = False
         if "akamai" in providers and await _page_has_cookie(
             page, url=url, name="_abck"
         ):
+            html = await get_page_html(page)
+            classification = await classify_blocked_page(
+                html,
+                _recovered_html_status_code(status_code),
+            )
+            checked_via_akamai = True
+            if _challenge_has_cleared(
+                html,
+                status_code=_recovered_html_status_code(status_code),
+                classification=classification,
+                looks_like_low_content_shell=looks_like_low_content_shell,
+            ):
+                phase_timings_ms["challenge_wait"] = elapsed_ms(wait_started_at)
+                return _response_for_recovered_page(response, status_code)
+
+        if not checked_via_akamai:
             html = await get_page_html(page)
             classification = await classify_blocked_page(
                 html,
@@ -74,31 +90,22 @@ async def recover_browser_challenge(
             ):
                 phase_timings_ms["challenge_wait"] = elapsed_ms(wait_started_at)
                 return _response_for_recovered_page(response, status_code)
+
+        await _emit_challenge_activity(page)
+
         remaining_ms = max(0, int((deadline - time.perf_counter()) * 1000))
         if remaining_ms <= 0:
             break
         await page.wait_for_timeout(min(poll_ms, remaining_ms))
-        html = await get_page_html(page)
-        classification = await classify_blocked_page(
-            html,
-            _recovered_html_status_code(status_code),
-        )
-        if _challenge_has_cleared(
-            html,
-            status_code=_recovered_html_status_code(status_code),
-            classification=classification,
-            looks_like_low_content_shell=looks_like_low_content_shell,
-        ):
-            phase_timings_ms["challenge_wait"] = elapsed_ms(wait_started_at)
-            return _response_for_recovered_page(response, status_code)
     phase_timings_ms["challenge_wait"] = elapsed_ms(wait_started_at)
 
     retry_started_at = time.perf_counter()
+    remaining_budget_ms = max(500, int((deadline - retry_started_at) * 1000))
     try:
         retried_response = await page.goto(
             url,
             wait_until="domcontentloaded",
-            timeout=min(int(timeout_seconds * 1000), int(navigation_timeout_ms)),
+            timeout=min(remaining_budget_ms, int(navigation_timeout_ms)),
         )
     except Exception:
         phase_timings_ms["challenge_retry"] = elapsed_ms(retry_started_at)

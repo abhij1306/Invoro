@@ -227,7 +227,6 @@ class CrawlerRuntimeSettings(BaseSettings):
     browser_real_chrome_native_context: bool = True
     browser_patchright_enabled: bool = True
     browser_launch_args: tuple[str, ...] = (
-        "--disable-blink-features=AutomationControlled",
         "--disable-features=IsolateOrigins,site-per-process",
         "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
         "--window-size=1920,1080",
@@ -236,7 +235,6 @@ class CrawlerRuntimeSettings(BaseSettings):
         "--disable-client-side-phishing-detection",
         "--disable-domain-reliability",
         "--disable-sync",
-        "--disable-component-update",
         "--no-first-run",
     )
     browser_use_new_headless: bool = True

@@ -21,12 +21,16 @@ from app.services.acquisition.browser_diagnostics import (
 )
 from app.services.acquisition.browser_identity import (
     PlaywrightContextSpec,
-    build_playwright_context_spec,
     clear_browser_identity_cache,
+)
+from app.services.acquisition.browser_pool_spec import (
+    build_playwright_context_spec,
+    Socks5AuthBridge,
+    persist_context_storage_state,
+    REAL_CHROME_IGNORE_DEFAULT_ARGS,
 )
 from app.services.acquisition.browser_page_helpers import object_int as _int_or_zero
 from app.services.acquisition.browser_proxy_bridge import (
-    Socks5AuthBridge,
     parse_socks5_upstream_proxy,
 )
 from app.services.acquisition.browser_proxy_config import (
@@ -36,11 +40,9 @@ from app.services.acquisition.browser_proxy_config import (
 from app.services.acquisition.browser_storage_state import (
     DOMAIN_STORAGE_PERSIST_ATTR as _DOMAIN_STORAGE_PERSIST_ATTR,
     RUN_STORAGE_PERSIST_ATTR as _RUN_STORAGE_PERSIST_ATTR,
-    persist_context_storage_state,
 )
 from app.services.config.browser_fingerprint_profiles import (
     NATIVE_REAL_CHROME_CONTEXT_OPTIONS,
-    REAL_CHROME_IGNORE_DEFAULT_ARGS,
 )
 from app.services.config.network_capture import (
     BLOCKED_BROWSER_RESOURCE_TYPES,
@@ -55,11 +57,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def _facade_attr(name: str, default):
-    import sys
 
-    facade = sys.modules.get("app.services.acquisition.browser_runtime")
-    return getattr(facade, name, default) if facade is not None else default
 
 
 
@@ -133,25 +131,20 @@ def _async_playwright_manager_for_engine(engine: str):
     normalized_engine = _normalize_browser_engine(engine)
     if normalized_engine in {_PATCHRIGHT_BROWSER_ENGINE, _CHROMIUM_BROWSER_ENGINE}:
         try:
-            playwright_factory = _facade_attr(
-                "_patchright_async_playwright_factory",
-                _patchright_async_playwright_factory,
-            )
+            playwright_factory = _patchright_async_playwright_factory
             return playwright_factory()
         except Exception as exc:
             raise RuntimeError(
                 "Patchright package is not available for browser runtime"
             ) from exc
     try:
-        playwright_factory = _facade_attr(
-            "_patchright_async_playwright_factory",
-            _patchright_async_playwright_factory,
-        )
+        playwright_factory = _patchright_async_playwright_factory
         return playwright_factory()
     except Exception as exc:
         raise RuntimeError(
             "Patchright package is not available for real_chrome browser runtime"
         ) from exc
+
 
 class SharedBrowserRuntime:
     def __init__(
@@ -163,7 +156,7 @@ class SharedBrowserRuntime:
     ) -> None:
         self.max_contexts = max(1, int(max_contexts))
         self.browser_engine = _normalize_browser_engine(browser_engine)
-        resolve_binary = _facade_attr("_resolve_browser_binary", _resolve_browser_binary)
+        resolve_binary = _resolve_browser_binary
         self.executable_path, self.browser_binary = resolve_binary(
             self.browser_engine
         )
@@ -248,10 +241,7 @@ class SharedBrowserRuntime:
                         "Real Chrome executable is not available for browser runtime"
                     )
                 launch_kwargs["executable_path"] = self.executable_path
-                real_chrome_ignore_args = _facade_attr(
-                    "REAL_CHROME_IGNORE_DEFAULT_ARGS",
-                    REAL_CHROME_IGNORE_DEFAULT_ARGS,
-                )
+                real_chrome_ignore_args = REAL_CHROME_IGNORE_DEFAULT_ARGS
                 ignore_default_args = [
                     str(arg).strip()
                     for arg in (real_chrome_ignore_args or ())
@@ -290,7 +280,6 @@ class SharedBrowserRuntime:
             context: BrowserContext | None = None
             try:
                 context = await self._browser.new_context(**cast(Any, context_options))
-                await _configure_context_routes(context)
                 async with self._counter_lock:
                     self._total_contexts_created += 1
                 page = await context.new_page()
@@ -318,7 +307,7 @@ class SharedBrowserRuntime:
         if self._authenticated_socks5_proxy is None:
             return dict(self.launch_proxy_config)
         if self._socks5_auth_bridge is None:
-            bridge_cls = _facade_attr("Socks5AuthBridge", Socks5AuthBridge)
+            bridge_cls = Socks5AuthBridge
             self._socks5_auth_bridge = bridge_cls(
                 self._authenticated_socks5_proxy
             )
@@ -362,10 +351,7 @@ class SharedBrowserRuntime:
                 browser_major_version = int(raw_version.split(".", 1)[0])
             except ValueError:
                 browser_major_version = None
-        spec_builder = _facade_attr(
-            "build_playwright_context_spec",
-            build_playwright_context_spec,
-        )
+        spec_builder = build_playwright_context_spec
         spec = spec_builder(
             run_id=run_id,
             browser_major_version=browser_major_version,
@@ -458,10 +444,7 @@ class SharedBrowserRuntime:
         finally:
             await self._update_active_contexts(-1)
             if context is not None:
-                persist_storage_state = _facade_attr(
-                    "persist_context_storage_state",
-                    persist_context_storage_state,
-                )
+                persist_storage_state = persist_context_storage_state
                 await persist_storage_state(
                     context,
                     run_id=run_id,
@@ -555,12 +538,6 @@ class SharedBrowserRuntime:
             "bridge_used": self.bridge_used(),
         }
         return snapshot
-
-async def _configure_context_routes(context: Any) -> None:
-    try:
-        await context.route("**/*", _block_unneeded_route)
-    except Exception:
-        logger.debug("Failed to install browser request blocking", exc_info=True)
 
 async def _block_unneeded_route(route: Any) -> None:
     request = getattr(route, "request", None)

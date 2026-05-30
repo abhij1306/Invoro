@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Any
 
 from app.services.acquisition.host_protection_memory import HostProtectionPolicy
+
+FetchEventHandler = Callable[[str, str], Awaitable[None] | None]
 
 
 @dataclass(slots=True)
@@ -17,7 +19,7 @@ class FetchRuntimeContext:
     max_pages: int
     max_scrolls: int
     max_records: int | None
-    on_event: Any | None
+    on_event: FetchEventHandler | None
     browser_reason: str | None
     requested_fields: list[str]
     listing_recovery_mode: str | None
@@ -60,4 +62,4 @@ class FetchPageCall:
     max_pages: int = 1
     max_scrolls: int = 1
     max_records: int | None = None
-    on_event: Any | None = None
+    on_event: FetchEventHandler | None = None

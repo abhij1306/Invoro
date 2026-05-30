@@ -159,6 +159,25 @@ Diagnostics controls are user controls. If `diagnostics_profile.capture_screensh
 
 Browser-driver disconnects are URL-local failures. If a shared browser dies during `new_context`, page bootstrap, or content serialization, the runtime may recycle that browser once, but `_batch_runtime.py` must keep the failure scoped to the current URL and continue the batch.
 
+**Patchright runs headless bundled Chromium, and headless leaks must be masked. This is a hard contract.**
+
+The primary browser engine is the `patchright` package launched as **headless bundled Chromium** (`chromium.launch(headless=...)`, `--headless=new`, `playwright_headless=True` in Docker/Celery). It is NOT launched in Patchright's documented "best practice" mode (`channel="chrome"`, headful, persistent context). That distinction drives the identity contract:
+
+- Headless bundled Chromium advertises a `HeadlessChrome` UA token and ships **no** `sec-ch-ua` client hints. PerimeterX, Akamai, and DataDome block that token on sight (observed: instant `403` + `px-captcha` on Belk). Therefore `build_playwright_context_spec` MUST normalize the UA to plain `Chrome` and emit coherent `sec-ch-ua` headers. This is UA normalization for an engine that is genuinely Chrome, not synthetic fingerprint forgery.
+- Patchright's "use Chrome without fingerprint injection" guidance applies ONLY to its headful `channel="chrome"` setup. Do not cite it to justify removing the headless UA mask while the engine still runs headless. Removing the mask is the regression that broke Belk and every PX/Akamai/DataDome commerce target.
+- **Fingerprint coherence is mandatory.** The UA OS token, the `sec-ch-ua-platform` header, and the engine's native `navigator.platform` MUST all agree. Identity is keyed off the **host OS** the browser runs on (Windows dev box vs Linux Docker in prod), never a hardcoded value. A Windows UA on a Linux host is an incoherent fingerprint and a violation.
+- Do not reintroduce `browserforge` or JS init-script fingerprint injection. Patchright avoids `Runtime.enable`; injected page scripts are a detection surface. Identity shaping is limited to context options (UA, client-hint headers, locale/timezone, permissions) — no `add_init_script` identity patching.
+- Real Chrome (`channel="chrome"`, headful, native context via `NATIVE_REAL_CHROME_CONTEXT_OPTIONS`) is the exception: it does NOT get the de-headless UA, because headful real Chrome reports a clean UA already.
+
+**Origin warmup is best-effort and strictly non-fatal.** Warmup seeds origin cookies for detail surfaces via the bounded challenge loop, but a blocked or challenge-shell origin during warmup MUST NOT raise or abort the fetch. The main navigation runs its own challenge loop and owns the blocked verdict for the URL. Warmup is budget-capped (`origin_warmup_max_budget_ratio`) so it cannot consume the navigation time budget.
+
+**VIOLATION signatures (patchright/identity):**
+- Context options expose a `HeadlessChrome` UA token to a live site
+- UA OS string, `sec-ch-ua-platform`, and native `navigator.platform` disagree (e.g. Windows UA on Linux Docker)
+- `browserforge` or a JS init-script is reintroduced to shape identity
+- Origin warmup raises/aborts the fetch on a blocked classification instead of staying non-fatal
+- The de-headless UA mask is removed by citing Patchright "no fingerprint injection" guidance while the engine still launches headless
+
 **Usable content beats provider noise. This is a hard contract.**
 If browser diagnostics report `browser_outcome == "usable_content"`, provider telemetry such as `provider:*`,
 `active_provider:*`, `challenge_provider_hits`, vendor headers, Akamai/DataDome/Cloudflare script markers,

@@ -29,7 +29,7 @@ Invoro backend is a crawl execution, extraction, review, and export system with:
 - Cache/runtime state: Redis
 - HTTP: `httpx` plus `curl_cffi`
 - Browser: Playwright
-- Parsing: BeautifulSoup, `glom`, `jmespath`, `lxml`, `extruct`, `browserforge`, `w3lib`
+- Parsing: BeautifulSoup, `glom`, `jmespath`, `lxml`, `extruct`, `w3lib`
 
 ## 3. Registered API Surface
 
@@ -254,7 +254,7 @@ Current live behavior:
 - fetch results carry headers, blocked state, browser diagnostics, transient browser artifacts, and network payload metadata
 - callers pass an explicit `AcquisitionPolicy`; `acquirer.py` translates that policy to `crawl_fetch_runtime.fetch_page` knobs so raw fetch-runtime controls stay inside acquisition
 - browser runtime is pooled and exposes runtime snapshots
-- `browserforge`-backed context identity is active
+- browser context identity is a minimal, host-OS-coherent UA de-headlessification (no `browserforge`, no fingerprint generator): `build_playwright_context_spec` rewrites the headless `HeadlessChrome` UA token to plain `Chrome` and emits matching `sec-ch-ua` client hints keyed off the host OS, because the engine runs headless bundled Chromium (see `docs/INVARIANTS.md` Rule 6, "Patchright runs headless bundled Chromium")
 - browser fetch uses `patchright` as the primary acquisition engine. There is no legacy `playwright-stealth` stack and no silent generic Chromium fallback. Explicit `real_chrome` remains an escalation lane for protected ecommerce detail pages and Product Intelligence native Google discovery when `C:\Program Files\Google\Chrome\Application\chrome.exe` (or `CRAWLER_RUNTIME_BROWSER_REAL_CHROME_EXECUTABLE_PATH`) is available.
 - `run_browser_surface_probe.py` is the canonical browser-surface verification harness for acquisition changes. It runs through the same shared browser runtime as crawls and writes timestamped `browser_surface_probe` artifacts with direct JS baseline, Sannysoft/Pixelscan/CreepJS extracted values, consensus drift, connection source metadata, and normalized findings. Report summary/Markdown rendering lives in `browser_surface_probe/report_rendering.py`.
 - the browser-surface probe treats `window.chrome.runtime` as healthy when its type is `object`, and its `isTrusted` behavioral smoke now uses real Playwright mouse input against a temporary overlay target instead of JS-dispatched synthetic events, so probe findings reflect actual runtime leaks instead of expected DOM-event semantics
@@ -305,9 +305,8 @@ Current live behavior:
 - once sanitized engine-scoped `real_chrome` domain state exists, later real-Chrome fetches skip origin warmup and go straight to the target URL
 - real Chrome is not challenge-exempt: if warmup or the direct PDP nav lands on a challenge shell, acquisition runs the same bounded challenge wait/activity/retry loop before returning a blocked verdict
 - browser contexts accept a per-fetch `proxy` for rotated-proxy traversal; `temporary_browser_page` is a thin wrapper over `SharedBrowserRuntime.page(proxy=...)`
-- `browser_identity` is host-OS-locked via `browserforge`, with a small regeneration loop to reject fingerprints whose UA tokens disagree with the OS
-- browser identity also normalizes exposed runtime hardware upstream: `hardwareConcurrency` is clamped to host-consistent values, `deviceMemory` is bucketed like Chrome, and page JS sees the same values as the generated context identity.
-- browser acquisition no longer injects custom init scripts into Patchright contexts; identity shaping is limited to context options, headers, locale/timezone alignment, and engine-native behavior so we do not reintroduce script-surface blockers
+- `browser_identity` is host-OS-coherent: the de-headlessified UA OS token, the `sec-ch-ua-platform` header, and the engine's native `navigator.platform` all agree, keyed off the host OS the browser runs on (Windows dev box vs Linux Docker in prod). There is no synthetic fingerprint generation and no UA-vs-OS regeneration loop; the engine is genuinely Chrome, so only the headless token is normalized.
+- browser acquisition no longer injects custom init scripts into Patchright contexts; identity shaping is limited to context options, headers, locale/timezone alignment, and engine-native behavior so we do not reintroduce script-surface blockers. Real Chrome (headful, native context) is exempt from de-headlessification because it already reports a clean UA.
 - browser runtime settings are split by concern: `runtime_settings.py` owns tunables/launch args, and `browser_fingerprint_profiles.py` owns static browser identity/profile constants
 - blocked-page escalation is now two-pronged: vendor-specific response headers (DataDome, Cloudflare, Akamai, PerimeterX, Sucuri, ...) classified via `classify_block_from_headers` short-circuit into the browser and mark the host vendor-blocked so sibling fetchers skip further HTTP attempts; HTML heuristics continue to catch vendor-silent blocks
 - `is_non_retryable_http_status` keeps `401` out of browser escalation (auth walls) while still escalating `403`/`429` challenges, and `classify_blocked_page` emits typed `BlockPageClassification` outcomes (`auth_wall`, `rate_limited`, `challenge_page`, ...) distinct from network failures
@@ -569,7 +568,7 @@ Implemented from recent extraction/audit work:
 
 - extruct-backed microdata + Open Graph support
 - generic network payload specs
-- browserforge identity restoration
+- host-OS-coherent headless UA de-headlessification (replaces browserforge identity)
 - URL tracking-param stripping
 - Nuxt data revival
 - selector self-heal + domain memory

@@ -108,6 +108,8 @@ async def get_page_html(page, *, flatten_shadow: bool = True) -> str:
 
 
 async def flatten_shadow_dom(page) -> None:
+    if getattr(crawler_runtime_settings, "shadow_dom_flatten_max_hosts", 100) <= 0:
+        return
     try:
         await page.evaluate(_SHADOW_DOM_FLATTENER_SCRIPT)
     except Exception:

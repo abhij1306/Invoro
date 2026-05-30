@@ -882,3 +882,23 @@ async def expand_interactive_elements_via_accessibility(
         elapsed_ms=_elapsed_ms,
         max_elapsed_ms=max_elapsed_ms,
     )
+
+
+async def expand_detail_content_if_needed(
+    page: Any,
+    *,
+    surface: str,
+    readiness_probe: dict[str, object],
+    requested_fields: list[str] | None = None,
+) -> dict[str, object]:
+    from app.services.acquisition.browser_readiness import probe_browser_readiness
+
+    return await expand_detail_content_if_needed_impl(
+        page,
+        surface=surface,
+        readiness_probe=readiness_probe,
+        requested_fields=requested_fields,
+        expand_all_interactive_elements=expand_all_interactive_elements,
+        probe_browser_readiness=probe_browser_readiness,
+        expand_interactive_elements_via_accessibility=expand_interactive_elements_via_accessibility,
+    )
