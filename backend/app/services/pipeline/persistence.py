@@ -9,6 +9,7 @@ from app.services.db_utils import mapping_or_empty
 from app.services.shared.field_coerce import object_list as _object_list
 from app.services.public_record_firewall import public_record_data_for_surface
 from app.services.export.schema import build_source_trace
+from app.services.observability.browser_artifact import shape_browser_artifact
 from app.services.artifact_store import (
     persist_html_artifact,
     persist_json_artifact,
@@ -117,6 +118,8 @@ async def persist_acquisition_artifacts(
     acquisition_result,
     browser_attempted: bool,
     screenshot_required: bool,
+    surface: str | None = None,
+    blocked: bool = False,
 ) -> str:
     raw_html_path = await asyncio.to_thread(
         persist_html_artifact,
@@ -130,6 +133,8 @@ async def persist_acquisition_artifacts(
             acquisition_result=acquisition_result,
             screenshot_required=screenshot_required,
             raw_html_path=raw_html_path,
+            surface=surface,
+            blocked=blocked,
         )
     return raw_html_path
 
@@ -140,6 +145,8 @@ async def _persist_browser_artifacts(
     acquisition_result,
     screenshot_required: bool,
     raw_html_path: str,
+    surface: str | None = None,
+    blocked: bool = False,
 ) -> None:
 
     diagnostics = mapping_or_empty(getattr(acquisition_result, "browser_diagnostics", {}))
@@ -165,7 +172,13 @@ async def _persist_browser_artifacts(
                 content=bytes(screenshot_bytes),
             )
 
-    diagnostics_payload = dict(diagnostics)
+    # Shape only the *saved* artifact (honest + lean). The in-memory diagnostics
+    # dict is left untouched for downstream runtime consumers.
+    diagnostics_payload = shape_browser_artifact(
+        diagnostics,
+        surface=surface,
+        blocked=blocked,
+    )
     diagnostics_payload["artifact_paths"] = {
         "html": raw_html_path or None,
         "screenshot": screenshot_path or None,

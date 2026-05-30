@@ -102,32 +102,28 @@ non-success verdict or when a flag fires. Candidate capture is high-value-field-
 `unit or component`).
 
 ### Slice 2: Rebuild `browser.json` (honest, lean) + close the launch->rendered blackhole
-**Status:** TODO
+**Status:** DONE
 **Files:**
-- `backend/app/services/acquisition/browser_diagnostics.py`
-- `backend/app/services/acquisition/browser_result_builder.py` (`build_browser_diagnostics`)
-- `backend/app/services/acquisition/browser_interstitial.py` (attribute real interstitial cost;
-  fix the "not_found yet 3873ms" mislabel)
-- `backend/app/services/pipeline/persistence.py` (`_persist_browser_artifacts` payload shaping)
-- `backend/app/services/config/observability.py` / `config/runtime_settings.py` as needed
-**What:**
-- Drop derivable fields (`browser_headless`, `browser_launch_mode`, `browser_profile`,
-  `browser_native_context`, `browser_binary`) from stored payload; they are pure functions of
-  `browser_engine` and can be recomputed on read.
-- Drop all-zero `phase_timings_ms` entries and empty-array/empty-dict padding
-  (`challenge_element_hits: []`, `challenge_evidence: []`, `behavior_realism: {}`, etc.) — emit a
-  key only when it carries signal.
-- Gate listing-only diagnostics (`listing_readiness`, `listing_recovery`,
-  `listing_artifact_capture`, `extractable_listing_evidence`, `rendered_listing_fragment_count`,
-  `listing_visual_element_count`) to listing surfaces only. Detail runs must not carry them.
-- Replace pre-fetch `host_policy_snapshot` with an honest post-fetch host outcome
-  (engine attempted, result, whether success/block was written back). Move the pre-fetch policy
-  read into the acquire timeline as a labeled *input decision*, not a result field.
-- Emit an ordered acquire timeline (nav strategy chosen, each readiness probe result, interstitial
-  action + true cost, challenge iterations, escalation decision + reason) feeding the RunTrace.
-**Verify:** Re-run a detail fetch smoke; new `browser.json` has zero listing fields, zero derivable
-fields, zero all-zero timings; interstitial cost is correctly attributed;
-`pytest tests/services/acquisition -q`.
+- `backend/app/services/acquisition/browser_fetch_support.py` (`dismiss_browser_interstitial`
+  relabels timing honestly: `interstitial_dismissal` only when dismissed, else `interstitial_probe`)
+- new `backend/app/services/observability/browser_artifact.py` (`shape_browser_artifact` +
+  `derive_browser_profile_fields`)
+- `backend/app/services/pipeline/persistence.py` (`_persist_browser_artifacts` shapes the SAVED
+  payload only; threads `surface` + `blocked`)
+- `backend/app/services/pipeline/extraction_loop.py` (`_record_acquire_timeline` feeds ordered
+  acquire events into RunTrace; passes surface/blocked to persistence)
+- `backend/app/services/config/observability.py` (artifact-shaping rules)
+**Verify:** DONE — `pytest tests/services/observability -q` = 23 passed; persistence/acquisition
+suites (`-k "persist or browser_fetch or acquisition_artifact or extraction_loop or
+browser_diagnostics"`) = 32 passed; `test_pipeline_core.py` browser/artifact/persist subset = 20
+passed; ruff + mypy clean.
+**Done notes:** The in-memory `browser_diagnostics` dict is left UNTOUCHED for runtime consumers
+(contract memory, listing decisions, log lines) — only the persisted `<page>.browser.json` is
+shaped. Shaper drops 6 engine-derivable fields (recomputable via `derive_browser_profile_fields`),
+drops listing-only fields on non-listing surfaces, drops all-zero `phase_timings_ms` entries + empty
+padding, replaces pre-fetch `host_policy_snapshot` with honest post-fetch `host_outcome`, and
+relabels interstitial cost. Acquire timeline (navigation, readiness probes, interstitial, challenge,
+escalation, policy decisions) now lands in RunTrace as ordered events.
 
 ### Slice 3: Instrument the extraction pipeline (close the dark blackhole)
 **Status:** TODO

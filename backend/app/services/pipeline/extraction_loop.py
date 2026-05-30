@@ -9,8 +9,10 @@ from app.services.acquisition.acquirer import AcquisitionResult
 from app.services.acquisition.acquirer import acquire as _acquire
 from app.services.acquisition.browser_runtime import real_chrome_browser_available
 from app.services.acquisition.host_protection_memory import note_host_hard_block
+from app.services.config import observability as obs_config
 from app.services.config.runtime_settings import crawler_runtime_settings
 from app.services.db_utils import mapping_or_empty
+from app.services.shared.field_coerce import object_list as _object_list
 from app.services.domain_memory_service import load_domain_selector_rules
 from app.services.domain_utils import normalize_domain
 from app.services.shared.field_coerce import validate_record_for_surface
@@ -313,6 +315,8 @@ async def _run_acquisition_stage(
             f"Acquisition detected rate limiting or bot protection for {context.url}",
         )
 
+    _record_acquire_timeline(context, acquisition_result)
+
     return _FetchedURLStage(
         context=context,
         acquisition_result=acquisition_result,
@@ -321,6 +325,81 @@ async def _run_acquisition_stage(
             requested_fields=list(context.requested_fields),
         ),
     )
+
+
+def _record_acquire_timeline(
+    context: _URLProcessingContext,
+    acquisition_result,
+) -> None:
+    """Project acquisition diagnostics into the ordered RunTrace acquire timeline.
+
+    Closes the launch -> rendered blackhole: navigation strategy, each readiness
+    probe, interstitial action, policy decisions, and escalation become ordered
+    events instead of only summed phase timings. No-op when tracing is disabled.
+    """
+    trace = context.trace
+    method = str(getattr(acquisition_result, "method", "") or "")
+    diagnostics = mapping_or_empty(getattr(acquisition_result, "browser_diagnostics", {}))
+    timings = mapping_or_empty(diagnostics.get("phase_timings_ms"))
+
+    for decision in _object_list(diagnostics.get("policy_decisions")):
+        if isinstance(decision, dict):
+            trace.record_acquire_event(
+                obs_config.ACQUIRE_EVENT_POLICY_DECISION,
+                detail={
+                    "action": decision.get("action"),
+                    "reason": decision.get("reason"),
+                    "stage": decision.get("stage"),
+                },
+            )
+
+    if method == "browser":
+        trace.record_acquire_event(
+            obs_config.ACQUIRE_EVENT_NAVIGATION,
+            detail={
+                "engine": diagnostics.get("browser_engine"),
+                "strategy": diagnostics.get("navigation_strategy"),
+                "reason": diagnostics.get("browser_reason"),
+            },
+            duration_ms=_as_int(timings.get("navigation")),
+        )
+        for probe in _object_list(diagnostics.get("readiness_probes")):
+            if isinstance(probe, dict):
+                trace.record_acquire_event(
+                    obs_config.ACQUIRE_EVENT_READINESS_PROBE,
+                    detail={
+                        "stage": probe.get("stage"),
+                        "is_ready": probe.get("is_ready"),
+                        "visible_text_length": probe.get("visible_text_length"),
+                        "detail_like": probe.get("detail_like"),
+                        "listing_card_count": probe.get("listing_card_count"),
+                    },
+                )
+        interstitial = mapping_or_empty(diagnostics.get("interstitial"))
+        if interstitial:
+            trace.record_acquire_event(
+                obs_config.ACQUIRE_EVENT_INTERSTITIAL,
+                detail={"status": interstitial.get("status")},
+                duration_ms=_as_int(
+                    timings.get(obs_config.INTERSTITIAL_DISMISSAL_TIMING_KEY)
+                ),
+            )
+        challenge_wait = _as_int(timings.get("challenge_wait"))
+        if challenge_wait:
+            trace.record_acquire_event(
+                obs_config.ACQUIRE_EVENT_CHALLENGE,
+                detail={"outcome": diagnostics.get("browser_outcome")},
+                duration_ms=challenge_wait,
+            )
+        escalation_lane = diagnostics.get("escalation_lane")
+        if escalation_lane:
+            trace.record_acquire_event(
+                obs_config.ACQUIRE_EVENT_ESCALATION,
+                detail={
+                    "lane": escalation_lane,
+                    "engine": diagnostics.get("browser_engine"),
+                },
+            )
 
 
 def _build_prefetch_only_result(
@@ -572,6 +651,8 @@ async def _run_persistence_stage(
         acquisition_result=acquisition_result,
         browser_attempted=_browser_attempted(acquisition_result),
         screenshot_required=_screenshot_required(_browser_outcome(acquisition_result)),
+        surface=context.surface,
+        blocked=_effective_blocked(acquisition_result),
     )
     await _enter_stage(context, STAGE_PERSIST)
     persisted_count = await persist_extracted_records(
@@ -639,3 +720,12 @@ URLProcessingContext = _URLProcessingContext
 best_adapter_result = _best_adapter_result
 empty_extraction_browser_retry_decision = _empty_extraction_browser_retry_decision
 resolved_url_processing_config = _resolved_url_processing_config
+
+
+def _as_int(value: object) -> int | None:
+    if value in (None, ""):
+        return None
+    try:
+        return int(float(value))  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None

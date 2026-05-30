@@ -65,6 +65,67 @@ EXTRACTION_TIER_STRUCTURED = "structured_data"
 EXTRACTION_TIER_JS_STATE = "js_state"
 EXTRACTION_TIER_DOM = "dom"
 
+# --- Persisted browser.json shaping (Slice 2) --------------------------------
+# The runtime browser_diagnostics dict stays as-is for in-memory consumers
+# (contract memory, listing decisions, log messages). Only the *saved* artifact
+# is shaped to be honest and lean via these rules.
+#
+# Engine-derivable fields: pure functions of ``browser_engine`` (see
+# ``browser_diagnostics.browser_profile_diagnostics``). Dropped from the saved
+# file and recomputed on read by ``derive_browser_profile_fields``.
+BROWSER_ARTIFACT_DERIVABLE_FIELDS = frozenset(
+    {
+        "browser_headless",
+        "browser_launch_mode",
+        "browser_profile",
+        "browser_native_context",
+        "browser_binary",
+        "browser_stealth_enabled",
+    }
+)
+
+# Listing-only diagnostics: meaningful on listing surfaces, pure noise on detail
+# /content/other surfaces. Dropped from the saved file when surface is not a
+# listing surface.
+BROWSER_ARTIFACT_LISTING_ONLY_FIELDS = frozenset(
+    {
+        "listing_readiness",
+        "listing_recovery",
+        "listing_artifact_capture",
+        "extractable_listing_evidence",
+        "rendered_listing_fragment_count",
+        "listing_visual_element_count",
+        "listing_visual_capture",
+    }
+)
+
+# Keys that carry no signal when empty: dropped from the saved file if their
+# value is an empty list/dict (kept verbatim when populated).
+BROWSER_ARTIFACT_DROP_WHEN_EMPTY = frozenset(
+    {
+        "challenge_evidence",
+        "challenge_provider_hits",
+        "challenge_element_hits",
+        "behavior_realism",
+        "policy_decisions",
+        "host_outcome",
+    }
+)
+
+# Substring marking a surface as a listing surface (mirrors pipeline usage).
+LISTING_SURFACE_KEYWORD = "listing"
+
+# Pre-fetch host snapshot key (misleading on read-back) replaced by an honest
+# post-fetch ``host_outcome`` in the saved artifact.
+BROWSER_ARTIFACT_PREFETCH_HOST_KEY = "host_policy_snapshot"
+BROWSER_ARTIFACT_HOST_OUTCOME_KEY = "host_outcome"
+
+# Phase-timing key for the interstitial step. When the interstitial probe finds
+# nothing, the time is detection cost, not dismissal cost; the shaper relabels
+# it so the saved file is self-consistent (no "not_found yet 3873ms").
+INTERSTITIAL_DISMISSAL_TIMING_KEY = "interstitial_dismissal"
+INTERSTITIAL_PROBE_TIMING_KEY = "interstitial_probe"
+
 # --- Baseline drift thresholds (Slice 5) -------------------------------------
 # Phase-timing band tolerance: a run's total acquire time breaches the baseline
 # band when it exceeds baseline_mean * (1 + tolerance) and the absolute slack.
@@ -101,6 +162,14 @@ __all__ = [
     "EXTRACTION_TIER_STRUCTURED",
     "EXTRACTION_TIER_JS_STATE",
     "EXTRACTION_TIER_DOM",
+    "BROWSER_ARTIFACT_DERIVABLE_FIELDS",
+    "BROWSER_ARTIFACT_LISTING_ONLY_FIELDS",
+    "BROWSER_ARTIFACT_DROP_WHEN_EMPTY",
+    "LISTING_SURFACE_KEYWORD",
+    "BROWSER_ARTIFACT_PREFETCH_HOST_KEY",
+    "BROWSER_ARTIFACT_HOST_OUTCOME_KEY",
+    "INTERSTITIAL_DISMISSAL_TIMING_KEY",
+    "INTERSTITIAL_PROBE_TIMING_KEY",
     "BASELINE_TIMING_TOLERANCE_RATIO",
     "BASELINE_TIMING_ABSOLUTE_SLACK_MS",
     "BASELINE_MIN_SAMPLES",
