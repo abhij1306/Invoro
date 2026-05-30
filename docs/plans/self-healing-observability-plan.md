@@ -79,7 +79,7 @@ scratch; the old script is at most a secondary record-quality input and is other
 ## Slices
 
 ### Slice 1: RunTrace collector + typed trace contract
-**Status:** TODO
+**Status:** DONE
 **Files:**
 - new `backend/app/services/observability/run_trace.py` (collector + typed trace objects)
 - new `backend/app/services/config/observability.py` (trace tiers, high-value field policy hook,
@@ -90,8 +90,16 @@ ordered events with reasons. Collector is opt-in/no-op when disabled so hot path
 High-value field set = union of run `requested_fields` + default canonical fields for the surface
 (reuse existing field-policy helpers; do not redefine). No instrumentation wired yet — just the
 contract + config.
-**Verify:** `pytest tests/services/observability -q` (new unit tests for the collector shape);
-collector is a no-op when disabled.
+**Verify:** DONE — `pytest tests/services/observability -q` = 12 passed; ruff + mypy clean on new
+files; pipeline tests (`-k "extraction_loop or process_single_url or pipeline"`) = 19 passed with
+the new `trace` field on `URLProcessingContext`.
+**Done notes:** `new_run_trace()` returns `NullRunTrace` (no-op) when `RUN_TRACE_ENABLED` is False or
+no run is attached; real collector otherwise. High-value resolution reuses
+`field_policy.repair_target_fields_for_surface` (no parallel list). Tiering implemented in
+`RunTrace.to_dict(flagged=...)`: light tier drops losing-candidate lists, full tier kept on
+non-success verdict or when a flag fires. Candidate capture is high-value-field-only and capped by
+`MAX_CANDIDATE_LOSERS_PER_FIELD`. Tests must carry `pytest.mark.unit` (pytest.ini runs only
+`unit or component`).
 
 ### Slice 2: Rebuild `browser.json` (honest, lean) + close the launch->rendered blackhole
 **Status:** TODO

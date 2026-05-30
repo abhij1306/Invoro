@@ -3,7 +3,7 @@
 **Current:** Self-Healing Observability & Run-Audit Layer → `docs/plans/self-healing-observability-plan.md`
 **Status:** IN PROGRESS
 **Started:** 2026-05-30
-**Last slice completed:** none yet — awaiting Slice 1 (RunTrace collector + typed trace contract)
+**Last slice completed:** Slice 1 — RunTrace collector + typed trace contract (DONE; obs tests 12 passed)
 
 ## Queue
 1. Extraction Wrong-Data Fixes (94URLs Audit) → `docs/plans/extraction-wrong-data-fixes-plan.md`
