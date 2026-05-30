@@ -273,9 +273,9 @@ async def select_category(
     normalized_urls = [url.strip() for url in urls if url and url.strip()]
     if not normalized_urls:
         raise ValueError("category URL is required")
-    if len(normalized_urls) > MAX_PRODUCTS:
+    unique_urls = list(dict.fromkeys(_validate_http_urls(normalized_urls)))
+    if len(unique_urls) > MAX_PRODUCTS:
         raise ValueError(f"Maximum {MAX_PRODUCTS} category URLs per session")
-    unique_urls = list(dict.fromkeys(normalized_urls))
     detail_urls, discover_urls = _partition_playground_urls(unique_urls)
     if detail_urls and not discover_urls:
         run_ids = await _launch_extract_runs(
@@ -811,6 +811,20 @@ def _partition_playground_urls(urls: list[str]) -> tuple[list[str], list[str]]:
     return detail_urls, discover_urls
 
 
+def _validate_http_urls(urls: list[str]) -> list[str]:
+    valid: list[str] = []
+    invalid: list[str] = []
+    for url in urls:
+        parsed = urlparse(url)
+        if parsed.scheme.lower() not in {"http", "https"} or not parsed.netloc:
+            invalid.append(url)
+            continue
+        valid.append(url)
+    if invalid:
+        raise ValueError(f"Invalid URL(s): {', '.join(invalid)}")
+    return valid
+
+
 def _merge_seed_detail_products(
     step_data: dict[str, Any],
     discovered_products: list[dict[str, Any]],
@@ -918,9 +932,14 @@ async def _resolve_extract_runs(
     step_data: dict[str, Any],
 ) -> list[CrawlRun]:
     resolved: dict[int, CrawlRun] = {}
-    for run_id in _extract_run_ids(step_data):
-        run = await session.get(CrawlRun, run_id)
-        if run is not None:
+    run_ids = _extract_run_ids(step_data)
+    if run_ids:
+        rows = await session.scalars(select(CrawlRun).where(CrawlRun.id.in_(run_ids)))
+        run_by_id = {int(run.id): run for run in rows.all()}
+        for run_id in run_ids:
+            run = run_by_id.get(run_id)
+            if run is None:
+                continue
             resolved[int(run.id)] = run
 
     selected_urls = _extract_selected_urls(step_data)

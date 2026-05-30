@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class PlaygroundSessionCreate(BaseModel):
@@ -53,6 +53,15 @@ class PlaygroundSelectCategoryRequest(BaseModel):
     """User picks one or more category URLs from the sitemap result."""
     url: str | None = None
     urls: list[str] = Field(default_factory=list, max_length=50)
+
+    @model_validator(mode="after")
+    def _validate_selected_urls(self) -> "PlaygroundSelectCategoryRequest":
+        selected = self.selected_urls()
+        if not selected:
+            raise ValueError("category URL is required")
+        if len(selected) > 50:
+            raise ValueError("Maximum 50 category URLs per session")
+        return self
 
     def selected_urls(self) -> list[str]:
         selected = [item.strip() for item in self.urls if item and item.strip()]

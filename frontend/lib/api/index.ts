@@ -74,6 +74,9 @@ export type PlaygroundPipelineApiResponse = {
   state: string;
   launched: Record<string, unknown>;
 };
+export type PlaygroundSelectCategoryPayload =
+  | { url: string; urls?: string[] }
+  | { url?: string; urls: string[] };
 
 export const api = {
   register: (email: string, password: string) =>
@@ -357,11 +360,15 @@ export const api = {
       `/api/playground/sessions/${sessionId}/select`,
       payload,
     ),
-  playgroundSelectCategory: (sessionId: number, payload: { url?: string; urls?: string[] }) =>
-    apiClient.post<PlaygroundSessionResponse>(
+  playgroundSelectCategory: (sessionId: number, payload: PlaygroundSelectCategoryPayload) => {
+    if (!payload.url && (!payload.urls || payload.urls.length === 0)) {
+      throw new Error('Select at least one category URL');
+    }
+    return apiClient.post<PlaygroundSessionResponse>(
       `/api/playground/sessions/${sessionId}/select-category`,
       payload,
-    ),
+    );
+  },
   playgroundExtract: (sessionId: number) =>
     apiClient.post<PlaygroundExtractApiResponse>(
       `/api/playground/sessions/${sessionId}/extract`,

@@ -32,11 +32,31 @@ def upgrade() -> None:
             "updated_at",
             sa.DateTime(timezone=True),
             server_default=sa.func.now(),
-            onupdate=sa.func.now(),
         ),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
+    )
+    op.execute(
+        """
+        CREATE OR REPLACE FUNCTION set_playground_sessions_updated_at()
+        RETURNS trigger AS $$
+        BEGIN
+            NEW.updated_at = now();
+            RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql
+        """
+    )
+    op.execute(
+        """
+        CREATE TRIGGER trg_playground_sessions_updated_at
+        BEFORE UPDATE ON playground_sessions
+        FOR EACH ROW
+        EXECUTE FUNCTION set_playground_sessions_updated_at()
+        """
     )
 
 
 def downgrade() -> None:
+    op.execute("DROP TRIGGER IF EXISTS trg_playground_sessions_updated_at ON playground_sessions")
+    op.execute("DROP FUNCTION IF EXISTS set_playground_sessions_updated_at()")
     op.drop_table("playground_sessions")

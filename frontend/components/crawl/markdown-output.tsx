@@ -272,15 +272,17 @@ function MarkdownPreview({ markdown }: Readonly<{ markdown: string }>) {
     if (trimmed.startsWith('```')) {
       const lang = trimmed.slice(3).trim();
       const code: string[] = [];
-      const startIndex = index;
       const maxCodeLines = 500;
       index += 1;
       while (
         index < lines.length &&
         !lines[index].trim().startsWith('```') &&
-        index - startIndex < maxCodeLines
+        code.length < maxCodeLines
       ) {
         code.push(lines[index]);
+        index += 1;
+      }
+      while (index < lines.length && !lines[index].trim().startsWith('```')) {
         index += 1;
       }
       if (index < lines.length && lines[index].trim().startsWith('```')) {

@@ -12,18 +12,20 @@ from bs4 import BeautifulSoup, Tag
 from app.services.config.sitemap import (
     SITEMAP_DEFAULT_FILTER_KEYWORD,
     SITEMAP_DEFAULT_MAX_URLS,
+    SITEMAP_FETCH_MAX_REDIRECTS,
     SITEMAP_FETCH_RETRY_ATTEMPTS,
     SITEMAP_FETCH_RETRY_DELAY_SECONDS,
     SITEMAP_FETCH_RETRY_STATUS_CODES,
     SITEMAP_FETCH_TIMEOUT_SECONDS,
     SITEMAP_HOMEPAGE_FALLBACK_EXCLUDED_EXTENSIONS,
+    SITEMAP_HOMEPAGE_FALLBACK_MAX_ANCHORS,
     SITEMAP_HOMEPAGE_FALLBACK_EXCLUDED_PATH_TOKENS,
     SITEMAP_HOMEPAGE_FALLBACK_MAX_LINK_TEXT_WORDS,
+    SITEMAP_HOMEPAGE_FALLBACK_MAX_VALIDATIONS,
     SITEMAP_THIN_RESULT_THRESHOLD,
     SITEMAP_USER_AGENT,
 )
 from app.services.crawl.utils import normalize_target_url
-from app.services.domain_utils import normalize_domain
 from app.services.shared.url_utils import absolute_url
 from app.services.surface_resolver import resolve_auto_surface
 from app.services.url_safety import validate_public_target
@@ -100,6 +102,7 @@ async def resolve_category_urls_from_sitemap_result(
 
     async with httpx.AsyncClient(
         follow_redirects=True,
+        max_redirects=SITEMAP_FETCH_MAX_REDIRECTS,
         timeout=SITEMAP_FETCH_TIMEOUT_SECONDS,
     ) as client:
         sitemap_result: SitemapResolutionResult | None = None
@@ -198,6 +201,7 @@ async def _resolve_child_sitemap_urls(
     all_urls: list[str] = []
     async with httpx.AsyncClient(
         follow_redirects=True,
+        max_redirects=SITEMAP_FETCH_MAX_REDIRECTS,
         timeout=SITEMAP_FETCH_TIMEOUT_SECONDS,
     ) as client:
         for child_url in child_urls:
@@ -281,6 +285,7 @@ async def _fetch_response(client: httpx.AsyncClient, url: str) -> httpx.Response
     response: httpx.Response | None = None
     for attempt in range(attempts):
         response = await client.get(url, headers={"User-Agent": SITEMAP_USER_AGENT})
+        await _validate_response_redirect_chain(response)
         if response.status_code == 200:
             break
         if response.status_code not in retry_status_codes or attempt >= attempts - 1:
@@ -307,6 +312,12 @@ async def _safe_locs(xml: ElementTree.Element) -> list[str]:
     return urls
 
 
+async def _validate_response_redirect_chain(response: httpx.Response) -> None:
+    for redirect_response in response.history:
+        await validate_public_target(str(redirect_response.url))
+    await validate_public_target(str(response.url))
+
+
 async def _extract_homepage_candidate_urls(
     *,
     homepage_url: str,
@@ -314,11 +325,14 @@ async def _extract_homepage_candidate_urls(
     keyword: str,
     limit: int,
 ) -> list[str]:
-    homepage_domain = normalize_domain(homepage_url)
+    homepage_origin = _origin_key(homepage_url)
     homepage_normalized = _strip_fragment(homepage_url).rstrip("/")
     soup = BeautifulSoup(html or "", "html.parser")
     scored_urls: dict[str, tuple[int, str, int]] = {}
-    for index, anchor in enumerate(soup.select("a[href]")):
+    validations = 0
+    for index, anchor in enumerate(
+        soup.select("a[href]")[:SITEMAP_HOMEPAGE_FALLBACK_MAX_ANCHORS]
+    ):
         candidate_url = normalize_target_url(
             _strip_fragment(absolute_url(homepage_url, anchor.get("href")))
         )
@@ -326,7 +340,7 @@ async def _extract_homepage_candidate_urls(
             continue
         if candidate_url.rstrip("/") == homepage_normalized:
             continue
-        if normalize_domain(candidate_url) != homepage_domain:
+        if _origin_key(candidate_url) != homepage_origin:
             continue
         if _reject_homepage_candidate(candidate_url):
             continue
@@ -337,7 +351,10 @@ async def _extract_homepage_candidate_urls(
         )
         if not classification:
             continue
+        if validations >= SITEMAP_HOMEPAGE_FALLBACK_MAX_VALIDATIONS:
+            break
         await validate_public_target(candidate_url)
+        validations += 1
         previous = scored_urls.get(candidate_url)
         next_value = (score, classification, index)
         if previous is None or score > previous[0]:
@@ -457,6 +474,14 @@ def _strip_fragment(value: str) -> str:
     return urlunsplit((parsed.scheme, parsed.netloc, parsed.path, parsed.query, ""))
 
 
+def _origin_key(value: str) -> tuple[str, str, int]:
+    parsed = urlsplit(value)
+    scheme = str(parsed.scheme or "").lower()
+    hostname = str(parsed.hostname or "").lower()
+    port = parsed.port or (443 if scheme == "https" else 80)
+    return scheme, hostname, port
+
+
 def _extract_locs(xml: ElementTree.Element) -> list[str]:
     return [
         loc.text.strip()
@@ -467,3 +492,4 @@ def _extract_locs(xml: ElementTree.Element) -> list[str]:
 
 def _local_tag(tag: str) -> str:
     return tag.rsplit("}", 1)[-1]
+

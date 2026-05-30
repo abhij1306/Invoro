@@ -6,6 +6,7 @@ SITEMAP_FETCH_TIMEOUT_SECONDS = 15
 SITEMAP_FETCH_RETRY_ATTEMPTS = 2
 SITEMAP_FETCH_RETRY_DELAY_SECONDS = 0.5
 SITEMAP_FETCH_RETRY_STATUS_CODES = (429, 502, 503, 504)
+SITEMAP_FETCH_MAX_REDIRECTS = 5
 SITEMAP_USER_AGENT = "Mozilla/5.0 (compatible; CrawlwiseBot/1.0)"
 # Path tokens that signal a page is not a category/listing/detail candidate
 # (account, auth, support, legal, transactional flows, on-page search). These
@@ -57,6 +58,8 @@ SITEMAP_HOMEPAGE_FALLBACK_EXCLUDED_EXTENSIONS = (
 # & Organization") routinely exceed 6 words. Use 10 to keep real categories
 # while still rejecting obvious sentences/marketing copy.
 SITEMAP_HOMEPAGE_FALLBACK_MAX_LINK_TEXT_WORDS = 10
+SITEMAP_HOMEPAGE_FALLBACK_MAX_ANCHORS = 500
+SITEMAP_HOMEPAGE_FALLBACK_MAX_VALIDATIONS = 100
 
 # Threshold below which a sitemap result is considered "thin" — when the
 # real sitemap returns fewer usable URLs than this and homepage fallback is
