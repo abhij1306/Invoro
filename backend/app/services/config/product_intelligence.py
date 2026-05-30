@@ -363,10 +363,67 @@ MATCH_SCORE_WEIGHTS = {
     "title_similarity": 0.45,
     "brand_match": 0.25,
     "gtin_match": 0.25,
+    "style_code_match": 0.25,
     "shopping_product_group": 0.04,
     "price_band": 0.05,
     "source_authority": 0.18,
 }
+
+# Manufacturer style/model code identity (deterministic, no LLM). Branded goods carry a
+# universal manufacturer style number (e.g. Nike "FV5285") that every retailer keys on.
+# Belk embeds it inside a composite SKU ("3900462FV5285" = Belk numeric prefix + "FV5285"),
+# and external listings expose it bare or with a colorway suffix ("FV5285-002"). The leading
+# retailer prefix is why a naive token match fails across sites, so the manufacturer core is
+# decomposed before comparison. An exact style-code match is a GTIN-class identity signal;
+# the distinctive brand-stripped model name token ("promina") is a model-level signal. These
+# drive both the discovery identity ladder (ranking/accept) and the matching floors below.
+PRODUCT_STYLE_CODE_PATTERN = r"[a-z]{2,}\d{3,}"
+PRODUCT_STYLE_CODE_MIN_LENGTH = 5
+# Generic apparel/footwear descriptors, sizes, and colors that are NOT distinctive model
+# identifiers. Used to isolate the distinctive model-name token (after brand removal) so a
+# shared distinctive token (e.g. "promina", "bedford") signals a model-level match while a
+# shared generic word (e.g. "walking", "shoes") does not.
+MATCH_GENERIC_PRODUCT_TOKENS = frozenset({
+    "athletic", "boot", "boots", "boys", "casual", "chino", "chinos", "classic",
+    "comfort", "cushioning", "dress", "extra", "fit", "flat", "front", "girls",
+    "gym", "kid", "kids", "ladies", "lace", "leather", "loafer", "loafers", "low",
+    "men", "mens", "pant", "pants", "regular", "running", "sandal", "sandals",
+    "shoe", "shoes", "short", "shorts", "size", "skinny", "slim", "slip", "sneaker",
+    "sneakers", "stretch", "straight", "top", "training", "trainer", "trainers",
+    "up", "walking", "wide", "women", "womens", "workout",
+})
+# Confidence floors for manufacturer-code / model-level identity (deterministic). Ranked
+# just below GTIN (0.92) for an exact style-code match; a brand-exact + distinctive model
+# token is a strong model-level match. Model-level matching requires a brand anchor: a
+# distinctive model token WITHOUT a confirmed brand is not floored, because a generic
+# descriptive title ("Floral Midi Dress") would otherwise collide across unrelated makers.
+MATCH_SCORE_FLOOR_STYLE_CODE = 0.92
+MATCH_SCORE_FLOOR_STYLE_CODE_NO_BRAND = 0.85
+MATCH_SCORE_FLOOR_MODEL_BRAND = 0.82
+# Minimum fraction of the SOURCE's distinctive model tokens that must appear in the
+# candidate title for a model-level match. Directional (source -> candidate) so a truncated
+# generic candidate ("Samsung Galaxy") cannot match a specific source ("Galaxy S24 Ultra").
+MATCH_MODEL_TOKEN_MIN_CONTAINMENT = 0.6
+
+# Match basis labels recorded in score_reasons["match_basis"] so review is explainable.
+MATCH_BASIS_GTIN = "gtin"
+MATCH_BASIS_STYLE_CODE = "style_code"
+MATCH_BASIS_MODEL_BRAND = "model+brand"
+MATCH_BASIS_BRAND_DTC = "brand_dtc"
+MATCH_BASIS_BRAND_TITLE = "brand+title"
+MATCH_BASIS_TITLE = "title"
+
+# Volatile query parameters stripped when building a candidate canonical-dedupe key. The same
+# listing offered at multiple sizes/colors arrives as separate URLs differing only by these
+# params (e.g. "?size=13", "?activeColor=002", tracking tokens). Collapsing them stops one
+# product at N sizes from consuming N per-product candidate slots. Identity-bearing params
+# (e.g. "product", "productId") are intentionally NOT stripped.
+DISCOVERY_VOLATILE_QUERY_PARAMS = frozenset({
+    "_country", "activecolor", "active_color", "cawidth", "clr", "cm_mmc", "cm_ven",
+    "color", "colour", "dwvar", "dwvar_color", "fbclid", "gclid", "link_id", "msclkid",
+    "ranmid", "show_expr", "size", "srsltid", "utm_campaign", "utm_content",
+    "utm_medium", "utm_source", "utm_term", "variant", "vid", "width",
+})
 
 # Confidence floors and thresholds. Search-result payloads (SerpAPI/Google) almost
 # never carry a UPC/GTIN, and Belk SKU/style numbers are meaningless to external

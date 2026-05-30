@@ -350,3 +350,47 @@ The playground flow creates normal `CrawlRun` rows for discover/extract, launche
 - `emit_browser_behavior_activity(page)` is called inside `_google_native_session`.
 - `_quoted` wraps every search token in double quotes.
 - `page.goto` is used for search execution instead of interacting with the search box.
+
+---
+
+## 16. Product Intelligence — Discovery Identity Ladder
+
+**Rule:** Deterministic product matching uses a fixed identity ladder, strongest signal first.
+Owner: `product_intelligence/matching.py` (`score_candidate`) + `product_intelligence/discovery.py`,
+thresholds in `config/product_intelligence.py`. No LLM in the deterministic path (see Rule 10).
+
+Ladder (highest confidence first), with the basis recorded in `score_reasons["match_basis"]`:
+1. **GTIN/UPC exact** — strongest, auto-accept.
+2. **Manufacturer style/model code exact** — GTIN-class. The universal cross-retailer code
+   (e.g. Nike `FV5285`) must be **decomposed** from a composite retailer SKU before comparison.
+   Belk SKUs glue a numeric retailer prefix onto the manufacturer core (`3900462FV5285` → `FV5285`),
+   and external listings expose it bare or with a colorway suffix (`FV5285-002`). Match on the core.
+3. **Brand-DTC own listing** (brand-exact on the brand's own domain).
+4. **Brand-exact + strong title similarity.**
+5. **Brand-exact + distinctive model token** — model-level match. The distinctive model name
+   (brand-stripped, generic-descriptor-stripped, e.g. `promina`) is matched **directionally**
+   (source distinctive tokens must be contained in the candidate) so a truncated generic candidate
+   cannot self-promote.
+6. **Brand-exact + medium title similarity.**
+7. **Title-only** — refinement, never auto-accept.
+
+**Brand resolution is evidence-based, not allowlist-gated.** The brand registry / `BRAND_DOMAIN_MAP`
+only *canonicalizes* aliases. A candidate whose own text states the source brand matches even when the
+brand is absent from the registry. Brand is never fabricated without candidate-side evidence (Rule 6).
+
+**Colorway and size are the SAME model, not a variant mismatch.** The variant-spec guard
+(`_variant_spec_mismatch`) only fires on genuine spec conflicts (capacity unit, "N-in-1"). Footwear/apparel
+color and size differences must stay matchable. Candidate URLs are canonicalized (volatile size/color/
+tracking query params stripped) before dedupe so one listing at N sizes consumes one candidate slot.
+
+**The manufacturer style core and distinctive model token are NOT a site-specific path** (Rule 13): they
+apply to every branded ecommerce target. Raw internal retailer identifiers (a composite SKU string,
+`product_id`, `style_id`) are still never scored as-is — only the decomposed manufacturer core.
+
+**VIOLATION signatures:**
+- Scoring a raw composite retailer SKU string as an identity signal instead of the decomposed core.
+- Gating `brand_match` on registry membership so an obviously-branded candidate cannot match.
+- Treating a colorway/size difference as a wrong-product variant mismatch.
+- A single listing at multiple sizes consuming multiple per-product candidate slots (missing canonical dedupe).
+- Re-introducing image/pHash matching for recall (audited NO-GO: rejects same-model colorways).
+- Adding an LLM call to the deterministic discovery/matching path.

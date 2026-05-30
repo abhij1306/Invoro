@@ -11,6 +11,8 @@ from app.services.config.adapter_runtime_settings import adapter_runtime_setting
 from app.services.config.extraction_rules import (
     BELK_BRAND_SELECTORS,
     BELK_CARD_TITLE_ATTRS,
+    BELK_COLOR_MAP_KEY,
+    BELK_COLOR_NAME_KEYS,
     BELK_IMAGE_SELECTORS,
     BELK_PRODUCT_BARCODE_KEYS,
     BELK_PRICE_SELECTORS,
@@ -136,11 +138,13 @@ def _state_product_index(page_url: str, html: str) -> dict[str, dict[str, Any]]:
     index: dict[str, dict[str, Any]] = {}
     for root in harvest_js_state_objects(None, html).values():
         variant_objects = _collect_variant_objects(root)
+        color_name_by_code = _collect_color_name_map(root)
         for product in _walk_product_payloads(root):
             record = _record_from_payload(
                 product,
                 page_url=page_url,
                 variant_objects=variant_objects,
+                color_name_by_code=color_name_by_code,
             )
             url = str(record.get("url") or "")
             if url:
@@ -148,6 +152,51 @@ def _state_product_index(page_url: str, html: str) -> dict[str, dict[str, Any]]:
             if len(index) >= adapter_runtime_settings.belk_max_products:
                 return index
     return index
+
+
+def _collect_color_name_map(root: object) -> dict[str, str]:
+    """Map Belk numeric color codes to display names from the RSC `colors` dict.
+
+    Belk's `colorSizeMap` exposes ``colors`` as ``{code: {"name": "Tan", ...}}``
+    where ``code`` is the value each variant object carries under ``color``.
+    Multi-colorway PDPs list several codes; this lets every variant resolve its
+    own colorway name instead of leaking the raw numeric code.
+    """
+    color_names: dict[str, str] = {}
+
+    def visit(node: object, depth: int) -> None:
+        if depth > 60:
+            return
+        if isinstance(node, dict):
+            color_map = node.get(BELK_COLOR_MAP_KEY)
+            if isinstance(color_map, dict):
+                for code, value in color_map.items():
+                    code_text = clean_text(code)
+                    if not code_text or code_text in color_names:
+                        continue
+                    name = _color_name_from_entry(value)
+                    if name:
+                        color_names[code_text] = name
+            for child in node.values():
+                if isinstance(child, (dict, list)):
+                    visit(child, depth + 1)
+        elif isinstance(node, list):
+            for child in node:
+                if isinstance(child, (dict, list)):
+                    visit(child, depth + 1)
+
+    visit(root, 0)
+    return color_names
+
+
+def _color_name_from_entry(value: object) -> str | None:
+    if not isinstance(value, dict):
+        return None
+    for key in BELK_COLOR_NAME_KEYS:
+        name = clean_text(value.get(key))
+        if name:
+            return name
+    return None
 
 
 def _collect_variant_objects(root: object) -> list[dict[str, Any]]:
@@ -207,7 +256,7 @@ def _looks_like_product_payload(payload: dict[str, Any]) -> bool:
     )
 
 
-def _record_from_payload(product: dict[str, Any], *, page_url: str, variant_objects: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+def _record_from_payload(product: dict[str, Any], *, page_url: str, variant_objects: list[dict[str, Any]] | None = None, color_name_by_code: dict[str, str] | None = None) -> dict[str, Any]:
     title = _first_payload_field(product, field_name="title", page_url=page_url, keys=BELK_PRODUCT_TITLE_KEYS)
     brand = _first_payload_field(product, field_name="brand", page_url=page_url, keys=BELK_PRODUCT_BRAND_KEYS)
     price_value = _first_payload_field(product, field_name="price", page_url=page_url, keys=BELK_PRODUCT_PRICE_KEYS)
@@ -226,6 +275,7 @@ def _record_from_payload(product: dict[str, Any], *, page_url: str, variant_obje
         product,
         page_url=page_url,
         variant_objects=variant_objects or [],
+        color_name_by_code=color_name_by_code or {},
     )
     if sku_variants:
         barcode = _primary_variant_barcode(sku_variants)
@@ -735,17 +785,47 @@ def _variant_size_label(obj: dict[str, Any]) -> str | None:
     return clean_text(obj.get("size")) if not isinstance(obj.get("size"), dict) else None
 
 
+def _variant_color_label(
+    obj: dict[str, Any],
+    color_name_by_code: dict[str, str],
+) -> str | None:
+    """Resolve a variant object's color to its display name.
+
+    The variant object's ``color`` is Belk's numeric color code; the human name
+    lives in the RSC ``colors`` map. Fall back to a non-numeric ``color`` value
+    if one is already a label, but never leak a raw numeric code.
+    """
+    raw_color = obj.get("color")
+    if isinstance(raw_color, dict):
+        label = clean_text(
+            raw_color.get("name") or raw_color.get("label") or raw_color.get("colorName")
+        )
+        return label or None
+    code = clean_text(raw_color)
+    if not code:
+        return None
+    mapped = clean_text(color_name_by_code.get(code))
+    if mapped:
+        return mapped
+    # A bare numeric code with no map entry is not a usable colorway label.
+    return None if code.isdigit() else code
+
+
 def _variants_from_sku_arrays(
     product: dict[str, Any],
     *,
     page_url: str,
     variant_objects: list[dict[str, Any]],
+    color_name_by_code: dict[str, str] | None = None,
 ) -> list[dict[str, object]] | None:
     """Build variant rows from Belk's per-SKU parallel `utag_data` arrays.
 
     Each array index is one sellable SKU; arrays are positionally aligned. Each
     variant row gets its own UPC (`barcode`), price, availability, and image. Size
     and color labels are joined from the variant objects via `variantId == sku_id`.
+    Each variant object carries a numeric color code that resolves to a display
+    name via `color_name_by_code` (the RSC `colors` map), so multi-colorway PDPs
+    keep each variant's own colorway.
     """
     sku_ids = _sku_array(product, BELK_SKU_ARRAY_ID_KEY)
     sku_upcs = _sku_array(product, BELK_SKU_ARRAY_UPC_KEY)
@@ -794,6 +874,9 @@ def _variants_from_sku_arrays(
             size_label = _variant_size_label(obj)
             if size_label:
                 row["size"] = size_label
+            color_label = _variant_color_label(obj, color_name_by_code or {})
+            if color_label:
+                row["color"] = color_label
         rows.append(row)
     if not rows:
         return None

@@ -33,6 +33,12 @@ BELK_SKU_ARRAY_IMAGE_KEY = "sku_image_url"
 # Variant objects elsewhere in the RSC payload carry the size/color labels and a
 # `variantId` that joins to the `sku_id` array.
 BELK_VARIANT_ID_KEYS = ("variantId", "variant_id", "id")
+# Belk's `colorSizeMap` carries a `colors` dict mapping the numeric color code
+# (the variant object's `color` value, e.g. "289475425516") to its display name
+# ({"289475425516": {"name": "Tan", ...}}). Multi-colorway PDPs expose several
+# codes; each variant resolves its own colorway through this map.
+BELK_COLOR_MAP_KEY = "colors"
+BELK_COLOR_NAME_KEYS = ("name", "label", "displayName", "colorName")
 FEATURE_SECTION_SELECTORS = (
     "[data-section='features']",
     ".features",

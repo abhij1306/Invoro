@@ -6,7 +6,7 @@ import logging
 import re
 from dataclasses import dataclass
 from typing import Awaitable, Callable
-from urllib.parse import parse_qs, unquote, urlencode, urljoin, urlsplit
+from urllib.parse import parse_qs, parse_qsl, unquote, urlencode, urljoin, urlsplit
 
 from bs4 import BeautifulSoup
 import httpx
@@ -25,6 +25,7 @@ from app.services.config.product_intelligence import (
     DISCOVERY_PRODUCT_PATH_HINTS,
     DISCOVERY_TITLE_MISMATCH_MIN_DISTINCTIVE_TOKENS,
     DISCOVERY_TITLE_MISMATCH_MIN_OVERLAP_RATIO,
+    DISCOVERY_VOLATILE_QUERY_PARAMS,
     MARKETPLACE_DOMAINS,
     RETAILER_DOMAINS,
     SEARCH_EXCLUDED_DOMAIN_PREFIX,
@@ -84,6 +85,7 @@ from app.services.config.product_intelligence import (
 )
 from app.services.shared.field_coerce import clean_text
 from app.services.product_intelligence.matching import (
+    manufacturer_style_code,
     normalize_brand,
     source_domain,
 )
@@ -235,7 +237,13 @@ async def _collect_candidates(
         results = await run_query(query, pool_limit)
         for rank, result in enumerate(results, start=1):
             normalized_url = _clean_result_url(result.url)
-            if not normalized_url or normalized_url in seen:
+            if not normalized_url:
+                continue
+            # Collapse the same listing offered at multiple sizes/colors (URLs differing only
+            # by volatile query params) to one canonical key so a single product at N sizes
+            # does not consume N per-product candidate slots.
+            dedupe_key = _candidate_dedupe_key(normalized_url)
+            if dedupe_key in seen:
                 continue
             if _same_source_url(normalized_url, source_urls):
                 continue
@@ -246,7 +254,7 @@ async def _collect_candidates(
                 continue
             if domain_counts.get(domain, 0) >= product_intelligence_settings.max_urls_per_result_domain:
                 continue
-            seen.add(normalized_url)
+            seen.add(dedupe_key)
             domain_counts[domain] = domain_counts.get(domain, 0) + 1
             candidates.append(
                 DiscoveredCandidate(
@@ -315,6 +323,7 @@ def _rank_discovered_candidates(
         candidates,
         key=lambda candidate: (
             -int(_identity_token_match(product or {}, _candidate_rank_text(candidate))),
+            -int(_candidate_model_token_match(product or {}, candidate)),
             -int(_candidate_has_shopping_group(candidate)),
             -_candidate_title_overlap(product or {}, candidate),
             int(DISCOVERY_SOURCE_TYPE_PRIORITY.get(candidate.source_type, 99)),
@@ -950,10 +959,34 @@ def _identity_token_match(product: dict[str, object], candidate_text: object) ->
         product.get("mpn"),
         product.get("gtin"),
     )
+    # The manufacturer style core (e.g. "fv5285") decomposed from a composite SKU is the
+    # cross-retailer identity key. A naive token match misses it because the source SKU
+    # ("3900462fv5285") carries a retailer prefix while candidates state it bare or with a
+    # colorway suffix ("fv5285-002"). Add the decomposed code on both sides.
+    source_codes = _style_code_tokens(
+        product.get("style_code"),
+        manufacturer_style_code(
+            product.get("sku"),
+            product.get("style"),
+            product.get("mpn"),
+            gtin_value=product.get("gtin"),
+        ),
+    )
+    source_tokens |= source_codes
     if not source_tokens:
         return False
     candidate_tokens = _identity_tokens(candidate_text)
+    candidate_tokens |= _style_code_tokens(manufacturer_style_code(candidate_text))
     return bool(source_tokens & candidate_tokens)
+
+
+def _style_code_tokens(*values: object) -> set[str]:
+    tokens: set[str] = set()
+    for value in values:
+        for token in str(value or "").casefold().split():
+            if token:
+                tokens.add(token)
+    return tokens
 
 
 def _has_conflicting_numeric_identity(
@@ -1097,6 +1130,31 @@ def _normalized_compare_url(value: object) -> str:
     return parsed._replace(fragment="").geturl().rstrip("/")
 
 
+def _candidate_dedupe_key(value: object) -> str:
+    """Canonical key for collapsing the same listing at different sizes/colors.
+
+    Drops the fragment and configured volatile query params (size, color, variant, tracking)
+    so ``.../582039?size=10`` and ``.../582039?size=13`` dedupe to one candidate. Identity-
+    bearing params (e.g. ``product``, ``productId``) are preserved.
+    """
+    cleaned = _clean_result_url(value)
+    if not cleaned:
+        return ""
+    try:
+        parsed = urlsplit(cleaned)
+    except ValueError:
+        return ""
+    kept_params = [
+        (key, val)
+        for key, val in parse_qsl(parsed.query, keep_blank_values=False)
+        if key.casefold() not in DISCOVERY_VOLATILE_QUERY_PARAMS
+    ]
+    query = urlencode(sorted(kept_params))
+    host = (parsed.hostname or "").removeprefix("www.").lower()
+    path = parsed.path.rstrip("/")
+    return f"{host}{path}?{query}" if query else f"{host}{path}"
+
+
 def _domain_matches(normalized_domain: str, target: str) -> bool:
     normalized_target = str(target or "").removeprefix("www.").lower()
     return bool(
@@ -1149,6 +1207,19 @@ def _query_identifier_value(product: dict[str, object]) -> str:
     mpn = _identity_field(product, "mpn")
     if mpn:
         return mpn
+    # Prefer the decomposed manufacturer style core (e.g. "FV5285") over a raw composite
+    # retailer SKU ("3900462FV5285"): external retailers index by the bare manufacturer code,
+    # so the composite would not match. Fall back to a manufacturer-looking style/product_id.
+    style_core = manufacturer_style_code(
+        product.get("style_code"),
+        product.get("sku"),
+        product.get("style"),
+        product.get("product_id"),
+        gtin_value=product.get("gtin"),
+    )
+    if style_core:
+        # A title may yield more than one code; use the first deterministic token.
+        return style_core.split()[0]
     for key in ("style", "product_id"):
         value = _identity_field(product, key)
         if _looks_like_manufacturer_identifier(value):
@@ -1191,6 +1262,15 @@ def _candidate_title_overlap(
     if not source_tokens or not candidate_tokens:
         return 0.0
     return len(source_tokens & candidate_tokens) / max(min(len(source_tokens), len(candidate_tokens)), 1)
+
+
+def _candidate_model_token_match(
+    product: dict[str, object],
+    candidate: DiscoveredCandidate,
+) -> bool:
+    source_tokens = _distinctive_title_tokens(product.get("title"), product.get("brand"))
+    candidate_tokens = _distinctive_title_tokens(_candidate_rank_text(candidate), product.get("brand"))
+    return bool(source_tokens and candidate_tokens and source_tokens & candidate_tokens)
 
 
 def _quoted(value: object) -> str:
