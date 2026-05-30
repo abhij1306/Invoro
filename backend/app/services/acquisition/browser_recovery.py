@@ -56,48 +56,63 @@ async def recover_browser_challenge(
     wait_started_at = time.perf_counter()
     poll_ms = max(100, int(challenge_poll_interval_ms))
     deadline = wait_started_at + max_wait_seconds
-    while time.perf_counter() < deadline:
-        checked_via_akamai = False
-        if "akamai" in providers and await _page_has_cookie(
+
+    async def _check_cleared() -> Any | None:
+        # Akamai needs its `_abck` cookie set before re-reading; other providers
+        # (DataDome/PerimeterX) clear by swapping the shell for real content.
+        if "akamai" in providers and not await _page_has_cookie(
             page, url=url, name="_abck"
         ):
-            html = await get_page_html(page)
-            classification = await classify_blocked_page(
-                html,
-                _recovered_html_status_code(status_code),
-            )
-            checked_via_akamai = True
-            if _challenge_has_cleared(
-                html,
-                status_code=_recovered_html_status_code(status_code),
-                classification=classification,
-                looks_like_low_content_shell=looks_like_low_content_shell,
-            ):
-                phase_timings_ms["challenge_wait"] = elapsed_ms(wait_started_at)
-                return _response_for_recovered_page(response, status_code)
+            return None
+        html = await get_page_html(page)
+        classification = await classify_blocked_page(
+            html, _recovered_html_status_code(status_code)
+        )
+        if _challenge_has_cleared(
+            html,
+            status_code=_recovered_html_status_code(status_code),
+            classification=classification,
+            looks_like_low_content_shell=looks_like_low_content_shell,
+        ):
+            phase_timings_ms["challenge_wait"] = elapsed_ms(wait_started_at)
+            return _response_for_recovered_page(response, status_code)
+        nonlocal terminal_hard_block
+        terminal_hard_block = _is_terminal_hard_block(classification)
+        return None
 
-        if not checked_via_akamai:
-            html = await get_page_html(page)
-            classification = await classify_blocked_page(
-                html,
-                _recovered_html_status_code(status_code),
-            )
-            if _challenge_has_cleared(
-                html,
-                status_code=_recovered_html_status_code(status_code),
-                classification=classification,
-                looks_like_low_content_shell=looks_like_low_content_shell,
-            ):
-                phase_timings_ms["challenge_wait"] = elapsed_ms(wait_started_at)
-                return _response_for_recovered_page(response, status_code)
+    terminal_hard_block = False
+    while time.perf_counter() < deadline:
+        recovered = await _check_cleared()
+        if recovered is not None:
+            return recovered
+        # A terminal "Access Denied" page (title/strong evidence, no active
+        # challenge markers) will never clear by waiting. Stop early so engine
+        # escalation is not delayed by the full challenge budget.
+        if terminal_hard_block:
+            break
 
         await _emit_challenge_activity(page)
+
+        # Re-check immediately after activity: challenge activity is ~2s and the
+        # provider often clears during it. Catching the clear here avoids burning
+        # another poll interval (and a needless engine escalation) on a page that
+        # is already usable.
+        recovered = await _check_cleared()
+        if recovered is not None:
+            return recovered
+        if terminal_hard_block:
+            break
 
         remaining_ms = max(0, int((deadline - time.perf_counter()) * 1000))
         if remaining_ms <= 0:
             break
         await page.wait_for_timeout(min(poll_ms, remaining_ms))
     phase_timings_ms["challenge_wait"] = elapsed_ms(wait_started_at)
+
+    # A terminal hard block ("Access Denied") will not clear on a fresh reload
+    # either; skip the retry-goto and let engine escalation take over immediately.
+    if terminal_hard_block:
+        return response
 
     retry_started_at = time.perf_counter()
     remaining_budget_ms = max(500, int((deadline - retry_started_at) * 1000))
@@ -163,6 +178,27 @@ def _challenge_has_cleared(
     if not low_content:
         return True
     return False
+
+
+def _is_terminal_hard_block(classification: Any) -> bool:
+    """A terminal hard block is a final denial page, not a solvable challenge.
+
+    Akamai/PerimeterX render an "Access Denied" page (title/strong blocker text)
+    with no active challenge markers. Waiting/polling cannot clear it, so the
+    recovery loop should stop early and let engine escalation proceed instead of
+    burning the full challenge budget on a page that will never change.
+    """
+    if not bool(getattr(classification, "blocked", False)):
+        return False
+    has_terminal_evidence = bool(
+        getattr(classification, "title_matches", None)
+        or getattr(classification, "strong_hits", None)
+    )
+    has_active_challenge = bool(
+        getattr(classification, "active_provider_hits", None)
+        or getattr(classification, "challenge_element_hits", None)
+    )
+    return has_terminal_evidence and not has_active_challenge
 
 
 def _recovered_html_status_code(status_code: int) -> int:

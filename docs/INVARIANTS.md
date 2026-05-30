@@ -165,6 +165,8 @@ Browser-driver disconnects are URL-local failures. If a shared browser dies duri
 - `build_playwright_context_spec` MUST rewrite the UA to plain `Chrome` with coherent `sec-ch-ua` headers. UA OS token, `sec-ch-ua-platform`, and native `navigator.platform` MUST agree, keyed off host OS. Real Chrome (headful, native context) is exempt.
 - No `browserforge`, no JS init-script shaping. Patchright's "no fingerprint injection" guidance applies only to headful `channel="chrome"` and never justifies dropping the mask while headless.
 - Origin warmup is non-fatal and budget-capped (`origin_warmup_max_budget_ratio`): a blocked/challenge-shell origin MUST NOT raise or abort; the main navigation owns the blocked verdict.
+- Challenge recovery re-checks for clear immediately after challenge activity (activity is ~2s; providers often clear during it) to avoid a needless engine escalation on an already-usable page.
+- A terminal hard block (title/strong "Access Denied" evidence, no active challenge or challenge-element markers) never clears by waiting; the recovery loop exits early and skips the retry-goto so real-Chrome escalation is not delayed by the full challenge budget.
 
 **Usable content beats provider noise. This is a hard contract.**
 If browser diagnostics report `browser_outcome == "usable_content"`, provider telemetry such as `provider:*`,
