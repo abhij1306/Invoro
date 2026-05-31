@@ -104,7 +104,7 @@ class OracleHCMAdapter(PublicEndpointAdapter):
                     if job_id:
                         seen_job_ids.add(job_id)
                     records.append(normalized)
-                    if target_job_id and job_id == target_job_id:
+                    if target_job_id:
                         return [normalized]
 
             if response_item_count < page_size:

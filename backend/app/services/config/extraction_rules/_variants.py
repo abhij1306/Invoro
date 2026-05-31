@@ -10,7 +10,9 @@ VARIANT_SIZE_ALIAS_SUFFIXES = (" us",)
 # set as an existing axis from another source, the two "axes" are really one
 # axis mislabeled (e.g. shoe sizes captured once as `size` and once as `color`).
 # Merging them as independent axes would fabricate a Cartesian explosion, so the
-# axis is treated as a duplicate when its value overlap meets this ratio.
+# axis is treated as a duplicate when the Jaccard similarity (shared / union of
+# values) meets this ratio. Union-based so genuinely distinct numeric axes that
+# merely share a value (waist vs inseam) are not collapsed.
 VARIANT_MISLABELED_AXIS_MIN_OVERLAP_RATIO = 0.5
 VARIANT_OPTION_VALUE_UI_NOISE_PHRASES = (
     "create an account",

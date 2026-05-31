@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import json
 import re
-from json import loads as parse_json
 import math
 from urllib.parse import parse_qsl, urljoin, urlparse, urlsplit
 
@@ -474,7 +473,7 @@ class ShopifyAdapter(BaseAdapter):
         match = re.search(pattern, html, re.DOTALL)
         if match:
             try:
-                meta = parse_json(match.group(1))
+                meta = json.loads(match.group(1))
                 product = meta.get("product", {})
                 if product.get("title"):
                     option_names = self._option_names(product.get("options"))
@@ -529,6 +528,7 @@ class ShopifyAdapter(BaseAdapter):
                         }
                     )
             except (json.JSONDecodeError, TypeError):
+                # Malformed embedded product JSON; skip this block and continue.
                 pass
         return records
 
