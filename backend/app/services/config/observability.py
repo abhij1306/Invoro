@@ -65,6 +65,20 @@ EXTRACTION_TIER_STRUCTURED = "structured_data"
 EXTRACTION_TIER_JS_STATE = "js_state"
 EXTRACTION_TIER_DOM = "dom"
 
+# --- DOM-skip decision contract ----------------------------------------------
+# Keys of the observe-only ``_dom_skip_decision`` record dict produced by the
+# detail tier runner and consumed by the trace projection + audit engine. Kept
+# here so producer (tiers.py) and consumers (run_audit.py, trace) cannot drift.
+DOM_SKIP_KEY_SKIPPED = "dom_skipped"
+DOM_SKIP_KEY_CONFIDENCE = "confidence"
+DOM_SKIP_KEY_THRESHOLD = "threshold"
+DOM_SKIP_KEY_REASON = "reason"
+
+# Canonical reason values for the DOM-skip decision.
+DOM_SKIP_REASON_CLEARED = "confidence_cleared_no_dom_completion_needed"
+DOM_SKIP_REASON_CONFIDENCE_BELOW_THRESHOLD = "confidence_below_threshold"
+DOM_SKIP_REASON_DOM_COMPLETION_REQUIRED = "dom_completion_required"
+
 # --- Persisted browser.json shaping (Slice 2) --------------------------------
 # The runtime browser_diagnostics dict stays as-is for in-memory consumers
 # (contract memory, listing decisions, log messages). Only the *saved* artifact
@@ -139,6 +153,23 @@ FLAG_SEVERITY_HIGH = "high"
 FLAG_SEVERITY_MEDIUM = "medium"
 FLAG_SEVERITY_LOW = "low"
 
+# --- Audit policy (Rule 1: policy literals live in config, not service code) -
+# Verdicts that mean the URL was effectively blocked (no usable content owed).
+AUDIT_BLOCKED_VERDICTS = frozenset({"blocked"})
+# Page-metadata-ish keys that signal a fake single-row listing result.
+AUDIT_METADATA_ONLY_KEYS = frozenset(
+    {"title", "description", "url", "source_url", "brand"}
+)
+# Record keys whose presence on a detail record indicates real variant cues
+# (used to flag a DOM-skip that dropped variants — INVARIANT Rule 3).
+AUDIT_VARIANT_CUE_FIELDS = (
+    "available_sizes",
+    "option_values",
+    "variant_axes",
+    "size",
+    "color",
+)
+
 __all__ = [
     "RUN_TRACE_ENABLED",
     "TRACE_ARTIFACT_SUBDIR",
@@ -162,6 +193,13 @@ __all__ = [
     "EXTRACTION_TIER_STRUCTURED",
     "EXTRACTION_TIER_JS_STATE",
     "EXTRACTION_TIER_DOM",
+    "DOM_SKIP_KEY_SKIPPED",
+    "DOM_SKIP_KEY_CONFIDENCE",
+    "DOM_SKIP_KEY_THRESHOLD",
+    "DOM_SKIP_KEY_REASON",
+    "DOM_SKIP_REASON_CLEARED",
+    "DOM_SKIP_REASON_CONFIDENCE_BELOW_THRESHOLD",
+    "DOM_SKIP_REASON_DOM_COMPLETION_REQUIRED",
     "BROWSER_ARTIFACT_DERIVABLE_FIELDS",
     "BROWSER_ARTIFACT_LISTING_ONLY_FIELDS",
     "BROWSER_ARTIFACT_DROP_WHEN_EMPTY",
@@ -176,4 +214,7 @@ __all__ = [
     "FLAG_SEVERITY_HIGH",
     "FLAG_SEVERITY_MEDIUM",
     "FLAG_SEVERITY_LOW",
+    "AUDIT_BLOCKED_VERDICTS",
+    "AUDIT_METADATA_ONLY_KEYS",
+    "AUDIT_VARIANT_CUE_FIELDS",
 ]

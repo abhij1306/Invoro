@@ -340,6 +340,7 @@ async def emit_browser_behavior_activity(page: Any) -> dict[str, object]:
         after = getattr(mouse, "_crawler_move_count", before)
         pointer_moves += max(0, int(after or 0) - int(before or 0))
     except Exception:
+        # Best-effort humanization metric; pointer move count is non-critical.
         pass
     scroll_steps += await _emit_scroll_physics(page)
     return {

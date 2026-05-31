@@ -8,6 +8,7 @@ trace/browser artifact reads.
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -165,7 +166,7 @@ def test_write_flags_creates_audit_artifact(tmp_path, monkeypatch):
         {"code": "y", "severity": "low"},
     ]
     path = run_audit._write_flags(99, flags)
-    payload = json.loads(open(path, encoding="utf-8").read())
+    payload = json.loads(Path(path).read_text(encoding="utf-8"))
     assert payload["run_id"] == 99
     assert payload["flag_count"] == 2
     assert payload["severity_counts"] == {"high": 1, "low": 1}

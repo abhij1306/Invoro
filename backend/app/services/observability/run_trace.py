@@ -269,33 +269,59 @@ class RunTrace:
 class NullRunTrace(RunTrace):
     """No-op trace used when tracing is disabled.
 
-    Every record_* call is a no-op and serialization yields nothing. Subclassing
-    keeps call sites type-stable (they always hold a ``RunTrace``) without paying
-    collection cost.
+    Every ``record_*`` call is a no-op and ``to_dict`` yields an empty envelope
+    (no acquire events, no completed tiers). Subclassing keeps call sites
+    type-stable (they always hold a ``RunTrace``) without paying collection
+    cost. ``persist_run_trace`` additionally short-circuits when tracing is
+    disabled, so a NullRunTrace is never actually serialized in production.
+
+    Override signatures mirror ``RunTrace`` exactly so static analysis sees a
+    consistent method contract across the hierarchy.
     """
 
     def __init__(self) -> None:
         super().__init__(run_id=0, url="")
 
-    def record_acquire_event(self, *args: Any, **kwargs: Any) -> None:  # noqa: D102
+    def record_acquire_event(
+        self,
+        kind: str,
+        *,
+        detail: dict[str, Any] | None = None,
+        duration_ms: int | None = None,
+    ) -> None:
         return None
 
-    def record_host_outcome(self, *args: Any, **kwargs: Any) -> None:  # noqa: D102
+    def record_host_outcome(self, outcome: dict[str, Any]) -> None:
         return None
 
-    def record_completed_tiers(self, *args: Any, **kwargs: Any) -> None:  # noqa: D102
+    def record_completed_tiers(self, tiers: list[str]) -> None:
         return None
 
-    def record_skip_dom_decision(self, *args: Any, **kwargs: Any) -> None:  # noqa: D102
+    def record_skip_dom_decision(
+        self,
+        *,
+        dom_skipped: bool,
+        confidence: float | None = None,
+        threshold: float | None = None,
+        dom_completion_reason: str | None = None,
+    ) -> None:
         return None
 
-    def record_field_candidate(self, *args: Any, **kwargs: Any) -> None:  # noqa: D102
+    def record_field_candidate(
+        self,
+        field_name: str,
+        *,
+        source: str,
+        won: bool,
+        value_preview: str = "",
+        reject_reason: str | None = None,
+    ) -> None:
         return None
 
-    def record_normalize_edit(self, *args: Any, **kwargs: Any) -> None:  # noqa: D102
+    def record_normalize_edit(self, field_name: str, reason: str) -> None:
         return None
 
-    def record_verdict(self, *args: Any, **kwargs: Any) -> None:  # noqa: D102
+    def record_verdict(self, verdict: str) -> None:
         return None
 
 

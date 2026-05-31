@@ -41,19 +41,25 @@ def _is_listing_surface(surface: str | None) -> bool:
 
 
 def _shape_phase_timings(timings: Any) -> dict[str, Any]:
-    """Keep only timing entries that carry signal (non-zero, parseable)."""
+    """Keep timing entries that carry signal (non-zero, parseable).
+
+    The ``total`` acquire time is always preserved when present and numeric
+    (even if zero) because the baseline drift loop reads it as the per-run
+    timing observation; dropping it would silently stall timing baselines.
+    """
     if not isinstance(timings, dict):
         return {}
     shaped: dict[str, Any] = {}
     for key, value in timings.items():
+        key_str = str(key)
         try:
             numeric = float(value)
         except (TypeError, ValueError):
             # Non-numeric timing payloads (e.g. an error marker) are signal.
-            shaped[str(key)] = value
+            shaped[key_str] = value
             continue
-        if numeric != 0:
-            shaped[str(key)] = value
+        if numeric != 0 or key_str == "total":
+            shaped[key_str] = value
     return shaped
 
 

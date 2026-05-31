@@ -187,7 +187,20 @@ def _load_html_snippet(record: CrawlRecord | None, *, anchors: list[str]) -> str
     if not raw_html_path:
         return ""
     try:
-        return Path(raw_html_path).read_text(encoding="utf-8", errors="ignore")
+        artifacts_root = Path(settings.artifacts_dir).resolve()
+        resolved = Path(raw_html_path).resolve()
+    except OSError:
+        return ""
+    # Path-traversal guard: only read files inside the artifacts directory. A
+    # poisoned raw_html_path must never let the diagnosis read arbitrary local
+    # files and forward them to the LLM (INVARIANT Rule 10 — observe-only).
+    if not resolved.is_relative_to(artifacts_root):
+        logger.warning(
+            "Refusing to read raw_html_path outside artifacts dir: %s", raw_html_path
+        )
+        return ""
+    try:
+        return resolved.read_text(encoding="utf-8", errors="ignore")
     except OSError:
         return ""
 

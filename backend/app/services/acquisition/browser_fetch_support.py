@@ -24,6 +24,7 @@ async def emit_page_loaded_event(
     try:
         page_title = clean_text(await page.title())
     except Exception:
+        # Best-effort: page title is cosmetic for the event; ignore failures.
         pass
     await emit_browser_event(
         on_event,

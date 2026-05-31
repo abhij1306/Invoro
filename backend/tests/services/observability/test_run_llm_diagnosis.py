@@ -8,6 +8,7 @@ real provider call (run_prompt_task is monkeypatched).
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -115,6 +116,6 @@ async def test_unavailable_when_llm_errors(monkeypatch):
 def test_write_diagnosis_creates_artifact(tmp_path, monkeypatch):
     monkeypatch.setattr(diag.settings, "artifacts_dir", tmp_path)
     path = diag.write_diagnosis(7, {"status": "ok", "diagnosis": {"summary": "x"}})
-    payload = json.loads(open(path, encoding="utf-8").read())
+    payload = json.loads(Path(path).read_text(encoding="utf-8"))
     assert payload["status"] == "ok"
     assert path.endswith("llm_diagnosis.json")

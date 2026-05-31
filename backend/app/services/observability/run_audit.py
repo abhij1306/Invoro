@@ -51,11 +51,6 @@ logger = logging.getLogger(__name__)
 
 _CALLBACK_KEY = "observability_run_audit"
 
-# Verdicts that mean the URL was effectively blocked (no usable content owed).
-_BLOCKED_VERDICTS = frozenset({"blocked"})
-# Page-metadata-ish keys that signal a fake single-row listing result.
-_METADATA_ONLY_KEYS = frozenset({"title", "description", "url", "source_url", "brand"})
-
 
 def ensure_run_audit_registered() -> None:
     """Register the auditor as a run-complete callback (idempotent)."""
@@ -188,7 +183,14 @@ def _audit_baseline_drift(
     baseline = load_baseline(domain, surface)
     flags = compare_to_baseline(baseline, observation)
     if update_baselines:
-        update_baseline(domain, surface, observation)
+        try:
+            update_baseline(domain, surface, observation)
+        except Exception:
+            # Baseline persistence is a sidecar; a write/serialize failure must
+            # not abort the audit and suppress flags.json for the run.
+            logger.exception(
+                "Baseline update failed for domain=%s surface=%s", domain, surface
+            )
     return flags
 
 
@@ -242,15 +244,18 @@ def _observed_total_acquire_ms(run_id: int) -> int | None:
     pages_dir = _run_pages_dir(run_id)
     if not pages_dir.is_dir():
         return None
+    total_ms = 0
+    found = False
     for browser_path in sorted(pages_dir.glob("*.browser.json")):
         diagnostics = _read_json(browser_path)
         if not isinstance(diagnostics, dict):
             continue
         timings = mapping_or_empty(diagnostics.get("phase_timings_ms"))
         total = timings.get("total")
-        if isinstance(total, (int, float)):
-            return int(total)
-    return None
+        if isinstance(total, (int, float)) and not isinstance(total, bool):
+            total_ms += int(total)
+            found = True
+    return total_ms if found else None
 
 
 def _audit_record(
@@ -286,14 +291,14 @@ def _audit_record(
     # DOM skipped while variants missing and variant cues present -> Rule 3.
     if "detail" in surface and data.get("variants") in (None, "", [], {}):
         skip = mapping_or_empty(extraction.get("dom_skip"))
-        if bool(skip.get("dom_skipped")) and _has_variant_cues(data):
+        if bool(skip.get(obs_config.DOM_SKIP_KEY_SKIPPED)) and _has_variant_cues(data):
             flags.append(
                 _flag(
                     FLAG_DOM_SKIPPED_WITH_VARIANT_CUES,
                     evidence={
-                        "confidence": skip.get("confidence"),
-                        "threshold": skip.get("threshold"),
-                        "reason": skip.get("reason"),
+                        "confidence": skip.get(obs_config.DOM_SKIP_KEY_CONFIDENCE),
+                        "threshold": skip.get(obs_config.DOM_SKIP_KEY_THRESHOLD),
+                        "reason": skip.get(obs_config.DOM_SKIP_KEY_REASON),
                     },
                     url=url,
                 )
@@ -312,7 +317,7 @@ def _audit_traces(*, run_id: int, verdict: str) -> list[dict[str, Any]]:
             continue
         outcome = str(diagnostics.get("browser_outcome") or "").strip().lower()
         host_outcome = mapping_or_empty(diagnostics.get("host_outcome"))
-        blocked = bool(host_outcome.get("blocked")) or verdict in _BLOCKED_VERDICTS
+        blocked = bool(host_outcome.get("blocked")) or verdict in obs_config.AUDIT_BLOCKED_VERDICTS
         # usable_content but the run/host says blocked -> Rule 6 contradiction.
         if outcome == "usable_content" and blocked:
             flags.append(
@@ -360,11 +365,11 @@ def _looks_like_metadata_only(data: dict[str, Any]) -> bool:
     }
     if not populated:
         return False
-    return populated <= _METADATA_ONLY_KEYS
+    return populated <= obs_config.AUDIT_METADATA_ONLY_KEYS
 
 
 def _has_variant_cues(data: dict[str, Any]) -> bool:
-    for key in ("available_sizes", "option_values", "variant_axes", "size", "color"):
+    for key in obs_config.AUDIT_VARIANT_CUE_FIELDS:
         if data.get(key) not in (None, "", [], {}):
             return True
     return False

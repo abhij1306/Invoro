@@ -74,3 +74,12 @@ if settings.scheduler_driver == SCHEDULER_DRIVER_CELERY:
             "schedule": 86400.0,
         },
     }
+
+# Re-exported for app.tasks, which binds the worker lifecycle hooks via
+# ``@worker_process_init.connect`` / ``@worker_process_shutdown.connect``. Listed
+# in __all__ so these names are recognized as intentional public re-exports.
+__all__ = [
+    "celery_app",
+    "worker_process_init",
+    "worker_process_shutdown",
+]

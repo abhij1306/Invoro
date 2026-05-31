@@ -15,6 +15,7 @@ from typing import Any, Callable
 from bs4 import BeautifulSoup
 from selectolax.lexbor import LexborHTMLParser
 
+from app.services.config import observability as obs_config
 from app.services.config.extraction_rules import (
     DETAIL_BREADCRUMB_JSONLD_TYPES,
     DETAIL_IRRELEVANT_JSON_LD_TYPES,
@@ -366,16 +367,16 @@ class DetailTierExecutor:
         )
         dom_skipped = confidence_clears and not dom_completion_required
         if dom_skipped:
-            reason = "confidence_cleared_no_dom_completion_needed"
+            reason = obs_config.DOM_SKIP_REASON_CLEARED
         elif not confidence_clears:
-            reason = "confidence_below_threshold"
+            reason = obs_config.DOM_SKIP_REASON_CONFIDENCE_BELOW_THRESHOLD
         else:
-            reason = "dom_completion_required"
+            reason = obs_config.DOM_SKIP_REASON_DOM_COMPLETION_REQUIRED
         decision = {
-            "dom_skipped": dom_skipped,
-            "confidence": confidence_score,
-            "threshold": threshold,
-            "reason": reason,
+            obs_config.DOM_SKIP_KEY_SKIPPED: dom_skipped,
+            obs_config.DOM_SKIP_KEY_CONFIDENCE: confidence_score,
+            obs_config.DOM_SKIP_KEY_THRESHOLD: threshold,
+            obs_config.DOM_SKIP_KEY_REASON: reason,
         }
         return dom_skipped, decision
 

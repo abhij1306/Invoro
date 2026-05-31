@@ -377,12 +377,18 @@ def _record_acquire_timeline(
                 )
         interstitial = mapping_or_empty(diagnostics.get("interstitial"))
         if interstitial:
+            interstitial_status = (
+                str(interstitial.get("status") or "").strip().lower()
+            )
+            interstitial_timing_key = (
+                obs_config.INTERSTITIAL_DISMISSAL_TIMING_KEY
+                if interstitial_status == "dismissed"
+                else obs_config.INTERSTITIAL_PROBE_TIMING_KEY
+            )
             trace.record_acquire_event(
                 obs_config.ACQUIRE_EVENT_INTERSTITIAL,
                 detail={"status": interstitial.get("status")},
-                duration_ms=_as_int(
-                    timings.get(obs_config.INTERSTITIAL_DISMISSAL_TIMING_KEY)
-                ),
+                duration_ms=_as_int(timings.get(interstitial_timing_key)),
             )
         challenge_wait = _as_int(timings.get("challenge_wait"))
         if challenge_wait:
@@ -764,6 +770,7 @@ async def _run_persistence_stage(
         run_id=context.run.id,
         source_url=acquisition_result.final_url,
         trace=context.trace,
+        flagged=verdict not in obs_config.TRACE_SUCCESS_VERDICTS,
     )
     await _update_acquisition_contract_memory(
         context,
