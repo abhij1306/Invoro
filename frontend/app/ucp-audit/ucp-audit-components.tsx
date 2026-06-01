@@ -910,6 +910,7 @@ export function UcpFixSequence({ report }: Readonly<{ report: UcpAuditReport | n
                     <EvidenceChips evidence={item.evidence} />
                   </div>
 
+
                   <Badge tone={priorityTone}>{item.priority}</Badge>
                 </li>
               );
@@ -933,33 +934,6 @@ const SCHEMA_GROUP_LABELS: Record<string, string> = {
   cart_checkout: 'Cart',
   order_policy: 'Order',
 };
-
-function ManifestSummary({
-  contract,
-  findings,
-}: Readonly<{ contract: UcpContract; findings: Array<Record<string, unknown>> }>) {
-  const manifest = contract.manifest;
-  if (!manifest) return null;
-  const signingKeyFindings = findingsForCodes(findings, ['signing_keys_missing']);
-  const cacheFindings = findingsForCodes(findings, ['cache_control_missing']);
-  const structuralFindings = findingsForCodes(findings, ['manifest_invalid']);
-  const redirectFindings = findingsForCodes(findings, ['manifest_redirected']);
-  let profileValue = 'invalid';
-  if (manifest.found === false) {
-    profileValue = 'not found';
-  } else if (manifest.valid) {
-    profileValue = 'valid';
-  }
-
-  return (
-    <div>
-      <h3 className="type-label-mono mb-2">DISCOVERY PROFILE</h3>
-      <div className="grid gap-3 lg:grid-cols-2">
-        <ManifestFact
-          label="Profile"
-          value={profileValue}
-          tone={manifest.found === false || manifest.valid === false ? 'danger' : 'success'}
-          detail={manifest.final_url}
         />
         <ManifestFact
           label="Version"
@@ -1008,33 +982,6 @@ function ManifestFact({
     </div>
   );
 }
-
-function TransportSummary({ transports }: Readonly<{ transports: ContractTransport[] }>) {
-  if (!transports.length) {
-    return (
-      <div>
-        <h3 className="type-label-mono mb-2">TRANSPORTS</h3>
-        <DataRegionEmpty
-          title="No declared transports"
-          description="The manifest did not expose REST, MCP, A2A, or embedded transports."
-        />
-      </div>
-    );
-  }
-  return (
-    <div>
-      <h3 className="type-label-mono mb-2">TRANSPORTS</h3>
-      <div className="overflow-x-auto">
-        <Table className="min-w-[820px]">
-          <TableHeader>
-            <TableRow>
-              <TableHead>Transport</TableHead>
-              <TableHead>Negotiation</TableHead>
-              <TableHead>Endpoint</TableHead>
-              <TableHead>Details</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
             {transports.map((transport) => {
               const negotiationTone = transportNegotiationTone(transport);
               const negotiationLabel = transportNegotiationLabel(transport);
@@ -1089,21 +1036,6 @@ function TransportSummary({ transports }: Readonly<{ transports: ContractTranspo
   );
 }
 
-function SchemaCoverageCell({
-  schema,
-}: Readonly<{ schema: NonNullable<UcpContract['schemas']>[number] }>) {
-  const groups = activeSchemaGroups(schema);
-  if (!groups.length) {
-    return <span className="type-caption-mono">No UCP payload group detected</span>;
-  }
-  return (
-    <div className="grid gap-2 sm:grid-cols-3">
-      {groups.map((group) => (
-        <SchemaGroupSummary key={group} schema={schema} group={group} />
-      ))}
-    </div>
-  );
-}
 
 function SchemaGroupSummary({
   schema,
@@ -1138,31 +1070,6 @@ function SchemaGroupSummary({
   );
 }
 
-function SchemaMissingCell({
-  schema,
-}: Readonly<{ schema: NonNullable<UcpContract['schemas']>[number] }>) {
-  const missingFields = new Set<string>();
-  for (const group of activeSchemaGroups(schema)) {
-    for (const [field, present] of Object.entries(schema.field_results?.[group] ?? {})) {
-      if (!present) {
-        missingFields.add(field);
-      }
-    }
-  }
-  const missing = Array.from(missingFields);
-  if (!missing.length) {
-    return <span className="text-success font-mono text-xs font-medium">Complete</span>;
-  }
-  return (
-    <div className="flex max-w-[260px] flex-wrap gap-1">
-      {missing.map((field) => (
-        <Badge key={field} tone="danger" className="font-mono lowercase">
-          {field}
-        </Badge>
-      ))}
-    </div>
-  );
-}
 
 function activeSchemaGroups(schema: NonNullable<UcpContract['schemas']>[number]) {
   const declared = (schema.groups ?? []).filter((group) => schema.field_results?.[group]);
@@ -1172,17 +1079,6 @@ function activeSchemaGroups(schema: NonNullable<UcpContract['schemas']>[number])
   );
 }
 
-function SchemaAnalysisText({
-  schema,
-}: Readonly<{ schema: NonNullable<UcpContract['schemas']>[number] }>) {
-  const llmSummary =
-    schema.llm_analysis && typeof schema.llm_analysis.summary === 'string'
-      ? schema.llm_analysis.summary
-      : '';
-  if (llmSummary) return <span className="text-accent">{llmSummary}</span>;
-  if (schema.error) return <span className="text-danger">{schema.error}</span>;
-  return <span className="text-muted">-</span>;
-}
 
 function AiAssessmentSummary({
   assessment,

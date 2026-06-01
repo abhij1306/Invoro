@@ -197,18 +197,6 @@ function severityTone(group: LogSiteGroup, index: number) {
     : 'bg-transparent';
 }
 
-function severityLabel(group: LogSiteGroup) {
-  if (group.hasError) {
-    return 'Error';
-  }
-  if (group.hasWarning) {
-    return 'Warning';
-  }
-  if (group.recordCount > 0 || group.stageLogs.persistence.length > 0) {
-    return 'Persisted';
-  }
-  return 'Running';
-}
 
 function payloadSnapshot(group: LogSiteGroup) {
   if (!group.records.length) {

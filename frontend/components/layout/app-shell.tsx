@@ -1,5 +1,4 @@
 'use client';
-
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -24,11 +23,9 @@ import {
   Radar,
   SearchCheck,
   Settings2,
-  Sparkles,
   ShieldCheck,
   Trash2,
   WandSparkles,
-  Zap,
 } from 'lucide-react';
 
 import { api, monitorsApi } from '../../lib/api';
