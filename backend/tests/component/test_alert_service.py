@@ -208,7 +208,8 @@ def test_rules_payload_normalizes_rule_shapes_and_warns_on_unexpected_types(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     class _ModelDumpRule:
-        def model_dump(self, *, exclude_none: bool) -> dict[object, object]:
+        @staticmethod
+        def model_dump(*, exclude_none: bool) -> dict[object, object]:
             assert exclude_none is True
             return {1: "value", "details": None}
 

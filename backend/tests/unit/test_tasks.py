@@ -37,27 +37,32 @@ def test_run_task_in_worker_loop_installs_asyncio_exception_filter(
     monkeypatch,
 ) -> None:
     class FakeTask:
-        def done(self) -> bool:
+        @staticmethod
+        def done() -> bool:
             return False
 
     class FakeLoop:
         def __init__(self) -> None:
             self.closed = False
 
-        def create_task(self, coro, name=None):
+        @staticmethod
+        def create_task(coro, name=None):
             if hasattr(coro, "close"):
                 coro.close()
             return FakeTask()
 
-        def run_until_complete(self, awaitable):
+        @staticmethod
+        def run_until_complete(awaitable):
             if hasattr(awaitable, "close"):
                 awaitable.close()
             return None
 
-        async def shutdown_asyncgens(self):
+        @staticmethod
+        async def shutdown_asyncgens():
             return None
 
-        async def shutdown_default_executor(self):
+        @staticmethod
+        async def shutdown_default_executor():
             return None
 
         def close(self) -> None:

@@ -55,7 +55,8 @@ class MonitorSchedulerService:
                 )
                 await session.commit()
 
-    async def pre_check_url(self, url: str, state: MonitorURLState) -> bool:
+    @staticmethod
+    async def pre_check_url(url: str, state: MonitorURLState) -> bool:
         now = utcnow()
         try:
             async with httpx.AsyncClient(timeout=HEAD_CHECK_TIMEOUT_SECONDS, follow_redirects=True) as client:
@@ -113,8 +114,8 @@ class MonitorSchedulerService:
             state.consecutive_unchanged_count = int(state.consecutive_unchanged_count or 0) + 1
         return changed
 
+    @staticmethod
     async def dispatch_monitor_run(
-        self,
         session: AsyncSession,
         monitor: MonitorJob,
         urls: list[str],
@@ -144,8 +145,8 @@ class MonitorSchedulerService:
             run_ids.append(int(run.id))
         return run_ids
 
+    @staticmethod
     async def _due_monitors(
-        self,
         session: AsyncSession,
         now: datetime,
     ) -> list[MonitorJob]:

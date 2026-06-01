@@ -113,8 +113,9 @@ class OracleHCMAdapter(PublicEndpointAdapter):
 
         return records
 
+    @staticmethod
     def _build_endpoint(
-        self, *, base_url: str, site_number: str, limit: int, offset: int
+        *, base_url: str, site_number: str, limit: int, offset: int
     ) -> str:
         finder = (
             f"findReqs;siteNumber={site_number},facetsList={ORACLE_HCM_DEFAULT_FACETS},"
@@ -125,14 +126,10 @@ class OracleHCMAdapter(PublicEndpointAdapter):
             f"?onlyData=true&expand={ORACLE_HCM_EXPAND_FIELDS}&finder={finder}"
         )
 
+    @staticmethod
     def _normalize_requisition(
-        self,
         requisition: object,
-        *,
-        base_url: str,
-        site_lang: str,
-        site_number: str,
-        company: str,
+        *, base_url: str, site_lang: str, site_number: str, company: str,
     ) -> dict | None:
         if not isinstance(requisition, dict):
             return None

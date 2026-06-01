@@ -42,7 +42,8 @@ async def _load_run_with_normalized_status(
 class CeleryRunDispatcher:
     """Dispatch crawl runs via Celery."""
 
-    async def dispatch(self, session: AsyncSession, run: CrawlRun) -> CrawlRun:
+    @staticmethod
+    async def dispatch(session: AsyncSession, run: CrawlRun) -> CrawlRun:
         loaded_run, current = await _load_run_with_normalized_status(
             session, int(run.id)
         )

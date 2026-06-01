@@ -870,12 +870,14 @@ def testvariant_choice_container_is_overbroad_avoids_css_select_scans() -> None:
     class FakeNode:
         name = "div"
 
-        def find_all(self, name=None, attrs=None, limit=None):  # type: ignore[no-untyped-def]
+        @staticmethod
+        def find_all(name=None, attrs=None, limit=None):  # type: ignore[no-untyped-def]
             if name == "fieldset":
                 return [object(), object()]
             return []
 
-        def select(self, *_args, **_kwargs):  # type: ignore[no-untyped-def]
+        @staticmethod
+        def select(*_args, **_kwargs):  # type: ignore[no-untyped-def]
             raise AssertionError("slow CSS select path should not run")
 
     assert variant_choice_container_is_overbroad(FakeNode()) is True
@@ -922,7 +924,8 @@ def testvariant_choice_container_for_input_avoids_css_select_scans() -> None:
                 return []
             return []
 
-        def select(self, *_args, **_kwargs):  # type: ignore[no-untyped-def]
+        @staticmethod
+        def select(*_args, **_kwargs):  # type: ignore[no-untyped-def]
             raise AssertionError("slow CSS select path should not run")
 
     parent = FakeParent()

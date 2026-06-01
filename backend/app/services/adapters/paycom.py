@@ -190,7 +190,8 @@ class PaycomAdapter(PublicEndpointAdapter):
             if value not in (None, "", [], {})
         }
 
-    def _extract_host_config(self, html: str) -> dict[str, str]:
+    @staticmethod
+    def _extract_host_config(html: str) -> dict[str, str]:
         match = _CONFIG_RE.search(str(html or ""))
         if not match:
             return {}
@@ -216,7 +217,8 @@ class PaycomAdapter(PublicEndpointAdapter):
             "locale": str(lib_config.get("locale") or "").strip(),
         }
 
-    def _normalize_preview(self, preview: object, *, page_url: str) -> dict | None:
+    @staticmethod
+    def _normalize_preview(preview: object, *, page_url: str) -> dict | None:
         if not isinstance(preview, dict):
             return None
         title = clean_text(preview.get("jobTitle"))
@@ -241,6 +243,7 @@ class PaycomAdapter(PublicEndpointAdapter):
             if value not in (None, "", [], {})
         }
 
-    def _extract_job_id(self, url: str) -> str:
+    @staticmethod
+    def _extract_job_id(url: str) -> str:
         match = _JOB_ID_RE.search(urlparse(str(url or "")).path)
         return clean_text(match.group(1)) if match else ""

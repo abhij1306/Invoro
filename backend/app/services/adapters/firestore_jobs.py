@@ -42,7 +42,8 @@ class FirestoreJobsAdapter(PublicEndpointAdapter):
         records = [self._normalize_document(item, page_url=url) for item in payload]
         return [record for record in records if record]
 
-    def _normalize_document(self, item: object, *, page_url: str) -> dict | None:
+    @staticmethod
+    def _normalize_document(item: object, *, page_url: str) -> dict | None:
         if not isinstance(item, dict):
             return None
         document = item.get("document")

@@ -21,7 +21,8 @@ class AlertMCPServer:
         self.api_key = api_key or os.environ.get(MCP_API_KEY_ENV, "")
         self.base_url = (base_url or os.environ.get(MCP_API_BASE_URL_ENV, MCP_DEFAULT_API_BASE_URL)).rstrip("/")
 
-    def tools(self) -> list[dict[str, Any]]:
+    @staticmethod
+    def tools() -> list[dict[str, Any]]:
         return [
             {
                 "name": "alert_product",

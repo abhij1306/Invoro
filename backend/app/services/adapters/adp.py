@@ -164,15 +164,16 @@ class ADPAdapter(BaseAdapter):
             record["apply_url"] = apply_url
         return record
 
-    def _extract_detail_location(self, parser: LexborHTMLParser) -> str:
-        details = []
-        for node in parser.css(
-            ".current-opening-location-item span, .current-opening-location-item"
-        ):
-            value = clean_text(selectolax_node_text(node, separator=" "))
-            if value and value not in details:
-                details.append(value)
-        return " | ".join(details[:4])
+        @staticmethod
+        def _extract_detail_location(parser: LexborHTMLParser) -> str:
+            details = []
+            for node in parser.css(
+                ".current-opening-location-item span, .current-opening-location-item"
+            ):
+                value = clean_text(selectolax_node_text(node, separator=" "))
+                if value and value not in details:
+                    details.append(value)
+            return " | ".join(details[:4])
 
     def _extract_detail_description(self, body_text: str) -> str:
         patterns = [

@@ -28,16 +28,20 @@ class _NoopMetric:
     def labels(self, **_: object) -> "_NoopMetric":
         return self
 
-    def set(self, _: object) -> None:
+    @staticmethod
+    def set(_: object) -> None:
         return None
 
-    def clear(self) -> None:
+    @staticmethod
+    def clear() -> None:
         return None
 
-    def observe(self, _: float) -> None:
+    @staticmethod
+    def observe(_: float) -> None:
         return None
 
-    def inc(self, _: float = 1.0) -> None:
+    @staticmethod
+    def inc(_: float = 1.0) -> None:
         return None
 
 

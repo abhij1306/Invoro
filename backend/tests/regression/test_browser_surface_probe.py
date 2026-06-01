@@ -452,7 +452,8 @@ async def test_build_report_ignores_runtime_page_init_script_path(
             return None
 
     class FakeBrowser:
-        async def new_context(self, **_kwargs):
+        @staticmethod
+        async def new_context(**_kwargs):
             return FakeContext()
 
     runtime = acquisition_browser_runtime.SharedBrowserRuntime(max_contexts=1)
@@ -529,7 +530,8 @@ async def test_build_report_keeps_partial_report_when_site_context_fails(
 
             return _Context()
 
-        def snapshot(self) -> dict[str, object]:
+        @staticmethod
+        def snapshot() -> dict[str, object]:
             return {"ready": True}
 
     async def _fake_runtime_provider(*, proxy: str | None = None, browser_engine: str = "chromium"):
@@ -580,7 +582,8 @@ async def test_build_report_keeps_invalid_target_urls_as_failed_diagnostics(
     tmp_path: Path,
 ) -> None:
     class FakeRuntime:
-        def snapshot(self) -> dict[str, object]:
+        @staticmethod
+        def snapshot() -> dict[str, object]:
             return {"ready": True}
 
     async def _fake_runtime_provider(*, proxy: str | None = None, browser_engine: str = "chromium"):
@@ -627,7 +630,8 @@ async def test_build_report_keeps_partial_target_diagnostics_when_one_target_fai
     tmp_path: Path,
 ) -> None:
     class FakeRuntime:
-        def snapshot(self) -> dict[str, object]:
+        @staticmethod
+        def snapshot() -> dict[str, object]:
             return {"ready": True}
 
     async def _fake_runtime_provider(*, proxy: str | None = None, browser_engine: str = "chromium"):
@@ -678,7 +682,8 @@ async def test_navigate_probe_target_uses_shared_navigation_timeout() -> None:
     calls: list[dict[str, object]] = []
 
     class FakePage:
-        async def goto(self, url: str, *, wait_until: str, timeout: int) -> None:
+        @staticmethod
+        async def goto(url: str, *, wait_until: str, timeout: int) -> None:
             calls.append(
                 {
                     "url": url,
@@ -687,10 +692,12 @@ async def test_navigate_probe_target_uses_shared_navigation_timeout() -> None:
                 }
             )
 
-        async def wait_for_load_state(self, *_args, **_kwargs) -> None:
+        @staticmethod
+        async def wait_for_load_state(*_args, **_kwargs) -> None:
             return None
 
-        async def wait_for_timeout(self, *_args, **_kwargs) -> None:
+        @staticmethod
+        async def wait_for_timeout(*_args, **_kwargs) -> None:
             return None
 
     await probe._navigate_probe_target(FakePage(), "https://example.com")

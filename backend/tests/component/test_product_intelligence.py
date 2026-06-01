@@ -786,25 +786,30 @@ async def test_google_native_session_reuses_single_page_across_queries(monkeypat
     html_by_query: dict[str, str] = {}
 
     class _Locator:
-        async def fill(self, value: str) -> None:
+        @staticmethod
+        async def fill(value: str) -> None:
             nonlocal last_query
             last_query = value
             actions.append(f"fill:{value}")
 
-        async def press(self, value: str) -> None:
+        @staticmethod
+        async def press(value: str) -> None:
             actions.append(f"press:{value}")
 
     class _Page:
-        async def goto(self, url: str, *, wait_until: str, timeout: int):
+        @staticmethod
+        async def goto(url: str, *, wait_until: str, timeout: int):
             nonlocal current_url
             current_url = url
             actions.append(f"goto:{url}")
 
-        def locator(self, selector: str):
+        @staticmethod
+        def locator(selector: str):
             actions.append(f"locator:{selector}")
             return _Locator()
 
-        async def wait_for_timeout(self, timeout_ms: int) -> None:
+        @staticmethod
+        async def wait_for_timeout(timeout_ms: int) -> None:
             actions.append(f"wait:{timeout_ms}")
 
         @property
@@ -812,7 +817,8 @@ async def test_google_native_session_reuses_single_page_across_queries(monkeypat
             return current_url
 
     class _Runtime:
-        def page(self, **kwargs):
+        @staticmethod
+        def page(**kwargs):
             actions.append(f"page-acquired:{kwargs.get('domain')}")
 
             class _Context:
@@ -880,25 +886,30 @@ async def test_google_native_session_stops_after_google_sorry_page(monkeypatch) 
     html_by_query: dict[str, str] = {}
 
     class _Locator:
-        async def fill(self, value: str) -> None:
+        @staticmethod
+        async def fill(value: str) -> None:
             nonlocal last_query
             last_query = value
             actions.append(f"fill:{value}")
 
-        async def press(self, value: str) -> None:
+        @staticmethod
+        async def press(value: str) -> None:
             actions.append(f"press:{value}")
 
     class _Page:
-        async def goto(self, url: str, *, wait_until: str, timeout: int):
+        @staticmethod
+        async def goto(url: str, *, wait_until: str, timeout: int):
             nonlocal current_url
             current_url = url
             actions.append(f"goto:{url}")
 
-        def locator(self, selector: str):
+        @staticmethod
+        def locator(selector: str):
             actions.append(f"locator:{selector}")
             return _Locator()
 
-        async def wait_for_timeout(self, timeout_ms: int) -> None:
+        @staticmethod
+        async def wait_for_timeout(timeout_ms: int) -> None:
             actions.append(f"wait:{timeout_ms}")
 
         @property
@@ -906,7 +917,8 @@ async def test_google_native_session_stops_after_google_sorry_page(monkeypatch) 
             return current_url
 
     class _Runtime:
-        def page(self, **kwargs):
+        @staticmethod
+        def page(**kwargs):
             actions.append(f"page-acquired:{kwargs.get('domain')}")
 
             class _Context:

@@ -29,7 +29,8 @@ class WalmartAdapter(BaseAdapter):
             records = self._extract_listing(next_data, url)
         return self._result(records)
 
-    def _get_next_data(self, soup: BeautifulSoup) -> dict:
+    @staticmethod
+    def _get_next_data(soup: BeautifulSoup) -> dict:
         node = soup.select_one("script#__NEXT_DATA__")
         if node and node.string:
             try:
@@ -38,8 +39,9 @@ class WalmartAdapter(BaseAdapter):
                 pass
         return {}
 
+    @staticmethod
     def _extract_detail(
-        self, soup: BeautifulSoup, next_data: dict, url: str
+        soup: BeautifulSoup, next_data: dict, url: str
     ) -> dict | None:
         # Try __NEXT_DATA__ first
         props = next_data.get("props", {}).get("pageProps", {})
@@ -75,7 +77,8 @@ class WalmartAdapter(BaseAdapter):
             }
         return None
 
-    def _extract_listing(self, next_data: dict, url: str) -> list[dict]:
+    @staticmethod
+    def _extract_listing(next_data: dict, url: str) -> list[dict]:
         records = []
         parsed = urlparse(url)
         base_url = f"{parsed.scheme}://{parsed.netloc}"

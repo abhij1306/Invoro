@@ -161,7 +161,8 @@ class GreenhouseAdapter(BaseAdapter):
             return None
         return self._normalize_detail_record(data, page_url=url)
 
-    def _extract_from_html(self, html: str, url: str) -> list[dict]:
+    @staticmethod
+    def _extract_from_html(html: str, url: str) -> list[dict]:
         """Extract jobs from the Greenhouse HTML board page."""
         soup = BeautifulSoup(html, _HTML_PARSER)
         records = []
@@ -294,7 +295,8 @@ class GreenhouseAdapter(BaseAdapter):
         except (TypeError, ValueError):
             return None
 
-    def _extract_job_id(self, url: str) -> str:
+    @staticmethod
+    def _extract_job_id(url: str) -> str:
         match = re.search(r"/jobs/(\d+)", urlparse(str(url or "")).path)
         query_id = parse_qs(urlparse(str(url or "")).query).get("gh_jid", [""])[0]
         return clean_text(match.group(1) if match else query_id)

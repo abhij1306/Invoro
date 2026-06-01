@@ -19,7 +19,8 @@ class RemoteOkAdapter(BaseAdapter):
     ) -> AdapterResult:
         return self._result(self._extract_remoteok_from_html(html))
 
-    def _extract_remoteok_from_html(self, html: str) -> list[dict]:
+    @staticmethod
+    def _extract_remoteok_from_html(html: str) -> list[dict]:
         """Extract RemoteOK jobs from rendered HTML or a JSON body."""
         try:
             data = json.loads(str(html or "").strip())

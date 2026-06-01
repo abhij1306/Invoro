@@ -52,7 +52,8 @@ def _network_capture_summary() -> SimpleNamespace:
 
 
 class _StaticPayloadCapture:
-    async def close(self, _page):
+    @staticmethod
+    async def close(_page):
         await _async_checkpoint()
         return _network_capture_summary()
 
@@ -369,7 +370,8 @@ async def test_fast_finalize_keeps_location_clear_when_precheck_found_no_signal(
 @pytest.mark.regression
 async def test_location_interstitial_dismisses_by_safe_text_token() -> None:
     class _MissingLocator:
-        async def count(self) -> int:
+        @staticmethod
+        async def count() -> int:
             await _async_checkpoint()
             return 0
 
@@ -384,7 +386,8 @@ async def test_location_interstitial_dismisses_by_safe_text_token() -> None:
             self.waited = False
             self.dismissed = False
 
-        def locator(self, selector: str):
+        @staticmethod
+        def locator(selector: str):
             del selector
             return _MissingLocator()
 
@@ -417,7 +420,8 @@ async def test_location_interstitial_dismissal_counts_before_first_locator() -> 
         def __init__(self, page: "_Page") -> None:
             self._page = page
 
-        async def wait_for(self, **_kwargs) -> None:
+        @staticmethod
+        async def wait_for(**_kwargs) -> None:
             await _async_checkpoint()
             return None
 
@@ -434,7 +438,8 @@ async def test_location_interstitial_dismissal_counts_before_first_locator() -> 
         def first(self):
             return _FirstLocator(self._page)
 
-        async def count(self) -> int:
+        @staticmethod
+        async def count() -> int:
             await _async_checkpoint()
             return 1
 
@@ -467,11 +472,13 @@ async def test_location_interstitial_dismissal_counts_before_first_locator() -> 
 @pytest.mark.regression
 async def test_location_interstitial_dismissal_requires_modal_to_clear() -> None:
     class _FirstLocator:
-        async def wait_for(self, **_kwargs) -> None:
+        @staticmethod
+        async def wait_for(**_kwargs) -> None:
             await _async_checkpoint()
             return None
 
-        async def click(self, **_kwargs) -> None:
+        @staticmethod
+        async def click(**_kwargs) -> None:
             await _async_checkpoint()
             return None
 
@@ -480,7 +487,8 @@ async def test_location_interstitial_dismissal_requires_modal_to_clear() -> None
         def first(self):
             return _FirstLocator()
 
-        async def count(self) -> int:
+        @staticmethod
+        async def count() -> int:
             await _async_checkpoint()
             return 1
 

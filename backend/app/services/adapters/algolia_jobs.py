@@ -71,7 +71,8 @@ class AlgoliaJobsAdapter(PublicEndpointAdapter):
         records = [self._normalize_hit(hit) for hit in hits]
         return [record for record in records if record]
 
-    def _extract_config(self, html: str) -> tuple[str, str, str] | None:
+    @staticmethod
+    def _extract_config(html: str) -> tuple[str, str, str] | None:
         text = str(html or "")
         app_id = _first_match(_ALGOLIA_APP_ID_RE, text)
         api_key = _first_match(_ALGOLIA_API_KEY_RE, text)
@@ -80,7 +81,8 @@ class AlgoliaJobsAdapter(PublicEndpointAdapter):
             return None
         return app_id, api_key, index_name
 
-    def _normalize_hit(self, hit: object) -> dict | None:
+    @staticmethod
+    def _normalize_hit(hit: object) -> dict | None:
         if not isinstance(hit, dict):
             return None
         title = clean_text(hit.get("title"))

@@ -995,9 +995,9 @@ async def test_run_site_harness_supports_acquisition_only_mode(
             return False
 
     class _FakeSettingsView:
-        def acquisition_plan(self, *, surface: str):
+        @staticmethod
+        def acquisition_plan(*, surface: str):
             return AcquisitionPlan(surface=surface)
-
     async def _fake_create_crawl_run(session, user_id, payload):
         del session, user_id
         return SimpleNamespace(
@@ -1060,7 +1060,8 @@ async def test_run_site_harness_surfaces_challenge_summary_in_acquisition_only_m
             return False
 
     class _FakeSettingsView:
-        def acquisition_plan(self, *, surface: str):
+        @staticmethod
+        def acquisition_plan(*, surface: str):
             return AcquisitionPlan(surface=surface)
 
     async def _fake_create_crawl_run(session, user_id, payload):

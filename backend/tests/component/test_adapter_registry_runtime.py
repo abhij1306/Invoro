@@ -40,8 +40,8 @@ async def test_request_result_applies_per_request_timeout_with_shared_client(
     class _FakeClient:
         is_closed = False
 
+        @staticmethod
         async def request(
-            self,
             method,
             url,
             headers=None,
@@ -243,8 +243,8 @@ async def test_request_result_honors_expect_json_without_json_content_type(
         text = '{"jobs":[{"id":1}]}'
 
     class _FakeClient:
+        @staticmethod
         async def request(
-            self,
             method,
             url,
             headers=None,
@@ -327,8 +327,8 @@ async def test_request_result_does_not_orchestrate_browser_fetches(
         text = "<html><body>detail page</body></html>"
 
     class _FakeClient:
+        @staticmethod
         async def request(
-            self,
             method,
             url,
             headers=None,
@@ -396,8 +396,8 @@ async def test_request_result_retries_dns_failure_with_forced_ipv4(
     attempts: list[str] = []
 
     class _FakeClient:
+        @staticmethod
         async def request(
-            self,
             method,
             url,
             headers=None,
@@ -421,8 +421,8 @@ async def test_request_result_retries_dns_failure_with_forced_ipv4(
             del exc_type, exc, tb
             return False
 
+        @staticmethod
         async def request(
-            self,
             method,
             url,
             headers=None,
@@ -600,8 +600,8 @@ async def test_request_result_uses_direct_http_for_expected_json(
         text = '<html><body><pre>{"jobs":[{"id":1}]}</pre></body></html>'
 
     class _FakeClient:
+        @staticmethod
         async def request(
-            self,
             method,
             url,
             headers=None,

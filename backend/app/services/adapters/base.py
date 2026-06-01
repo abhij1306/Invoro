@@ -94,7 +94,8 @@ class BaseAdapter(ABC):
         """
         ...
 
-    def normalize_acquisition_url(self, url: str | None) -> str | None:
+    @staticmethod
+    def normalize_acquisition_url(url: str | None) -> str | None:
         return url
 
     async def resolve_acquisition_url(self, url: str | None) -> str | None:
@@ -191,7 +192,6 @@ class BaseAdapter(ABC):
         return (
             response.json_data if isinstance(response.json_data, (dict, list)) else None
         )
-
     async def _request_text(
         self,
         url: str,
@@ -216,8 +216,8 @@ class BaseAdapter(ABC):
             return ""
         return str(response.text or "")
 
+    @staticmethod
     async def _request_json_with_curl(
-        self,
         request_callable,
         url: str,
         *,

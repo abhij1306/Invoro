@@ -112,7 +112,8 @@ async def _load_run_with_normalized_status(
 class LocalRunDispatcher:
     """Dispatches crawl runs as in-process asyncio tasks."""
 
-    async def dispatch(self, session: AsyncSession, run: CrawlRun) -> CrawlRun:
+    @staticmethod
+    async def dispatch(session: AsyncSession, run: CrawlRun) -> CrawlRun:
         from app.services.crawl.service import recover_stale_local_runs
 
         await recover_stale_local_runs(session)

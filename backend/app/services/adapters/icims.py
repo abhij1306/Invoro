@@ -121,7 +121,8 @@ class ICIMSAdapter(BaseAdapter):
                 break
         return records
 
-    def _discover_ajax_endpoint(self, url: str, html: str) -> str | None:
+    @staticmethod
+    def _discover_ajax_endpoint(url: str, html: str) -> str | None:
         parsed = urlparse(url)
         base_url = f"{parsed.scheme}://{parsed.netloc}"
         match = re.search(r"(/ajax/joblisting/\?[^\"']+)", html, flags=re.IGNORECASE)
@@ -135,7 +136,8 @@ class ICIMSAdapter(BaseAdapter):
             )
         return None
 
-    def _discover_embedded_board_url(self, url: str, html: str) -> str | None:
+    @staticmethod
+    def _discover_embedded_board_url(url: str, html: str) -> str | None:
         soup = BeautifulSoup(html, HTML_PARSER)
         iframe = soup.select_one(
             "iframe[src*='icims.com/jobs/search'], iframe[src*='in_iframe=1']"
@@ -171,7 +173,8 @@ class ICIMSAdapter(BaseAdapter):
             return fallback_html
         return response_text or fallback_html
 
-    def _paginate_endpoint(self, endpoint: str, offset: int) -> str:
+    @staticmethod
+    def _paginate_endpoint(endpoint: str, offset: int) -> str:
         page_url = (
             re.sub(r"offset=\d+", f"offset={offset}", endpoint)
             if "offset=" in endpoint

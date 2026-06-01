@@ -88,11 +88,13 @@ class BullhornAdapter(BaseAdapter):
                 break
         return records
 
-    def _discover_api_base(self, html: str) -> str:
+    @staticmethod
+    def _discover_api_base(html: str) -> str:
         match = _API_BASE_RE.search(str(html or ""))
         return match.group(0) if match else ""
 
-    def _discover_where_clause(self, html: str) -> str:
+    @staticmethod
+    def _discover_where_clause(html: str) -> str:
         text = str(html or "")
         match = _WHERE_RE.search(text)
         if not match:
@@ -104,7 +106,8 @@ class BullhornAdapter(BaseAdapter):
             cleaned = f"({cleaned})"
         return cleaned or "(isOpen=true) AND (isDeleted=false)"
 
-    def _build_query_url(self, api_base: str, where_clause: str, offset: int) -> str:
+    @staticmethod
+    def _build_query_url(api_base: str, where_clause: str, offset: int) -> str:
         query = urlencode(
             {
                 "where": where_clause,

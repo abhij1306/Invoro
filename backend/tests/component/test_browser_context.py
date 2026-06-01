@@ -242,7 +242,8 @@ async def test_read_client_request_rejects_missing_no_auth_method() -> None:
         def write(self, data: bytes) -> None:
             self.data.extend(data)
 
-        async def drain(self) -> None:
+        @staticmethod
+        async def drain() -> None:
             return None
 
     reader = asyncio.StreamReader()
@@ -260,10 +261,12 @@ async def test_read_client_request_rejects_missing_no_auth_method() -> None:
 @pytest.mark.component
 async def test_read_client_request_rebuilds_validated_connect_request() -> None:
     class _Writer:
-        def write(self, _data: bytes) -> None:
+        @staticmethod
+        def write(_data: bytes) -> None:
             return None
 
-        async def drain(self) -> None:
+        @staticmethod
+        async def drain() -> None:
             return None
 
     raw_request = bytes([5, 1, 0, 5, 1, 0, 3, 11]) + b"example.com" + bytes([1, 187])
@@ -284,16 +287,19 @@ async def test_socks5_auth_bridge_start_is_singleflight(
     start_calls = 0
 
     class _Socket:
-        def getsockname(self):
+        @staticmethod
+        def getsockname():
             return ("127.0.0.1", 41001)
 
     class _Server:
         sockets = [_Socket()]
 
-        def close(self) -> None:
+        @staticmethod
+        def close() -> None:
             return None
 
-        async def wait_closed(self) -> None:
+        @staticmethod
+        async def wait_closed() -> None:
             return None
 
     async def _fake_start_server(*_args, **_kwargs):
@@ -556,20 +562,24 @@ async def test_shared_browser_runtime_passes_generated_context_options(
     routed_patterns: list[str] = []
 
     class FakeContext:
-        async def route(self, pattern: str, handler) -> None:
+        @staticmethod
+        async def route(pattern: str, handler) -> None:
             del handler
             routed_patterns.append(pattern)
 
-        async def new_page(self):
+        @staticmethod
+        async def new_page():
             page = object()
             created_pages.append(page)
             return page
 
-        async def close(self) -> None:
+        @staticmethod
+        async def close() -> None:
             return None
 
     class FakeBrowser:
-        async def new_context(self, **kwargs):
+        @staticmethod
+        async def new_context(**kwargs):
             captured_kwargs.append(kwargs)
             return FakeContext()
 
@@ -622,21 +632,25 @@ async def test_shared_browser_runtime_uses_native_context_for_real_chrome(
     captured_kwargs: list[dict[str, object]] = []
 
     class FakeContext:
-        async def route(self, pattern: str, handler) -> None:
+        @staticmethod
+        async def route(pattern: str, handler) -> None:
             del pattern, handler
             return None
 
-        async def add_init_script(self, script: str) -> None:
+        @staticmethod
+        async def add_init_script(script: str) -> None:
             return None
 
         async def new_page(self):
             return SimpleNamespace(context=self)
 
-        async def close(self) -> None:
+        @staticmethod
+        async def close() -> None:
             return None
 
     class FakeBrowser:
-        async def new_context(self, **kwargs):
+        @staticmethod
+        async def new_context(**kwargs):
             captured_kwargs.append(kwargs)
             return FakeContext()
 
@@ -676,21 +690,25 @@ async def test_shared_browser_runtime_skips_init_script_by_default(
     init_scripts: list[str] = []
 
     class FakeContext:
-        async def route(self, pattern: str, handler) -> None:
+        @staticmethod
+        async def route(pattern: str, handler) -> None:
             del pattern, handler
             return None
 
-        async def add_init_script(self, script: str) -> None:
+        @staticmethod
+        async def add_init_script(script: str) -> None:
             init_scripts.append(script)
 
         async def new_page(self):
             return SimpleNamespace(context=self)
 
-        async def close(self) -> None:
+        @staticmethod
+        async def close() -> None:
             return None
 
     class FakeBrowser:
-        async def new_context(self, **kwargs):
+        @staticmethod
+        async def new_context(**kwargs):
             del kwargs
             return FakeContext()
 
@@ -720,21 +738,26 @@ async def test_shared_browser_runtime_uses_socks5_auth_bridge_and_keeps_context_
     bridge_close_calls: list[str] = []
 
     class FakeContext:
-        async def route(self, pattern: str, handler) -> None:
+        @staticmethod
+        async def route(pattern: str, handler) -> None:
             del pattern, handler
             return None
 
-        async def add_init_script(self, script: str) -> None:
+        @staticmethod
+        async def add_init_script(script: str) -> None:
             return None
 
-        async def new_page(self):
+        @staticmethod
+        async def new_page():
             return object()
 
-        async def close(self) -> None:
+        @staticmethod
+        async def close() -> None:
             return None
 
     class FakeBrowser:
-        async def new_context(self, **kwargs):
+        @staticmethod
+        async def new_context(**kwargs):
             captured_context_kwargs.append(kwargs)
             return FakeContext()
 
@@ -742,15 +765,18 @@ async def test_shared_browser_runtime_uses_socks5_auth_bridge_and_keeps_context_
         def __init__(self) -> None:
             self.chromium = SimpleNamespace(launch=self._launch)
 
-        async def _launch(self, **kwargs):
+        @staticmethod
+        async def _launch(**kwargs):
             captured_launch_kwargs.append(kwargs)
             return FakeBrowser()
 
-        async def stop(self) -> None:
+        @staticmethod
+        async def stop() -> None:
             return None
 
     class FakePlaywrightManager:
-        async def start(self) -> FakePlaywrightInstance:
+        @staticmethod
+        async def start() -> FakePlaywrightInstance:
             return FakePlaywrightInstance()
 
     class FakeBridge:
@@ -763,7 +789,8 @@ async def test_shared_browser_runtime_uses_socks5_auth_bridge_and_keeps_context_
             )
             return "socks5://127.0.0.1:8899"
 
-        async def close(self) -> None:
+        @staticmethod
+        async def close() -> None:
             bridge_close_calls.append("closed")
 
     monkeypatch.setattr(
@@ -819,21 +846,26 @@ async def test_shared_browser_runtime_launches_http_proxy_directly(
     captured_launch_kwargs: list[dict[str, object]] = []
 
     class FakeContext:
-        async def route(self, pattern: str, handler) -> None:
+        @staticmethod
+        async def route(pattern: str, handler) -> None:
             del pattern, handler
             return None
 
-        async def add_init_script(self, script: str) -> None:
+        @staticmethod
+        async def add_init_script(script: str) -> None:
             return None
 
-        async def new_page(self):
+        @staticmethod
+        async def new_page():
             return object()
 
-        async def close(self) -> None:
+        @staticmethod
+        async def close() -> None:
             return None
 
     class FakeBrowser:
-        async def new_context(self, **kwargs):
+        @staticmethod
+        async def new_context(**kwargs):
             del kwargs
             return FakeContext()
 
@@ -845,11 +877,13 @@ async def test_shared_browser_runtime_launches_http_proxy_directly(
             captured_launch_kwargs.append(kwargs)
             return FakeBrowser()
 
-        async def stop(self) -> None:
+        @staticmethod
+        async def stop() -> None:
             return None
 
     class FakePlaywrightManager:
-        async def start(self) -> FakePlaywrightInstance:
+        @staticmethod
+        async def start() -> FakePlaywrightInstance:
             return FakePlaywrightInstance()
 
     monkeypatch.setattr(
@@ -908,21 +942,26 @@ async def test_shared_browser_runtime_launches_real_chrome_headful_for_fallback(
     captured_launch_kwargs: list[dict[str, object]] = []
 
     class FakeContext:
-        async def route(self, pattern: str, handler) -> None:
+        @staticmethod
+        async def route(pattern: str, handler) -> None:
             del pattern, handler
             return None
 
-        async def add_init_script(self, script: str) -> None:
+        @staticmethod
+        async def add_init_script(script: str) -> None:
             return None
 
-        async def new_page(self):
+        @staticmethod
+        async def new_page():
             return object()
 
-        async def close(self) -> None:
+        @staticmethod
+        async def close() -> None:
             return None
 
     class FakeBrowser:
-        async def new_context(self, **kwargs):
+        @staticmethod
+        async def new_context(**kwargs):
             del kwargs
             return FakeContext()
 
@@ -930,15 +969,18 @@ async def test_shared_browser_runtime_launches_real_chrome_headful_for_fallback(
         def __init__(self) -> None:
             self.chromium = SimpleNamespace(launch=self._launch)
 
-        async def _launch(self, **kwargs):
+        @staticmethod
+        async def _launch(**kwargs):
             captured_launch_kwargs.append(kwargs)
             return FakeBrowser()
 
-        async def stop(self) -> None:
+        @staticmethod
+        async def stop() -> None:
             return None
 
     class FakePlaywrightManager:
-        async def start(self) -> FakePlaywrightInstance:
+        @staticmethod
+        async def start() -> FakePlaywrightInstance:
             return FakePlaywrightInstance()
 
     monkeypatch.setattr(
@@ -1095,17 +1137,21 @@ async def test_shared_browser_runtime_reuses_run_storage_state(
     persisted_states: list[tuple[int, dict[str, object]]] = []
 
     class FakeContext:
-        async def route(self, pattern: str, handler) -> None:
+        @staticmethod
+        async def route(pattern: str, handler) -> None:
             del pattern, handler
             return None
 
-        async def add_init_script(self, script: str) -> None:
+        @staticmethod
+        async def add_init_script(script: str) -> None:
             return None
 
-        async def new_page(self):
+        @staticmethod
+        async def new_page():
             return object()
 
-        async def storage_state(self) -> dict[str, object]:
+        @staticmethod
+        async def storage_state() -> dict[str, object]:
             return {
                 "cookies": [
                     {
@@ -1125,11 +1171,13 @@ async def test_shared_browser_runtime_reuses_run_storage_state(
                 ],
             }
 
-        async def close(self) -> None:
+        @staticmethod
+        async def close() -> None:
             return None
 
     class FakeBrowser:
-        async def new_context(self, **kwargs):
+        @staticmethod
+        async def new_context(**kwargs):
             captured_kwargs.append(kwargs)
             return FakeContext()
 
@@ -1243,24 +1291,30 @@ async def test_shared_browser_runtime_skips_storage_state_reuse_when_disallowed(
     captured_kwargs: list[dict[str, object]] = []
 
     class FakeContext:
-        async def route(self, pattern: str, handler) -> None:
+        @staticmethod
+        async def route(pattern: str, handler) -> None:
             del pattern, handler
             return None
 
-        async def add_init_script(self, script: str) -> None:
+        @staticmethod
+        async def add_init_script(script: str) -> None:
             return None
 
-        async def new_page(self):
+        @staticmethod
+        async def new_page():
             return object()
 
-        async def storage_state(self) -> dict[str, object]:
+        @staticmethod
+        async def storage_state() -> dict[str, object]:
             return {"cookies": [], "origins": []}
 
-        async def close(self) -> None:
+        @staticmethod
+        async def close() -> None:
             return None
 
     class FakeBrowser:
-        async def new_context(self, **kwargs):
+        @staticmethod
+        async def new_context(**kwargs):
             captured_kwargs.append(kwargs)
             return FakeContext()
 
@@ -1308,24 +1362,30 @@ async def test_shared_browser_runtime_skips_domain_storage_for_proxied_runtime_b
     domain_persist_calls: list[str] = []
 
     class FakeContext:
-        async def route(self, pattern: str, handler) -> None:
+        @staticmethod
+        async def route(pattern: str, handler) -> None:
             del pattern, handler
             return None
 
-        async def add_init_script(self, script: str) -> None:
+        @staticmethod
+        async def add_init_script(script: str) -> None:
             return None
 
-        async def new_page(self):
+        @staticmethod
+        async def new_page():
             return object()
 
-        async def storage_state(self) -> dict[str, object]:
+        @staticmethod
+        async def storage_state() -> dict[str, object]:
             return {"cookies": [], "origins": []}
 
-        async def close(self) -> None:
+        @staticmethod
+        async def close() -> None:
             return None
 
     class FakeBrowser:
-        async def new_context(self, **kwargs):
+        @staticmethod
+        async def new_context(**kwargs):
             captured_kwargs.append(kwargs)
             return FakeContext()
 
@@ -1388,24 +1448,30 @@ async def test_shared_browser_runtime_suppresses_storage_state_persist_failures(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     class FakeContext:
-        async def route(self, pattern: str, handler) -> None:
+        @staticmethod
+        async def route(pattern: str, handler) -> None:
             del pattern, handler
             return None
 
-        async def add_init_script(self, script: str) -> None:
+        @staticmethod
+        async def add_init_script(script: str) -> None:
             return None
 
-        async def new_page(self):
+        @staticmethod
+        async def new_page():
             return object()
 
-        async def storage_state(self) -> dict[str, object]:
+        @staticmethod
+        async def storage_state() -> dict[str, object]:
             return {"cookies": [], "origins": []}
 
-        async def close(self) -> None:
+        @staticmethod
+        async def close() -> None:
             return None
 
     class FakeBrowser:
-        async def new_context(self, **kwargs):
+        @staticmethod
+        async def new_context(**kwargs):
             del kwargs
             return FakeContext()
 
@@ -1458,25 +1524,31 @@ async def test_shared_browser_runtime_bounds_hung_context_cleanup(
     blocker = asyncio.Event()
 
     class FakeContext:
-        async def route(self, pattern: str, handler) -> None:
+        @staticmethod
+        async def route(pattern: str, handler) -> None:
             del pattern, handler
             return None
 
-        async def add_init_script(self, script: str) -> None:
+        @staticmethod
+        async def add_init_script(script: str) -> None:
             return None
 
-        async def new_page(self):
+        @staticmethod
+        async def new_page():
             return object()
 
-        async def storage_state(self) -> dict[str, object]:
+        @staticmethod
+        async def storage_state() -> dict[str, object]:
             await blocker.wait()
             return {"cookies": [], "origins": []}
 
-        async def close(self) -> None:
+        @staticmethod
+        async def close() -> None:
             await blocker.wait()
 
     class FakeBrowser:
-        async def new_context(self, **kwargs):
+        @staticmethod
+        async def new_context(**kwargs):
             del kwargs
             return FakeContext()
 
@@ -1531,15 +1603,17 @@ async def test_shared_browser_runtime_close_bounds_hung_shutdown(
     blocker = asyncio.Event()
 
     class FakeBrowser:
-        async def close(self) -> None:
+        @staticmethod
+        async def close() -> None:
             await blocker.wait()
 
     class FakePlaywright:
-        async def stop(self) -> None:
+        @staticmethod
+        async def stop() -> None:
             await blocker.wait()
-
     class FakeBridge:
-        async def close(self) -> None:
+        @staticmethod
+        async def close() -> None:
             await blocker.wait()
 
     runtime = crawl_fetch_runtime.SharedBrowserRuntime(max_contexts=1)
@@ -1579,7 +1653,8 @@ async def test_persist_context_storage_state_normalizes_domain_before_persist(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     class FakeContext:
-        async def storage_state(self) -> dict[str, object]:
+        @staticmethod
+        async def storage_state() -> dict[str, object]:
             return {"cookies": [], "origins": []}
 
     persisted_domains: list[str] = []
@@ -1611,7 +1686,8 @@ async def test_persist_context_storage_state_skips_domain_persist_when_disallowe
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     class FakeContext:
-        async def storage_state(self) -> dict[str, object]:
+        @staticmethod
+        async def storage_state() -> dict[str, object]:
             return {
                 "cookies": [
                     {
@@ -1654,7 +1730,8 @@ async def test_persist_context_storage_state_skips_run_persist_when_disallowed(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     class FakeContext:
-        async def storage_state(self) -> dict[str, object]:
+        @staticmethod
+        async def storage_state() -> dict[str, object]:
             return {
                 "cookies": [
                     {
@@ -1700,21 +1777,26 @@ async def test_shared_browser_runtime_snapshot_tracks_queue_without_private_sema
     release = asyncio.Event()
 
     class FakeContext:
-        async def route(self, pattern: str, handler) -> None:
+        @staticmethod
+        async def route(pattern: str, handler) -> None:
             del pattern, handler
             return None
 
-        async def add_init_script(self, script: str) -> None:
+        @staticmethod
+        async def add_init_script(script: str) -> None:
             return None
 
-        async def new_page(self):
+        @staticmethod
+        async def new_page():
             return object()
 
-        async def close(self) -> None:
+        @staticmethod
+        async def close() -> None:
             return None
 
     class FakeBrowser:
-        async def new_context(self, **kwargs):
+        @staticmethod
+        async def new_context(**kwargs):
             del kwargs
             return FakeContext()
 
@@ -1756,24 +1838,29 @@ async def test_shared_browser_runtime_recycles_browser_without_deadlocking(
     new_events: list[str] = []
 
     class FakeContext:
-        async def route(self, pattern: str, handler) -> None:
+        @staticmethod
+        async def route(pattern: str, handler) -> None:
             del pattern, handler
             return None
 
-        async def add_init_script(self, script: str) -> None:
+        @staticmethod
+        async def add_init_script(script: str) -> None:
             return None
 
-        async def new_page(self):
+        @staticmethod
+        async def new_page():
             return object()
 
-        async def close(self) -> None:
+        @staticmethod
+        async def close() -> None:
             new_events.append("context_closed")
 
     class FakeBrowser:
         def __init__(self, events: list[str]) -> None:
             self._events = events
 
-        def is_connected(self) -> bool:
+        @staticmethod
+        def is_connected() -> bool:
             return True
 
         async def new_context(self, **kwargs):
@@ -1798,11 +1885,13 @@ async def test_shared_browser_runtime_recycles_browser_without_deadlocking(
             self._events.append("playwright_stopped")
 
     class FakePlaywrightManager:
-        async def start(self) -> FakePlaywrightInstance:
+        @staticmethod
+        async def start() -> FakePlaywrightInstance:
             return FakePlaywrightInstance(new_events)
 
     class OldPlaywright:
-        async def stop(self) -> None:
+        @staticmethod
+        async def stop() -> None:
             old_events.append("playwright_stopped")
 
     runtime = crawl_fetch_runtime.SharedBrowserRuntime(max_contexts=1)
@@ -1842,21 +1931,26 @@ async def test_acquisition_shared_browser_runtime_recycles_after_driver_closed_o
     new_events: list[str] = []
 
     class FakeContext:
-        async def route(self, pattern: str, handler) -> None:
+        @staticmethod
+        async def route(pattern: str, handler) -> None:
             del pattern, handler
             return None
 
-        async def add_init_script(self, script: str) -> None:
+        @staticmethod
+        async def add_init_script(script: str) -> None:
             return None
 
-        async def new_page(self):
+        @staticmethod
+        async def new_page():
             return object()
 
-        async def close(self) -> None:
+        @staticmethod
+        async def close() -> None:
             new_events.append("context_closed")
 
     class DeadBrowser:
-        def is_connected(self) -> bool:
+        @staticmethod
+        def is_connected() -> bool:
             return True
 
         async def new_context(self, **kwargs):

@@ -406,7 +406,8 @@ async def test_resets_leave_outer_transaction_control_to_caller() -> None:
     class _Session:
         nested_started = False
 
-        def in_transaction(self) -> bool:
+        @staticmethod
+        def in_transaction() -> bool:
             return True
 
         def begin_nested(self) -> _Transaction:

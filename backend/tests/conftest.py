@@ -43,7 +43,8 @@ class FakeRedis:
         self._hashes: dict[str, dict[str, str]] = {}
         self._ttl: dict[str, int] = {}
 
-    async def aclose(self) -> None:
+    @staticmethod
+    async def aclose() -> None:
         return None
 
     async def set(

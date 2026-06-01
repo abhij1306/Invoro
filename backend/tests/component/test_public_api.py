@@ -335,7 +335,8 @@ async def test_render_prometheus_metrics_continues_on_crawl_run_query_failure(
             del exc_type, exc, tb
             return False
 
-        async def execute(self, *_args, **_kwargs):
+        @staticmethod
+        async def execute(*_args, **_kwargs):
             raise SQLAlchemyError("db down")
 
     class _Counter:
@@ -627,7 +628,8 @@ async def test_authenticate_public_api_key_fails_when_touch_commit_fails() -> No
         async def get(self, model, _id):
             return self.user if model is User else None
 
-        async def commit(self):
+        @staticmethod
+        async def commit():
             raise SQLAlchemyError("boom")
 
         async def rollback(self):

@@ -64,7 +64,8 @@ class _FailingHttpClient:
     async def __aexit__(self, exc_type, exc, tb):
         return False
 
-    async def post(self, url, *, json):
+    @staticmethod
+    async def post(url, *, json):
         del json
         request = httpx.Request("POST", url)
         raise httpx.RequestError("network down", request=request)

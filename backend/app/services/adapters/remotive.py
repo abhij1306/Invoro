@@ -15,7 +15,8 @@ class RemotiveAdapter(BaseAdapter):
     async def extract(self, url: str, html: str, surface: str, proxy: str | None = None) -> AdapterResult:
         return self._result(self._extract_remotive_from_html(html))
 
-    def _extract_remotive_from_html(self, html: str) -> list[dict]:
+    @staticmethod
+    def _extract_remotive_from_html(html: str) -> list[dict]:
         """Extract Remotive jobs from rendered HTML or a JSON body."""
         try:
             data = parse_json(str(html or "").strip())

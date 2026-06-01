@@ -53,7 +53,8 @@ class VariantCandidateGroup:
 
 
 class VariantGroupValidator:
-    def validate(self, group: VariantCandidateGroup, *, page_url: str) -> bool:
+    @staticmethod
+    def validate(group: VariantCandidateGroup, *, page_url: str) -> bool:
         score = 0.0
         reasons: list[str] = []
         if group.axis_key in _PUBLIC_AXES:

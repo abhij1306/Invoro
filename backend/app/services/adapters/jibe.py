@@ -107,7 +107,8 @@ class JibeAdapter(PublicEndpointAdapter):
             return parsed if isinstance(parsed, dict) else {}
         return {}
 
-    def _extract_object_literal(self, html: str, start: int) -> str:
+    @staticmethod
+    def _extract_object_literal(html: str, start: int) -> str:
         object_start = html.find("{", start)
         if object_start < 0:
             return ""
@@ -137,11 +138,13 @@ class JibeAdapter(PublicEndpointAdapter):
                     return html[object_start : index + 1]
         return ""
 
-    def _normalize_query_value(self, value: object) -> str:
+    @staticmethod
+    def _normalize_query_value(value: object) -> str:
         text = "" if value is None else str(value).strip()
         return unescape(text)
 
-    def _normalize_job(self, row: object, *, base_url: str) -> dict | None:
+    @staticmethod
+    def _normalize_job(row: object, *, base_url: str) -> dict | None:
         payload = row.get("data") if isinstance(row, dict) else None
         if not isinstance(payload, dict):
             return None
@@ -193,7 +196,8 @@ class JibeAdapter(PublicEndpointAdapter):
             if value not in (None, "", [], {})
         }
 
-    def _join_names(self, values: object) -> str:
+    @staticmethod
+    def _join_names(values: object) -> str:
         if not isinstance(values, list):
             return ""
         names: list[str] = []
@@ -206,10 +210,12 @@ class JibeAdapter(PublicEndpointAdapter):
                 names.append(cleaned)
         return " | ".join(names)
 
-    def _extract_job_id_from_url(self, url: str) -> str:
+    @staticmethod
+    def _extract_job_id_from_url(url: str) -> str:
         path = urlparse(url).path
         match = re.search(r"/jobs/([^/?#]+)", path, re.IGNORECASE)
         return match.group(1) if match else ""
 
-    def _normalize_job_id(self, value: object) -> str:
+    @staticmethod
+    def _normalize_job_id(value: object) -> str:
         return clean_text(value).strip().lower()

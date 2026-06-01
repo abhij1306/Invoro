@@ -65,10 +65,12 @@ class _FakeLocator:
         del timeout
         return await self.count() > 0
 
-    async def is_disabled(self) -> bool:
+    @staticmethod
+    async def is_disabled() -> bool:
         return False
 
-    async def scroll_into_view_if_needed(self, timeout: int | None = None) -> None:
+    @staticmethod
+    async def scroll_into_view_if_needed(timeout: int | None = None) -> None:
         del timeout
 
     async def click(self, timeout: int | None = None, force: bool = False) -> None:
@@ -103,18 +105,21 @@ class _FakeLocator:
 
 
 class _EmptyRoleLocator:
-    async def count(self) -> int:
+    @staticmethod
+    async def count() -> int:
         return 0
 
     def nth(self, index: int) -> "_EmptyRoleLocator":
         del index
         return self
 
-    async def is_visible(self, timeout: int | None = None) -> bool:
+    @staticmethod
+    async def is_visible(timeout: int | None = None) -> bool:
         del timeout
         return False
 
-    async def is_disabled(self) -> bool:
+    @staticmethod
+    async def is_disabled() -> bool:
         return False
 
 
@@ -142,10 +147,12 @@ class _RoleLocator:
             return True
         return bool(self._matches[0].get("disabled", False))
 
-    async def scroll_into_view_if_needed(self, timeout: int | None = None) -> None:
+    @staticmethod
+    async def scroll_into_view_if_needed(timeout: int | None = None) -> None:
         del timeout
 
-    async def evaluate(self, script: str) -> Any:
+    @staticmethod
+    async def evaluate(script: str) -> Any:
         del script
         return None
 
@@ -253,11 +260,13 @@ class _OverlayTestLocator:
 
 
 class _OverlayTestPage:
-    def locator(self, selector: str) -> "_OverlayCookieLocator":
+    @staticmethod
+    def locator(selector: str) -> "_OverlayCookieLocator":
         del selector
         return _OverlayCookieLocator()
 
-    async def wait_for_timeout(self, timeout_ms: int) -> None:
+    @staticmethod
+    async def wait_for_timeout(timeout_ms: int) -> None:
         del timeout_ms
 
 
@@ -266,10 +275,12 @@ class _OverlayCookieLocator:
     def first(self) -> "_OverlayCookieLocator":
         return self
 
-    async def count(self) -> int:
+    @staticmethod
+    async def count() -> int:
         return 0
 
-    async def is_visible(self, timeout: int | None = None) -> bool:
+    @staticmethod
+    async def is_visible(timeout: int | None = None) -> bool:
         del timeout
         return False
 
@@ -1539,21 +1550,25 @@ async def test_count_listing_cards_falls_back_to_heuristics_when_selectors_miss(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     class _ZeroLocator:
-        async def count(self) -> int:
+        @staticmethod
+        async def count() -> int:
             return 0
 
     class _SelectorPage:
-        def locator(self, selector: str) -> _ZeroLocator:
+        @staticmethod
+        def locator(selector: str) -> _ZeroLocator:
             del selector
             return _ZeroLocator()
 
-        async def evaluate(self, script: str, arg: Any | None = None) -> int | None:
+        @staticmethod
+        async def evaluate(script: str, arg: Any | None = None) -> int | None:
             del arg
             if "querySelectorAll(selector).length" in script:
                 return 0
             return None
 
-        async def content(self) -> str:
+        @staticmethod
+        async def content() -> str:
             return """
             <html>
               <body>
@@ -1598,14 +1613,16 @@ async def test_count_listing_cards_falls_back_to_heuristics_when_selectors_miss(
 @pytest.mark.component
 async def test_count_listing_cards_ignores_weak_product_selector_chrome() -> None:
     class _WeakProductChromePage:
-        async def evaluate(self, script: str, arg: Any | None = None) -> dict[str, int]:
+        @staticmethod
+        async def evaluate(script: str, arg: Any | None = None) -> dict[str, int]:
             assert "querySelectorAll(selector).length" in script
             return {
                 selector: (2 if listing_selector_is_weak(str(selector)) else 0)
                 for selector in list(arg or [])
             }
 
-        async def content(self) -> str:
+        @staticmethod
+        async def content() -> str:
             return """
             <html>
               <body>
@@ -1635,7 +1652,8 @@ async def test_count_listing_cards_prefers_product_anchor_count_over_productcard
     None
 ):
     class _DesertcartCountPage:
-        async def evaluate(self, script: str, arg: Any | None = None) -> dict[str, int]:
+        @staticmethod
+        async def evaluate(script: str, arg: Any | None = None) -> dict[str, int]:
             assert "querySelectorAll(selector).length" in script
             return {
                 selector: (
@@ -1698,21 +1716,25 @@ async def test_count_listing_cards_heuristic_rejects_detail_sections_with_suppor
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     class _ZeroLocator:
-        async def count(self) -> int:
+        @staticmethod
+        async def count() -> int:
             return 0
 
     class _SelectorPage:
-        def locator(self, selector: str) -> _ZeroLocator:
+        @staticmethod
+        def locator(selector: str) -> _ZeroLocator:
             del selector
             return _ZeroLocator()
 
-        async def evaluate(self, script: str, arg: Any | None = None) -> int | None:
+        @staticmethod
+        async def evaluate(script: str, arg: Any | None = None) -> int | None:
             del arg
             if "querySelectorAll(selector).length" in script:
                 return 0
             return None
 
-        async def content(self) -> str:
+        @staticmethod
+        async def content() -> str:
             return """
             <html>
               <body>
@@ -1755,7 +1777,8 @@ async def testclick_with_retry_uses_mutation_settle_after_js_fallback() -> None:
             self.wait_timeout_calls: list[int] = []
             self.mutation_settle_calls = 0
 
-        def locator(self, selector: str):
+        @staticmethod
+        def locator(selector: str):
             del selector
             return _OverlayCookieLocator()
 
@@ -1778,17 +1801,20 @@ async def testclick_with_retry_uses_mutation_settle_after_js_fallback() -> None:
             self.wait_timeout_calls.append(timeout_ms)
 
     class _ClickLocator:
-        async def scroll_into_view_if_needed(self, timeout: int | None = None) -> None:
+        @staticmethod
+        async def scroll_into_view_if_needed(timeout: int | None = None) -> None:
             del timeout
 
-        async def evaluate(self, script: str) -> Any:
+        @staticmethod
+        async def evaluate(script: str) -> Any:
             if "scrollIntoView" in script:
                 return None
             if "node.click()" in script:
                 return None
             return 0
 
-        async def click(self, timeout: int | None = None, force: bool = False) -> None:
+        @staticmethod
+        async def click(timeout: int | None = None, force: bool = False) -> None:
             del timeout, force
             raise RuntimeError("intercepted")
 
@@ -1809,22 +1835,25 @@ async def testclick_with_retry_stops_when_locator_no_longer_resolves() -> None:
     class _ClickPage:
         url = "https://example.com/listing"
 
-        def locator(self, selector: str):
+        @staticmethod
+        def locator(selector: str):
             del selector
             return _OverlayCookieLocator()
 
-        async def evaluate(self, script: str, arg: Any | None = None) -> Any:
+        @staticmethod
+        async def evaluate(script: str, arg: Any | None = None) -> Any:
             del script, arg
             return None
 
+        @staticmethod
         async def wait_for_load_state(
-            self,
             state: str,
             timeout: int | None = None,
         ) -> None:
             del state, timeout
 
-        async def wait_for_timeout(self, timeout_ms: int) -> None:
+        @staticmethod
+        async def wait_for_timeout(timeout_ms: int) -> None:
             del timeout_ms
 
     class _StaleLocator:
@@ -1832,7 +1861,8 @@ async def testclick_with_retry_stops_when_locator_no_longer_resolves() -> None:
             self.detached = False
             self.click_calls = 0
 
-        async def scroll_into_view_if_needed(self, timeout: int | None = None) -> None:
+        @staticmethod
+        async def scroll_into_view_if_needed(timeout: int | None = None) -> None:
             del timeout
 
         async def evaluate(self, script: str) -> Any:
@@ -1864,22 +1894,25 @@ async def testclick_with_retry_tolerates_transient_locator_resolution_loss() -> 
     class _ClickPage:
         url = "https://example.com/listing"
 
-        def locator(self, selector: str):
+        @staticmethod
+        def locator(selector: str):
             del selector
             return _OverlayCookieLocator()
 
-        async def evaluate(self, script: str, arg: Any | None = None) -> Any:
+        @staticmethod
+        async def evaluate(script: str, arg: Any | None = None) -> Any:
             del script, arg
             return None
 
+        @staticmethod
         async def wait_for_load_state(
-            self,
             state: str,
             timeout: int | None = None,
         ) -> None:
             del state, timeout
 
-        async def wait_for_timeout(self, timeout_ms: int) -> None:
+        @staticmethod
+        async def wait_for_timeout(timeout_ms: int) -> None:
             del timeout_ms
 
     class _TransientLocator:
@@ -1887,10 +1920,12 @@ async def testclick_with_retry_tolerates_transient_locator_resolution_loss() -> 
             self.count_calls = 0
             self.click_calls = 0
 
-        async def scroll_into_view_if_needed(self, timeout: int | None = None) -> None:
+        @staticmethod
+        async def scroll_into_view_if_needed(timeout: int | None = None) -> None:
             del timeout
 
-        async def evaluate(self, script: str) -> Any:
+        @staticmethod
+        async def evaluate(script: str) -> Any:
             del script
             raise RuntimeError("transient evaluate failure")
 
@@ -1916,7 +1951,8 @@ async def testclick_with_retry_tolerates_transient_locator_resolution_loss() -> 
 @pytest.mark.asyncio
 async def testlocator_still_resolves_returns_false_after_probe_errors() -> None:
     class _ProbeErrorLocator:
-        async def count(self) -> int:
+        @staticmethod
+        async def count() -> int:
             raise traversal_module.PlaywrightError("transient probe failure")
 
     assert await locator_still_resolves(_ProbeErrorLocator()) is False

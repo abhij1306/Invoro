@@ -109,7 +109,8 @@ def test_install_asyncio_exception_filter_suppresses_known_pipe_reset() -> None:
             self.handler = None
             self.default_calls: list[object] = []
 
-        def get_exception_handler(self):
+        @staticmethod
+        def get_exception_handler() -> None:
             return None
 
         def set_exception_handler(self, handler) -> None:
@@ -144,7 +145,8 @@ def test_install_asyncio_exception_filter_delegates_unknown_errors() -> None:
             self.handler = None
             self.default_calls: list[object] = []
 
-        def get_exception_handler(self):
+        @staticmethod
+        def get_exception_handler():
             return None
 
         def set_exception_handler(self, handler) -> None:
@@ -179,7 +181,8 @@ def test_install_asyncio_exception_filter_preserves_original_context_for_previou
         def set_exception_handler(self, handler) -> None:
             self.handler = handler
 
-        def default_exception_handler(self, context) -> None:
+        @staticmethod
+        def default_exception_handler(context) -> None:
             raise AssertionError("default handler should not run")
 
     loop = FakeLoop()

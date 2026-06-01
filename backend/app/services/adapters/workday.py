@@ -130,7 +130,6 @@ class WorkdayAdapter(BaseAdapter):
             for key, value in record.items()
             if value not in (None, "", [], {})
         }
-
     def _site_context(self, url: str, html: str) -> dict[str, str] | None:
         parsed = urlparse(str(url or ""))
         host = str(parsed.netloc or "").strip()
@@ -155,7 +154,8 @@ class WorkdayAdapter(BaseAdapter):
             "site_slug": site_slug,
         }
 
-    def _localized_prefix(self, *, html: str, site_slug: str, locale: str) -> str:
+    @staticmethod
+    def _localized_prefix(*, html: str, site_slug: str, locale: str) -> str:
         if locale:
             return f"/{locale}/{site_slug}"
         pattern = re.compile(
@@ -220,12 +220,14 @@ class WorkdayAdapter(BaseAdapter):
             return ""
         return suffix
 
-    def _looks_like_detail(self, url: str, surface: str) -> bool:
+    @staticmethod
+    def _looks_like_detail(url: str, surface: str) -> bool:
         lowered_surface = str(surface or "").lower()
         lowered_path = urlparse(str(url or "").lower()).path
         return "detail" in lowered_surface or "/job/" in lowered_path
 
-    def _split_localized_path(self, path: str) -> tuple[str, list[str]]:
+    @staticmethod
+    def _split_localized_path(path: str) -> tuple[str, list[str]]:
         path_segments = [segment for segment in str(path or "").split("/") if segment]
         if path_segments and _LOCALE_RE.fullmatch(path_segments[0]):
             return path_segments[0], path_segments[1:]

@@ -994,7 +994,8 @@ async def test_celery_dispatch_commits_task_id_before_enqueue(
         await real_commit()
 
     class _FakeTask:
-        def apply_async(self, *args, **kwargs):
+        @staticmethod
+        def apply_async(*args, **kwargs):
             del args, kwargs
             events.append("enqueue")
 

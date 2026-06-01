@@ -46,7 +46,8 @@ async def test_record_failure_normalizes_none_threshold_for_redis(
     seen_args: list[object] = []
 
     class _FakeRedis:
-        async def eval(self, *args) -> None:
+        @staticmethod
+        async def eval(*args) -> None:
             seen_args.extend(args)
 
     async def _fake_redis_fail_open(operation, *, default, operation_name):

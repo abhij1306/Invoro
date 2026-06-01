@@ -143,7 +143,8 @@ class SaaSHRAdapter(PublicEndpointAdapter):
             return ""
         return clean_text(payload.get("comp_name"))
 
-    def _discover_board_url(self, url: str, html: str) -> str:
+    @staticmethod
+    def _discover_board_url(url: str, html: str) -> str:
         host = (urlparse(str(url or "")).hostname or "").lower()
         if host == SAASHR_DOMAIN or host.endswith(f".{SAASHR_DOMAIN}"):
             return url
@@ -154,7 +155,8 @@ class SaaSHRAdapter(PublicEndpointAdapter):
         src = str(iframe.get("src") or "").strip()
         return urljoin(url, src) if src else ""
 
-    def _extract_company_code(self, board_url: str) -> str:
+    @staticmethod
+    def _extract_company_code(board_url: str) -> str:
         match = _COMPANY_RE.search(urlparse(str(board_url or "")).path)
         return clean_text(match.group(1)) if match else ""
 
@@ -195,13 +197,15 @@ class SaaSHRAdapter(PublicEndpointAdapter):
             if value not in (None, "", [], {})
         }
 
-    def _build_detail_url(self, board_url: str, job_id: str) -> str:
+    @staticmethod
+    def _build_detail_url(board_url: str, job_id: str) -> str:
         parsed = urlparse(board_url)
         params = dict(parse_qsl(parsed.query, keep_blank_values=True))
         params["ShowJob"] = job_id
         query = urlencode(params)
         return parsed._replace(query=query).geturl()
 
-    def _requested_job_id(self, board_url: str) -> str:
+    @staticmethod
+    def _requested_job_id(board_url: str) -> str:
         params = dict(parse_qsl(urlparse(board_url).query, keep_blank_values=True))
         return clean_text(params.get("ShowJob"))

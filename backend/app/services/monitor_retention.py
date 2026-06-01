@@ -26,7 +26,8 @@ class MonitorRetentionService:
         async with SessionLocal() as session:
             await self.purge_expired_with_session(session)
 
-    async def purge_expired_with_session(self, session: AsyncSession) -> None:
+    @staticmethod
+    async def purge_expired_with_session(session: AsyncSession) -> None:
         now = utcnow()
         purged_count = 0
         last_id = 0
