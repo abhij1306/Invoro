@@ -114,9 +114,9 @@ async def looks_like_paginate_control(locator) -> bool:
                   datasetKeys.some((key) => /(page|paginate|next|cursor)/i.test(key)),
                 pagination_container: Boolean(container),
                 pagination_text:
-                  /\\b(next|previous|prev|page|older|newer)\\b/.test(label) ||
-                  /\\b(next|previous|prev|page|older|newer)\\b/.test(containerText),
-                sibling_page_numbers: /(?:^|\\s)\\d+(?:\\s|$)/.test(containerText),
+                  /\b(next|previous|prev|page|older|newer)\b/.test(label) ||
+                  /\b(next|previous|prev|page|older|newer)\b/.test(containerText),
+                sibling_page_numbers: /(?:^|\s)\d+(?:\s|$)/.test(containerText),
                 follows_current_page:
                   currentIndex >= 0 && nodeIndex === currentIndex + 1,
                 arrow_only: /^(>|›|»)$/.test(label),
@@ -127,7 +127,7 @@ async def looks_like_paginate_control(locator) -> bool:
             }
             """
         )
-    except _RECOVERABLE_ERRORS:
+    except Exception:
         logger.debug("Traversal next_page control inspection failed", exc_info=True)
         return False
     if not isinstance(inspection, dict):
@@ -175,7 +175,7 @@ async def _looks_like_next_page_control(locator) -> bool:
               ]
                 .filter(Boolean)
                 .join(' ')
-                .replace(/\\s+/g, ' ')
+                .replace(/\s+/g, ' ')
                 .trim()
                 .toLowerCase();
               const disabled =
@@ -186,7 +186,7 @@ async def _looks_like_next_page_control(locator) -> bool:
             }
             """
         )
-    except _RECOVERABLE_ERRORS:
+    except Exception:
         return False
     if not isinstance(inspection, dict):
         return False
@@ -309,7 +309,7 @@ async def _settle_after_action(
         return
     try:
         await page.wait_for_load_state("networkidle", timeout=min(1500, wait_ms * 2))
-    except _RECOVERABLE_ERRORS:
+    except TimeoutError:
         logger.debug(
             "Traversal networkidle settle wait failed url=%s",
             page.url,
@@ -317,7 +317,7 @@ async def _settle_after_action(
         )
     try:
         await page.wait_for_load_state("domcontentloaded", timeout=min(1500, wait_ms * 2))
-    except _RECOVERABLE_ERRORS:
+    except TimeoutError:
         logger.debug(
             "Traversal domcontentloaded settle wait failed url=%s",
             page.url,
@@ -383,7 +383,7 @@ async def _wait_for_domcontentloaded(page, *, deadline_at: float | None) -> None
             "domcontentloaded",
             timeout=timeout_ms,
         )
-    except _RECOVERABLE_ERRORS:
+    except Exception:
         logger.debug("Traversal domcontentloaded wait failed", exc_info=True)
         return
 
