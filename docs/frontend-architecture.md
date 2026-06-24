@@ -101,6 +101,7 @@ Primary files:
 
 - `components/crawl/crawl-config-screen.tsx`
 - `components/crawl/use-crawl-config.ts`
+- `components/crawl/use-crawl-config-lifecycle.ts`
 - `components/crawl/domain-surface-config.ts`
 - `components/crawl/crawl.module.css`
 - `components/crawl/shared.tsx`
@@ -110,6 +111,7 @@ Responsibilities:
 
 - choose domain/surface tab/mode
 - own Crawl Studio form validation and manual field arrays through React Hook Form and Zod
+- coordinate one-shot prefill, saved run-profile loading, dirty-edit protection, and stale domain-memory responses in the feature lifecycle hook
 - derive surface from the domain/tab dispatch map
 - build dispatch payload
 - collect advanced settings and additional fields
@@ -133,6 +135,8 @@ Current UI settings behavior reflects the backend contract:
 Primary files:
 
 - `components/crawl/crawl-run-screen.tsx`
+- `components/crawl/use-crawl-run-controller.ts`
+- `components/crawl/crawl-diagnostics.ts`
 - `components/crawl/use-run-workspace.ts`
 - `components/crawl/use-run-polling.ts`
 - `components/crawl/crawl-run-store.ts`
@@ -145,6 +149,8 @@ Responsibilities:
 - show records, JSON, and logs
 - consume websocket logs when available
 - show quality/verdict/progress signals
+- coordinate derived record selection, result handoffs, run controls, and run-change UI reset through the crawl-run controller
+- normalize open crawl acquisition, phase timing, confidence, and LLM source diagnostics before renderers consume them
 - expose pause/resume/kill and export actions
 - keep run workspace UI coordination in the crawl Zustand store, not in server-query state
 - build product alert rules from run records in the dedicated alert drawer
@@ -160,6 +166,8 @@ Important live data features:
 Primary files:
 
 - `app/playground/page.tsx`
+- `app/playground/use-playground-workflow.ts`
+- `app/playground/playground-normalizers.ts`
 - `app/dashboard/page.tsx`
 - `app/runs/page.tsx`
 - `app/monitors/*`
@@ -170,7 +178,7 @@ Primary files:
 
 Responsibilities:
 
-- guided playground flow for URL intake, product discovery, product selection, PDP extraction, pipeline launch, and unified results
+- guided playground flow for URL intake, product discovery, product selection, PDP extraction, pipeline launch, and unified results, with workflow queries/transitions owned by `use-playground-workflow.ts` and tolerant payload shaping owned by `playground-normalizers.ts`
 - single-page source/rendered-DOM technical audit workspace with deterministic checks and JSON/Markdown exports
 - dashboard metrics and recent runs
 - run history

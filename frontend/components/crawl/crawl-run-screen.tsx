@@ -12,7 +12,7 @@ import {
   Plus,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useDeferredValue, useEffect, useMemo, useReducer, useRef } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useReducer, useRef } from 'react';
 import { HistoryDrawer, type HistoryItem } from '../ui/history-drawer';
 import { syntaxHighlightJsonNodes } from '../../lib/ui/syntax';
 import {
@@ -72,6 +72,7 @@ import { storeDataEnrichmentPrefill, storeProductIntelligencePrefill } from './c
 import { buildInitialCrawlRunLocalState, crawlRunLocalReducer } from './crawl-run-state';
 import { useLiveClock, useTerminalRecordSync, useTerminalSync } from './use-run-polling';
 import { useRunWorkspace } from './use-run-workspace';
+import { useCrawlRunController } from './use-crawl-run-controller';
 
 type CrawlRunScreenProps = { runId: number };
 
@@ -115,31 +116,6 @@ function RunOutputSummary({
       />
     </div>
   );
-}
-
-function llmTouchedFieldNames(record: CrawlRecord): string[] {
-  const raw =
-    record.raw_data && typeof record.raw_data === 'object'
-      ? (record.raw_data as Record<string, unknown>)
-      : {};
-  const touched = new Set<string>();
-  const source = typeof raw._source === 'string' ? raw._source : '';
-  if (source.startsWith('llm_')) {
-    touched.add('_record');
-  }
-  const fieldSources =
-    raw._field_sources && typeof raw._field_sources === 'object'
-      ? (raw._field_sources as Record<string, unknown>)
-      : {};
-  for (const [fieldName, value] of Object.entries(fieldSources)) {
-    if (
-      Array.isArray(value) &&
-      value.some((item) => typeof item === 'string' && item.startsWith('llm_'))
-    ) {
-      touched.add(fieldName);
-    }
-  }
-  return Array.from(touched);
 }
 
 export function CrawlRunScreen({ runId }: Readonly<CrawlRunScreenProps>) {
@@ -367,12 +343,6 @@ export function CrawlRunScreen({ runId }: Readonly<CrawlRunScreenProps>) {
   useTerminalSync(run, terminal, [runQuery, tableRecordsQuery, jsonRecordsQuery, logsQuery]);
 
   useEffect(() => {
-    resetWorkspaceUi();
-    logCursorRef.current = undefined;
-    dispatchLocal({ type: 'runChanged', sessionStartMs: Date.now() });
-  }, [resetWorkspaceUi, runId]);
-
-  useEffect(() => {
     logCursorRef.current = socketLogItems.length ? logCursorRef.current : logCursorAfterId;
   }, [logCursorAfterId, socketLogItems.length]);
 
@@ -463,148 +433,62 @@ export function CrawlRunScreen({ runId }: Readonly<CrawlRunScreenProps>) {
     return () => window.cancelAnimationFrame(frame);
   }, [logs, live]);
 
-  const visibleColumns = useMemo(() => {
-    const columns = new Set<string>();
-    for (const record of [...tableRecords, ...records]) {
-      for (const source of [record.data, record.raw_data]) {
-        Object.keys(source ?? {}).forEach((key) => {
-          const normalized = key.toLowerCase();
-          if (
-            !key.startsWith('_') &&
-            normalized !== 'canonical_url' &&
-            normalized !== 'source_run_id' &&
-            normalized !== 'run_id' &&
-            normalized !== 'product'
-          ) {
-            columns.add(key);
-          }
-        });
-      }
-    }
-    const URL_KEYS = new Set(['url', 'source_url', 'product_url']);
-    const sorted = Array.from(columns).sort((a, b) => {
-      const aIsUrl = URL_KEYS.has(a.toLowerCase());
-      const bIsUrl = URL_KEYS.has(b.toLowerCase());
-      if (aIsUrl && !bIsUrl) return -1;
-      if (!aIsUrl && bIsUrl) return 1;
-      return 0;
-    });
-    return sorted;
-  }, [tableRecords, records]);
+  const resetLogCursor = useCallback(() => {
+    logCursorRef.current = undefined;
+  }, []);
+  const controller = useCrawlRunController({
+    runId,
+    run,
+    terminal,
+    localNow,
+    effectiveStartMs,
+    effectiveOutputTab,
+    selectedIds,
+    tableRecords,
+    records,
+    recordsTotal,
+    tableRecordsQueryData: tableRecordsQuery.data,
+    resetWorkspaceUi,
+    resetLogCursor,
+    dispatchLocal,
+    router,
+    runQuery,
+    logsQuery,
+    tableRecordsQuery,
+    jsonRecordsQuery,
+  });
+  const {
+    visibleColumns,
+    visibleSelectedIds,
+    selectedRecords,
+    batchSourceRecords,
+    resultUrls,
+    selectedResultUrls,
+    llmSummary,
+    listingRun,
+    ecommerceDetailRun,
+    verdict,
+    completedQualityLevel,
+    emptyRecordsState,
+    summaryRecordsFromRun,
+    summary,
+    batchFromResultsUrls,
+    batchFromResultsLabel,
+    productIntelligenceRecords,
+    productIntelligenceLabel,
+    dataEnrichmentRecords,
+    dataEnrichmentLabel,
+    resetToConfig,
+    downloadExport,
+    runControl,
+    triggerBatchCrawlFromResults,
+    triggerProductIntelligenceFromResults,
+    triggerDataEnrichmentFromResults,
+  } = controller;
 
-  const filteredTableRecords = tableRecords;
-  const visibleRecordIds = useMemo(
-    () =>
-      new Set(
-        (effectiveOutputTab === 'table' ? filteredTableRecords : records).map(
-          (record) => record.id,
-        ),
-      ),
-    [effectiveOutputTab, filteredTableRecords, records],
-  );
-  const visibleSelectedIds = useMemo(
-    () => selectedIds.filter((id) => visibleRecordIds.has(id)),
-    [selectedIds, visibleRecordIds],
-  );
-
-  const selectedRecords = useMemo(
-    () =>
-      (effectiveOutputTab === 'table' ? filteredTableRecords : records).filter((record) =>
-        visibleSelectedIds.includes(record.id),
-      ),
-    [effectiveOutputTab, filteredTableRecords, records, visibleSelectedIds],
-  );
-  const batchSourceRecords = tableRecords.length ? tableRecords : records;
-  const llmSummary = useMemo(() => {
-    const llmRequested = Boolean(run?.settings?.llm_enabled);
-    const touchedFields = new Set<string>();
-    let touchedRecords = 0;
-    for (const record of batchSourceRecords) {
-      const fields = llmTouchedFieldNames(record);
-      if (!fields.length) {
-        continue;
-      }
-      touchedRecords += 1;
-      fields.forEach((fieldName) => touchedFields.add(fieldName));
-    }
-    return {
-      requested: llmRequested,
-      touchedRecords,
-      touchedFields: touchedFields.size,
-    };
-  }, [batchSourceRecords, run?.settings?.llm_enabled]);
-  const resultUrls = useMemo(
-    () => uniqueStrings(batchSourceRecords.map((record) => extractRecordUrl(record))),
-    [batchSourceRecords],
-  );
-  const selectedResultUrls = useMemo(
-    () => uniqueStrings(selectedRecords.map((record) => extractRecordUrl(record))),
-    [selectedRecords],
-  );
-  const listingRun = useMemo(() => isListingRun(run), [run]);
-  const ecommerceDetailRun = String(run?.surface ?? '') === 'ecommerce_detail';
-  const verdict = extractionVerdict(run);
   const runErrorMessage =
     typeof run?.result_summary?.error === 'string' ? run.result_summary.error : '';
-  const persistedQualityLevel = useMemo(() => {
-    const level = String(run?.result_summary?.quality_summary?.level ?? '')
-      .trim()
-      .toLowerCase();
-    if (level === 'high' || level === 'medium' || level === 'low' || level === 'unknown') {
-      return level as ResultSummaryQualityLevel;
-    }
-    return null;
-  }, [run?.result_summary?.quality_summary?.level]);
-  const quality = useMemo(
-    () => estimateDataQuality(tableRecords.length ? tableRecords : records, visibleColumns),
-    [tableRecords, records, visibleColumns],
-  );
-  const completedQualityLevel = terminal ? (persistedQualityLevel ?? quality.level) : quality.level;
-  const emptyRecordsState =
-    verdict === 'blocked'
-      ? {
-          title: 'Access blocked',
-          description:
-            'The target site blocked acquisition for this run. Check Logs or browser diagnostics for challenge details.',
-        }
-      : {
-          title: 'No records captured yet',
-          description: 'Records will appear here once extraction returns rows.',
-        };
-  const batchFromResultsUrls = selectedResultUrls.length ? selectedResultUrls : resultUrls;
-  const batchFromResultsLabel = selectedResultUrls.length
-    ? `Batch Crawl Selected (${selectedResultUrls.length})`
-    : `Batch Crawl (${resultUrls.length})`;
-  const productIntelligenceRecords = selectedRecords.length ? selectedRecords : batchSourceRecords;
-  const productIntelligenceLabel = selectedRecords.length
-    ? `Product Intelligence Selected (${selectedRecords.length})`
-    : `Product Intelligence (${productIntelligenceRecords.length})`;
-  const dataEnrichmentRecords = selectedRecords.length ? selectedRecords : batchSourceRecords;
-  const dataEnrichmentLabel = selectedRecords.length
-    ? `Enrich Selected (${selectedRecords.length})`
-    : `Enrich Records (${dataEnrichmentRecords.length})`;
-
-  const summaryRecordsFromRun = Number(run?.result_summary?.record_count ?? 0) || 0;
-  const summaryRecordsFromTable =
-    Number(tableRecordsQuery.data?.meta?.total ?? tableRecordsQuery.data?.items?.length ?? 0) || 0;
-  const summaryPagesFromRun =
-    Number(run?.result_summary?.processed_urls ?? run?.result_summary?.completed_urls ?? 0) || 0;
-  const summaryCurrentUrlIndex = Number(run?.result_summary?.current_url_index ?? 0) || 0;
-  const summary = {
-    records: Math.max(summaryRecordsFromRun, recordsTotal, summaryRecordsFromTable),
-    pages: Math.max(
-      summaryPagesFromRun,
-      summaryCurrentUrlIndex,
-      Number(run?.result_summary?.progress ?? 0) > 0 ? 1 : 0,
-    ),
-    fields: visibleColumns.length,
-    duration:
-      (terminal ? formatDurationMs(run?.result_summary?.duration_ms) : null) ??
-      formatDuration(
-        new Date(effectiveStartMs).toISOString(),
-        terminal ? run?.completed_at : new Date(localNow).toISOString(),
-      ),
-  };
+  const filteredTableRecords = tableRecords;
   const outputTabs = useMemo(
     () => (
       <TabBar
@@ -669,104 +553,11 @@ export function CrawlRunScreen({ runId }: Readonly<CrawlRunScreenProps>) {
     refetchTableRecords,
   });
 
-  function downloadExport(kind: 'csv' | 'json') {
-    dispatchLocal({ type: 'runActionErrorCleared' });
-    const filename = `run-${runId}.${kind}`;
-    try {
-      const href = kind === 'csv' ? api.exportCsv(runId) : api.exportJson(runId);
-      const anchor = document.createElement('a');
-      anchor.href = href;
-      anchor.download = filename;
-      anchor.style.display = 'none';
-      document.body.append(anchor);
-      anchor.click();
-      anchor.remove();
-    } catch (error) {
-      dispatchLocal({
-        type: 'runActionFailed',
-        message: error instanceof Error ? error.message : 'Unable to download export.',
-      });
-    }
-  }
-
-  async function runControl() {
-    dispatchLocal({ type: 'runActionStarted', pendingKey: 'kill' });
-    try {
-      await api.killCrawl(runId);
-      await Promise.all([
-        runQuery.refetch(),
-        logsQuery.refetch(),
-        tableRecordsQuery.refetch(),
-        jsonRecordsQuery.refetch(),
-      ]);
-    } catch (error) {
-      dispatchLocal({
-        type: 'runActionFailed',
-        message: error instanceof Error ? error.message : 'Unable to kill crawl.',
-      });
-    } finally {
-      dispatchLocal({ type: 'runActionFinished' });
-    }
-  }
-
-  function resetToConfig() {
-    router.replace('/crawl?module=category&mode=single');
-  }
-
   async function retryFailedPanels() {
     if (!panelRefreshErrors.length) {
       return;
     }
     await Promise.allSettled(panelRefreshErrors.map((panel) => panel.refetch()));
-  }
-
-  function triggerBatchCrawlFromResults() {
-    const urls = batchFromResultsUrls;
-    if (!urls.length) {
-      return;
-    }
-    const domain = inferDomainFromSurface(run?.surface) ?? 'commerce';
-    window.sessionStorage.setItem(
-      STORAGE_KEYS.BULK_PREFILL,
-      JSON.stringify({
-        domain,
-        urls,
-      }),
-    );
-    router.replace('/crawl?module=pdp&mode=batch');
-  }
-
-  function triggerProductIntelligenceFromResults() {
-    if (!productIntelligenceRecords.length) {
-      return;
-    }
-    storeProductIntelligencePrefill({
-      source_run_id: run?.id ?? null,
-      source_domain: run?.url ?? '',
-      records: productIntelligenceRecords.map((record) => ({
-        id: record.id,
-        run_id: record.run_id,
-        source_url: record.source_url,
-        data: record.data,
-      })),
-    });
-    router.replace('/product-intelligence');
-  }
-
-  function triggerDataEnrichmentFromResults() {
-    if (!dataEnrichmentRecords.length) {
-      return;
-    }
-    storeDataEnrichmentPrefill({
-      source_run_id: run?.id ?? null,
-      records: dataEnrichmentRecords.map((record) => ({
-        id: record.id,
-        run_id: record.run_id,
-        source_url: record.source_url,
-        data: record.data,
-      })),
-    });
-    router.replace('/data-enrichment');
   }
 
   async function applyFieldLearningAction(

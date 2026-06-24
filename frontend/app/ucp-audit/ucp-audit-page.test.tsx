@@ -87,6 +87,7 @@ function UcpAuditHarness() {
 
 describe('UcpAuditPage', () => {
   beforeEach(() => {
+    globalThis.localStorage.clear();
     apiMock.createUcpAuditJob.mockReset();
     apiMock.getUcpAuditJob.mockReset();
     apiMock.listUcpAuditJobs.mockReset();
@@ -200,6 +201,43 @@ describe('UcpAuditPage', () => {
       expect(link).toHaveAttribute('href', '/api/ucp-audit/jobs/101/export.md');
     });
     expect(link).toHaveAttribute('download');
+  });
+
+  it('persists checklist completion and reloads it', () => {
+    const report = sampleReport();
+    const { unmount } = render(<UcpFixSequence report={report} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /toggle roadmap action/i }));
+
+    expect(globalThis.localStorage.getItem('ucp-fix-sequence-101')).toContain(
+      'freshness availability-0',
+    );
+    expect(screen.getByText(/1 of 1 fixed \(100%\)/i)).toBeInTheDocument();
+
+    unmount();
+    render(<UcpFixSequence report={report} />);
+    expect(screen.getByText(/1 of 1 fixed \(100%\)/i)).toBeInTheDocument();
+  });
+
+  it('loads the corresponding checklist when the report storage key changes', async () => {
+    globalThis.localStorage.setItem(
+      'ucp-fix-sequence-202',
+      JSON.stringify({ 'freshness availability-0': true }),
+    );
+    const first = sampleReport();
+    const second = { ...sampleReport(), id: 202, job_id: 202 };
+    const { rerender } = render(<UcpFixSequence report={first} />);
+
+    expect(screen.getByText(/0 of 1 fixed \(0%\)/i)).toBeInTheDocument();
+
+    rerender(<UcpFixSequence report={second} />);
+
+    expect(screen.getByText(/1 of 1 fixed \(100%\)/i)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /toggle roadmap action/i })).toHaveClass(
+        'bg-success',
+      );
+    });
   });
 
   it('exports roadmap evidence', async () => {

@@ -2,16 +2,14 @@
 import { Globe, Info, Plus, SlidersHorizontal, Sparkles } from 'lucide-react';
 import type { Route } from 'next';
 import { useRouter } from 'next/navigation';
-import { startTransition, useEffect, useLayoutEffect, useMemo, useReducer, useRef } from 'react';
+import { startTransition, useCallback, useEffect, useMemo, useReducer } from 'react';
 import { cn } from '../../lib/utils';
 import { InlineAlert, TabBar } from '../ui/patterns';
 import { Badge, Button, Dropdown, Card, Input, Textarea, Toggle, Tooltip } from '../ui/primitives';
 import { api } from '../../lib/api';
-import type { CrawlConfig, CrawlDomain, DomainRunProfile } from '../../lib/api/types';
+import type { CrawlConfig, CrawlDomain } from '../../lib/api/types';
 import { CRAWL_DEFAULTS, CRAWL_LIMITS } from '../../lib/constants/crawl-defaults';
 import { getNormalizedDomain } from '../../lib/format/domain';
-import { STORAGE_KEYS } from '../../lib/constants/storage-keys';
-import { UI_DELAYS } from '../../lib/constants/timing';
 import { telemetryErrorPayload, trackEvent } from '../../lib/telemetry/events';
 import {
   AdditionalFieldInput,
@@ -36,12 +34,9 @@ import {
   applyDiagnosticsPreset,
   BROWSER_ENGINE_OPTIONS,
   buildDispatch,
-  buildFieldRowFromSelectorRecord,
   buildFieldRowFromSuggestion,
   canPreview,
   CAPTURE_NETWORK_OPTIONS,
-  cloneRunProfile,
-  defaultRunProfile,
   diagnosticsPresetForProfile,
   EXTRACTION_SOURCE_OPTIONS,
   FETCH_MODE_OPTIONS,
@@ -53,7 +48,6 @@ import {
   parseOptionalClampedNumber,
   selectRelevantSelectorRecords,
   selectorGenerationFields,
-  stripDomainMemoryFieldRows,
   surfaceLabel,
   TRAVERSAL_MODE_OPTIONS,
   type BrowserEngine,
@@ -76,7 +70,6 @@ import {
   bindCrawlConfigLocalDispatch,
   buildInitialLocalState,
   crawlConfigLocalReducer,
-  isBulkPrefill,
   RUN_SETUP_CONTROL_CLASS,
   RUN_SETUP_LABEL_CLASS,
   RUN_SETUP_ROW_CLASS,
@@ -86,6 +79,7 @@ import {
 import { createDesignCrawlRun } from './design-crawl-submit';
 import { DOMAIN_OPTIONS, DOMAIN_TABS } from './domain-surface-config';
 import * as crawlConfigForm from './use-crawl-config';
+import { useCrawlConfigLifecycle } from './use-crawl-config-lifecycle';
 
 export function CrawlConfigScreen({
   requestedTab,
@@ -143,12 +137,7 @@ export function CrawlConfigScreen({
     workspaceMode,
   } = localState;
   const localDispatch = useMemo(() => bindCrawlConfigLocalDispatch(dispatchLocal), [dispatchLocal]);
-  const profileLookupRequestRef = useRef(0);
-  const domainMemoryLookupRequestRef = useRef(0);
-  const profileLookupTargetUrlRef = useRef('');
-  const profileDirtyRef = useRef(false);
-  const lastProfileKeyRef = useRef('');
-  const lastDomainMemoryKeyRef = useRef('');
+
   const modePickerEnabled = crawlDomain === 'commerce' || crawlDomain === 'jobs';
   const selectedMode = crawlTab === 'category' ? categoryMode : pdpMode;
   const activeMode = modePickerEnabled ? selectedMode : 'single';
@@ -174,38 +163,30 @@ export function CrawlConfigScreen({
       ? `${normalizedTargetDomain}|${effectiveSurface}`
       : '';
   const diagnosticsPreset = diagnosticsPresetForProfile(runProfile);
+  const setLifecycleTargetUrl = useCallback(
+    (value: string) => setValue('targetUrl', value),
+    [setValue],
+  );
+  const setLifecycleBulkUrls = useCallback(
+    (value: string) => setValue('bulkUrls', value),
+    [setValue],
+  );
+  const { loadDomainMemoryForUrl, markProfileDirty } = useCrawlConfigLifecycle({
+    requestedWorkspace,
+    requestedUrl,
+    profileLookupKey,
+    domainMemoryLookupKey,
+    targetUrl,
+    normalizedTargetDomain,
+    effectiveSurface,
+    bulkPrefillRouteSyncGuardRef,
+    dispatchRoute,
+    localDispatch,
+    setTargetUrl: setLifecycleTargetUrl,
+    setBulkUrls: setLifecycleBulkUrls,
+    setFieldRows,
+  });
 
-  // Adjust state during render when the lookup key changes, instead of in an
-  // effect. This avoids an extra render with stale UI between commits. See
-  // https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes
-  /* eslint-disable react-hooks/refs -- Existing render-time state synchronization uses refs as change guards. */
-  if (lastProfileKeyRef.current !== profileLookupKey) {
-    profileDirtyRef.current = false;
-    lastProfileKeyRef.current = profileLookupKey;
-    if (!profileLookupKey) {
-      localDispatch.setSavedProfileLoaded(false);
-      localDispatch.setSavedProfileDomain('');
-      localDispatch.setSavedProfileMessage('');
-      localDispatch.setRunProfile(defaultRunProfile());
-    }
-  }
-  if (lastDomainMemoryKeyRef.current !== domainMemoryLookupKey) {
-    lastDomainMemoryKeyRef.current = domainMemoryLookupKey;
-    localDispatch.setFieldConfigError('');
-    localDispatch.setFieldConfigMessage('');
-    localDispatch.setFieldRowMessages({});
-    setFieldRows((current) => stripDomainMemoryFieldRows(current));
-  }
-  /* eslint-enable react-hooks/refs */
-
-  useEffect(() => {
-    if (requestedWorkspace === 'audit' && requestedUrl) {
-      setValue('targetUrl', requestedUrl);
-    }
-  }, [requestedUrl, requestedWorkspace, setValue]);
-  useEffect(() => {
-    profileLookupTargetUrlRef.current = profileLookupKey ? targetUrl.trim() : '';
-  }, [profileLookupKey, targetUrl]);
   useEffect(() => {
     if (workspaceMode === 'audit') {
       return;
@@ -239,121 +220,6 @@ export function CrawlConfigScreen({
       bulkPrefillRouteSyncGuardRef.current = false;
     }
   }, [bulkPrefillRouteSyncGuardRef, crawlTab, pdpMode]);
-
-  useLayoutEffect(() => {
-    const stored = window.sessionStorage.getItem(STORAGE_KEYS.BULK_PREFILL);
-    if (!stored) {
-      return;
-    }
-    try {
-      const parsed = JSON.parse(stored) as unknown;
-      if (isBulkPrefill(parsed) && parsed.urls.length) {
-        bulkPrefillRouteSyncGuardRef.current = true;
-        const parsedDomain = parsed.domain;
-        const domain =
-          parsedDomain && DOMAIN_OPTIONS.some((option) => option.value === parsedDomain)
-            ? parsedDomain
-            : undefined;
-        dispatchRoute({ type: 'applyBulkPrefill', domain });
-        setValue('bulkUrls', parsed.urls.join('\n'));
-        if (Array.isArray(parsed.additional_fields)) {
-          localDispatch.setAdditionalFields(uniqueRequestedFields(parsed.additional_fields));
-        }
-        const nextUrl = '/crawl?module=pdp&mode=batch';
-        const currentUrl = `${window.location.pathname}${window.location.search}`;
-        if (currentUrl !== nextUrl) {
-          window.history.replaceState(null, '', nextUrl);
-        }
-      }
-    } catch {
-    } finally {
-      window.sessionStorage.removeItem(STORAGE_KEYS.BULK_PREFILL);
-    }
-  }, [bulkPrefillRouteSyncGuardRef, dispatchRoute, localDispatch, setValue]);
-
-  useEffect(() => {
-    if (!profileLookupKey) {
-      return;
-    }
-    const requestId = profileLookupRequestRef.current + 1;
-    profileLookupRequestRef.current = requestId;
-    const timer = window.setTimeout(async () => {
-      try {
-        const response = await api.getDomainRunProfile({
-          url: profileLookupTargetUrlRef.current,
-          surface: effectiveSurface,
-        });
-        if (profileLookupRequestRef.current === requestId) {
-          const savedProfile = response.saved_run_profile;
-          localDispatch.setSavedProfileDomain(response.domain);
-          if (savedProfile && !profileDirtyRef.current) {
-            localDispatch.setRunProfile(cloneRunProfile(savedProfile));
-            localDispatch.setSavedProfileLoaded(true);
-            localDispatch.setSavedProfileMessage(
-              `Saved domain profile applied for ${response.domain} on ${surfaceLabel(response.surface)}. Explicit edits below override it for this run.`,
-            );
-          } else {
-            localDispatch.setSavedProfileLoaded(Boolean(savedProfile));
-            localDispatch.setSavedProfileMessage(
-              savedProfile
-                ? `Saved domain profile found for ${response.domain}. Your current edits are preserved for this run.`
-                : '',
-            );
-            if (!savedProfile && !profileDirtyRef.current) {
-              localDispatch.setRunProfile(defaultRunProfile());
-            }
-          }
-        }
-      } catch {
-        if (profileLookupRequestRef.current === requestId) {
-          localDispatch.setSavedProfileLoaded(false);
-          localDispatch.setSavedProfileDomain('');
-          localDispatch.setSavedProfileMessage('');
-        }
-      }
-    }, UI_DELAYS.DEBOUNCE_MS);
-    return () => window.clearTimeout(timer);
-  }, [effectiveSurface, localDispatch, profileLookupKey]);
-
-  useEffect(() => {
-    if (!domainMemoryLookupKey) {
-      return;
-    }
-    const requestId = domainMemoryLookupRequestRef.current + 1;
-    domainMemoryLookupRequestRef.current = requestId;
-    const lookupDomain = normalizedTargetDomain;
-    const timer = window.setTimeout(async () => {
-      localDispatch.setFieldConfigError('');
-      try {
-        const records = await api.listSelectors({ domain: lookupDomain });
-        if (domainMemoryLookupRequestRef.current === requestId) {
-          const matchingRecords = selectRelevantSelectorRecords(records, effectiveSurface);
-          if (!matchingRecords.length) {
-            setFieldRows((current) => stripDomainMemoryFieldRows(current));
-            return;
-          }
-          const incomingRows = matchingRecords.map(buildFieldRowFromSelectorRecord);
-          setFieldRows((current) =>
-            mergeFieldRows(stripDomainMemoryFieldRows(current), incomingRows),
-          );
-          localDispatch.setFieldRowMessages({});
-        }
-      } catch (error) {
-        if (domainMemoryLookupRequestRef.current === requestId) {
-          localDispatch.setFieldConfigError(
-            error instanceof Error ? error.message : 'Unable to load domain memory.',
-          );
-        }
-      }
-    }, UI_DELAYS.DEBOUNCE_MS);
-    return () => window.clearTimeout(timer);
-  }, [
-    domainMemoryLookupKey,
-    effectiveSurface,
-    localDispatch,
-    normalizedTargetDomain,
-    setFieldRows,
-  ]);
 
   const config = useMemo<CrawlConfig>(
     () => ({
@@ -397,47 +263,6 @@ export function CrawlConfigScreen({
       targetUrl,
     ],
   );
-
-  async function loadDomainMemoryForUrl(rawUrl: string) {
-    const target = rawUrl.trim();
-    const domain = getNormalizedDomain(target);
-    if (!target || !domain) {
-      return;
-    }
-    const requestId = domainMemoryLookupRequestRef.current + 1;
-    domainMemoryLookupRequestRef.current = requestId;
-    localDispatch.setFieldConfigError('');
-    try {
-      const records = await api.listSelectors({ domain });
-      if (domainMemoryLookupRequestRef.current === requestId) {
-        const matchingRecords = selectRelevantSelectorRecords(records, effectiveSurface);
-        if (!matchingRecords.length) {
-          localDispatch.setFieldConfigMessage('No saved domain memory found for this URL.');
-          setFieldRows((current) => stripDomainMemoryFieldRows(current));
-          return;
-        }
-        const incomingRows = matchingRecords.map(buildFieldRowFromSelectorRecord);
-        setFieldRows((current) =>
-          mergeFieldRows(stripDomainMemoryFieldRows(current), incomingRows),
-        );
-        localDispatch.setFieldRowMessages({});
-        localDispatch.setFieldConfigMessage(
-          `Loaded ${matchingRecords.length} saved selector${matchingRecords.length === 1 ? '' : 's'} from domain memory.`,
-        );
-      }
-    } catch (error) {
-      if (domainMemoryLookupRequestRef.current === requestId) {
-        localDispatch.setFieldConfigError(
-          error instanceof Error ? error.message : 'Unable to load domain memory.',
-        );
-      }
-    }
-  }
-
-  function markProfileDirty(updater: (current: DomainRunProfile) => DomainRunProfile) {
-    profileDirtyRef.current = true;
-    localDispatch.setRunProfile((current) => cloneRunProfile(updater(current)));
-  }
 
   async function startCrawl() {
     localDispatch.setConfigError('');

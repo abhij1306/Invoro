@@ -1,6 +1,6 @@
 'use client';
 
-import { type ReactNode, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useMemo } from 'react';
 import { AlertTriangle, Check, CheckSquare, Download, ShieldAlert, Sparkles } from 'lucide-react';
 
 import { DataRegionEmpty, DataRegionLoading, TableSurface } from '../../components/ui/patterns';
@@ -15,6 +15,13 @@ import {
 } from '../../components/ui/table';
 import { cn } from '../../lib/utils';
 import type { UcpAuditJob, UcpAuditReport } from '../../lib/api/types';
+import {
+  getContract,
+  getRoadmap,
+  normalizeFinding,
+  normalizeFindings,
+} from './ucp-report-normalizers';
+import { useUcpFixChecklist } from './use-ucp-fix-checklist';
 
 const DIMENSION_META: Record<string, { label: string; subtitle: string; desc: string }> = {
   'D-AID1': {
@@ -502,7 +509,7 @@ export function UcpDimensionTable({
               desc: '',
             };
             const findings = dimension.findings.map((finding, index) =>
-              normalizeFinding(finding, index),
+              normalizeFinding(finding, index, FINDING_COPY),
             );
 
             return (
@@ -758,67 +765,11 @@ export function UcpContractPanel({ report }: Readonly<{ report: UcpAuditReport |
 }
 
 export function UcpFixSequence({ report }: Readonly<{ report: UcpAuditReport | null }>) {
-  const roadmap = useMemo(() => getRoadmap(report), [report]);
-  const storageKey = report?.job_id ? `ucp-fix-sequence-${report.job_id}` : null;
-  const [done, setDone] = useState<Record<string, boolean>>(() => {
-    if (storageKey && typeof globalThis.window !== 'undefined') {
-      try {
-        const stored = globalThis.window.localStorage.getItem(storageKey);
-        if (stored) return JSON.parse(stored) as Record<string, boolean>;
-      } catch {
-        // Ignore invalid JSON
-      }
-    }
-    return {};
+  const roadmap = useMemo(() => getRoadmap(report, FINDING_COPY), [report]);
+  const { done, doneCount, progressPercent, toggle, exportPlan } = useUcpFixChecklist({
+    report,
+    roadmap,
   });
-
-  // Re-sync from localStorage when the audit report (and storageKey) changes.
-  // Uses the derive-state-from-prop pattern instead of setState-in-effect so
-  // we don't cascade an extra render when the storageKey hasn't changed.
-  const prevStorageKeyRef = useRef(storageKey);
-  if (storageKey !== prevStorageKeyRef.current) {
-    prevStorageKeyRef.current = storageKey;
-    if (!storageKey || typeof globalThis.window === 'undefined') {
-      setDone({});
-    } else {
-      try {
-        const stored = globalThis.window.localStorage.getItem(storageKey);
-        setDone(stored ? (JSON.parse(stored) as Record<string, boolean>) : {});
-      } catch {
-        setDone({});
-      }
-    }
-  }
-  const doneCount = roadmap.filter((item) => done[item.id]).length;
-  const progressPercent = roadmap.length ? Math.round((doneCount / roadmap.length) * 100) : 0;
-
-  function toggle(id: string) {
-    const next = { ...done, [id]: !done[id] };
-    setDone(next);
-    if (storageKey && globalThis.window !== undefined) {
-      globalThis.window.localStorage.setItem(storageKey, JSON.stringify(next));
-    }
-  }
-
-  function exportPlan() {
-    const lines = roadmap.map((item, index) => {
-      const checked = done[item.id] ? 'x' : ' ';
-      const evidenceLines = evidenceToLines(item.evidence)
-        .map((line) => `   - ${line}`)
-        .join('\n');
-      const evidenceBlock = evidenceLines ? `\n${evidenceLines}` : '';
-      return `- [${checked}] ${index + 1}. [${item.subSkill}] ${item.action} (${item.priority}, ${item.effort})\n   Source: ${item.source}${evidenceBlock}`;
-    });
-    const domain = formatUnknownText(report?.report_json?.domain, 'Audit Store');
-    const content = `# AI Discoverability Repair Roadmap\n\nTarget Domain: ${domain}\nOverall Score: ${report?.overall_score ?? 0}/100\n\n${lines.join('\n\n')}\n`;
-    const blob = new Blob([content], { type: 'text/markdown' });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = `aid-repair-roadmap-${report?.job_id ?? 'audit'}.md`;
-    anchor.click();
-    URL.revokeObjectURL(url);
-  }
 
   return (
     <TableSurface>
@@ -1426,78 +1377,7 @@ function ScoreBadge({ score }: Readonly<{ score: number }>) {
 }
 
 function useNormalizedFindings(report: UcpAuditReport | null) {
-  return useMemo(
-    () => (report?.findings ?? []).map((finding, index) => normalizeFinding(finding, index)),
-    [report],
-  );
-}
-
-function normalizeFinding(finding: Record<string, unknown>, index: number): NormalizedFinding {
-  const code = formatUnknownText(finding.code, 'unknown_finding');
-  const dimension = formatUnknownText(finding.dimension_id ?? finding.dimension);
-  const copy = FINDING_COPY[code] ?? {
-    description: formatUnknownText(finding.message, code),
-    fix: 'Inspect the exported signal payload and repair the missing catalog signal.',
-    effort: 'review',
-    action: `Resolve ${code}`,
-    impact: 'medium' as const,
-  };
-  return {
-    id: `${dimension}-${code}-${index}`,
-    code,
-    dimension,
-    severity: formatUnknownText(finding.severity, 'info'),
-    description: formatUnknownText(finding.message, copy.description),
-    fix: copy.fix,
-    effort: copy.effort,
-    action: copy.action,
-    impact: copy.impact,
-    evidence: Array.isArray(finding.evidence)
-      ? (finding.evidence as Array<Record<string, unknown>>)
-      : [],
-  };
-}
-
-function getContract(report: UcpAuditReport | null): UcpContract {
-  const raw = report?.report_json?.ucp_contract;
-  return raw && typeof raw === 'object' ? raw : {};
-}
-
-function getRoadmap(report: UcpAuditReport | null) {
-  const raw = report?.report_json?.repair_roadmap;
-  if (Array.isArray(raw) && raw.length) {
-    return raw.map((item, index) => {
-      const roadmap = item;
-      const subSkill = formatUnknownText(roadmap.sub_skill, 'aid');
-      return {
-        id: `${subSkill}-${index}`,
-        subSkill,
-        priority: formatUnknownText(roadmap.priority, 'medium'),
-        action: formatUnknownText(roadmap.action, 'Repair AI discoverability signal'),
-        source: formatUnknownText(roadmap.source, 'AI Discoverability Score guidance'),
-        evidence: Array.isArray(roadmap.evidence)
-          ? (roadmap.evidence as Array<Record<string, unknown>>)
-          : [],
-        effort: formatUnknownText(roadmap.effort, 'review'),
-        dependsOn: Array.isArray(roadmap.depends_on)
-          ? roadmap.depends_on.map(formatUnknownText)
-          : [],
-      };
-    });
-  }
-  return (report?.findings ?? []).map((finding, index) => {
-    const normalized = normalizeFinding(finding, index);
-    return {
-      id: normalized.id,
-      subSkill: normalized.dimension,
-      priority: normalized.impact,
-      action: normalized.action,
-      source: 'AI Discoverability Score guidance',
-      evidence: normalized.evidence,
-      effort: normalized.effort,
-      dependsOn: [],
-    };
-  });
+  return useMemo(() => normalizeFindings(report, FINDING_COPY), [report]);
 }
 
 function scoreTone(score: number) {

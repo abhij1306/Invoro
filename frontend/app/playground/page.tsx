@@ -1,6 +1,6 @@
 'use client';
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import {
   AlertTriangle,
   ArrowRight,
@@ -11,14 +11,7 @@ import {
   Play,
   Search,
 } from 'lucide-react';
-import {
-  type Dispatch,
-  type SetStateAction,
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
+import { type Dispatch, type SetStateAction, useEffect, useMemo, useState } from 'react';
 
 import {
   DataRegionEmpty,
@@ -40,86 +33,22 @@ import {
 import { api } from '../../lib/api';
 import type { PlaygroundSessionResponse } from '../../lib/api/types';
 import { cn } from '../../lib/utils';
-
-// ─── Types ───────────────────────────────────────────────────────────────────
-
-type SessionState =
-  | 'created'
-  | 'sitemap_listed'
-  | 'discovering'
-  | 'discovered'
-  | 'extracting'
-  | 'extracted'
-  | 'running_pipeline'
-  | 'complete';
+import {
+  type DiscoveredProduct,
+  type ExtractedRecord,
+  type NavNode,
+  type NavTreeGroup,
+  type SitemapGroup,
+} from './playground-normalizers';
+import {
+  clampCategoryLimit,
+  parseUrlInput,
+  usePlaygroundWorkflow,
+} from './use-playground-workflow';
 
 type PlaygroundSession = PlaygroundSessionResponse;
 
-type DiscoveredProduct = {
-  url: string;
-  title?: string;
-  brand?: string;
-  price?: string;
-  image?: string;
-};
-
-type ExtractedRecord = {
-  id: number;
-  run_id: number;
-  source_url: string;
-  data: Record<string, unknown>;
-};
-
-type SitemapGroup = {
-  inputUrl: string;
-  urls: string[];
-  source: string;
-  error?: string;
-};
-
-export type NavNode = {
-  label: string;
-  url?: string;
-  children: NavNode[];
-};
-
-export type NavTreeGroup = {
-  inputUrl: string;
-  source: string;
-  error?: string;
-  tree: NavNode[];
-};
-
-const CATEGORY_LIMIT_MIN = 1;
-const CATEGORY_LIMIT_MAX = 50;
-
-function clampCategoryLimit(value: number): number {
-  if (!Number.isFinite(value)) return 10;
-  return Math.min(CATEGORY_LIMIT_MAX, Math.max(CATEGORY_LIMIT_MIN, Math.trunc(value)));
-}
-
-function parseUrlInput(value: string): string[] {
-  return Array.from(
-    new Set(
-      value
-        .split(/\r?\n/)
-        .map((item) => item.trim())
-        .filter(Boolean),
-    ),
-  );
-}
-
-function isNavNode(value: unknown): value is NavNode {
-  if (!value || typeof value !== 'object') return false;
-  const data = value as Record<string, unknown>;
-  if (typeof data.label !== 'string') return false;
-  if (data.url !== undefined && typeof data.url !== 'string') return false;
-  return Array.isArray(data.children) && data.children.every(isNavNode);
-}
-
-function parseNavTree(value: unknown): NavNode[] {
-  return Array.isArray(value) ? value.filter(isNavNode) : [];
-}
+export type { NavTreeGroup } from './playground-normalizers';
 
 function collectNodeUrls(node: NavNode): string[] {
   const urls = node.url ? [node.url] : [];
@@ -133,8 +62,6 @@ function collectTreeUrls(tree: NavNode[]): string[] {
   return Array.from(new Set(tree.flatMap(collectNodeUrls)));
 }
 
-// ─── Steps ───────────────────────────────────────────────────────────────────
-
 const STEPS = [
   { id: 'discover', label: 'Discover' },
   { id: 'select', label: 'Select Products' },
@@ -143,335 +70,49 @@ const STEPS = [
   { id: 'results', label: 'Results' },
 ] as const;
 
-function stepIndex(state: SessionState): number {
-  switch (state) {
-    case 'created':
-    case 'sitemap_listed':
-    case 'discovering':
-      return 0;
-    case 'discovered':
-      return 1;
-    case 'extracting':
-      return 2;
-    case 'extracted':
-      return 3;
-    case 'running_pipeline':
-    case 'complete':
-      return 4;
-    default:
-      return 0;
-  }
-}
-
 // ─── Main Component ──────────────────────────────────────────────────────────
 
 // skipcq: JS-R1005
 // skipcq: JS-0067
 export default function PlaygroundPage() {
-  const queryClient = useQueryClient();
-  const [sessionId, setSessionId] = useState<number | null>(null);
-  const [url, setUrl] = useState('');
-  const [categoryLimit, setCategoryLimit] = useState(10);
-  const [error, setError] = useState('');
-  const [selectedUrls, setSelectedUrls] = useState<Set<string>>(new Set());
-  const [pipelineOptions, setPipelineOptions] = useState({
-    enrich: false,
-    compare: false,
-    monitor: false,
-    audit: false,
-  });
-
-  // ─── Session polling ─────────────────────────────────────────────────────
-
-  const sessionQuery = useQuery({
-    queryKey: ['playground-session', sessionId],
-    queryFn: () => api.getPlaygroundSession(sessionId!),
-    enabled: sessionId !== null,
-    refetchInterval: (query) => {
-      const data = query.state.data;
-      const state = data?.state;
-      if (state === 'discovering' || state === 'extracting' || state === 'running_pipeline') {
-        return 3000;
-      }
-      // Audit can run independently while the session stays in `extracted`.
-      // Keep polling while the audit job is still in flight.
-      const audit = data?.step_data?.audit as Record<string, unknown> | undefined;
-      if (audit && audit.status === 'running') {
-        return 3000;
-      }
-      return false;
-    },
-  });
-
-  const session = sessionQuery.data as PlaygroundSession | undefined;
-  const currentStep = session ? stepIndex(session.state as SessionState) : -1;
-  const hasResultsState = session
-    ? session.state === 'extracted' ||
-      session.state === 'running_pipeline' ||
-      session.state === 'complete'
-    : false;
-
-  const resultsQuery = useQuery({
-    queryKey: ['playground-results', sessionId],
-    queryFn: () => api.playgroundResults(sessionId!),
-    enabled: sessionId !== null && hasResultsState,
-    refetchInterval: () => {
-      if (session?.state === 'running_pipeline') return 3000;
-      const audit = session?.step_data?.audit as Record<string, unknown> | undefined;
-      if (audit?.status === 'running') return 3000;
-      return false;
-    },
-  });
-
-  // ─── Mutations ───────────────────────────────────────────────────────────
-
-  const createSession = useMutation({
-    mutationFn: (inputUrl: string) => {
-      const inputUrls = parseUrlInput(inputUrl);
-      return api.createPlaygroundSession({
-        url: inputUrls[0] ?? inputUrl,
-        urls: inputUrls.slice(1),
-        category_limit: clampCategoryLimit(categoryLimit),
-      }) as Promise<PlaygroundSession>;
-    },
-    onSuccess: (data) => {
-      setSessionId(data.id);
-      setError('');
-    },
-    onError: (err: Error) => setError(err.message),
-  });
-
-  const startDiscover = useMutation({
-    mutationFn: (sid: number) => api.playgroundDiscover(sid),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['playground-session', sessionId] }),
-    onError: (err: Error) => setError(err.message),
-  });
-
-  const selectProducts = useMutation({
-    mutationFn: ({ sid, urls }: { sid: number; urls: string[] }) =>
-      api.playgroundSelect(sid, { urls }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['playground-session', sessionId] });
-      // Auto-start extraction after successful selection
-      if (sessionId) startExtract.mutate(sessionId);
-    },
-    onError: (err: Error) => setError(err.message),
-  });
-
-  const selectCategory = useMutation({
-    mutationFn: ({ sid, categoryUrls }: { sid: number; categoryUrls: string[] }) =>
-      api.playgroundSelectCategory(sid, { urls: categoryUrls }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['playground-session', sessionId] }),
-    onError: (err: Error) => setError(err.message),
-  });
-
-  const startExtract = useMutation({
-    mutationFn: (sid: number) => api.playgroundExtract(sid),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['playground-session', sessionId] }),
-    onError: (err: Error) => setError(err.message),
-  });
-
-  const runPipeline = useMutation({
-    mutationFn: ({ sid, options }: { sid: number; options: typeof pipelineOptions }) =>
-      api.playgroundPipeline(sid, options),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['playground-session', sessionId] }),
-    onError: (err: Error) => setError(err.message),
-  });
-
-  // ─── Handlers ────────────────────────────────────────────────────────────
-
-  const handleStart = useCallback(() => {
-    const inputUrls = parseUrlInput(url);
-    if (inputUrls.length === 0) return;
-    setError('');
-    createSession.mutate(inputUrls.join('\n'));
-  }, [url, createSession]);
-
-  const handleSelect = useCallback(() => {
-    if (!sessionId || selectedUrls.size === 0) return;
-    selectProducts.mutate({ sid: sessionId, urls: Array.from(selectedUrls) });
-  }, [sessionId, selectedUrls, selectProducts]);
-
-  const handlePipeline = useCallback(() => {
-    if (!sessionId) return;
-    runPipeline.mutate({ sid: sessionId, options: pipelineOptions });
-  }, [sessionId, pipelineOptions, runPipeline]);
-
-  const handleReset = useCallback(() => {
-    setSessionId(null);
-    setUrl('');
-    setCategoryLimit(10);
-    setError('');
-    setSelectedUrls(new Set());
-    setPipelineOptions({ enrich: false, compare: false, monitor: false, audit: false });
-  }, []);
-
-  // Auto-start discovery after session creation
-  // startDiscover omitted from deps: React Query mutation objects are referentially stable
-  useEffect(() => {
-    if (session?.state === 'created' && sessionId && !startDiscover.isPending) {
-      startDiscover.mutate(sessionId);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session?.state, sessionId]);
-
-  // Reset url selection when the session transitions into a stage with a
-  // fresh picker (sitemap or discovered). Using the "derive state from prop"
-  // pattern instead of a setState-in-effect avoids cascading renders flagged
-  // by react-hooks/set-state-in-effect.
-  const [prevSelectionStage, setPrevSelectionStage] = useState(session?.state);
-  if (session?.state !== prevSelectionStage) {
-    setPrevSelectionStage(session?.state);
-    if (session?.state === 'sitemap_listed' || session?.state === 'discovered') {
-      setSelectedUrls(new Set());
-    }
-  }
-
-  // ─── Derived data ────────────────────────────────────────────────────────
-
-  const discoveredProducts: DiscoveredProduct[] = (() => {
-    const discover = session?.step_data?.discover;
-    if (discover && typeof discover === 'object' && 'products' in discover) {
-      const products = (discover as Record<string, unknown>).products;
-      return Array.isArray(products) ? (products as DiscoveredProduct[]) : [];
-    }
-    return [];
-  })();
-
-  const sitemapUrls: string[] = (() => {
-    const sitemap = session?.step_data?.sitemap;
-    if (sitemap && typeof sitemap === 'object' && 'urls' in sitemap) {
-      const urls = (sitemap as Record<string, unknown>).urls;
-      return Array.isArray(urls) ? (urls as string[]) : [];
-    }
-    return [];
-  })();
-
-  // skipcq: JS-R1005
-  const sitemapSource = (() => {
-    const sitemap = session?.step_data?.sitemap;
-    if (sitemap && typeof sitemap === 'object' && 'source' in sitemap) {
-      const source = (sitemap as Record<string, unknown>).source;
-      if (source === 'homepage') return 'homepage';
-      if (source === 'rendered_site_links') return 'rendered site links';
-      if (source === 'mixed' || String(source).includes('rendered_site_links'))
-        return 'mixed discovery';
-      return 'sitemap';
-    }
-    return 'sitemap';
-  })();
-
-  const sitemapGroups: SitemapGroup[] = (() => {
-    const sitemap = session?.step_data?.sitemap;
-    if (!sitemap || typeof sitemap !== 'object') return [];
-    const data = sitemap as Record<string, unknown>;
-    const groups = data.groups;
-    if (!groups || typeof groups !== 'object' || Array.isArray(groups)) return [];
-    const sources = data.sources && typeof data.sources === 'object' ? data.sources : {};
-    const errors = data.errors && typeof data.errors === 'object' ? data.errors : {};
-    return Object.entries(groups as Record<string, unknown>).map(([inputUrl, rawUrls]) => ({
-      inputUrl,
-      urls: Array.isArray(rawUrls)
-        ? rawUrls.filter((item): item is string => typeof item === 'string')
-        : [],
-      source:
-        typeof (sources as Record<string, unknown>)[inputUrl] === 'string'
-          ? String((sources as Record<string, unknown>)[inputUrl])
-          : 'unknown',
-      error:
-        typeof (errors as Record<string, unknown>)[inputUrl] === 'string'
-          ? String((errors as Record<string, unknown>)[inputUrl])
-          : undefined,
-    }));
-  })();
-
-  const navTreeGroups: NavTreeGroup[] = (() => {
-    const sitemap = session?.step_data?.sitemap;
-    if (!sitemap || typeof sitemap !== 'object') return [];
-    const data = sitemap as Record<string, unknown>;
-    const sources = data.sources && typeof data.sources === 'object' ? data.sources : {};
-    const errors = data.errors && typeof data.errors === 'object' ? data.errors : {};
-    const trees = data.trees;
-    if (trees && typeof trees === 'object' && !Array.isArray(trees)) {
-      return Object.entries(trees as Record<string, unknown>)
-        .map(([inputUrl, rawTree]) => ({
-          inputUrl,
-          tree: parseNavTree(rawTree),
-          source:
-            typeof (sources as Record<string, unknown>)[inputUrl] === 'string'
-              ? String((sources as Record<string, unknown>)[inputUrl])
-              : 'unknown',
-          error:
-            typeof (errors as Record<string, unknown>)[inputUrl] === 'string'
-              ? String((errors as Record<string, unknown>)[inputUrl])
-              : undefined,
-        }))
-        .filter((group) => group.tree.length > 0);
-    }
-    const navTree = parseNavTree(data.nav_tree);
-    if (navTree.length === 0 || !session) return [];
-    return [
-      {
-        inputUrl: session.input_url,
-        source: typeof data.source === 'string' ? data.source : 'unknown',
-        error: typeof data.error === 'string' ? data.error : undefined,
-        tree: navTree,
-      },
-    ];
-  })();
-
-  const resultsSteps = (() => {
-    const payload = resultsQuery.data;
-    if (payload && typeof payload === 'object' && 'steps' in payload) {
-      const steps = (payload as Record<string, unknown>).steps;
-      return steps && typeof steps === 'object' ? (steps as Record<string, unknown>) : undefined;
-    }
-    return undefined;
-  })();
-
-  const extractedRecords: ExtractedRecord[] = (() => {
-    const extract = resultsSteps?.extract;
-    if (extract && typeof extract === 'object' && 'records' in extract) {
-      const records = (extract as Record<string, unknown>).records;
-      return Array.isArray(records) ? (records as ExtractedRecord[]) : [];
-    }
-    return [];
-  })();
-
-  const extractedRunIds: number[] = (() => {
-    const extract = resultsSteps?.extract;
-    if (extract && typeof extract === 'object' && 'run_ids' in extract) {
-      const runIds = (extract as Record<string, unknown>).run_ids;
-      return Array.isArray(runIds)
-        ? runIds.filter((value): value is number => typeof value === 'number')
-        : [];
-    }
-    return [];
-  })();
-
-  const hasPipelineActivity = Boolean(
-    session?.step_data?.enrich ||
-    session?.step_data?.compare ||
-    session?.step_data?.monitor ||
-    session?.step_data?.audit,
-  );
-
-  const toggleProduct = (productUrl: string) => {
-    setSelectedUrls((prev) => {
-      const next = new Set(prev);
-      if (next.has(productUrl)) {
-        next.delete(productUrl);
-      } else if (next.size < 50) {
-        next.add(productUrl);
-      }
-      return next;
-    });
-  };
-
-  const selectAll = () => {
-    const all = discoveredProducts.slice(0, 50).map((p) => p.url);
-    setSelectedUrls(new Set(all));
-  };
+  const workflow = usePlaygroundWorkflow();
+  const {
+    sessionId,
+    session,
+    currentStep,
+    url,
+    setUrl,
+    categoryLimit,
+    setCategoryLimit,
+    error,
+    selectedUrls,
+    setSelectedUrls,
+    pipelineOptions,
+    setPipelineOptions,
+    sessionQuery,
+    resultsQuery,
+    createSession,
+    startDiscover,
+    selectProducts,
+    selectCategory,
+    startExtract,
+    runPipeline,
+    handleStart,
+    handleSelect,
+    handlePipeline,
+    handleReset,
+    discoveredProducts,
+    sitemapUrls,
+    sitemapSource,
+    sitemapGroups,
+    navTreeGroups,
+    resultsSteps,
+    extractedRecords,
+    extractedRunIds,
+    hasPipelineActivity,
+    toggleProduct,
+    selectAll,
+  } = workflow;
 
   // ─── Render ──────────────────────────────────────────────────────────────
 

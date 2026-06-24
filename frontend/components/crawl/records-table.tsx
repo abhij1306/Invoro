@@ -85,7 +85,7 @@ function RecordCell({ col, record }: Readonly<{ col: string; record: CrawlRecord
   if (!raw || raw === '--') return <span className="text-muted/40 text-xs">--</span>;
 
   if (TITLE_KEYS.has(colKey)) {
-    return <span className="text-xs block max-w-[320px] truncate font-medium">{raw}</span>;
+    return <span className="block max-w-[320px] truncate text-xs font-medium">{raw}</span>;
   }
   if (PRICE_KEYS.has(colKey)) {
     return <span className="text-foreground text-xs font-bold tabular-nums">{raw}</span>;

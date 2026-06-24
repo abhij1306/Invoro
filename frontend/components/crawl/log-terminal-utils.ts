@@ -1,4 +1,5 @@
 import type { CrawlLog, CrawlRecord } from '../../lib/api/types';
+import { acquisitionDiagnosticsSummary } from './crawl-diagnostics';
 
 export function logMessageIsError(level: string, message: string): boolean {
   const normalizedLevel = String(level || '').toLowerCase();
@@ -188,9 +189,7 @@ function matchesSiteUrl(record: CrawlRecord, siteUrl: string) {
     record.source_url,
     record.data?.url,
     record.raw_data?.url,
-    record.source_trace?.acquisition && typeof record.source_trace.acquisition === 'object'
-      ? (record.source_trace.acquisition as Record<string, unknown>).final_url
-      : null,
+    acquisitionDiagnosticsSummary(record).finalUrl,
   ]) {
     const text = typeof value === 'string' ? value.trim() : '';
     if (text) {

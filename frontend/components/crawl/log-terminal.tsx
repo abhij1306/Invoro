@@ -36,6 +36,7 @@ import { isInformativeValue, qualityLevelFromScore } from '../../lib/crawl/quali
 import { scrollViewportToBottom } from '../../lib/crawl/scroll';
 import { syntaxHighlightJsonNodes } from '../../lib/ui/syntax';
 import { Button } from '../ui/primitives';
+import { acquisitionDiagnosticsSummary, recordConfidenceSummary } from './crawl-diagnostics';
 import {
   buildLogSiteGroups,
   getLogStage,
@@ -215,28 +216,7 @@ function publicFieldNames(record: CrawlRecord) {
 }
 
 function recordConfidence(record: CrawlRecord): { score: number; level: string } | null {
-  const rawConfidence =
-    (record.raw_data && typeof record.raw_data === 'object'
-      ? (record.raw_data as Record<string, unknown>)._confidence
-      : null) ||
-    (record.discovered_data && typeof record.discovered_data === 'object'
-      ? (record.discovered_data as Record<string, unknown>).confidence
-      : null);
-  if (!rawConfidence || typeof rawConfidence !== 'object') {
-    return null;
-  }
-  const payload = rawConfidence as Record<string, unknown>;
-  const score = Number(payload.score);
-  if (!Number.isFinite(score)) {
-    return null;
-  }
-  return {
-    score,
-    level:
-      String(payload.level || qualityLevelFromScore(score))
-        .trim()
-        .toLowerCase() || 'unknown',
-  };
+  return recordConfidenceSummary(record);
 }
 
 function groupConfidence(group: LogSiteGroup): { score: number; level: string } | null {
@@ -253,29 +233,9 @@ function groupConfidence(group: LogSiteGroup): { score: number; level: string } 
   };
 }
 
-function numberOrNull(value: unknown) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
-}
-
 function groupDurationMs(group: LogSiteGroup, activeNowMs?: number): number | null {
   const recordDurations = group.records
-    .map((record) => {
-      const acquisition =
-        record.source_trace?.acquisition && typeof record.source_trace.acquisition === 'object'
-          ? (record.source_trace.acquisition as Record<string, unknown>)
-          : null;
-      const browserDiagnostics =
-        acquisition?.browser_diagnostics && typeof acquisition.browser_diagnostics === 'object'
-          ? (acquisition.browser_diagnostics as Record<string, unknown>)
-          : null;
-      const phaseTimings =
-        browserDiagnostics?.phase_timings_ms &&
-        typeof browserDiagnostics.phase_timings_ms === 'object'
-          ? (browserDiagnostics.phase_timings_ms as Record<string, unknown>)
-          : null;
-      return numberOrNull(phaseTimings?.total);
-    })
+    .map((record) => acquisitionDiagnosticsSummary(record).durationMs)
     .filter((value): value is number => value !== null);
   const startedAt = group.logs[0]?.created_at;
   if (!startedAt) {

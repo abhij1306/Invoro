@@ -60,4 +60,23 @@ describe('useTerminalSync', () => {
       expect(refetch).toHaveBeenCalledTimes(2);
     });
   });
+
+  it('performs one final refetch when an active run becomes terminal', async () => {
+    const refetch = vi.fn().mockResolvedValue(undefined);
+    const activeRun = makeTerminalRun({ status: 'running', completed_at: null });
+    const terminalRun = makeTerminalRun();
+    const { rerender } = render(<SyncHarness run={activeRun} terminal={false} refetch={refetch} />);
+
+    expect(refetch).not.toHaveBeenCalled();
+
+    rerender(<SyncHarness run={terminalRun} terminal refetch={refetch} />);
+    await waitFor(() => {
+      expect(refetch).toHaveBeenCalledTimes(1);
+    });
+
+    rerender(<SyncHarness run={terminalRun} terminal refetch={refetch} />);
+    await waitFor(() => {
+      expect(refetch).toHaveBeenCalledTimes(1);
+    });
+  });
 });

@@ -116,6 +116,30 @@ describe('CrawlConfigScreen bulk prefill', () => {
       'https://jobs.example.com/posting/1',
     );
     expect(screen.getByRole('button', { name: 'Batch' })).toHaveAttribute('aria-pressed', 'true');
+    expect(window.sessionStorage.getItem(STORAGE_KEYS.BULK_PREFILL)).toBeNull();
+  });
+
+  it('ignores malformed bulk prefill and removes it from storage', () => {
+    window.sessionStorage.setItem(
+      STORAGE_KEYS.BULK_PREFILL,
+      JSON.stringify({ domain: 'jobs', urls: [42] }),
+    );
+
+    renderConfigScreen();
+
+    expect(screen.getByLabelText('Target URL input')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Bulk URLs input')).not.toBeInTheDocument();
+    expect(window.sessionStorage.getItem(STORAGE_KEYS.BULK_PREFILL)).toBeNull();
+  });
+
+  it('ignores invalid JSON prefill and removes it from storage', () => {
+    window.sessionStorage.setItem(STORAGE_KEYS.BULK_PREFILL, 'not-json');
+
+    renderConfigScreen();
+
+    expect(screen.getByLabelText('Target URL input')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Bulk URLs input')).not.toBeInTheDocument();
+    expect(window.sessionStorage.getItem(STORAGE_KEYS.BULK_PREFILL)).toBeNull();
   });
 
   it('keeps pdp batch prefill active for non-picker domains', async () => {
