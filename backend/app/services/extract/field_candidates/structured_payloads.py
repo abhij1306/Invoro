@@ -5,7 +5,7 @@ import logging
 from typing import Any
 from urllib.parse import urlparse
 
-from bs4 import BeautifulSoup
+from app.services.dom.html_parser import BeautifulSoup
 
 from app.services.config.extraction_rules import (
     DETAIL_BREADCRUMB_ROOT_LABELS,

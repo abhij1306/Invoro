@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from bs4 import BeautifulSoup
+from app.services.dom.html_parser import BeautifulSoup
 
 from app.services.extract.detail.assembly import record_assembly
 from app.services.extract.detail.assembly.record_assembly import build_detail_record

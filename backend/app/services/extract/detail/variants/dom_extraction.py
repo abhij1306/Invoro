@@ -14,7 +14,7 @@ from itertools import product
 from typing import Any
 from urllib.parse import parse_qsl, urlsplit
 
-from bs4 import BeautifulSoup
+from app.services.dom.html_parser import BeautifulSoup
 
 from app.services.config.extraction_rules import (
     DOM_VARIANT_CARTESIAN_COMBO_LIMIT,
@@ -138,11 +138,11 @@ _strip_variant_option_value_suffix_noise = (
 def _visible_node_text(
     node: Any | None,
     *,
-    cache: dict[int, str] | None = None,
+    cache: dict[Any, str] | None = None,
 ) -> str:
     if node is None or not hasattr(node, "get_text"):
         return ""
-    cache_key = id(node)
+    cache_key = node
     if cache is not None:
         cached = cache.get(cache_key)
         if cached is not None:
@@ -169,7 +169,7 @@ def _collect_variant_choice_entries(
         else "style"
     )
     entries_by_value: dict[str, dict[str, object]] = {}
-    visible_text_cache: dict[int, str] = {}
+    visible_text_cache: dict[Any, str] = {}
     option_limit = _safe_int_config(
         VARIANT_CHOICE_OPTION_LIMIT,
         50,
@@ -293,7 +293,7 @@ def _variant_choice_entry_value(
     *,
     axis_name: str,
     label_node: Any | None = None,
-    visible_text_cache: dict[int, str] | None = None,
+    visible_text_cache: dict[Any, str] | None = None,
 ) -> str:
     resolved_label = label_node or variant_input_label(container, node)
     label_text = _visible_node_text(resolved_label, cache=visible_text_cache)

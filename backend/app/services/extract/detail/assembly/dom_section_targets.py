@@ -9,7 +9,7 @@ __all__ = (
 import logging
 from typing import Any
 
-from bs4 import BeautifulSoup
+from app.services.dom.html_parser import BeautifulSoup
 from selectolax.lexbor import LexborHTMLParser
 
 from app.services.config.extraction_rules import (

@@ -6,7 +6,7 @@ from collections import Counter
 from typing import Any
 from urllib.parse import urljoin, urlparse
 
-from bs4 import BeautifulSoup, Tag
+from app.services.dom.html_parser import BeautifulSoup, Tag
 
 from app.services.config import page_audit as config
 

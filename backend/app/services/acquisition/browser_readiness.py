@@ -9,7 +9,7 @@ from types import SimpleNamespace
 from typing import Any
 from urllib.parse import urlparse
 
-from bs4 import BeautifulSoup, Comment
+from app.services.dom.html_parser import BeautifulSoup, Comment
 
 from app.services.acquisition.dom_runtime import get_page_html
 from app.services.acquisition.traversal_card_counting import count_listing_cards

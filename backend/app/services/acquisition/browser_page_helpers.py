@@ -4,7 +4,7 @@ import asyncio
 import logging
 from typing import Any
 
-from bs4 import BeautifulSoup
+from app.services.dom.html_parser import BeautifulSoup
 from patchright.async_api import Error as PlaywrightError
 from patchright.async_api import TimeoutError as PlaywrightTimeoutError
 

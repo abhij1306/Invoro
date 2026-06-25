@@ -9,7 +9,7 @@ import re
 from typing import Any, cast
 
 import httpx
-from bs4 import BeautifulSoup
+from app.services.dom.html_parser import BeautifulSoup
 
 from app.services.acquisition.browser_readiness import HtmlAnalysis, analyze_html
 from app.core.config import settings

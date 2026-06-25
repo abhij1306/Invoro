@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import logging
 from typing import Any
 
-from bs4 import BeautifulSoup
+from app.services.dom.html_parser import HtmlDocument
 from selectolax.lexbor import LexborHTMLParser
 
 from app.services.config.domain_profiles import LISTING_SURFACE_IDENTIFIER
@@ -29,24 +29,24 @@ class ExtractionContext:
     original_html: str
     cleaned_html: str
     dom_parser: LexborHTMLParser
-    _soup: BeautifulSoup | None = None
-    _original_soup: BeautifulSoup | None = None
+    _soup: HtmlDocument | None = None
+    _original_soup: HtmlDocument | None = None
     _original_dom_parser: LexborHTMLParser | None = None
     _js_state_objects: dict[str, Any] | None = None
 
     @property
-    def soup(self) -> BeautifulSoup:
+    def soup(self) -> HtmlDocument:
         current = self._soup
         if current is None:
-            current = BeautifulSoup(self.cleaned_html, "html.parser")
+            current = HtmlDocument.from_parser(self.dom_parser)
             object.__setattr__(self, "_soup", current)
         return current
 
     @property
-    def original_soup(self) -> BeautifulSoup:
+    def original_soup(self) -> HtmlDocument:
         current = self._original_soup
         if current is None:
-            current = BeautifulSoup(self.original_html, "html.parser")
+            current = HtmlDocument.from_parser(self.original_dom_parser)
             object.__setattr__(self, "_original_soup", current)
         return current
 
@@ -97,7 +97,7 @@ def collect_structured_source_payloads(
 ) -> tuple[tuple[str, list[dict[str, Any]]], ...]:
     json_ld_payloads = _dict_payloads(parse_json_ld(context.soup))
     is_listing_surface = LISTING_SURFACE_IDENTIFIER in str(surface or "").strip().lower()
-    skip_extruct_fallbacks = is_listing_surface and _json_ld_listing_confident(
+    skip_structured_fallbacks = is_listing_surface and _json_ld_listing_confident(
         json_ld_payloads
     )
     js_state_objects = context.js_state_objects
@@ -123,7 +123,7 @@ def collect_structured_source_payloads(
         (
             "microdata",
             []
-            if skip_extruct_fallbacks
+            if skip_structured_fallbacks
             else _dict_payloads(
                 parse_microdata(context.soup, context.cleaned_html, page_url)
             ),
@@ -131,7 +131,7 @@ def collect_structured_source_payloads(
         (
             "opengraph",
             []
-            if skip_extruct_fallbacks
+            if skip_structured_fallbacks
             else _dict_payloads(
                 parse_opengraph(context.soup, context.cleaned_html, page_url)
             ),

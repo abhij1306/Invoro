@@ -6,8 +6,7 @@ import logging
 from collections.abc import Callable, Iterator
 from typing import Any
 
-from bs4 import BeautifulSoup, Tag
-from soupsieve import SelectorSyntaxError
+from app.services.dom.html_parser import BeautifulSoup, InvalidSelectorError, Tag
 
 __all__ = (
     "iter_tag_children",
@@ -27,7 +26,7 @@ def safe_select(root: Any, selector: str) -> list[Tag]:
         return []
     try:
         return [node for node in root.select(selector) if isinstance(node, Tag)]
-    except SelectorSyntaxError:
+    except InvalidSelectorError:
         logger.warning("Skipping invalid css selector: %s", selector)
         return []
 

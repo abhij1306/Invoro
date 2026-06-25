@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from bs4 import BeautifulSoup
+from app.services.dom.html_parser import BeautifulSoup
 
 from app.services.acquisition.acquirer import AcquisitionResult, PageEvidence
 from app.services.acquisition.runtime import (

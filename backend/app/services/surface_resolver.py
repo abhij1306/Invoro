@@ -5,7 +5,7 @@ import re
 from dataclasses import asdict, dataclass
 from urllib.parse import urlparse
 
-from bs4 import BeautifulSoup
+from app.services.dom.html_parser import BeautifulSoup
 
 from app.services.config import surface_detection as config
 

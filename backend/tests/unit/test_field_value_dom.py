@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pytest
-from bs4 import BeautifulSoup
+from app.services.dom.html_parser import BeautifulSoup
 
 from app.services.dom import section_extraction, selector_engine
 from app.services.dom.content_extractability import dom_pattern_has_extractable_content

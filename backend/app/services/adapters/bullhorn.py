@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from html import unescape
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
-from bs4 import BeautifulSoup
+from app.services.dom.html_parser import BeautifulSoup
 
 from app.services.adapters.base import AdapterResult, BaseAdapter
 from app.services.config.adapter_runtime_settings import adapter_runtime_settings

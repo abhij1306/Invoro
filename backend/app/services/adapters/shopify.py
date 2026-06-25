@@ -6,7 +6,7 @@ import re
 import math
 from urllib.parse import parse_qsl, urljoin, urlparse, urlsplit
 
-from bs4 import BeautifulSoup
+from app.services.dom.html_parser import BeautifulSoup
 
 from app.services.adapters.base import AdapterResult, BaseAdapter
 from app.services.config.adapter_runtime_settings import adapter_runtime_settings

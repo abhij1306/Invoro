@@ -34,6 +34,8 @@ import { api } from '../../lib/api';
 import type { PlaygroundSessionResponse } from '../../lib/api/types';
 import { cn } from '../../lib/utils';
 import {
+  collectNodeUrls,
+  collectTreeUrls,
   type DiscoveredProduct,
   type ExtractedRecord,
   type NavNode,
@@ -49,18 +51,6 @@ import {
 type PlaygroundSession = PlaygroundSessionResponse;
 
 export type { NavTreeGroup } from './playground-normalizers';
-
-function collectNodeUrls(node: NavNode): string[] {
-  const urls = node.url ? [node.url] : [];
-  for (const child of node.children) {
-    urls.push(...collectNodeUrls(child));
-  }
-  return Array.from(new Set(urls));
-}
-
-function collectTreeUrls(tree: NavNode[]): string[] {
-  return Array.from(new Set(tree.flatMap(collectNodeUrls)));
-}
 
 const STEPS = [
   { id: 'discover', label: 'Discover' },
@@ -86,7 +76,6 @@ export default function PlaygroundPage() {
     setCategoryLimit,
     error,
     selectedUrls,
-    setSelectedUrls,
     pipelineOptions,
     setPipelineOptions,
     sessionQuery,
@@ -111,6 +100,8 @@ export default function PlaygroundPage() {
     extractedRunIds,
     hasPipelineActivity,
     toggleProduct,
+    toggleProducts,
+    selectUrls,
     selectAll,
   } = workflow;
 
@@ -237,27 +228,9 @@ export default function PlaygroundPage() {
                 <NavTreePanel
                   groups={navTreeGroups}
                   selected={selectedUrls}
-                  onToggleUrls={(urls) => {
-                    setSelectedUrls((prev) => {
-                      const next = new Set(prev);
-                      const allSelected = urls.every((item) => next.has(item));
-                      if (allSelected) {
-                        urls.forEach((item) => next.delete(item));
-                      } else {
-                        for (const item of urls) {
-                          if (next.size >= 50 && !next.has(item)) break;
-                          next.add(item);
-                        }
-                      }
-                      return next;
-                    });
-                  }}
+                  onToggleUrls={toggleProducts}
                   onSelectAll={() =>
-                    setSelectedUrls(
-                      new Set(
-                        navTreeGroups.flatMap((group) => collectTreeUrls(group.tree)).slice(0, 50),
-                      ),
-                    )
+                    selectUrls(navTreeGroups.flatMap((group) => collectTreeUrls(group.tree)))
                   }
                   onConfirm={() => {
                     const categoryUrls = Array.from(selectedUrls);
@@ -288,7 +261,7 @@ export default function PlaygroundPage() {
                   items={sitemapUrls.map((u) => ({ url: u }))}
                   selected={selectedUrls}
                   onToggle={toggleProduct}
-                  onSelectAll={() => setSelectedUrls(new Set(sitemapUrls.slice(0, 50)))}
+                  onSelectAll={() => selectUrls(sitemapUrls)}
                   onConfirm={() => {
                     const categoryUrls = Array.from(selectedUrls);
                     if (sessionId && categoryUrls.length > 0) {

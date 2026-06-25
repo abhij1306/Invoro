@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from bs4 import BeautifulSoup
+from app.services.dom.html_parser import BeautifulSoup
 from selectolax.lexbor import LexborHTMLParser
 
 from app.services.extract.detail.assembly import dom_completion as detail_dom_completion

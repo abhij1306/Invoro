@@ -9,8 +9,6 @@ __all__ = (
 
 from typing import Any
 
-from soupsieve import match as selector_matches
-
 from app.services.config.extraction_rules import (
     DETAIL_VARIANT_SCOPE_SELECTOR,
     VARIANT_CHOICE_GROUP_SELECTOR,
@@ -97,9 +95,9 @@ def variant_scope_roots(soup: Any) -> list[Any]:
     if isinstance(cached, tuple):
         return list(cached)
     roots: list[Any] = []
-    seen: set[int] = set()
+    seen: set[Any] = set()
     for node in soup.select(_variant_scope_selector):
-        if id(node) in seen or variant_node_in_noise_context(node):
+        if node in seen or variant_node_in_noise_context(node):
             continue
         if not (
             node.select(VARIANT_SELECT_GROUP_SELECTOR)
@@ -108,7 +106,7 @@ def variant_scope_roots(soup: Any) -> list[Any]:
         ):
             continue
         roots.append(node)
-        seen.add(id(node))
+        seen.add(node)
         if max_roots is not None and len(roots) >= max_roots:
             break
     soft_limit = (
@@ -120,10 +118,10 @@ def variant_scope_roots(soup: Any) -> list[Any]:
         else []
     )
     for node in soft_roots:
-        if id(node) in seen or _node_is_within_any_root(node, roots):
+        if node in seen or _node_is_within_any_root(node, roots):
             continue
         roots.append(node)
-        seen.add(id(node))
+        seen.add(node)
         if max_roots is not None and len(roots) >= max_roots:
             break
     if roots:
@@ -143,14 +141,14 @@ def _variant_soft_scope_roots(soup: Any, *, max_roots: int | None) -> list[Any]:
     except (TypeError, ValueError):
         min_radio_inputs = VARIANT_SOFT_SCOPE_MIN_RADIO_INPUTS_FALLBACK
     roots: list[Any] = []
-    seen: set[int] = set()
+    seen: set[Any] = set()
     for node in soup.select(_variant_soft_scope_selector):
-        if id(node) in seen or variant_node_in_noise_context(node):
+        if node in seen or variant_node_in_noise_context(node):
             continue
         if not _node_has_soft_variant_signal(node, min_radio_inputs=min_radio_inputs):
             continue
         roots.append(node)
-        seen.add(id(node))
+        seen.add(node)
         if max_roots is not None and len(roots) >= max_roots:
             break
     return roots
@@ -185,7 +183,7 @@ def _node_has_soft_variant_signal(node: Any, *, min_radio_inputs: int) -> bool:
 def _node_is_within_any_root(node: Any, roots: list[Any]) -> bool:
     current = getattr(node, "parent", None)
     while current is not None:
-        if any(current is root for root in roots):
+        if any(current == root for root in roots):
             return True
         current = getattr(current, "parent", None)
     return False
@@ -198,7 +196,7 @@ def select_variant_nodes(soup: Any, selector: str) -> list[Any]:
     if isinstance(cached, tuple):
         return list(cached)
     nodes: list[Any] = []
-    seen: set[int] = set()
+    seen: set[Any] = set()
     for root in variant_scope_roots(soup):
         if not hasattr(root, "select"):
             continue
@@ -206,18 +204,21 @@ def select_variant_nodes(soup: Any, selector: str) -> list[Any]:
             root
         ):
             nodes.append(root)
-            seen.add(id(root))
+            seen.add(root)
         for node in root.select(selector):
-            if id(node) in seen or variant_node_in_noise_context(node):
+            if node in seen or variant_node_in_noise_context(node):
                 continue
             nodes.append(node)
-            seen.add(id(node))
+            seen.add(node)
     cache[cache_key] = tuple(nodes)
     return nodes
 
 
 def _node_matches_selector(node: Any, selector: str) -> bool:
+    matcher = getattr(node, "matches", None)
+    if not callable(matcher):
+        return False
     try:
-        return bool(selector_matches(selector, node))
+        return bool(matcher(selector))
     except Exception:
         return False

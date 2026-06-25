@@ -47,8 +47,9 @@ export function usePlaygroundWorkflow() {
   const [error, setError] = useState('');
   const [selectedUrls, setSelectedUrls] = useState<Set<string>>(new Set());
   const [pipelineOptions, setPipelineOptions] = useState(DEFAULT_PIPELINE_OPTIONS);
-  const autoDiscoverStartedRef = useRef<Set<number>>(new Set());
-  const [previousSelectionStage, setPreviousSelectionStage] = useState<string | undefined>();
+  const autoDiscoverFiredRef = useRef(false);
+  const previousSelectionStageRef = useRef<string | undefined>(undefined);
+  const sessionIdRef = useRef<number | null>(null);
 
   const sessionQuery = useQuery({
     queryKey: ['playground-session', sessionId],
@@ -83,6 +84,8 @@ export function usePlaygroundWorkflow() {
       });
     },
     onSuccess: (data) => {
+      sessionIdRef.current = data.id;
+      autoDiscoverFiredRef.current = false;
       setSessionId(data.id);
       setError('');
     },
@@ -105,6 +108,7 @@ export function usePlaygroundWorkflow() {
     mutationFn: ({ sid, urls }: { sid: number; urls: string[] }) =>
       api.playgroundSelect(sid, { urls }),
     onSuccess: (_data, variables) => {
+      if (sessionIdRef.current !== variables.sid) return;
       void invalidateSession();
       startExtract.mutate(variables.sid);
     },
@@ -126,18 +130,18 @@ export function usePlaygroundWorkflow() {
   });
 
   useEffect(() => {
-    if (state !== 'created' || sessionId === null) return;
-    if (autoDiscoverStartedRef.current.has(sessionId)) return;
-    autoDiscoverStartedRef.current.add(sessionId);
+    if (state !== 'created' || sessionId === null || autoDiscoverFiredRef.current) return;
+    autoDiscoverFiredRef.current = true;
     startDiscover.mutate(sessionId);
   }, [sessionId, startDiscover, state]);
 
-  if (state !== previousSelectionStage) {
-    setPreviousSelectionStage(state);
+  useEffect(() => {
+    if (state === previousSelectionStageRef.current) return;
+    previousSelectionStageRef.current = state;
     if (state === 'sitemap_listed' || state === 'discovered') {
       setSelectedUrls(new Set());
     }
-  }
+  }, [state]);
 
   const handleStart = useCallback(() => {
     const inputUrls = parseUrlInput(url);
@@ -163,14 +167,15 @@ export function usePlaygroundWorkflow() {
     setError('');
     setSelectedUrls(new Set());
     setPipelineOptions(DEFAULT_PIPELINE_OPTIONS);
-    autoDiscoverStartedRef.current.clear();
-    setPreviousSelectionStage(undefined);
+    sessionIdRef.current = null;
+    autoDiscoverFiredRef.current = false;
+    previousSelectionStageRef.current = undefined;
   }, []);
 
   const retryDiscover = useCallback(() => {
     if (sessionId === null) return;
     setError('');
-    autoDiscoverStartedRef.current.add(sessionId);
+    autoDiscoverFiredRef.current = true;
     startDiscover.mutate(sessionId);
   }, [sessionId, startDiscover]);
 
@@ -206,6 +211,26 @@ export function usePlaygroundWorkflow() {
       else if (next.size < 50) next.add(productUrl);
       return next;
     });
+  }, []);
+
+  const toggleProducts = useCallback((productUrls: string[]) => {
+    setSelectedUrls((previous) => {
+      const next = new Set(previous);
+      const allSelected = productUrls.every((productUrl) => next.has(productUrl));
+      if (allSelected) {
+        productUrls.forEach((productUrl) => next.delete(productUrl));
+      } else {
+        for (const productUrl of productUrls) {
+          if (next.size >= 50 && !next.has(productUrl)) break;
+          next.add(productUrl);
+        }
+      }
+      return next;
+    });
+  }, []);
+
+  const selectUrls = useCallback((productUrls: string[]) => {
+    setSelectedUrls(new Set(productUrls.slice(0, 50)));
   }, []);
 
   const selectAll = useCallback(() => {
@@ -251,6 +276,8 @@ export function usePlaygroundWorkflow() {
     extractedRunIds: normalizedResults.runIds,
     hasPipelineActivity,
     toggleProduct,
+    toggleProducts,
+    selectUrls,
     selectAll,
   };
 }

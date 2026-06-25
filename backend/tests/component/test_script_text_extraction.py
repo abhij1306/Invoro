@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from bs4 import BeautifulSoup
+from app.services.dom.html_parser import BeautifulSoup
 import pytest
 
 from app.services.script_text_extractor import (

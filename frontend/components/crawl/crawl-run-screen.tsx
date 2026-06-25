@@ -56,7 +56,6 @@ import {
   RecordsTable,
   scrollViewportToBottom,
   selectorWinnerLabel,
-  uniqueNumbers,
   uniqueStrings,
 } from './shared';
 import { AlertBuilderDrawer } from './alert-builder-drawer';
@@ -444,6 +443,7 @@ export function CrawlRunScreen({ runId }: Readonly<CrawlRunScreenProps>) {
     effectiveStartMs,
     effectiveOutputTab,
     selectedIds,
+    setSelectedIds,
     tableRecords,
     records,
     recordsTotal,
@@ -484,6 +484,8 @@ export function CrawlRunScreen({ runId }: Readonly<CrawlRunScreenProps>) {
     triggerBatchCrawlFromResults,
     triggerProductIntelligenceFromResults,
     triggerDataEnrichmentFromResults,
+    toggleRecord,
+    selectAll,
   } = controller;
 
   const runErrorMessage =
@@ -867,17 +869,11 @@ export function CrawlRunScreen({ runId }: Readonly<CrawlRunScreenProps>) {
                             visibleColumns={visibleColumns}
                             selectedIds={visibleSelectedIds}
                             onSelectAll={(checked) =>
-                              setSelectedIds(
+                              selectAll(
                                 checked ? filteredTableRecords.map((record) => record.id) : [],
                               )
                             }
-                            onToggleRow={(id, checked) =>
-                              setSelectedIds((current) =>
-                                checked
-                                  ? uniqueNumbers([...current, id])
-                                  : current.filter((value) => value !== id),
-                              )
-                            }
+                            onToggleRow={toggleRecord}
                           />
                           {hasMoreTableRecords ? (
                             <div className="table-footer-rail flex items-center justify-between rounded-md px-6 py-2">

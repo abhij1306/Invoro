@@ -6,7 +6,7 @@ import re
 from collections.abc import Callable
 from urllib.parse import urlsplit
 
-from bs4 import BeautifulSoup
+from app.services.dom.html_parser import BeautifulSoup
 from selectolax.lexbor import LexborHTMLParser
 
 from app.services.config.extraction_rules import DETAIL_DOM_SCALAR_SIZE_PATTERN

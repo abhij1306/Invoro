@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 
 import pytest
-from bs4 import BeautifulSoup
+from app.services.dom.html_parser import BeautifulSoup
 
 from app.services.adapters.shopify import ShopifyAdapter
 from app.services.adapters.myntra import MyntraAdapter

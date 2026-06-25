@@ -6,7 +6,7 @@ from decimal import Decimal, InvalidOperation
 from typing import Any
 
 import jmespath
-from bs4 import BeautifulSoup
+from app.services.dom.html_parser import BeautifulSoup
 from glom import GlomError, glom  # type: ignore[import-untyped]
 
 from ._common import *

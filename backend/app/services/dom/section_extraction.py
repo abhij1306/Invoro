@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from typing import cast
 
-from bs4 import BeautifulSoup, NavigableString, Tag
+from app.services.dom.html_parser import BeautifulSoup, NavigableString, Tag
 
 from app.services.config.extraction_rules import (
     DETAIL_LONG_TEXT_MAX_SECTION_BLOCKS,
@@ -68,6 +68,7 @@ _SECTION_LABEL_SELECTOR = ",".join(
         "h3",
         "h4",
         "h5",
+        "a[href^='#'][aria-controls]",
         "strong",
     ]
 )
@@ -169,16 +170,23 @@ def extract_heading_sections(
 ) -> dict[str, str]:
     scoped_root = _pruned_text_scope_root(root)
     sections: dict[str, str] = {}
-    seen: set[int] = set()
+    seen: set[Tag] = set()
     normalized_allowed_fields = {
         normalize_field_key(field_name)
         for field_name in allowed_fields or ()
         if normalize_field_key(field_name)
     }
-    for heading in _safe_select(scoped_root, _SECTION_LABEL_SELECTOR):
-        if id(heading) in seen:
+    heading_candidates = _safe_select(scoped_root, _SECTION_LABEL_SELECTOR)
+    heading_candidates.extend(
+        anchor
+        for anchor in scoped_root.find_all("a")
+        if str(anchor.get("href") or "").startswith("#")
+        or anchor.has_attr("aria-controls")
+    )
+    for heading in heading_candidates:
+        if heading in seen:
             continue
-        seen.add(id(heading))
+        seen.add(heading)
         if _node_is_section_navigation_label(heading):
             continue
         heading_text = section_label_text(heading)
@@ -189,6 +197,8 @@ def extract_heading_sections(
             if canonical_field not in normalized_allowed_fields:
                 continue
         content = extract_section_content(heading, scoped_root)
+        if not content and scoped_root is not root and _section_target_ids(heading):
+            content = extract_section_content(heading, root)
         if len(content) >= 12:
             sections.setdefault(heading_text, content)
     materials = _extract_product_materials(scoped_root) or _extract_product_materials(
@@ -201,6 +211,22 @@ def extract_heading_sections(
         in normalized_allowed_fields
     ):
         sections.setdefault("Composition", materials)
+
+    for anchor in root.find_all("a"):
+        if not (str(anchor.get("href") or "").startswith("#") or anchor.has_attr("aria-controls")):
+            continue
+        if _node_is_section_navigation_label(anchor):
+            continue
+        heading_text = section_label_text(anchor)
+        if not _is_section_label(heading_text):
+            continue
+        if normalized_allowed_fields and alias_lookup is not None:
+            canonical_field = alias_lookup.get(normalize_field_key(heading_text))
+            if canonical_field not in normalized_allowed_fields:
+                continue
+        content = extract_section_content(anchor, root)
+        if len(content) >= 12:
+            sections.setdefault(heading_text, content)
     return sections
 
 
@@ -272,11 +298,13 @@ def _node_is_section_navigation_label(node: Tag, *, max_depth: int = 4) -> bool:
             token in attr_text
             for token in (
                 "breadcrumb",
+                "index",
                 "jump",
                 "linkstylebutton",
                 "menu",
                 "nav",
                 "skip",
+                "toc",
             )
         ):
             return True
@@ -336,9 +364,10 @@ def _is_section_label(label: str) -> bool:
     cleaned = clean_text(label)
     if len(cleaned) < 3 or len(cleaned) > 80:
         return False
-    if cleaned.lower() in {"details", "more", "overview"}:
+    lowered = cleaned.lower()
+    if lowered in {"details", "more", "overview"} or lowered.startswith("check"):
         return False
-    if any(token in cleaned.lower() for token in SEMANTIC_SECTION_LABEL_SKIP_TOKENS):
+    if any(token in lowered for token in SEMANTIC_SECTION_LABEL_SKIP_TOKENS):
         return False
     return any(char.isalpha() for char in cleaned)
 
@@ -407,6 +436,19 @@ def _section_target_ids(node: Tag) -> list[str]:
             seen.add(target)
             targets.append(target)
     return targets
+
+
+def _css_attribute_string(value: str) -> str:
+    escaped: list[str] = []
+    for character in value:
+        codepoint = ord(character)
+        if character in {"\\", "'"}:
+            escaped.append(f"\\{character}")
+        elif codepoint < 32 or codepoint == 127:
+            escaped.append(f"\\{codepoint:x} ")
+        else:
+            escaped.append(character)
+    return "".join(escaped)
 
 
 def section_text_is_meaningful(node: Tag | None, *, label: str, text: str) -> bool:
@@ -594,7 +636,8 @@ def _extract_product_materials(root: BeautifulSoup | Tag) -> str:
                 else:
                     area_rows.append("; ".join(values))
             if part_name and area_rows:
-                rows.append(f"{part_name}: {' '.join(area_rows)}")
+                unique_area_rows = list(dict.fromkeys(area_rows))
+                rows.append(f"{part_name}: {' '.join(unique_area_rows)}")
             elif area_rows:
                 rows.extend(area_rows)
         if rows:
@@ -608,7 +651,9 @@ def _extract_product_materials(root: BeautifulSoup | Tag) -> str:
 def extract_section_content(node: Tag, root: BeautifulSoup | Tag) -> str:
     label = section_label_text(node)
     for target_id in _section_target_ids(node):
-        target = root.find(id=target_id)
+        target = root.find(id=target_id) or root.select_one(
+            f"[id='{_css_attribute_string(target_id)}']"
+        )
         if isinstance(target, Tag):
             text = _section_text(target, label=label)
             if (

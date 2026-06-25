@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from bs4 import BeautifulSoup
+from app.services.dom.html_parser import BeautifulSoup
 
 from app.services.extract.content_listing_handler import validate_table_rows_quality
 from app.services.extract.table_extractor import extract_tables

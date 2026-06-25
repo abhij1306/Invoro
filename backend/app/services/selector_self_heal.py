@@ -3,8 +3,8 @@ from __future__ import annotations
 import asyncio
 from copy import deepcopy
 
-from bs4 import BeautifulSoup
-from bs4.element import NavigableString, Tag
+from app.services.dom.html_parser import BeautifulSoup
+from app.services.dom.html_parser import NavigableString, Tag
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.crawl_run import CrawlRun

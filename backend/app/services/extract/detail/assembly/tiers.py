@@ -12,7 +12,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any, Callable
 
-from bs4 import BeautifulSoup
+from app.services.dom.html_parser import BeautifulSoup
 from selectolax.lexbor import LexborHTMLParser
 
 from app.services.config import observability as obs_config

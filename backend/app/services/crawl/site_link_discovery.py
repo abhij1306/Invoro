@@ -7,7 +7,7 @@ import re
 from typing import Any
 from urllib.parse import urlsplit
 
-from bs4 import BeautifulSoup, Tag
+from app.services.dom.html_parser import BeautifulSoup, Tag
 
 from app.services.config.data_enrichment import ECOMMERCE_LISTING_SURFACE
 from app.services.config.sitemap import (

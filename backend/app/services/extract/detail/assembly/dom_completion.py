@@ -17,7 +17,7 @@ __all__ = (
 import re
 from typing import Any
 
-from bs4 import BeautifulSoup
+from app.services.dom.html_parser import BeautifulSoup
 
 from app.services.config.field_mappings import (
     DOM_HIGH_VALUE_FIELDS,

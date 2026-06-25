@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from bs4 import BeautifulSoup, Tag
+from app.services.dom.html_parser import BeautifulSoup, Tag
 
 from app.services.config.extraction_rules import EXTRACTION_RULES
 from app.services.field_policy import (

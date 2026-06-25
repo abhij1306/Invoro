@@ -11,18 +11,11 @@ __all__ = (
 
 import re
 
-from bs4 import BeautifulSoup
-from bs4.element import (
-    CData,
+from app.services.dom.html_parser import (
+    BeautifulSoup,
     Comment,
-    Declaration,
-    Doctype,
     NavigableString,
-    ProcessingInstruction,
-    Script,
-    Stylesheet,
     Tag,
-    TemplateString,
 )
 
 from app.services.config.extraction_rules import (
@@ -33,16 +26,7 @@ from app.services.config.extraction_rules import (
 )
 from app.services.shared.field_coerce import clean_text
 
-_NON_TEXT_STRING_NODES = (
-    CData,
-    Comment,
-    Declaration,
-    Doctype,
-    ProcessingInstruction,
-    Script,
-    Stylesheet,
-    TemplateString,
-)
+_NON_TEXT_STRING_NODES = (Comment,)
 
 
 def collect_inline_scalar_rows(

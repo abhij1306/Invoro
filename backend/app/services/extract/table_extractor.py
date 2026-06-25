@@ -12,7 +12,7 @@ __all__ = (
 import re
 from typing import Any
 
-from bs4 import BeautifulSoup, Tag
+from app.services.dom.html_parser import BeautifulSoup, Tag
 
 from app.services.field_policy import normalize_field_key
 from app.services.shared.field_coerce import clean_text

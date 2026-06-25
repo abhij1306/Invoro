@@ -337,7 +337,9 @@ All selector memory is scoped by normalized `(domain, surface)`.
 | Path | Purpose |
 |---|---|
 | `app/` | Next.js App Router pages |
-| `app/playground/*` | Guided playground page for discovery, selection, extraction, pipeline launch, and results |
+| `app/playground/page.tsx` | Guided Playground rendering and panel composition |
+| `app/playground/use-playground-workflow.ts` | Playground session queries, mutations, polling, retries, automatic transitions, and reset ownership |
+| `app/playground/playground-normalizers.ts` | Tolerant normalization for Playground navigation, discovery, and extracted-result payloads |
 | `app/product-intelligence/product-intelligence-components.tsx` | Product Intelligence local UI pieces |
 | `app/monitors/*`, `app/alerts/*`, `components/monitors/*` | Monitor and alert list/detail/create UI, monitor/alert forms, events, history chart, snapshot table, webhook delivery log, loading and empty states |
 | `app/ucp-audit/*` | AI Discoverability operator page, hook, and local report components |
@@ -347,7 +349,10 @@ All selector memory is scoped by normalized `(domain, surface)`.
 | `components/ui/patterns.tsx` | shared operator-page UI patterns |
 | `components/ui/table.module.css` | compact and commerce table styling |
 | `components/crawl/crawl-config-screen.tsx` | Crawl Studio form and dispatch |
-| `components/crawl/crawl-run-screen.tsx` | Run workspace and Domain Recipe workflow |
+| `components/crawl/use-crawl-config-lifecycle.ts` | Crawl Studio prefill, saved-profile, and domain-memory lifecycle coordination |
+| `components/crawl/crawl-run-screen.tsx` | Run workspace rendering and Domain Recipe workflow |
+| `components/crawl/use-crawl-run-controller.ts` | Run-workspace derived state, record selection, controls, handoffs, and run-change UI reset coordination |
+| `components/crawl/crawl-diagnostics.ts` | Tolerant normalization boundary for open crawl acquisition, timing, confidence, and LLM source diagnostics |
 | `components/crawl/form-fields.tsx` | Crawl form field controls and manual selector editor |
 | `components/crawl/log-terminal.tsx` | Crawl run log terminal grouping and rendering |
 | `components/crawl/records-table.tsx` | Crawl records table rendering |

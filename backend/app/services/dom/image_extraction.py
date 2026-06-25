@@ -6,7 +6,7 @@ import re
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse, unquote
 
 import regex as regex_lib
-from bs4 import BeautifulSoup, Tag
+from app.services.dom.html_parser import BeautifulSoup, Tag
 
 from app.services.config.extraction_rules import (
     AMAZON_IMAGE_CDN_HOSTS,

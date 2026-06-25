@@ -9,7 +9,7 @@ from urllib.parse import urlsplit, urlunsplit
 
 from defusedxml import ElementTree
 import httpx
-from bs4 import BeautifulSoup, Tag
+from app.services.dom.html_parser import BeautifulSoup, Tag
 
 from app.services.config.sitemap import (
     SITEMAP_CATEGORY_ANCHOR_TEXT_EXCLUDED_TOKENS,

@@ -16,7 +16,7 @@ from app.services.config.adapter_runtime_settings import adapter_runtime_setting
 from app.services.domain_utils import normalize_domain
 from app.services.extraction_html_helpers import extract_job_sections, html_to_text
 from app.services.shared.field_coerce import clean_text
-from bs4 import BeautifulSoup
+from app.services.dom.html_parser import BeautifulSoup
 
 _HTML_PARSER = "html.parser"
 _GREENHOUSE_API_HOST = normalize_domain("https://boards-api.greenhouse.io")

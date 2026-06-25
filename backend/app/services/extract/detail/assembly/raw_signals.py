@@ -16,7 +16,7 @@ import logging
 import re
 from urllib.parse import urlparse
 
-from bs4 import BeautifulSoup, Tag
+from app.services.dom.html_parser import BeautifulSoup, Tag
 
 from app.services.config.extraction_rules import (
     DETAIL_BREADCRUMB_CONTAINER_SELECTORS,

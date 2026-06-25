@@ -5,8 +5,8 @@ from __future__ import annotations
 import html
 
 import pytest
-from bs4 import BeautifulSoup
-from bs4.element import Tag
+from app.services.dom.html_parser import BeautifulSoup
+from app.services.dom.html_parser import Tag
 
 from app.services.shared.field_coerce import coerce_field_value
 from app.services.dom.selector_engine import (

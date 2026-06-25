@@ -8,7 +8,7 @@ __all__ = (
 
 from typing import Any
 
-from bs4 import BeautifulSoup, Tag
+from app.services.dom.html_parser import BeautifulSoup, Tag
 
 from app.services.extract.table_extractor import (
     meaningful_listing_table,

@@ -20,7 +20,7 @@ __all__ = (
 import logging
 from typing import Any
 
-from bs4 import BeautifulSoup
+from app.services.dom.html_parser import BeautifulSoup
 
 from app.services.confidence import score_record_confidence
 from app.services.config.field_mappings import (

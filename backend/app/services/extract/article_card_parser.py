@@ -6,7 +6,7 @@ __all__ = (
     "article_card_summary",
 )
 
-from bs4 import BeautifulSoup
+from app.services.dom.html_parser import BeautifulSoup
 
 from app.services.shared.field_coerce import clean_text
 

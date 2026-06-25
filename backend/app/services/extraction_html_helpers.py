@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 
-from bs4 import BeautifulSoup
-from bs4.element import Comment, NavigableString, PageElement, Tag
+from app.services.dom.html_parser import BeautifulSoup
+from app.services.dom.html_parser import Comment, NavigableString, PageElement, Tag
 
 from app.services.field_policy import HTML_SECTION_FIELDS, normalize_requested_field
 

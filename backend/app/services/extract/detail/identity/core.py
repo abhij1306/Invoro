@@ -28,7 +28,7 @@ import logging
 import re
 from urllib.parse import parse_qsl, urlparse
 
-from bs4 import BeautifulSoup
+from app.services.dom.html_parser import BeautifulSoup
 
 from app.services.config.extraction_rules import (
     CANDIDATE_PLACEHOLDER_VALUES,

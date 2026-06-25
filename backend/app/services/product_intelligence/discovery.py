@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import Awaitable, Callable
 from urllib.parse import parse_qs, urlencode, urljoin, urlsplit
 
-from bs4 import BeautifulSoup
+from app.services.dom.html_parser import BeautifulSoup
 import httpx
 
 from app.services.acquisition.runtime import classify_blocked_page

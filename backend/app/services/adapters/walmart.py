@@ -5,7 +5,7 @@ import json
 from urllib.parse import urljoin, urlparse
 
 from app.services.adapters.base import AdapterResult, BaseAdapter, adapter_host_matches
-from bs4 import BeautifulSoup
+from app.services.dom.html_parser import BeautifulSoup
 
 
 class WalmartAdapter(BaseAdapter):

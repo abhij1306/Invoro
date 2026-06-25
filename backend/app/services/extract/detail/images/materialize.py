@@ -8,7 +8,7 @@ __all__ = (
 
 import logging
 
-from bs4 import BeautifulSoup
+from app.services.dom.html_parser import BeautifulSoup
 
 from app.services.config.extraction_rules import (
     DETAIL_IMAGE_RAW_SOUP_FALLBACK_MAX_WINNING_IMAGES,

@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import parse_qsl, unquote, urlencode, urljoin, urlparse, urlunparse
 
-from bs4 import BeautifulSoup
+from app.services.dom.html_parser import BeautifulSoup
 
 from app.services.config import aid_score as config
 from app.services.extract.detail.identity import detail_url_looks_like_product
@@ -133,7 +133,7 @@ def _listing_candidate_urls(
         if not isinstance(record, dict):
             continue
         candidate = str(record.get("url") or record.get("source_url") or "").strip()
-        if not candidate:
+        if not candidate or _has_encoded_tracking_query(candidate):
             continue
         absolute = _clean_url(urljoin(page_url, candidate))
         if not _same_host(page_url, absolute):

@@ -9,7 +9,7 @@ import math
 import re
 from typing import Any
 
-from bs4 import BeautifulSoup, Comment, NavigableString, Tag
+from app.services.dom.html_parser import BeautifulSoup, Comment, NavigableString, Tag
 
 from app.services.config.extraction_rules import (
     CONTENT_SURFACE_CONTAINER_TAGS,

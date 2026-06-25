@@ -613,7 +613,7 @@ def _select_is_quantity_node(node: Any) -> bool:
 
 def iter_variant_select_groups(soup: Any) -> list[Any]:
     groups: list[Any] = []
-    seen_ids: set[int] = set()
+    seen_ids: set[Any] = set()
     for select in _select_variant_nodes(soup, VARIANT_SELECT_GROUP_SELECTOR):
         if _select_is_quantity_node(select):
             continue
@@ -621,13 +621,13 @@ def iter_variant_select_groups(soup: Any) -> list[Any]:
             continue
         if resolve_variant_group_name(select):
             groups.append(select)
-            seen_ids.add(id(select))
+            seen_ids.add(select)
         if len(groups) >= int(VARIANT_SELECT_GROUP_MAX):
             break
     if len(groups) >= int(VARIANT_SELECT_GROUP_MAX):
         return groups
     for select in _select_variant_nodes(soup, "select"):
-        if id(select) in seen_ids:
+        if select in seen_ids:
             continue
         if _select_is_quantity_node(select):
             continue
@@ -635,7 +635,7 @@ def iter_variant_select_groups(soup: Any) -> list[Any]:
             continue
         if resolve_variant_group_name(select):
             groups.append(select)
-            seen_ids.add(id(select))
+            seen_ids.add(select)
         if len(groups) >= int(VARIANT_SELECT_GROUP_MAX):
             break
     return groups
@@ -644,7 +644,7 @@ def iter_variant_select_groups(soup: Any) -> list[Any]:
 def iter_variant_choice_groups(soup: Any) -> list[Any]:
     """Find variant groups via selectors, input inference, buttons, then swatch parents."""
     groups: list[Any] = []
-    seen_ids: set[int] = set()
+    seen_ids: set[Any] = set()
     for container in soup.select("[role='group'][aria-label]"):
         resolved_name = resolve_variant_group_name(container)
         resolved_axis = normalized_variant_axis_key(resolved_name)
@@ -655,10 +655,12 @@ def iter_variant_choice_groups(soup: Any) -> list[Any]:
             continue
         if resolved_name and _variant_group_has_multiple_options(container):
             groups.append(container)
-            seen_ids.add(id(container))
+            seen_ids.add(container)
             if len(groups) >= int(VARIANT_CHOICE_GROUP_MAX):
                 return groups
     for container in _select_variant_nodes(soup, VARIANT_CHOICE_GROUP_SELECTOR):
+        if container in seen_ids:
+            continue
         if _variant_choice_container_is_overbroad(container):
             continue
         resolved_name = resolve_variant_group_name(container)
@@ -672,7 +674,7 @@ def iter_variant_choice_groups(soup: Any) -> list[Any]:
             )
         ):
             groups.append(container)
-            seen_ids.add(id(container))
+            seen_ids.add(container)
         if len(groups) >= int(VARIANT_CHOICE_GROUP_MAX):
             break
     if len(groups) >= int(VARIANT_CHOICE_GROUP_MAX):
@@ -685,10 +687,10 @@ def iter_variant_choice_groups(soup: Any) -> list[Any]:
         if (
             candidate is not None
             and not variant_node_in_noise_context(candidate)
-            and id(candidate) not in seen_ids
+            and candidate not in seen_ids
         ):
             groups.append(candidate)
-            seen_ids.add(id(candidate))
+            seen_ids.add(candidate)
             if len(groups) >= int(VARIANT_CHOICE_GROUP_MAX):
                 break
     if len(groups) < int(VARIANT_CHOICE_GROUP_MAX):
@@ -697,9 +699,9 @@ def iter_variant_choice_groups(soup: Any) -> list[Any]:
         ):
             if variant_node_in_noise_context(node):
                 continue
-            if id(node) not in seen_ids:
+            if node not in seen_ids:
                 groups.append(node)
-                seen_ids.add(id(node))
+                seen_ids.add(node)
                 if len(groups) >= int(VARIANT_CHOICE_GROUP_MAX):
                     break
     # Fallback: discover containers of button / link / div swatches (e.g. YETI, Shopify visual swatches)
@@ -743,7 +745,7 @@ def iter_variant_choice_groups(soup: Any) -> list[Any]:
                         depth += 1
                         continue
                     pid = id(parent)
-                    if pid in seen_ids:
+                    if parent in seen_ids:
                         break
                     tag_name = str(getattr(parent, "name", "") or "").lower()
                     role = (
@@ -799,7 +801,7 @@ def iter_variant_choice_groups(soup: Any) -> list[Any]:
                             or resolve_variant_group_name(parent)
                         ) and _variant_group_has_multiple_options(parent):
                             groups.append(parent)
-                            seen_ids.add(pid)
+                            seen_ids.add(parent)
                             if len(groups) >= int(VARIANT_CHOICE_GROUP_MAX):
                                 break
                         # Stop walking up for this button once we found a sibling-rich parent

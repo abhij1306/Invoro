@@ -6,7 +6,7 @@ from typing import Any
 from app.services.config.llm_runtime import llm_runtime_settings
 from app.services.extraction_html_helpers import prune_html_tree
 from app.services.structured_sources import harvest_js_state_objects, parse_json_ld
-from bs4 import BeautifulSoup, Tag
+from app.services.dom.html_parser import BeautifulSoup, Tag
 
 
 def extract_structured_data(html_text: str) -> dict[str, object]:

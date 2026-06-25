@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from bs4 import BeautifulSoup, Tag
+from app.services.dom.html_parser import BeautifulSoup, Tag
 
 from app.services.config.extraction_rules import EXTRACTION_RULES, SELECTOR_NOISE_VALUES
 from app.services.config.selectors import CARD_SELECTORS, LISTING_FIELD_SELECTORS

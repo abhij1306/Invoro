@@ -21,7 +21,7 @@ from decimal import Decimal, InvalidOperation
 import re
 from typing import Any
 
-from bs4 import BeautifulSoup
+from app.services.dom.html_parser import BeautifulSoup
 
 from app.services.config.extraction_rules import (
     DETAIL_CURRENT_PRICE_SELECTORS,

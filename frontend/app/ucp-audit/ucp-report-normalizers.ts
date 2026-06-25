@@ -1,4 +1,5 @@
 import type { UcpAuditReport } from '../../lib/api/types';
+import { isRecord } from '../../lib/utils/type-guards';
 
 export type FindingCopy = Record<
   string,
@@ -105,10 +106,6 @@ export function formatUnknownText(value: unknown, fallback = ''): string {
   } catch {
     return fallback;
   }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 export function normalizeEvidence(value: unknown): Array<Record<string, unknown>> {

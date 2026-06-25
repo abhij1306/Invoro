@@ -6,7 +6,7 @@ import re
 from functools import lru_cache
 from typing import Any, cast
 
-from bs4 import BeautifulSoup
+from app.services.dom.html_parser import BeautifulSoup
 from app.services.config.extraction_rules import (
     EMBEDDED_ASSIGNMENT_NAMES,
     HYDRATED_STATE_GLOBAL_ONLY_PATTERNS,
@@ -24,11 +24,6 @@ from app.services.script_text_extractor import (
     find_script_regex_matches,
     iter_script_text_nodes,
 )
-
-try:
-    import extruct  # type: ignore[import-untyped]
-except ImportError:  # pragma: no cover - dependency may be absent in local test envs
-    extruct = None
 
 try:
     from w3lib.html import get_base_url
@@ -197,9 +192,6 @@ def parse_microdata(
     html: str,
     page_url: str,
 ) -> list[dict[str, Any]]:
-    rows = _extract_extruct_rows(html, page_url, syntax="microdata")
-    if rows:
-        return rows
     return _parse_microdata_fallback(soup, page_url)
 
 
@@ -208,9 +200,6 @@ def parse_opengraph(
     html: str,
     page_url: str,
 ) -> list[dict[str, Any]]:
-    rows = _extract_extruct_rows(html, page_url, syntax="opengraph")
-    if rows:
-        return [_normalize_opengraph_row(row) for row in rows if isinstance(row, dict)]
     return _parse_opengraph_fallback(soup)
 
 
@@ -441,28 +430,6 @@ def _balanced_json_fragment(text: str) -> str:
             if depth == 0:
                 return source[start : index + 1]
     return ""
-
-
-def _extract_extruct_rows(html: str, page_url: str, *, syntax: str) -> list[dict[str, Any]]:
-    if extruct is None or get_base_url is None:
-        return []
-    try:
-        extracted = extruct.extract(
-            html,
-            base_url=get_base_url(html, page_url),
-            syntaxes=[syntax],
-            uniform=True,
-        )
-    except Exception:
-        logger.warning(
-            "Structured source extraction via extruct failed for syntax=%s url=%s",
-            syntax,
-            page_url,
-            exc_info=True,
-        )
-        return []
-    rows = extracted.get(syntax)
-    return [row for row in list(rows or []) if isinstance(row, dict)]
 
 
 def _parse_microdata_fallback(soup: BeautifulSoup, page_url: str) -> list[dict[str, Any]]:

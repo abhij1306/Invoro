@@ -4,7 +4,7 @@ import json
 from typing import Any
 from urllib.parse import urlparse
 
-from bs4 import BeautifulSoup
+from app.services.dom.html_parser import BeautifulSoup
 
 from app.services.adapters.base import AdapterResult, BaseAdapter, adapter_host_matches
 from app.services.config.nike_config import NIKE_CURRENCY_BY_HOST

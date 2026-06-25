@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from bs4 import BeautifulSoup
+from app.services.dom.html_parser import BeautifulSoup
 
 from app.services.extract.detail.variants.dom_extraction import extract_variants_from_dom
 from app.services.extract.variant_normalization import normalize_variant_record

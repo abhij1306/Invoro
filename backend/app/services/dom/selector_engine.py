@@ -9,7 +9,7 @@ import regex as regex_lib
 from typing import cast
 from urllib.parse import urlparse
 
-from bs4 import BeautifulSoup, NavigableString, Tag
+from app.services.dom.html_parser import BeautifulSoup, NavigableString, Tag
 from lxml import etree  # skipcq: BAN-B410 - lxml is used in HTML parsing mode for sanitized DOM recovery, not arbitrary XML.
 from lxml import html as lxml_html  # skipcq: BAN-B410 - lxml.html.fromstring parses sanitized HTML snippets, not arbitrary XML.
 
@@ -507,14 +507,20 @@ def _attribute_text(value: object) -> str:
 def _variant_option_node_text(node: Tag, _field_name: str) -> str:
     if not node.find(True):
         return node.get_text(" ", strip=True)
-    pruned = deepcopy(node)
-    for child in list(pruned.find_all(True)):
-        text = clean_text(child.get_text(" ", strip=True))
-        if text and any(
-            pattern.search(text) for pattern in _VARIANT_OPTION_CHILD_DROP_RE
-        ):
-            child.decompose()
-    return pruned.get_text(" ", strip=True)
+    kept: list[str] = []
+    for child in node.contents:
+        if isinstance(child, NavigableString):
+            text = clean_text(str(child))
+        elif isinstance(child, Tag):
+            text = clean_text(child.get_text(" ", strip=True))
+        else:
+            continue
+        if not text:
+            continue
+        if any(pattern.search(text) for pattern in _VARIANT_OPTION_CHILD_DROP_RE):
+            continue
+        kept.append(text)
+    return " ".join(kept)
 
 
 def extract_selector_values(

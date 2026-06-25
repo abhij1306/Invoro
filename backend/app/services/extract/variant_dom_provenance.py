@@ -15,9 +15,6 @@ __all__ = (
 
 from typing import Any
 from urllib.parse import urlsplit
-
-from soupsieve import match as selector_matches
-
 from app.services.config.extraction_rules import DETAIL_VARIANT_SCOPE_SELECTOR
 from app.services.config.variant_migration_rules import (
     VARIANT_OPTION_ATTRIBUTE_NAMES,
@@ -120,8 +117,11 @@ def variant_option_node_type(node: Any) -> str:
 def node_matches_selector(node: Any, selector: str) -> bool:
     if not selector:
         return False
+    matcher = getattr(node, "matches", None)
+    if not callable(matcher):
+        return False
     try:
-        return bool(selector_matches(selector, node))
+        return bool(matcher(selector))
     except Exception:
         return False
 

@@ -31,6 +31,7 @@ type ControllerOptions = {
   effectiveStartMs: number;
   effectiveOutputTab: OutputTabKey;
   selectedIds: number[];
+  setSelectedIds: (next: number[] | ((current: number[]) => number[])) => void;
   tableRecords: CrawlRecord[];
   records: CrawlRecord[];
   recordsTotal: number;
@@ -54,6 +55,7 @@ export function useCrawlRunController(options: ControllerOptions) {
     effectiveStartMs,
     effectiveOutputTab,
     selectedIds,
+    setSelectedIds,
     tableRecords,
     records,
     recordsTotal,
@@ -76,7 +78,8 @@ export function useCrawlRunController(options: ControllerOptions) {
 
   const visibleColumns = useMemo(() => {
     const columns = new Set<string>();
-    for (const record of [...tableRecords, ...records]) {
+    const columnSourceRecords = records.length ? records : tableRecords;
+    for (const record of columnSourceRecords) {
       for (const source of [record.data, record.raw_data]) {
         Object.keys(source ?? {}).forEach((key) => {
           const normalized = key.toLowerCase();
@@ -112,8 +115,11 @@ export function useCrawlRunController(options: ControllerOptions) {
     [selectedIds, visibleRecordIds],
   );
   const selectedRecords = useMemo(
-    () => visibleRecords.filter((record) => visibleSelectedIds.includes(record.id)),
-    [visibleRecords, visibleSelectedIds],
+    () =>
+      visibleRecords.filter(
+        (record) => record.run_id === runId && visibleSelectedIds.includes(record.id),
+      ),
+    [runId, visibleRecords, visibleSelectedIds],
   );
   const batchSourceRecords = tableRecords.length ? tableRecords : records;
   const resultUrls = useMemo(
@@ -193,6 +199,20 @@ export function useCrawlRunController(options: ControllerOptions) {
   const batchFromResultsUrls = selectedResultUrls.length ? selectedResultUrls : resultUrls;
   const productIntelligenceRecords = selectedRecords.length ? selectedRecords : batchSourceRecords;
   const dataEnrichmentRecords = selectedRecords.length ? selectedRecords : batchSourceRecords;
+
+  function toggleRecord(id: number, checked: boolean) {
+    setSelectedIds((current) =>
+      checked ? Array.from(new Set([...current, id])) : current.filter((value) => value !== id),
+    );
+  }
+
+  function selectAll(recordIds: number[]) {
+    setSelectedIds(Array.from(new Set(recordIds)));
+  }
+
+  function clearSelection() {
+    setSelectedIds([]);
+  }
 
   function resetToConfig() {
     router.replace('/crawl?module=category&mode=single');
@@ -304,6 +324,9 @@ export function useCrawlRunController(options: ControllerOptions) {
     dataEnrichmentLabel: selectedRecords.length
       ? `Enrich Selected (${selectedRecords.length})`
       : `Enrich Records (${dataEnrichmentRecords.length})`,
+    toggleRecord,
+    selectAll,
+    clearSelection,
     resetToConfig,
     downloadExport,
     runControl,

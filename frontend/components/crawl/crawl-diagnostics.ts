@@ -1,7 +1,11 @@
 import type { CrawlRecord } from '../../lib/api/types';
 import { qualityLevelFromScore } from '../../lib/crawl/quality';
-
-type UnknownRecord = Record<string, unknown>;
+import {
+  nonEmptyStringOrNull,
+  nonNegativeNumberOrNull,
+  objectOrNull,
+  stringList,
+} from '../../lib/utils/type-guards';
 
 export type AcquisitionDiagnosticsSummary = {
   finalUrl: string | null;
@@ -18,28 +22,6 @@ export type RecordConfidenceSummary = {
   score: number;
   level: string;
 };
-
-function objectOrNull(value: unknown): UnknownRecord | null {
-  return value !== null && typeof value === 'object' && !Array.isArray(value)
-    ? (value as UnknownRecord)
-    : null;
-}
-
-function stringOrNull(value: unknown): string | null {
-  if (typeof value !== 'string') return null;
-  const normalized = value.trim();
-  return normalized || null;
-}
-
-function nonNegativeNumberOrNull(value: unknown): number | null {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
-}
-
-function stringList(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return value.filter((item): item is string => typeof item === 'string');
-}
 
 export function normalizePhaseTimingMap(value: unknown): Record<string, number> {
   const payload = objectOrNull(value);
@@ -62,7 +44,7 @@ export function acquisitionDiagnosticsSummary(
   const phaseTimingsMs = normalizePhaseTimingMap(browserDiagnostics?.phase_timings_ms);
 
   return {
-    finalUrl: stringOrNull(acquisition?.final_url),
+    finalUrl: nonEmptyStringOrNull(acquisition?.final_url),
     phaseTimingsMs,
     durationMs: phaseTimingsMs.total ?? null,
   };
@@ -72,7 +54,7 @@ export function llmFieldSourceSummary(
   record: Pick<CrawlRecord, 'raw_data'>,
 ): LlmFieldSourceSummary {
   const rawData = objectOrNull(record.raw_data);
-  const source = stringOrNull(rawData?._source);
+  const source = nonEmptyStringOrNull(rawData?._source);
   const recordTouched = Boolean(source?.startsWith('llm_'));
   const touched = new Set<string>();
   if (recordTouched) touched.add('_record');
@@ -103,7 +85,7 @@ export function recordConfidenceSummary(
   const score = nonNegativeNumberOrNull(payload.score);
   if (score === null) return null;
 
-  const explicitLevel = stringOrNull(payload.level);
+  const explicitLevel = nonEmptyStringOrNull(payload.level);
   return {
     score,
     level: (explicitLevel ?? String(qualityLevelFromScore(score))).toLowerCase(),

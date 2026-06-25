@@ -1,4 +1,10 @@
 import type { PlaygroundSessionResponse } from '../../lib/api/types';
+import {
+  objectOrNull,
+  stringList,
+  stringOrUndefined,
+  type UnknownRecord,
+} from '../../lib/utils/type-guards';
 
 export type PlaygroundSessionState =
   | 'created'
@@ -45,22 +51,16 @@ export type NavTreeGroup = {
   tree: NavNode[];
 };
 
-type UnknownRecord = Record<string, unknown>;
-
-function objectOrNull(value: unknown): UnknownRecord | null {
-  return value !== null && typeof value === 'object' && !Array.isArray(value)
-    ? (value as UnknownRecord)
-    : null;
+export function collectNodeUrls(node: NavNode): string[] {
+  const urls = node.url ? [node.url] : [];
+  for (const child of node.children) {
+    urls.push(...collectNodeUrls(child));
+  }
+  return Array.from(new Set(urls));
 }
 
-function stringOrUndefined(value: unknown): string | undefined {
-  return typeof value === 'string' ? value : undefined;
-}
-
-function stringList(value: unknown): string[] {
-  return Array.isArray(value)
-    ? value.filter((item): item is string => typeof item === 'string')
-    : [];
+export function collectTreeUrls(tree: NavNode[]): string[] {
+  return Array.from(new Set(tree.flatMap(collectNodeUrls)));
 }
 
 function isNavNode(value: unknown): value is NavNode {

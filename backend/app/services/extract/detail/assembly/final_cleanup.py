@@ -11,7 +11,7 @@ __all__ = (
 
 from typing import Any
 
-from bs4 import BeautifulSoup
+from app.services.dom.html_parser import BeautifulSoup
 
 from app.services.config.extraction_rules import (
     AVAILABILITY_IN_STOCK,

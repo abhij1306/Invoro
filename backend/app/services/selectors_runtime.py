@@ -5,7 +5,7 @@ from collections.abc import Iterable
 from typing import TYPE_CHECKING
 from urllib.parse import urljoin
 
-from bs4 import BeautifulSoup
+from app.services.dom.html_parser import BeautifulSoup
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services.fetch.fetch_context import fetch_page

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from bs4 import BeautifulSoup
+from app.services.dom.html_parser import BeautifulSoup
 
 from app.core.logfire_integration import logfire_span, set_logfire_attributes
 from app.services.acquisition.runtime import classify_blocked_page

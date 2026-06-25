@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from bs4 import BeautifulSoup
+from app.services.dom.html_parser import BeautifulSoup
 
 from app.services.extract.detail.assembly.final_cleanup import (
     _reconcile_variant_derived_parent_fields,

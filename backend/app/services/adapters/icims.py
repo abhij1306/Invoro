@@ -10,7 +10,7 @@ import httpx
 from app.services.adapters.base import AdapterResult, BaseAdapter
 from app.services.config.adapter_runtime_settings import adapter_runtime_settings
 from app.services.shared.field_coerce import clean_text
-from bs4 import BeautifulSoup, Tag
+from app.services.dom.html_parser import BeautifulSoup, Tag
 
 try:  # pragma: no cover - optional dependency
     from aiohttp import ClientError as AioHttpClientError
