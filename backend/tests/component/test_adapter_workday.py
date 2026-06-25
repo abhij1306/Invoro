@@ -5,8 +5,6 @@ import pytest
 from app.services.adapters.workday import WorkdayAdapter
 
 
-
-
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_workday_adapter_does_not_duplicate_localized_prefix_in_listing_url(
@@ -202,4 +200,3 @@ async def test_workday_adapter_extracts_detail_from_cxs_api(
             "benefits": "Health and dental.",
         }
     ]
-

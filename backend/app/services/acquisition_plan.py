@@ -28,5 +28,7 @@ class AcquisitionPlan:
     sleep_ms: int = crawler_runtime_settings.min_request_delay_ms
     adapter_recovery_enabled: bool = False
 
-    def with_updates(self, **updates: Unpack[AcquisitionPlanUpdates]) -> "AcquisitionPlan":
+    def with_updates(
+        self, **updates: Unpack[AcquisitionPlanUpdates]
+    ) -> "AcquisitionPlan":
         return replace(self, **updates)

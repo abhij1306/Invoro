@@ -86,8 +86,7 @@ def _variant_row_has_labeled_size_dimension(variant: dict[str, Any]) -> bool:
     return bool(
         style_value
         and any(
-            label.casefold() == style_value.casefold()
-            and pattern.fullmatch(size_value)
+            label.casefold() == style_value.casefold() and pattern.fullmatch(size_value)
             for pattern, label in variant_separate_dimension_size_rules
         )
     )

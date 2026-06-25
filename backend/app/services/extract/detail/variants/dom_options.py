@@ -81,7 +81,10 @@ def _option_node_is_selected(node: Any, label_node: Any | None) -> bool:
             return True
         if node_attr_is_truthy(candidate, *VARIANT_OPTION_SELECTED_TRUTHY_ATTRIBUTES):
             return True
-        if text_or_none(candidate.get("data-state")) in VARIANT_OPTION_SELECTED_STATE_VALUES:
+        if (
+            text_or_none(candidate.get("data-state"))
+            in VARIANT_OPTION_SELECTED_STATE_VALUES
+        ):
             return True
         if text_or_none(candidate.get("data-selected")) not in (None,):
             if node_attr_is_truthy(candidate, "data-selected") or _node_has_attr(

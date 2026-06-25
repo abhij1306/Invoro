@@ -24,6 +24,7 @@ from app.services.config.variant_policy import (
 
 logger = logging.getLogger(__name__)
 
+
 def _map_product_payload(
     product: dict[str, Any],
     *,
@@ -54,7 +55,9 @@ def _map_product_payload(
     ]
     normalized_variants = _drop_geographic_state_variant_rows(normalized_variants)
     axes = variant_axes(normalized_variants)
-    variants = resolve_variants(axes, normalized_variants) if axes else normalized_variants
+    variants = (
+        resolve_variants(axes, normalized_variants) if axes else normalized_variants
+    )
     active_variant = select_variant(variants, page_url=page_url)
     price = variant_attribute(active_variant, "price")
     if price in (None, "", [], {}):
@@ -80,9 +83,13 @@ def _map_product_payload(
             product,
             interpret_integral_as_cents=shopify_like,
         )
-        original_price = raw_original_price if raw_original_price is not None else normalize_price(
-            base.get("original_price"),
-            interpret_integral_as_cents=shopify_like,
+        original_price = (
+            raw_original_price
+            if raw_original_price is not None
+            else normalize_price(
+                base.get("original_price"),
+                interpret_integral_as_cents=shopify_like,
+            )
         )
     currency = variant_attribute(active_variant, "currency") or text_or_none(
         base.get("currency")
@@ -138,7 +145,8 @@ def _map_product_payload(
             "availability": availability,
             "stock_quantity": product_stock,
             "sku": variant_attribute(active_variant, "sku") or base.get("sku"),
-            "barcode": variant_attribute(active_variant, "barcode") or base.get("barcode"),
+            "barcode": variant_attribute(active_variant, "barcode")
+            or base.get("barcode"),
             "color": color,
             "size": size,
             "image_url": (
@@ -179,7 +187,11 @@ def _drop_geographic_state_variant_rows(
 
 def _variant_state_axis_value(variant: dict[str, Any]) -> str | None:
     option_values = variant.get("option_values")
-    value = option_values.get("state") if isinstance(option_values, dict) else variant.get("state")
+    value = (
+        option_values.get("state")
+        if isinstance(option_values, dict)
+        else variant.get("state")
+    )
     return text_or_none(value)
 
 
@@ -195,6 +207,7 @@ def _product_scalar_size_is_public(
     if any(normalized_variant_axis_key(name) == "size" for name in option_names):
         return True
     return True
+
 
 def _extract_ecommerce_description_fields(value: object) -> dict[str, object]:
     description_html = str(value or "").strip()
@@ -243,6 +256,7 @@ def _extract_ecommerce_description_fields(value: object) -> dict[str, object]:
         result["features"] = features
     return result
 
+
 def _raw_current_price_value(
     product: dict[str, Any],
     *,
@@ -258,6 +272,7 @@ def _raw_current_price_value(
         ),
         interpret_integral_as_cents=interpret_integral_as_cents,
     )
+
 
 def _raw_original_price_value(
     product: dict[str, Any],
@@ -275,6 +290,7 @@ def _raw_original_price_value(
         interpret_integral_as_cents=interpret_integral_as_cents,
     )
 
+
 def _discounted_percentage_price(product: dict[str, Any]) -> str | None:
     list_price = _raw_numeric_value(product, (("mrp",),))
     discount_percent = _raw_numeric_value(product, (("Dis",),))
@@ -287,6 +303,7 @@ def _discounted_percentage_price(product: dict[str, Any]) -> str | None:
     if discounted <= 0:
         return None
     return f"{discounted:.2f}".rstrip("0").rstrip(".") or None
+
 
 def _contextual_numeric_value(
     product: dict[str, Any],
@@ -315,6 +332,7 @@ def _contextual_numeric_value(
         return normalized
     return f"{currency} {normalized}"
 
+
 def _raw_numeric_value(
     product: dict[str, Any],
     paths: tuple[tuple[str, ...], ...],
@@ -329,6 +347,7 @@ def _raw_numeric_value(
         if isinstance(current, (int, float)) and not isinstance(current, bool):
             return current
     return None
+
 
 def _raw_currency_value(product: dict[str, Any]) -> str | None:
     for path in (
@@ -348,6 +367,7 @@ def _raw_currency_value(product: dict[str, Any]) -> str | None:
             return current.strip()
     return None
 
+
 def _product_base_fields(
     product: dict[str, Any],
     *,
@@ -363,6 +383,7 @@ def _product_base_fields(
             merged[field_name] = value
     return compact_dict(merged)
 
+
 def _glom_product_base_fields(product: dict[str, Any]) -> dict[str, Any]:
     try:
         base = glom(product, JS_STATE_PRODUCT_FIELD_SPEC, default=None)
@@ -372,6 +393,7 @@ def _glom_product_base_fields(product: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(base, dict):
         return {}
     return compact_dict(base)
+
 
 def _map_jmespath_fields(
     product: dict[str, Any],
@@ -389,6 +411,7 @@ def _map_jmespath_fields(
             mapped[field_name] = value
     return compact_dict(mapped)
 
+
 def _first_non_empty_jmespath(
     payload: dict[str, Any],
     expressions: str | list[str],
@@ -404,6 +427,7 @@ def _first_non_empty_jmespath(
             return value
     return None
 
+
 def _extract_product_images(product: dict[str, Any], *, page_url: str) -> list[str]:
     values = extract_urls(product.get("images"), page_url)
     values.extend(extract_urls(_connection_nodes(product.get("images")), page_url))
@@ -414,7 +438,10 @@ def _extract_product_images(product: dict[str, Any], *, page_url: str) -> list[s
     values.extend(extract_urls(_connection_nodes(product.get("media")), page_url))
     return dedupe_image_urls(values)
 
-def _extract_nested_image_urls(value: Any, *, page_url: str, depth: int = 0) -> list[str]:
+
+def _extract_nested_image_urls(
+    value: Any, *, page_url: str, depth: int = 0
+) -> list[str]:
     if depth > 6:
         return []
     urls = extract_urls(value, page_url)
@@ -432,6 +459,7 @@ def _extract_nested_image_urls(value: Any, *, page_url: str, depth: int = 0) -> 
                 _extract_nested_image_urls(item, page_url=page_url, depth=depth + 1)
             )
     return dedupe_image_urls(nested)
+
 
 def _looks_like_shopify_product(product: dict[str, Any]) -> bool:
     raw_variants = _product_variant_rows(product)

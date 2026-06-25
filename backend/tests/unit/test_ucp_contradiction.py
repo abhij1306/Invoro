@@ -21,7 +21,10 @@ def _packet(**overrides) -> EvidencePacket:
         },
         "dom_fields": {"price": "221", "availability": "in_stock"},
         "extracted_record": {
-            "variants": [{"sku": "SKU-1", "price": "221"}, {"sku": "SKU-2", "price": "429"}]
+            "variants": [
+                {"sku": "SKU-1", "price": "221"},
+                {"sku": "SKU-2", "price": "429"},
+            ]
         },
         "robots_allows_perplexitybot": True,
         "robots_allows_gptbot": True,

@@ -172,7 +172,9 @@ def prune_irrelevant_detail_dom_nodes(
             match_found = False
             script_product_name = ""
             for item in items:
-                if not isinstance(item, dict) or not jsonld_item_supports_identity(item):
+                if not isinstance(item, dict) or not jsonld_item_supports_identity(
+                    item
+                ):
                     continue
                 if not script_product_name:
                     script_product_name = jsonld_item_product_name(item)
@@ -220,7 +222,9 @@ def _listing_url_has_category_path_segment(path: str) -> bool:
     for segment in segments:
         # Broader split is intentional here, unlike _path_segment_tokens:
         # _LISTING_CATEGORY_PATH_SEGMENTS may be embedded behind "_" or mixed punctuation.
-        segment_tokens = {token for token in _LOWER_NON_ALNUM_RE.split(segment) if token}
+        segment_tokens = {
+            token for token in _LOWER_NON_ALNUM_RE.split(segment) if token
+        }
         if segment in _LISTING_CATEGORY_PATH_SEGMENTS:
             return True
         if _LISTING_CATEGORY_PATH_SEGMENTS.intersection(segment_tokens):
@@ -340,7 +344,9 @@ def listing_url_is_structural(url: str, page_url: str) -> bool:
         page_parsed = urlparse(page_url)
         if parsed.path in ("", "/"):
             return True
-        same_path = parsed.path.rstrip("/").lower() == page_parsed.path.rstrip("/").lower()
+        same_path = (
+            parsed.path.rstrip("/").lower() == page_parsed.path.rstrip("/").lower()
+        )
         if same_path and _job_detail_query_has_identity(parsed.query):
             return False
         if same_path:
@@ -388,9 +394,8 @@ def listing_url_is_structural(url: str, page_url: str) -> bool:
             terminal_token_list=terminal_token_list,
             terminal_raw=terminal_raw,
         )
-        if (
-            not terminal_looks_like_product_slug
-            and _listing_query_looks_structural(parsed.query)
+        if not terminal_looks_like_product_slug and _listing_query_looks_structural(
+            parsed.query
         ):
             return True
         if not terminal_looks_like_product_slug and _listing_url_has_non_listing_prefix(
@@ -494,7 +499,9 @@ def _job_detail_like_path(url: str) -> bool:
 
 def _job_detail_query_has_identity(query: str) -> bool:
     lowered = str(query or "").lower()
-    return any(token in lowered for token in ("showjob=", "jobid=", "job_id=", "gh_jid="))
+    return any(
+        token in lowered for token in ("showjob=", "jobid=", "job_id=", "gh_jid=")
+    )
 
 
 def _detail_url_path_segments(url: str) -> list[str]:
@@ -815,7 +822,10 @@ def _detail_requested_identity_text(page_url: object) -> str:
             continue
         title = clean_text(_SLUG_SEPARATOR_RE.sub(" ", terminal))
         semantic_tokens = _semantic_detail_identity_tokens(title)
-        if _detail_segment_looks_like_identity_code(terminal) and len(semantic_tokens) < 2:
+        if (
+            _detail_segment_looks_like_identity_code(terminal)
+            and len(semantic_tokens) < 2
+        ):
             continue
         if semantic_tokens:
             return title

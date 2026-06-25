@@ -52,7 +52,9 @@ def _record_content_fingerprint(
     }
     if not values:
         values = {"url": _fingerprint_value(identity_source_url)}
-    payload = json.dumps(values, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+    payload = json.dumps(
+        values, ensure_ascii=True, sort_keys=True, separators=(",", ":")
+    )
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
@@ -176,9 +178,13 @@ async def _persist_browser_artifacts(
     blocked: bool = False,
 ) -> None:
 
-    diagnostics = mapping_or_empty(getattr(acquisition_result, "browser_diagnostics", {}))
+    diagnostics = mapping_or_empty(
+        getattr(acquisition_result, "browser_diagnostics", {})
+    )
     artifacts = dict(mapping_or_empty(getattr(acquisition_result, "artifacts", {})))
-    screenshot_path_source = str(artifacts.pop("browser_screenshot_path", "") or "").strip()
+    screenshot_path_source = str(
+        artifacts.pop("browser_screenshot_path", "") or ""
+    ).strip()
     screenshot_bytes = artifacts.pop("browser_screenshot_png", b"")
     screenshot_path = ""
     if screenshot_required:
@@ -284,11 +290,13 @@ async def persist_extracted_records(
             str(run.surface or "") == "content_listing"
             and raw_record.get("_extraction_mode") == "table_rows"
         )
-        if "listing" in str(run.surface or "") and not data.get("url") and not is_content_table_row:
+        if (
+            "listing" in str(run.surface or "")
+            and not data.get("url")
+            and not is_content_table_row
+        ):
             continue
-        record_source_url = str(
-            data.get("source_url") or acquisition_result.final_url
-        )
+        record_source_url = str(data.get("source_url") or acquisition_result.final_url)
         identity_source_url = str(data.get("url") or record_source_url)
         identity_key = _record_identity_key(identity_source_url)
         if rejected_public_fields:

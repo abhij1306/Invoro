@@ -241,9 +241,7 @@ async def acquire(request: AcquisitionRequest) -> AcquisitionResult:
             html="",
             method="api_replay",
             status_code=status_code,
-            content_type=str(
-                replay_payload.get("content_type") or "application/json"
-            ),
+            content_type=str(replay_payload.get("content_type") or "application/json"),
             blocked=False,
             platform_family=runtime_policy.get("family"),
             headers={},
@@ -308,7 +306,11 @@ def _merge_context_profiles(
     explicit_context: object,
 ) -> dict[str, object]:
     """Merge browser_context_profile: explicit values override runtime."""
-    merged = dict(cast(Mapping[str, object], runtime_context)) if isinstance(runtime_context, Mapping) and runtime_context else {}
+    merged = (
+        dict(cast(Mapping[str, object], runtime_context))
+        if isinstance(runtime_context, Mapping) and runtime_context
+        else {}
+    )
     if isinstance(explicit_context, Mapping):
         merged.update(dict(explicit_context))
     return merged
@@ -321,7 +323,11 @@ def _merge_locality(
     merged_context_profile: dict[str, object],
 ) -> dict[str, object]:
     """Merge locality: remove browser_context_profile from explicit before merge, inject back."""
-    merged = dict(cast(Mapping[str, object], runtime_locality)) if isinstance(runtime_locality, Mapping) and runtime_locality else {}
+    merged = (
+        dict(cast(Mapping[str, object], runtime_locality))
+        if isinstance(runtime_locality, Mapping) and runtime_locality
+        else {}
+    )
     explicit_without_context = dict(explicit_locality)
     explicit_without_context.pop("browser_context_profile", None)
     merged.update(explicit_without_context)

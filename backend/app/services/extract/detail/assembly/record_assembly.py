@@ -17,7 +17,9 @@ from app.services.extraction_context import (
     prepare_extraction_context,
 )
 from app.services.extract.detail.assembly import candidate_collection as _candidates
-from app.services.extract.detail.assembly import dom_completion as _detail_dom_completion
+from app.services.extract.detail.assembly import (
+    dom_completion as _detail_dom_completion,
+)
 from app.services.extract.detail.assembly.dom_fallbacks import apply_dom_fallbacks
 from app.services.extract.detail.assembly.dom_section_targets import primary_dom_context
 from app.services.extract.detail.variants.dom_extraction import (
@@ -36,7 +38,9 @@ from app.services.extract.detail.price.core import (
     drop_low_signal_zero_detail_price,
     reconcile_detail_currency_with_url as _reconcile_detail_currency_with_url,
 )
-from app.services.extract.detail.assembly.final_cleanup import repair_ecommerce_detail_record_quality
+from app.services.extract.detail.assembly.final_cleanup import (
+    repair_ecommerce_detail_record_quality,
+)
 from app.services.extract.detail.identity.shell_filter import (
     detail_url_has_multiple_product_segments as _detail_url_has_multiple_product_segments,
     looks_like_site_shell_record as _looks_like_site_shell_record,
@@ -83,6 +87,7 @@ from app.services.shared.field_coerce import (
     _detail_dom_completion._requires_dom_completion,
     _detail_dom_completion._should_collect_dom_variants,
 )
+
 
 def _promote_dom_detail_title(
     record: dict[str, Any],
@@ -149,7 +154,7 @@ def _finalize_detail_record(
                 requested_page_url=requested_page_url,
                 soup=raw_soup,
                 js_state_objects=js_state_objects,
-        )
+            )
         drop_low_signal_zero_detail_price(record)
         record = finalize_record(record, surface=surface)
     record.pop("_description_repaired_from_product_details", None)

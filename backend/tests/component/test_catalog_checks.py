@@ -164,7 +164,9 @@ def test_offer_availability_and_discovery_findings() -> None:
 @pytest.mark.component
 def test_visible_record_rating_counts_as_trust_signal() -> None:
     result = _clean_result()
-    result.jsonld_blocks = [{"@type": "Product", "offers": {"price": "100", "availability": "InStock"}}]
+    result.jsonld_blocks = [
+        {"@type": "Product", "offers": {"price": "100", "availability": "InStock"}}
+    ]
     result.product_records[0]["rating"] = 4.7
     result.product_records[0]["review_count"] = 28
 
@@ -236,7 +238,7 @@ def test_uncertain_or_subjective_llm_findings_are_excluded_from_scored_report() 
                     evidence_quote="Some lightweight advisory.",
                     finding_code=config.FINDING_AID_LLM_DESCRIPTION_FLUFF,
                     recommendation="Consider adding more detail.",
-                )
+                ),
             ],
         )
     ]

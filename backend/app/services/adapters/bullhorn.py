@@ -33,7 +33,9 @@ class BullhornAdapter(BaseAdapter):
     job_surface_only = True
 
     async def can_handle(self, url: str, html: str) -> bool:
-        return self._matches_platform_family(url, html) or bool(self._discover_api_base(html))
+        return self._matches_platform_family(url, html) or bool(
+            self._discover_api_base(html)
+        )
 
     async def extract(
         self,

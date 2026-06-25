@@ -39,7 +39,7 @@ _STATIC_EXPORTS = {
 HYDRATED_STATE_PATTERNS = tuple(
     dict.fromkeys(
         [
-            *( 
+            *(
                 value
                 for value in _STATIC_EXPORTS.get("HYDRATED_STATE_PATTERNS", ())
                 if str(value).strip()
@@ -230,6 +230,7 @@ def _string_frozenset(value: object) -> frozenset[str]:
     else:
         return frozenset()
     return frozenset(str(item).strip() for item in values if str(item).strip())
+
 
 __all__ = [
     "annotations",

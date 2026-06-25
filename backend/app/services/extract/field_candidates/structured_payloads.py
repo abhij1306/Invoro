@@ -173,7 +173,7 @@ def structured_feature_rows(payload: dict[str, object], page_url: str) -> list[s
 
     additional_properties = payload.get("additionalProperty")
     if isinstance(additional_properties, list):
-        for item in additional_properties[: _structured_candidate_list_slice]:
+        for item in additional_properties[:_structured_candidate_list_slice]:
             if not isinstance(item, dict):
                 continue
             name = _structured_property_label(item.get("name") or item.get("label"))
@@ -237,7 +237,7 @@ def collect_structured_candidates(
         )
         additional_properties = payload.get("additionalProperty")
         if isinstance(additional_properties, list):
-            for item in additional_properties[: _structured_candidate_list_slice]:
+            for item in additional_properties[:_structured_candidate_list_slice]:
                 if not isinstance(item, dict):
                     continue
                 label = normalize_requested_field(
@@ -536,7 +536,7 @@ def collect_structured_candidates(
             if remote_hint:
                 add_candidate(candidates, "remote", remote_hint)
     elif isinstance(payload, list):
-        for item in payload[: _structured_candidate_list_slice]:
+        for item in payload[:_structured_candidate_list_slice]:
             collect_structured_candidates(
                 item,
                 alias_lookup,

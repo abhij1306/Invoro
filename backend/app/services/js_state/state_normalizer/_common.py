@@ -54,14 +54,21 @@ from app.services.js_state.helpers import (
     variant_axes,
 )
 from app.services.js_state import job_mapper as _job_mapper
-from app.services.platform_policy import JSStateExtractorConfig, platform_js_state_extractors
+from app.services.platform_policy import (
+    JSStateExtractorConfig,
+    platform_js_state_extractors,
+)
 
 PRODUCT_FIELD_SPEC = JS_STATE_PRODUCT_FIELD_SPEC
 map_configured_state_payload = _job_mapper.map_configured_state_payload
 map_job_detail_state = _job_mapper.map_job_detail_state
 path_value = _job_mapper.path_value
+
+
 def _as_list(value: object) -> list[Any]:
     return value if isinstance(value, list) else []
+
+
 as_list = _as_list
 
 __all__ = [

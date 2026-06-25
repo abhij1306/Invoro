@@ -196,7 +196,13 @@ async def try_blocked_adapter_recovery(
                     surface=plan.surface,
                     **recovery_kwargs,
                 )
-            except (httpx.HTTPError, RuntimeError, OSError, ValueError, TypeError) as exc:
+            except (
+                httpx.HTTPError,
+                RuntimeError,
+                OSError,
+                ValueError,
+                TypeError,
+            ) as exc:
                 logger.debug(
                     "%s recovery proxy failed for %s via %s: %s",
                     adapter.name,

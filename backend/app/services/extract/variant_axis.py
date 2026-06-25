@@ -25,7 +25,10 @@ from app.services.config.extraction_rules import (
     VARIANT_COLOR_AXIS_TOKENS,
     VARIANT_SIZE_AXIS_TOKENS,
 )
-from app.services.config.variant_policy import OPTION_SCALAR_FIELDS, PUBLIC_VARIANT_AXIS_FIELDS
+from app.services.config.variant_policy import (
+    OPTION_SCALAR_FIELDS,
+    PUBLIC_VARIANT_AXIS_FIELDS,
+)
 from app.services.shared.field_coerce import clean_text
 from app.services.shared.regex_patterns import compile_regex_patterns
 

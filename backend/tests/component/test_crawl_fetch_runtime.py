@@ -709,9 +709,7 @@ async def test_real_chrome_cookie_contract_tries_curl_cffi_handoff_first(
         return "session=ok"
 
     @_as_async
-    def _curl_fetch(
-        request_url, timeout_seconds, *, proxy=None, cookie_header=None
-    ):
+    def _curl_fetch(request_url, timeout_seconds, *, proxy=None, cookie_header=None):
         return PageFetchResult(
             url=request_url,
             final_url=request_url,
@@ -770,9 +768,7 @@ async def test_curl_handoff_failure_falls_back_to_real_chrome(
         return "session=bad"
 
     @_as_async
-    def _curl_fetch(
-        request_url, timeout_seconds, *, proxy=None, cookie_header=None
-    ):
+    def _curl_fetch(request_url, timeout_seconds, *, proxy=None, cookie_header=None):
         return PageFetchResult(
             url=request_url,
             final_url=request_url,
@@ -1053,7 +1049,9 @@ async def test_handle_http_result_retries_browser_after_browser_first_failure_an
         "_browser_escalation_allowed",
         lambda **_kwargs: True,
     )
-    monkeypatch.setattr(crawl_fetch_runtime, "apply_protected_host_backoff", AsyncMock())
+    monkeypatch.setattr(
+        crawl_fetch_runtime, "apply_protected_host_backoff", AsyncMock()
+    )
     monkeypatch.setattr(crawl_fetch_runtime, "note_host_hard_block", AsyncMock())
     monkeypatch.setattr(
         crawl_fetch_runtime,
@@ -1087,9 +1085,7 @@ async def test_fetch_page_browser_only_skips_http_fetchers(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     @_as_async
-    def _unexpected_curl(
-        url: str, timeout_seconds: float, *, proxy: str | None = None
-    ):
+    def _unexpected_curl(url: str, timeout_seconds: float, *, proxy: str | None = None):
         raise AssertionError(
             f"curl should not run for browser_only: {url} {timeout_seconds} {proxy}"
         )
@@ -1215,9 +1211,7 @@ async def test_fetch_page_prefers_browser_from_learned_host_memory(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     @_as_async
-    def _unexpected_curl(
-        url: str, timeout_seconds: float, *, proxy: str | None = None
-    ):
+    def _unexpected_curl(url: str, timeout_seconds: float, *, proxy: str | None = None):
         raise AssertionError(
             f"http should be skipped for learned browser-first host: {url} {timeout_seconds} {proxy}"
         )
@@ -2628,9 +2622,7 @@ async def test_fetch_page_stops_http_waterfall_after_vendor_confirmed_block(
     browser_proxies: list[str | None] = []
 
     @_as_async
-    def _vendor_blocked_curl(
-        url: str, timeout: float, *, proxy: str | None = None
-    ):
+    def _vendor_blocked_curl(url: str, timeout: float, *, proxy: str | None = None):
         del timeout
         curl_proxies.append(proxy)
         return PageFetchResult(
@@ -3063,14 +3055,17 @@ async def test_fetch_page_emits_http_strategy_and_escalation_events(
 
     assert result.method == "browser"
     messages = [message for _level, message in events]
-    assert any(message.startswith("Acquisition strategy: http-first") for message in messages)
     assert any(
-        "curl=primary, httpx_fallback=on_transport_failure"
-        in message
+        message.startswith("Acquisition strategy: http-first") for message in messages
+    )
+    assert any(
+        "curl=primary, httpx_fallback=on_transport_failure" in message
         for message in messages
     )
     assert any("HTTP fetch via" in message for message in messages)
-    assert any("Escalating to browser after HTTP result" in message for message in messages)
+    assert any(
+        "Escalating to browser after HTTP result" in message for message in messages
+    )
 
 
 @pytest.mark.asyncio
@@ -3166,7 +3161,7 @@ async def test_fetch_page_retries_patchright_http2_protocol_error_with_real_chro
         browser_engines.append(engine)
         if engine == "patchright":
             raise PlaywrightError(
-                f'Page.goto: net::ERR_HTTP2_PROTOCOL_ERROR at {request_url}'
+                f"Page.goto: net::ERR_HTTP2_PROTOCOL_ERROR at {request_url}"
             )
         return PageFetchResult(
             url=request_url,
@@ -3181,7 +3176,9 @@ async def test_fetch_page_retries_patchright_http2_protocol_error_with_real_chro
     monkeypatch.setattr(crawl_fetch_runtime, "_curl_fetch", _failing_curl)
     monkeypatch.setattr(crawl_fetch_runtime, "_http_fetch", _failing_http)
     monkeypatch.setattr(crawl_fetch_runtime, "_browser_fetch", _browser_fetch)
-    monkeypatch.setattr(crawl_fetch_runtime, "real_chrome_browser_available", lambda: True)
+    monkeypatch.setattr(
+        crawl_fetch_runtime, "real_chrome_browser_available", lambda: True
+    )
 
     try:
         result = await crawl_fetch_runtime.fetch_page(

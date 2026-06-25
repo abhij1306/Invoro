@@ -30,7 +30,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 
 ResolveRunConfigFn = Callable[..., Awaitable[dict[str, object] | None]]
-ExtractRecordsFn = Callable[..., Awaitable[tuple[list[dict[str, object]] | None, str | None]]]
+ExtractRecordsFn = Callable[
+    ..., Awaitable[tuple[list[dict[str, object]] | None, str | None]]
+]
 
 
 def _sanitize_llm_existing_values(record: dict[str, object]) -> dict[str, object]:
@@ -134,7 +136,9 @@ async def apply_direct_record_llm_fallback(
                     field_name, value
                 ):
                     continue
-                next_record[field_name] = coerce_field_value(field_name, value, page_url)
+                next_record[field_name] = coerce_field_value(
+                    field_name, value, page_url
+                )
         updated_records.append(finalize_record(next_record, surface=run.surface))
     return updated_records
 

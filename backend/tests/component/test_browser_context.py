@@ -44,7 +44,9 @@ def _credential_url(
     return f"{scheme}://{username}:{secret}@{host}{port_suffix}{path_suffix}"
 
 
-def _authority_with_credentials(*, username: str, secret: str, host: str, port: int) -> str:
+def _authority_with_credentials(
+    *, username: str, secret: str, host: str, port: int
+) -> str:
     return f"{username}:{secret}@{host}:{port}"
 
 
@@ -73,7 +75,6 @@ def test_chromium_browser_binary_is_labeled_chromium() -> None:
         None,
         "chromium",
     )
-
 
 
 @pytest.mark.component
@@ -161,7 +162,6 @@ def test_listing_signals_detect_list_item_type() -> None:
     assert has_extractable_listing_signals(html) is True
 
 
-
 @pytest.mark.component
 def test_acquisition_package_exports_runtime_expand_function() -> None:
     from app.services import acquisition
@@ -170,7 +170,6 @@ def test_acquisition_package_exports_runtime_expand_function() -> None:
         acquisition.expand_all_interactive_elements
         is acquisition_browser_runtime.expand_all_interactive_elements
     )
-
 
 
 @pytest.mark.component
@@ -218,7 +217,6 @@ def test_normalize_domain_handles_domain_only_input() -> None:
 @pytest.mark.component
 def test_normalize_domain_strips_credentials_without_password() -> None:
     assert normalize_domain("https://user@example.com/path") == "example.com"
-
 
 
 @pytest.mark.asyncio
@@ -322,7 +320,6 @@ async def test_socks5_auth_bridge_start_is_singleflight(
     assert start_calls == 1
 
 
-
 @pytest.mark.component
 def test_browser_storage_state_persist_policy_rejects_challenge_shell_without_ready_probe() -> (
     None
@@ -342,7 +339,6 @@ def test_browser_storage_state_persist_policy_rejects_challenge_shell_without_re
         )
         is False
     )
-
 
 
 @pytest.mark.asyncio
@@ -999,18 +995,15 @@ async def test_shared_browser_runtime_launches_real_chrome_headful_for_fallback(
 
 @pytest.mark.component
 def test_display_proxy_masks_authenticated_proxy_credentials() -> None:
-    assert (
-        acquisition_browser_runtime._display_proxy(
-            _credential_url(
-                scheme="http",
-                username="user-name",
-                secret="pass-word",
-                host="31.58.9.4",
-                port=6077,
-            )
+    assert acquisition_browser_runtime._display_proxy(
+        _credential_url(
+            scheme="http",
+            username="user-name",
+            secret="pass-word",
+            host="31.58.9.4",
+            port=6077,
         )
-        == _masked_proxy_display(scheme="http", host="31.58.9.4", port=6077)
-    )
+    ) == _masked_proxy_display(scheme="http", host="31.58.9.4", port=6077)
 
 
 @pytest.mark.component
@@ -2559,8 +2552,13 @@ async def test_browser_pool_skip_evicts_runtime_reused_after_candidate_snapshot(
 
 @pytest.mark.component
 def test_browser_launch_args_exclude_detectable_flags() -> None:
-    assert "--disable-component-update" not in crawler_runtime_settings.browser_launch_args
-    assert "--disable-blink-features=AutomationControlled" not in crawler_runtime_settings.browser_launch_args
+    assert (
+        "--disable-component-update" not in crawler_runtime_settings.browser_launch_args
+    )
+    assert (
+        "--disable-blink-features=AutomationControlled"
+        not in crawler_runtime_settings.browser_launch_args
+    )
 
 
 @pytest.mark.asyncio

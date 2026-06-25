@@ -76,7 +76,10 @@ async def run_ucp_audit_job(job_id: int) -> None:
 
 async def run_job(session: AsyncSession, job: UCPAuditJob) -> None:
     job.status = config.AID_AUDIT_JOB_STATUS_RUNNING
-    job.summary = {**dict(job.summary or {}), "started_at": datetime.now(UTC).isoformat()}
+    job.summary = {
+        **dict(job.summary or {}),
+        "started_at": datetime.now(UTC).isoformat(),
+    }
     await session.commit()
 
     audit_id = f"ucp-{job.id}-{uuid4().hex[:8]}"

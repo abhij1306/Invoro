@@ -1,4 +1,5 @@
 """Unit tests for detail image candidate filtering."""
+
 from __future__ import annotations
 
 import pytest
@@ -16,9 +17,7 @@ def test_walmart_pdp_url_is_rejected_from_additional_images() -> None:
     ``/ip/`` segment) instead of real product images. A URL whose path has
     no image extension AND looks like a PDP segment must be filtered.
     """
-    identity = (
-        "https://www.walmart.com/ip/Apple-AirPods-with-Charging-Case-2nd-Generation/604342441"
-    )
+    identity = "https://www.walmart.com/ip/Apple-AirPods-with-Charging-Case-2nd-Generation/604342441"
     pdp = (
         "https://www.walmart.com/ip/Apple-AirPods-with-Charging-Case-2nd-Generation/"
         "D88D543AD9E843C0A93F1A4DFE93BDF2"
@@ -28,9 +27,7 @@ def test_walmart_pdp_url_is_rejected_from_additional_images() -> None:
 
 @pytest.mark.unit
 def test_real_walmart_image_is_kept() -> None:
-    identity = (
-        "https://www.walmart.com/ip/Apple-AirPods-with-Charging-Case-2nd-Generation/604342441"
-    )
+    identity = "https://www.walmart.com/ip/Apple-AirPods-with-Charging-Case-2nd-Generation/604342441"
     real = (
         "https://i5.walmartimages.com/asr/b6247579-386a-4bda-99aa-01e44801bc33."
         "49db04f5e5b8d7f329c6580455e2e010.jpeg?odnHeight=160&odnWidth=160"

@@ -1,4 +1,5 @@
 """Unit tests for materials field cleanup in detail extraction."""
+
 from __future__ import annotations
 
 import pytest
@@ -41,17 +42,13 @@ def test_clean_materials_salvages_trailing_composition_from_editorial_block() ->
 
 @pytest.mark.unit
 def test_clean_materials_drops_long_editorial_with_no_composition() -> None:
-    long_editorial = (
-        "Lorem ipsum dolor sit amet, consectetur adipiscing elit. " * 30
-    )
+    long_editorial = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. " * 30
     assert _clean_materials_pollution(long_editorial) == ""
 
 
 @pytest.mark.unit
 def test_clean_materials_keeps_long_text_when_head_has_composition() -> None:
-    head_with_compo = (
-        "100% Cotton. " + "Some additional care notes that follow. " * 30
-    )
+    head_with_compo = "100% Cotton. " + "Some additional care notes that follow. " * 30
     cleaned = _clean_materials_pollution(head_with_compo)
     # The salvage logic should NOT trigger when composition is in the head.
     assert "100% Cotton" in cleaned

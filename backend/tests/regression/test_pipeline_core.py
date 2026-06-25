@@ -23,7 +23,9 @@ from app.services.pipeline.extraction_loop import (
     apply_llm_fallback,
     process_single_url,
 )
-from app.services.pipeline.direct_record_fallback import apply_direct_record_llm_fallback
+from app.services.pipeline.direct_record_fallback import (
+    apply_direct_record_llm_fallback,
+)
 from app.services.pipeline.extraction_retry_decision import (
     low_quality_extraction_browser_retry_decision,
     records_missing_repair_fields,
@@ -34,13 +36,13 @@ from app.services.robots_policy import RobotsPolicyResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
-
 def _as_async(fn):
     async def _wrapped(*args, **kwargs):
         await asyncio.sleep(0)
         return fn(*args, **kwargs)
 
     return _wrapped
+
 
 def _detail_html() -> str:
     return "<html><body><h1>Widget Prime</h1></body></html>"
@@ -392,9 +394,12 @@ async def test_process_single_url_marks_non_retryable_http_status_as_error(
         )
 
     monkeypatch.setattr("app.services.pipeline.extraction_loop.acquire", _fake_acquire)
-    monkeypatch.setattr("app.services.pipeline.extraction_loop.run_adapter", _no_adapter)
     monkeypatch.setattr(
-        "app.services.pipeline.extraction_loop.extract_records", lambda *args, **kwargs: []
+        "app.services.pipeline.extraction_loop.run_adapter", _no_adapter
+    )
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.extract_records",
+        lambda *args, **kwargs: [],
     )
 
     result = await process_single_url(db_session, run, run.url)
@@ -456,7 +461,9 @@ async def test_process_single_url_retries_406_empty_detail_with_browser(
         return []
 
     monkeypatch.setattr("app.services.pipeline.extraction_loop.acquire", _fake_acquire)
-    monkeypatch.setattr("app.services.pipeline.extraction_loop.run_adapter", _no_adapter)
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.run_adapter", _no_adapter
+    )
     monkeypatch.setattr(
         "app.services.pipeline.extraction_loop.extract_records",
         _fake_extract_records,
@@ -643,7 +650,9 @@ async def test_process_single_url_skips_low_quality_browser_retry_when_budget_lo
         return [{"title": "Widget Prime"}]
 
     monkeypatch.setattr("app.services.pipeline.extraction_loop.acquire", _fake_acquire)
-    monkeypatch.setattr("app.services.pipeline.extraction_loop.run_adapter", _fake_run_adapter)
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.run_adapter", _fake_run_adapter
+    )
     monkeypatch.setattr(
         "app.services.pipeline.extraction_loop.extract_records", _fake_extract_records
     )
@@ -703,7 +712,9 @@ async def test_low_quality_browser_retry_timeout_preserves_http_record(
         )
 
     monkeypatch.setattr("app.services.pipeline.extraction_loop.acquire", _fake_acquire)
-    monkeypatch.setattr("app.services.pipeline.extraction_loop.run_adapter", _no_adapter)
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.run_adapter", _no_adapter
+    )
     monkeypatch.setattr(
         "app.services.pipeline.extraction_loop.extract_records",
         lambda *args, **kwargs: [{"title": "Widget Prime"}],
@@ -758,9 +769,12 @@ async def test_process_single_url_skips_empty_browser_retry_when_budget_low(
         return None
 
     monkeypatch.setattr("app.services.pipeline.extraction_loop.acquire", _fake_acquire)
-    monkeypatch.setattr("app.services.pipeline.extraction_loop.run_adapter", _fake_run_adapter)
     monkeypatch.setattr(
-        "app.services.pipeline.extraction_loop.extract_records", lambda *args, **kwargs: []
+        "app.services.pipeline.extraction_loop.run_adapter", _fake_run_adapter
+    )
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.extract_records",
+        lambda *args, **kwargs: [],
     )
     monkeypatch.setattr(
         "app.services.pipeline.extraction_loop._remaining_url_budget_seconds",
@@ -806,8 +820,12 @@ async def test_process_single_url_blocks_before_acquire_when_robots_disallows(
     def _unexpected_acquire(request):
         raise AssertionError(f"acquire should not run for {request.url}")
 
-    monkeypatch.setattr("app.services.pipeline.extraction_loop.check_url_crawlability", _disallow)
-    monkeypatch.setattr("app.services.pipeline.extraction_loop.acquire", _unexpected_acquire)
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.check_url_crawlability", _disallow
+    )
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.acquire", _unexpected_acquire
+    )
 
     result = await process_single_url(db_session, run, run.url)
     logs = await get_run_logs(db_session, run.id)
@@ -930,7 +948,9 @@ async def test_post_extraction_challenge_shell_retries_real_chrome(
         "app.services.pipeline.extraction_loop.note_host_hard_block",
         _fake_note_host_hard_block,
     )
-    monkeypatch.setattr("app.services.pipeline.extraction_loop.run_adapter", _no_adapter)
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.run_adapter", _no_adapter
+    )
 
     result = await process_single_url(db_session, run, run.url)
     rows, total = await get_run_records(db_session, run.id, 1, 20)
@@ -1003,7 +1023,9 @@ async def test_post_extraction_detail_shell_escalates_real_chrome(
         "app.services.pipeline.extraction_loop.real_chrome_browser_available",
         lambda: True,
     )
-    monkeypatch.setattr("app.services.pipeline.extraction_loop.run_adapter", _no_adapter)
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.run_adapter", _no_adapter
+    )
     monkeypatch.setattr(
         "app.services.pipeline.extraction_loop.infer_detail_failure_reason",
         lambda *_args, **_kwargs: "detail_shell",
@@ -1089,7 +1111,9 @@ async def test_post_extraction_identity_mismatch_escalates_real_chrome(
         "app.services.pipeline.extraction_loop.real_chrome_browser_available",
         lambda: True,
     )
-    monkeypatch.setattr("app.services.pipeline.extraction_loop.run_adapter", _no_adapter)
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.run_adapter", _no_adapter
+    )
     monkeypatch.setattr(
         "app.services.pipeline.extraction_loop.infer_detail_failure_reason",
         lambda *_args, **_kwargs: "detail_identity_mismatch",
@@ -1163,7 +1187,9 @@ async def test_usable_detail_with_active_provider_evidence_does_not_retry_real_c
         "app.services.pipeline.extraction_loop.real_chrome_browser_available",
         lambda: True,
     )
-    monkeypatch.setattr("app.services.pipeline.extraction_loop.run_adapter", _no_adapter)
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.run_adapter", _no_adapter
+    )
 
     result = await process_single_url(db_session, run, run.url)
 
@@ -1225,7 +1251,9 @@ async def test_patchright_challenge_shell_updates_host_memory(
         "app.services.pipeline.extraction_loop.note_host_hard_block",
         _fake_note_host_hard_block,
     )
-    monkeypatch.setattr("app.services.pipeline.extraction_loop.run_adapter", _no_adapter)
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.run_adapter", _no_adapter
+    )
 
     await process_single_url(db_session, run, run.url)
 
@@ -1302,9 +1330,12 @@ async def test_process_single_url_runs_adapter_against_browser_artifact_fragment
         return "artifacts/belk.html"
 
     monkeypatch.setattr("app.services.pipeline.extraction_loop.acquire", _fake_acquire)
-    monkeypatch.setattr("app.services.pipeline.extraction_loop.run_adapter", _fake_run_adapter)
     monkeypatch.setattr(
-        "app.services.pipeline.extraction_loop.load_domain_selector_rules", _no_selector_rules
+        "app.services.pipeline.extraction_loop.run_adapter", _fake_run_adapter
+    )
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.load_domain_selector_rules",
+        _no_selector_rules,
     )
     monkeypatch.setattr(
         "app.services.pipeline.extraction_loop.extract_records", _fake_extract_records
@@ -1341,9 +1372,7 @@ async def test_process_single_url_runs_adapter_against_network_payloads(
     payload_body = {
         "utag_data": {
             "product_name": ["Example Pants"],
-            "product_url": [
-                "https://www.belk.com/p/example-pants/3200645HC01000.html"
-            ],
+            "product_url": ["https://www.belk.com/p/example-pants/3200645HC01000.html"],
             "sku_id": ["0438651111111"],
             "sku_upc": ["0019783000001"],
         }
@@ -1397,9 +1426,12 @@ async def test_process_single_url_runs_adapter_against_network_payloads(
         return "artifacts/belk.html"
 
     monkeypatch.setattr("app.services.pipeline.extraction_loop.acquire", _fake_acquire)
-    monkeypatch.setattr("app.services.pipeline.extraction_loop.run_adapter", _fake_run_adapter)
     monkeypatch.setattr(
-        "app.services.pipeline.extraction_loop.load_domain_selector_rules", _no_selector_rules
+        "app.services.pipeline.extraction_loop.run_adapter", _fake_run_adapter
+    )
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.load_domain_selector_rules",
+        _no_selector_rules,
     )
     monkeypatch.setattr(
         "app.services.pipeline.extraction_loop.extract_records", _fake_extract_records
@@ -1492,9 +1524,12 @@ async def test_process_single_url_skips_redundant_adapter_artifacts_when_main_ht
         return "artifacts/belk.html"
 
     monkeypatch.setattr("app.services.pipeline.extraction_loop.acquire", _fake_acquire)
-    monkeypatch.setattr("app.services.pipeline.extraction_loop.run_adapter", _fake_run_adapter)
     monkeypatch.setattr(
-        "app.services.pipeline.extraction_loop.load_domain_selector_rules", _no_selector_rules
+        "app.services.pipeline.extraction_loop.run_adapter", _fake_run_adapter
+    )
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.load_domain_selector_rules",
+        _no_selector_rules,
     )
     monkeypatch.setattr(
         "app.services.pipeline.extraction_loop.extract_records", _fake_extract_records
@@ -1577,9 +1612,12 @@ async def test_process_single_url_prefers_richer_adapter_artifact_rows(
         return "artifacts/belk.html"
 
     monkeypatch.setattr("app.services.pipeline.extraction_loop.acquire", _fake_acquire)
-    monkeypatch.setattr("app.services.pipeline.extraction_loop.run_adapter", _fake_run_adapter)
     monkeypatch.setattr(
-        "app.services.pipeline.extraction_loop.load_domain_selector_rules", _no_selector_rules
+        "app.services.pipeline.extraction_loop.run_adapter", _fake_run_adapter
+    )
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.load_domain_selector_rules",
+        _no_selector_rules,
     )
     monkeypatch.setattr(
         "app.services.pipeline.extraction_loop.extract_records", _fake_extract_records
@@ -1758,9 +1796,12 @@ async def test_process_single_url_marks_empty_listing_as_listing_detection_faile
         del args, kwargs
         return []
 
-    monkeypatch.setattr("app.services.pipeline.extraction_loop.run_adapter", _no_adapter)
     monkeypatch.setattr(
-        "app.services.pipeline.extraction_loop.load_domain_selector_rules", _no_selector_rules
+        "app.services.pipeline.extraction_loop.run_adapter", _no_adapter
+    )
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.load_domain_selector_rules",
+        _no_selector_rules,
     )
 
     result = await process_single_url(db_session, run, run.url)
@@ -1818,9 +1859,12 @@ async def test_process_single_url_preserves_proxy_list_for_detail_surface(
         del args, kwargs
         return []
 
-    monkeypatch.setattr("app.services.pipeline.extraction_loop.run_adapter", _no_adapter)
     monkeypatch.setattr(
-        "app.services.pipeline.extraction_loop.load_domain_selector_rules", _no_selector_rules
+        "app.services.pipeline.extraction_loop.run_adapter", _no_adapter
+    )
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.load_domain_selector_rules",
+        _no_selector_rules,
     )
     monkeypatch.setattr(
         "app.services.pipeline.extraction_loop.extract_records",
@@ -1888,9 +1932,12 @@ async def test_process_single_url_repairs_missing_proxy_list_from_run_settings_w
         del args, kwargs
         return []
 
-    monkeypatch.setattr("app.services.pipeline.extraction_loop.run_adapter", _no_adapter)
     monkeypatch.setattr(
-        "app.services.pipeline.extraction_loop.load_domain_selector_rules", _no_selector_rules
+        "app.services.pipeline.extraction_loop.run_adapter", _no_adapter
+    )
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.load_domain_selector_rules",
+        _no_selector_rules,
     )
     monkeypatch.setattr(
         "app.services.pipeline.extraction_loop.extract_records",
@@ -1964,12 +2011,16 @@ async def test_process_single_url_does_not_duplicate_block_warning_after_browser
         return []
 
     monkeypatch.setattr("app.services.pipeline.extraction_loop.acquire", _fake_acquire)
-    monkeypatch.setattr("app.services.pipeline.extraction_loop.run_adapter", _no_adapter)
     monkeypatch.setattr(
-        "app.services.pipeline.extraction_loop.load_domain_selector_rules", _no_selector_rules
+        "app.services.pipeline.extraction_loop.run_adapter", _no_adapter
     )
     monkeypatch.setattr(
-        "app.services.pipeline.extraction_loop.extract_records", lambda *args, **kwargs: []
+        "app.services.pipeline.extraction_loop.load_domain_selector_rules",
+        _no_selector_rules,
+    )
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.extract_records",
+        lambda *args, **kwargs: [],
     )
 
     @_as_async
@@ -2047,18 +2098,24 @@ async def test_process_single_url_persists_detail_records_after_self_heal_and_ll
         del args, kwargs
         return []
 
-    monkeypatch.setattr("app.services.pipeline.extraction_loop.run_adapter", _no_adapter)
     monkeypatch.setattr(
-        "app.services.pipeline.extraction_loop.load_domain_selector_rules", _no_selector_rules
+        "app.services.pipeline.extraction_loop.run_adapter", _no_adapter
+    )
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.load_domain_selector_rules",
+        _no_selector_rules,
     )
     monkeypatch.setattr(
         "app.services.pipeline.extraction_loop.extract_records",
         lambda *args, **kwargs: [{"title": "Widget Prime", "_source": "extraction"}],
     )
     monkeypatch.setattr(
-        "app.services.pipeline.extraction_loop.apply_selector_self_heal", _fake_self_heal
+        "app.services.pipeline.extraction_loop.apply_selector_self_heal",
+        _fake_self_heal,
     )
-    monkeypatch.setattr("app.services.pipeline.extraction_loop.apply_llm_fallback", _fake_llm)
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.apply_llm_fallback", _fake_llm
+    )
 
     @_as_async
     def _persist_artifacts(**kwargs):
@@ -2144,11 +2201,16 @@ async def test_process_single_url_retries_with_browser_after_empty_non_browser_e
         return []
 
     monkeypatch.setattr("app.services.pipeline.extraction_loop.acquire", _fake_acquire)
-    monkeypatch.setattr("app.services.pipeline.extraction_loop.run_adapter", _no_adapter)
     monkeypatch.setattr(
-        "app.services.pipeline.extraction_loop.load_domain_selector_rules", _no_selector_rules
+        "app.services.pipeline.extraction_loop.run_adapter", _no_adapter
     )
-    monkeypatch.setattr("app.services.pipeline.extraction_loop.extract_records", _extract_records)
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.load_domain_selector_rules",
+        _no_selector_rules,
+    )
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.extract_records", _extract_records
+    )
 
     @_as_async
     def _persist_artifacts(**kwargs):
@@ -2218,7 +2280,9 @@ async def test_process_single_url_does_not_auto_scroll_after_empty_browser_listi
         return []
 
     monkeypatch.setattr("app.services.pipeline.extraction_loop.acquire", _fake_acquire)
-    monkeypatch.setattr("app.services.pipeline.extraction_loop.run_adapter", _no_adapter)
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.run_adapter", _no_adapter
+    )
     monkeypatch.setattr(
         "app.services.pipeline.extraction_loop.load_domain_selector_rules",
         _no_selector_rules,
@@ -2281,9 +2345,12 @@ async def test_process_single_url_persists_listing_page_source_separately_from_r
         return []
 
     monkeypatch.setattr("app.services.pipeline.extraction_loop.acquire", _fake_acquire)
-    monkeypatch.setattr("app.services.pipeline.extraction_loop.run_adapter", _no_adapter)
     monkeypatch.setattr(
-        "app.services.pipeline.extraction_loop.load_domain_selector_rules", _no_selector_rules
+        "app.services.pipeline.extraction_loop.run_adapter", _no_adapter
+    )
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.load_domain_selector_rules",
+        _no_selector_rules,
     )
     monkeypatch.setattr(
         "app.services.pipeline.extraction_loop.extract_records",
@@ -2352,9 +2419,12 @@ async def test_process_single_url_log_uses_generic_extraction_label_when_no_adap
         return []
 
     monkeypatch.setattr("app.services.pipeline.extraction_loop.acquire", _fake_acquire)
-    monkeypatch.setattr("app.services.pipeline.extraction_loop.run_adapter", _no_adapter)
     monkeypatch.setattr(
-        "app.services.pipeline.extraction_loop.load_domain_selector_rules", _no_selector_rules
+        "app.services.pipeline.extraction_loop.run_adapter", _no_adapter
+    )
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.load_domain_selector_rules",
+        _no_selector_rules,
     )
     monkeypatch.setattr(
         "app.services.pipeline.extraction_loop.extract_records",
@@ -2422,9 +2492,12 @@ async def test_process_single_url_upserts_duplicate_run_identity_records(
         return []
 
     monkeypatch.setattr("app.services.pipeline.extraction_loop.acquire", _fake_acquire)
-    monkeypatch.setattr("app.services.pipeline.extraction_loop.run_adapter", _no_adapter)
     monkeypatch.setattr(
-        "app.services.pipeline.extraction_loop.load_domain_selector_rules", _no_selector_rules
+        "app.services.pipeline.extraction_loop.run_adapter", _no_adapter
+    )
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.load_domain_selector_rules",
+        _no_selector_rules,
     )
     extracted_prices = iter(["19.99", "24.99"])
 
@@ -2444,7 +2517,9 @@ async def test_process_single_url_upserts_duplicate_run_identity_records(
             }
         ]
 
-    monkeypatch.setattr("app.services.pipeline.extraction_loop.extract_records", _extract_records)
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.extract_records", _extract_records
+    )
 
     @_as_async
     def _persist_artifacts(**kwargs):
@@ -2508,9 +2583,12 @@ async def test_process_single_url_offloads_extract_records_to_thread(
         return func(*args, **kwargs)
 
     monkeypatch.setattr("app.services.pipeline.extraction_loop.acquire", _fake_acquire)
-    monkeypatch.setattr("app.services.pipeline.extraction_loop.run_adapter", _no_adapter)
     monkeypatch.setattr(
-        "app.services.pipeline.extraction_loop.load_domain_selector_rules", _no_selector_rules
+        "app.services.pipeline.extraction_loop.run_adapter", _no_adapter
+    )
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.load_domain_selector_rules",
+        _no_selector_rules,
     )
     monkeypatch.setattr(
         "app.services.pipeline.record_extraction_stage.asyncio.to_thread",
@@ -2566,9 +2644,12 @@ async def test_process_single_url_keeps_platform_family_separate_from_adapter_pr
         "app.services.pipeline.extraction_loop.detect_platform_family",
         lambda *args, **kwargs: "shopify",
     )
-    monkeypatch.setattr("app.services.pipeline.extraction_loop.run_adapter", _no_adapter)
     monkeypatch.setattr(
-        "app.services.pipeline.extraction_loop.load_domain_selector_rules", _no_selector_rules
+        "app.services.pipeline.extraction_loop.run_adapter", _no_adapter
+    )
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.load_domain_selector_rules",
+        _no_selector_rules,
     )
     monkeypatch.setattr(
         "app.services.pipeline.extraction_loop.extract_records",
@@ -2739,7 +2820,9 @@ async def test_process_single_url_applies_llm_fallback_when_confidence_score_is_
         "app.services.pipeline.direct_record_fallback.extract_missing_fields",
         _fake_extract_missing_fields,
     )
-    monkeypatch.setattr("app.services.pipeline.extraction_loop.run_adapter", _no_adapter)
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.run_adapter", _no_adapter
+    )
     monkeypatch.setattr(
         "app.services.pipeline.extraction_loop.load_domain_selector_rules",
         _no_selector_rules,
@@ -2812,7 +2895,9 @@ async def test_process_single_url_strips_schema_type_mismatches_during_normaliza
         return "artifacts/widget-prime.html"
 
     monkeypatch.setattr("app.services.pipeline.extraction_loop.acquire", _fake_acquire)
-    monkeypatch.setattr("app.services.pipeline.extraction_loop.run_adapter", _no_adapter)
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.run_adapter", _no_adapter
+    )
     monkeypatch.setattr(
         "app.services.pipeline.extraction_loop.load_domain_selector_rules",
         _no_selector_rules,
@@ -2894,12 +2979,16 @@ async def test_process_single_url_persists_browser_diagnostics_and_screenshot_ar
         return []
 
     monkeypatch.setattr("app.services.pipeline.extraction_loop.acquire", _fake_acquire)
-    monkeypatch.setattr("app.services.pipeline.extraction_loop.run_adapter", _no_adapter)
     monkeypatch.setattr(
-        "app.services.pipeline.extraction_loop.load_domain_selector_rules", _no_selector_rules
+        "app.services.pipeline.extraction_loop.run_adapter", _no_adapter
     )
     monkeypatch.setattr(
-        "app.services.pipeline.extraction_loop.extract_records", lambda *args, **kwargs: []
+        "app.services.pipeline.extraction_loop.load_domain_selector_rules",
+        _no_selector_rules,
+    )
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.extract_records",
+        lambda *args, **kwargs: [],
     )
 
     await process_single_url(db_session, run, run.url)
@@ -3040,12 +3129,16 @@ async def test_process_single_url_does_not_retry_browser_after_empty_browser_acq
         return []
 
     monkeypatch.setattr("app.services.pipeline.extraction_loop.acquire", _fake_acquire)
-    monkeypatch.setattr("app.services.pipeline.extraction_loop.run_adapter", _no_adapter)
     monkeypatch.setattr(
-        "app.services.pipeline.extraction_loop.load_domain_selector_rules", _no_selector_rules
+        "app.services.pipeline.extraction_loop.run_adapter", _no_adapter
     )
     monkeypatch.setattr(
-        "app.services.pipeline.extraction_loop.extract_records", lambda *args, **kwargs: []
+        "app.services.pipeline.extraction_loop.load_domain_selector_rules",
+        _no_selector_rules,
+    )
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.extract_records",
+        lambda *args, **kwargs: [],
     )
 
     @_as_async
@@ -3117,12 +3210,16 @@ async def test_process_single_url_skips_llm_on_low_content_browser_listing(
         return "artifacts/widgets.html"
 
     monkeypatch.setattr("app.services.pipeline.extraction_loop.acquire", _fake_acquire)
-    monkeypatch.setattr("app.services.pipeline.extraction_loop.run_adapter", _no_adapter)
     monkeypatch.setattr(
-        "app.services.pipeline.extraction_loop.load_domain_selector_rules", _no_selector_rules
+        "app.services.pipeline.extraction_loop.run_adapter", _no_adapter
     )
     monkeypatch.setattr(
-        "app.services.pipeline.extraction_loop.extract_records", lambda *args, **kwargs: []
+        "app.services.pipeline.extraction_loop.load_domain_selector_rules",
+        _no_selector_rules,
+    )
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.extract_records",
+        lambda *args, **kwargs: [],
     )
     monkeypatch.setattr(
         "app.services.pipeline.extraction_loop.apply_direct_record_llm_fallback_impl",
@@ -3191,15 +3288,20 @@ async def test_process_single_url_does_not_use_direct_llm_as_primary_listing_ext
         return "artifacts/widgets.html"
 
     monkeypatch.setattr("app.services.pipeline.extraction_loop.acquire", _fake_acquire)
-    monkeypatch.setattr("app.services.pipeline.extraction_loop.run_adapter", _no_adapter)
     monkeypatch.setattr(
-        "app.services.pipeline.extraction_loop.load_domain_selector_rules", _no_selector_rules
+        "app.services.pipeline.extraction_loop.run_adapter", _no_adapter
     )
     monkeypatch.setattr(
-        "app.services.pipeline.extraction_loop.extract_records", lambda *args, **kwargs: []
+        "app.services.pipeline.extraction_loop.load_domain_selector_rules",
+        _no_selector_rules,
     )
     monkeypatch.setattr(
-        "app.services.pipeline.extraction_loop.resolve_run_config", _unexpected_resolve_run_config
+        "app.services.pipeline.extraction_loop.extract_records",
+        lambda *args, **kwargs: [],
+    )
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.resolve_run_config",
+        _unexpected_resolve_run_config,
     )
     monkeypatch.setattr(
         "app.services.pipeline.extraction_loop.persist_acquisition_artifacts",
@@ -3254,9 +3356,12 @@ async def test_process_single_url_ignores_extracted_placeholder_records_from_low
         return []
 
     monkeypatch.setattr("app.services.pipeline.extraction_loop.acquire", _fake_acquire)
-    monkeypatch.setattr("app.services.pipeline.extraction_loop.run_adapter", _no_adapter)
     monkeypatch.setattr(
-        "app.services.pipeline.extraction_loop.load_domain_selector_rules", _no_selector_rules
+        "app.services.pipeline.extraction_loop.run_adapter", _no_adapter
+    )
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.load_domain_selector_rules",
+        _no_selector_rules,
     )
     monkeypatch.setattr(
         "app.services.pipeline.extraction_loop.extract_records",
@@ -3327,12 +3432,16 @@ async def test_process_single_url_does_not_retry_browser_after_prior_challenge_a
         return []
 
     monkeypatch.setattr("app.services.pipeline.extraction_loop.acquire", _fake_acquire)
-    monkeypatch.setattr("app.services.pipeline.extraction_loop.run_adapter", _no_adapter)
     monkeypatch.setattr(
-        "app.services.pipeline.extraction_loop.load_domain_selector_rules", _no_selector_rules
+        "app.services.pipeline.extraction_loop.run_adapter", _no_adapter
     )
     monkeypatch.setattr(
-        "app.services.pipeline.extraction_loop.extract_records", lambda *args, **kwargs: []
+        "app.services.pipeline.extraction_loop.load_domain_selector_rules",
+        _no_selector_rules,
+    )
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.extract_records",
+        lambda *args, **kwargs: [],
     )
 
     @_as_async
@@ -3397,12 +3506,16 @@ async def test_process_single_url_marks_low_content_listing_with_challenge_signa
         return []
 
     monkeypatch.setattr("app.services.pipeline.extraction_loop.acquire", _fake_acquire)
-    monkeypatch.setattr("app.services.pipeline.extraction_loop.run_adapter", _no_adapter)
     monkeypatch.setattr(
-        "app.services.pipeline.extraction_loop.load_domain_selector_rules", _no_selector_rules
+        "app.services.pipeline.extraction_loop.run_adapter", _no_adapter
     )
     monkeypatch.setattr(
-        "app.services.pipeline.extraction_loop.extract_records", lambda *args, **kwargs: []
+        "app.services.pipeline.extraction_loop.load_domain_selector_rules",
+        _no_selector_rules,
+    )
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.extract_records",
+        lambda *args, **kwargs: [],
     )
 
     @_as_async
@@ -3463,9 +3576,12 @@ async def test_process_single_url_rejects_detail_non_detail_seed_with_failure_re
         return []
 
     monkeypatch.setattr("app.services.pipeline.extraction_loop.acquire", _fake_acquire)
-    monkeypatch.setattr("app.services.pipeline.extraction_loop.run_adapter", _no_adapter)
     monkeypatch.setattr(
-        "app.services.pipeline.extraction_loop.load_domain_selector_rules", _no_selector_rules
+        "app.services.pipeline.extraction_loop.run_adapter", _no_adapter
+    )
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.load_domain_selector_rules",
+        _no_selector_rules,
     )
     monkeypatch.setattr(
         "app.services.pipeline.extraction_loop.extract_records",
@@ -3539,9 +3655,12 @@ async def test_process_single_url_rejects_detail_challenge_shell_and_marks_block
         return []
 
     monkeypatch.setattr("app.services.pipeline.extraction_loop.acquire", _fake_acquire)
-    monkeypatch.setattr("app.services.pipeline.extraction_loop.run_adapter", _no_adapter)
     monkeypatch.setattr(
-        "app.services.pipeline.extraction_loop.load_domain_selector_rules", _no_selector_rules
+        "app.services.pipeline.extraction_loop.run_adapter", _no_adapter
+    )
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.load_domain_selector_rules",
+        _no_selector_rules,
     )
     monkeypatch.setattr(
         "app.services.pipeline.extraction_loop.extract_records",
@@ -3618,9 +3737,12 @@ async def test_challenge_shell_budget_skip_logs_once(
         return []
 
     monkeypatch.setattr("app.services.pipeline.extraction_loop.acquire", _fake_acquire)
-    monkeypatch.setattr("app.services.pipeline.extraction_loop.run_adapter", _no_adapter)
     monkeypatch.setattr(
-        "app.services.pipeline.extraction_loop.load_domain_selector_rules", _no_selector_rules
+        "app.services.pipeline.extraction_loop.run_adapter", _no_adapter
+    )
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.load_domain_selector_rules",
+        _no_selector_rules,
     )
     monkeypatch.setattr(
         "app.services.pipeline.extraction_loop.extract_records",
@@ -3690,12 +3812,16 @@ async def test_process_single_url_raises_when_browser_retry_fails(
         return []
 
     monkeypatch.setattr("app.services.pipeline.extraction_loop.acquire", _fake_acquire)
-    monkeypatch.setattr("app.services.pipeline.extraction_loop.run_adapter", _no_adapter)
     monkeypatch.setattr(
-        "app.services.pipeline.extraction_loop.load_domain_selector_rules", _no_selector_rules
+        "app.services.pipeline.extraction_loop.run_adapter", _no_adapter
     )
     monkeypatch.setattr(
-        "app.services.pipeline.extraction_loop.extract_records", lambda *args, **kwargs: []
+        "app.services.pipeline.extraction_loop.load_domain_selector_rules",
+        _no_selector_rules,
+    )
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.extract_records",
+        lambda *args, **kwargs: [],
     )
 
     with pytest.raises(TimeoutError, match="browser retry timed out"):
@@ -3751,9 +3877,12 @@ async def test_process_single_url_persists_live_acquisition_events(
         return []
 
     monkeypatch.setattr("app.services.pipeline.extraction_loop.acquire", _fake_acquire)
-    monkeypatch.setattr("app.services.pipeline.extraction_loop.run_adapter", _no_adapter)
     monkeypatch.setattr(
-        "app.services.pipeline.extraction_loop.load_domain_selector_rules", _no_selector_rules
+        "app.services.pipeline.extraction_loop.run_adapter", _no_adapter
+    )
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.load_domain_selector_rules",
+        _no_selector_rules,
     )
     monkeypatch.setattr(
         "app.services.pipeline.extraction_loop.extract_records",
@@ -3855,11 +3984,16 @@ async def test_extract_records_for_acquisition_recovers_from_zero_record_travers
         return "artifacts/widgets.html"
 
     monkeypatch.setattr("app.services.pipeline.extraction_loop.acquire", _fake_acquire)
-    monkeypatch.setattr("app.services.pipeline.extraction_loop.run_adapter", _no_adapter)
     monkeypatch.setattr(
-        "app.services.pipeline.extraction_loop.load_domain_selector_rules", _no_selector_rules
+        "app.services.pipeline.extraction_loop.run_adapter", _no_adapter
     )
-    monkeypatch.setattr("app.services.pipeline.extraction_loop.extract_records", _extract_records)
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.load_domain_selector_rules",
+        _no_selector_rules,
+    )
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.extract_records", _extract_records
+    )
     monkeypatch.setattr(
         "app.services.pipeline.extraction_loop.persist_acquisition_artifacts",
         _persist_artifacts,

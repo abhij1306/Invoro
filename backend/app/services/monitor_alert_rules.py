@@ -48,7 +48,9 @@ def alert_rule_requested_fields(rules: list[dict[str, Any]]) -> list[str]:
     return _dedupe(fields)
 
 
-def alert_rule_tracked_values(data: dict[str, Any], rules: list[dict[str, Any]]) -> dict[str, Any]:
+def alert_rule_tracked_values(
+    data: dict[str, Any], rules: list[dict[str, Any]]
+) -> dict[str, Any]:
     values: dict[str, Any] = {}
     for index, rule in enumerate(rules):
         values[alert_rule_key(rule, index)] = alert_rule_value(data, rule)
@@ -98,11 +100,17 @@ def alert_rule_condition_met(rule: dict[str, Any], value: Any) -> bool:
         ALERT_RULE_OPERATOR_LESS_THAN_OR_EQUALS,
         ALERT_RULE_OPERATOR_GREATER_THAN_OR_EQUALS,
     }:
-        return _any_value_matches(value, lambda item: _compare_numbers(item, expected, operator))
+        return _any_value_matches(
+            value, lambda item: _compare_numbers(item, expected, operator)
+        )
     if operator == ALERT_RULE_OPERATOR_EQUALS:
-        return _any_value_matches(value, lambda item: _normalize_text(item) == _normalize_text(expected))
+        return _any_value_matches(
+            value, lambda item: _normalize_text(item) == _normalize_text(expected)
+        )
     if operator == ALERT_RULE_OPERATOR_NOT_EQUALS:
-        return _any_value_matches(value, lambda item: _normalize_text(item) != _normalize_text(expected))
+        return _any_value_matches(
+            value, lambda item: _normalize_text(item) != _normalize_text(expected)
+        )
     return False
 
 

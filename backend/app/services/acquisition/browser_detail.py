@@ -295,7 +295,9 @@ async def expand_all_interactive_elements_impl(
         selector_clicks = 0
         for handle, prefetched_snapshot in candidate_rows:
             if clicked_count >= max_interactions:
-                diagnostics["status"] = DETAIL_EXPANSION_STATUS_INTERACTION_LIMIT_REACHED
+                diagnostics["status"] = (
+                    DETAIL_EXPANSION_STATUS_INTERACTION_LIMIT_REACHED
+                )
                 break
             if max_elapsed_ms is not None and elapsed_ms(started_at) >= int(
                 max_elapsed_ms

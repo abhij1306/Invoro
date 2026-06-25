@@ -67,7 +67,11 @@ class AlertRule(BaseModel):
             field = path.removeprefix(ALERT_VARIANT_WILDCARD_PATH_PREFIX)
             if field and field.replace("_", "").isalnum() and not field[0].isdigit():
                 return path
-        if "." not in path and path.replace("_", "").isalnum() and not path[0].isdigit():
+        if (
+            "." not in path
+            and path.replace("_", "").isalnum()
+            and not path[0].isdigit()
+        ):
             return path
         raise ValueError("unsupported alert rule path")
 
@@ -92,7 +96,9 @@ def validate_target_rules(value: list[AlertRule] | None) -> list[AlertRule] | No
 
 class AlertCreate(BaseModel):
     url: str
-    target_fields: list[str] = Field(default_factory=lambda: list(ALERT_DEFAULT_TARGET_FIELDS))
+    target_fields: list[str] = Field(
+        default_factory=lambda: list(ALERT_DEFAULT_TARGET_FIELDS)
+    )
     target_rules: list[AlertRule] | None = None
     condition: str | None = None
     webhook_url: str | None = None
@@ -125,7 +131,9 @@ class AlertCreate(BaseModel):
 class AlertUpdate(BaseModel):
     condition: str | None = None
     webhook_url: str | None = None
-    poll_interval_seconds: int | None = Field(default=None, ge=MIN_ALERT_POLL_INTERVAL_SECONDS)
+    poll_interval_seconds: int | None = Field(
+        default=None, ge=MIN_ALERT_POLL_INTERVAL_SECONDS
+    )
     status: AlertStatus | None = None
     target_fields: list[str] | None = None
     target_rules: list[AlertRule] | None = None

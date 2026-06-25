@@ -213,7 +213,10 @@ def extract_heading_sections(
         sections.setdefault("Composition", materials)
 
     for anchor in root.find_all("a"):
-        if not (str(anchor.get("href") or "").startswith("#") or anchor.has_attr("aria-controls")):
+        if not (
+            str(anchor.get("href") or "").startswith("#")
+            or anchor.has_attr("aria-controls")
+        ):
             continue
         if _node_is_section_navigation_label(anchor):
             continue
@@ -531,9 +534,8 @@ def _extract_adjacent_panel_content(node: Tag, *, label: str) -> str:
             if _node_is_hidden_or_auxiliary(sibling):
                 continue
             text = _section_text(sibling, label=label)
-            if (
-                len(text) >= 12
-                and section_text_is_meaningful(sibling, label=label, text=text)
+            if len(text) >= 12 and section_text_is_meaningful(
+                sibling, label=label, text=text
             ):
                 return text
         parent = container.parent

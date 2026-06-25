@@ -28,9 +28,9 @@ async def create_page_audit_job(
 ) -> PageAuditJob:
     normalized_url = ensure_scheme(str(payload.get("url") or "").strip())
     await validate_public_target(normalized_url)
-    context = str(
-        payload.get("context") or config.PAGE_AUDIT_CONTEXT_AUTO
-    ).strip().lower()
+    context = (
+        str(payload.get("context") or config.PAGE_AUDIT_CONTEXT_AUTO).strip().lower()
+    )
     if context not in config.PAGE_AUDIT_ALLOWED_CONTEXTS:
         raise ValueError("Unsupported page audit context")
     job = PageAuditJob(
@@ -101,9 +101,7 @@ async def get_page_audit_job(
     job_id: int,
 ) -> PageAuditJob:
     job = await session.get(PageAuditJob, job_id)
-    if job is None or (
-        getattr(user, "role", "") != "admin" and job.user_id != user.id
-    ):
+    if job is None or (getattr(user, "role", "") != "admin" and job.user_id != user.id):
         raise LookupError("Page audit job not found")
     return job
 
@@ -158,9 +156,7 @@ async def build_page_audit_report(
         else {}
     )
     dom_html = str(
-        artifacts.get("full_rendered_html")
-        or getattr(dom_result, "html", "")
-        or ""
+        artifacts.get("full_rendered_html") or getattr(dom_result, "html", "") or ""
     )
     final_url = str(
         getattr(dom_result, "final_url", "")
@@ -173,9 +169,7 @@ async def build_page_audit_report(
         dom_html=dom_html,
         context=context,
     )
-    browser_diagnostics = dict(
-        getattr(dom_result, "browser_diagnostics", {}) or {}
-    )
+    browser_diagnostics = dict(getattr(dom_result, "browser_diagnostics", {}) or {})
     report["render_summary"] = {
         **dict(report.get("render_summary") or {}),
         "source_method": str(getattr(source_result, "method", "") or ""),

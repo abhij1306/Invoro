@@ -524,7 +524,9 @@ async def test_select_category_skips_discover_when_sitemap_urls_are_all_pdps(
 
 
 @pytest.mark.component
-def test_merge_seed_detail_products_keeps_seed_pdps_without_duplicate_discovery() -> None:
+def test_merge_seed_detail_products_keeps_seed_pdps_without_duplicate_discovery() -> (
+    None
+):
     merged = _merge_seed_detail_products(
         {
             "seed_detail_urls": [
@@ -637,17 +639,17 @@ async def test_start_discover_uses_sitemap_stage_for_shallow_locale_root(
         assert urls == ["https://usa.tommy.com/en"]
         assert kwargs["limit"] == 10
         nav_tree = [
-                {
-                    "label": "Women",
-                    "url": "https://usa.tommy.com/en/women",
-                    "children": [
-                        {
-                            "label": "Clothing",
-                            "url": "https://usa.tommy.com/en/women/clothing",
-                            "children": [],
-                        }
-                    ],
-                }
+            {
+                "label": "Women",
+                "url": "https://usa.tommy.com/en/women",
+                "children": [
+                    {
+                        "label": "Clothing",
+                        "url": "https://usa.tommy.com/en/women/clothing",
+                        "children": [],
+                    }
+                ],
+            }
         ]
         return {
             "status": "completed",
@@ -655,9 +657,7 @@ async def test_start_discover_uses_sitemap_stage_for_shallow_locale_root(
             "sources": {"https://usa.tommy.com/en": "homepage"},
             "urls": ["https://usa.tommy.com/en/women/clothing"],
             "groups": {
-                "https://usa.tommy.com/en": [
-                    "https://usa.tommy.com/en/women/clothing"
-                ]
+                "https://usa.tommy.com/en": ["https://usa.tommy.com/en/women/clothing"]
             },
             "trees": {"https://usa.tommy.com/en": nav_tree},
             "errors": {},
@@ -947,5 +947,11 @@ async def test_start_discover_does_not_block_remaining_urls_on_slow_first_input(
     assert playground.step_data["sitemap"]["urls"] == [
         "https://fast-brand.example/collections/women"
     ]
-    assert playground.step_data["sitemap"]["sources"]["https://slow-brand.example"] == "timeout"
-    assert playground.step_data["sitemap"]["errors"]["https://slow-brand.example"] == "TimeoutError"
+    assert (
+        playground.step_data["sitemap"]["sources"]["https://slow-brand.example"]
+        == "timeout"
+    )
+    assert (
+        playground.step_data["sitemap"]["errors"]["https://slow-brand.example"]
+        == "TimeoutError"
+    )

@@ -7,6 +7,7 @@ These guard two real failures observed in the DB crawl history:
   because `unsupported_non_detail_ecommerce_merchandise_hint` accepted paths
   like `/en-us/lp/dt/energy-efficient-data-center`.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -22,7 +23,9 @@ from app.services.extract.detail.identity import (
 def test_tirerack_product_url_is_not_structural() -> None:
     """Product URLs like `/accessories/<product-slug>` must survive the filter."""
     page = "https://www.tirerack.com/accessories/category.jsp?category=Batteries"
-    product = "https://www.tirerack.com/accessories/ctek-nxt-5-battery-charger-maintainer"
+    product = (
+        "https://www.tirerack.com/accessories/ctek-nxt-5-battery-charger-maintainer"
+    )
     assert listing_url_is_structural(product, page) is False
 
 
@@ -157,7 +160,9 @@ def test_looks_like_utility_url_rejects_hyphenated_policy_pages() -> None:
     from app.services.extract.listing_candidate_ranking import looks_like_utility_url
 
     assert looks_like_utility_url("https://content.abfrl.in/shipping-policy") is True
-    assert looks_like_utility_url("https://content.abfrl.in/returns-cancel-policy") is True
+    assert (
+        looks_like_utility_url("https://content.abfrl.in/returns-cancel-policy") is True
+    )
     assert (
         looks_like_utility_url(
             "https://euremotejobs.com/job/account-manager-generator-customers/"

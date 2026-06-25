@@ -59,14 +59,18 @@ def analyze_page(
     }
 
 
-def _source_checks(soup: BeautifulSoup, *, url: str) -> tuple[list[Check], dict[str, Any]]:
+def _source_checks(
+    soup: BeautifulSoup, *, url: str
+) -> tuple[list[Check], dict[str, Any]]:
     title_nodes = soup.find_all("title")
     title = _node_text(title_nodes[0]) if title_nodes else ""
     description = _meta_content(soup, name="description")
     h1_nodes = soup.find_all("h1")
     h1_text = _node_text(h1_nodes[0]) if h1_nodes else ""
     canonical_nodes = soup.select("link[rel~='canonical']")
-    canonical = _absolute_url(url, canonical_nodes[0].get("href")) if canonical_nodes else ""
+    canonical = (
+        _absolute_url(url, canonical_nodes[0].get("href")) if canonical_nodes else ""
+    )
     robots = _meta_content(soup, name="robots").lower()
     viewport = _meta_content(soup, name="viewport").lower()
     lang = str(soup.html.get("lang") or "").strip() if soup.html else ""
@@ -76,34 +80,194 @@ def _source_checks(soup: BeautifulSoup, *, url: str) -> tuple[list[Check], dict[
     homepage = not page_path
     product_signals = _has_product_signals(soup, schema_types)
     review_signals = bool(
-        soup.select("[itemprop='review'], [itemprop='reviewCount'], [class*='review' i]")
+        soup.select(
+            "[itemprop='review'], [itemprop='reviewCount'], [class*='review' i]"
+        )
     )
     canonical_target = canonical or url
     checks = [
-        _check("title_exists", config.CATEGORY_SEO, config.SEVERITY_CRITICAL, config.DATA_SOURCE_SOURCE, bool(title), title, "non-empty"),
-        _check("title_length", config.CATEGORY_SEO, config.SEVERITY_HIGH, config.DATA_SOURCE_SOURCE, config.TITLE_MIN_CHARS <= len(title) <= config.TITLE_MAX_CHARS, len(title), f"{config.TITLE_MIN_CHARS}-{config.TITLE_MAX_CHARS}"),
-        _check("meta_description_exists", config.CATEGORY_SEO, config.SEVERITY_HIGH, config.DATA_SOURCE_SOURCE, bool(description), description, "non-empty"),
-        _check("meta_description_length", config.CATEGORY_SEO, config.SEVERITY_HIGH, config.DATA_SOURCE_SOURCE, config.META_DESCRIPTION_MIN_CHARS <= len(description) <= config.META_DESCRIPTION_MAX_CHARS, len(description), f"{config.META_DESCRIPTION_MIN_CHARS}-{config.META_DESCRIPTION_MAX_CHARS}"),
-        _check("h1_count", config.CATEGORY_SEO, config.SEVERITY_CRITICAL, config.DATA_SOURCE_SOURCE, len(h1_nodes) == 1, len(h1_nodes), 1),
-        _check("h1_non_empty", config.CATEGORY_ACCESSIBILITY, config.SEVERITY_HIGH, config.DATA_SOURCE_SOURCE, bool(h1_text), h1_text, "non-empty"),
-        _check("canonical_exists", config.CATEGORY_SEO, config.SEVERITY_HIGH, config.DATA_SOURCE_SOURCE, bool(canonical), canonical, url),
-        _check("canonical_matches_url", config.CATEGORY_SEO, config.SEVERITY_HIGH, config.DATA_SOURCE_SOURCE, _same_url(canonical, url), canonical, url),
-        _check("lang_attribute", config.CATEGORY_ACCESSIBILITY, config.SEVERITY_MEDIUM, config.DATA_SOURCE_SOURCE, bool(re.fullmatch(r"[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*", lang)), lang, "BCP47 language code"),
-        _check("robots_indexable", config.CATEGORY_SEO, config.SEVERITY_CRITICAL, config.DATA_SOURCE_SOURCE, "noindex" not in robots, robots or "not set", "no noindex"),
-        _check("viewport_mobile", config.CATEGORY_ACCESSIBILITY, config.SEVERITY_HIGH, config.DATA_SOURCE_SOURCE, "width=device-width" in viewport.replace(" ", ""), viewport, "width=device-width"),
+        _check(
+            "title_exists",
+            config.CATEGORY_SEO,
+            config.SEVERITY_CRITICAL,
+            config.DATA_SOURCE_SOURCE,
+            bool(title),
+            title,
+            "non-empty",
+        ),
+        _check(
+            "title_length",
+            config.CATEGORY_SEO,
+            config.SEVERITY_HIGH,
+            config.DATA_SOURCE_SOURCE,
+            config.TITLE_MIN_CHARS <= len(title) <= config.TITLE_MAX_CHARS,
+            len(title),
+            f"{config.TITLE_MIN_CHARS}-{config.TITLE_MAX_CHARS}",
+        ),
+        _check(
+            "meta_description_exists",
+            config.CATEGORY_SEO,
+            config.SEVERITY_HIGH,
+            config.DATA_SOURCE_SOURCE,
+            bool(description),
+            description,
+            "non-empty",
+        ),
+        _check(
+            "meta_description_length",
+            config.CATEGORY_SEO,
+            config.SEVERITY_HIGH,
+            config.DATA_SOURCE_SOURCE,
+            config.META_DESCRIPTION_MIN_CHARS
+            <= len(description)
+            <= config.META_DESCRIPTION_MAX_CHARS,
+            len(description),
+            f"{config.META_DESCRIPTION_MIN_CHARS}-{config.META_DESCRIPTION_MAX_CHARS}",
+        ),
+        _check(
+            "h1_count",
+            config.CATEGORY_SEO,
+            config.SEVERITY_CRITICAL,
+            config.DATA_SOURCE_SOURCE,
+            len(h1_nodes) == 1,
+            len(h1_nodes),
+            1,
+        ),
+        _check(
+            "h1_non_empty",
+            config.CATEGORY_ACCESSIBILITY,
+            config.SEVERITY_HIGH,
+            config.DATA_SOURCE_SOURCE,
+            bool(h1_text),
+            h1_text,
+            "non-empty",
+        ),
+        _check(
+            "canonical_exists",
+            config.CATEGORY_SEO,
+            config.SEVERITY_HIGH,
+            config.DATA_SOURCE_SOURCE,
+            bool(canonical),
+            canonical,
+            url,
+        ),
+        _check(
+            "canonical_matches_url",
+            config.CATEGORY_SEO,
+            config.SEVERITY_HIGH,
+            config.DATA_SOURCE_SOURCE,
+            _same_url(canonical, url),
+            canonical,
+            url,
+        ),
+        _check(
+            "lang_attribute",
+            config.CATEGORY_ACCESSIBILITY,
+            config.SEVERITY_MEDIUM,
+            config.DATA_SOURCE_SOURCE,
+            bool(re.fullmatch(r"[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*", lang)),
+            lang,
+            "BCP47 language code",
+        ),
+        _check(
+            "robots_indexable",
+            config.CATEGORY_SEO,
+            config.SEVERITY_CRITICAL,
+            config.DATA_SOURCE_SOURCE,
+            "noindex" not in robots,
+            robots or "not set",
+            "no noindex",
+        ),
+        _check(
+            "viewport_mobile",
+            config.CATEGORY_ACCESSIBILITY,
+            config.SEVERITY_HIGH,
+            config.DATA_SOURCE_SOURCE,
+            "width=device-width" in viewport.replace(" ", ""),
+            viewport,
+            "width=device-width",
+        ),
         _meta_check(soup, "og_title", property_name="og:title"),
         _meta_check(soup, "og_description", property_name="og:description"),
         _meta_check(soup, "og_image", property_name="og:image"),
-        _check("og_url", config.CATEGORY_SEO, config.SEVERITY_MEDIUM, config.DATA_SOURCE_SOURCE, _same_url(_meta_content(soup, property_name="og:url"), canonical_target), _meta_content(soup, property_name="og:url"), canonical_target),
+        _check(
+            "og_url",
+            config.CATEGORY_SEO,
+            config.SEVERITY_MEDIUM,
+            config.DATA_SOURCE_SOURCE,
+            _same_url(_meta_content(soup, property_name="og:url"), canonical_target),
+            _meta_content(soup, property_name="og:url"),
+            canonical_target,
+        ),
         _meta_check(soup, "twitter_card", name="twitter:card"),
         _meta_check(soup, "twitter_image", name="twitter:image"),
-        _check("jsonld_present", config.CATEGORY_STRUCTURED_DATA, config.SEVERITY_HIGH, config.DATA_SOURCE_SOURCE, bool(soup.select("script[type='application/ld+json']")), len(jsonld_values), "at least 1 block"),
-        _check("jsonld_parseable", config.CATEGORY_STRUCTURED_DATA, config.SEVERITY_HIGH, config.DATA_SOURCE_SOURCE, not jsonld_errors, jsonld_errors, "no parse errors"),
-        _check("schema_types_detected", config.CATEGORY_STRUCTURED_DATA, config.SEVERITY_MEDIUM, config.DATA_SOURCE_SOURCE, bool(schema_types), schema_types, "at least 1 @type"),
-        _check("schema_organization_present", config.CATEGORY_STRUCTURED_DATA, config.SEVERITY_MEDIUM, config.DATA_SOURCE_SOURCE, "organization" in schema_types, schema_types, "Organization", applicable=homepage),
-        _check("schema_breadcrumb_present", config.CATEGORY_STRUCTURED_DATA, config.SEVERITY_MEDIUM, config.DATA_SOURCE_SOURCE, "breadcrumblist" in schema_types, schema_types, "BreadcrumbList", applicable=not homepage),
-        _check("schema_product_present", config.CATEGORY_STRUCTURED_DATA, config.SEVERITY_CRITICAL, config.DATA_SOURCE_SOURCE, "product" in schema_types, schema_types, "Product", applicable=product_signals),
-        _check("schema_review_present", config.CATEGORY_STRUCTURED_DATA, config.SEVERITY_MEDIUM, config.DATA_SOURCE_SOURCE, bool({"review", "aggregaterating"} & set(schema_types)), schema_types, "Review or AggregateRating", applicable=review_signals),
+        _check(
+            "jsonld_present",
+            config.CATEGORY_STRUCTURED_DATA,
+            config.SEVERITY_HIGH,
+            config.DATA_SOURCE_SOURCE,
+            bool(soup.select("script[type='application/ld+json']")),
+            len(jsonld_values),
+            "at least 1 block",
+        ),
+        _check(
+            "jsonld_parseable",
+            config.CATEGORY_STRUCTURED_DATA,
+            config.SEVERITY_HIGH,
+            config.DATA_SOURCE_SOURCE,
+            not jsonld_errors,
+            jsonld_errors,
+            "no parse errors",
+        ),
+        _check(
+            "schema_types_detected",
+            config.CATEGORY_STRUCTURED_DATA,
+            config.SEVERITY_MEDIUM,
+            config.DATA_SOURCE_SOURCE,
+            bool(schema_types),
+            schema_types,
+            "at least 1 @type",
+        ),
+        _check(
+            "schema_organization_present",
+            config.CATEGORY_STRUCTURED_DATA,
+            config.SEVERITY_MEDIUM,
+            config.DATA_SOURCE_SOURCE,
+            "organization" in schema_types,
+            schema_types,
+            "Organization",
+            applicable=homepage,
+        ),
+        _check(
+            "schema_breadcrumb_present",
+            config.CATEGORY_STRUCTURED_DATA,
+            config.SEVERITY_MEDIUM,
+            config.DATA_SOURCE_SOURCE,
+            "breadcrumblist" in schema_types,
+            schema_types,
+            "BreadcrumbList",
+            applicable=not homepage,
+        ),
+        _check(
+            "schema_product_present",
+            config.CATEGORY_STRUCTURED_DATA,
+            config.SEVERITY_CRITICAL,
+            config.DATA_SOURCE_SOURCE,
+            "product" in schema_types,
+            schema_types,
+            "Product",
+            applicable=product_signals,
+        ),
+        _check(
+            "schema_review_present",
+            config.CATEGORY_STRUCTURED_DATA,
+            config.SEVERITY_MEDIUM,
+            config.DATA_SOURCE_SOURCE,
+            bool({"review", "aggregaterating"} & set(schema_types)),
+            schema_types,
+            "Review or AggregateRating",
+            applicable=review_signals,
+        ),
     ]
     return checks, {
         "schema_types": schema_types,
@@ -124,14 +288,18 @@ def _dom_checks(
     lcp = _lcp_candidate(soup)
     source_lcp = _lcp_candidate(source_soup)
     lcp_hidden = _is_hidden(lcp)
-    lcp_lazy = bool(lcp and lcp.name == "img" and str(lcp.get("loading") or "").lower() == "lazy")
+    lcp_lazy = bool(
+        lcp and lcp.name == "img" and str(lcp.get("loading") or "").lower() == "lazy"
+    )
     above_fold_lazy = [
         _element_summary(image)
         for image in images[: config.ABOVE_FOLD_IMAGE_SAMPLE_SIZE]
         if str(image.get("loading") or "").lower() == "lazy"
     ]
     hero_image = soup.select_one("[class*='hero' i] img, [class*='banner' i] img")
-    missing_alt = [_element_summary(image) for image in images if image.get("alt") is None]
+    missing_alt = [
+        _element_summary(image) for image in images if image.get("alt") is None
+    ]
     missing_dimensions = [
         _element_summary(image)
         for image in images
@@ -150,28 +318,42 @@ def _dom_checks(
     oversized_srcsets = [
         _element_summary(image)
         for image in images
-        if len([item for item in str(image.get("srcset") or "").split(",") if item.strip()])
+        if len(
+            [item for item in str(image.get("srcset") or "").split(",") if item.strip()]
+        )
         > config.MAX_SRCSET_ENTRIES
     ]
     external_scripts = list(soup.select("script[src]"))
     blocking_scripts = [
         _element_summary(node)
-        for node in soup.select("head script[src]:not([async]):not([defer]):not([type='module'])")
+        for node in soup.select(
+            "head script[src]:not([async]):not([defer]):not([type='module'])"
+        )
     ]
-    script_text = " ".join(str(node.get("src") or "") for node in external_scripts).lower()
-    analytics_hits = sorted({token for token in config.ANALYTICS_SIGNALS if token in script_text})
-    ab_hits = sorted({token for token in config.AB_TEST_SIGNALS if token in script_text})
+    script_text = " ".join(
+        str(node.get("src") or "") for node in external_scripts
+    ).lower()
+    analytics_hits = sorted(
+        {token for token in config.ANALYTICS_SIGNALS if token in script_text}
+    )
+    ab_hits = sorted(
+        {token for token in config.AB_TEST_SIGNALS if token in script_text}
+    )
     chat_hits = sorted({token for token in config.CHAT_SIGNALS if token in script_text})
     frameworks = _frameworks(str(soup))
     forms = list(soup.find_all("form"))
-    forms_without_action = [_element_summary(form) for form in forms if not form.get("action")]
+    forms_without_action = [
+        _element_summary(form) for form in forms if not form.get("action")
+    ]
     state_changing_forms = [
         form for form in forms if str(form.get("method") or "get").lower() != "get"
     ]
     forms_without_csrf = [
         _element_summary(form)
         for form in state_changing_forms
-        if not form.select_one("input[type='hidden'][name*='csrf' i], input[type='hidden'][name*='token' i]")
+        if not form.select_one(
+            "input[type='hidden'][name*='csrf' i], input[type='hidden'][name*='token' i]"
+        )
     ]
     unlabeled_inputs = [
         _element_summary(control)
@@ -191,52 +373,355 @@ def _dom_checks(
     broken_anchors = _broken_anchor_links(soup)
     insecure_external_links = _insecure_external_blank_links(soup, url=url)
     duplicate_ids = sorted(
-        value for value, count in Counter(str(node.get("id")) for node in soup.select("[id]")).items() if count > 1
+        value
+        for value, count in Counter(
+            str(node.get("id")) for node in soup.select("[id]")
+        ).items()
+        if count > 1
     )
     canonical_count = len(soup.select("link[rel~='canonical']"))
     internal_nofollow = _internal_nofollow_links(soup, url=url)
     font_preloads = list(soup.select("link[rel~='preload'][as='font']"))
     font_links = list(soup.select("link[href*='fonts.googleapis.com']"))
     font_families = _font_family_count(soup)
-    body_stylesheets = [_element_summary(node) for node in soup.select("body link[rel~='stylesheet']")]
-    inline_style_bytes = sum(len(node.get_text().encode("utf-8")) for node in soup.find_all("style"))
+    body_stylesheets = [
+        _element_summary(node) for node in soup.select("body link[rel~='stylesheet']")
+    ]
+    inline_style_bytes = sum(
+        len(node.get_text().encode("utf-8")) for node in soup.find_all("style")
+    )
     base_nodes = list(soup.find_all("base"))
     checks = [
-        _check("lcp_candidate_present", config.CATEGORY_PERFORMANCE, config.SEVERITY_CRITICAL, config.DATA_SOURCE_DOM, lcp is not None, _element_summary(lcp), "identifiable candidate"),
-        _check("lcp_candidate_visible", config.CATEGORY_PERFORMANCE, config.SEVERITY_CRITICAL, config.DATA_SOURCE_DOM, not lcp_hidden, _element_summary(lcp), "visible", applicable=lcp is not None),
-        _check("lcp_candidate_in_source", config.CATEGORY_PERFORMANCE, config.SEVERITY_HIGH, config.DATA_SOURCE_DOM, source_lcp is not None, _element_summary(source_lcp), "candidate in source", applicable=lcp is not None),
-        _check("lcp_candidate_lazy_loaded", config.CATEGORY_PERFORMANCE, config.SEVERITY_CRITICAL, config.DATA_SOURCE_DOM, not lcp_lazy, _element_summary(lcp), "not loading=lazy", applicable=bool(lcp and lcp.name == "img")),
-        _check("above_fold_images_eager", config.CATEGORY_PERFORMANCE, config.SEVERITY_HIGH, config.DATA_SOURCE_DOM, not above_fold_lazy, above_fold_lazy, "no lazy images in first viewport"),
-        _check("hero_image_priority", config.CATEGORY_PERFORMANCE, config.SEVERITY_HIGH, config.DATA_SOURCE_DOM, bool(hero_image and str(hero_image.get("fetchpriority") or "").lower() == "high"), _element_summary(hero_image), "fetchpriority=high", applicable=hero_image is not None),
-        _check("images_have_alt", config.CATEGORY_ACCESSIBILITY, config.SEVERITY_HIGH, config.DATA_SOURCE_DOM, not missing_alt, missing_alt, "alt attribute on every image"),
-        _check("images_have_dimensions", config.CATEGORY_PERFORMANCE, config.SEVERITY_MEDIUM, config.DATA_SOURCE_DOM, not missing_dimensions, missing_dimensions, "width and height"),
-        _check("image_origins_reliable", config.CATEGORY_PERFORMANCE, config.SEVERITY_MEDIUM, config.DATA_SOURCE_DOM, not suspicious_origins, suspicious_origins, "site or CDN origins"),
-        _check("srcset_size_reasonable", config.CATEGORY_PERFORMANCE, config.SEVERITY_LOW, config.DATA_SOURCE_DOM, not oversized_srcsets, oversized_srcsets, f"at most {config.MAX_SRCSET_ENTRIES} entries"),
-        _check("external_script_count", config.CATEGORY_PERFORMANCE, config.SEVERITY_MEDIUM, config.DATA_SOURCE_DOM, len(external_scripts) <= config.MAX_EXTERNAL_SCRIPT_COUNT, len(external_scripts), f"at most {config.MAX_EXTERNAL_SCRIPT_COUNT}"),
-        _check("render_blocking_scripts", config.CATEGORY_PERFORMANCE, config.SEVERITY_HIGH, config.DATA_SOURCE_DOM, not blocking_scripts, blocking_scripts, "none"),
-        _check("analytics_stack_bounded", config.CATEGORY_PERFORMANCE, config.SEVERITY_MEDIUM, config.DATA_SOURCE_DOM, len(analytics_hits) <= config.MAX_ANALYTICS_STACK_COUNT, analytics_hits, f"at most {config.MAX_ANALYTICS_STACK_COUNT}"),
-        _check("gtm_not_redundant", config.CATEGORY_PERFORMANCE, config.SEVERITY_MEDIUM, config.DATA_SOURCE_DOM, not ("googletagmanager.com/gtm.js" in analytics_hits and "googletagmanager.com/gtag/js" in analytics_hits), analytics_hits, "one Google loading path"),
-        _check("ab_testing_tools_absent", config.CATEGORY_PERFORMANCE, config.SEVERITY_LOW, config.DATA_SOURCE_DOM, not ab_hits, ab_hits, "none"),
-        _check("chat_widgets_absent", config.CATEGORY_PERFORMANCE, config.SEVERITY_LOW, config.DATA_SOURCE_DOM, not chat_hits, chat_hits, "none"),
-        _check("framework_detected", config.CATEGORY_PERFORMANCE, config.SEVERITY_LOW, config.DATA_SOURCE_DOM, True, frameworks, "informational"),
-        _check("forms_have_action", config.CATEGORY_ACCESSIBILITY, config.SEVERITY_MEDIUM, config.DATA_SOURCE_DOM, not forms_without_action, forms_without_action, "action on each form"),
-        _check("forms_have_csrf", config.CATEGORY_ACCESSIBILITY, config.SEVERITY_HIGH, config.DATA_SOURCE_DOM, not forms_without_csrf, forms_without_csrf, "CSRF token"),
-        _check("inputs_have_labels", config.CATEGORY_ACCESSIBILITY, config.SEVERITY_HIGH, config.DATA_SOURCE_DOM, not unlabeled_inputs, unlabeled_inputs, "label or aria-label"),
-        _check("password_autocomplete_allowed", config.CATEGORY_ACCESSIBILITY, config.SEVERITY_LOW, config.DATA_SOURCE_DOM, not password_autocomplete_off, password_autocomplete_off, "autocomplete enabled"),
-        _check("sensitive_forms_not_get", config.CATEGORY_ACCESSIBILITY, config.SEVERITY_HIGH, config.DATA_SOURCE_DOM, not sensitive_get_forms, sensitive_get_forms, "POST"),
-        _check("anchor_targets_exist", config.CATEGORY_ACCESSIBILITY, config.SEVERITY_MEDIUM, config.DATA_SOURCE_DOM, not broken_anchors, broken_anchors, "existing target IDs"),
-        _check("external_blank_links_secure", config.CATEGORY_ACCESSIBILITY, config.SEVERITY_MEDIUM, config.DATA_SOURCE_DOM, not insecure_external_links, insecure_external_links, "rel=noopener noreferrer"),
-        _check("duplicate_ids_absent", config.CATEGORY_ACCESSIBILITY, config.SEVERITY_HIGH, config.DATA_SOURCE_DOM, not duplicate_ids, duplicate_ids, "unique IDs"),
-        _check("single_canonical", config.CATEGORY_SEO, config.SEVERITY_CRITICAL, config.DATA_SOURCE_DOM, canonical_count <= 1, canonical_count, "at most 1"),
-        _check("internal_nofollow_absent", config.CATEGORY_SEO, config.SEVERITY_LOW, config.DATA_SOURCE_DOM, not internal_nofollow, internal_nofollow, "none"),
-        _check("critical_fonts_preloaded", config.CATEGORY_PERFORMANCE, config.SEVERITY_LOW, config.DATA_SOURCE_DOM, bool(font_preloads), len(font_preloads), "at least 1", applicable=_uses_custom_fonts(soup)),
-        _check("font_preloads_crossorigin", config.CATEGORY_PERFORMANCE, config.SEVERITY_MEDIUM, config.DATA_SOURCE_DOM, all(node.has_attr("crossorigin") for node in font_preloads), [_element_summary(node) for node in font_preloads if not node.has_attr("crossorigin")], "crossorigin on every font preload"),
-        _check("google_fonts_nonblocking", config.CATEGORY_PERFORMANCE, config.SEVERITY_MEDIUM, config.DATA_SOURCE_DOM, not font_links, [_element_summary(node) for node in font_links], "no blocking Google Fonts stylesheet"),
-        _check("font_family_count", config.CATEGORY_PERFORMANCE, config.SEVERITY_LOW, config.DATA_SOURCE_DOM, font_families <= config.MAX_FONT_FAMILIES, font_families, f"at most {config.MAX_FONT_FAMILIES}"),
-        _check("stylesheets_in_head", config.CATEGORY_PERFORMANCE, config.SEVERITY_HIGH, config.DATA_SOURCE_DOM, not body_stylesheets, body_stylesheets, "none in body"),
-        _check("inline_style_size", config.CATEGORY_PERFORMANCE, config.SEVERITY_MEDIUM, config.DATA_SOURCE_DOM, inline_style_bytes <= config.MAX_INLINE_STYLE_BYTES, inline_style_bytes, f"at most {config.MAX_INLINE_STYLE_BYTES} bytes"),
-        _check("single_title", config.CATEGORY_SEO, config.SEVERITY_HIGH, config.DATA_SOURCE_DOM, len(soup.find_all("title")) <= 1, len(soup.find_all("title")), "at most 1"),
-        _check("base_tag_absent", config.CATEGORY_SEO, config.SEVERITY_LOW, config.DATA_SOURCE_DOM, not base_nodes, [_element_summary(node) for node in base_nodes], "none"),
+        _check(
+            "lcp_candidate_present",
+            config.CATEGORY_PERFORMANCE,
+            config.SEVERITY_CRITICAL,
+            config.DATA_SOURCE_DOM,
+            lcp is not None,
+            _element_summary(lcp),
+            "identifiable candidate",
+        ),
+        _check(
+            "lcp_candidate_visible",
+            config.CATEGORY_PERFORMANCE,
+            config.SEVERITY_CRITICAL,
+            config.DATA_SOURCE_DOM,
+            not lcp_hidden,
+            _element_summary(lcp),
+            "visible",
+            applicable=lcp is not None,
+        ),
+        _check(
+            "lcp_candidate_in_source",
+            config.CATEGORY_PERFORMANCE,
+            config.SEVERITY_HIGH,
+            config.DATA_SOURCE_DOM,
+            source_lcp is not None,
+            _element_summary(source_lcp),
+            "candidate in source",
+            applicable=lcp is not None,
+        ),
+        _check(
+            "lcp_candidate_lazy_loaded",
+            config.CATEGORY_PERFORMANCE,
+            config.SEVERITY_CRITICAL,
+            config.DATA_SOURCE_DOM,
+            not lcp_lazy,
+            _element_summary(lcp),
+            "not loading=lazy",
+            applicable=bool(lcp and lcp.name == "img"),
+        ),
+        _check(
+            "above_fold_images_eager",
+            config.CATEGORY_PERFORMANCE,
+            config.SEVERITY_HIGH,
+            config.DATA_SOURCE_DOM,
+            not above_fold_lazy,
+            above_fold_lazy,
+            "no lazy images in first viewport",
+        ),
+        _check(
+            "hero_image_priority",
+            config.CATEGORY_PERFORMANCE,
+            config.SEVERITY_HIGH,
+            config.DATA_SOURCE_DOM,
+            bool(
+                hero_image
+                and str(hero_image.get("fetchpriority") or "").lower() == "high"
+            ),
+            _element_summary(hero_image),
+            "fetchpriority=high",
+            applicable=hero_image is not None,
+        ),
+        _check(
+            "images_have_alt",
+            config.CATEGORY_ACCESSIBILITY,
+            config.SEVERITY_HIGH,
+            config.DATA_SOURCE_DOM,
+            not missing_alt,
+            missing_alt,
+            "alt attribute on every image",
+        ),
+        _check(
+            "images_have_dimensions",
+            config.CATEGORY_PERFORMANCE,
+            config.SEVERITY_MEDIUM,
+            config.DATA_SOURCE_DOM,
+            not missing_dimensions,
+            missing_dimensions,
+            "width and height",
+        ),
+        _check(
+            "image_origins_reliable",
+            config.CATEGORY_PERFORMANCE,
+            config.SEVERITY_MEDIUM,
+            config.DATA_SOURCE_DOM,
+            not suspicious_origins,
+            suspicious_origins,
+            "site or CDN origins",
+        ),
+        _check(
+            "srcset_size_reasonable",
+            config.CATEGORY_PERFORMANCE,
+            config.SEVERITY_LOW,
+            config.DATA_SOURCE_DOM,
+            not oversized_srcsets,
+            oversized_srcsets,
+            f"at most {config.MAX_SRCSET_ENTRIES} entries",
+        ),
+        _check(
+            "external_script_count",
+            config.CATEGORY_PERFORMANCE,
+            config.SEVERITY_MEDIUM,
+            config.DATA_SOURCE_DOM,
+            len(external_scripts) <= config.MAX_EXTERNAL_SCRIPT_COUNT,
+            len(external_scripts),
+            f"at most {config.MAX_EXTERNAL_SCRIPT_COUNT}",
+        ),
+        _check(
+            "render_blocking_scripts",
+            config.CATEGORY_PERFORMANCE,
+            config.SEVERITY_HIGH,
+            config.DATA_SOURCE_DOM,
+            not blocking_scripts,
+            blocking_scripts,
+            "none",
+        ),
+        _check(
+            "analytics_stack_bounded",
+            config.CATEGORY_PERFORMANCE,
+            config.SEVERITY_MEDIUM,
+            config.DATA_SOURCE_DOM,
+            len(analytics_hits) <= config.MAX_ANALYTICS_STACK_COUNT,
+            analytics_hits,
+            f"at most {config.MAX_ANALYTICS_STACK_COUNT}",
+        ),
+        _check(
+            "gtm_not_redundant",
+            config.CATEGORY_PERFORMANCE,
+            config.SEVERITY_MEDIUM,
+            config.DATA_SOURCE_DOM,
+            not (
+                "googletagmanager.com/gtm.js" in analytics_hits
+                and "googletagmanager.com/gtag/js" in analytics_hits
+            ),
+            analytics_hits,
+            "one Google loading path",
+        ),
+        _check(
+            "ab_testing_tools_absent",
+            config.CATEGORY_PERFORMANCE,
+            config.SEVERITY_LOW,
+            config.DATA_SOURCE_DOM,
+            not ab_hits,
+            ab_hits,
+            "none",
+        ),
+        _check(
+            "chat_widgets_absent",
+            config.CATEGORY_PERFORMANCE,
+            config.SEVERITY_LOW,
+            config.DATA_SOURCE_DOM,
+            not chat_hits,
+            chat_hits,
+            "none",
+        ),
+        _check(
+            "framework_detected",
+            config.CATEGORY_PERFORMANCE,
+            config.SEVERITY_LOW,
+            config.DATA_SOURCE_DOM,
+            True,
+            frameworks,
+            "informational",
+        ),
+        _check(
+            "forms_have_action",
+            config.CATEGORY_ACCESSIBILITY,
+            config.SEVERITY_MEDIUM,
+            config.DATA_SOURCE_DOM,
+            not forms_without_action,
+            forms_without_action,
+            "action on each form",
+        ),
+        _check(
+            "forms_have_csrf",
+            config.CATEGORY_ACCESSIBILITY,
+            config.SEVERITY_HIGH,
+            config.DATA_SOURCE_DOM,
+            not forms_without_csrf,
+            forms_without_csrf,
+            "CSRF token",
+        ),
+        _check(
+            "inputs_have_labels",
+            config.CATEGORY_ACCESSIBILITY,
+            config.SEVERITY_HIGH,
+            config.DATA_SOURCE_DOM,
+            not unlabeled_inputs,
+            unlabeled_inputs,
+            "label or aria-label",
+        ),
+        _check(
+            "password_autocomplete_allowed",
+            config.CATEGORY_ACCESSIBILITY,
+            config.SEVERITY_LOW,
+            config.DATA_SOURCE_DOM,
+            not password_autocomplete_off,
+            password_autocomplete_off,
+            "autocomplete enabled",
+        ),
+        _check(
+            "sensitive_forms_not_get",
+            config.CATEGORY_ACCESSIBILITY,
+            config.SEVERITY_HIGH,
+            config.DATA_SOURCE_DOM,
+            not sensitive_get_forms,
+            sensitive_get_forms,
+            "POST",
+        ),
+        _check(
+            "anchor_targets_exist",
+            config.CATEGORY_ACCESSIBILITY,
+            config.SEVERITY_MEDIUM,
+            config.DATA_SOURCE_DOM,
+            not broken_anchors,
+            broken_anchors,
+            "existing target IDs",
+        ),
+        _check(
+            "external_blank_links_secure",
+            config.CATEGORY_ACCESSIBILITY,
+            config.SEVERITY_MEDIUM,
+            config.DATA_SOURCE_DOM,
+            not insecure_external_links,
+            insecure_external_links,
+            "rel=noopener noreferrer",
+        ),
+        _check(
+            "duplicate_ids_absent",
+            config.CATEGORY_ACCESSIBILITY,
+            config.SEVERITY_HIGH,
+            config.DATA_SOURCE_DOM,
+            not duplicate_ids,
+            duplicate_ids,
+            "unique IDs",
+        ),
+        _check(
+            "single_canonical",
+            config.CATEGORY_SEO,
+            config.SEVERITY_CRITICAL,
+            config.DATA_SOURCE_DOM,
+            canonical_count <= 1,
+            canonical_count,
+            "at most 1",
+        ),
+        _check(
+            "internal_nofollow_absent",
+            config.CATEGORY_SEO,
+            config.SEVERITY_LOW,
+            config.DATA_SOURCE_DOM,
+            not internal_nofollow,
+            internal_nofollow,
+            "none",
+        ),
+        _check(
+            "critical_fonts_preloaded",
+            config.CATEGORY_PERFORMANCE,
+            config.SEVERITY_LOW,
+            config.DATA_SOURCE_DOM,
+            bool(font_preloads),
+            len(font_preloads),
+            "at least 1",
+            applicable=_uses_custom_fonts(soup),
+        ),
+        _check(
+            "font_preloads_crossorigin",
+            config.CATEGORY_PERFORMANCE,
+            config.SEVERITY_MEDIUM,
+            config.DATA_SOURCE_DOM,
+            all(node.has_attr("crossorigin") for node in font_preloads),
+            [
+                _element_summary(node)
+                for node in font_preloads
+                if not node.has_attr("crossorigin")
+            ],
+            "crossorigin on every font preload",
+        ),
+        _check(
+            "google_fonts_nonblocking",
+            config.CATEGORY_PERFORMANCE,
+            config.SEVERITY_MEDIUM,
+            config.DATA_SOURCE_DOM,
+            not font_links,
+            [_element_summary(node) for node in font_links],
+            "no blocking Google Fonts stylesheet",
+        ),
+        _check(
+            "font_family_count",
+            config.CATEGORY_PERFORMANCE,
+            config.SEVERITY_LOW,
+            config.DATA_SOURCE_DOM,
+            font_families <= config.MAX_FONT_FAMILIES,
+            font_families,
+            f"at most {config.MAX_FONT_FAMILIES}",
+        ),
+        _check(
+            "stylesheets_in_head",
+            config.CATEGORY_PERFORMANCE,
+            config.SEVERITY_HIGH,
+            config.DATA_SOURCE_DOM,
+            not body_stylesheets,
+            body_stylesheets,
+            "none in body",
+        ),
+        _check(
+            "inline_style_size",
+            config.CATEGORY_PERFORMANCE,
+            config.SEVERITY_MEDIUM,
+            config.DATA_SOURCE_DOM,
+            inline_style_bytes <= config.MAX_INLINE_STYLE_BYTES,
+            inline_style_bytes,
+            f"at most {config.MAX_INLINE_STYLE_BYTES} bytes",
+        ),
+        _check(
+            "single_title",
+            config.CATEGORY_SEO,
+            config.SEVERITY_HIGH,
+            config.DATA_SOURCE_DOM,
+            len(soup.find_all("title")) <= 1,
+            len(soup.find_all("title")),
+            "at most 1",
+        ),
+        _check(
+            "base_tag_absent",
+            config.CATEGORY_SEO,
+            config.SEVERITY_LOW,
+            config.DATA_SOURCE_DOM,
+            not base_nodes,
+            [_element_summary(node) for node in base_nodes],
+            "none",
+        ),
     ]
     if ecommerce:
         checks.extend(_ecommerce_checks(soup, source_facts=source_facts))
@@ -262,11 +747,51 @@ def _diff_checks(
     source_lcp = _element_identity(_lcp_candidate(source_soup))
     dom_lcp = _element_identity(_lcp_candidate(dom_soup))
     checks = [
-        _check("content_present_in_source", config.CATEGORY_SEO, config.SEVERITY_CRITICAL, config.DATA_SOURCE_DIFF, not dom_only_text, dom_only_text[: config.DOM_ONLY_TEXT_SAMPLE_SIZE], "no important DOM-only content"),
-        _check("links_present_in_source", config.CATEGORY_SEO, config.SEVERITY_CRITICAL, config.DATA_SOURCE_DIFF, not dom_only_links, dom_only_links[: config.DOM_ONLY_LINK_SAMPLE_SIZE], "no DOM-only links"),
-        _check("h1_present_in_source", config.CATEGORY_SEO, config.SEVERITY_CRITICAL, config.DATA_SOURCE_DIFF, not dom_h1 or source_h1, {"source": source_h1, "dom": dom_h1}, "H1 in source"),
-        _check("schema_present_in_source", config.CATEGORY_STRUCTURED_DATA, config.SEVERITY_HIGH, config.DATA_SOURCE_DIFF, not dom_schema or source_schema, {"source": source_schema, "dom": dom_schema}, "JSON-LD in source"),
-        _check("lcp_candidate_matches_source", config.CATEGORY_PERFORMANCE, config.SEVERITY_HIGH, config.DATA_SOURCE_DIFF, not dom_lcp or source_lcp == dom_lcp, {"source": source_lcp, "dom": dom_lcp}, "same candidate"),
+        _check(
+            "content_present_in_source",
+            config.CATEGORY_SEO,
+            config.SEVERITY_CRITICAL,
+            config.DATA_SOURCE_DIFF,
+            not dom_only_text,
+            dom_only_text[: config.DOM_ONLY_TEXT_SAMPLE_SIZE],
+            "no important DOM-only content",
+        ),
+        _check(
+            "links_present_in_source",
+            config.CATEGORY_SEO,
+            config.SEVERITY_CRITICAL,
+            config.DATA_SOURCE_DIFF,
+            not dom_only_links,
+            dom_only_links[: config.DOM_ONLY_LINK_SAMPLE_SIZE],
+            "no DOM-only links",
+        ),
+        _check(
+            "h1_present_in_source",
+            config.CATEGORY_SEO,
+            config.SEVERITY_CRITICAL,
+            config.DATA_SOURCE_DIFF,
+            not dom_h1 or source_h1,
+            {"source": source_h1, "dom": dom_h1},
+            "H1 in source",
+        ),
+        _check(
+            "schema_present_in_source",
+            config.CATEGORY_STRUCTURED_DATA,
+            config.SEVERITY_HIGH,
+            config.DATA_SOURCE_DIFF,
+            not dom_schema or source_schema,
+            {"source": source_schema, "dom": dom_schema},
+            "JSON-LD in source",
+        ),
+        _check(
+            "lcp_candidate_matches_source",
+            config.CATEGORY_PERFORMANCE,
+            config.SEVERITY_HIGH,
+            config.DATA_SOURCE_DIFF,
+            not dom_lcp or source_lcp == dom_lcp,
+            {"source": source_lcp, "dom": dom_lcp},
+            "same candidate",
+        ),
     ]
     return checks, {
         "dom_only_text_count": len(dom_only_text),
@@ -276,14 +801,18 @@ def _diff_checks(
     }
 
 
-def _ecommerce_checks(soup: BeautifulSoup, *, source_facts: dict[str, Any]) -> list[Check]:
+def _ecommerce_checks(
+    soup: BeautifulSoup, *, source_facts: dict[str, Any]
+) -> list[Check]:
     schema_types = set(source_facts["schema_types"])
     product_blocks = [
         item
         for item in source_facts["jsonld_values"]
         if "product" in _schema_types([item])
     ]
-    offers = [block.get("offers") for block in product_blocks if isinstance(block, dict)]
+    offers = [
+        block.get("offers") for block in product_blocks if isinstance(block, dict)
+    ]
     offer_rows = [
         row
         for value in offers
@@ -298,16 +827,82 @@ def _ecommerce_checks(soup: BeautifulSoup, *, source_facts: dict[str, Any]) -> l
     )
     breadcrumbs = bool(soup.select(", ".join(config.BREADCRUMB_SELECTORS)))
     review_count = bool(soup.select(", ".join(config.REVIEW_COUNT_SELECTORS)))
-    offers_complete = any(row.get("price") and row.get("availability") for row in offer_rows)
+    offers_complete = any(
+        row.get("price") and row.get("availability") for row in offer_rows
+    )
     return [
-        _check("ecommerce_price_present", config.CATEGORY_ECOMMERCE, config.SEVERITY_CRITICAL, config.DATA_SOURCE_DOM, price_present, price_present, True),
-        _check("ecommerce_product_schema_present", config.CATEGORY_ECOMMERCE, config.SEVERITY_HIGH, config.DATA_SOURCE_DOM, "product" in schema_types, sorted(schema_types), "Product"),
-        _check("ecommerce_offers_complete", config.CATEGORY_ECOMMERCE, config.SEVERITY_HIGH, config.DATA_SOURCE_DOM, offers_complete, offer_rows, "price and availability"),
-        _check("ecommerce_add_to_cart_present", config.CATEGORY_ECOMMERCE, config.SEVERITY_HIGH, config.DATA_SOURCE_DOM, add_to_cart, add_to_cart, True),
-        _check("ecommerce_variants_detected", config.CATEGORY_ECOMMERCE, config.SEVERITY_LOW, config.DATA_SOURCE_DOM, variants, variants, True),
-        _check("ecommerce_stock_signal_present", config.CATEGORY_ECOMMERCE, config.SEVERITY_MEDIUM, config.DATA_SOURCE_DOM, stock_signal, stock_signal, True),
-        _check("ecommerce_breadcrumbs_present", config.CATEGORY_ECOMMERCE, config.SEVERITY_MEDIUM, config.DATA_SOURCE_DOM, breadcrumbs, breadcrumbs, True),
-        _check("ecommerce_review_count_present", config.CATEGORY_ECOMMERCE, config.SEVERITY_LOW, config.DATA_SOURCE_DOM, review_count, review_count, True),
+        _check(
+            "ecommerce_price_present",
+            config.CATEGORY_ECOMMERCE,
+            config.SEVERITY_CRITICAL,
+            config.DATA_SOURCE_DOM,
+            price_present,
+            price_present,
+            True,
+        ),
+        _check(
+            "ecommerce_product_schema_present",
+            config.CATEGORY_ECOMMERCE,
+            config.SEVERITY_HIGH,
+            config.DATA_SOURCE_DOM,
+            "product" in schema_types,
+            sorted(schema_types),
+            "Product",
+        ),
+        _check(
+            "ecommerce_offers_complete",
+            config.CATEGORY_ECOMMERCE,
+            config.SEVERITY_HIGH,
+            config.DATA_SOURCE_DOM,
+            offers_complete,
+            offer_rows,
+            "price and availability",
+        ),
+        _check(
+            "ecommerce_add_to_cart_present",
+            config.CATEGORY_ECOMMERCE,
+            config.SEVERITY_HIGH,
+            config.DATA_SOURCE_DOM,
+            add_to_cart,
+            add_to_cart,
+            True,
+        ),
+        _check(
+            "ecommerce_variants_detected",
+            config.CATEGORY_ECOMMERCE,
+            config.SEVERITY_LOW,
+            config.DATA_SOURCE_DOM,
+            variants,
+            variants,
+            True,
+        ),
+        _check(
+            "ecommerce_stock_signal_present",
+            config.CATEGORY_ECOMMERCE,
+            config.SEVERITY_MEDIUM,
+            config.DATA_SOURCE_DOM,
+            stock_signal,
+            stock_signal,
+            True,
+        ),
+        _check(
+            "ecommerce_breadcrumbs_present",
+            config.CATEGORY_ECOMMERCE,
+            config.SEVERITY_MEDIUM,
+            config.DATA_SOURCE_DOM,
+            breadcrumbs,
+            breadcrumbs,
+            True,
+        ),
+        _check(
+            "ecommerce_review_count_present",
+            config.CATEGORY_ECOMMERCE,
+            config.SEVERITY_LOW,
+            config.DATA_SOURCE_DOM,
+            review_count,
+            review_count,
+            True,
+        ),
     ]
 
 
@@ -534,7 +1129,9 @@ def _font_family_count(soup: BeautifulSoup) -> int:
 
 
 def _uses_custom_fonts(soup: BeautifulSoup) -> bool:
-    return bool(soup.select("link[href*='font'], style")) and _font_family_count(soup) > 0
+    return (
+        bool(soup.select("link[href*='font'], style")) and _font_family_count(soup) > 0
+    )
 
 
 def _frameworks(html: str) -> list[str]:
@@ -560,7 +1157,9 @@ def _link_set(soup: BeautifulSoup, *, url: str) -> set[str]:
         _absolute_url(url, node.get("href")).split("#", 1)[0]
         for node in soup.select("a[href]")
         if str(node.get("href") or "").strip()
-        and not str(node.get("href") or "").startswith(("javascript:", "mailto:", "tel:", "#"))
+        and not str(node.get("href") or "").startswith(
+            ("javascript:", "mailto:", "tel:", "#")
+        )
     }
 
 

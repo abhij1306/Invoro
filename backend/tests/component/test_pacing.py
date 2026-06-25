@@ -3,6 +3,8 @@ from __future__ import annotations
 import pytest
 
 from app.services.acquisition import pacing
+
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_apply_protected_host_backoff_extends_wait_window(
@@ -31,4 +33,3 @@ async def test_apply_protected_host_backoff_extends_wait_window(
 
     assert sleeps
     assert sleeps[-1] >= 1.5
-

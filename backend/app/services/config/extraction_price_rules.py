@@ -18,6 +18,7 @@ _STATIC_EXPORTS: dict[str, Any] = {
 def _static_export_tuple(key: str, default: tuple[Any, ...] = ()) -> tuple[Any, ...]:
     return tuple(_STATIC_EXPORTS.get(key, default) or ())
 
+
 DETAIL_PRICE_CENT_MAGNITUDE_RATIO = 100
 DETAIL_PRICE_MAGNITUDE_EPSILON = 0.01
 DETAIL_PRICE_COMPARISON_TOLERANCE = Decimal("0.01")

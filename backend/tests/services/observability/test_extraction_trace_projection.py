@@ -62,7 +62,10 @@ def test_projects_completed_tiers_and_skip_decision():
         "dom",
     ]
     assert payload["dom_skipped"] is False
-    assert payload["skip_decision"]["dom_completion_reason"] == "confidence_below_threshold"
+    assert (
+        payload["skip_decision"]["dom_completion_reason"]
+        == "confidence_below_threshold"
+    )
     assert payload["skip_decision"]["confidence"] == pytest.approx(0.55)
 
 

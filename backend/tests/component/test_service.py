@@ -176,7 +176,11 @@ async def test_aid_report_scores_catalog_signals(
             jsonld_blocks=[
                 {
                     "@type": "Product",
-                    "offers": {"@type": "Offer", "price": "100", "availability": "InStock"},
+                    "offers": {
+                        "@type": "Offer",
+                        "price": "100",
+                        "availability": "InStock",
+                    },
                     "aggregateRating": {"ratingValue": "4.8", "reviewCount": "12"},
                 },
                 {"@type": "LocalBusiness"},
@@ -200,7 +204,9 @@ async def test_aid_report_scores_catalog_signals(
 
     monkeypatch.setattr("app.services.ucp_audit.service.crawl_catalog", fake_crawl)
 
-    report = await build_ucp_report_for_domain("example.com", "audit-1", {"sample_size": 7})
+    report = await build_ucp_report_for_domain(
+        "example.com", "audit-1", {"sample_size": 7}
+    )
     by_dimension = {item.dimension_id: item for item in report.dimension_scores}
 
     assert captured_sample_size == 7
@@ -228,7 +234,9 @@ async def test_aid_report_runs_llm_when_enabled(
             domain="example.com",
             pages_crawled=1,
             jsonld_blocks=[{"@type": "Product", "name": "Product"}],
-            product_records=[{"source_url": "https://example.com/p/1", "title": "Product"}],
+            product_records=[
+                {"source_url": "https://example.com/p/1", "title": "Product"}
+            ],
             sitemap_found=True,
         )
 
@@ -240,7 +248,9 @@ async def test_aid_report_runs_llm_when_enabled(
         return []
 
     monkeypatch.setattr("app.services.ucp_audit.service.crawl_catalog", fake_crawl)
-    monkeypatch.setattr("app.services.ucp_audit.service.audit_evidence_packets", fake_audit)
+    monkeypatch.setattr(
+        "app.services.ucp_audit.service.audit_evidence_packets", fake_audit
+    )
 
     report = await build_ucp_report_for_domain(
         "example.com",

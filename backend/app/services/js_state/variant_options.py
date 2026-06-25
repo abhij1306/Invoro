@@ -142,7 +142,10 @@ def variant_option_values(
                 or not variant_axis_name_is_semantic(axis_name)
             ):
                 continue
-            if axis_key in direct_axis_keys and axis_key != str(axis_name).strip().lower():
+            if (
+                axis_key in direct_axis_keys
+                and axis_key != str(axis_name).strip().lower()
+            ):
                 continue
             if axis_key in option_values:
                 continue
@@ -256,7 +259,10 @@ def option_value_labels(product: dict[str, Any]) -> dict[str, dict[str, str]]:
         axis_key = normalized_variant_axis_key(axis_name or "")
         if not axis_key:
             continue
-        if axis_key in direct_axis_keys and axis_key != str(axis_name or "").strip().lower():
+        if (
+            axis_key in direct_axis_keys
+            and axis_key != str(axis_name or "").strip().lower()
+        ):
             continue
         values = attribute.get("values")
         if not isinstance(values, list):
@@ -266,7 +272,9 @@ def option_value_labels(product: dict[str, Any]) -> dict[str, dict[str, str]]:
         for item in values:
             if not isinstance(item, dict):
                 continue
-            raw_value = text_or_none(item.get("value") or item.get("id") or item.get("slug"))
+            raw_value = text_or_none(
+                item.get("value") or item.get("id") or item.get("slug")
+            )
             display = text_or_none(
                 item.get("name")
                 or item.get("displayValue")

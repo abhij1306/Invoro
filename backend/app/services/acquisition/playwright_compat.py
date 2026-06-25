@@ -6,6 +6,7 @@ try:
         TimeoutError as PlaywrightTimeoutError,
     )
 except ImportError:  # pragma: no cover
+
     class PlaywrightError(Exception):  # type: ignore[no-redef]
         pass
 

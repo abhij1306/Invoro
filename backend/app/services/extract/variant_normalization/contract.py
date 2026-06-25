@@ -169,9 +169,7 @@ def _drop_geographic_state_public_rows(
     rows: list[dict[str, object]],
 ) -> list[dict[str, object]]:
     state_values = [
-        state_value
-        for row in rows
-        if (state_value := text_or_none(row.get("state")))
+        state_value for row in rows if (state_value := text_or_none(row.get("state")))
     ]
     if not variant_state_values_are_geographic(state_values):
         return rows

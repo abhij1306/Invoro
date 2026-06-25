@@ -378,9 +378,11 @@ def _postprocess_detail_records(
                 html=html,
                 page_url=page_url,
                 requested_page_url=requested_page_url,
-        )
+            )
         drop_low_signal_zero_detail_price(record)
-        rows.append(finalize_record(record, surface=surface) if finalize_rows else record)
+        rows.append(
+            finalize_record(record, surface=surface) if finalize_rows else record
+        )
     return rows
 
 

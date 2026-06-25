@@ -176,7 +176,9 @@ def top_taxonomy_candidates(
             return [exact_match]
     phrase_match = phrase_leaf_category_match(candidate_values, taxonomy_index)
 
-    primary_tokens = pool_tokens(data, candidate_value_loader, "category", "product_type")
+    primary_tokens = pool_tokens(
+        data, candidate_value_loader, "category", "product_type"
+    )
     secondary_tokens = pool_tokens(data, candidate_value_loader, "title")
     tertiary_tokens = pool_tokens(
         data,
@@ -200,7 +202,9 @@ def top_taxonomy_candidates(
             string_iterable(item.get("path_match_tokens"))
             or tokenize_text(item.get("category_path"))
         )
-        attribute_tokens = set(string_iterable(item.get("attribute_match_tokens"))) - category_tokens
+        attribute_tokens = (
+            set(string_iterable(item.get("attribute_match_tokens"))) - category_tokens
+        )
         if not category_tokens:
             continue
         if taxonomy_candidate_conflicts(
@@ -210,7 +214,9 @@ def top_taxonomy_candidates(
         ):
             continue
         primary_score = weighted_overlap(primary_tokens, category_tokens)
-        if primary_score and not has_product_kind_overlap(primary_tokens, category_tokens):
+        if primary_score and not has_product_kind_overlap(
+            primary_tokens, category_tokens
+        ):
             continue
         secondary_score = weighted_overlap(secondary_tokens, category_tokens)
         tertiary_score = weighted_overlap(tertiary_tokens, category_tokens)
@@ -237,9 +243,9 @@ def top_taxonomy_candidates(
         evidence_tokens = (
             primary_tokens | secondary_tokens | tertiary_tokens
         ) & category_tokens
-        enough_sparse_evidence = len(
-            evidence_tokens - DATA_ENRICHMENT_TAXONOMY_CONTEXT_ONLY_TOKENS
-        ) >= 2
+        enough_sparse_evidence = (
+            len(evidence_tokens - DATA_ENRICHMENT_TAXONOMY_CONTEXT_ONLY_TOKENS) >= 2
+        )
         if (
             primary_score == 0
             and primary_attribute_score == 0
@@ -291,7 +297,9 @@ def phrase_leaf_category_match(
             leaf_matches = [
                 item
                 for item in leaf_matches
-                if not taxonomy_candidate_conflicts(source_tokens, item.get("category_path"))
+                if not taxonomy_candidate_conflicts(
+                    source_tokens, item.get("category_path")
+                )
             ]
             for item in leaf_matches:
                 candidates.append(
@@ -342,21 +350,30 @@ def phrase_path_category_match(
         # and do not conflict; the post-filter prefers non-accessory paths.
         leaf_tokens_by_path = {
             str(item.get("category_path") or ""): set(
-                tokenize_text(item.get("leaf") or clean_text(item.get("category_path")).split(">")[-1])
+                tokenize_text(
+                    item.get("leaf")
+                    or clean_text(item.get("category_path")).split(">")[-1]
+                )
             )
             for item in taxonomy_index.categories
         }
         matches = [
             item
             for item in taxonomy_index.categories
-            if phrase_tokens <= normalized_token_set(
-                string_iterable(item.get("path_match_tokens"))
+            if phrase_tokens
+            <= normalized_token_set(string_iterable(item.get("path_match_tokens")))
+            and bool(
+                phrase_tokens
+                & leaf_tokens_by_path[str(item.get("category_path") or "")]
             )
-            and bool(phrase_tokens & leaf_tokens_by_path[str(item.get("category_path") or "")])
-            and not taxonomy_candidate_conflicts(source_tokens, item.get("category_path"))
+            and not taxonomy_candidate_conflicts(
+                source_tokens, item.get("category_path")
+            )
         ]
     non_accessory_matches = [
-        item for item in matches if not taxonomy_accessory_path(clean_text(item.get("category_path")).casefold())
+        item
+        for item in matches
+        if not taxonomy_accessory_path(clean_text(item.get("category_path")).casefold())
     ]
     if non_accessory_matches:
         matches = non_accessory_matches
@@ -407,7 +424,9 @@ def leaf_token_category_match(
         leaf_matches = [
             item
             for item in leaf_matches
-            if not taxonomy_candidate_conflicts(source_tokens, item.get("category_path"))
+            if not taxonomy_candidate_conflicts(
+                source_tokens, item.get("category_path")
+            )
         ]
         if len(leaf_matches) != 1:
             continue
@@ -483,11 +502,7 @@ def taxonomy_candidate_conflicts(
 
 
 def normalized_token_set(values: Iterable[object]) -> set[str]:
-    return {
-        token
-        for value in values
-        if (token := normalize_taxonomy_token(value))
-    }
+    return {token for value in values if (token := normalize_taxonomy_token(value))}
 
 
 def accessory_path_conflict(path_text: str, evidence_tokens: set[str]) -> bool:
@@ -595,8 +610,7 @@ def load_attribute_repository_data(path: Path) -> dict[str, object]:
     size_systems = shopify_size_systems(size_attribute)
     # Audience falls back only to audience-specific aliases; gender terms stay separate.
     audience_terms = shopify_attribute_terms(audience_attribute) or {
-        key: list(values)
-        for key, values in DATA_ENRICHMENT_AUDIENCE_ALIASES.items()
+        key: list(values) for key, values in DATA_ENRICHMENT_AUDIENCE_ALIASES.items()
     }
     material_terms = shopify_material_terms(
         raw_attributes,
@@ -669,14 +683,20 @@ def load_taxonomy_index(path: Path) -> TaxonomyIndex:
         categories=tuple(rows),
         exact_lookup=exact_lookup,
         leaf_lookup={key: tuple(value) for key, value in leaf_lookup.items()},
-        path_phrase_lookup={key: tuple(value) for key, value in path_phrase_lookup.items()},
+        path_phrase_lookup={
+            key: tuple(value) for key, value in path_phrase_lookup.items()
+        },
         id_lookup=id_lookup,
     )
 
 
 def taxonomy_path_lookup_phrases(item: dict[str, object]) -> list[str]:
     phrases = taxonomy_phrases(tokenize_text(item.get("normalized_path")))
-    parts = [part for part in clean_text(item.get("category_path")).split(">") if part.strip()]
+    parts = [
+        part
+        for part in clean_text(item.get("category_path")).split(">")
+        if part.strip()
+    ]
     if len(parts) < 2:
         return phrases
     root_tokens = tokenize_text(parts[0])
@@ -770,8 +790,13 @@ def shopify_color_family_terms(
         return {}
     terms: dict[str, list[str]] = {}
     for canonical, aliases in DATA_ENRICHMENT_COLOR_FAMILY_ALIASES.items():
-        allowed = [alias for alias in aliases if clean_text(alias).casefold() in source_values]
-        if clean_text(canonical).casefold() in source_values and canonical not in allowed:
+        allowed = [
+            alias for alias in aliases if clean_text(alias).casefold() in source_values
+        ]
+        if (
+            clean_text(canonical).casefold() in source_values
+            and canonical not in allowed
+        ):
             allowed.insert(0, canonical)
         if allowed:
             terms[canonical] = list(dict.fromkeys(allowed))
@@ -866,7 +891,9 @@ def weighted_overlap(source_tokens: set[str], category_tokens: set[str]) -> floa
     return len(overlap) / len(source_tokens)
 
 
-def weighted_product_overlap(source_tokens: set[str], category_tokens: set[str]) -> float:
+def weighted_product_overlap(
+    source_tokens: set[str], category_tokens: set[str]
+) -> float:
     product_tokens = {
         token
         for token in source_tokens
@@ -875,7 +902,9 @@ def weighted_product_overlap(source_tokens: set[str], category_tokens: set[str])
     return weighted_overlap(product_tokens, category_tokens)
 
 
-def has_product_kind_overlap(source_tokens: set[str], category_tokens: set[str]) -> bool:
+def has_product_kind_overlap(
+    source_tokens: set[str], category_tokens: set[str]
+) -> bool:
     overlap = source_tokens & category_tokens
     if not overlap:
         return False

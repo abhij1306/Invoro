@@ -48,7 +48,9 @@ class SelectorCreateRequest(BaseModel):
             str(value or "").strip()
             for value in (self.css_selector, self.xpath, self.regex)
         ):
-            raise ValueError("At least one of css_selector, xpath, or regex is required")
+            raise ValueError(
+                "At least one of css_selector, xpath, or regex is required"
+            )
         return self
 
 
@@ -76,7 +78,9 @@ class SelectorTestRequest(BaseModel):
             str(value or "").strip()
             for value in (self.css_selector, self.xpath, self.regex)
         ):
-            raise ValueError("At least one of css_selector, xpath, or regex is required")
+            raise ValueError(
+                "At least one of css_selector, xpath, or regex is required"
+            )
         return self
 
 

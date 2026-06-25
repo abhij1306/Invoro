@@ -136,7 +136,9 @@ def test_article_detail_uses_original_dom_when_cleaned_dom_drops_date() -> None:
 
 
 @pytest.mark.regression
-def test_content_listing_does_not_fall_back_to_related_links_when_table_shape_rejected() -> None:
+def test_content_listing_does_not_fall_back_to_related_links_when_table_shape_rejected() -> (
+    None
+):
     rows = extract_records(
         """
         <html><body><main>

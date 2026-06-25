@@ -33,6 +33,7 @@ try:
 except (TypeError, ValueError):
     DETAIL_PAYLOAD_MAX_DEPTH_INT = 10
 
+
 def _structured_payload_is_breadcrumb_list(payload: object) -> bool:
     if not isinstance(payload, dict):
         return False
@@ -42,7 +43,6 @@ def _structured_payload_is_breadcrumb_list(payload: object) -> bool:
         str(value or "").strip().lower() in {"breadcrumblist", "breadcrumb_list"}
         for value in type_values
     )
-
 
 
 def _prune_irrelevant_detail_structured_payload(
@@ -186,7 +186,9 @@ def _detail_structured_payload_is_irrelevant_product(
         if same_site(candidate_url, requested_page_url):
             candidate_path = urlparse(candidate_url).path.rstrip("/")
             requested_path = urlparse(requested_page_url).path.rstrip("/")
-            return bool(candidate_path and requested_path and candidate_path != requested_path)
+            return bool(
+                candidate_path and requested_path and candidate_path != requested_path
+            )
     else:
         if _record_matches_requested_detail_identity(
             candidate_record,
@@ -226,7 +228,10 @@ def _preferred_structured_payload_url(
     requested_query_codes = _detail_query_identity_codes_from_url(requested_page_url)
     if requested_query_codes:
         for candidate_url in candidate_urls:
-            if _detail_query_identity_codes_from_url(candidate_url) & requested_query_codes:
+            if (
+                _detail_query_identity_codes_from_url(candidate_url)
+                & requested_query_codes
+            ):
                 return candidate_url
     for candidate_url in candidate_urls:
         if _detail_url_matches_requested_identity(
@@ -235,9 +240,8 @@ def _preferred_structured_payload_url(
         ):
             return candidate_url
     for candidate_url in candidate_urls:
-        if (
-            same_site(requested_page_url, candidate_url)
-            and not _detail_url_is_utility(candidate_url)
+        if same_site(requested_page_url, candidate_url) and not _detail_url_is_utility(
+            candidate_url
         ):
             return candidate_url
     return candidate_urls[0]

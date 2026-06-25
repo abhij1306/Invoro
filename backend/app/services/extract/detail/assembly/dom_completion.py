@@ -176,7 +176,10 @@ def _record_has_complete_unrequested_dom_variant_skip_fields(
         *_EARLY_PRICE_REPAIR_REQUIRED_FIELDS,
         *set(DOM_HIGH_VALUE_FIELDS.get("ecommerce_detail") or ()),
     }
-    return all(record.get(field_name) not in (None, "", [], {}) for field_name in required_fields)
+    return all(
+        record.get(field_name) not in (None, "", [], {})
+        for field_name in required_fields
+    )
 
 
 def _detail_long_text_value_looks_truncated(value: object) -> bool:
@@ -361,9 +364,7 @@ def _normalized_category_path(value: object) -> str:
             if part
         )
     text = clean_text(value).casefold()
-    return " > ".join(
-        part for part in re.split(r"\s*[>/›»→|]\s*", text) if part
-    )
+    return " > ".join(part for part in re.split(r"\s*[>/›»→|]\s*", text) if part)
 
 
 early_price_repair_required_fields = _EARLY_PRICE_REPAIR_REQUIRED_FIELDS

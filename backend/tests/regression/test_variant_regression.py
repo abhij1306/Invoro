@@ -4,11 +4,15 @@ import pytest
 
 from app.services.dom.html_parser import BeautifulSoup
 
-from app.services.extract.detail.variants.dom_extraction import extract_variants_from_dom
+from app.services.extract.detail.variants.dom_extraction import (
+    extract_variants_from_dom,
+)
 from app.services.extract.variant_normalization import normalize_variant_record
 
 
-def _dom_variants(html: str, page_url: str = "https://example.com/pdp/item") -> dict[str, object]:
+def _dom_variants(
+    html: str, page_url: str = "https://example.com/pdp/item"
+) -> dict[str, object]:
     return extract_variants_from_dom(
         BeautifulSoup(html, "html.parser"),
         page_url=page_url,

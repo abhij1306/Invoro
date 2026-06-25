@@ -89,10 +89,22 @@ def test_content_detail_uses_largest_page_content_region() -> None:
 
     assert len(rows) == 1
     assert "Short first card only" not in rows[0]["markdown"]
-    assert "[First announcement](https://codeforces.com/blog/entry/1)" in rows[0]["markdown"]
-    assert "[First announcement](https://codeforces.com/blog/entry/1)\n\nBy" in rows[0]["markdown"]
-    assert "By [Author](https://codeforces.com/profile/author), 7 days ago," in rows[0]["markdown"]
-    assert "[Second announcement](https://codeforces.com/blog/entry/2)" in rows[0]["markdown"]
+    assert (
+        "[First announcement](https://codeforces.com/blog/entry/1)"
+        in rows[0]["markdown"]
+    )
+    assert (
+        "[First announcement](https://codeforces.com/blog/entry/1)\n\nBy"
+        in rows[0]["markdown"]
+    )
+    assert (
+        "By [Author](https://codeforces.com/profile/author), 7 days ago,"
+        in rows[0]["markdown"]
+    )
+    assert (
+        "[Second announcement](https://codeforces.com/blog/entry/2)"
+        in rows[0]["markdown"]
+    )
 
 
 @pytest.mark.unit

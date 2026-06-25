@@ -53,7 +53,9 @@ def test_prepared_dom_variants_keeps_first_pass_signals_without_fallback_variant
     rendered_soup = BeautifulSoup("<html><body>rendered</body></html>", "html.parser")
     raw_soup = BeautifulSoup("<html><body>raw</body></html>", "html.parser")
 
-    def fake_extract_variants_from_dom(soup: BeautifulSoup, **kwargs: object) -> dict[str, object]:
+    def fake_extract_variants_from_dom(
+        soup: BeautifulSoup, **kwargs: object
+    ) -> dict[str, object]:
         del kwargs
         if soup is rendered_soup:
             return {"variant_axes": {"size": ["S"]}}
@@ -81,7 +83,9 @@ def test_prepared_dom_variants_merges_first_pass_metadata_into_fallback_variants
     rendered_soup = BeautifulSoup("<html><body>rendered</body></html>", "html.parser")
     raw_soup = BeautifulSoup("<html><body>raw</body></html>", "html.parser")
 
-    def fake_extract_variants_from_dom(soup: BeautifulSoup, **kwargs: object) -> dict[str, object]:
+    def fake_extract_variants_from_dom(
+        soup: BeautifulSoup, **kwargs: object
+    ) -> dict[str, object]:
         del kwargs
         if soup is rendered_soup:
             return {"variant_axes": {"size": ["S"]}, "source": "rendered"}
@@ -439,7 +443,9 @@ def test_resolve_variant_group_name_rejects_report_reason_select() -> None:
 
 
 @pytest.mark.unit
-def test_build_detail_record_extracts_bhphoto_resolution_and_screen_size_variants() -> None:
+def test_build_detail_record_extracts_bhphoto_resolution_and_screen_size_variants() -> (
+    None
+):
     html = """
         <html>
           <body>
@@ -508,7 +514,9 @@ def test_build_detail_record_extracts_bhphoto_resolution_and_screen_size_variant
 
 
 @pytest.mark.unit
-def test_build_detail_record_extracts_wayfair_color_variants_from_next_f_state() -> None:
+def test_build_detail_record_extracts_wayfair_color_variants_from_next_f_state() -> (
+    None
+):
     html = "\n".join(
         [
             "<html><body><main class='product-detail'><h1>Bryce Power Reclining Sofa with Power Headrest</h1></main>",
@@ -620,9 +628,7 @@ def test_build_detail_record_extracts_wayfair_color_variants_from_next_f_state()
 
     variants = [row for row in record.get("variants", []) if isinstance(row, dict)]
     assert {
-        row.get("upholstery_color")
-        for row in variants
-        if row.get("upholstery_color")
+        row.get("upholstery_color") for row in variants if row.get("upholstery_color")
     } == {
         "Brown",
         "Tan",

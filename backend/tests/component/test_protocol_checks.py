@@ -54,7 +54,9 @@ class DummyAsyncClient:
         return self.post_resp
 
 
-def _response(method: str, url: str, status: int, payload: dict, headers: dict | None = None):
+def _response(
+    method: str, url: str, status: int, payload: dict, headers: dict | None = None
+):
     return httpx.Response(
         status,
         json=payload,
@@ -276,8 +278,16 @@ def test_transport_incomplete_uses_reachable_only_and_best_score() -> None:
         manifest_found=True,
         manifest_valid=True,
         transport_entries=[
-            {"service": "dev.ucp.shopping", "transport": "mcp", "endpoint": "https://a"},
-            {"service": "dev.ucp.shopping", "transport": "mcp", "endpoint": "https://b"},
+            {
+                "service": "dev.ucp.shopping",
+                "transport": "mcp",
+                "endpoint": "https://a",
+            },
+            {
+                "service": "dev.ucp.shopping",
+                "transport": "mcp",
+                "endpoint": "https://b",
+            },
         ],
     )
 
@@ -373,8 +383,16 @@ def test_transport_score_uses_best_with_breadth_bonus() -> None:
         manifest_found=True,
         manifest_valid=True,
         transport_entries=[
-            {"service": "dev.ucp.shopping", "transport": "mcp", "endpoint": "https://a"},
-            {"service": "dev.ucp.shopping", "transport": "mcp", "endpoint": "https://b"},
+            {
+                "service": "dev.ucp.shopping",
+                "transport": "mcp",
+                "endpoint": "https://a",
+            },
+            {
+                "service": "dev.ucp.shopping",
+                "transport": "mcp",
+                "endpoint": "https://b",
+            },
         ],
     )
 
@@ -435,7 +453,15 @@ def test_schema_url_keywords_do_not_score_without_fields() -> None:
             valid_json=True,
             schema_valid=True,
             title="Catalog Search",
-            field_results={"catalog": {"product_id": False, "title": False, "price": False, "currency": False, "availability": False}},
+            field_results={
+                "catalog": {
+                    "product_id": False,
+                    "title": False,
+                    "price": False,
+                    "currency": False,
+                    "availability": False,
+                }
+            },
         )
     ]
 
@@ -508,7 +534,9 @@ def test_schema_groups_detect_monolithic_shopping_schema() -> None:
 
 @pytest.mark.asyncio
 @pytest.mark.component
-async def test_probe_rest_requires_ucp_shaped_get(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_probe_rest_requires_ucp_shaped_get(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     endpoint = "https://example.com/rest"
     fake_client = DummyAsyncClient(
         options_resp=_response("OPTIONS", endpoint, 200, {}, {"allow": "GET, OPTIONS"}),
@@ -535,7 +563,9 @@ async def test_probe_rest_requires_ucp_shaped_get(monkeypatch: pytest.MonkeyPatc
 
     assert probe.negotiated is False
 
-    fake_client.get_resp = _response("GET", endpoint, 200, {"capabilities": ["catalog.search"]})
+    fake_client.get_resp = _response(
+        "GET", endpoint, 200, {"capabilities": ["catalog.search"]}
+    )
 
     probe = await protocol_checks._probe_rest(
         service="dev.ucp.shopping",
@@ -564,7 +594,9 @@ async def test_probe_rest_requires_ucp_shaped_get(monkeypatch: pytest.MonkeyPatc
 
 @pytest.mark.asyncio
 @pytest.mark.component
-async def test_probe_mcp_sends_ucp_agent_header(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_probe_mcp_sends_ucp_agent_header(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     endpoint = "https://example.com/mcp"
     fake_client = DummyAsyncClient(
         post_resp=_response(
@@ -673,7 +705,9 @@ async def test_probe_mcp_persists_redacted_tool_schema_summaries(
         lambda **kwargs: fake_client,
     )
 
-    probe = await protocol_checks._probe_mcp(service="dev.ucp.shopping", endpoint=endpoint)
+    probe = await protocol_checks._probe_mcp(
+        service="dev.ucp.shopping", endpoint=endpoint
+    )
 
     assert probe.tool_names == ["catalog"]
     assert probe.tool_schemas == [
@@ -709,7 +743,9 @@ async def test_probe_transports_handles_a2a_without_catch_all(
             negotiated=True,
         )
 
-    monkeypatch.setattr("app.services.ucp_audit.protocol_checks._probe_a2a", fake_probe_a2a)
+    monkeypatch.setattr(
+        "app.services.ucp_audit.protocol_checks._probe_a2a", fake_probe_a2a
+    )
     manifest = UCPManifestResult(
         transport_entries=[
             {

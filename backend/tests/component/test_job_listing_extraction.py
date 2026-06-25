@@ -15,8 +15,6 @@ from app.services.listing_extractor import (
 from app.services.shared.text_coerce import is_title_noise
 
 
-
-
 @pytest.mark.component
 def test_extract_listing_records_preserves_job_cards_inside_filtered_container() -> (
     None
@@ -164,4 +162,3 @@ def test_visual_job_listing_rejects_unbound_neighbor_title() -> None:
     )
 
     assert records == []
-

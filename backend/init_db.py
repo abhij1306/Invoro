@@ -1,4 +1,5 @@
 """Initialize the database by applying Alembic migrations."""
+
 import asyncio
 
 from app.core.migrations import apply_pending_migrations_async

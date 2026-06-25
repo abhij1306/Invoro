@@ -63,7 +63,9 @@ async def list_webhook_deliveries(
     rows = await session.scalars(
         select(MonitorWebhookDelivery)
         .where(MonitorWebhookDelivery.monitor_id == monitor_id)
-        .order_by(MonitorWebhookDelivery.created_at.desc(), MonitorWebhookDelivery.id.desc())
+        .order_by(
+            MonitorWebhookDelivery.created_at.desc(), MonitorWebhookDelivery.id.desc()
+        )
         .limit(limit)
     )
     return list(rows.all())

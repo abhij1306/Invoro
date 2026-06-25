@@ -118,7 +118,9 @@ class AlgoliaJobsAdapter(PublicEndpointAdapter):
             ),
             "salary": clean_text(hit.get("salary")),
             "job_type": _first_list_text(hit.get("tags_role_type")),
-            "posted_date": clean_text(hit.get("posted_at_relative") or hit.get("posted_at")),
+            "posted_date": clean_text(
+                hit.get("posted_at_relative") or hit.get("posted_at")
+            ),
             "department": _first_list_text(hit.get("tags_area")),
             "description": description,
         }

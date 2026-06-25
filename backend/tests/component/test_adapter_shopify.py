@@ -5,8 +5,6 @@ import pytest
 from app.services.adapters.shopify import ShopifyAdapter
 
 
-
-
 @pytest.mark.component
 def test_shopify_adapter_preserves_localized_product_path() -> None:
     adapter = ShopifyAdapter()
@@ -114,4 +112,3 @@ def test_shopify_adapter_reads_shopifyanalytics_meta_with_unquoted_product() -> 
 
     assert records[0]["title"] == "Inline Widget"
     assert records[0]["price"] == "25"
-

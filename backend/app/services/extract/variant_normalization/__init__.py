@@ -17,7 +17,9 @@ __all__ = ("normalize_variant_record",)
 # modules here. They are stable only for this internal normalization pipeline.
 
 
-def normalize_variant_record(record: dict[str, Any], *, finalize_contract: bool = True) -> None:
+def normalize_variant_record(
+    record: dict[str, Any], *, finalize_contract: bool = True
+) -> None:
     hydration._hydrate_variant_axes(record)
     sanitization._sanitize_variant_axes(record)
     deduplication._dedupe_and_prune_variant_rows(record)

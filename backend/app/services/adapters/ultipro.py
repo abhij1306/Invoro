@@ -22,7 +22,9 @@ class UltiProAdapter(BaseAdapter):
     async def can_handle(self, url: str, html: str) -> bool:
         return self._matches_platform_family(url, html)
 
-    async def extract(self, url: str, html: str, surface: str, proxy: str | None = None) -> AdapterResult:
+    async def extract(
+        self, url: str, html: str, surface: str, proxy: str | None = None
+    ) -> AdapterResult:
         if self._looks_like_detail(url, surface):
             records = []
         else:
@@ -155,9 +157,7 @@ class UltiProAdapter(BaseAdapter):
             "url": detail_url,
             "apply_url": detail_url,
             "location": clean_text(
-                row.get("LocationName")
-                or row.get("Location")
-                or row.get("location")
+                row.get("LocationName") or row.get("Location") or row.get("location")
             ),
             "posted_date": clean_text(row.get("PostedDate") or row.get("postedDate")),
             "requisition_id": clean_text(

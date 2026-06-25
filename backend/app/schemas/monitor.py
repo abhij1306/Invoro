@@ -79,7 +79,9 @@ class MonitorCreate(BaseModel):
 class MonitorUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=100)
     tracked_fields: list[str] | None = None
-    schedule_interval_hours: int | None = Field(default=None, ge=MIN_SCHEDULE_INTERVAL_HOURS)
+    schedule_interval_hours: int | None = Field(
+        default=None, ge=MIN_SCHEDULE_INTERVAL_HOURS
+    )
     priority: MonitorPriority | None = None
     retention_days: int | None = Field(default=None, ge=1, le=MAX_RETENTION_DAYS)
     status: MonitorStatus | None = None

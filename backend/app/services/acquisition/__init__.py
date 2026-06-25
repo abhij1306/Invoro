@@ -25,6 +25,7 @@ async def close_shared_http_client() -> None:
     await _close_runtime_shared_http_client()
     await _close_adapter_shared_http_client()
 
+
 __all__ = [
     "browser_runtime_snapshot",
     "expand_all_interactive_elements",

@@ -8,8 +8,6 @@ from app.services.adapters.algolia_jobs import AlgoliaJobsAdapter
 from app.services.adapters.firestore_jobs import FirestoreJobsAdapter
 
 
-
-
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_algolia_jobs_adapter_extracts_public_job_index(
@@ -159,4 +157,3 @@ async def test_firestore_jobs_adapter_extracts_public_published_jobs(
         "op": "EQUAL",
         "value": {"stringValue": "published"},
     }
-

@@ -93,14 +93,14 @@ def breadcrumb_labels_from_dom(
         if not nodes:
             continue
         # Group by closest nav, ul, ol, or generic div parent to avoid flattening multiple breadcrumbs
-        groups: dict[int, list[Tag]] = {}
+        groups: dict[Tag | None, list[Tag]] = {}
         for node in nodes:
             parent = node.parent
             while parent and parent.name not in ("nav", "ul", "ol", "div", "section"):
                 parent = parent.parent
             if not parent:
                 parent = node.parent
-            groups.setdefault(id(parent), []).append(node)
+            groups.setdefault(parent, []).append(node)
         for group_nodes in groups.values():
             labels = _clean_breadcrumb_labels(
                 node.get_text(" ", strip=True) for node in group_nodes

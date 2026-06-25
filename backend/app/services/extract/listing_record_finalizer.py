@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-__all__ = (
-    "finalize_listing_price_fields",
-)
+__all__ = ("finalize_listing_price_fields",)
 
 from typing import Any
 

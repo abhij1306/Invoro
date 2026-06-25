@@ -29,6 +29,7 @@ from app.services.platform_policy import resolve_platform_runtime_policy
 
 logger = logging.getLogger(__name__)
 
+
 @dataclass(slots=True)
 class BrowserFinalizeInput:
     page: Any
@@ -54,6 +55,7 @@ class BrowserFinalizeInput:
     interstitial_diagnostics: dict[str, object] | None = None
     capture_screenshot: bool = False
     html_analysis: HtmlAnalysis | None = None
+
 
 class BrowserAcquisitionResultBuilder:
     def __init__(
@@ -84,9 +86,13 @@ class BrowserAcquisitionResultBuilder:
         self.elapsed_ms = elapsed_ms
         self.build_browser_diagnostics = build_browser_diagnostics_impl
         self.build_browser_artifacts = build_browser_artifacts_impl
-        self.capture_rendered_listing_fragments = capture_rendered_listing_fragments_impl
+        self.capture_rendered_listing_fragments = (
+            capture_rendered_listing_fragments_impl
+        )
         self.capture_listing_visual_elements = capture_listing_visual_elements_impl
-        self.ready_probe_supports_fast_finalize = ready_probe_supports_fast_finalize_impl
+        self.ready_probe_supports_fast_finalize = (
+            ready_probe_supports_fast_finalize_impl
+        )
         self.logger = logger_impl
 
     async def build(self) -> dict[str, object]:
@@ -340,17 +346,22 @@ class BrowserAcquisitionResultBuilder:
                 self.capture_rendered_listing_fragments(
                     payload.page,
                     surface=payload.surface,
-                    limit=int(crawler_runtime_settings.rendered_listing_card_capture_limit),
+                    limit=int(
+                        crawler_runtime_settings.rendered_listing_card_capture_limit
+                    ),
                 ),
                 stage="rendered_listing_fragment_capture",
                 item_kind="text",
             )
         else:
             payload.phase_timings_ms["rendered_listing_fragment_capture"] = 0
-            rendered_listing_fragments, rendered_listing_fragment_capture = [], {
-                "status": "skipped",
-                "reason": "non_listing_surface",
-            }
+            rendered_listing_fragments, rendered_listing_fragment_capture = (
+                [],
+                {
+                    "status": "skipped",
+                    "reason": "non_listing_surface",
+                },
+            )
         if is_listing:
             (
                 listing_visual_elements,
@@ -365,10 +376,13 @@ class BrowserAcquisitionResultBuilder:
             )
         else:
             payload.phase_timings_ms["listing_visual_capture"] = 0
-            listing_visual_elements, listing_visual_capture = [], {
-                "status": "skipped",
-                "reason": "non_listing_surface",
-            }
+            listing_visual_elements, listing_visual_capture = (
+                [],
+                {
+                    "status": "skipped",
+                    "reason": "non_listing_surface",
+                },
+            )
         return (
             cast(list[str], rendered_listing_fragments),
             cast(list[dict[str, object]], listing_visual_elements),
@@ -407,6 +421,7 @@ class BrowserAcquisitionResultBuilder:
         )
         payload.phase_timings_ms[stage] = self.elapsed_ms(started_at)
         return artifacts, capture_diagnostics
+
 
 async def _capture_listing_artifact_with_timeout(
     operation,
@@ -465,6 +480,7 @@ async def _capture_listing_artifact_with_timeout(
                 rows.append(text)
     return (rows, {"status": "ok"})
 
+
 def _capture_status_ok(
     diagnostics: dict[str, object],
     key: str,
@@ -473,6 +489,7 @@ def _capture_status_ok(
     if not isinstance(capture, dict):
         return False
     return str(capture.get("status") or "").strip().lower() == "ok"
+
 
 def build_browser_diagnostics(
     *,
@@ -535,6 +552,7 @@ def build_browser_diagnostics(
         diagnostics.update(traversal_result.diagnostics())
     return diagnostics
 
+
 def build_browser_artifacts(
     *,
     screenshot_path: str,
@@ -555,6 +573,7 @@ def build_browser_artifacts(
         artifacts["traversal_composed_html"] = traversal_result.compose_html()
         artifacts["full_rendered_html"] = rendered_html
     return artifacts
+
 
 def _ready_probe_supports_fast_finalize(
     readiness_probes: list[dict[str, object]],

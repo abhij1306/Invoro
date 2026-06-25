@@ -82,7 +82,9 @@ async def public_alert_patch(
     user: Annotated[User, Depends(get_public_api_user)],
 ) -> dict[str, Any]:
     try:
-        monitor = await update_alert(session, alert_id=alert_id, user_id=int(user.id), payload=payload)
+        monitor = await update_alert(
+            session, alert_id=alert_id, user_id=int(user.id), payload=payload
+        )
     except LookupError as exc:
         raise PublicApiError(
             "ALERT_NOT_FOUND",
@@ -158,7 +160,9 @@ async def public_alert_test(
     user: Annotated[User, Depends(get_public_api_user)],
 ) -> dict[str, Any]:
     try:
-        monitor, run_id = await test_alert(session, alert_id=alert_id, user_id=int(user.id))
+        monitor, run_id = await test_alert(
+            session, alert_id=alert_id, user_id=int(user.id)
+        )
     except LookupError as exc:
         raise PublicApiError(
             "ALERT_NOT_FOUND",

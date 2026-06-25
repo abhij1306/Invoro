@@ -34,4 +34,3 @@ class SelectorHealthSnapshot(BaseModel):
     stale: bool = False
     critical: bool = False
     captured_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-

@@ -93,7 +93,9 @@ def test_map_network_payloads_to_fields_maps_generic_job_detail_payload() -> Non
 
 
 @pytest.mark.unit
-def test_map_network_payloads_to_fields_maps_generic_ecommerce_first_non_empty_paths() -> None:
+def test_map_network_payloads_to_fields_maps_generic_ecommerce_first_non_empty_paths() -> (
+    None
+):
     rows = map_network_payloads_to_fields(
         [
             {
@@ -144,7 +146,9 @@ def test_map_network_payloads_to_fields_maps_generic_ecommerce_first_non_empty_p
 
 
 @pytest.mark.unit
-def test_map_network_payloads_to_fields_prioritizes_late_high_signal_job_payloads() -> None:
+def test_map_network_payloads_to_fields_prioritizes_late_high_signal_job_payloads() -> (
+    None
+):
     rows = map_network_payloads_to_fields(
         [
             {
@@ -181,7 +185,9 @@ def test_map_network_payloads_to_fields_prioritizes_late_high_signal_job_payload
 
 
 @pytest.mark.unit
-def test_map_network_payloads_to_fields_prioritizes_late_high_signal_product_payloads() -> None:
+def test_map_network_payloads_to_fields_prioritizes_late_high_signal_product_payloads() -> (
+    None
+):
     rows = map_network_payloads_to_fields(
         [
             {
@@ -221,7 +227,9 @@ def test_map_network_payloads_to_fields_prioritizes_late_high_signal_product_pay
 
 
 @pytest.mark.unit
-def test_map_network_payloads_to_fields_maps_current_variant_availability_payload() -> None:
+def test_map_network_payloads_to_fields_maps_current_variant_availability_payload() -> (
+    None
+):
     rows = map_network_payloads_to_fields(
         [
             {
@@ -295,7 +303,9 @@ def test_map_network_payloads_to_fields_maps_current_variant_availability_payloa
 
 
 @pytest.mark.unit
-def test_map_network_payloads_to_fields_matches_hyphenated_availability_product_id() -> None:
+def test_map_network_payloads_to_fields_matches_hyphenated_availability_product_id() -> (
+    None
+):
     rows = map_network_payloads_to_fields(
         [
             {
@@ -339,7 +349,9 @@ def test_map_network_payloads_to_fields_matches_hyphenated_availability_product_
 
 
 @pytest.mark.unit
-def test_map_network_payloads_to_fields_keeps_richer_product_fields_alongside_availability_rows() -> None:
+def test_map_network_payloads_to_fields_keeps_richer_product_fields_alongside_availability_rows() -> (
+    None
+):
     rows = map_network_payloads_to_fields(
         [
             {
@@ -395,38 +407,46 @@ def test_map_network_payloads_to_fields_keeps_richer_product_fields_alongside_av
 
 @pytest.mark.unit
 def test_looks_like_product_api_detects_product_payload() -> None:
-    assert looks_like_product_api({
-        "price": "29.99",
-        "sku": "ABC-123",
-        "name": "Widget",
-        "description": "A fine widget",
-    })
+    assert looks_like_product_api(
+        {
+            "price": "29.99",
+            "sku": "ABC-123",
+            "name": "Widget",
+            "description": "A fine widget",
+        }
+    )
 
 
 @pytest.mark.unit
 def test_looks_like_product_api_rejects_insufficient_keys() -> None:
-    assert not looks_like_product_api({
-        "price": "29.99",
-        "sku": "ABC-123",
-    })
+    assert not looks_like_product_api(
+        {
+            "price": "29.99",
+            "sku": "ABC-123",
+        }
+    )
 
 
 @pytest.mark.unit
 def test_looks_like_job_api_detects_job_payload() -> None:
-    assert looks_like_job_api({
-        "title": "Engineer",
-        "description": "Build things",
-        "location": "Remote",
-        "company": "Acme",
-    })
+    assert looks_like_job_api(
+        {
+            "title": "Engineer",
+            "description": "Build things",
+            "location": "Remote",
+            "company": "Acme",
+        }
+    )
 
 
 @pytest.mark.unit
 def test_looks_like_job_api_rejects_insufficient_keys() -> None:
-    assert not looks_like_job_api({
-        "title": "Engineer",
-        "description": "Build things",
-    })
+    assert not looks_like_job_api(
+        {
+            "title": "Engineer",
+            "description": "Build things",
+        }
+    )
 
 
 @pytest.mark.unit
@@ -661,7 +681,9 @@ def test_ghost_route_rejects_listing_envelope_for_detail_surface() -> None:
 
 
 @pytest.mark.unit
-def test_ghost_route_maps_vtex_style_product_payload_with_requested_custom_fields() -> None:
+def test_ghost_route_maps_vtex_style_product_payload_with_requested_custom_fields() -> (
+    None
+):
     rows = map_network_payloads_to_fields(
         [
             {
@@ -708,7 +730,9 @@ def test_ghost_route_maps_vtex_style_product_payload_with_requested_custom_field
 
 
 @pytest.mark.unit
-def test_ghost_route_rejects_product_payload_whose_url_does_not_match_current_detail_page() -> None:
+def test_ghost_route_rejects_product_payload_whose_url_does_not_match_current_detail_page() -> (
+    None
+):
     rows = map_network_payloads_to_fields(
         [
             {
@@ -732,7 +756,9 @@ def test_ghost_route_rejects_product_payload_whose_url_does_not_match_current_de
 
 
 @pytest.mark.unit
-def test_ghost_route_rejects_product_payload_whose_url_only_matches_locale_tokens() -> None:
+def test_ghost_route_rejects_product_payload_whose_url_only_matches_locale_tokens() -> (
+    None
+):
     rows = map_network_payloads_to_fields(
         [
             {

@@ -584,7 +584,9 @@ def test_field_coercion_repairs_source_quality_before_enrichment() -> None:
         coerce_field_value("availability", "https://schema.org/LimitedAvailability", "")
         == "limited_stock"
     )
-    assert coerce_field_value("rating", {"ratingValue": "4.5"}, "") == pytest.approx(4.5)
+    assert coerce_field_value("rating", {"ratingValue": "4.5"}, "") == pytest.approx(
+        4.5
+    )
     assert coerce_field_value("product_type", {"variationGroup": True}, "") is None
 
 

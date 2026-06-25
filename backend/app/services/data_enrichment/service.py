@@ -59,6 +59,7 @@ from app.services.product_intelligence.matching import source_domain
 
 logger = logging.getLogger(__name__)
 
+
 async def create_data_enrichment_job(
     session: AsyncSession,
     *,
@@ -498,7 +499,9 @@ def _apply_llm_payload(
         )
         values = string_list(payload.get(field_name), max_items=10, max_chars=max_chars)
         if field_name == "ai_discovery_tags":
-            allowed = set(allowed_tags or ai_discovery_allowed_tags_for_product(product))
+            allowed = set(
+                allowed_tags or ai_discovery_allowed_tags_for_product(product)
+            )
             kept: list[str] = []
             discarded: list[dict[str, str]] = []
             for value in values:
@@ -521,7 +524,9 @@ def _apply_llm_payload(
     return applied
 
 
-def _category_match_for_product_path(category_path: str | None) -> dict[str, object] | None:
+def _category_match_for_product_path(
+    category_path: str | None,
+) -> dict[str, object] | None:
     if not category_path:
         return None
     taxonomy_reference = taxonomy_reference_for_category_path(
@@ -662,7 +667,9 @@ def _taxonomy_candidate_context(candidate: dict[str, object]) -> dict[str, objec
             "taxonomy_version": candidate.get("taxonomy_version")
             or taxonomy_reference.get("taxonomy_version")
             or DATA_ENRICHMENT_TAXONOMY_VERSION,
-            "attribute_handles": object_list(taxonomy_reference.get("attribute_handles")),
+            "attribute_handles": object_list(
+                taxonomy_reference.get("attribute_handles")
+            ),
         }
     )
 

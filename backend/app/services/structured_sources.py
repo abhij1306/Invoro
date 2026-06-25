@@ -111,8 +111,7 @@ def _resolve_json_ld_value(
 ) -> Any:
     if isinstance(value, list):
         return [
-            _resolve_json_ld_value(item, id_index=id_index, path=path)
-            for item in value
+            _resolve_json_ld_value(item, id_index=id_index, path=path) for item in value
         ]
     if not isinstance(value, dict):
         return value
@@ -264,7 +263,7 @@ def _extract_next_f_payloads(html: str) -> list[Any]:
     payloads: list[Any] = []
     for raw_fragment in _NEXT_F_PUSH_REGEX.findall(html):
         try:
-            decoded = json.loads(f"\"{raw_fragment}\"")
+            decoded = json.loads(f'"{raw_fragment}"')
         except json.JSONDecodeError:
             continue
         _, _, payload_fragment = str(decoded).partition(":")
@@ -313,7 +312,9 @@ def _extract_assignment_payload(html: str, state_name: str) -> Any | None:
 
 
 def _script_texts_matching(html: str, pattern: re.Pattern[str]) -> list[str]:
-    return [node.text for node in iter_script_text_nodes(html) if pattern.search(node.text)]
+    return [
+        node.text for node in iter_script_text_nodes(html) if pattern.search(node.text)
+    ]
 
 
 def _balanced_object_property_fragment(text: str, property_name: str) -> str:
@@ -328,9 +329,7 @@ def _extract_generic_assignment_payloads(html: str) -> list[Any]:
     max_script_chars = (
         crawler_runtime_settings.structured_source_generic_assignment_max_script_chars
     )
-    max_matches_per_script = (
-        crawler_runtime_settings.structured_source_generic_assignment_max_matches_per_script
-    )
+    max_matches_per_script = crawler_runtime_settings.structured_source_generic_assignment_max_matches_per_script
     assignment_patterns = _generic_assignment_patterns()
     for node in iter_script_text_nodes(html):
         raw = node.text
@@ -373,7 +372,9 @@ def _assignment_patterns(
     if not declarations_only:
         if state_name in HYDRATED_STATE_GLOBAL_ONLY_PATTERNS:
             return (
-                re.compile(rf"(?:window|self|globalThis)\s*\.\s*{escaped}\s*=\s*", re.S),
+                re.compile(
+                    rf"(?:window|self|globalThis)\s*\.\s*{escaped}\s*=\s*", re.S
+                ),
                 re.compile(
                     rf"(?:window|self|globalThis)\s*\[\s*['\"]{escaped}['\"]\s*\]\s*=\s*",
                     re.S,
@@ -432,7 +433,9 @@ def _balanced_json_fragment(text: str) -> str:
     return ""
 
 
-def _parse_microdata_fallback(soup: BeautifulSoup, page_url: str) -> list[dict[str, Any]]:
+def _parse_microdata_fallback(
+    soup: BeautifulSoup, page_url: str
+) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for node in soup.find_all(attrs=cast(Any, {"itemscope": True})):
         if _has_itemscope_ancestor(node):
@@ -454,7 +457,7 @@ def _parse_microdata_node(node: Any, page_url: str) -> dict[str, Any]:
         property_name = str(candidate.get("itemprop") or "").strip()
         if not property_name:
             continue
-        if candidate is not node and candidate.has_attr("itemscope"):
+        if candidate != node and candidate.has_attr("itemscope"):
             value: object = _parse_microdata_node(candidate, page_url)
         else:
             value = _microdata_node_value(candidate, page_url)
@@ -498,7 +501,7 @@ def _has_itemscope_ancestor(node: Any) -> bool:
 
 def _belongs_to_nested_itemscope(candidate: Any, root: Any) -> bool:
     parent = getattr(candidate, "parent", None)
-    while parent is not None and parent is not root:
+    while parent is not None and parent != root:
         if getattr(parent, "attrs", {}).get("itemscope") is not None:
             return True
         parent = getattr(parent, "parent", None)

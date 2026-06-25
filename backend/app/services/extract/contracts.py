@@ -56,4 +56,3 @@ class RuntimeMetrics(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     counters: dict[str, int] = Field(default_factory=dict)
-

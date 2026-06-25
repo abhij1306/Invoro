@@ -24,9 +24,7 @@ def _decode_export_value(value: Any) -> Any:
     if value_type == "set":
         return {_decode_export_value(item) for item in value.get("items", [])}
     if value_type == "frozenset":
-        return frozenset(
-            _decode_export_value(item) for item in value.get("items", [])
-        )
+        return frozenset(_decode_export_value(item) for item in value.get("items", []))
     if value_type == "dict":
         return {
             _decode_export_value(item["key"]): _decode_export_value(item["value"])
@@ -56,7 +54,9 @@ def load_export_data(path: str) -> dict[str, Any]:
 def _validate_export_provenance(path: str, payload: dict[str, Any]) -> None:
     provenance = payload.get(EXPORT_PROVENANCE_KEY)
     if not isinstance(provenance, dict):
-        raise ValueError(f"Export payload at {path} must define {EXPORT_PROVENANCE_KEY}")
+        raise ValueError(
+            f"Export payload at {path} must define {EXPORT_PROVENANCE_KEY}"
+        )
     generator = str(provenance.get("generator") or "").strip()
     if generator != EXPORT_PROVENANCE_GENERATOR:
         raise ValueError(

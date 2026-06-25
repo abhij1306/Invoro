@@ -33,7 +33,9 @@ class FirestoreJobsAdapter(PublicEndpointAdapter):
             _run_query_url("djplatform"),
             method="POST",
             headers={"Content-Type": "application/json"},
-            json_body=_published_jobs_query(adapter_runtime_settings.firestore_jobs_page_size),
+            json_body=_published_jobs_query(
+                adapter_runtime_settings.firestore_jobs_page_size
+            ),
             proxy=proxy,
             timeout_seconds=adapter_runtime_settings.ats_request_timeout_seconds,
         )
@@ -144,7 +146,9 @@ def _decode_firestore_value(value: object) -> Any:
 
 def _job_url(*, page_url: str, company_slug: str, job_slug: str) -> str:
     parsed = urlsplit(str(page_url or ""))
-    origin = f"{parsed.scheme}://{parsed.netloc}" if parsed.scheme and parsed.netloc else ""
+    origin = (
+        f"{parsed.scheme}://{parsed.netloc}" if parsed.scheme and parsed.netloc else ""
+    )
     base = origin or "https://dynamitejobs.com"
     if company_slug:
         return f"{base}/company/{company_slug}/remote-job/{job_slug}"

@@ -56,8 +56,7 @@ async def list_jobs(
 ) -> list[UCPAuditJobResponse]:
     jobs = await list_ucp_audit_jobs(session, user=user, limit=limit)
     return [
-        UCPAuditJobResponse.model_validate(job, from_attributes=True)
-        for job in jobs
+        UCPAuditJobResponse.model_validate(job, from_attributes=True) for job in jobs
     ]
 
 
@@ -70,7 +69,9 @@ async def get_job(
     try:
         job = await get_ucp_audit_job(session, user=user, job_id=job_id)
     except LookupError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
     payload = await build_ucp_audit_job_payload(session, job=job)
     return UCPAuditJobDetailResponse.model_validate(payload)
 
@@ -84,10 +85,14 @@ async def export_json(
     try:
         await get_ucp_audit_job(session, user=user, job_id=job_id)
     except LookupError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
     report = await get_ucp_audit_report(session, job_id)
     if report is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Report not found"
+        )
     return JSONResponse(report.report_json)
 
 
@@ -100,10 +105,14 @@ async def export_markdown(
     try:
         job = await get_ucp_audit_job(session, user=user, job_id=job_id)
     except LookupError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
     report = await get_ucp_audit_report(session, job_id)
     if report is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Report not found"
+        )
     filename = f"ai-discoverability-audit-{quote(job.domain)}-{job_id}.md"
     return PlainTextResponse(
         report.markdown_report,

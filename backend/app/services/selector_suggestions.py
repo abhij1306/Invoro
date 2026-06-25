@@ -32,9 +32,13 @@ def deterministic_suggestions(
     field_name: str,
 ) -> list[dict[str, object]]:
     suggestions: list[dict[str, object]] = []
-    selector = str((EXTRACTION_RULES.get("dom_patterns") or {}).get(field_name) or "").strip()
+    selector = str(
+        (EXTRACTION_RULES.get("dom_patterns") or {}).get(field_name) or ""
+    ).strip()
     if selector:
-        matched_value, count, _selector_used = extract_selector_value(html, css_selector=selector)
+        matched_value, count, _selector_used = extract_selector_value(
+            html, css_selector=selector
+        )
         if count > 0:
             suggestions.append(
                 {

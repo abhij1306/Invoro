@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-__all__ = (
-    "collect_inline_scalar_rows",
-)
+__all__ = ("collect_inline_scalar_rows",)
 
 # PHASE-3 CHILD: Belongs in extract/ detail materialization decomposition.
 # Keep imports tight here. This stays a helper module, not a public entrypoint.
@@ -52,9 +50,8 @@ def collect_inline_scalar_rows(
         if len(fragments) != 2:
             continue
         label, value = fragments
-        if (
-            len(label) > int(INLINE_SCALAR_LABEL_MAX_LEN)
-            or len(value) > int(INLINE_SCALAR_VALUE_MAX_LEN)
+        if len(label) > int(INLINE_SCALAR_LABEL_MAX_LEN) or len(value) > int(
+            INLINE_SCALAR_VALUE_MAX_LEN
         ):
             continue
         normalized = alias_lookup.get(label.lower()) or alias_lookup.get(

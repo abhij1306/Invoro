@@ -1,6 +1,14 @@
 from __future__ import annotations
 
-__all__ = ("infer_variant_group_name", "variant_dom_cues_present", "variant_input_label", "resolve_variant_group_name", "infer_variant_group_name_from_values", "iter_variant_select_groups", "iter_variant_choice_groups")
+__all__ = (
+    "infer_variant_group_name",
+    "variant_dom_cues_present",
+    "variant_input_label",
+    "resolve_variant_group_name",
+    "infer_variant_group_name_from_values",
+    "iter_variant_select_groups",
+    "iter_variant_choice_groups",
+)
 
 import re
 from collections.abc import Sequence
@@ -208,19 +216,27 @@ def _descendant_variant_group_name(node: Any) -> str:
         recursive=False,
     ):
         child_tag = str(getattr(child, "name", "") or "").strip().lower()
-        child_role = str(child.get("role") or "").strip().lower() if hasattr(child, "get") else ""
-        if child_tag in {"a", "button", "input", "option"} or (
-            hasattr(child, "get")
-            and (
-                child.get("data-selected") not in (None, "", [], {})
-                or child.get("aria-selected") not in (None, "", [], {})
-                or child_role in {"radio", "option"}
+        child_role = (
+            str(child.get("role") or "").strip().lower()
+            if hasattr(child, "get")
+            else ""
+        )
+        if (
+            child_tag in {"a", "button", "input", "option"}
+            or (
+                hasattr(child, "get")
+                and (
+                    child.get("data-selected") not in (None, "", [], {})
+                    or child.get("aria-selected") not in (None, "", [], {})
+                    or child_role in {"radio", "option"}
+                )
             )
-        ) or (
-            hasattr(child, "select")
-            and child.select(
-                "a[href], button, input[type='radio'], input[type='checkbox'], "
-                "[role='radio'], [role='option'], [data-selected], [aria-selected]"
+            or (
+                hasattr(child, "select")
+                and child.select(
+                    "a[href], button, input[type='radio'], input[type='checkbox'], "
+                    "[role='radio'], [role='option'], [data-selected], [aria-selected]"
+                )
             )
         ):
             continue
@@ -281,7 +297,11 @@ def _descendant_variant_choice_inputs(node: Any, *, limit: int) -> list[Any]:
         if tag_name == "button":
             inputs.append(child)
             continue
-        input_type = str(child.get("type") or "").strip().lower() if hasattr(child, "get") else ""
+        input_type = (
+            str(child.get("type") or "").strip().lower()
+            if hasattr(child, "get")
+            else ""
+        )
         if input_type in {"radio", "checkbox"}:
             inputs.append(child)
     remaining = normalized_limit - len(inputs)
@@ -291,6 +311,7 @@ def _descendant_variant_choice_inputs(node: Any, *, limit: int) -> list[Any]:
         if _anchor_node_has_variant_signal(child):
             inputs.append(child)
     return inputs
+
 
 def _anchor_node_has_variant_signal(node: Any) -> bool:
     href = text_or_none(node.get("href")) if hasattr(node, "get") else None
@@ -313,7 +334,8 @@ def _anchor_node_has_variant_signal(node: Any) -> bool:
             probe_parts.append(str(value))
     probe = clean_text(" ".join(probe_parts)).lower()
     return any(
-        token in probe for token in ("selected", "current", "checked", "variant", "swatch", "option")
+        token in probe
+        for token in ("selected", "current", "checked", "variant", "swatch", "option")
     )
 
 
@@ -483,9 +505,7 @@ def resolve_variant_group_name(node: Any) -> str:
 
 
 def infer_variant_group_name_from_values(values: Sequence[object]) -> str:
-    cleaned_values = [
-        clean_text(value) for value in values or [] if clean_text(value)
-    ]
+    cleaned_values = [clean_text(value) for value in values or [] if clean_text(value)]
     if len(cleaned_values) < 2:
         return ""
     # Sequential integer runs are quantity selectors, not variant axes.
@@ -728,10 +748,9 @@ def iter_variant_choice_groups(soup: Any) -> list[Any]:
             # Cache parent sibling counts so we never re-select the same parent
             _parent_swatch_cache: dict[int, list[Any]] = {}
             for btn in btn_slice:
-                if (
-                    str(getattr(btn, "name", "") or "").strip().lower() == "a"
-                    and not _anchor_node_has_variant_signal(btn)
-                ):
+                if str(
+                    getattr(btn, "name", "") or ""
+                ).strip().lower() == "a" and not _anchor_node_has_variant_signal(btn):
                     continue
                 parent = getattr(btn, "parent", None)
                 depth = 0
@@ -884,15 +903,14 @@ def _variant_choice_container_for_input(
             parent = getattr(parent, "parent", None)
             continue
         if input_type == "checkbox" and not (
-            axis_name
-            or parent_has_axis_hint
-            or parent_group_name
+            axis_name or parent_has_axis_hint or parent_group_name
         ):
             parent = getattr(parent, "parent", None)
             continue
         inferred_from_values = (
             infer_variant_group_name_from_values(_choice_option_texts(parent))
-            if input_type != "checkbox" and _node_supports_value_only_axis_inference(parent)
+            if input_type != "checkbox"
+            and _node_supports_value_only_axis_inference(parent)
             else ""
         )
         if parent_is_axis_container or inferred_from_values:

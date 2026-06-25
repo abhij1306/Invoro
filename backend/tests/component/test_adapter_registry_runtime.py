@@ -20,8 +20,6 @@ from app.services.extract.listing_candidate_ranking import (
 )
 
 
-
-
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_request_result_applies_per_request_timeout_with_shared_client(
@@ -647,4 +645,3 @@ class _ProxyPublicEndpointAdapter(PublicEndpointAdapter):
     ) -> list[dict]:
         self.captured_proxy = proxy
         return [{"url": url, "surface": surface}]
-

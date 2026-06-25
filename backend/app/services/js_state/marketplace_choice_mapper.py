@@ -45,7 +45,12 @@ def _collect_marketplace_choice_products(
                 for field_name, field_value in product.items():
                     if field_name == "variants":
                         continue
-                    if existing.get(field_name) in (None, "", [], {}) and field_value not in (
+                    if existing.get(field_name) in (
+                        None,
+                        "",
+                        [],
+                        {},
+                    ) and field_value not in (
                         None,
                         "",
                         [],
@@ -100,7 +105,8 @@ def _marketplace_choice_product(value: dict[str, Any]) -> dict[str, Any]:
                 row = _marketplace_choice_variant_row(
                     axis_name=axis_name,
                     choice_name=edge_choice.get("name"),
-                    choice_id=edge_choice.get("displayId") or edge_choice.get("choiceId"),
+                    choice_id=edge_choice.get("displayId")
+                    or edge_choice.get("choiceId"),
                     listing_url=selectable.get("listingUrl"),
                     stock_status=_marketplace_stock_status(selectable),
                     price_amount=_marketplace_price_amount(selectable),
@@ -115,7 +121,9 @@ def _marketplace_choice_product(value: dict[str, Any]) -> dict[str, Any]:
             if isinstance(selected_variant_choice, dict)
             else None
         )
-        raw_selected_choice = selected.get("choice") if isinstance(selected, dict) else None
+        raw_selected_choice = (
+            selected.get("choice") if isinstance(selected, dict) else None
+        )
         choice: dict[str, Any] = (
             raw_selected_choice if isinstance(raw_selected_choice, dict) else {}
         )

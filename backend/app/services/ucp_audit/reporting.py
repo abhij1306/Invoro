@@ -45,15 +45,21 @@ def build_report_payload(report: UCPComplianceReport) -> dict[str, Any]:
 
 
 def build_markdown_report(report: UCPComplianceReport) -> str:
-    contract: dict[str, Any] = report.ucp_contract if isinstance(report.ucp_contract, dict) else {}
+    contract: dict[str, Any] = (
+        report.ucp_contract if isinstance(report.ucp_contract, dict) else {}
+    )
     catalog_raw = contract.get("catalog")
     structured_raw = contract.get("structured_markup")
     discovery_raw = contract.get("discovery")
     product_records_raw = contract.get("product_records")
     catalog: dict[str, Any] = catalog_raw if isinstance(catalog_raw, dict) else {}
-    structured: dict[str, Any] = structured_raw if isinstance(structured_raw, dict) else {}
+    structured: dict[str, Any] = (
+        structured_raw if isinstance(structured_raw, dict) else {}
+    )
     discovery: dict[str, Any] = discovery_raw if isinstance(discovery_raw, dict) else {}
-    product_records: list[Any] = product_records_raw if isinstance(product_records_raw, list) else []
+    product_records: list[Any] = (
+        product_records_raw if isinstance(product_records_raw, list) else []
+    )
     lines = [
         f"# AI Discoverability Audit Report: {escape_markdown(report.domain, mode='selective')}",
         "",
@@ -123,7 +129,10 @@ def _finding_lines(finding: Any) -> list[str]:
         lines.append(f"- Affected samples: {escape_markdown(finding.affected_count)}")
     if finding.affected_urls:
         lines.append("- Affected URLs:")
-        lines.extend(f"  - {escape_markdown(url, mode='selective')}" for url in finding.affected_urls[:5])
+        lines.extend(
+            f"  - {escape_markdown(url, mode='selective')}"
+            for url in finding.affected_urls[:5]
+        )
     evidence = _evidence_lines(finding.evidence)
     if evidence:
         lines.append("- Evidence:")
@@ -140,7 +149,9 @@ def _roadmap_lines(index: int, item: Any) -> list[str]:
         f"   - Source: {escape_markdown(item.source, mode='selective')}",
     ]
     if item.finding_codes:
-        codes = ", ".join(escape_markdown(code, mode="selective") for code in item.finding_codes)
+        codes = ", ".join(
+            escape_markdown(code, mode="selective") for code in item.finding_codes
+        )
         lines.append(f"   - Finding codes: {codes}")
     evidence = _evidence_lines(item.evidence)
     if evidence:
@@ -157,10 +168,18 @@ def _product_table(records: list[Any]) -> list[str]:
     for record in records[:10]:
         if not isinstance(record, dict):
             continue
-        url = escape_markdown(_short_text(str(record.get("source_url") or record.get("url") or ""), 80), mode="selective")
-        title = escape_markdown(_short_text(str(record.get("title") or record.get("name") or ""), 64), mode="selective")
+        url = escape_markdown(
+            _short_text(str(record.get("source_url") or record.get("url") or ""), 80),
+            mode="selective",
+        )
+        title = escape_markdown(
+            _short_text(str(record.get("title") or record.get("name") or ""), 64),
+            mode="selective",
+        )
         price = escape_markdown(str(record.get("price") or ""))
-        variants = escape_markdown(str(record.get("variant_count") or len(record.get("variants") or [])))
+        variants = escape_markdown(
+            str(record.get("variant_count") or len(record.get("variants") or []))
+        )
         rating = escape_markdown(str(record.get("rating") or ""))
         lines.append(f"| {url} | {title} | {price} | {variants} | {rating} |")
     return lines
@@ -173,7 +192,9 @@ def _evidence_lines(evidence: list[dict[str, Any]]) -> list[str]:
             continue
         for key, value in item.items():
             if isinstance(value, list):
-                value_text = ", ".join(_short_text(str(entry), 140) for entry in value[:5])
+                value_text = ", ".join(
+                    _short_text(str(entry), 140) for entry in value[:5]
+                )
             else:
                 value_text = _short_text(str(value), 180)
             lines.append(

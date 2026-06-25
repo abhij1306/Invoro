@@ -56,10 +56,16 @@ from app.services.extract.detail.identity.core import (
     detail_url_candidate_is_low_signal as _detail_url_candidate_is_low_signal,
     preferred_detail_identity_url as _preferred_detail_identity_url,
 )
-from app.services.extract.detail.images.dedupe import dedupe_primary_and_additional_images
-from app.services.extract.detail.assembly import dom_completion as _detail_dom_completion
+from app.services.extract.detail.images.dedupe import (
+    dedupe_primary_and_additional_images,
+)
+from app.services.extract.detail.assembly import (
+    dom_completion as _detail_dom_completion,
+)
 from app.services.extract.detail.images import materialize as _detail_image_materialize
-from app.services.extract.detail.identity import structured_pruning as _detail_structured_pruning
+from app.services.extract.detail.identity import (
+    structured_pruning as _detail_structured_pruning,
+)
 from app.services.extract.detail.text.sanitizer import detail_candidate_is_valid
 from app.services.extract.detail.price.core import (
     drop_low_signal_zero_detail_price,
@@ -200,17 +206,16 @@ def _collect_structured_payload_candidates(
         requested_title = _detail_title_from_url(identity_url)
         requested_tokens = _detail_identity_tokens(requested_title)
         requested_codes = _detail_identity_codes_from_url(identity_url)
-        had_irrelevant_product_payload = (
-            isinstance(payload, dict)
-            and _detail_structured_payload_is_irrelevant_product(
-                payload,
-                page_url=page_url,
-                requested_page_url=identity_url,
-                requested_title=requested_title,
-                requested_tokens=requested_tokens,
-                requested_codes=requested_codes,
-                detail_identity_tokens=_detail_identity_tokens,
-            )
+        had_irrelevant_product_payload = isinstance(
+            payload, dict
+        ) and _detail_structured_payload_is_irrelevant_product(
+            payload,
+            page_url=page_url,
+            requested_page_url=identity_url,
+            requested_title=requested_title,
+            requested_tokens=requested_tokens,
+            requested_codes=requested_codes,
+            detail_identity_tokens=_detail_identity_tokens,
         )
         payload = _prune_irrelevant_detail_structured_payload(
             payload,
@@ -417,16 +422,23 @@ def _materialize_record(
                     candidate_long_text = finalize_candidate_value(
                         field_name, candidate_values
                     )
-                    if candidate_long_text not in (
-                        None,
-                        "",
-                        [],
-                        {},
-                    ) and not _detail_long_text_value_looks_truncated(
+                    if (
                         candidate_long_text
-                    ) and not (
-                        field_name == "description"
-                        and _detail_description_value_looks_thin(candidate_long_text)
+                        not in (
+                            None,
+                            "",
+                            [],
+                            {},
+                        )
+                        and not _detail_long_text_value_looks_truncated(
+                            candidate_long_text
+                        )
+                        and not (
+                            field_name == "description"
+                            and _detail_description_value_looks_thin(
+                                candidate_long_text
+                            )
+                        )
                     ):
                         selected_source = candidate_source
                         winning_values = candidate_values

@@ -88,14 +88,18 @@ class MonitorChangeDetectionService:
                             source_url=record.source_url,
                             event_type=MONITOR_EVENT_RECORD_NEW,
                             detected_at=detected_at,
-                            new_value=_tracked_values(record, tracked_fields, alert_rules),
+                            new_value=_tracked_values(
+                                record, tracked_fields, alert_rules
+                            ),
                         )
                     )
                     continue
                 previous_row = previous[key]
                 for field in _tracked_value_names(tracked_fields, alert_rules):
                     old_raw = dict(previous_row.field_values or {}).get(field)
-                    new_raw = _tracked_values(record, tracked_fields, alert_rules).get(field)
+                    new_raw = _tracked_values(record, tracked_fields, alert_rules).get(
+                        field
+                    )
 
                     old_value = _normalized_value(field, old_raw)
                     new_value = _normalized_value(field, new_raw)
@@ -147,30 +151,41 @@ class MonitorChangeDetectionService:
                         monitor_id=monitor.id,
                         source_url=record.source_url,
                         url_identity_key=key,
-                        field_values=_tracked_values(record, tracked_fields, alert_rules),
+                        field_values=_tracked_values(
+                            record, tracked_fields, alert_rules
+                        ),
                     )
                 )
             for event in events:
                 if event.event_type == MONITOR_EVENT_FIELD_CHANGED:
-                    event.condition_met = _condition_met(monitor, dict(monitor.last_known_values or {}), event)
+                    event.condition_met = _condition_met(
+                        monitor, dict(monitor.last_known_values or {}), event
+                    )
                 session.add(event)
             if current:
                 first_record = next(iter(current.values()))
-                monitor.last_known_values = _tracked_values(first_record, tracked_fields, alert_rules)
+                monitor.last_known_values = _tracked_values(
+                    first_record, tracked_fields, alert_rules
+                )
                 monitor.last_checked_at = detected_at
                 monitor.last_crawl_method = _crawl_method(run, first_record)
                 monitor.consecutive_failure_count = 0
                 monitor.last_error = None
             else:
                 monitor.last_checked_at = detected_at
-                monitor.consecutive_failure_count = int(monitor.consecutive_failure_count or 0) + 1
+                monitor.consecutive_failure_count = (
+                    int(monitor.consecutive_failure_count or 0) + 1
+                )
                 monitor.last_error = "No records extracted for alert poll"
                 if (
                     monitor.poll_interval_seconds
-                    and monitor.consecutive_failure_count >= ALERT_CONSECUTIVE_FAILURE_LIMIT
+                    and monitor.consecutive_failure_count
+                    >= ALERT_CONSECUTIVE_FAILURE_LIMIT
                 ):
                     monitor.status = MONITOR_STATUS_ERROR
-            if monitor.poll_interval_seconds and any(event.condition_met for event in events):
+            if monitor.poll_interval_seconds and any(
+                event.condition_met for event in events
+            ):
                 monitor.status = MONITOR_STATUS_TRIGGERED
             await session.flush()
             await create_monitor_change_notification(
@@ -178,9 +193,8 @@ class MonitorChangeDetectionService:
                 monitor=monitor,
                 events=events,
             )
-            if (
-                monitor.poll_interval_seconds
-                and not bool(settings.get(MONITOR_SUPPRESS_WEBHOOKS_SETTING_KEY, False))
+            if monitor.poll_interval_seconds and not bool(
+                settings.get(MONITOR_SUPPRESS_WEBHOOKS_SETTING_KEY, False)
             ):
                 await dispatch_alert_webhooks(session, monitor=monitor, events=events)
             summary = dict(run.result_summary or {})
@@ -194,7 +208,9 @@ def ensure_monitor_change_detection_registered() -> None:
     register_run_complete_callback(service.handle_run_complete, key=_CALLBACK_KEY)
 
 
-async def _latest_snapshot_records(session, monitor_id: int) -> list[MonitorSnapshotRecord]:
+async def _latest_snapshot_records(
+    session, monitor_id: int
+) -> list[MonitorSnapshotRecord]:
     snapshot_id = await session.scalar(
         select(MonitorSnapshot.id)
         .where(MonitorSnapshot.monitor_id == monitor_id)
@@ -295,7 +311,9 @@ def _normalized_value(field: str, value: Any) -> object:
     if value in (None, "", [], {}):
         return None
     if isinstance(value, dict):
-        return {key: _normalized_value(field, item) for key, item in sorted(value.items())}
+        return {
+            key: _normalized_value(field, item) for key, item in sorted(value.items())
+        }
     if isinstance(value, list):
         return [_normalized_value(field, item) for item in value]
     if "price" in field.lower():
@@ -325,7 +343,9 @@ def _as_int(value: object) -> int | None:
     return parsed if parsed > 0 else None
 
 
-def _condition_met(monitor: MonitorJob, values: dict[str, Any], event: MonitorEvent) -> bool:
+def _condition_met(
+    monitor: MonitorJob, values: dict[str, Any], event: MonitorEvent
+) -> bool:
     if not monitor.poll_interval_seconds:
         return False
     if event.field_name:

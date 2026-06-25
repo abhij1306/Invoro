@@ -418,9 +418,7 @@ def _dedupe_image_values(
     if primary:
         seen.add(primary.lower())
     if isinstance(value, str):
-        candidates: list[object] = [
-            part for part in value.split(", ") if part.strip()
-        ]
+        candidates: list[object] = [part for part in value.split(", ") if part.strip()]
     else:
         candidates = (
             list(value)
@@ -457,5 +455,3 @@ def _stringify_export_value(value: object) -> str:
     else:
         text = json.dumps(value, ensure_ascii=False)
     return text.replace("\r\n", "\n").replace("\u00a0", " ").strip()
-
-

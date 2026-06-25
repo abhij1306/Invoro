@@ -24,6 +24,7 @@ from app.services.shared.field_coerce import (
 
 logger = logging.getLogger(__name__)
 
+
 def extract_raw_json_records(
     text: str,
     page_url: str,

@@ -107,7 +107,9 @@ async def discover_ucp_manifest(domain: str) -> UCPManifestResult:
         item for item in config.UCP_REQUIRED_SERVICE_NAMES if item not in service_names
     ]
     missing_capabilities = [
-        item for item in config.UCP_REQUIRED_CAPABILITIES if item not in capability_names
+        item
+        for item in config.UCP_REQUIRED_CAPABILITIES
+        if item not in capability_names
     ]
     shape_errors, signing_keys_errors = _validate_manifest_shape(payload)
     if not _is_json_content_type(metadata["content_type"]):
@@ -144,7 +146,9 @@ async def discover_ucp_manifest(domain: str) -> UCPManifestResult:
             capabilities,
             _payment_handler_entries(payload),
         ),
-        payment_handlers=sorted({item["name"] for item in _payment_handler_entries(payload)}),
+        payment_handlers=sorted(
+            {item["name"] for item in _payment_handler_entries(payload)}
+        ),
         raw_manifest=payload,
         errors=shape_errors + signing_keys_errors + entry_errors,
         signing_keys_errors=signing_keys_errors,
@@ -152,7 +156,9 @@ async def discover_ucp_manifest(domain: str) -> UCPManifestResult:
     )
 
 
-async def _selected_manifest_payload(result: object) -> tuple[object, dict | None, list[str]]:
+async def _selected_manifest_payload(
+    result: object,
+) -> tuple[object, dict | None, list[str]]:
     raw_body = str(getattr(result, "html", "") or "")
     try:
         payload = json.loads(raw_body)
@@ -174,9 +180,13 @@ async def _selected_manifest_payload(result: object) -> tuple[object, dict | Non
     if version_url:
         fetched = await _fetch_manifest_page(version_url)
         if fetched is None or _page_error(fetched):
-            return result, payload, [
-                f"Unable to fetch supported version profile {config.UCP_TARGET_VERSION}"
-            ]
+            return (
+                result,
+                payload,
+                [
+                    f"Unable to fetch supported version profile {config.UCP_TARGET_VERSION}"
+                ],
+            )
         raw_supported = str(getattr(fetched, "html", "") or "")
         try:
             supported_payload = json.loads(raw_supported)
@@ -190,9 +200,11 @@ async def _selected_manifest_payload(result: object) -> tuple[object, dict | Non
         _set_result_attr(result, "version_source", "supported_versions")
         return result, payload, []
     _set_result_attr(result, "version_source", "unsupported")
-    return result, payload, [
-        f"UCP target version {config.UCP_TARGET_VERSION} is not declared"
-    ]
+    return (
+        result,
+        payload,
+        [f"UCP target version {config.UCP_TARGET_VERSION} is not declared"],
+    )
 
 
 def _supported_versions_declares_target(value: object) -> bool:
@@ -215,7 +227,10 @@ def _supported_version_url(value: object, base_url: str) -> str:
         raw = value.get(config.UCP_TARGET_VERSION)
     elif isinstance(value, list):
         for item in value:
-            if isinstance(item, dict) and str(item.get("version") or "") == config.UCP_TARGET_VERSION:
+            if (
+                isinstance(item, dict)
+                and str(item.get("version") or "") == config.UCP_TARGET_VERSION
+            ):
                 raw = item.get("url") or item.get("href") or item.get("profile")
                 break
     if isinstance(raw, dict):
@@ -364,7 +379,9 @@ def _transport_entries(service_entries: list[dict], base_url: str) -> list[dict]
                 "service": str(service.get("name") or ""),
                 "transport": transport,
                 "endpoint": endpoint,
-                "schema": _absolute_http_url(str(service.get("schema") or ""), base_url),
+                "schema": _absolute_http_url(
+                    str(service.get("schema") or ""), base_url
+                ),
                 "errors": errors,
             }
         )
@@ -451,7 +468,11 @@ def check_version_alignment(
     required_service: str,
 ) -> list[str]:
     service_version = next(
-        (str(e.get("version") or "") for e in service_entries if e.get("name") == required_service),
+        (
+            str(e.get("version") or "")
+            for e in service_entries
+            if e.get("name") == required_service
+        ),
         "",
     )
     if not service_version:

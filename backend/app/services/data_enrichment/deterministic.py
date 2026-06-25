@@ -171,7 +171,9 @@ def normalize_price(
         return None
     normalized: dict[str, object] = {"amount": float(amount), "currency": currency}
     sale_amount = decimal_text(first_present(data, "sale_price", "discounted_price"))
-    original_amount = decimal_text(first_present(data, *DATA_ENRICHMENT_PRICE_ORIGINAL_FIELDS))
+    original_amount = decimal_text(
+        first_present(data, *DATA_ENRICHMENT_PRICE_ORIGINAL_FIELDS)
+    )
     if sale_amount is not None:
         normalized["sale_price"] = float(sale_amount)
     if original_amount is not None:
@@ -205,9 +207,7 @@ def normalize_sizes(
         ),
     ]
     category_supports_size = (
-        category_supports_attribute(category_match, "size")
-        if category_match
-        else False
+        category_supports_attribute(category_match, "size") if category_match else False
     )
     size_context = has_size_context(data)
     if not values and not category_supports_size:
@@ -288,7 +288,9 @@ def has_size_context(data: dict[str, object]) -> bool:
     )
     if not context:
         return False
-    return any(term_present(context, term) for term in DATA_ENRICHMENT_SIZE_CONTEXT_TERMS)
+    return any(
+        term_present(context, term) for term in DATA_ENRICHMENT_SIZE_CONTEXT_TERMS
+    )
 
 
 def normalize_materials(
@@ -321,7 +323,9 @@ def collect_material_matches(
     for canonical, tokens in material_terms.items():
         if canonical in seen:
             continue
-        if isinstance(tokens, list) and any(term_present(text, token) for token in tokens):
+        if isinstance(tokens, list) and any(
+            term_present(text, token) for token in tokens
+        ):
             found.append(str(canonical))
             seen.add(str(canonical))
 
@@ -526,9 +530,7 @@ def category_url_context(source_url: object) -> str | None:
         if not path:
             return None
         segments = [
-            segment.strip().casefold()
-            for segment in path.split("/")
-            if segment.strip()
+            segment.strip().casefold() for segment in path.split("/") if segment.strip()
         ]
         for marker in DATA_ENRICHMENT_CATEGORY_URL_CONTEXT_MARKERS:
             if marker not in segments:
@@ -792,9 +794,7 @@ def split_values(values: list[object]) -> list[str]:
         if not text:
             continue
         rows.extend(
-            clean_text(part)
-            for part in re.split(r"[,/|;·]", text)
-            if clean_text(part)
+            clean_text(part) for part in re.split(r"[,/|;·]", text) if clean_text(part)
         )
     return rows
 

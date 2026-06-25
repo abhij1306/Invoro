@@ -203,7 +203,9 @@ def detail_jsonld_price_bundle(
         if price:
             price = format_detail_price_decimal(price) or price
         if original_price:
-            original_price = format_detail_price_decimal(original_price) or original_price
+            original_price = (
+                format_detail_price_decimal(original_price) or original_price
+            )
         if price or original_price:
             return price, original_price, text_or_none(offer_currency)
     return None, None, saved_currency
@@ -289,7 +291,9 @@ def _price_node_looks_like_installment(node: object) -> bool:
             elif raw not in (None, "", [], {}):
                 text_parts.append(str(raw))
     lowered = " ".join(text_parts).lower()
-    return any(token in lowered for token in DETAIL_INSTALLMENT_PRICE_TEXT_TOKENS_NORMALIZED)
+    return any(
+        token in lowered for token in DETAIL_INSTALLMENT_PRICE_TEXT_TOKENS_NORMALIZED
+    )
 
 
 def _price_node_looks_like_related_offer(node: object) -> bool:

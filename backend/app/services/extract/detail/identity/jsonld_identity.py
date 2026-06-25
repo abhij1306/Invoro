@@ -47,7 +47,9 @@ def jsonld_items(payload: object) -> list[object]:
     if isinstance(payload, list):
         items: list[object] = []
         for item in payload:
-            items.extend(_jsonld_graph_items(item) if isinstance(item, dict) else [item])
+            items.extend(
+                _jsonld_graph_items(item) if isinstance(item, dict) else [item]
+            )
         return items
     if isinstance(payload, dict):
         return _jsonld_graph_items(payload)

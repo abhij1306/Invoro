@@ -55,7 +55,9 @@ def build_variant_candidate_group(
         ancestor_class_tokens=ancestor_class_tokens(node),
         extractor_path=extractor_path,
         scope_source=variant_scope_source(node),
-        option_node_types=variant_option_node_types(node, extractor_path=extractor_path),
+        option_node_types=variant_option_node_types(
+            node, extractor_path=extractor_path
+        ),
     )
 
 
@@ -104,7 +106,9 @@ def variant_option_node_types(node: Any, *, extractor_path: str) -> list[str]:
 def variant_option_node_type(node: Any) -> str:
     tag_name = str(getattr(node, "name", "") or "").strip().lower()
     role = str(node.get("role") or "").strip().lower() if hasattr(node, "get") else ""
-    input_type = str(node.get("type") or "").strip().lower() if hasattr(node, "get") else ""
+    input_type = (
+        str(node.get("type") or "").strip().lower() if hasattr(node, "get") else ""
+    )
     if hasattr(node, "get") and node.get("data-selected") not in (None, "", [], {}):
         return "data_selected"
     if tag_name == "input" and input_type in {"radio", "checkbox"}:
@@ -126,7 +130,9 @@ def node_matches_selector(node: Any, selector: str) -> bool:
         return False
 
 
-def weak_variant_option_node_allowed(node: Any, *, container: Any, page_url: str) -> bool:
+def weak_variant_option_node_allowed(
+    node: Any, *, container: Any, page_url: str
+) -> bool:
     if str(getattr(node, "name", "") or "").strip().lower() != "a":
         return True
     if not hasattr(node, "get"):
@@ -140,7 +146,11 @@ def weak_variant_option_node_allowed(node: Any, *, container: Any, page_url: str
         return True
     if _anchor_has_inline_variant_option_signal(node, container=container):
         return True
-    role = str(container.get("role") or "").strip().lower() if hasattr(container, "get") else ""
+    role = (
+        str(container.get("role") or "").strip().lower()
+        if hasattr(container, "get")
+        else ""
+    )
     if role == "radiogroup" and text_or_none(node.get("aria-label")):
         return True
     return anchor_is_variant_candidate(node, page_url=page_url)
@@ -174,10 +184,10 @@ def anchor_has_selected_variant_signal(node: Any) -> bool:
 
 
 def _anchor_has_inline_variant_option_signal(node: Any, *, container: Any) -> bool:
-    option_label = text_or_none(
-        node.get("title") or node.get("aria-label")
-    ) or (
-        clean_text(node.get_text(" ", strip=True)) if hasattr(node, "get_text") else None
+    option_label = text_or_none(node.get("title") or node.get("aria-label")) or (
+        clean_text(node.get_text(" ", strip=True))
+        if hasattr(node, "get_text")
+        else None
     )
     if not option_label:
         return False
@@ -197,4 +207,6 @@ def _anchor_has_inline_variant_option_signal(node: Any, *, container: Any) -> bo
             elif value not in (None, "", [], {}):
                 container_probe_parts.append(str(value))
     probe = clean_text(" ".join([*node_probe_parts, *container_probe_parts])).lower()
-    return any(token in probe for token in ("swatch", "size", "color", "colour", "variant"))
+    return any(
+        token in probe for token in ("swatch", "size", "color", "colour", "variant")
+    )

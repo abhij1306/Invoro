@@ -66,13 +66,17 @@ def _payload_mapping_specs(
                 elif normalized_key in {"endpoint_families", "endpoint_path_tokens"}:
                     spec[normalized_key] = _tuple_of_strings(raw_value)
                 else:
-                    spec[normalized_key] = str(raw_value) if isinstance(raw_value, str) else raw_value
+                    spec[normalized_key] = (
+                        str(raw_value) if isinstance(raw_value, str) else raw_value
+                    )
             specs.append(spec)
         normalized_specs[str(surface)] = tuple(specs)
     return tuple(normalized_specs.items())
 
 
-_EXPORTS = load_export_data(str(Path(__file__).with_name("network_payload_specs.exports.json")))
+_EXPORTS = load_export_data(
+    str(Path(__file__).with_name("network_payload_specs.exports.json"))
+)
 _SURFACE_SPECS = dict(_payload_mapping_specs(_EXPORTS.get("NETWORK_PAYLOAD_SPECS")))
 
 NETWORK_PAYLOAD_SIGNATURE_MIN_MATCH: Final[int] = (

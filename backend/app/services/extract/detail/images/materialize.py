@@ -41,6 +41,7 @@ def _ordered_candidates_for_field(
     rows.sort(key=lambda item: (item[0], item[1]))
     return [(source, raw_value) for _, _, source, raw_value in rows]
 
+
 def _materialize_image_fields(
     *,
     surface: str,

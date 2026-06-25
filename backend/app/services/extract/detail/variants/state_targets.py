@@ -136,9 +136,7 @@ def state_variant_targets(
     return axis_targets, combo_targets
 
 
-def variant_query_url(
-    page_url: str, *, query_key: str, query_value: str
-) -> str | None:
+def variant_query_url(page_url: str, *, query_key: str, query_value: str) -> str | None:
     normalized_key = text_or_none(query_key)
     normalized_value = text_or_none(query_value)
     if not normalized_key or not normalized_value:

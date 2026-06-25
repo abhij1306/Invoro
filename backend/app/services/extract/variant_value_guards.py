@@ -23,8 +23,12 @@ from app.services.config.public_record_policy import (
 )
 from app.services.shared.field_coerce import clean_text, text_or_none
 
-_BLOCKED_SUFFIXES = tuple(clean_text(v).casefold() for v in VARIANT_URL_BLOCKED_PATH_SUFFIXES if clean_text(v))
-_BLOCKED_PREFIXES = tuple(clean_text(v).casefold() for v in VARIANT_URL_BLOCKED_PATH_PREFIXES if clean_text(v))
+_BLOCKED_SUFFIXES = tuple(
+    clean_text(v).casefold() for v in VARIANT_URL_BLOCKED_PATH_SUFFIXES if clean_text(v)
+)
+_BLOCKED_PREFIXES = tuple(
+    clean_text(v).casefold() for v in VARIANT_URL_BLOCKED_PATH_PREFIXES if clean_text(v)
+)
 _DETAIL_QUERY_KEYS = frozenset(
     clean_text(value).casefold()
     for value in tuple(PUBLIC_RECORD_DETAIL_CANONICAL_QUERY_KEYS or ())
@@ -77,10 +81,7 @@ def variant_url_is_product_like(value: str) -> bool:
         return False
     if any(path.startswith(prefix) for prefix in _BLOCKED_PREFIXES):
         return False
-    return any(
-        token in query
-        for token in _variant_query_tokens()
-    )
+    return any(token in query for token in _variant_query_tokens())
 
 
 def _variant_query_tokens() -> tuple[str, ...]:
@@ -104,7 +105,6 @@ def _path_has_product_detail_marker(path: str) -> bool:
 def _url_is_public_http(parsed: object) -> bool:
     if not hasattr(parsed, "scheme") or not hasattr(parsed, "netloc"):
         return False
-    return (
-        str(getattr(parsed, "scheme", "")).lower() in VARIANT_PUBLIC_URL_SCHEMES
-        and bool(getattr(parsed, "netloc", ""))
-    )
+    return str(
+        getattr(parsed, "scheme", "")
+    ).lower() in VARIANT_PUBLIC_URL_SCHEMES and bool(getattr(parsed, "netloc", ""))

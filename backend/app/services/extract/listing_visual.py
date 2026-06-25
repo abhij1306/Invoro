@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-__all__ = (
-    "visual_listing_records",
-)
+__all__ = ("visual_listing_records",)
 
 import re
 from typing import Any, Callable
@@ -144,8 +142,10 @@ def _cluster_visual_elements(
             continue
         origin = _visual_cluster_origin(cluster)
         current = clusters_by_href.get(anchor_href)
-        if current is None or score > current[0] or (
-            score == current[0] and origin < current[1]
+        if (
+            current is None
+            or score > current[0]
+            or (score == current[0] and origin < current[1])
         ):
             clusters_by_href[anchor_href] = (score, origin, cluster)
     clusters = [entry[2] for entry in clusters_by_href.values()]
@@ -171,17 +171,15 @@ def _visual_cluster_score(
         return -50
     score = 10
     if any(
-        _visual_element_is_title(item, title_is_noise=title_is_noise) for item in cluster
+        _visual_element_is_title(item, title_is_noise=title_is_noise)
+        for item in cluster
     ):
         score += 8
     if any(re.search(r"[$€£₹]\s?\d", str(item.get("text") or "")) for item in cluster):
         score += 4
     if any(str(item.get("tag") or "") == "img" and item.get("src") for item in cluster):
         score += 3
-    score += max(
-        int(item.get("score") or 0)
-        for item in cluster
-    )
+    score += max(int(item.get("score") or 0) for item in cluster)
     if len(cluster) > 12:
         score -= (len(cluster) - 12) // 2
     return score
@@ -215,7 +213,9 @@ def _visual_cluster_to_record(
     title_is_noise: Callable[[str], bool],
     url_is_structural: Callable[[str, str], bool],
 ) -> dict[str, Any] | None:
-    href = next((str(item.get("href") or "") for item in cluster if item.get("href")), "")
+    href = next(
+        (str(item.get("href") or "") for item in cluster if item.get("href")), ""
+    )
     if not href or url_is_structural(href, page_url):
         return None
     title_item, title = _visual_cluster_title_candidate(
@@ -246,13 +246,20 @@ def _visual_cluster_to_record(
         ),
         "",
     )
-    extracted_price = extract_price_text(price_text, prefer_last=False, allow_unmarked=True)
+    extracted_price = extract_price_text(
+        price_text, prefer_last=False, allow_unmarked=True
+    )
     is_job = surface.startswith("job_")
     if is_job and not (
-        _visual_title_bound_to_href(title_item, href) or _visual_title_matches_url(title, href)
+        _visual_title_bound_to_href(title_item, href)
+        or _visual_title_matches_url(title, href)
     ):
         return None
-    if not is_job and not extracted_price and not _visual_title_matches_url(title, href):
+    if (
+        not is_job
+        and not extracted_price
+        and not _visual_title_matches_url(title, href)
+    ):
         return None
     record = {
         "source_url": page_url,
@@ -368,10 +375,7 @@ def _visual_cluster_brand(
         ):
             continue
         value = clean_text(
-            item.get("raw_text")
-            or item.get("raw_alt")
-            or item.get("text")
-            or ""
+            item.get("raw_text") or item.get("raw_alt") or item.get("text") or ""
         )
         if not value or value.casefold() == title_text or extract_price_text(value):
             continue

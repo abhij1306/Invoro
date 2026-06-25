@@ -99,7 +99,9 @@ async def create_monitor(
         status=MONITOR_STATUS_ACTIVE,
         last_run_at=None,
         next_run_at=(
-            next_alert_run_time(now, _optional_int(payload.get("poll_interval_seconds")))
+            next_alert_run_time(
+                now, _optional_int(payload.get("poll_interval_seconds"))
+            )
             if payload.get("poll_interval_seconds") is not None
             else next_run_time(now, interval)
         ),
@@ -177,14 +179,20 @@ async def update_monitor(
             _field_list(payload.get("requested_fields"))
         )
     if payload.get("schedule_interval_hours") is not None:
-        monitor.schedule_interval_hours = _bounded_interval(payload.get("schedule_interval_hours"))
+        monitor.schedule_interval_hours = _bounded_interval(
+            payload.get("schedule_interval_hours")
+        )
         monitor.next_run_at = next_run_time(utcnow(), monitor.schedule_interval_hours)
     if payload.get("poll_interval_seconds") is not None:
         monitor.poll_interval_seconds = max(
             MIN_ALERT_POLL_INTERVAL_SECONDS,
-            _int_value(payload.get("poll_interval_seconds"), MIN_ALERT_POLL_INTERVAL_SECONDS),
+            _int_value(
+                payload.get("poll_interval_seconds"), MIN_ALERT_POLL_INTERVAL_SECONDS
+            ),
         )
-        monitor.next_run_at = next_alert_run_time(utcnow(), monitor.poll_interval_seconds)
+        monitor.next_run_at = next_alert_run_time(
+            utcnow(), monitor.poll_interval_seconds
+        )
     if payload.get("priority") is not None:
         monitor.priority = _priority(payload.get("priority"))
     if payload.get("retention_days") is not None:
@@ -220,8 +228,10 @@ async def monitor_change_count_since(
     monitor_id: int,
     since: datetime | None = None,
 ) -> int:
-    statement = select(func.count()).select_from(MonitorEvent).where(
-        MonitorEvent.monitor_id == monitor_id
+    statement = (
+        select(func.count())
+        .select_from(MonitorEvent)
+        .where(MonitorEvent.monitor_id == monitor_id)
     )
     if since is not None:
         statement = statement.where(MonitorEvent.detected_at > since)
@@ -257,7 +267,11 @@ async def list_events(
 ) -> tuple[list[MonitorEvent], int]:
     page = max(1, page)
     statement = select(MonitorEvent).where(MonitorEvent.monitor_id == monitor_id)
-    count = select(func.count()).select_from(MonitorEvent).where(MonitorEvent.monitor_id == monitor_id)
+    count = (
+        select(func.count())
+        .select_from(MonitorEvent)
+        .where(MonitorEvent.monitor_id == monitor_id)
+    )
     if event_type:
         statement = statement.where(MonitorEvent.event_type == event_type)
         count = count.where(MonitorEvent.event_type == event_type)
@@ -282,7 +296,9 @@ async def list_snapshot_records(
     rows = await session.scalars(
         select(MonitorSnapshotRecord)
         .where(MonitorSnapshotRecord.monitor_id == monitor_id)
-        .order_by(MonitorSnapshotRecord.created_at.asc(), MonitorSnapshotRecord.id.asc())
+        .order_by(
+            MonitorSnapshotRecord.created_at.asc(), MonitorSnapshotRecord.id.asc()
+        )
         .limit(limit)
     )
     return list(rows.all())
@@ -298,7 +314,13 @@ async def list_snapshots(
     page = max(1, page)
     statement = select(MonitorSnapshot).where(MonitorSnapshot.monitor_id == monitor_id)
     total = int(
-        (await session.scalar(select(func.count()).select_from(MonitorSnapshot).where(MonitorSnapshot.monitor_id == monitor_id)))
+        (
+            await session.scalar(
+                select(func.count())
+                .select_from(MonitorSnapshot)
+                .where(MonitorSnapshot.monitor_id == monitor_id)
+            )
+        )
         or 0
     )
     rows = await session.scalars(

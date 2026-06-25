@@ -185,11 +185,7 @@ _product_type_noise_tokens = frozenset(
 
 
 def clean_record(record: dict[str, Any]) -> dict[str, Any]:
-    return {
-        str(key): value
-        for key, value in record.items()
-        if not is_blank(value)
-    }
+    return {str(key): value for key, value in record.items() if not is_blank(value)}
 
 
 def _surface_field_type_error(
@@ -227,8 +223,7 @@ def validate_record_for_surface(
         return {
             key: value
             for key, value in dict(record or {}).items()
-            if str(key).startswith("_")
-            or (key in allowed and not is_blank(value))
+            if str(key).startswith("_") or (key in allowed and not is_blank(value))
         }, []
     logical_fields = {
         key: value

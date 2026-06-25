@@ -53,7 +53,11 @@ def select_variant(
         ]
         if matches:
             return next(
-                (variant for variant in matches if variant.get("availability") == "in_stock"),
+                (
+                    variant
+                    for variant in matches
+                    if variant.get("availability") == "in_stock"
+                ),
                 matches[0],
             )
         partial_matches = [
@@ -173,7 +177,15 @@ def ordered_axes(
 def availability_value(value: dict[str, Any] | None) -> str | None:
     if not isinstance(value, dict):
         return None
-    in_stock_aliases = {"1", "true", "yes", "available", "in-stock", "instock", "in stock"}
+    in_stock_aliases = {
+        "1",
+        "true",
+        "yes",
+        "available",
+        "in-stock",
+        "instock",
+        "in stock",
+    }
     out_of_stock_aliases = {
         "0",
         "false",
@@ -184,7 +196,11 @@ def availability_value(value: dict[str, Any] | None) -> str | None:
         "out of stock",
         "sold out",
     }
-    raw = value.get("availability") or value.get("inventory_status") or value.get("stock_status")
+    raw = (
+        value.get("availability")
+        or value.get("inventory_status")
+        or value.get("stock_status")
+    )
     cleaned = text_or_none(raw)
     if cleaned:
         coerced = coerce_availability_value(cleaned)

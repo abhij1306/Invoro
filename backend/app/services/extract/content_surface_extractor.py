@@ -39,10 +39,14 @@ def extract(soup: BeautifulSoup, *, page_url: str, surface: str) -> dict[str, An
         record = _content_detail(working, container, page_url)
     if tables:
         record["tables"] = tables
-    return {key: value for key, value in record.items() if value not in (None, "", [], {})}
+    return {
+        key: value for key, value in record.items() if value not in (None, "", [], {})
+    }
 
 
-def _content_detail(soup: BeautifulSoup, container: Tag, page_url: str) -> dict[str, Any]:
+def _content_detail(
+    soup: BeautifulSoup, container: Tag, page_url: str
+) -> dict[str, Any]:
     content = _container_text(container)
     return {
         "title": _title(soup),
@@ -57,14 +61,20 @@ def _content_detail(soup: BeautifulSoup, container: Tag, page_url: str) -> dict[
     }
 
 
-def _article_detail(soup: BeautifulSoup, container: Tag, page_url: str) -> dict[str, Any]:
-    content_container = _article_body_container(container) or _article_body_container(soup) or container
+def _article_detail(
+    soup: BeautifulSoup, container: Tag, page_url: str
+) -> dict[str, Any]:
+    content_container = (
+        _article_body_container(container) or _article_body_container(soup) or container
+    )
     content = _container_text(content_container)
     word_count = _word_count(content)
     return {
         "title": _title(soup),
         "url": _canonical_url(soup, page_url),
-        "author": _selector_text(soup, [".author", "[rel='author']", "[itemprop='author']", ".byline"]),
+        "author": _selector_text(
+            soup, [".author", "[rel='author']", "[itemprop='author']", ".byline"]
+        ),
         "publication_date": _date_text(soup),
         "markdown": _container_markdown(content_container, page_url),
         "content": content,
@@ -79,20 +89,27 @@ def _article_detail(soup: BeautifulSoup, container: Tag, page_url: str) -> dict[
 
 
 def _forum_detail(soup: BeautifulSoup, container: Tag, page_url: str) -> dict[str, Any]:
-    op_container = _first_match(
-        soup,
-        list(CONTENT_SURFACE_FORUM_BODY_SELECTORS),
-    ) or container
+    op_container = (
+        _first_match(
+            soup,
+            list(CONTENT_SURFACE_FORUM_BODY_SELECTORS),
+        )
+        or container
+    )
     content = _container_text(op_container)
     return {
         "title": _title(soup),
         "url": _canonical_url(soup, page_url),
-        "author": _selector_text(soup, [".author", "[rel='author']", "[itemprop='author']", ".username"]),
+        "author": _selector_text(
+            soup, [".author", "[rel='author']", "[itemprop='author']", ".username"]
+        ),
         "publication_date": _date_text(soup),
         "markdown": _container_markdown(op_container, page_url),
         "content": content,
         "summary": _meta_description(soup) or clean_text(content[:280]),
-        "reply_count": _count_from_text(soup, ("reply", "replies", "comment", "comments")),
+        "reply_count": _count_from_text(
+            soup, ("reply", "replies", "comment", "comments")
+        ),
         "view_count": _count_from_text(soup, ("view", "views")),
         "tags": _tags(soup),
         "category": _category(soup),
@@ -117,7 +134,10 @@ def _sanitize_node_is_protected_container(node: Tag) -> bool:
     name = str(getattr(node, "name", "") or "").strip().lower()
     if name in CONTENT_SURFACE_CONTAINER_TAGS:
         return True
-    return any(node.select_one(selector) is not None for selector in CONTENT_SURFACE_PROTECTED_DESCENDANT_SELECTORS)
+    return any(
+        node.select_one(selector) is not None
+        for selector in CONTENT_SURFACE_PROTECTED_DESCENDANT_SELECTORS
+    )
 
 
 def _main_container(soup: BeautifulSoup, surface: str) -> Tag:
@@ -152,7 +172,12 @@ def _largest_text_match(soup: BeautifulSoup | Tag, selectors: list[str]) -> Tag 
 
 def _article_body_container(root: BeautifulSoup | Tag) -> Tag | None:
     for selectors in (
-        ["[itemprop='articleBody']", ".article-body", ".post-content", ".entry-content"],
+        [
+            "[itemprop='articleBody']",
+            ".article-body",
+            ".post-content",
+            ".entry-content",
+        ],
         ["article"],
         [".post"],
     ):
@@ -165,7 +190,13 @@ def _article_body_container(root: BeautifulSoup | Tag) -> Tag | None:
 def _title(soup: BeautifulSoup) -> str:
     for selector in ("h1", "meta[property='og:title']", "title"):
         node = soup.select_one(selector)
-        value = clean_text(node.get("content") if node and node.name == "meta" else node.get_text(" ", strip=True) if node else "")
+        value = clean_text(
+            node.get("content")
+            if node and node.name == "meta"
+            else node.get_text(" ", strip=True)
+            if node
+            else ""
+        )
         if value:
             return value
     return ""
@@ -173,11 +204,17 @@ def _title(soup: BeautifulSoup) -> str:
 
 def _canonical_url(soup: BeautifulSoup, page_url: str) -> str:
     canonical = soup.find("link", attrs={"rel": re.compile("canonical", re.I)})
-    return absolute_url(page_url, canonical.get("href") if canonical else "") or page_url
+    return (
+        absolute_url(page_url, canonical.get("href") if canonical else "") or page_url
+    )
 
 
 def _meta_description(soup: BeautifulSoup) -> str:
-    for selector in ("meta[name='description']", "meta[property='og:description']", "meta[name='twitter:description']"):
+    for selector in (
+        "meta[name='description']",
+        "meta[property='og:description']",
+        "meta[name='twitter:description']",
+    ):
         node = soup.select_one(selector)
         value = clean_text(node.get("content") if node else "")
         if value:
@@ -199,10 +236,10 @@ _MATH_DOLLAR_RE = re.compile(r"\$\$[\s\S]*?\$\$|\$[^$\n]*?\$")
 
 # Matches all 4 types of math delimiters for stashing during inline cleaning
 _ALL_MATH_RE = re.compile(
-    r"\$\$[\s\S]*?\$\$|"       # $$...$$
-    r"\$[^$\n]*?\$|"           # $...$
-    r"\\\[[\s\S]*?\\\]|"       # \[...\]
-    r"\\\([\s\S]*?\\\)"        # \(...\)
+    r"\$\$[\s\S]*?\$\$|"  # $$...$$
+    r"\$[^$\n]*?\$|"  # $...$
+    r"\\\[[\s\S]*?\\\]|"  # \[...\]
+    r"\\\([\s\S]*?\\\)"  # \(...\)
 )
 
 # MathJax \[...\] display and \(...\) inline delimiters.
@@ -254,13 +291,15 @@ def _normalize_math(text: str) -> str:
     """Convert MathJax \\[…\\] / \\(…\\) delimiters to $$…$$ / $…$ and clean math text."""
     # Stash existing $...$ math first so we don't double-convert.
     text, stash = _stash_math(text)
-    
+
     # Also clean the stashed math content
     clean_stash = {}
     for key, val in stash.items():
         clean_stash[key] = _clean_math_text(val)
-        
-    text = _MATH_DISPLAY_RE.sub(lambda m: f"$$\n{_clean_math_text(m.group(1))}\n$$", text)
+
+    text = _MATH_DISPLAY_RE.sub(
+        lambda m: f"$$\n{_clean_math_text(m.group(1))}\n$$", text
+    )
     text = _MATH_INLINE_RE.sub(lambda m: f"${_clean_math_text(m.group(1))}$", text)
     return _restore_math(text, clean_stash)
 
@@ -268,6 +307,7 @@ def _normalize_math(text: str) -> str:
 # ---------------------------------------------------------------------------
 # Code block helpers
 # ---------------------------------------------------------------------------
+
 
 def _collapse_tokenized_code_block(body: str) -> str:
     """Collapse span-per-token code blocks back to proper lines.
@@ -315,8 +355,12 @@ _FENCED_CODE_BLOCK_RE = re.compile(r"(```[^\n]*)\n(.*?)\n(```)", re.DOTALL)
 
 def _collapse_tokenized_code_blocks(markdown: str) -> str:
     """Apply _collapse_tokenized_code_block to every fenced code block."""
+
     def _replace(m: re.Match) -> str:
-        return f"{m.group(1)}\n{_collapse_tokenized_code_block(m.group(2))}\n{m.group(3)}"
+        return (
+            f"{m.group(1)}\n{_collapse_tokenized_code_block(m.group(2))}\n{m.group(3)}"
+        )
+
     return _FENCED_CODE_BLOCK_RE.sub(_replace, markdown)
 
 
@@ -343,7 +387,13 @@ def _code_language(node: Tag) -> str:
             if m:
                 lang = m.group(1) or m.group(2)
                 # Skip generic classes like "highlight", "code", "hljs"
-                if lang.lower() not in {"highlight", "code", "hljs", "prettyprint", "sourceCode"}:
+                if lang.lower() not in {
+                    "highlight",
+                    "code",
+                    "hljs",
+                    "prettyprint",
+                    "sourceCode",
+                }:
                     return lang
     return ""
 
@@ -449,7 +499,9 @@ def _markdown_lines(node: Tag, page_url: str) -> list[str]:
             text = _inline_markdown(child, page_url)
             href = absolute_url(page_url, child.get("href"))
             if text:
-                lines.append(f"[{clean_text(text)}]({href})" if href else clean_text(text))
+                lines.append(
+                    f"[{clean_text(text)}]({href})" if href else clean_text(text)
+                )
             continue
 
         # ------------------------------------------------------------------ #
@@ -494,7 +546,9 @@ def _markdown_lines(node: Tag, page_url: str) -> list[str]:
             lang = _code_language(child)
             # Use inner <code> text when present so we strip the wrapper tag.
             code_node = child.find("code")
-            raw_text = (code_node if isinstance(code_node, Tag) else child).get_text("", strip=False)
+            raw_text = (code_node if isinstance(code_node, Tag) else child).get_text(
+                "", strip=False
+            )
             # Normalise trailing whitespace per line but keep empty lines.
             text = "\n".join(ln.rstrip() for ln in raw_text.splitlines()).strip()
             if text:
@@ -528,9 +582,22 @@ def _markdown_lines(node: Tag, page_url: str) -> list[str]:
 
 def _has_markdown_block_child(node: Tag) -> bool:
     block_names = {
-        "article", "blockquote", "div",
-        "h1", "h2", "h3", "h4", "h5", "h6",
-        "li", "ol", "p", "pre", "section", "table", "ul",
+        "article",
+        "blockquote",
+        "div",
+        "h1",
+        "h2",
+        "h3",
+        "h4",
+        "h5",
+        "h6",
+        "li",
+        "ol",
+        "p",
+        "pre",
+        "section",
+        "table",
+        "ul",
     }
     return any(
         isinstance(child, Tag)
@@ -541,7 +608,11 @@ def _has_markdown_block_child(node: Tag) -> bool:
 
 
 def _node_has_markdown_signal(node: Tag) -> bool:
-    return bool(clean_text(node.get_text(" ", strip=True)) or node.find("img") or node.name == "img")
+    return bool(
+        clean_text(node.get_text(" ", strip=True))
+        or node.find("img")
+        or node.name == "img"
+    )
 
 
 def _inline_markdown(node: Tag, page_url: str) -> str:
@@ -618,6 +689,7 @@ def _clean_markdown_inline(value: str) -> str:
 # Field helpers
 # ---------------------------------------------------------------------------
 
+
 def _leading_paragraph(container: Tag) -> str:
     for paragraph in container.find_all("p"):
         value = clean_text(paragraph.get_text(" ", strip=True))
@@ -627,11 +699,13 @@ def _leading_paragraph(container: Tag) -> str:
 
 
 def _headings(container: Tag) -> list[str]:
-    return list(dict.fromkeys(
-        clean_text(node.get_text(" ", strip=True))
-        for node in container.find_all(["h2", "h3"])
-        if clean_text(node.get_text(" ", strip=True))
-    ))
+    return list(
+        dict.fromkeys(
+            clean_text(node.get_text(" ", strip=True))
+            for node in container.find_all(["h2", "h3"])
+            if clean_text(node.get_text(" ", strip=True))
+        )
+    )
 
 
 def _word_count(value: str) -> int:
@@ -662,7 +736,11 @@ def _date_text(soup: BeautifulSoup) -> str:
         node = soup.select_one(selector)
         if node is None:
             continue
-        value = clean_text(node.get("datetime") or node.get("content") or node.get_text(" ", strip=True))
+        value = clean_text(
+            node.get("datetime")
+            or node.get("content")
+            or node.get_text(" ", strip=True)
+        )
         if value:
             return value
     return ""
@@ -682,8 +760,18 @@ def _category(soup: BeautifulSoup) -> str:
 
 
 def _reading_time(soup: BeautifulSoup, word_count: int) -> int | None:
-    node = _first_match(soup, [".reading-time", "[itemprop='timeRequired']", "[data-reading-time]"])
-    raw = clean_text((node.get("content") or node.get("data-reading-time") or node.get_text(" ", strip=True)) if node else "")
+    node = _first_match(
+        soup, [".reading-time", "[itemprop='timeRequired']", "[data-reading-time]"]
+    )
+    raw = clean_text(
+        (
+            node.get("content")
+            or node.get("data-reading-time")
+            or node.get_text(" ", strip=True)
+        )
+        if node
+        else ""
+    )
     match = re.search(r"\d+", raw)
     if match:
         return int(match.group(0))

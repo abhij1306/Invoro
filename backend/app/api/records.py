@@ -53,7 +53,9 @@ def _route_responses(
     return normalized
 
 
-@router.get("/api/crawls/{run_id}/records", responses=_route_responses(RUN_NOT_FOUND_RESPONSE))
+@router.get(
+    "/api/crawls/{run_id}/records", responses=_route_responses(RUN_NOT_FOUND_RESPONSE)
+)
 async def records_list(
     run_id: int,
     session: Annotated[AsyncSession, Depends(get_db)],
@@ -111,7 +113,10 @@ async def _require_run_access(
         raise HTTPException(status_code=404, detail=RUN_NOT_FOUND_DETAIL) from exc
 
 
-@router.get("/api/crawls/{run_id}/export/json", responses=_route_responses(RUN_NOT_FOUND_RESPONSE))
+@router.get(
+    "/api/crawls/{run_id}/export/json",
+    responses=_route_responses(RUN_NOT_FOUND_RESPONSE),
+)
 async def export_json(
     run_id: int,
     session: Annotated[AsyncSession, Depends(get_db)],
@@ -121,7 +126,10 @@ async def export_json(
     return await build_json_export_response(session, run_id=run_id)
 
 
-@router.get("/api/crawls/{run_id}/export/csv", responses=_route_responses(RUN_NOT_FOUND_RESPONSE))
+@router.get(
+    "/api/crawls/{run_id}/export/csv",
+    responses=_route_responses(RUN_NOT_FOUND_RESPONSE),
+)
 async def export_csv(
     run_id: int,
     session: Annotated[AsyncSession, Depends(get_db)],

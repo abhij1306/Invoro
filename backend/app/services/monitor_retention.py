@@ -39,8 +39,7 @@ class MonitorRetentionService:
                         .order_by(MonitorJob.id)
                         .limit(PURGE_BATCH_SIZE)
                     )
-                )
-                .all()
+                ).all()
             )
             if not monitors:
                 break
@@ -48,7 +47,9 @@ class MonitorRetentionService:
                 monitor_id = int(monitor.id)
                 last_id = monitor_id
                 try:
-                    cutoff = now - timedelta(days=max(1, int(monitor.retention_days or 1)))
+                    cutoff = now - timedelta(
+                        days=max(1, int(monitor.retention_days or 1))
+                    )
                     old_snapshot_ids = list(
                         (
                             await session.scalars(

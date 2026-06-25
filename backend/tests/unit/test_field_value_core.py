@@ -1022,15 +1022,9 @@ def test_coerce_color_rejects_internal_swatch_codes() -> None:
     assert coerce_field_value("color", "BLK", "https://example.com/p") is None
     assert coerce_field_value("color", "AQT", "https://example.com/p") is None
     # Mixed-case short colors and longer human-readable values are kept.
-    assert (
-        coerce_field_value("color", "Tan", "https://example.com/p") == "Tan"
-    )
-    assert (
-        coerce_field_value("color", "mint", "https://example.com/p") == "mint"
-    )
-    assert (
-        coerce_field_value("color", "cream", "https://example.com/p") == "cream"
-    )
+    assert coerce_field_value("color", "Tan", "https://example.com/p") == "Tan"
+    assert coerce_field_value("color", "mint", "https://example.com/p") == "mint"
+    assert coerce_field_value("color", "cream", "https://example.com/p") == "cream"
     assert (
         coerce_field_value("color", "Bobcat Brown", "https://example.com/p")
         == "Bobcat Brown"

@@ -148,8 +148,18 @@ def test_variant_alert_rule_values_are_identity_stable() -> None:
     ]
     data = {
         "variants": [
-            {"sku": "sku-m", "size": "M", "availability": "in_stock", "price": "999.00"},
-            {"sku": "sku-s", "size": "S", "availability": "out_of_stock", "price": "849.00"},
+            {
+                "sku": "sku-m",
+                "size": "M",
+                "availability": "in_stock",
+                "price": "999.00",
+            },
+            {
+                "sku": "sku-s",
+                "size": "S",
+                "availability": "out_of_stock",
+                "price": "849.00",
+            },
         ]
     }
 

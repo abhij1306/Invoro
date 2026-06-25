@@ -197,8 +197,7 @@ export function useCrawlRunController(options: ControllerOptions) {
   };
 
   const batchFromResultsUrls = selectedResultUrls.length ? selectedResultUrls : resultUrls;
-  const productIntelligenceRecords = selectedRecords.length ? selectedRecords : batchSourceRecords;
-  const dataEnrichmentRecords = selectedRecords.length ? selectedRecords : batchSourceRecords;
+  const downstreamRecords = selectedRecords.length ? selectedRecords : batchSourceRecords;
 
   function toggleRecord(id: number, checked: boolean) {
     setSelectedIds((current) =>
@@ -208,10 +207,6 @@ export function useCrawlRunController(options: ControllerOptions) {
 
   function selectAll(recordIds: number[]) {
     setSelectedIds(Array.from(new Set(recordIds)));
-  }
-
-  function clearSelection() {
-    setSelectedIds([]);
   }
 
   function resetToConfig() {
@@ -269,11 +264,11 @@ export function useCrawlRunController(options: ControllerOptions) {
   }
 
   function triggerProductIntelligenceFromResults() {
-    if (!productIntelligenceRecords.length) return;
+    if (!downstreamRecords.length) return;
     storeProductIntelligencePrefill({
       source_run_id: run?.id ?? null,
       source_domain: run?.url ?? '',
-      records: productIntelligenceRecords.map(({ id, run_id, source_url, data }) => ({
+      records: downstreamRecords.map(({ id, run_id, source_url, data }) => ({
         id,
         run_id,
         source_url,
@@ -284,10 +279,10 @@ export function useCrawlRunController(options: ControllerOptions) {
   }
 
   function triggerDataEnrichmentFromResults() {
-    if (!dataEnrichmentRecords.length) return;
+    if (!downstreamRecords.length) return;
     storeDataEnrichmentPrefill({
       source_run_id: run?.id ?? null,
-      records: dataEnrichmentRecords.map(({ id, run_id, source_url, data }) => ({
+      records: downstreamRecords.map(({ id, run_id, source_url, data }) => ({
         id,
         run_id,
         source_url,
@@ -302,8 +297,6 @@ export function useCrawlRunController(options: ControllerOptions) {
     visibleSelectedIds,
     selectedRecords,
     batchSourceRecords,
-    resultUrls,
-    selectedResultUrls,
     llmSummary,
     listingRun,
     ecommerceDetailRun,
@@ -316,17 +309,15 @@ export function useCrawlRunController(options: ControllerOptions) {
     batchFromResultsLabel: selectedResultUrls.length
       ? `Batch Crawl Selected (${selectedResultUrls.length})`
       : `Batch Crawl (${resultUrls.length})`,
-    productIntelligenceRecords,
+    downstreamRecords,
     productIntelligenceLabel: selectedRecords.length
       ? `Product Intelligence Selected (${selectedRecords.length})`
-      : `Product Intelligence (${productIntelligenceRecords.length})`,
-    dataEnrichmentRecords,
+      : `Product Intelligence (${downstreamRecords.length})`,
     dataEnrichmentLabel: selectedRecords.length
       ? `Enrich Selected (${selectedRecords.length})`
-      : `Enrich Records (${dataEnrichmentRecords.length})`,
+      : `Enrich Records (${downstreamRecords.length})`,
     toggleRecord,
     selectAll,
-    clearSelection,
     resetToConfig,
     downloadExport,
     runControl,

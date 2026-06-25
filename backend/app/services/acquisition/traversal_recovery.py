@@ -30,14 +30,20 @@ if TYPE_CHECKING:
 
 
 async def _find_actionable_locator(page, selector_group: str):
-    selectors = PAGINATION_SELECTORS.get(selector_group) if isinstance(PAGINATION_SELECTORS, dict) else []
+    selectors = (
+        PAGINATION_SELECTORS.get(selector_group)
+        if isinstance(PAGINATION_SELECTORS, dict)
+        else []
+    )
     for selector in selectors or []:
         locator = page.locator(str(selector)).first
         try:
             if await locator.count() == 0:
                 continue
             if not await locator.is_visible(
-                timeout=int(crawler_runtime_settings.traversal_locator_visible_timeout_ms)
+                timeout=int(
+                    crawler_runtime_settings.traversal_locator_visible_timeout_ms
+                )
             ):
                 continue
             if await locator.is_disabled():
@@ -92,7 +98,9 @@ async def _find_generic_next_page_locator(page):
             if selector == "link[rel='next']":
                 continue
             if not await locator.is_visible(
-                timeout=int(crawler_runtime_settings.traversal_locator_visible_timeout_ms)
+                timeout=int(
+                    crawler_runtime_settings.traversal_locator_visible_timeout_ms
+                )
             ):
                 continue
             if await locator.is_disabled():
@@ -102,7 +110,9 @@ async def _find_generic_next_page_locator(page):
                 or await _looks_like_next_page_control(locator)
             ):
                 continue
-            logger.info("Traversal generic next-page selector=%s url=%s", selector, page.url)
+            logger.info(
+                "Traversal generic next-page selector=%s url=%s", selector, page.url
+            )
             return locator
         except _RECOVERABLE_ERRORS:
             logger.debug(
@@ -175,14 +185,13 @@ async def recover_listing_page_content(
             )
     if diagnostics["status"] == "attempted":
         diagnostics["status"] = (
-            "recovered"
-            if clicked_count > 0
-            else "no_actionable_elements"
+            "recovered" if clicked_count > 0 else "no_actionable_elements"
         )
     diagnostics["clicked_count"] = clicked_count
     diagnostics["actions_taken"] = actions_taken
     diagnostics["click_retries"] = helper_result.click_retries
     return diagnostics
+
 
 async def _find_aom_actionable_locator(
     page,
@@ -208,7 +217,9 @@ async def _find_aom_actionable_locator(
             candidate = locator.nth(index)
             try:
                 if not await candidate.is_visible(
-                    timeout=int(crawler_runtime_settings.traversal_locator_visible_timeout_ms)
+                    timeout=int(
+                        crawler_runtime_settings.traversal_locator_visible_timeout_ms
+                    )
                 ):
                     continue
                 if await candidate.is_disabled():
@@ -232,6 +243,7 @@ async def _find_aom_actionable_locator(
                 )
                 continue
     return None
+
 
 async def click_with_retry(
     page,
@@ -323,9 +335,7 @@ async def click_with_retry(
 
     # Step 4: JavaScript fallback
     try:
-        await locator.evaluate(
-            "(node) => node instanceof HTMLElement && node.click()"
-        )
+        await locator.evaluate("(node) => node instanceof HTMLElement && node.click()")
         await _wait_for_dom_mutation_settle(
             page,
             quiet_window_ms=min(500, max(100, click_timeout_ms // 5)),
@@ -342,6 +352,7 @@ async def click_with_retry(
             type(js_exc).__name__,
         )
         return False
+
 
 async def locator_still_resolves(locator) -> bool:
     counter = getattr(locator, "count", None)
@@ -361,6 +372,7 @@ async def locator_still_resolves(locator) -> bool:
         if attempt == 0:
             await asyncio.sleep(0)
     return False
+
 
 async def dismiss_overlays_if_needed(
     page,
@@ -446,10 +458,14 @@ async def dismiss_overlays_if_needed(
         try:
             btn = page.locator(str(selector)).first
             if await btn.count() > 0 and await btn.is_visible(
-                timeout=int(crawler_runtime_settings.traversal_cookie_consent_visible_timeout_ms)
+                timeout=int(
+                    crawler_runtime_settings.traversal_cookie_consent_visible_timeout_ms
+                )
             ):
                 await btn.click(
-                    timeout=int(crawler_runtime_settings.traversal_cookie_consent_click_timeout_ms),
+                    timeout=int(
+                        crawler_runtime_settings.traversal_cookie_consent_click_timeout_ms
+                    ),
                     force=True,
                 )
                 await _wait_for_dom_mutation_settle(
@@ -470,6 +486,7 @@ async def dismiss_overlays_if_needed(
             continue
     if dismissed_any:
         result.overlays_dismissed = True
+
 
 async def _restore_overlays(page) -> None:
     """Restore overlay elements to their original inline styles after a click."""

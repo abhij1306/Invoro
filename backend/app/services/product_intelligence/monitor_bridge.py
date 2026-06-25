@@ -6,8 +6,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.user import User
 from app.models.monitor import MonitorJob
-from app.models.product_intelligence import ProductIntelligenceJob, ProductIntelligenceMatch
-from app.services.config.product_intelligence import PRODUCT_INTELLIGENCE_REVIEW_ACCEPTED
+from app.models.product_intelligence import (
+    ProductIntelligenceJob,
+    ProductIntelligenceMatch,
+)
+from app.services.config.product_intelligence import (
+    PRODUCT_INTELLIGENCE_REVIEW_ACCEPTED,
+)
 from app.services.config.monitor_settings import (
     MONITOR_PRIORITY_BACKGROUND,
     PRODUCT_INTELLIGENCE_MONITOR_DEFAULT_SCHEDULE_HOURS,
@@ -46,21 +51,23 @@ async def create_monitor_from_job(
         raise ValueError("No accepted match URLs found to monitor")
 
     monitor_name = name or f"PI Job #{job_id} - Accepted Matches"
-    
+
     payload = {
         "name": monitor_name,
         "urls": urls,
         "surface": PRODUCT_INTELLIGENCE_MONITOR_DEFAULT_SURFACE,
-        "tracked_fields": tracked_fields or PRODUCT_INTELLIGENCE_MONITOR_DEFAULT_TRACKED_FIELDS,
+        "tracked_fields": tracked_fields
+        or PRODUCT_INTELLIGENCE_MONITOR_DEFAULT_TRACKED_FIELDS,
         "schedule_interval_hours": (
-            schedule_interval_hours or PRODUCT_INTELLIGENCE_MONITOR_DEFAULT_SCHEDULE_HOURS
+            schedule_interval_hours
+            or PRODUCT_INTELLIGENCE_MONITOR_DEFAULT_SCHEDULE_HOURS
         ),
         "priority": priority or MONITOR_PRIORITY_BACKGROUND,
         "settings": {
             # PI monitors always do full scheduled crawls for content sampling accuracy.
             # Users cannot opt out of full crawls for monitors created from PI workflows.
             SKIP_HEAD_CHECK_KEY: True
-        }
+        },
     }
 
     logger.info(

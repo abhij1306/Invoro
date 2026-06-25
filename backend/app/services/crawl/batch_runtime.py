@@ -147,9 +147,7 @@ def _settings_fetch_mode(settings_view) -> str:
     try:
         fetch_profile_attr = getattr(settings_view, "fetch_profile", None)
         fetch_profile = (
-            fetch_profile_attr()
-            if callable(fetch_profile_attr)
-            else fetch_profile_attr
+            fetch_profile_attr() if callable(fetch_profile_attr) else fetch_profile_attr
         )
     except (AttributeError, TypeError, ValueError):
         fetch_profile = None

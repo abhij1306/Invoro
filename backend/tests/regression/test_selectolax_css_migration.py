@@ -1277,7 +1277,9 @@ async def test_amazon_adapter_variants_survive_full_detail_materialization() -> 
 
 
 @pytest.mark.regression
-def test_amazon_detail_sanitization_rejects_media_and_related_product_variants() -> None:
+def test_amazon_detail_sanitization_rejects_media_and_related_product_variants() -> (
+    None
+):
     record = build_detail_record(
         "<html><body><h1>EVGA GeForce RTX 3090</h1></body></html>",
         "https://www.amazon.com/dp/B08J5F3G18",
@@ -1772,14 +1774,21 @@ async def test_belk_adapter_maps_per_variant_upc_from_utag_sku_arrays() -> None:
         }
     }
     variant_objects = [
-        {"variantId": "0480069328350", "color": "289475425516",
-         "size": {"sizeId": "50500_10M", "sizeName": "10M"}},
-        {"variantId": "0480069328459", "color": "011475425516",
-         "size": {"sizeId": "50460_7.5M", "sizeName": "7.5M"}},
+        {
+            "variantId": "0480069328350",
+            "color": "289475425516",
+            "size": {"sizeId": "50500_10M", "sizeName": "10M"},
+        },
+        {
+            "variantId": "0480069328459",
+            "color": "011475425516",
+            "size": {"sizeId": "50460_7.5M", "sizeName": "7.5M"},
+        },
     ]
     # Embed both the utag analytics object and the variant objects in one __next_f chunk.
-    inner = "3:" + _json.dumps({"utag_data": utag["utag_data"], "v": variant_objects},
-                               separators=(",", ":"))
+    inner = "3:" + _json.dumps(
+        {"utag_data": utag["utag_data"], "v": variant_objects}, separators=(",", ":")
+    )
     chunk = _json.dumps(inner)
     html = (
         "<html><body><script>self.__next_f.push([1,"
@@ -1810,7 +1819,9 @@ async def test_belk_adapter_maps_per_variant_upc_from_utag_sku_arrays() -> None:
 
 @pytest.mark.asyncio
 @pytest.mark.regression
-async def test_belk_adapter_extracts_detail_variants_from_captured_json_payload() -> None:
+async def test_belk_adapter_extracts_detail_variants_from_captured_json_payload() -> (
+    None
+):
     import json as _json
 
     body = {

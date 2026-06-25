@@ -5,8 +5,6 @@ import pytest
 from app.services.adapters.jibe import JibeAdapter
 
 
-
-
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_jibe_adapter_matches_detail_records_by_slug_like_job_id(
@@ -102,4 +100,3 @@ def test_jibe_normalize_job_preserves_job_id_in_fallback_url() -> None:
 
     assert record is not None
     assert record["url"] == "https://jobs.example.com/jobs/REQ 1/2"
-

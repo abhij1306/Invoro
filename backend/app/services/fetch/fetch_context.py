@@ -76,10 +76,12 @@ from app.services.fetch.browser_policy import (
 )
 from app.services.fetch.types import FetchPageCall, FetchRuntimeContext
 from app.services.shared.url_utils import ensure_scheme
+
 logger = logging.getLogger(__name__)
 
 _FetchRuntimeContext = FetchRuntimeContext
 _FetchPageCall = FetchPageCall
+
 
 async def _emit_fetch_event(on_event: Any | None, level: str, message: str) -> None:
     if not callable(on_event):
@@ -370,17 +372,18 @@ async def fetch_page(
             context.last_error = exc
             context.browser_first_failed = True
             if not context.last_browser_attempt_diagnostics:
-                context.last_browser_attempt_diagnostics = build_failed_browser_diagnostics(
-                    browser_reason=resolved_browser_reason,
-                    exc=exc,
+                context.last_browser_attempt_diagnostics = (
+                    build_failed_browser_diagnostics(
+                        browser_reason=resolved_browser_reason,
+                        exc=exc,
+                    )
                 )
             _attach_exception_browser_diagnostics(
                 exc,
                 context.last_browser_attempt_diagnostics,
             )
-            if (
-                context.fetch_mode == "browser_only"
-                or _hard_browser_requirement(context=context)
+            if context.fetch_mode == "browser_only" or _hard_browser_requirement(
+                context=context
             ):
                 raise
             await _emit_fetch_event(
@@ -407,7 +410,9 @@ async def fetch_page(
     if vendor_block_confirmed and context.last_error is not None:
         raise context.last_error
     if context.last_error is not None:
-        cause = context.last_error if isinstance(context.last_error, Exception) else None
+        cause = (
+            context.last_error if isinstance(context.last_error, Exception) else None
+        )
         logger.info(
             "HTTP fetchers exhausted for %s (%s); attempting browser fallback",
             context.url,
@@ -625,7 +630,13 @@ async def _run_browser_attempts(
                         host_policy=active_host_policy,
                     )
                     if engine_index < len(engine_attempts):
-                        cooldown_ms = max(0, int(crawler_runtime_settings.browser_post_block_cooldown_ms or 0))
+                        cooldown_ms = max(
+                            0,
+                            int(
+                                crawler_runtime_settings.browser_post_block_cooldown_ms
+                                or 0
+                            ),
+                        )
                         if cooldown_ms > 0:
                             await asyncio.sleep(cooldown_ms / 1000)
                         continue
@@ -702,7 +713,13 @@ async def _run_browser_attempts(
                         host_policy=active_host_policy,
                     )
                     if engine_index < len(engine_attempts):
-                        cooldown_ms = max(0, int(crawler_runtime_settings.browser_post_block_cooldown_ms or 0))
+                        cooldown_ms = max(
+                            0,
+                            int(
+                                crawler_runtime_settings.browser_post_block_cooldown_ms
+                                or 0
+                            ),
+                        )
                         if cooldown_ms > 0:
                             await asyncio.sleep(cooldown_ms / 1000)
                         continue

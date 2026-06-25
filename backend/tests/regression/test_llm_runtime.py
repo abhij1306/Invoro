@@ -41,7 +41,9 @@ def test_estimate_cost_usd_uses_configured_mistral_rates() -> None:
 
 @pytest.mark.asyncio
 @pytest.mark.regression
-async def test_provider_retry_retries_rate_limit(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_provider_retry_retries_rate_limit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     calls = 0
 
     async def fake_call_provider(**_kwargs):
@@ -65,7 +67,11 @@ async def test_provider_retry_retries_rate_limit(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setattr(provider_client, "record_failure", fake_record_failure)
     monkeypatch.setattr(provider_client, "record_success", fake_record_success)
 
-    result, input_tokens, output_tokens = await provider_client.call_provider_with_retry(
+    (
+        result,
+        input_tokens,
+        output_tokens,
+    ) = await provider_client.call_provider_with_retry(
         provider="groq",
         model=MODEL_GROQ,
         api_key="key",

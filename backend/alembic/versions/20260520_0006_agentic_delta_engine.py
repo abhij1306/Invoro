@@ -20,7 +20,9 @@ depends_on = None
 def upgrade() -> None:
     op.add_column("monitor_jobs", sa.Column("condition", sa.Text(), nullable=True))
     op.add_column("monitor_jobs", sa.Column("webhook_url", sa.Text(), nullable=True))
-    op.add_column("monitor_jobs", sa.Column("poll_interval_seconds", sa.Integer(), nullable=True))
+    op.add_column(
+        "monitor_jobs", sa.Column("poll_interval_seconds", sa.Integer(), nullable=True)
+    )
     op.add_column(
         "monitor_jobs",
         sa.Column(
@@ -30,18 +32,33 @@ def upgrade() -> None:
             server_default=sa.text("'{}'::jsonb"),
         ),
     )
-    op.add_column("monitor_jobs", sa.Column("last_checked_at", sa.DateTime(timezone=True), nullable=True))
     op.add_column(
         "monitor_jobs",
-        sa.Column("consecutive_failure_count", sa.Integer(), nullable=False, server_default="0"),
+        sa.Column("last_checked_at", sa.DateTime(timezone=True), nullable=True),
+    )
+    op.add_column(
+        "monitor_jobs",
+        sa.Column(
+            "consecutive_failure_count",
+            sa.Integer(),
+            nullable=False,
+            server_default="0",
+        ),
     )
     op.add_column("monitor_jobs", sa.Column("last_error", sa.Text(), nullable=True))
-    op.add_column("monitor_jobs", sa.Column("last_crawl_method", sa.String(length=32), nullable=True))
+    op.add_column(
+        "monitor_jobs",
+        sa.Column("last_crawl_method", sa.String(length=32), nullable=True),
+    )
     op.add_column(
         "monitor_events",
-        sa.Column("condition_met", sa.Boolean(), nullable=False, server_default=sa.false()),
+        sa.Column(
+            "condition_met", sa.Boolean(), nullable=False, server_default=sa.false()
+        ),
     )
-    op.create_index("ix_monitor_events_condition_met", "monitor_events", ["condition_met"])
+    op.create_index(
+        "ix_monitor_events_condition_met", "monitor_events", ["condition_met"]
+    )
 
     op.create_table(
         "monitor_webhook_deliveries",
@@ -52,16 +69,37 @@ def upgrade() -> None:
         sa.Column("attempt", sa.Integer(), nullable=False),
         sa.Column("response_code", sa.Integer(), nullable=True),
         sa.Column("error_message", sa.Text(), nullable=True),
-        sa.Column("payload_preview", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
+        sa.Column(
+            "payload_preview", postgresql.JSONB(astext_type=sa.Text()), nullable=False
+        ),
         sa.Column("delivered_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.ForeignKeyConstraint(["event_id"], ["monitor_events.id"], ondelete="SET NULL"),
-        sa.ForeignKeyConstraint(["monitor_id"], ["monitor_jobs.id"], ondelete="CASCADE"),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
+        sa.ForeignKeyConstraint(
+            ["event_id"], ["monitor_events.id"], ondelete="SET NULL"
+        ),
+        sa.ForeignKeyConstraint(
+            ["monitor_id"], ["monitor_jobs.id"], ondelete="CASCADE"
+        ),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index("ix_monitor_webhook_deliveries_monitor_id", "monitor_webhook_deliveries", ["monitor_id"])
-    op.create_index("ix_monitor_webhook_deliveries_event_id", "monitor_webhook_deliveries", ["event_id"])
-    op.create_index("ix_monitor_webhook_deliveries_status", "monitor_webhook_deliveries", ["status"])
+    op.create_index(
+        "ix_monitor_webhook_deliveries_monitor_id",
+        "monitor_webhook_deliveries",
+        ["monitor_id"],
+    )
+    op.create_index(
+        "ix_monitor_webhook_deliveries_event_id",
+        "monitor_webhook_deliveries",
+        ["event_id"],
+    )
+    op.create_index(
+        "ix_monitor_webhook_deliveries_status", "monitor_webhook_deliveries", ["status"]
+    )
     op.create_index(
         "ix_monitor_webhook_deliveries_monitor_created",
         "monitor_webhook_deliveries",
@@ -77,7 +115,12 @@ def upgrade() -> None:
         sa.Column("key_hash", sa.String(length=64), nullable=False),
         sa.Column("is_active", sa.Boolean(), nullable=False),
         sa.Column("last_used_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="SET NULL"),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("key_hash"),
@@ -96,10 +139,21 @@ def downgrade() -> None:
     op.drop_index("ix_api_keys_key_prefix", table_name="api_keys")
     op.drop_index("ix_api_keys_user_id", table_name="api_keys")
     op.drop_table("api_keys")
-    op.drop_index("ix_monitor_webhook_deliveries_monitor_created", table_name="monitor_webhook_deliveries")
-    op.drop_index("ix_monitor_webhook_deliveries_status", table_name="monitor_webhook_deliveries")
-    op.drop_index("ix_monitor_webhook_deliveries_event_id", table_name="monitor_webhook_deliveries")
-    op.drop_index("ix_monitor_webhook_deliveries_monitor_id", table_name="monitor_webhook_deliveries")
+    op.drop_index(
+        "ix_monitor_webhook_deliveries_monitor_created",
+        table_name="monitor_webhook_deliveries",
+    )
+    op.drop_index(
+        "ix_monitor_webhook_deliveries_status", table_name="monitor_webhook_deliveries"
+    )
+    op.drop_index(
+        "ix_monitor_webhook_deliveries_event_id",
+        table_name="monitor_webhook_deliveries",
+    )
+    op.drop_index(
+        "ix_monitor_webhook_deliveries_monitor_id",
+        table_name="monitor_webhook_deliveries",
+    )
     op.drop_table("monitor_webhook_deliveries")
     op.drop_index("ix_monitor_events_condition_met", table_name="monitor_events")
     op.drop_column("monitor_events", "condition_met")

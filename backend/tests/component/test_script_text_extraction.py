@@ -8,7 +8,10 @@ from app.services.script_text_extractor import (
     iter_script_text_nodes,
     iter_script_text_nodes_async,
 )
-from app.services.structured_sources import harvest_js_state_objects, parse_embedded_json
+from app.services.structured_sources import (
+    harvest_js_state_objects,
+    parse_embedded_json,
+)
 
 
 @pytest.mark.component
@@ -53,9 +56,12 @@ def test_harvest_js_state_objects_reads_ng_state_script_by_id() -> None:
         html,
     )
 
-    assert state_objects["__NG_STATE__"]["cx-state"]["product"]["details"]["entities"][
-        "107455"
-    ]["details"]["value"]["name"] == "Selector Widget"
+    assert (
+        state_objects["__NG_STATE__"]["cx-state"]["product"]["details"]["entities"][
+            "107455"
+        ]["details"]["value"]["name"]
+        == "Selector Widget"
+    )
 
 
 @pytest.mark.component
@@ -80,7 +86,9 @@ def test_parse_embedded_json_extracts_inline_script_assignment_payloads() -> Non
 
 
 @pytest.mark.component
-def test_parse_embedded_json_ignores_inline_script_without_complete_json_terminal() -> None:
+def test_parse_embedded_json_ignores_inline_script_without_complete_json_terminal() -> (
+    None
+):
     html = """
     <html>
       <head>

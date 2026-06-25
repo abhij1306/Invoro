@@ -25,7 +25,12 @@ from app.services.config.monitor_settings import (
     SKIP_HEAD_CHECK_KEY,
 )
 from app.services.domain_utils import normalize_domain
-from app.services.monitor_service import PRIORITY_ORDER, next_run_time, next_alert_run_time, utcnow
+from app.services.monitor_service import (
+    PRIORITY_ORDER,
+    next_run_time,
+    next_alert_run_time,
+    utcnow,
+)
 
 logger = logging.getLogger(__name__)
 create_crawl_run_from_payload = None
@@ -74,7 +79,9 @@ class MonitorSchedulerService:
     async def pre_check_url(self, url: str, state: MonitorURLState) -> bool:
         now = utcnow()
         try:
-            async with httpx.AsyncClient(timeout=HEAD_CHECK_TIMEOUT_SECONDS, follow_redirects=True) as client:
+            async with httpx.AsyncClient(
+                timeout=HEAD_CHECK_TIMEOUT_SECONDS, follow_redirects=True
+            ) as client:
                 response = await client.head(url)
                 if _head_response_needs_get_fallback(response):
                     content_hash = await _stream_content_hash(client, url)
@@ -83,13 +90,18 @@ class MonitorSchedulerService:
                     if content_hash is None:
                         changed = had_prior_hash
                     else:
-                        changed = not had_prior_hash or state.last_content_hash != content_hash
+                        changed = (
+                            not had_prior_hash
+                            or state.last_content_hash != content_hash
+                        )
                         state.last_content_hash = content_hash
                     if changed:
                         state.last_changed_at = now
                         state.consecutive_unchanged_count = 0
                     else:
-                        state.consecutive_unchanged_count = int(state.consecutive_unchanged_count or 0) + 1
+                        state.consecutive_unchanged_count = (
+                            int(state.consecutive_unchanged_count or 0) + 1
+                        )
                     logger.info(
                         "head_precheck_failed_get_succeeded",
                         extra={"url": url, "status_code": response.status_code},
@@ -105,14 +117,18 @@ class MonitorSchedulerService:
             state.last_checked_at = now
             return True
 
-        had_prior_state = bool(state.last_etag or state.last_modified or state.last_content_hash)
+        had_prior_state = bool(
+            state.last_etag or state.last_modified or state.last_content_hash
+        )
         changed = not had_prior_state
         if etag:
             changed = state.last_etag != etag if had_prior_state else True
         elif last_modified:
             changed = state.last_modified != last_modified if had_prior_state else True
         elif content_hash:
-            changed = state.last_content_hash != content_hash if had_prior_state else True
+            changed = (
+                state.last_content_hash != content_hash if had_prior_state else True
+            )
         else:
             changed = True
 
@@ -125,7 +141,9 @@ class MonitorSchedulerService:
             state.last_changed_at = now
             state.consecutive_unchanged_count = 0
         else:
-            state.consecutive_unchanged_count = int(state.consecutive_unchanged_count or 0) + 1
+            state.consecutive_unchanged_count = (
+                int(state.consecutive_unchanged_count or 0) + 1
+            )
         return changed
 
     async def dispatch_monitor_run(
@@ -146,7 +164,9 @@ class MonitorSchedulerService:
             settings = dict(monitor.settings or {})
             settings[MONITOR_ID_SETTING_KEY] = monitor.id
             payload = {
-                "run_type": MONITOR_RUN_TYPE_BATCH if len(domain_urls) > 1 else MONITOR_RUN_TYPE_CRAWL,
+                "run_type": MONITOR_RUN_TYPE_BATCH
+                if len(domain_urls) > 1
+                else MONITOR_RUN_TYPE_CRAWL,
                 "url": domain_urls[0],
                 "urls": domain_urls,
                 "surface": monitor.surface,
@@ -198,7 +218,9 @@ class MonitorSchedulerService:
             row.url: row
             for row in (
                 await session.scalars(
-                    select(MonitorURLState).where(MonitorURLState.monitor_id == monitor.id)
+                    select(MonitorURLState).where(
+                        MonitorURLState.monitor_id == monitor.id
+                    )
                 )
             ).all()
         }
@@ -241,4 +263,6 @@ async def _stream_content_hash(client: httpx.AsyncClient, url: str) -> str | Non
 def _head_response_needs_get_fallback(response: httpx.Response) -> bool:
     if response.status_code in {403, 405, 429}:
         return True
-    return str(response.headers.get("cf-mitigated") or "").strip().lower() == "challenge"
+    return (
+        str(response.headers.get("cf-mitigated") or "").strip().lower() == "challenge"
+    )

@@ -14,7 +14,9 @@ from app.services.extract.detail.assembly.record_assembly import (
 from app.services.extract.field_candidates.variant_rows import (
     _structured_variants_from_product_payload,
 )
-from app.services.extract.field_candidates.structured_payloads import structured_feature_rows
+from app.services.extract.field_candidates.structured_payloads import (
+    structured_feature_rows,
+)
 from app.services.extract.detail.variants.dom_options import variant_option_availability
 from app.services.extract.detail.variants.dom_availability import (
     reconcile_variant_availability_from_dom,
@@ -1512,7 +1514,9 @@ def test_extract_ecommerce_detail_keeps_structured_subscript_feature_label() -> 
 
 
 @pytest.mark.regression
-def test_extract_ecommerce_detail_prefers_visible_description_panel_without_inference() -> None:
+def test_extract_ecommerce_detail_prefers_visible_description_panel_without_inference() -> (
+    None
+):
     html = """
     <html>
       <head>
@@ -8274,7 +8278,9 @@ def test_extract_ecommerce_detail_preserves_zadig_js_state_variants_from_artifac
 
 
 @pytest.mark.regression
-def test_extract_ecommerce_detail_preserves_toddsnyder_suit_component_variants() -> None:
+def test_extract_ecommerce_detail_preserves_toddsnyder_suit_component_variants() -> (
+    None
+):
     html = read_optional_artifact_text("artifacts/runs/1/pages/3f9356011b5bfe4f.html")
 
     rows = extract_records(

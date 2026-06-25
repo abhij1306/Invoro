@@ -205,7 +205,10 @@ async def test_crawl_catalog_uses_category_pages_to_find_real_product_urls(
                 {"url": "/minecraft"},
                 {"url": "/state-of-origin-supporter-gear%3Fintpromo%3Dhomepage_tile"},
             ]
-        if surface == "ecommerce_listing" and page_url == "https://example.com/minecraft":
+        if (
+            surface == "ecommerce_listing"
+            and page_url == "https://example.com/minecraft"
+        ):
             return [{"url": "/products/creeper-pyjamas-123"}]
         if surface == "ecommerce_detail":
             return [{"title": "Creeper Pyjamas", "price": "28"}]
@@ -223,9 +226,14 @@ async def test_crawl_catalog_uses_category_pages_to_find_real_product_urls(
         "https://example.com/",
         "https://example.com/products/creeper-pyjamas-123",
     ]
-    assert not any("state-of-origin-supporter-gear" in url for url in result.sampled_urls)
+    assert not any(
+        "state-of-origin-supporter-gear" in url for url in result.sampled_urls
+    )
     assert ("https://example.com/minecraft", "ecommerce_listing") in fetched
-    assert ("https://example.com/products/creeper-pyjamas-123", "ecommerce_detail") in fetched
+    assert (
+        "https://example.com/products/creeper-pyjamas-123",
+        "ecommerce_detail",
+    ) in fetched
 
 
 @pytest.mark.asyncio
@@ -238,7 +246,9 @@ async def test_crawl_catalog_does_not_create_product_sample_for_category_page(
         if url == "https://example.com":
             return _page(url, "<html><body>homepage tiles</body></html>")
         if url == "https://example.com/minecraft":
-            return _page(url, "<html><body>category without extracted products</body></html>")
+            return _page(
+                url, "<html><body>category without extracted products</body></html>"
+            )
         if url.endswith("/robots.txt"):
             return _page(url, "")
         if url.endswith("/sitemap.xml"):
@@ -262,9 +272,12 @@ async def test_crawl_catalog_does_not_create_product_sample_for_category_page(
 
 @pytest.mark.component
 def test_clean_url_decodes_encoded_query_and_removes_tracking_parameters() -> None:
-    assert catalog_crawl._clean_url(
-        "https://example.com/products/item%3Fintpromo%3Dhome%26sku%3D123"
-    ) == "https://example.com/products/item?sku=123"
+    assert (
+        catalog_crawl._clean_url(
+            "https://example.com/products/item%3Fintpromo%3Dhome%26sku%3D123"
+        )
+        == "https://example.com/products/item?sku=123"
+    )
 
 
 @pytest.mark.component

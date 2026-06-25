@@ -36,6 +36,7 @@ from app.services.url_safety import ensure_public_crawl_targets
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+
 async def create_crawl_run(
     session: AsyncSession, user_id: int, payload: dict
 ) -> CrawlRun:

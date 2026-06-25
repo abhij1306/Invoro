@@ -162,9 +162,7 @@ def variant_option_value_is_noise(value: object) -> bool:
         or lowered in _variant_option_value_exact_noise_tokens
         or variant_option_value_matches_ui_noise(cleaned)
         or any(phrase in lowered for phrase in _variant_option_noise_phrases)
-        or any(
-            rx.search(lowered) for rx in _variant_option_value_noise_search_regexes
-        )
+        or any(rx.search(lowered) for rx in _variant_option_value_noise_search_regexes)
     )
 
 
@@ -190,7 +188,9 @@ def _select_option_values_are_noise(node: Any) -> bool:
     if _is_sequential_integer_run(values):
         return True
     normalized = {
-        re.sub(_ALNUM_SPLIT_PATTERN, "", value.lower()) for value in values if value.strip()
+        re.sub(_ALNUM_SPLIT_PATTERN, "", value.lower())
+        for value in values
+        if value.strip()
     }
     return bool(normalized) and normalized <= _variant_option_value_noise_tokens
 

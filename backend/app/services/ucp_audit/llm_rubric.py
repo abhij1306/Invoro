@@ -124,7 +124,9 @@ def _parse_finding(raw: dict[str, Any]) -> RubricFinding | None:
         dimension=str(raw.get("dimension") or ""),
         verdict=verdict,
         evidence_quote=evidence_quote,
-        finding_code=str(raw.get("finding_code") or config.FINDING_AID_LLM_INSUFFICIENT_EVIDENCE),
+        finding_code=str(
+            raw.get("finding_code") or config.FINDING_AID_LLM_INSUFFICIENT_EVIDENCE
+        ),
         recommendation=str(raw.get("recommendation") or ""),
     )
 

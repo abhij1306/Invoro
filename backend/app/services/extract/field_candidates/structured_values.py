@@ -51,11 +51,16 @@ def _coerce_structured_candidate_value(
         urls = extract_urls(value, page_url)
         if urls:
             return urls[0]
-    if canonical in {
-        "price",
-        "sale_price",
-        "original_price",
-    } and _source_key_is_price_field(source_key) and _uses_integral_price_payload(payload):
+    if (
+        canonical
+        in {
+            "price",
+            "sale_price",
+            "original_price",
+        }
+        and _source_key_is_price_field(source_key)
+        and _uses_integral_price_payload(payload)
+    ):
         normalized = normalize_decimal_price(
             value,
             interpret_integral_as_cents=True,
@@ -99,7 +104,9 @@ def _structured_alias_allowed(
         "image_url",
         "additional_images",
         "url",
-    } and (payload_types & {"brand", "organization", "person", "review", "reviewrating"}):
+    } and (
+        payload_types & {"brand", "organization", "person", "review", "reviewrating"}
+    ):
         return False
     if canonical == "brand" and "person" in payload_types:
         return False
@@ -122,7 +129,9 @@ def _structured_alias_value_allowed(
     if not isinstance(value, (int, float, str)):
         return True
     payload_keys = {normalize_field_key(str(key or "")) for key in payload}
-    inventory_payload_hint_fields = frozenset(SHIPPING_INVENTORY_PAYLOAD_HINT_FIELDS or ())
+    inventory_payload_hint_fields = frozenset(
+        SHIPPING_INVENTORY_PAYLOAD_HINT_FIELDS or ()
+    )
     inventory_payload_keys = payload_keys & inventory_payload_hint_fields
     # Reject size candidates from inventory estimation payloads: require
     # SHIPPING_DATE_FIELD and SPECIAL_DAYS_FIELD plus availability/inventory flags.

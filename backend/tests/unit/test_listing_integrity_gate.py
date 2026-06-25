@@ -42,9 +42,9 @@ def _category_record(idx: int) -> dict:
 
 @pytest.mark.unit
 def test_ensure_frozenset_uses_mapping_values() -> None:
-    assert ensure_frozenset({"primary": "price", "secondary": "image_url"}) == frozenset(
-        {"price", "image_url"}
-    )
+    assert ensure_frozenset(
+        {"primary": "price", "secondary": "image_url"}
+    ) == frozenset({"price", "image_url"})
 
 
 class TestEvaluateListingIntegrityProductGrid:

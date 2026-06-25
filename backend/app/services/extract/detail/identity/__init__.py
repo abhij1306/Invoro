@@ -55,4 +55,3 @@ __all__ = (
     "record_matches_requested_detail_identity",
     "semantic_detail_identity_tokens",
 )
-

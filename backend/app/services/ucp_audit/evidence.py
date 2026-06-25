@@ -40,10 +40,16 @@ def build_evidence_packets(result: CatalogCrawlResult) -> list[EvidencePacket]:
                 "description": _best_description(record),
                 "page_text_excerpt": _page_text_excerpt(record),
                 "availability": _text(record.get("availability")),
-                "images": _text(record.get("images") or record.get("image_url") or record.get("image")),
+                "images": _text(
+                    record.get("images")
+                    or record.get("image_url")
+                    or record.get("image")
+                ),
             },
             extracted_record=_public_record(record),
-            robots_allows_perplexitybot=_agent_allowed(result.robots_directives, "perplexitybot"),
+            robots_allows_perplexitybot=_agent_allowed(
+                result.robots_directives, "perplexitybot"
+            ),
             robots_allows_gptbot=_agent_allowed(result.robots_directives, "gptbot"),
             sitemap_found=bool(result.sitemap_found),
         )
@@ -55,7 +61,9 @@ def build_evidence_packets(result: CatalogCrawlResult) -> list[EvidencePacket]:
 def _product_blocks(rows: object) -> list[dict[str, Any]]:
     if not isinstance(rows, list):
         return []
-    return [row for row in rows if isinstance(row, dict) and _type_matches(row, "product")]
+    return [
+        row for row in rows if isinstance(row, dict) and _type_matches(row, "product")
+    ]
 
 
 def _type_matches(block: dict[str, Any], expected: str) -> bool:

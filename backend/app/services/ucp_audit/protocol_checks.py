@@ -70,9 +70,13 @@ async def probe_schemas(schema_urls: list[str]) -> list[UCPSchemaProbe]:
                 )
             payload = response.json()
             valid_json = isinstance(payload, dict)
-            schema_error = _schema_error(payload) if valid_json else "schema is not an object"
+            schema_error = (
+                _schema_error(payload) if valid_json else "schema is not an object"
+            )
             field_results = (
-                _schema_field_results(payload) if valid_json and not schema_error else {}
+                _schema_field_results(payload)
+                if valid_json and not schema_error
+                else {}
             )
             return UCPSchemaProbe(
                 url=url,
@@ -85,11 +89,15 @@ async def probe_schemas(schema_urls: list[str]) -> list[UCPSchemaProbe]:
                 if isinstance(payload, dict)
                 else "",
                 error=schema_error,
-                groups=_schema_groups(url, payload if isinstance(payload, dict) else {}),
+                groups=_schema_groups(
+                    url, payload if isinstance(payload, dict) else {}
+                ),
                 field_results=field_results,
             )
         except ValueError as exc:
-            return UCPSchemaProbe(url=url, reachable=True, valid_json=False, error=str(exc))
+            return UCPSchemaProbe(
+                url=url, reachable=True, valid_json=False, error=str(exc)
+            )
         except (httpx.HTTPError, OSError, TimeoutError) as exc:
             logger.debug("UCP schema probe failed for %s: %s", url, exc, exc_info=True)
             return UCPSchemaProbe(url=url, error=str(exc))
@@ -178,11 +186,15 @@ async def _probe_mcp(*, service: str, endpoint: str) -> UCPTransportProbe:
             transport="mcp",
             endpoint=endpoint,
             reachable=response.status_code < 500,
-            negotiated=response.status_code < 400 and not payload.get("error") and not errors,
+            negotiated=response.status_code < 400
+            and not payload.get("error")
+            and not errors,
             profile_required=profile_required,
             status_code=response.status_code,
             error=error_message,
-            tool_names=[str(item.get("name") or "") for item in tools if item.get("name")],
+            tool_names=[
+                str(item.get("name") or "") for item in tools if item.get("name")
+            ],
             tool_schemas=tool_schemas,
             response_preview=_preview(payload),
         )
@@ -297,7 +309,9 @@ def _discovery_dimension(manifest: UCPManifestResult) -> UCPDimensionScore:
                 dimension_id=config.D_UCP1_ID,
                 severity=config.UCP_FINDING_BLOCKING,
                 message="UCP discovery profile has structural errors.",
-                evidence=[{"errors": [e for e in manifest.errors if "signing_keys" not in e]}],
+                evidence=[
+                    {"errors": [e for e in manifest.errors if "signing_keys" not in e]}
+                ],
             )
         )
     if manifest.signing_keys_errors:
@@ -485,14 +499,18 @@ def _catalog_dimension(
         for item in config.UCP_REQUIRED_CATALOG_CAPABILITIES
         if item not in manifest.capabilities_declared
     ]
-    findings = [
-        _missing_finding(
-            config.FINDING_CATALOG_CONTRACT_MISSING,
-            config.D_UCP4_ID,
-            missing,
-            "Catalog search and lookup payload contracts are incomplete.",
-        )
-    ] if missing or schema_score < 40 else []
+    findings = (
+        [
+            _missing_finding(
+                config.FINDING_CATALOG_CONTRACT_MISSING,
+                config.D_UCP4_ID,
+                missing,
+                "Catalog search and lookup payload contracts are incomplete.",
+            )
+        ]
+        if missing or schema_score < 40
+        else []
+    )
     _append_missing_schema_evidence(
         findings,
         config.FINDING_CATALOG_CONTRACT_MISSING,
@@ -519,14 +537,18 @@ def _cart_checkout_dimension(
         for item in config.UCP_REQUIRED_CART_CHECKOUT_CAPABILITIES
         if item not in manifest.capabilities_declared
     ]
-    findings = [
-        _missing_finding(
-            config.FINDING_CART_CHECKOUT_CONTRACT_MISSING,
-            config.D_UCP5_ID,
-            missing,
-            "Cart and checkout payload contracts are incomplete.",
-        )
-    ] if missing or schema_score < 40 else []
+    findings = (
+        [
+            _missing_finding(
+                config.FINDING_CART_CHECKOUT_CONTRACT_MISSING,
+                config.D_UCP5_ID,
+                missing,
+                "Cart and checkout payload contracts are incomplete.",
+            )
+        ]
+        if missing or schema_score < 40
+        else []
+    )
     _append_missing_schema_evidence(
         findings,
         config.FINDING_CART_CHECKOUT_CONTRACT_MISSING,
@@ -575,7 +597,9 @@ def _order_policy_dimension(
                 message="No UCP payment handler is declared.",
             )
         )
-    return _dimension(config.D_UCP6_ID, caps_score + schema_score + payment_score, findings)
+    return _dimension(
+        config.D_UCP6_ID, caps_score + schema_score + payment_score, findings
+    )
 
 
 def _transport_probe_score(
@@ -609,11 +633,16 @@ def _embedded_schema_valid(
     schema_url = str(probe.schema_url or "")
     return bool(
         schema_url
-        and any(item.url == schema_url and item.reachable and item.schema_valid for item in schema_probes)
+        and any(
+            item.url == schema_url and item.reachable and item.schema_valid
+            for item in schema_probes
+        )
     )
 
 
-def _coverage_score(required: tuple[str, ...], declared: list[str], *, maximum: int) -> int:
+def _coverage_score(
+    required: tuple[str, ...], declared: list[str], *, maximum: int
+) -> int:
     if not required:
         return maximum
     found = len([item for item in required if item in declared])
@@ -755,14 +784,18 @@ def _summarize_tool_schemas(tools: list[dict]) -> list[dict]:
         if output_schema is not None:
             summary["output_schema"] = _schema_shape_summary(output_schema)
 
-        redacted_count = len([key for key in item.keys() if key not in _ALLOWED_TOOL_SCHEMA_FIELDS])
+        redacted_count = len(
+            [key for key in item.keys() if key not in _ALLOWED_TOOL_SCHEMA_FIELDS]
+        )
         if redacted_count:
             summary["redacted_field_count"] = redacted_count
         if len(raw) > _MAX_TOOL_SCHEMA_BYTES:
             summary["truncated"] = True
         summaries.append(summary)
     if len(tools) > _MAX_TOOL_SCHEMAS:
-        summaries.append({"truncated": True, "remaining": len(tools) - _MAX_TOOL_SCHEMAS})
+        summaries.append(
+            {"truncated": True, "remaining": len(tools) - _MAX_TOOL_SCHEMAS}
+        )
     return summaries
 
 
@@ -778,7 +811,9 @@ def _schema_shape_summary(schema: object) -> dict[str, Any]:
         "property_count": len(properties) if isinstance(properties, dict) else 0,
         "required_count": len(required) if isinstance(required, list) else 0,
         "has_items": "items" in schema,
-        "has_refs": any(key in schema for key in ("$ref", "$defs", "definitions", "components")),
+        "has_refs": any(
+            key in schema for key in ("$ref", "$defs", "definitions", "components")
+        ),
         "has_composition": any(
             isinstance(schema.get(key), list) and bool(schema.get(key))
             for key in ("allOf", "anyOf", "oneOf")
@@ -799,7 +834,9 @@ def _mcp_conformance_errors(payload: dict, *, expected_id: str) -> list[str]:
         errors.append("MCP tools/list did not return result.tools")
     for tool in tools:
         if not isinstance(tool.get("inputSchema"), dict):
-            errors.append(f"MCP tool {tool.get('name') or '<unknown>'} lacks inputSchema")
+            errors.append(
+                f"MCP tool {tool.get('name') or '<unknown>'} lacks inputSchema"
+            )
     return errors
 
 
@@ -823,8 +860,10 @@ def _profile_required(payload: dict) -> bool:
             str(data.get("content") or "").lower(),
         ]
     )
-    return -32099 <= code <= -32000 and "profile" in text and any(
-        kw in text for kw in ("missing", "invalid", "required", "uri", "url")
+    return (
+        -32099 <= code <= -32000
+        and "profile" in text
+        and any(kw in text for kw in ("missing", "invalid", "required", "uri", "url"))
     )
 
 
@@ -902,7 +941,9 @@ def _schema_dict_contains_field(value: dict, field: str, root: dict) -> bool:
     )
 
 
-def _schema_entry_contains_field(key: object, child: object, field: str, root: dict) -> bool:
+def _schema_entry_contains_field(
+    key: object, child: object, field: str, root: dict
+) -> bool:
     if str(key).lower() == field:
         return True
     if key == "required" and _schema_list_contains_field(child, field):
@@ -936,7 +977,10 @@ def _schema_groups(url: str, payload: dict) -> list[str]:
 
 def _entry_validation_errors(entries: list[dict]) -> list[dict[str, Any]]:
     return [
-        {"name": str(entry.get("name") or ""), "errors": list(entry.get("_errors") or [])}
+        {
+            "name": str(entry.get("name") or ""),
+            "errors": list(entry.get("_errors") or []),
+        }
         for entry in entries
         if entry.get("_errors")
     ]

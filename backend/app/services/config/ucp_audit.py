@@ -8,7 +8,9 @@ UCP_DISCOVERY_TIMEOUT_SECONDS = 5.0
 UCP_SCHEMA_TIMEOUT_SECONDS = 5.0
 UCP_TRANSPORT_TIMEOUT_SECONDS = 5.0
 UCP_SCHEMA_LLM_TIMEOUT_SECONDS = 20.0
-UCP_AUDIT_PLATFORM_PROFILE_URL = "https://your-audit-platform.example.com/.well-known/ucp"
+UCP_AUDIT_PLATFORM_PROFILE_URL = (
+    "https://your-audit-platform.example.com/.well-known/ucp"
+)
 
 UCP_AUDIT_JOB_STATUS_QUEUED = "queued"
 UCP_AUDIT_JOB_STATUS_RUNNING = "running"
@@ -50,7 +52,14 @@ UCP_REQUIRED_ORDER_POLICY_CAPABILITIES = (
 UCP_REQUIRED_SCHEMA_KEYWORDS = {
     "catalog": ("catalog", "product", "search", "lookup", "shopping"),
     "cart_checkout": ("cart", "checkout", "shopping"),
-    "order_policy": ("order", "fulfillment", "discount", "policy", "return", "shopping"),
+    "order_policy": (
+        "order",
+        "fulfillment",
+        "discount",
+        "policy",
+        "return",
+        "shopping",
+    ),
 }
 UCP_REQUIRED_SCHEMA_FIELDS = {
     "catalog": ("product_id", "title", "price", "currency", "availability"),

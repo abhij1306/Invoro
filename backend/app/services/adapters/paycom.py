@@ -11,7 +11,9 @@ from app.services.config.adapter_runtime_settings import adapter_runtime_setting
 from app.services.shared.field_coerce import clean_text
 
 
-_CONFIG_RE = re.compile(r"var configsFromHost = (\{[^}]*\});\s*var Mountable", re.DOTALL)
+_CONFIG_RE = re.compile(
+    r"var configsFromHost = (\{[^}]*\});\s*var Mountable", re.DOTALL
+)
 _JOB_ID_RE = re.compile(r"/jobs/(\d+)", re.IGNORECASE)
 
 
@@ -34,7 +36,9 @@ class PaycomAdapter(PublicEndpointAdapter):
         service_base = str(host_config.get("service_base") or "").rstrip("/")
         auth_token = str(host_config.get("auth_token") or "").strip()
         locale = (
-            str(host_config.get("locale") or adapter_runtime_settings.default_locale).strip()
+            str(
+                host_config.get("locale") or adapter_runtime_settings.default_locale
+            ).strip()
             or adapter_runtime_settings.default_locale
         )
         if not service_base or not auth_token:

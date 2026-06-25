@@ -462,8 +462,6 @@ export function CrawlRunScreen({ runId }: Readonly<CrawlRunScreenProps>) {
     visibleSelectedIds,
     selectedRecords,
     batchSourceRecords,
-    resultUrls,
-    selectedResultUrls,
     llmSummary,
     listingRun,
     ecommerceDetailRun,
@@ -474,9 +472,8 @@ export function CrawlRunScreen({ runId }: Readonly<CrawlRunScreenProps>) {
     summary,
     batchFromResultsUrls,
     batchFromResultsLabel,
-    productIntelligenceRecords,
+    downstreamRecords,
     productIntelligenceLabel,
-    dataEnrichmentRecords,
     dataEnrichmentLabel,
     resetToConfig,
     downloadExport,
@@ -490,7 +487,6 @@ export function CrawlRunScreen({ runId }: Readonly<CrawlRunScreenProps>) {
 
   const runErrorMessage =
     typeof run?.result_summary?.error === 'string' ? run.result_summary.error : '';
-  const filteredTableRecords = tableRecords;
   const outputTabs = useMemo(
     () => (
       <TabBar
@@ -779,7 +775,7 @@ export function CrawlRunScreen({ runId }: Readonly<CrawlRunScreenProps>) {
                   ) : null}
                   {!designSystemRun &&
                   (listingRun || ecommerceDetailRun) &&
-                  productIntelligenceRecords.length ? (
+                  downstreamRecords.length ? (
                     <Button
                       variant="neutral"
                       type="button"
@@ -790,7 +786,7 @@ export function CrawlRunScreen({ runId }: Readonly<CrawlRunScreenProps>) {
                       {productIntelligenceLabel}
                     </Button>
                   ) : null}
-                  {!designSystemRun && ecommerceDetailRun && dataEnrichmentRecords.length ? (
+                  {!designSystemRun && ecommerceDetailRun && downstreamRecords.length ? (
                     <Button
                       variant="action"
                       type="button"
@@ -865,12 +861,12 @@ export function CrawlRunScreen({ runId }: Readonly<CrawlRunScreenProps>) {
                       ) : tableRecords.length ? (
                         <div className="space-y-3">
                           <RecordsTable
-                            records={filteredTableRecords}
+                            records={tableRecords}
                             visibleColumns={visibleColumns}
                             selectedIds={visibleSelectedIds}
                             onSelectAll={(checked) =>
                               selectAll(
-                                checked ? filteredTableRecords.map((record) => record.id) : [],
+                                checked ? tableRecords.map((record) => record.id) : [],
                               )
                             }
                             onToggleRow={toggleRecord}

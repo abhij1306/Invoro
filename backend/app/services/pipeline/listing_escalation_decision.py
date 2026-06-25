@@ -105,9 +105,15 @@ def listing_integrity_escalation_decision(
     # 6. Determine current tier and compute next tier.
     method = str(getattr(acquisition_result, "method", "") or "").strip().lower()
     browser_diagnostics = getattr(acquisition_result, "browser_diagnostics", None) or {}
-    browser_engine = str(
-        browser_diagnostics.get("browser_engine", "") if isinstance(browser_diagnostics, dict) else ""
-    ).strip().lower()
+    browser_engine = (
+        str(
+            browser_diagnostics.get("browser_engine", "")
+            if isinstance(browser_diagnostics, dict)
+            else ""
+        )
+        .strip()
+        .lower()
+    )
 
     prior_tier = _compute_prior_tier(method, browser_engine)
     next_tier = _compute_next_tier(method, browser_engine)

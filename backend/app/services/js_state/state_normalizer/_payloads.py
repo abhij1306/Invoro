@@ -7,12 +7,14 @@ from typing import Any
 from ._common import *
 from ._variant_rows import _product_variant_rows
 
+
 def _normalized_state_payload(state_key: str, payload: Any) -> Any:
     if state_key == "__NUXT_DATA__":
         revived = _revive_nuxt_data_array(payload)
         if revived is not None:
             return revived
     return payload
+
 
 def _revive_nuxt_data_array(payload: Any) -> dict[str, Any] | None:
     if not isinstance(payload, list):
@@ -34,6 +36,7 @@ def _revive_nuxt_data_array(payload: Any) -> dict[str, Any] | None:
     if state:
         revived["state"] = state
     return revived or None
+
 
 def _looks_like_product_payload(value: Any) -> bool:
     if not isinstance(value, dict):
@@ -99,6 +102,7 @@ def _looks_like_product_payload(value: Any) -> bool:
         )
     )
 
+
 def _payload_type_is_non_product(value: dict[str, Any]) -> bool:
     raw_type = (
         clean_text(
@@ -121,12 +125,14 @@ def _payload_type_is_non_product(value: dict[str, Any]) -> bool:
         if str(pattern).strip()
     )
 
+
 def _looks_like_stock_price_product_payload(value: dict[str, Any]) -> bool:
     return (
         value.get("productId") not in (None, "", [], {})
         and isinstance(value.get("productPrice"), dict)
         and isinstance(value.get("variants"), list)
     )
+
 
 def _find_product_payloads(
     value: Any,
@@ -147,6 +153,7 @@ def _find_product_payloads(
             payloads.extend(_find_product_payloads(item, depth=depth + 1, limit=limit))
     payloads.sort(key=_product_payload_score, reverse=True)
     return payloads[: int(JS_STATE_PRODUCT_PAYLOAD_LIMIT)]
+
 
 def _product_payload_score(product: dict[str, Any]) -> tuple[int, ...]:
     raw_variants = _product_variant_rows(product)
@@ -207,7 +214,10 @@ def _product_payload_score(product: dict[str, Any]) -> tuple[int, ...]:
         axis_signal_count,
         product_identifier_count,
         price_signal_count,
-        1 if product.get("images") not in (None, "", [], {}) or product.get("image") not in (None, "", [], {}) else 0,
+        1
+        if product.get("images") not in (None, "", [], {})
+        or product.get("image") not in (None, "", [], {})
+        else 0,
         len(product_keys & strong_product_keys),
         len(product_keys),
     )

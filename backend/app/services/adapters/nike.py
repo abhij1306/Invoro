@@ -56,7 +56,9 @@ class NikeAdapter(BaseAdapter):
             or "skuData" in raw_html
         )
 
-    async def extract(self, url: str, html: str, surface: str, proxy: str | None = None) -> AdapterResult:
+    async def extract(
+        self, url: str, html: str, surface: str, proxy: str | None = None
+    ) -> AdapterResult:
         records: list[dict[str, Any]] = []
         if str(surface or "").strip().lower() == "ecommerce_detail":
             record = _extract_detail_record(url, html)
@@ -130,7 +132,9 @@ def _next_data_product(html: str) -> dict[str, Any] | None:
                 "id": option.get("merchSkuId"),
                 "sku": option.get("merchSkuId"),
                 "barcode": _next_data_gtin(option),
-                "sizeName": text_or_none(option.get("label") or option.get("localizedLabel")),
+                "sizeName": text_or_none(
+                    option.get("label") or option.get("localizedLabel")
+                ),
                 "discountedPrice": current_price,
                 "price": initial_price,
                 "isOutOfStock": not _next_data_size_is_in_stock(option),
@@ -157,8 +161,12 @@ def _next_data_product(html: str) -> dict[str, Any] | None:
     )
     return compact_dict(
         {
-            "id": product.get("id") or product.get("merchProductId") or product.get("globalProductId"),
-            "sku": product.get("styleColor") or product.get("styleCode") or product.get("id"),
+            "id": product.get("id")
+            or product.get("merchProductId")
+            or product.get("globalProductId"),
+            "sku": product.get("styleColor")
+            or product.get("styleCode")
+            or product.get("id"),
             "discountedPrice": current_price,
             "price": initial_price,
             "imageUrl": images[0] if images else None,
@@ -217,7 +225,9 @@ def _next_data_product_details(product_info: dict[str, Any]) -> str | None:
     for field_name in ("featuresAndBenefits", "productDetails", "sizeFitSections"):
         for item in product_info.get(field_name) or []:
             if isinstance(item, dict):
-                text = text_or_none(item.get("body") or item.get("text") or item.get("header"))
+                text = text_or_none(
+                    item.get("body") or item.get("text") or item.get("header")
+                )
             else:
                 text = text_or_none(item)
             if text:

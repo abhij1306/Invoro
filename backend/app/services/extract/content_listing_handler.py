@@ -32,7 +32,9 @@ def validate_table_rows_quality(listing_rows: list[dict[str, Any]]) -> bool:
     return meaningful_rows > 0 and meaningful_rows == len(listing_rows)
 
 
-def table_row_records(html: str, page_url: str, *, max_records: int) -> list[dict[str, Any]]:
+def table_row_records(
+    html: str, page_url: str, *, max_records: int
+) -> list[dict[str, Any]]:
     if max_records <= 0:
         return []
     soup = BeautifulSoup(html or "", "html.parser")
@@ -89,7 +91,9 @@ def _table_has_row_intent(table: Tag) -> bool:
     return True
 
 
-def _table_row_pairs(table: Tag, headers: list[str]) -> list[tuple[Tag, dict[str, str]]]:
+def _table_row_pairs(
+    table: Tag, headers: list[str]
+) -> list[tuple[Tag, dict[str, str]]]:
     pairs: list[tuple[Tag, dict[str, str]]] = []
     if not headers or headers == ["field", "value"]:
         return pairs

@@ -49,7 +49,9 @@ class ICIMSAdapter(BaseAdapter):
     async def can_handle(self, url: str, html: str) -> bool:
         return self._matches_platform_family(url, html)
 
-    async def extract(self, url: str, html: str, surface: str, proxy: str | None = None) -> AdapterResult:
+    async def extract(
+        self, url: str, html: str, surface: str, proxy: str | None = None
+    ) -> AdapterResult:
         if self._is_detail_surface(surface) or self._looks_like_detail_url(url):
             html = await self._follow_embedded_content_url(url, html)
             record = self._extract_detail(url, html)
@@ -386,4 +388,3 @@ class ICIMSAdapter(BaseAdapter):
             re.search(r"/[a-f0-9]{20,}/job/?$", path, flags=re.IGNORECASE)
             or re.search(r"/jobs?/\d+", path, flags=re.IGNORECASE)
         )
-

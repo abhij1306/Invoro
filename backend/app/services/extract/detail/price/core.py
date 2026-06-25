@@ -79,7 +79,8 @@ def backfill_detail_price_from_html(
         current_price = record.get("price")
         if (
             current_price in (None, "", [], {})
-            or detail_price_decimal(current_price) == detail_price_decimal(visible_price)
+            or detail_price_decimal(current_price)
+            == detail_price_decimal(visible_price)
             or _should_override_record_price_from_dom(
                 record=record,
                 dom_price=visible_price,
@@ -88,7 +89,11 @@ def backfill_detail_price_from_html(
         ):
             record["currency"] = visible_price_currency
             append_record_field_source(record, "currency", "dom_text")
-    if visible_price_currency and html_currency and visible_price_currency != html_currency:
+    if (
+        visible_price_currency
+        and html_currency
+        and visible_price_currency != html_currency
+    ):
         html_currency = visible_price_currency
         jsonld_price_bundle = (None, None, None)
     html_currency_conflicts_with_host = _html_currency_conflicts_with_strong_host_hint(

@@ -20,6 +20,7 @@ from ._product_mapping import *
 from ._variant_mapping import *
 from ._variant_rows import *
 
+
 def _sync_compat_hooks() -> None:
     _product_mapping_module.glom = glom
     _variant_mapping_module.glom = glom

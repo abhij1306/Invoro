@@ -10,7 +10,9 @@ from app.models.crawl_run import CrawlRun
 from app.services.acquisition.acquirer import AcquisitionResult
 from app.services.crawl.batch_runtime import process_run
 from app.services.crawl.crud import create_crawl_run
-from app.services.monitor_change_detection import ensure_monitor_change_detection_registered
+from app.services.monitor_change_detection import (
+    ensure_monitor_change_detection_registered,
+)
 from app.services.monitor_scheduler_service import MonitorSchedulerService
 from app.services.monitor_service import create_monitor, utcnow
 from app.services.pipeline import run_complete_callbacks
@@ -120,7 +122,9 @@ async def test_monitor_api_end_to_end_with_monitor_form_settings(
         _allow,
     )
     monkeypatch.setattr("app.services.pipeline.extraction_loop.acquire", _fake_acquire)
-    monkeypatch.setattr("app.services.crawl.batch_runtime._prewarm_browser_pool", _noop_prewarm)
+    monkeypatch.setattr(
+        "app.services.crawl.batch_runtime._prewarm_browser_pool", _noop_prewarm
+    )
     monkeypatch.setattr(
         "app.services.monitor_scheduler_service.create_crawl_run_from_payload",
         _inline_create_and_process,
@@ -145,7 +149,9 @@ async def test_monitor_api_end_to_end_with_monitor_form_settings(
         },
     }
 
-    create_response = await monitors_api_client.post("/api/monitors", json=create_payload)
+    create_response = await monitors_api_client.post(
+        "/api/monitors", json=create_payload
+    )
     assert create_response.status_code == 201
     monitor = create_response.json()
     monitor_id = monitor["id"]
@@ -162,7 +168,9 @@ async def test_monitor_api_end_to_end_with_monitor_form_settings(
         },
     }
 
-    first_run_response = await monitors_api_client.post(f"/api/monitors/{monitor_id}/run/now")
+    first_run_response = await monitors_api_client.post(
+        f"/api/monitors/{monitor_id}/run/now"
+    )
     assert first_run_response.status_code == 200
     first_run_payload = first_run_response.json()
     assert first_run_payload["url_count"] == 1
@@ -175,10 +183,14 @@ async def test_monitor_api_end_to_end_with_monitor_form_settings(
     assert persisted_run.settings["monitor_id"] == monitor_id
     assert persisted_run.settings["proxy_enabled"] is True
     assert persisted_run.settings["fetch_profile"]["js_mode"] == "enabled"
-    assert persisted_run.settings["fetch_profile"]["extraction_source"] == "rendered_dom"
+    assert (
+        persisted_run.settings["fetch_profile"]["extraction_source"] == "rendered_dom"
+    )
     assert persisted_run.requested_fields == ["title", "price", "availability"]
 
-    monitor_after_first_run = await monitors_api_client.get(f"/api/monitors/{monitor_id}")
+    monitor_after_first_run = await monitors_api_client.get(
+        f"/api/monitors/{monitor_id}"
+    )
     assert monitor_after_first_run.status_code == 200
     assert monitor_after_first_run.json()["next_run_at"] == next_run_at_before
 
@@ -193,13 +205,17 @@ async def test_monitor_api_end_to_end_with_monitor_form_settings(
         "availability": "in_stock",
     }
 
-    first_events_response = await monitors_api_client.get(f"/api/monitors/{monitor_id}/events")
+    first_events_response = await monitors_api_client.get(
+        f"/api/monitors/{monitor_id}/events"
+    )
     assert first_events_response.status_code == 200
     first_events_payload = first_events_response.json()
     assert first_events_payload["total"] == 1
     assert first_events_payload["items"][0]["event_type"] == "record_new"
 
-    unread_before_change = await monitors_api_client.get("/api/notifications/unread-count")
+    unread_before_change = await monitors_api_client.get(
+        "/api/notifications/unread-count"
+    )
     assert unread_before_change.status_code == 200
     assert unread_before_change.json()["count"] == 0
 
@@ -209,7 +225,9 @@ async def test_monitor_api_end_to_end_with_monitor_form_settings(
         availability="OutOfStock",
     )
 
-    second_run_response = await monitors_api_client.post(f"/api/monitors/{monitor_id}/run/now")
+    second_run_response = await monitors_api_client.post(
+        f"/api/monitors/{monitor_id}/run/now"
+    )
     assert second_run_response.status_code == 200
     second_run_id = second_run_response.json()["run_id"]
     second_run = await db_session.get(CrawlRun, second_run_id)
@@ -227,13 +245,17 @@ async def test_monitor_api_end_to_end_with_monitor_form_settings(
         "availability": "out_of_stock",
     }
 
-    history_response = await monitors_api_client.get(f"/api/monitors/{monitor_id}/history")
+    history_response = await monitors_api_client.get(
+        f"/api/monitors/{monitor_id}/history"
+    )
     assert history_response.status_code == 200
     history_payload = history_response.json()
     assert history_payload["total"] == 2
     assert history_payload["items"][0]["change_count"] == 2
 
-    second_events_response = await monitors_api_client.get(f"/api/monitors/{monitor_id}/events")
+    second_events_response = await monitors_api_client.get(
+        f"/api/monitors/{monitor_id}/events"
+    )
     assert second_events_response.status_code == 200
     second_events_payload = second_events_response.json()
     changed_fields = {
@@ -291,7 +313,9 @@ async def test_monitor_api_end_to_end_with_monitor_form_settings(
     }
     assert updated_monitor["next_run_at"] != next_run_at_before
 
-    paused_run_now = await monitors_api_client.post(f"/api/monitors/{monitor_id}/run/now")
+    paused_run_now = await monitors_api_client.post(
+        f"/api/monitors/{monitor_id}/run/now"
+    )
     assert paused_run_now.status_code == 400
     assert paused_run_now.json()["detail"] == "Monitor is paused — resume it first"
 
@@ -309,7 +333,9 @@ async def test_monitor_api_end_to_end_with_monitor_form_settings(
     assert deleted_get.status_code == 404
     assert deleted_get.json()["detail"] == "Monitor not found"
 
-    archived_run_now = await monitors_api_client.post(f"/api/monitors/{monitor_id}/run/now")
+    archived_run_now = await monitors_api_client.post(
+        f"/api/monitors/{monitor_id}/run/now"
+    )
     assert archived_run_now.status_code == 404
     assert archived_run_now.json()["detail"] == "Monitor not found"
 

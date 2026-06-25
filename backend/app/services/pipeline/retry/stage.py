@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import time
 
-from app.services.acquisition.acquirer import AcquisitionRequest, AcquisitionResult, PageEvidence
+from app.services.acquisition.acquirer import (
+    AcquisitionRequest,
+    AcquisitionResult,
+    PageEvidence,
+)
 from app.services.acquisition.acquirer import acquire as _acquire
 from app.services.acquisition.browser_runtime import (
     build_failed_browser_diagnostics,
@@ -61,6 +65,7 @@ async def _apply_extraction_post_processing(*args, **kwargs):
     # skipcq: PYL-E1125 - retry stage forwards the full extraction-loop call contract.
     return await extraction_loop._apply_extraction_post_processing(*args, **kwargs)
 
+
 async def _build_acquisition_request(
     context: _URLProcessingContext,
 ) -> AcquisitionRequest:
@@ -104,6 +109,7 @@ async def _build_acquisition_request(
         policy=acquisition_policy,
         on_event=_pipeline_acquisition_event_logger(context),
     )
+
 
 async def _retry_detail_challenge_shell_with_real_chrome(
     context: _URLProcessingContext,
@@ -233,10 +239,12 @@ async def _retry_patchright_detail_rejection_with_real_chrome(
         await _log_extraction_outcome(context, retry_result, retry_records)
     return _ExtractedURLStage(fetched=fetched, records=retry_records)
 
+
 def _challenge_shell_reason(acquisition_result: AcquisitionResult) -> str | None:
     return PageEvidence.from_acquisition_result(
         acquisition_result
     ).challenge_shell_reason
+
 
 def _apply_detail_rejection_guard(
     context: _URLProcessingContext,
@@ -304,6 +312,7 @@ def _apply_detail_rejection_guard(
     fetched.url_metrics["failure_reason"] = rejection_reason
     return [], rejection_reason
 
+
 async def _log_extraction_outcome(
     context: _URLProcessingContext,
     acquisition_result,
@@ -325,6 +334,7 @@ async def _log_extraction_outcome(
         "warning",
         f"Extraction yielded 0 records ({extraction_label})",
     )
+
 
 async def _retry_empty_extraction_with_browser(
     context: _URLProcessingContext,
@@ -367,6 +377,7 @@ async def _retry_empty_extraction_with_browser(
         context, fetched
     )
     return retry_records, retry_selector_rules
+
 
 async def _retry_low_quality_extraction_with_browser(
     context: _URLProcessingContext,
@@ -429,6 +440,7 @@ async def _retry_low_quality_extraction_with_browser(
     fetched.acquisition_result = browser_result
     return await _extract_records_for_acquisition(context, fetched)
 
+
 async def _retry_listing_integrity_with_stronger_tier(
     context: _URLProcessingContext,
     fetched: _FetchedURLStage,
@@ -448,9 +460,7 @@ async def _retry_listing_integrity_with_stronger_tier(
 
     # Retrieve the gate decision from artifacts (attached by listing_extractor
     # via _attach_gate_decision_to_artifacts during extract_listing_records).
-    artifacts = mapping_or_empty(
-        getattr(acquisition_result, "artifacts", {})
-    )
+    artifacts = mapping_or_empty(getattr(acquisition_result, "artifacts", {}))
     gate_payload = artifacts.get("listing_integrity")
     if not isinstance(gate_payload, dict):
         return records, selector_rules
@@ -536,7 +546,9 @@ async def _retry_listing_integrity_with_stronger_tier(
     # --- Increment retry count AFTER successful acquisition (at-most-one enforcement) ---
 
     next_tier = str(escalation.get("next_tier") or "")
-    forced_engine = next_tier.replace("browser:", "") if next_tier.startswith("browser:") else None
+    forced_engine = (
+        next_tier.replace("browser:", "") if next_tier.startswith("browser:") else None
+    )
 
     await _log_pipeline_event(
         context,
@@ -573,9 +585,7 @@ async def _retry_listing_integrity_with_stronger_tier(
     )
 
     # Check the new gate decision after re-extraction.
-    retry_artifacts = mapping_or_empty(
-        getattr(retry_result, "artifacts", {})
-    )
+    retry_artifacts = mapping_or_empty(getattr(retry_result, "artifacts", {}))
     retry_gate_payload = retry_artifacts.get("listing_integrity")
     if (
         isinstance(retry_gate_payload, dict)
@@ -587,6 +597,7 @@ async def _retry_listing_integrity_with_stronger_tier(
 
     return retry_records, retry_selector_rules
 
+
 class _ListingIntegritySnapshot:
     """Lightweight stand-in for IntegrityDecision used by the escalation decision."""
 
@@ -596,6 +607,7 @@ class _ListingIntegritySnapshot:
         self.outcome = outcome
         self.reason = reason
         self.metrics = metrics
+
 
 def _build_escalation_policy_snapshot(acquisition_result) -> object:
     """Build a policy snapshot object for the escalation decision.
@@ -617,6 +629,7 @@ def _build_escalation_policy_snapshot(acquisition_result) -> object:
         host_hard_block=host_hard_block,
     )
 
+
 class _EscalationPolicySnapshot:
     """Minimal policy snapshot for listing_integrity_escalation_decision."""
 
@@ -632,6 +645,7 @@ class _EscalationPolicySnapshot:
         self.escalation_disabled = escalation_disabled
         self.host_hard_block = host_hard_block
 
+
 def _remaining_url_budget_seconds(context: _URLProcessingContext) -> float:
     from app.services.pipeline import extraction_loop
 
@@ -644,6 +658,7 @@ def _remaining_url_budget_seconds(context: _URLProcessingContext) -> float:
         - max(0.0, time.monotonic() - float(context.started_at_monotonic)),
     )
 
+
 def _browser_retry_min_remaining_seconds() -> float:
     return max(
         float(crawler_runtime_settings.low_quality_browser_retry_min_remaining_seconds),
@@ -654,12 +669,14 @@ def _browser_retry_min_remaining_seconds() -> float:
 
 remaining_url_budget_seconds = _remaining_url_budget_seconds
 
+
 def _post_extraction_browser_retry_min_remaining_seconds() -> float:
     return max(
         _browser_retry_min_remaining_seconds(),
         float(crawler_runtime_settings.browser_render_timeout_seconds)
         + float(crawler_runtime_settings.url_process_timeout_buffer_seconds),
     )
+
 
 async def _acquire_browser_retry_result(
     context: _URLProcessingContext,

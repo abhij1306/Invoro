@@ -8,7 +8,9 @@ pytestmark = pytest.mark.unit
 
 
 def test_resolve_auto_codeforces_homepage_to_content_detail() -> None:
-    result = resolve_surface("auto", url="https://codeforces.com/", crawl_module="category")
+    result = resolve_surface(
+        "auto", url="https://codeforces.com/", crawl_module="category"
+    )
 
     assert result.surface == "content_detail"
     assert result.confidence == pytest.approx(0.4)

@@ -24,17 +24,35 @@ def upgrade() -> None:
         sa.Column("user_id", sa.Integer(), nullable=True),
         sa.Column("name", sa.String(length=160), nullable=False),
         sa.Column("description", sa.Text(), nullable=False),
-        sa.Column("competitors", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
+        sa.Column(
+            "competitors", postgresql.JSONB(astext_type=sa.Text()), nullable=False
+        ),
         sa.Column("category", sa.String(length=160), nullable=False),
-        sa.Column("tracked_fields", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
+        sa.Column(
+            "tracked_fields", postgresql.JSONB(astext_type=sa.Text()), nullable=False
+        ),
         sa.Column("archived", sa.Boolean(), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="SET NULL"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index("ix_orchestration_projects_user_id", "orchestration_projects", ["user_id"])
-    op.create_index("ix_orchestration_projects_archived", "orchestration_projects", ["archived"])
+    op.create_index(
+        "ix_orchestration_projects_user_id", "orchestration_projects", ["user_id"]
+    )
+    op.create_index(
+        "ix_orchestration_projects_archived", "orchestration_projects", ["archived"]
+    )
     op.create_index(
         "ix_orchestration_projects_user_archived",
         "orchestration_projects",
@@ -50,24 +68,66 @@ def upgrade() -> None:
         sa.Column("template_version", sa.String(length=24), nullable=False),
         sa.Column("label", sa.String(length=180), nullable=False),
         sa.Column("status", sa.String(length=32), nullable=False),
-        sa.Column("intent_inputs", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
-        sa.Column("advanced_overrides", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
-        sa.Column("pipeline_config", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
+        sa.Column(
+            "intent_inputs", postgresql.JSONB(astext_type=sa.Text()), nullable=False
+        ),
+        sa.Column(
+            "advanced_overrides",
+            postgresql.JSONB(astext_type=sa.Text()),
+            nullable=False,
+        ),
+        sa.Column(
+            "pipeline_config", postgresql.JSONB(astext_type=sa.Text()), nullable=False
+        ),
         sa.Column("summary", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
         sa.Column("monitor_id", sa.Integer(), nullable=True),
         sa.Column("completed_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.ForeignKeyConstraint(["monitor_id"], ["monitor_jobs.id"], ondelete="SET NULL"),
-        sa.ForeignKeyConstraint(["project_id"], ["orchestration_projects.id"], ondelete="CASCADE"),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
+        sa.ForeignKeyConstraint(
+            ["monitor_id"], ["monitor_jobs.id"], ondelete="SET NULL"
+        ),
+        sa.ForeignKeyConstraint(
+            ["project_id"], ["orchestration_projects.id"], ondelete="CASCADE"
+        ),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="SET NULL"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index("ix_orchestration_workflow_runs_user_id", "orchestration_workflow_runs", ["user_id"])
-    op.create_index("ix_orchestration_workflow_runs_project_id", "orchestration_workflow_runs", ["project_id"])
-    op.create_index("ix_orchestration_workflow_runs_template_id", "orchestration_workflow_runs", ["template_id"])
-    op.create_index("ix_orchestration_workflow_runs_status", "orchestration_workflow_runs", ["status"])
-    op.create_index("ix_orchestration_workflow_runs_monitor_id", "orchestration_workflow_runs", ["monitor_id"])
+    op.create_index(
+        "ix_orchestration_workflow_runs_user_id",
+        "orchestration_workflow_runs",
+        ["user_id"],
+    )
+    op.create_index(
+        "ix_orchestration_workflow_runs_project_id",
+        "orchestration_workflow_runs",
+        ["project_id"],
+    )
+    op.create_index(
+        "ix_orchestration_workflow_runs_template_id",
+        "orchestration_workflow_runs",
+        ["template_id"],
+    )
+    op.create_index(
+        "ix_orchestration_workflow_runs_status",
+        "orchestration_workflow_runs",
+        ["status"],
+    )
+    op.create_index(
+        "ix_orchestration_workflow_runs_monitor_id",
+        "orchestration_workflow_runs",
+        ["monitor_id"],
+    )
     op.create_index(
         "ix_orchestration_workflow_runs_project_created",
         "orchestration_workflow_runs",
@@ -85,15 +145,35 @@ def upgrade() -> None:
         sa.Column("inputs", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
         sa.Column("outputs", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
         sa.Column("error", sa.Text(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
         sa.ForeignKeyConstraint(["run_id"], ["crawl_runs.id"], ondelete="SET NULL"),
-        sa.ForeignKeyConstraint(["workflow_id"], ["orchestration_workflow_runs.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(
+            ["workflow_id"], ["orchestration_workflow_runs.id"], ondelete="CASCADE"
+        ),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index("ix_orchestration_step_runs_workflow_id", "orchestration_step_runs", ["workflow_id"])
-    op.create_index("ix_orchestration_step_runs_status", "orchestration_step_runs", ["status"])
-    op.create_index("ix_orchestration_step_runs_run_id", "orchestration_step_runs", ["run_id"])
+    op.create_index(
+        "ix_orchestration_step_runs_workflow_id",
+        "orchestration_step_runs",
+        ["workflow_id"],
+    )
+    op.create_index(
+        "ix_orchestration_step_runs_status", "orchestration_step_runs", ["status"]
+    )
+    op.create_index(
+        "ix_orchestration_step_runs_run_id", "orchestration_step_runs", ["run_id"]
+    )
     op.create_index(
         "ix_orchestration_steps_workflow_step",
         "orchestration_step_runs",
@@ -103,19 +183,51 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index("ix_orchestration_steps_workflow_step", table_name="orchestration_step_runs")
-    op.drop_index("ix_orchestration_step_runs_run_id", table_name="orchestration_step_runs")
-    op.drop_index("ix_orchestration_step_runs_status", table_name="orchestration_step_runs")
-    op.drop_index("ix_orchestration_step_runs_workflow_id", table_name="orchestration_step_runs")
+    op.drop_index(
+        "ix_orchestration_steps_workflow_step", table_name="orchestration_step_runs"
+    )
+    op.drop_index(
+        "ix_orchestration_step_runs_run_id", table_name="orchestration_step_runs"
+    )
+    op.drop_index(
+        "ix_orchestration_step_runs_status", table_name="orchestration_step_runs"
+    )
+    op.drop_index(
+        "ix_orchestration_step_runs_workflow_id", table_name="orchestration_step_runs"
+    )
     op.drop_table("orchestration_step_runs")
-    op.drop_index("ix_orchestration_workflow_runs_project_created", table_name="orchestration_workflow_runs")
-    op.drop_index("ix_orchestration_workflow_runs_monitor_id", table_name="orchestration_workflow_runs")
-    op.drop_index("ix_orchestration_workflow_runs_status", table_name="orchestration_workflow_runs")
-    op.drop_index("ix_orchestration_workflow_runs_template_id", table_name="orchestration_workflow_runs")
-    op.drop_index("ix_orchestration_workflow_runs_project_id", table_name="orchestration_workflow_runs")
-    op.drop_index("ix_orchestration_workflow_runs_user_id", table_name="orchestration_workflow_runs")
+    op.drop_index(
+        "ix_orchestration_workflow_runs_project_created",
+        table_name="orchestration_workflow_runs",
+    )
+    op.drop_index(
+        "ix_orchestration_workflow_runs_monitor_id",
+        table_name="orchestration_workflow_runs",
+    )
+    op.drop_index(
+        "ix_orchestration_workflow_runs_status",
+        table_name="orchestration_workflow_runs",
+    )
+    op.drop_index(
+        "ix_orchestration_workflow_runs_template_id",
+        table_name="orchestration_workflow_runs",
+    )
+    op.drop_index(
+        "ix_orchestration_workflow_runs_project_id",
+        table_name="orchestration_workflow_runs",
+    )
+    op.drop_index(
+        "ix_orchestration_workflow_runs_user_id",
+        table_name="orchestration_workflow_runs",
+    )
     op.drop_table("orchestration_workflow_runs")
-    op.drop_index("ix_orchestration_projects_user_archived", table_name="orchestration_projects")
-    op.drop_index("ix_orchestration_projects_archived", table_name="orchestration_projects")
-    op.drop_index("ix_orchestration_projects_user_id", table_name="orchestration_projects")
+    op.drop_index(
+        "ix_orchestration_projects_user_archived", table_name="orchestration_projects"
+    )
+    op.drop_index(
+        "ix_orchestration_projects_archived", table_name="orchestration_projects"
+    )
+    op.drop_index(
+        "ix_orchestration_projects_user_id", table_name="orchestration_projects"
+    )
     op.drop_table("orchestration_projects")

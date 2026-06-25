@@ -80,7 +80,9 @@ async def test_selectors_api_preview_test_and_suggest(
         assert kwargs["css_selector"] == ".price"
         return {"matched_value": "$19.99", "count": 1, "selector_used": ".price"}
 
-    async def _fake_suggest(session, *, url: str, expected_columns: list[str], surface: str | None):
+    async def _fake_suggest(
+        session, *, url: str, expected_columns: list[str], surface: str | None
+    ):
         del session
         assert expected_columns == ["title"]
         return {
@@ -107,7 +109,7 @@ async def test_selectors_api_preview_test_and_suggest(
         params={"url": "https://example.com/products/widget"},
     )
     assert preview_response.status_code == 200
-    assert "<base href=\"https://example.com/products/widget\"" in preview_response.text
+    assert '<base href="https://example.com/products/widget"' in preview_response.text
 
     test_response = await selector_api_client.post(
         "/api/selectors/test",
@@ -125,7 +127,10 @@ async def test_selectors_api_preview_test_and_suggest(
         },
     )
     assert suggest_response.status_code == 200
-    assert suggest_response.json()["suggestions"]["title"][0]["css_selector"] == ".custom-title"
+    assert (
+        suggest_response.json()["suggestions"]["title"][0]["css_selector"]
+        == ".custom-title"
+    )
 
 
 @pytest.mark.asyncio
@@ -161,10 +166,7 @@ async def test_selectors_api_lists_all_domain_records_when_surface_is_omitted(
     )
 
     assert list_response.status_code == 200
-    assert {
-        (row["surface"], row["field_name"])
-        for row in list_response.json()
-    } == {
+    assert {(row["surface"], row["field_name"]) for row in list_response.json()} == {
         ("ecommerce_detail", "price"),
         ("generic", "title"),
     }

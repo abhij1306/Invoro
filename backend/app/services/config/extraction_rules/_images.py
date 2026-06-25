@@ -56,9 +56,7 @@ CDN_IMAGE_PATH_SUFFIX_PATTERN = (
     r"|/t_(?:default|thumbnail|pdp_\d+_v\d+|web_pdp_\d+_v\d+)"
     r")(?=\.[a-z0-9]+$|/|$)"
 )
-SHOPIFY_IMAGE_FILE_PATH_PATTERN = (
-    r"(?:^|/)(?:cdn/shop/files|s/files/(?:[^/]+/)*files)/(?P<filename>[^/?#]+)(?:[?#].*)?$"
-)
+SHOPIFY_IMAGE_FILE_PATH_PATTERN = r"(?:^|/)(?:cdn/shop/files|s/files/(?:[^/]+/)*files)/(?P<filename>[^/?#]+)(?:[?#].*)?$"
 BROKEN_FETCH_IMAGE_PATH_PATTERN = (
     r"/image/(?:fetch|upload)/"
     r"(?:[a-z]{1,5}_[a-z0-9:.,-]+|[a-z]+:[a-z0-9:.,-]+|[a-z]+)"
@@ -85,7 +83,8 @@ _LOCAL_EXPORTS = (
     "AMAZON_IMAGE_CDN_HOSTS",
     "AMAZON_IMAGE_LOW_RES_MAX_DIMENSION",
     "AMAZON_IMAGE_LOW_RES_SUFFIX_PATTERN",
-    "BARE_HOST_URL_RE", "BROKEN_FETCH_IMAGE_PATH_PATTERN",
+    "BARE_HOST_URL_RE",
+    "BROKEN_FETCH_IMAGE_PATH_PATTERN",
     "CDN_IMAGE_PATH_SUFFIX_PATTERN",
     "CDN_IMAGE_QUERY_KEY_PATTERNS",
     "CDN_IMAGE_QUERY_PARAMS",
@@ -93,7 +92,8 @@ _LOCAL_EXPORTS = (
     "DETAIL_IMAGE_COLORWAY_CODE_PATTERN",
     "DETAIL_IMAGE_PRODUCT_CODE_PATTERN",
     "DETAIL_IMAGE_VIEW_CODE_PATTERN",
-    "EXPORT_IMAGE_URL_SUFFIXES", "LOW_RES_SWATCH_IMAGE_PATH_PATTERN",
+    "EXPORT_IMAGE_URL_SUFFIXES",
+    "LOW_RES_SWATCH_IMAGE_PATH_PATTERN",
     "SHOPIFY_IMAGE_FILE_PATH_PATTERN",
     "VARIANT_UI_NOISE_EXACT_MATCH_MAX_LENGTH",
 )

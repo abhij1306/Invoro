@@ -148,7 +148,9 @@ async def resolve_category_urls_with_site_links(
             return static_result
         if static_error is not None:
             raise static_error
-        raise ValueError(f"Unable to resolve sitemap for {_normalize_homepage_url(domain)}")
+        raise ValueError(
+            f"Unable to resolve sitemap for {_normalize_homepage_url(domain)}"
+        )
 
     try:
         discover_rendered_category_links = importlib.import_module(
@@ -203,11 +205,15 @@ async def resolve_category_urls_from_sitemap_result(
     allow_homepage_fallback: bool = False,
     category_only: bool = False,
 ) -> SitemapResolutionResult:
-    keyword = str(
-        filter_keyword
-        if filter_keyword is not None
-        else SITEMAP_DEFAULT_FILTER_KEYWORD
-    ).strip().lower()
+    keyword = (
+        str(
+            filter_keyword
+            if filter_keyword is not None
+            else SITEMAP_DEFAULT_FILTER_KEYWORD
+        )
+        .strip()
+        .lower()
+    )
     limit = max(1, int(max_urls or SITEMAP_DEFAULT_MAX_URLS))
     homepage_url = _normalize_homepage_url(domain)
     last_sitemap_error: ValueError | None = None
@@ -228,8 +234,12 @@ async def resolve_category_urls_from_sitemap_result(
                     limit=limit,
                     category_only=category_only,
                 )
-                sitemap_result.diagnostics.setdefault("sitemap_attempts", sitemap_attempts)
-                sitemap_result.diagnostics.setdefault("static_status", "sitemap_success")
+                sitemap_result.diagnostics.setdefault(
+                    "sitemap_attempts", sitemap_attempts
+                )
+                sitemap_result.diagnostics.setdefault(
+                    "static_status", "sitemap_success"
+                )
                 break
             except ValueError as exc:
                 last_sitemap_error = exc
@@ -335,8 +345,7 @@ async def _resolve_sitemap_urls(
         child_urls = [
             loc.text.strip()
             for sitemap in root_xml.findall(f"{{{SITEMAP_NS}}}sitemap")
-            if (loc := sitemap.find(f"{{{SITEMAP_NS}}}loc")) is not None
-            and loc.text
+            if (loc := sitemap.find(f"{{{SITEMAP_NS}}}loc")) is not None and loc.text
         ]
         if not child_urls:
             raise ValueError(f"No child sitemaps found in {root_url}.")
@@ -454,9 +463,7 @@ async def _resolve_homepage_urls(
         raise ValueError(f"No candidate links found on homepage {homepage_url}.")
     urls = [candidate.url for candidate in candidates]
     labels = {
-        candidate.url: candidate.label
-        for candidate in candidates
-        if candidate.label
+        candidate.url: candidate.label for candidate in candidates if candidate.label
     }
     return SitemapResolutionResult(
         urls=urls,
@@ -563,15 +570,12 @@ async def _extract_homepage_candidate_entries(
             keyword=keyword,
             anchor=anchor,
         )
-        category_signal = (
-            category_only and _has_category_homepage_signal(candidate_url, anchor)
+        category_signal = category_only and _has_category_homepage_signal(
+            candidate_url, anchor
         )
         if not classification and not category_signal:
             continue
-        if category_only and (
-            classification != "listing"
-            and not category_signal
-        ):
+        if category_only and (classification != "listing" and not category_signal):
             continue
         if validations >= SITEMAP_HOMEPAGE_FALLBACK_MAX_VALIDATIONS:
             break
@@ -602,9 +606,7 @@ def _build_nav_tree(
     labels_by_url: Mapping[str, str | None] | None = None,
 ) -> list[dict[str, object]]:
     labels = {
-        _url_key(url): label
-        for url, label in (labels_by_url or {}).items()
-        if label
+        _url_key(url): label for url, label in (labels_by_url or {}).items() if label
     }
     url_by_key = {_url_key(url): url for url in urls}
     roots: list[dict[str, object]] = []
@@ -635,7 +637,8 @@ def _build_nav_tree(
             node = siblings.get(segment.lower())
             if node is None:
                 node = {
-                    "label": labels.get(prefix_key) or _label_from_path_segment(segment),
+                    "label": labels.get(prefix_key)
+                    or _label_from_path_segment(segment),
                     "children": [],
                 }
                 siblings[segment.lower()] = node
@@ -660,9 +663,7 @@ def _labels_by_url_from_tree(tree: list[dict[str, object]]) -> dict[str, str]:
             labels[_url_key(url)] = label
         children = node.get("children")
         if isinstance(children, list):
-            stack.extend(
-                child for child in children if isinstance(child, dict)
-            )
+            stack.extend(child for child in children if isinstance(child, dict))
     return labels
 
 
@@ -812,7 +813,9 @@ def _looks_like_category_url(url: str) -> bool:
     if any(segment.isdigit() for segment in segments):
         return False
     segment_text = " ".join(segment.replace("-", " ") for segment in segments)
-    if any(token in segment_text for token in SITEMAP_CATEGORY_ANCHOR_TEXT_EXCLUDED_TOKENS):
+    if any(
+        token in segment_text for token in SITEMAP_CATEGORY_ANCHOR_TEXT_EXCLUDED_TOKENS
+    ):
         return False
     category_segments = {
         token
@@ -840,7 +843,9 @@ def _has_category_homepage_signal(url: str, anchor: Tag) -> bool:
         for token in SITEMAP_CATEGORY_ANCHOR_TEXT_EXCLUDED_TOKENS
     ):
         return False
-    return any(text_has_token(text, token) for token in SITEMAP_CATEGORY_ANCHOR_TEXT_TOKENS)
+    return any(
+        text_has_token(text, token) for token in SITEMAP_CATEGORY_ANCHOR_TEXT_TOKENS
+    )
 
 
 def _looks_like_locale_path(path: str) -> bool:
@@ -857,9 +862,7 @@ def _reject_homepage_candidate(candidate_url: str) -> bool:
     path = parsed.path.lower()
     if not path or path == "/":
         return True
-    if any(
-        path.endswith(ext) for ext in SITEMAP_HOMEPAGE_FALLBACK_EXCLUDED_EXTENSIONS
-    ):
+    if any(path.endswith(ext) for ext in SITEMAP_HOMEPAGE_FALLBACK_EXCLUDED_EXTENSIONS):
         return True
     return any(
         token in path for token in SITEMAP_HOMEPAGE_FALLBACK_EXCLUDED_PATH_TOKENS
@@ -868,7 +871,9 @@ def _reject_homepage_candidate(candidate_url: str) -> bool:
 
 def _path_depth(path: str) -> int:
     parts = [
-        part for part in path.split("/") if part and not _looks_like_locale_segment(part)
+        part
+        for part in path.split("/")
+        if part and not _looks_like_locale_segment(part)
     ]
     return len(parts)
 

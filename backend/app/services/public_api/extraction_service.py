@@ -250,7 +250,9 @@ def _browser_was_required(metrics: dict[str, Any]) -> bool:
     diagnostics = metrics.get("browser_diagnostics")
     if isinstance(diagnostics, dict) and diagnostics.get("browser_attempted"):
         return True
-    failure_reason = str(metrics.get("failure_reason") or metrics.get("browser_outcome") or "")
+    failure_reason = str(
+        metrics.get("failure_reason") or metrics.get("browser_outcome") or ""
+    )
     return "render" in failure_reason.lower() or "browser" in failure_reason.lower()
 
 

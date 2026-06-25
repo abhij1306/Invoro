@@ -5,8 +5,6 @@ import pytest
 from app.services.adapters.oracle_hcm import OracleHCMAdapter
 
 
-
-
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_oracle_hcm_adapter_does_not_swallow_runtime_errors(

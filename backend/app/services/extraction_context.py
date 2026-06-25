@@ -96,7 +96,9 @@ def collect_structured_source_payloads(
     surface: str = "",
 ) -> tuple[tuple[str, list[dict[str, Any]]], ...]:
     json_ld_payloads = _dict_payloads(parse_json_ld(context.soup))
-    is_listing_surface = LISTING_SURFACE_IDENTIFIER in str(surface or "").strip().lower()
+    is_listing_surface = (
+        LISTING_SURFACE_IDENTIFIER in str(surface or "").strip().lower()
+    )
     skip_structured_fallbacks = is_listing_surface and _json_ld_listing_confident(
         json_ld_payloads
     )
@@ -160,13 +162,20 @@ def _json_ld_listing_confident(payloads: list[dict[str, Any]]) -> bool:
 def _looks_like_listing_payload(payload: dict[str, Any]) -> bool:
     raw_type = payload.get("@type")
     normalized_type = (
-        " ".join(str(item or "") for item in raw_type)
-        if isinstance(raw_type, list)
-        else str(raw_type or "")
-    ).strip().lower()
+        (
+            " ".join(str(item or "") for item in raw_type)
+            if isinstance(raw_type, list)
+            else str(raw_type or "")
+        )
+        .strip()
+        .lower()
+    )
     if "itemlist" in normalized_type:
         return True
-    if any(token in normalized_type for token in ("product", "jobposting", "offer", "aggregateoffer")):
+    if any(
+        token in normalized_type
+        for token in ("product", "jobposting", "offer", "aggregateoffer")
+    ):
         return bool(payload.get("name") or payload.get("title") or payload.get("url"))
     return _payload_has_item_list(payload)
 
@@ -243,7 +252,9 @@ def _extract_vtex_state_listing_items(
         items.append(item)
     if len(items) < 2:
         return []
-    return [{"@type": "ItemList", "itemListElement": [{"item": item} for item in items]}]
+    return [
+        {"@type": "ItemList", "itemListElement": [{"item": item} for item in items]}
+    ]
 
 
 def _vtex_state_product_price(
@@ -281,7 +292,12 @@ def _vtex_state_product_price(
     # Fallback: items[0].sellers[0].commertialOffer
     if product_id:
         offer_key = next(
-            (k for k in state if k.startswith(f"$Product:sp-{product_id}.items") and "commertialOffer" in k),
+            (
+                k
+                for k in state
+                if k.startswith(f"$Product:sp-{product_id}.items")
+                and "commertialOffer" in k
+            ),
             None,
         )
         if offer_key:

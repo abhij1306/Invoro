@@ -57,6 +57,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.execute("DROP TRIGGER IF EXISTS trg_playground_sessions_updated_at ON playground_sessions")
+    op.execute(
+        "DROP TRIGGER IF EXISTS trg_playground_sessions_updated_at ON playground_sessions"
+    )
     op.execute("DROP FUNCTION IF EXISTS set_playground_sessions_updated_at()")
     op.drop_table("playground_sessions")

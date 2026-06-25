@@ -78,7 +78,10 @@ def test_markdown_report_includes_aid_gate_max_score() -> None:
     assert "# AI Discoverability Audit Report: example\\.com" in markdown
     assert f"D-AID1 gate max score: {config.D_AID1_GATE_MAX_SCORE}" in markdown
     assert "D-UCP3 gate max score" not in markdown
-    assert "Reliability rule: uncertain or insufficient-evidence signals are excluded" in markdown
+    assert (
+        "Reliability rule: uncertain or insufficient-evidence signals are excluded"
+        in markdown
+    )
     assert "| D-AID2 | 80 | warning | 0 |" in markdown
     assert "https://example\\.com/p/1" in markdown
     assert "Expose current product prices" in markdown

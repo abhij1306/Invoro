@@ -26,8 +26,18 @@ def upgrade() -> None:
         sa.Column("status", sa.String(length=32), nullable=False),
         sa.Column("options", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
         sa.Column("summary", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
         sa.Column("completed_at", sa.DateTime(timezone=True), nullable=True),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="SET NULL"),
         sa.PrimaryKeyConstraint("id"),
@@ -42,26 +52,51 @@ def upgrade() -> None:
         sa.Column("job_id", sa.Integer(), nullable=False),
         sa.Column("url", sa.Text(), nullable=False),
         sa.Column("acquisition_mode", sa.String(length=32), nullable=False),
-        sa.Column("dimension_payloads", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
+        sa.Column(
+            "dimension_payloads",
+            postgresql.JSONB(astext_type=sa.Text()),
+            nullable=False,
+        ),
         sa.Column("findings", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
         sa.ForeignKeyConstraint(["job_id"], ["ucp_audit_jobs.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("job_id", "url", name="uq_ucp_audit_page_results_job_url"),
     )
-    op.create_index("ix_ucp_audit_page_results_job_id", "ucp_audit_page_results", ["job_id"])
+    op.create_index(
+        "ix_ucp_audit_page_results_job_id", "ucp_audit_page_results", ["job_id"]
+    )
 
     op.create_table(
         "ucp_audit_reports",
         sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
         sa.Column("job_id", sa.Integer(), nullable=False),
         sa.Column("overall_score", sa.Integer(), nullable=False),
-        sa.Column("dimension_scores", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
+        sa.Column(
+            "dimension_scores", postgresql.JSONB(astext_type=sa.Text()), nullable=False
+        ),
         sa.Column("findings", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
-        sa.Column("report_json", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
+        sa.Column(
+            "report_json", postgresql.JSONB(astext_type=sa.Text()), nullable=False
+        ),
         sa.Column("markdown_report", sa.Text(), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
         sa.ForeignKeyConstraint(["job_id"], ["ucp_audit_jobs.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("job_id"),
@@ -72,7 +107,9 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_index("ix_ucp_audit_reports_job_id", table_name="ucp_audit_reports")
     op.drop_table("ucp_audit_reports")
-    op.drop_index("ix_ucp_audit_page_results_job_id", table_name="ucp_audit_page_results")
+    op.drop_index(
+        "ix_ucp_audit_page_results_job_id", table_name="ucp_audit_page_results"
+    )
     op.drop_table("ucp_audit_page_results")
     op.drop_index("ix_ucp_audit_jobs_status", table_name="ucp_audit_jobs")
     op.drop_index("ix_ucp_audit_jobs_domain", table_name="ucp_audit_jobs")

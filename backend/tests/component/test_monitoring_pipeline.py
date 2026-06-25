@@ -39,9 +39,7 @@ def _route_by_path(path: str):
 
 @pytest.mark.component
 def test_product_intelligence_create_monitor_accepts_omitted_body() -> None:
-    route = _route_by_path(
-        "/api/product-intelligence/jobs/{job_id}/create-monitor"
-    )
+    route = _route_by_path("/api/product-intelligence/jobs/{job_id}/create-monitor")
 
     assert [param.name for param in route.dependant.body_params] == ["payload"]
     assert route.dependant.body_params[0].default is None
@@ -67,7 +65,9 @@ def test_monitor_change_detection_registration_replaces_stale_callback(monkeypat
 
 @pytest.mark.asyncio
 @pytest.mark.component
-async def test_dispatch_monitor_run_uses_dispatched_run_from_payload_factory(monkeypatch):
+async def test_dispatch_monitor_run_uses_dispatched_run_from_payload_factory(
+    monkeypatch,
+):
     calls: list[tuple[str, int]] = []
 
     async def fake_create_run(session, user_id, payload):
@@ -205,7 +205,9 @@ async def test_monitor_head_challenge_falls_back_to_get_hash(monkeypatch):
         consecutive_unchanged_count=0,
     )
 
-    changed = await MonitorSchedulerService().pre_check_url("https://codeforces.com/", state)
+    changed = await MonitorSchedulerService().pre_check_url(
+        "https://codeforces.com/", state
+    )
 
     assert changed is True
     assert state.last_content_hash == "hash-1"
@@ -294,12 +296,16 @@ async def test_monitor_pre_check_unchanged_detection(monkeypatch):
     )
 
     # First call — changed because no prior hash
-    changed = await MonitorSchedulerService().pre_check_url("https://example.com/", state)
+    changed = await MonitorSchedulerService().pre_check_url(
+        "https://example.com/", state
+    )
     assert changed is True
     assert state.last_content_hash == "stable-hash"
 
     # Second call — same hash, should be unchanged
-    changed = await MonitorSchedulerService().pre_check_url("https://example.com/", state)
+    changed = await MonitorSchedulerService().pre_check_url(
+        "https://example.com/", state
+    )
     assert changed is False
     assert state.consecutive_unchanged_count == 1
 
@@ -342,7 +348,9 @@ async def test_monitor_pre_check_status_only_fallback(monkeypatch):
         consecutive_unchanged_count=0,
     )
 
-    changed = await MonitorSchedulerService().pre_check_url("https://example.com/", state)
+    changed = await MonitorSchedulerService().pre_check_url(
+        "https://example.com/", state
+    )
     assert changed is True
     assert state.last_content_hash == "fallback-hash"
     assert hash_calls == ["https://example.com/"]
@@ -383,7 +391,9 @@ async def test_monitor_pre_check_none_hash_no_overwrite(monkeypatch):
         consecutive_unchanged_count=0,
     )
 
-    changed = await MonitorSchedulerService().pre_check_url("https://example.com/", state)
+    changed = await MonitorSchedulerService().pre_check_url(
+        "https://example.com/", state
+    )
     # None hash with existing prior hash => treat as changed, but keep prior hash.
     assert changed is True
     # Should not overwrite existing hash

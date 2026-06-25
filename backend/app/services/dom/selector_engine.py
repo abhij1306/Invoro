@@ -4,14 +4,17 @@ from __future__ import annotations
 
 import logging
 import re
-from copy import deepcopy
 import regex as regex_lib
 from typing import cast
 from urllib.parse import urlparse
 
 from app.services.dom.html_parser import BeautifulSoup, NavigableString, Tag
-from lxml import etree  # skipcq: BAN-B410 - lxml is used in HTML parsing mode for sanitized DOM recovery, not arbitrary XML.
-from lxml import html as lxml_html  # skipcq: BAN-B410 - lxml.html.fromstring parses sanitized HTML snippets, not arbitrary XML.
+from lxml import (
+    etree,
+)  # skipcq: BAN-B410 - lxml is used in HTML parsing mode for sanitized DOM recovery, not arbitrary XML.
+from lxml import (
+    html as lxml_html,
+)  # skipcq: BAN-B410 - lxml.html.fromstring parses sanitized HTML snippets, not arbitrary XML.
 
 from app.services.config.extraction_rules import (
     CROSS_LINK_CONTAINER_HINTS,
@@ -193,7 +196,7 @@ def _field_uses_scoped_text(field_name: str) -> bool:
 def _node_within_scope(node: Tag, scope: Tag) -> bool:
     current: Tag | None = node
     while isinstance(current, Tag):
-        if current is scope:
+        if current == scope:
             return True
         parent = current.parent
         current = parent if isinstance(parent, Tag) else None
@@ -461,7 +464,7 @@ def extract_node_value(node: Tag, field_name: str, page_url: str) -> object | No
                 str(_clone_visible_only(node) or node), preserve_block_breaks=True
             )
             if _field_uses_scoped_text(field_name)
-            else (_clone_visible_only(node) or node).get_text(" ", strip=True)
+            else cast(Tag, _clone_visible_only(node) or node).get_text(" ", strip=True)
         )
     )
     text_value = coerce_field_value(field_name, raw_text, page_url)

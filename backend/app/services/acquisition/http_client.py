@@ -20,6 +20,7 @@ from app.services.network_resolution import (
     should_retry_with_forced_ipv4,
 )
 
+
 @dataclass(slots=True)
 class HttpFetchResult:
     url: str
@@ -130,6 +131,7 @@ async def _request_with_httpx(
 
 async def close_shared_http_client() -> None:
     await close_runtime_shared_http_client()
+
 
 def _parse_json_payload(
     text: str,

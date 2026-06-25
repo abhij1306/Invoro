@@ -11,6 +11,7 @@ from app.services.shared.field_coerce import absolute_url, clean_text, finalize_
 
 logger = logging.getLogger(__name__)
 
+
 def extract_xml_sitemap_records(
     text: str,
     page_url: str,
@@ -103,5 +104,3 @@ def _xml_listing_title(url: str) -> str:
     if title:
         return title
     return clean_text(path.rsplit("/", 1)[-1])
-
-

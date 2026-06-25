@@ -72,5 +72,7 @@ async def notification_mark_read(
             notification_id=notification_id,
         )
     except LookupError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
     return InAppNotificationResponse.model_validate(notification, from_attributes=True)

@@ -22,7 +22,9 @@ from app.services.config.monitor_settings import (
     WEBHOOK_STATUS_SENT,
 )
 from app.services.monitor_condition import condition_matches, validate_condition
-from app.services.monitor_change_detection import ensure_monitor_change_detection_registered
+from app.services.monitor_change_detection import (
+    ensure_monitor_change_detection_registered,
+)
 from app.services.monitor_service import utcnow
 from app.services.monitor_webhook_service import dispatch_alert_webhooks
 from app.services.pipeline import run_complete_callbacks
@@ -85,7 +87,9 @@ class _BuggyHttpClient:
         raise ValueError("boom")
 
 
-def _detail_html(*, title: str, price: str, availability: str, sku: str = "W-100") -> str:
+def _detail_html(
+    *, title: str, price: str, availability: str, sku: str = "W-100"
+) -> str:
     return f"""
     <html>
       <head>
@@ -139,7 +143,9 @@ def test_alert_condition_evaluator_is_sandboxed() -> None:
 
 @pytest.mark.asyncio
 @pytest.mark.component
-async def test_alert_webhook_delivery_logs_success(db_session, test_user, monkeypatch) -> None:
+async def test_alert_webhook_delivery_logs_success(
+    db_session, test_user, monkeypatch
+) -> None:
     monitor = MonitorJob(
         user_id=test_user.id,
         name="Alert example.com",
@@ -174,7 +180,9 @@ async def test_alert_webhook_delivery_logs_success(db_session, test_user, monkey
     )
     db_session.add(event)
     await db_session.flush()
-    monkeypatch.setattr("app.services.monitor_webhook_service.httpx.AsyncClient", _HttpClient)
+    monkeypatch.setattr(
+        "app.services.monitor_webhook_service.httpx.AsyncClient", _HttpClient
+    )
 
     await dispatch_alert_webhooks(db_session, monitor=monitor, events=[event])
     await db_session.commit()
@@ -189,7 +197,9 @@ async def test_alert_webhook_delivery_logs_success(db_session, test_user, monkey
 
 @pytest.mark.asyncio
 @pytest.mark.component
-async def test_alert_webhook_delivery_logs_request_errors(db_session, test_user, monkeypatch) -> None:
+async def test_alert_webhook_delivery_logs_request_errors(
+    db_session, test_user, monkeypatch
+) -> None:
     monitor = MonitorJob(
         user_id=test_user.id,
         name="Alert example.com",
@@ -224,8 +234,12 @@ async def test_alert_webhook_delivery_logs_request_errors(db_session, test_user,
     )
     db_session.add(event)
     await db_session.flush()
-    monkeypatch.setattr("app.services.monitor_webhook_service.httpx.AsyncClient", _FailingHttpClient)
-    monkeypatch.setattr("app.services.monitor_webhook_service.WEBHOOK_MAX_RETRY_ATTEMPTS", 1)
+    monkeypatch.setattr(
+        "app.services.monitor_webhook_service.httpx.AsyncClient", _FailingHttpClient
+    )
+    monkeypatch.setattr(
+        "app.services.monitor_webhook_service.WEBHOOK_MAX_RETRY_ATTEMPTS", 1
+    )
 
     await dispatch_alert_webhooks(db_session, monitor=monitor, events=[event])
     await db_session.commit()
@@ -277,8 +291,12 @@ async def test_alert_webhook_delivery_propagates_unexpected_errors(
     )
     db_session.add(event)
     await db_session.flush()
-    monkeypatch.setattr("app.services.monitor_webhook_service.httpx.AsyncClient", _BuggyHttpClient)
-    monkeypatch.setattr("app.services.monitor_webhook_service.WEBHOOK_MAX_RETRY_ATTEMPTS", 1)
+    monkeypatch.setattr(
+        "app.services.monitor_webhook_service.httpx.AsyncClient", _BuggyHttpClient
+    )
+    monkeypatch.setattr(
+        "app.services.monitor_webhook_service.WEBHOOK_MAX_RETRY_ATTEMPTS", 1
+    )
 
     with pytest.raises(ValueError, match="boom"):
         await dispatch_alert_webhooks(db_session, monitor=monitor, events=[event])
@@ -363,7 +381,9 @@ async def test_alert_api_end_to_end_with_dummy_product_change(
         _allow,
     )
     monkeypatch.setattr("app.services.pipeline.extraction_loop.acquire", _fake_acquire)
-    monkeypatch.setattr("app.services.crawl.batch_runtime._prewarm_browser_pool", _noop_prewarm)
+    monkeypatch.setattr(
+        "app.services.crawl.batch_runtime._prewarm_browser_pool", _noop_prewarm
+    )
 
     create_response = await public_client.post(
         "/api/alerts",
@@ -427,7 +447,6 @@ async def test_public_alert_api_requires_api_key(public_client: AsyncClient) -> 
     assert response.json()["meta"]["duration_ms"] >= 0
 
 
-
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_public_alert_list_uses_api_key_envelope(
@@ -474,7 +493,10 @@ async def test_public_alert_list_uses_api_key_envelope(
     assert payload["status"] == "ok"
     assert payload["data"][0]["id"] == monitor.id
     assert payload["data"][0]["target_fields"] == ["price"]
-    assert alert_response((await list_alerts(db_session, user_id=test_user.id))[0]).id == monitor.id
+    assert (
+        alert_response((await list_alerts(db_session, user_id=test_user.id))[0]).id
+        == monitor.id
+    )
 
 
 @pytest.mark.asyncio
@@ -617,7 +639,9 @@ async def test_alert_run_delta_count_handles_bad_summary_count() -> None:
 
 @pytest.mark.asyncio
 @pytest.mark.component
-async def test_alert_target_field_update_replaces_requested_fields(db_session, test_user) -> None:
+async def test_alert_target_field_update_replaces_requested_fields(
+    db_session, test_user
+) -> None:
     monitor = MonitorJob(
         user_id=test_user.id,
         name="Alert example.com",
@@ -679,7 +703,9 @@ async def test_mcp_alert_tools_map_to_public_api(monkeypatch) -> None:
 
             return _ApiResponse()
 
-    monkeypatch.setattr("app.mcp.alert_server.httpx.AsyncClient", lambda timeout=30: _Client())
+    monkeypatch.setattr(
+        "app.mcp.alert_server.httpx.AsyncClient", lambda timeout=30: _Client()
+    )
     server = AlertMCPServer(api_key="secret", base_url="http://api.test/api/v1")
 
     result = await server.call_tool(

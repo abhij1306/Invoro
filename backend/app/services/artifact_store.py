@@ -42,6 +42,8 @@ def persist_png_artifact_from_file(
     suffix: str,
     file_path: str | Path,
 ) -> str:
-    return get_artifact_storage(root_dir=settings.artifacts_dir).persist_png_artifact_from_file(
+    return get_artifact_storage(
+        root_dir=settings.artifacts_dir
+    ).persist_png_artifact_from_file(
         run_id=run_id, source_url=source_url, suffix=suffix, file_path=file_path
     )

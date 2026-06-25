@@ -18,7 +18,9 @@ pytestmark = pytest.mark.component
 
 @pytest.mark.asyncio
 async def test_design_sampler_uses_same_domain_sitemap_urls(monkeypatch) -> None:
-    async def _fake_resolver(domain: str, filter_keyword: str, max_urls: int) -> list[str]:
+    async def _fake_resolver(
+        domain: str, filter_keyword: str, max_urls: int
+    ) -> list[str]:
         assert domain == "https://example.com"
         assert filter_keyword == ""
         assert max_urls >= 6
@@ -28,7 +30,9 @@ async def test_design_sampler_uses_same_domain_sitemap_urls(monkeypatch) -> None
             "https://example.com/pricing",
         ]
 
-    monkeypatch.setattr(design_system, "resolve_category_urls_from_sitemap", _fake_resolver)
+    monkeypatch.setattr(
+        design_system, "resolve_category_urls_from_sitemap", _fake_resolver
+    )
 
     urls = await sample_design_system_urls("https://example.com/")
 
@@ -44,7 +48,9 @@ async def test_design_sampler_falls_back_to_single_url(monkeypatch) -> None:
     async def _fake_resolver(*_args, **_kwargs) -> list[str]:
         raise ValueError("missing sitemap")
 
-    monkeypatch.setattr(design_system, "resolve_category_urls_from_sitemap", _fake_resolver)
+    monkeypatch.setattr(
+        design_system, "resolve_category_urls_from_sitemap", _fake_resolver
+    )
 
     assert await sample_design_system_urls("https://example.com/page") == [
         "https://example.com/page"

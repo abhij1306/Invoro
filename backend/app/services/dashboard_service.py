@@ -258,7 +258,9 @@ async def _reset_crawl_runtime_state() -> dict:
         and artifacts_dir.is_relative_to(PROJECT_ROOT.resolve())
         and legacy_artifacts_dir.resolve() != artifacts_dir
     ):
-        artifacts_removed += _reset_directory(legacy_artifacts_dir, create_if_missing=False)
+        artifacts_removed += _reset_directory(
+            legacy_artifacts_dir, create_if_missing=False
+        )
     cookies_removed = _reset_directory(settings.cookie_store_dir)
     return {
         "artifacts_removed": artifacts_removed,
@@ -303,17 +305,11 @@ async def _reset_bucket_db(
     preserved: list[tuple[str, type]] | None = None,
     zeroed: tuple[str, ...] = (),
 ) -> dict[str, int]:
-    counts = {
-        key: await _count_rows(session, model)
-        for key, model in deleted
-    }
+    counts = {key: await _count_rows(session, model) for key, model in deleted}
     counts.update({key: 0 for key in zeroed})
     if preserved:
         counts.update(
-            {
-                key: await _count_rows(session, model)
-                for key, model in preserved
-            }
+            {key: await _count_rows(session, model) for key, model in preserved}
         )
     return counts
 

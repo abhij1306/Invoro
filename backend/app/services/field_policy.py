@@ -124,10 +124,14 @@ def normalize_field_key(value: str | None) -> str:
     for index, char in enumerate(text):
         previous = text[index - 1] if index else ""
         next_char = text[index + 1] if index + 1 < len(text) else ""
-        if index and char.isupper() and (
-            previous.islower()
-            or previous.isdigit()
-            or (previous.isupper() and next_char.islower())
+        if (
+            index
+            and char.isupper()
+            and (
+                previous.islower()
+                or previous.isdigit()
+                or (previous.isupper() and next_char.islower())
+            )
         ):
             separated.append("_")
         separated.append(char.lower())

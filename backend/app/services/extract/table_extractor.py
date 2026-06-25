@@ -29,7 +29,9 @@ def extract_tables(
         return []
     root = content_container or soup
     tables: list[dict[str, Any]] = []
-    seen_fingerprints: set[tuple[tuple[str, ...], tuple[tuple[tuple[str, str], ...], ...]]] = set()
+    seen_fingerprints: set[
+        tuple[tuple[str, ...], tuple[tuple[tuple[str, str], ...], ...]]
+    ] = set()
     for table in list(root.find_all("table")):
         if key_value_table(table):
             headers = ["field", "value"]
@@ -82,8 +84,12 @@ def table_rows(table: Tag, headers: list[str]) -> list[dict[str, str]]:
             cells = tr.find_all(["td", "th"], recursive=False)
             if len(cells) < 2:
                 continue
-            label = _dedupe_repeated_text(clean_text(cells[0].get_text(" ", strip=True)))
-            value = _dedupe_repeated_text(clean_text(cells[1].get_text(" ", strip=True)))
+            label = _dedupe_repeated_text(
+                clean_text(cells[0].get_text(" ", strip=True))
+            )
+            value = _dedupe_repeated_text(
+                clean_text(cells[1].get_text(" ", strip=True))
+            )
             if label and value:
                 rows.append({"field": label, "value": value})
         return rows
@@ -118,19 +124,29 @@ def meaningful_table(table: Tag) -> bool:
     link_only = 0
     for cell in all_cells:
         text = clean_text(cell.get_text(" ", strip=True))
-        link_text = clean_text(" ".join(node.get_text(" ", strip=True) for node in cell.find_all(["a", "button"])))
+        link_text = clean_text(
+            " ".join(
+                node.get_text(" ", strip=True)
+                for node in cell.find_all(["a", "button"])
+            )
+        )
         if text and link_text and text == link_text:
             link_only += 1
     if link_only / max(1, len(all_cells)) > 0.5:
         return False
     text_blob = clean_text(table.get_text(" ", strip=True)).lower()
-    if re.search(r"\b(?:sun|mon|tue|wed|thu|fri|sat)\b", text_blob) and re.search(r"\b(?:next|prev|today)\b", text_blob):
+    if re.search(r"\b(?:sun|mon|tue|wed|thu|fri|sat)\b", text_blob) and re.search(
+        r"\b(?:next|prev|today)\b", text_blob
+    ):
         return False
     raw_class = table.get("class")
     class_values = raw_class if isinstance(raw_class, list) else [raw_class]
     table_class = " ".join(str(value) for value in class_values if value).lower()
     table_id = str(table.get("id") or "").lower()
-    return not any(token in f"{table_class} {table_id}" for token in ("nav", "menu", "calendar", "layout"))
+    return not any(
+        token in f"{table_class} {table_id}"
+        for token in ("nav", "menu", "calendar", "layout")
+    )
 
 
 def meaningful_listing_table(table: Tag) -> bool:
@@ -149,7 +165,9 @@ def key_value_table(table: Tag) -> bool:
         if len(cells) != 2:
             continue
         row_shapes.append((cells[0].name, cells[1].name))
-    return len(row_shapes) >= 2 and sum(left == "th" for left, _right in row_shapes) >= max(2, len(row_shapes) // 2)
+    return len(row_shapes) >= 2 and sum(
+        left == "th" for left, _right in row_shapes
+    ) >= max(2, len(row_shapes) // 2)
 
 
 def _dedupe_repeated_text(value: str) -> str:

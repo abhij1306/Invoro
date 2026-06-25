@@ -84,11 +84,13 @@ class JibeAdapter(PublicEndpointAdapter):
         if "listing" in str(surface or "").lower():
             merged.setdefault(
                 "limit",
-                merged.get("limit") or adapter_runtime_settings.jibe_listing_default_limit,
+                merged.get("limit")
+                or adapter_runtime_settings.jibe_listing_default_limit,
             )
             merged.setdefault(
                 "page",
-                merged.get("page") or adapter_runtime_settings.jibe_listing_default_page,
+                merged.get("page")
+                or adapter_runtime_settings.jibe_listing_default_page,
             )
         return [(key, value) for key, value in merged.items() if value]
 

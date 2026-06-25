@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-__all__ = (
-    "hydrate_numbered_variant_options_from_dom",
-)
+__all__ = ("hydrate_numbered_variant_options_from_dom",)
 
 import re
 from decimal import Decimal
@@ -23,7 +21,9 @@ from app.services.shared.field_coerce import clean_text, text_or_none
 def hydrate_numbered_variant_options_from_dom(
     record: dict[str, Any], *, soup: Any | None
 ) -> None:
-    variants = [row for row in list(record.get("variants") or []) if isinstance(row, dict)]
+    variants = [
+        row for row in list(record.get("variants") or []) if isinstance(row, dict)
+    ]
     if soup is None or not variants:
         return
     axis_order = _dom_axis_order(soup)

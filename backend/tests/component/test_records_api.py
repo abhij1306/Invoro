@@ -9,7 +9,10 @@ from app.core.dependencies import get_current_user, get_db
 from app.main import app
 from app.models.crawl_run import CrawlRecord
 from app.services.config.runtime_settings import crawler_runtime_settings
-from app.services.crawl.crud import create_crawl_run, get_run_records as real_get_run_records
+from app.services.crawl.crud import (
+    create_crawl_run,
+    get_run_records as real_get_run_records,
+)
 from app.services.crawl.state import CrawlStatus, update_run_status
 
 

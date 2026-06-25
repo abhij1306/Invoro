@@ -99,7 +99,9 @@ class ShopifyAdapter(BaseAdapter):
             for linked_handle, axis_value, axis_key in linked_handles[
                 : adapter_runtime_settings.shopify_linked_variant_max_handles
             ]:
-                api_url = f"{parsed.scheme}://{parsed.netloc}/products/{linked_handle}.js"
+                api_url = (
+                    f"{parsed.scheme}://{parsed.netloc}/products/{linked_handle}.js"
+                )
                 try:
                     data = await self._request_json(
                         api_url,
@@ -124,7 +126,9 @@ class ShopifyAdapter(BaseAdapter):
                         axis_key=axis_key,
                         current_handle=handle,
                     )
-                self._apply_linked_axis(record, axis_key=axis_key, axis_value=axis_value)
+                self._apply_linked_axis(
+                    record, axis_key=axis_key, axis_value=axis_value
+                )
                 product_records.append(record)
             return self._merge_linked_product_records(product_records)
         else:
@@ -214,7 +218,10 @@ class ShopifyAdapter(BaseAdapter):
                 label = self._linked_axis_value(anchor, handle, current_handle)
                 rows.append((handle, label, axis_key))
                 seen.add(handle)
-                if len(rows) >= adapter_runtime_settings.shopify_linked_variant_max_handles:
+                if (
+                    len(rows)
+                    >= adapter_runtime_settings.shopify_linked_variant_max_handles
+                ):
                     return rows
         if current_handle and current_handle not in seen and rows:
             rows.insert(0, (current_handle, "", rows[0][2]))
@@ -238,9 +245,11 @@ class ShopifyAdapter(BaseAdapter):
         family_prefix = self._linked_handle_family_prefix(current_handle, handles)
         if not family_prefix:
             return []
-        axis_key = "scent" if any(
-            token in family_prefix for token in ("mist", "fragrance", "scent")
-        ) else "color"
+        axis_key = (
+            "scent"
+            if any(token in family_prefix for token in ("mist", "fragrance", "scent"))
+            else "color"
+        )
         rows: list[tuple[str, str, str]] = []
         seen: set[str] = set()
         for handle in handles:
@@ -286,7 +295,10 @@ class ShopifyAdapter(BaseAdapter):
             ]
             if len(set(matches)) >= 2:
                 return prefix
-        if any(token in tokens for token in ("mist", "fragrance", "scent")) and len(tokens) > 3:
+        if (
+            any(token in tokens for token in ("mist", "fragrance", "scent"))
+            and len(tokens) > 3
+        ):
             return "-".join(tokens[:-2])
         # Without at least one true sibling handle on the page, the last
         # handle token is most likely a SKU/style code or a category word,
@@ -331,11 +343,16 @@ class ShopifyAdapter(BaseAdapter):
                     anchor.get("title"),
                     anchor.get("data-value"),
                     anchor.get("data-option-value"),
-                    anchor.get_text(" ", strip=True) if hasattr(anchor, "get_text") else "",
+                    anchor.get_text(" ", strip=True)
+                    if hasattr(anchor, "get_text")
+                    else "",
                 ]
             )
             if hasattr(anchor, "find_parent"):
-                for parent in (anchor.find_parent("button"), anchor.find_parent("label")):
+                for parent in (
+                    anchor.find_parent("button"),
+                    anchor.find_parent("label"),
+                ):
                     if parent is not None:
                         candidates.extend(
                             [
@@ -398,7 +415,9 @@ class ShopifyAdapter(BaseAdapter):
 
     def _axis_value_from_handle(self, handle: str, current_handle: str) -> str:
         handle_tokens = [token for token in str(handle or "").split("-") if token]
-        current_tokens = [token for token in str(current_handle or "").split("-") if token]
+        current_tokens = [
+            token for token in str(current_handle or "").split("-") if token
+        ]
         common_prefix = 0
         for left, right in zip(handle_tokens, current_tokens):
             if left != right:

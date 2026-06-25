@@ -267,9 +267,12 @@ async def test_process_run_auto_saves_dom_observed_selectors_and_reuses_domain_m
     second_rows, second_total = await get_run_records(db_session, second_run.id, 1, 20)
 
     assert second_total == 1
-    assert second_rows[0].source_trace["field_discovery"]["price"]["selector_trace"][
-        "selector_record_id"
-    ] == first_rules["price"]["id"]
+    assert (
+        second_rows[0].source_trace["field_discovery"]["price"]["selector_trace"][
+            "selector_record_id"
+        ]
+        == first_rules["price"]["id"]
+    )
 
 
 @pytest.mark.asyncio
@@ -508,8 +511,13 @@ async def test_process_run_self_heals_selectors_and_reuses_domain_memory_without
     assert first_total == 1
     assert second_total == 1
     assert first_rows[0].data["specifications"] == "Rubber outsole, reinforced toe cap."
-    assert second_rows[0].data["specifications"] == "Rubber outsole, reinforced toe cap."
-    assert first_rows[0].source_trace["extraction"]["self_heal"]["mode"] == "selector_synthesis"
+    assert (
+        second_rows[0].data["specifications"] == "Rubber outsole, reinforced toe cap."
+    )
+    assert (
+        first_rows[0].source_trace["extraction"]["self_heal"]["mode"]
+        == "selector_synthesis"
+    )
     assert (
         second_rows[0].source_trace["field_discovery"]["specifications"]["value"]
         == "Rubber outsole, reinforced toe cap."

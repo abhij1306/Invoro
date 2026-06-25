@@ -128,11 +128,7 @@ def best_listing_candidate_set(
     best_records: list[dict[str, Any]] = []
     best_score: tuple[bool, int, int, int, int, int, int, int] | None = None
     for set_name, records in candidate_sets:
-        limited = [
-            record
-            for record in records or []
-            if isinstance(record, dict)
-        ]
+        limited = [record for record in records or [] if isinstance(record, dict)]
         prepared = _prepare_listing_candidate_set(
             limited,
             page_url=page_url,
@@ -153,17 +149,18 @@ def best_listing_candidate_set(
         if diagnostics_sink is not None and prepared and not score[0]:
             homogeneity = _set_cohort_homogeneity(prepared, page_url=page_url)
             signatures = Counter(
-                _record_url_signature(str(r.get("url") or "").strip())
-                for r in prepared
+                _record_url_signature(str(r.get("url") or "").strip()) for r in prepared
             )
             dominant_count = signatures.most_common(1)[0][1] if signatures else 0
-            diagnostics_sink.append({
-                "type": "cohort_penalty_applied",
-                "set_name": set_name,
-                "record_count": len(prepared),
-                "dominant_signature_count": dominant_count,
-                "cohort_homogeneity_ratio": homogeneity,
-            })
+            diagnostics_sink.append(
+                {
+                    "type": "cohort_penalty_applied",
+                    "set_name": set_name,
+                    "record_count": len(prepared),
+                    "dominant_signature_count": dominant_count,
+                    "cohort_homogeneity_ratio": homogeneity,
+                }
+            )
         if best_score is None or score > best_score:
             best_score = score
             best_records = prepared
@@ -278,9 +275,15 @@ def _listing_record_set_score(
     # Support-signal override: when the set is large enough and a majority of
     # records carry support signals, treat cohort as passing. This prevents a
     # few navigation links from penalizing an otherwise valid product grid.
-    if not cohort_pass and len(quality_metrics) >= 5 and supported_records >= max(1, len(quality_metrics) // 2):
+    if (
+        not cohort_pass
+        and len(quality_metrics) >= 5
+        and supported_records >= max(1, len(quality_metrics) // 2)
+    ):
         cohort_pass = True
-    detail_like_records = sum(bool(metrics["detail_like"]) for metrics in quality_metrics)
+    detail_like_records = sum(
+        bool(metrics["detail_like"]) for metrics in quality_metrics
+    )
     utility_records = sum(bool(metrics["utility"]) for metrics in quality_metrics)
     clean_records = len(quality_metrics) - utility_records
     avg_quality = int(round(sum(quality_scores) / max(1, len(quality_scores)) * 100))
@@ -310,7 +313,9 @@ def _listing_record_quality_metrics(
     title = clean_text(record.get("title"))
     url = str(record.get("url") or "").strip()
     is_job_surface = str(surface or "").startswith("job_")
-    detail_like = bool(detail_like_url(url)) if url and detail_like_url is not None else False
+    detail_like = (
+        bool(detail_like_url(url)) if url and detail_like_url is not None else False
+    )
     utility = looks_like_utility_record(title=title, url=url)
     supported = _record_has_supporting_signals(
         record,
@@ -421,7 +426,9 @@ def _record_has_supporting_signals(
         return False
     if detail_like:
         return True
-    if any(token in _listing_url_path_tokens(url) for token in DETAIL_PRODUCT_PATH_TOKENS):
+    if any(
+        token in _listing_url_path_tokens(url) for token in DETAIL_PRODUCT_PATH_TOKENS
+    ):
         return True
     title = clean_text(record.get("title"))
     return _unsupported_non_detail_ecommerce_merchandise_hint(title=title, url=url)
@@ -450,8 +457,7 @@ def listing_record_supported(
     is_job_surface = surface.startswith("job_")
     detail_like = detail_like_url(url)
     if is_job_surface and (
-        job_listing_url_is_utility(url)
-        or job_listing_url_is_hub(url)
+        job_listing_url_is_utility(url) or job_listing_url_is_hub(url)
     ):
         return False
     if is_job_surface and job_listing_title_is_hub(title) and not detail_like:
@@ -470,9 +476,7 @@ def listing_record_supported(
     if is_job_surface and job_listing_url_looks_like_posting(url):
         return True
     return (
-        not is_job_surface
-        and source_kind == "structured_listing"
-        and len(title) >= 12
+        not is_job_surface and source_kind == "structured_listing" and len(title) >= 12
     )
 
 
@@ -496,7 +500,9 @@ def _record_has_supporting_listing_signals(
 
 def job_listing_url_looks_like_posting(url: str) -> bool:
     parsed = urlsplit(url.lower())
-    segments = [segment.strip().lower() for segment in parsed.path.split("/") if segment.strip()]
+    segments = [
+        segment.strip().lower() for segment in parsed.path.split("/") if segment.strip()
+    ]
     if not segments:
         return False
     terminal = segments[-1]
@@ -583,7 +589,10 @@ def _job_detail_query_identity(query: str) -> str:
     for key, value in parse_qsl(str(query or ""), keep_blank_values=True):
         normalized_key = str(key or "").strip().lower()
         normalized_value = str(value or "").strip().lower()
-        if normalized_key in {"showjob", "jobid", "job_id", "gh_jid"} and normalized_value:
+        if (
+            normalized_key in {"showjob", "jobid", "job_id", "gh_jid"}
+            and normalized_value
+        ):
             return f"{normalized_key}={normalized_value}"
     return ""
 
@@ -608,9 +617,19 @@ def _should_drop_record(metrics: dict[str, object], *, surface: str) -> bool:
         return True
     if utility and score < 10:
         return True
-    if not supported and detail_like and not is_job_surface and not detail_like_merchandise:
+    if (
+        not supported
+        and detail_like
+        and not is_job_surface
+        and not detail_like_merchandise
+    ):
         return True
-    if not supported and not detail_like and not is_job_surface and not fallback_merchandise:
+    if (
+        not supported
+        and not detail_like
+        and not is_job_surface
+        and not fallback_merchandise
+    ):
         return True
     if not supported and not detail_like and score < 10:
         return True
@@ -622,7 +641,9 @@ def looks_like_utility_title(title: str) -> bool:
     normalized_title = " ".join(str(title or "").strip().lower().split())
     if not normalized_title:
         return False
-    if any(pattern.search(normalized_title) for pattern in LISTING_UTILITY_TITLE_REGEXES):
+    if any(
+        pattern.search(normalized_title) for pattern in LISTING_UTILITY_TITLE_REGEXES
+    ):
         return True
     return any(
         title_contains_token_phrase(normalized_title, token)
@@ -636,12 +657,13 @@ def looks_like_utility_url(url: str) -> bool:
     if not normalized_url:
         return False
     parsed = urlsplit(normalized_url)
-    segments = [segment.strip().lower() for segment in parsed.path.split("/") if segment.strip()]
-    if (
-        len(segments) >= 3
-        and (
-            LISTING_PRODUCT_DETAIL_ID_RE.search(normalized_url) is not None
-            or any(marker in normalized_url for marker in detail_path_hints("ecommerce_detail"))
+    segments = [
+        segment.strip().lower() for segment in parsed.path.split("/") if segment.strip()
+    ]
+    if len(segments) >= 3 and (
+        LISTING_PRODUCT_DETAIL_ID_RE.search(normalized_url) is not None
+        or any(
+            marker in normalized_url for marker in detail_path_hints("ecommerce_detail")
         )
     ):
         return False
@@ -651,14 +673,11 @@ def looks_like_utility_url(url: str) -> bool:
     # like Tire Rack that mount products under `/accessories/<slug>` would
     # lose every product anchor.
     terminal_raw = segments[-1] if segments else ""
-    terminal_tokens = [
-        token for token in re.split(r"[-.]+", terminal_raw) if token
-    ]
+    terminal_tokens = [token for token in re.split(r"[-.]+", terminal_raw) if token]
     # "Year-led" slugs like 2025-ceo-letter or 2024-annual-report are
     # editorial/news URLs, not product slugs.
     year_led = bool(
-        terminal_tokens
-        and re.fullmatch(YEAR_SLUG_PATTERN, terminal_tokens[0])
+        terminal_tokens and re.fullmatch(YEAR_SLUG_PATTERN, terminal_tokens[0])
     )
     terminal_is_product_slug = (
         len(terminal_tokens) >= PRODUCT_SLUG_MIN_TERMINAL_TOKENS
@@ -719,12 +738,15 @@ def title_contains_token_phrase(title: str, token: str) -> bool:
     pattern = rf"(^|[^a-z0-9]){re.escape(normalized_token)}([^a-z0-9]|$)"
     return re.search(pattern, normalized_title) is not None
 
+
 def _unsupported_non_detail_ecommerce_merchandise_hint(*, title: str, url: str) -> bool:
     normalized_title = " ".join(str(title or "").strip().lower().split())
     normalized_url = str(url or "").strip().lower()
     if not normalized_title or not normalized_url:
         return False
-    if any(pattern.search(normalized_title) for pattern in LISTING_EDITORIAL_TITLE_PATTERNS):
+    if any(
+        pattern.search(normalized_title) for pattern in LISTING_EDITORIAL_TITLE_PATTERNS
+    ):
         return False
     if any(token in normalized_url for token in LISTING_EDITORIAL_URL_TOKENS):
         return False
@@ -735,30 +757,30 @@ def _unsupported_non_detail_ecommerce_merchandise_hint(*, title: str, url: str) 
     normalized_segments = [segment.strip().lower() for segment in segments]
     if "categories" in normalized_segments[:-1]:
         return False
-    if any(segment in LISTING_NON_LISTING_PATH_TOKENS for segment in normalized_segments):
+    if any(
+        segment in LISTING_NON_LISTING_PATH_TOKENS for segment in normalized_segments
+    ):
         return False
     if any(segment in LISTING_EDITORIAL_PATH_SEGMENTS for segment in segments[:-1]):
         return False
     terminal = segments[-1]
     terminal_tokens = [
-        token
-        for token in re.split(r"[^a-z0-9]+", terminal)
-        if len(token) >= 3
+        token for token in re.split(r"[^a-z0-9]+", terminal) if len(token) >= 3
     ]
     if len(terminal_tokens) < 2:
         return False
     if any(token in LISTING_NON_LISTING_PATH_TOKENS for token in terminal_tokens):
         return False
     title_tokens = {
-        token
-        for token in re.split(r"[^a-z0-9]+", normalized_title)
-        if len(token) >= 3
+        token for token in re.split(r"[^a-z0-9]+", normalized_title) if len(token) >= 3
     }
     overlap = sum(token in title_tokens for token in terminal_tokens)
     return overlap >= min(2, len(terminal_tokens))
 
 
-def _unsupported_detail_like_ecommerce_merchandise_hint(*, title: str, url: str) -> bool:
+def _unsupported_detail_like_ecommerce_merchandise_hint(
+    *, title: str, url: str
+) -> bool:
     normalized_title = " ".join(str(title or "").strip().lower().split())
     normalized_url = str(url or "").strip().lower()
     if not normalized_title or not normalized_url:
@@ -771,16 +793,12 @@ def _unsupported_detail_like_ecommerce_merchandise_hint(*, title: str, url: str)
         return False
     terminal = segments[-1]
     terminal_tokens = [
-        token
-        for token in re.split(r"[^a-z0-9]+", terminal)
-        if len(token) >= 3
+        token for token in re.split(r"[^a-z0-9]+", terminal) if len(token) >= 3
     ]
     if not terminal_tokens:
         return False
     title_tokens = {
-        token
-        for token in re.split(r"[^a-z0-9]+", normalized_title)
-        if len(token) >= 3
+        token for token in re.split(r"[^a-z0-9]+", normalized_title) if len(token) >= 3
     }
     return bool(title_tokens & set(terminal_tokens))
 
@@ -788,5 +806,3 @@ def _unsupported_detail_like_ecommerce_merchandise_hint(*, title: str, url: str)
 unsupported_non_detail_ecommerce_merchandise_hint = (
     _unsupported_non_detail_ecommerce_merchandise_hint
 )
-
-

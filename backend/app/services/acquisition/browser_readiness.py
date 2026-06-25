@@ -272,7 +272,11 @@ async def listing_card_signal_count_impl(page: Any, *, surface: str) -> int:
         analysis = analyze_html(html)
         ready_count = _ecommerce_ready_card_count(analysis.soup)
         if ready_count <= 0:
-            return 0 if _ecommerce_ready_card_candidates_present(analysis.soup) else await count_listing_cards(page, surface=surface)
+            return (
+                0
+                if _ecommerce_ready_card_candidates_present(analysis.soup)
+                else await count_listing_cards(page, surface=surface)
+            )
         selector_count = await count_listing_cards(page, surface=surface)
         return max(ready_count, selector_count)
     return await count_listing_cards(

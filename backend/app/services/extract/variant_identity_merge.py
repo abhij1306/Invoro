@@ -1,9 +1,14 @@
 from __future__ import annotations
 
 __all__ = (
-    "split_variant_axes", "resolve_variants", "variant_identity",
-    "variant_semantic_identity", "collapse_duplicate_size_aliases",
-    "variant_row_richness", "merge_variant_pair", "merge_variant_rows",
+    "split_variant_axes",
+    "resolve_variants",
+    "variant_identity",
+    "variant_semantic_identity",
+    "collapse_duplicate_size_aliases",
+    "variant_row_richness",
+    "merge_variant_pair",
+    "merge_variant_rows",
     "axis_values_are_mislabeled_duplicate",
 )
 
@@ -11,16 +16,28 @@ import itertools
 import logging
 from typing import Any
 
-from app.services.config.extraction_rules import VARIANT_MISLABELED_AXIS_MIN_OVERLAP_RATIO, VARIANT_SIZE_ALIAS_SUFFIXES
+from app.services.config.extraction_rules import (
+    VARIANT_MISLABELED_AXIS_MIN_OVERLAP_RATIO,
+    VARIANT_SIZE_ALIAS_SUFFIXES,
+)
 from app.services.config.variant_policy import FLAT_VARIANT_KEYS
-from app.services.extract.variant_axis import normalized_variant_axis_key, variant_axis_allowed_single_tokens
+from app.services.extract.variant_axis import (
+    normalized_variant_axis_key,
+    variant_axis_allowed_single_tokens,
+)
 from app.services.shared.field_coerce import clean_text, text_or_none
 
 logger = logging.getLogger(__name__)
 _variant_axis_allowed_single_tokens = variant_axis_allowed_single_tokens
-_variant_size_alias_suffixes = tuple(str(token).strip().lower() for token in tuple(VARIANT_SIZE_ALIAS_SUFFIXES or ()) if str(token).strip())
+_variant_size_alias_suffixes = tuple(
+    str(token).strip().lower()
+    for token in tuple(VARIANT_SIZE_ALIAS_SUFFIXES or ())
+    if str(token).strip()
+)
 try:
-    _variant_mislabeled_axis_min_overlap_ratio = float(VARIANT_MISLABELED_AXIS_MIN_OVERLAP_RATIO)
+    _variant_mislabeled_axis_min_overlap_ratio = float(
+        VARIANT_MISLABELED_AXIS_MIN_OVERLAP_RATIO
+    )
 except (TypeError, ValueError):
     _variant_mislabeled_axis_min_overlap_ratio = 0.5
 
@@ -60,6 +77,7 @@ def axis_values_are_mislabeled_duplicate(
         return False
     union = len(set_a | set_b)
     return overlap / union >= ratio
+
 
 def split_variant_axes(
     axes: dict[str, list[str]],

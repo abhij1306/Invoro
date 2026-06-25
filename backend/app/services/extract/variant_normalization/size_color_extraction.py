@@ -44,8 +44,11 @@ __all__ = (
     "_extract_color_value",
 )
 
+
 def _safe_compile_patterns(name: str, patterns: object) -> tuple[re.Pattern[str], ...]:
-    raw_patterns = patterns if isinstance(patterns, (list, tuple, set, frozenset)) else ()
+    raw_patterns = (
+        patterns if isinstance(patterns, (list, tuple, set, frozenset)) else ()
+    )
     return compile_regex_patterns(
         raw_patterns,
         logger=logger,
@@ -194,9 +197,7 @@ def _extract_size_value(value: object) -> str:
         pattern = _gender_artifact_patterns.get(lowered_candidate)
         if pattern is None:
             pattern = re.compile(
-                gender_artifact_pattern.format(
-                    candidate=re.escape(lowered_candidate)
-                )
+                gender_artifact_pattern.format(candidate=re.escape(lowered_candidate))
             )
             _gender_artifact_patterns[lowered_candidate] = pattern
         return pattern.search(lowered_text) is not None

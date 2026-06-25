@@ -52,7 +52,9 @@ def test_jsonld_item_candidate_record_keeps_identity_fields() -> None:
 
 @pytest.mark.unit
 def test_prune_duplicate_product_headings_removes_pruned_only_heading() -> None:
-    soup = BeautifulSoup("<html><body><h1>Widget Prime</h1></body></html>", "html.parser")
+    soup = BeautifulSoup(
+        "<html><body><h1>Widget Prime</h1></body></html>", "html.parser"
+    )
 
     prune_duplicate_product_headings(
         soup,

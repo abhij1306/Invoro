@@ -6,8 +6,12 @@ import re
 import regex as regex_lib
 from app.services.dom.html_parser import BeautifulSoup, NavigableString, Tag
 from cssselect import GenericTranslator, SelectorError
-from lxml import etree  # skipcq: BAN-B410 - lxml is used in HTML parsing mode for sanitized selector validation, not arbitrary XML.
-from lxml import html as lxml_html  # skipcq: BAN-B410 - lxml.html.fromstring parses sanitized HTML snippets, not arbitrary XML.
+from lxml import (
+    etree,
+)  # skipcq: BAN-B410 - lxml is used in HTML parsing mode for sanitized selector validation, not arbitrary XML.
+from lxml import (
+    html as lxml_html,
+)  # skipcq: BAN-B410 - lxml.html.fromstring parses sanitized HTML snippets, not arbitrary XML.
 
 from app.services.config.selectors import (
     XPATH_ALLOWED_FUNCTIONS,
@@ -47,7 +51,9 @@ def extract_selector_value(
         normalized = _normalize_css_selector(css_selector)
         matches = soup.select(normalized) if normalized else []
         if matches:
-            values = [value for value in (_node_value(node) for node in matches[:12]) if value]
+            values = [
+                value for value in (_node_value(node) for node in matches[:12]) if value
+            ]
             filtered_values = _apply_regex_filter(regex, values)
             if filtered_values:
                 return filtered_values[0], len(filtered_values), css_selector
@@ -223,9 +229,7 @@ def _coerce_xpath_matches(results: list[object]) -> list[str]:
 def _apply_regex_filter(pattern: str | None, values: list[str]) -> list[str]:
     if not pattern:
         return values
-    max_pattern_length = int(
-        crawler_runtime_settings.selector_regex_max_pattern_length
-    )
+    max_pattern_length = int(crawler_runtime_settings.selector_regex_max_pattern_length)
     if max_pattern_length > 0 and len(pattern) > max_pattern_length:
         logger.warning(
             "Skipping selector regex that exceeds configured length",

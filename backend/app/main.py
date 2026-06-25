@@ -50,7 +50,10 @@ from app.core.metrics import (
     check_redis,
     render_prometheus_metrics,
 )
-from app.core.rate_limit import client_identifier_from_request, consume_sliding_window_limit
+from app.core.rate_limit import (
+    client_identifier_from_request,
+    consume_sliding_window_limit,
+)
 from app.core.redis import close_redis
 from app.core.database import SessionLocal, dispose_engine
 from app.core.public_auth import authenticate_public_api_key
@@ -92,7 +95,9 @@ from app.services.config.public_api import (
     PUBLIC_API_ERROR_RATE_LIMITED,
 )
 from app.services.monitor_async_loop import AsyncSchedulerLoop
-from app.services.monitor_change_detection import ensure_monitor_change_detection_registered
+from app.services.monitor_change_detection import (
+    ensure_monitor_change_detection_registered,
+)
 from app.services.observability.run_audit import ensure_run_audit_registered
 from app.services.monitor_scheduler_service import MonitorSchedulerService
 
@@ -491,7 +496,9 @@ async def correlation_middleware(request: Request, call_next) -> Response:
 
 
 @app.exception_handler(PublicApiError)
-async def public_api_error_handler(request: Request, exc: PublicApiError) -> JSONResponse:
+async def public_api_error_handler(
+    request: Request, exc: PublicApiError
+) -> JSONResponse:
     if request.url.path.startswith(_PUBLIC_API_PREFIX):
         return public_error_response(
             request,
@@ -504,9 +511,13 @@ async def public_api_error_handler(request: Request, exc: PublicApiError) -> JSO
 
 
 @app.exception_handler(HTTPException)
-async def public_http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
+async def public_http_exception_handler(
+    request: Request, exc: HTTPException
+) -> JSONResponse:
     if not request.url.path.startswith(_PUBLIC_API_PREFIX):
-        return JSONResponse({"detail": exc.detail}, status_code=exc.status_code, headers=exc.headers)
+        return JSONResponse(
+            {"detail": exc.detail}, status_code=exc.status_code, headers=exc.headers
+        )
     detail: dict[str, Any] = exc.detail if isinstance(exc.detail, dict) else {}
     if detail.get("status") == "error":
         return JSONResponse(detail, status_code=exc.status_code, headers=exc.headers)
@@ -514,10 +525,19 @@ async def public_http_exception_handler(request: Request, exc: HTTPException) ->
     nested: dict[str, Any] = nested_raw if isinstance(nested_raw, dict) else {}
     return public_error_response(
         request,
-        code=str(detail.get("code") or nested.get("code") or PUBLIC_API_ERROR_INVALID_API_KEY),
-        message=str(detail.get("message") or nested.get("message") or exc.detail or "Request failed"),
+        code=str(
+            detail.get("code") or nested.get("code") or PUBLIC_API_ERROR_INVALID_API_KEY
+        ),
+        message=str(
+            detail.get("message")
+            or nested.get("message")
+            or exc.detail
+            or "Request failed"
+        ),
         status_code=exc.status_code,
-        details=detail.get("details") if isinstance(detail.get("details"), dict) else {},
+        details=detail.get("details")
+        if isinstance(detail.get("details"), dict)
+        else {},
         headers=dict(exc.headers) if exc.headers else None,
     )
 

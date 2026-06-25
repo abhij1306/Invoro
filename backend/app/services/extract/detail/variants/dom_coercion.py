@@ -43,6 +43,7 @@ from app.services.shared.field_coerce import (
     text_or_none,
 )
 
+
 def _dom_variant_axis_allowed(axis_name: str) -> bool:
     return axis_name in public_variant_axis_fields or axis_name == "style"
 
@@ -52,7 +53,6 @@ def _dom_variant_group_name_allowed(group_name: str) -> bool:
     return _dom_variant_axis_allowed(axis_name) or bool(
         _split_compound_axis_name(group_name)
     )
-
 
 
 def _resolve_dom_variant_group_name(node: Any) -> str:
@@ -248,8 +248,7 @@ def _split_compound_option_value(
     for width in range(min(3, len(tokens)), 0, -1):
         size_candidate = " ".join(tokens[-width:])
         if not any(
-            pattern.fullmatch(size_candidate)
-            for pattern in variant_size_value_patterns
+            pattern.fullmatch(size_candidate) for pattern in variant_size_value_patterns
         ):
             continue
         other_value = clean_text(" ".join(tokens[:-width]))

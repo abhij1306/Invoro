@@ -88,8 +88,7 @@ def resolve_auto_surface(
         return typed_html_resolution
 
     if _has_any(path, config.SURFACE_RESOLVER_ARTICLE_PATH_TOKENS) or (
-        host in config.SURFACE_RESOLVER_ARTICLE_HOSTS
-        and _has_article_detail_path(path)
+        host in config.SURFACE_RESOLVER_ARTICLE_HOSTS and _has_article_detail_path(path)
     ):
         return SurfaceResolution(
             "article_detail",
@@ -222,7 +221,9 @@ def _has_article_detail_path(path: str) -> bool:
 
 
 def _has_forum_signal(host: str, path: str) -> bool:
-    return any(token in host for token in config.SURFACE_RESOLVER_FORUM_HOST_TOKENS) or _has_any(
+    return any(
+        token in host for token in config.SURFACE_RESOLVER_FORUM_HOST_TOKENS
+    ) or _has_any(
         path,
         config.SURFACE_RESOLVER_FORUM_PATH_TOKENS,
     )

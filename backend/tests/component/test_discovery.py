@@ -62,7 +62,9 @@ async def test_manifest_404_returns_not_found(monkeypatch: pytest.MonkeyPatch) -
 
 @pytest.mark.asyncio
 @pytest.mark.component
-async def test_valid_manifest_parses_capabilities(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_valid_manifest_parses_capabilities(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     async def fake_fetch_page(*args, **kwargs):
         return DummyPage(
             status_code=200,
@@ -538,7 +540,9 @@ async def test_link_header_fallback_uses_requested_origin_after_redirect(
 
 @pytest.mark.asyncio
 @pytest.mark.component
-async def test_valid_manifest_accepts_ucp_services(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_valid_manifest_accepts_ucp_services(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     async def fake_fetch_page(*args, **kwargs):
         return DummyPage(
             status_code=200,
@@ -581,7 +585,9 @@ async def test_valid_manifest_accepts_ucp_services(monkeypatch: pytest.MonkeyPat
 
 @pytest.mark.asyncio
 @pytest.mark.component
-async def test_manifest_content_type_must_be_json(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_manifest_content_type_must_be_json(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     async def fake_fetch_page(*args, **kwargs):
         return DummyPage(
             status_code=200,
@@ -613,12 +619,16 @@ async def test_manifest_content_type_must_be_json(monkeypatch: pytest.MonkeyPatc
 
     assert result.manifest_found is True
     assert result.manifest_valid is False
-    assert "Content-Type" in result.errors[0] or any("Content-Type" in item for item in result.errors)
+    assert "Content-Type" in result.errors[0] or any(
+        "Content-Type" in item for item in result.errors
+    )
 
 
 @pytest.mark.asyncio
 @pytest.mark.component
-async def test_invalid_manifest_json_reports_error(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_invalid_manifest_json_reports_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     async def fake_fetch_page(*args, **kwargs):
         return DummyPage(status_code=200, html="{not-json")
 

@@ -26,7 +26,10 @@ def test_repair_roadmap_preserves_evidence_and_dependency_order() -> None:
 
     roadmap = build_repair_roadmap(findings, domain="example.com")
 
-    assert [item.sub_skill for item in roadmap] == ["structured markup", "commerce signals"]
+    assert [item.sub_skill for item in roadmap] == [
+        "structured markup",
+        "commerce signals",
+    ]
     assert roadmap[0].evidence == findings[1].evidence
     assert roadmap[0].effort == "2 hours"
     assert roadmap[1].depends_on == ["structured markup", "catalog completeness"]

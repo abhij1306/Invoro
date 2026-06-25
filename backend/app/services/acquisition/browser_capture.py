@@ -32,6 +32,7 @@ from app.services.platform_policy import classify_network_endpoint_family
 
 logger = logging.getLogger(__name__)
 
+
 @dataclass(slots=True)
 class BrowserNetworkCaptureSummary:
     payloads: list[dict[str, object]]

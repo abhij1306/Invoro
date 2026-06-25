@@ -215,7 +215,7 @@ def is_job_platform_signal(
 
 def detect_platform_family(url: str, html: str = "") -> str | None:
     normalized_url = str(url or "").strip().lower()
-    normalized_html = str(html or "").lower()[:_platform_detection_html_search_limit()]
+    normalized_html = str(html or "").lower()[: _platform_detection_html_search_limit()]
     domain = normalize_domain(urlparse(normalized_url).netloc)
 
     for config in platform_configs():
@@ -261,7 +261,9 @@ def detect_platform_family(url: str, html: str = "") -> str | None:
 
     if any(token in normalized_url for token in GENERIC_PLATFORM_URL_TOKENS["job"]):
         return "generic_jobs"
-    if any(token in normalized_url for token in GENERIC_PLATFORM_URL_TOKENS["ecommerce"]):
+    if any(
+        token in normalized_url for token in GENERIC_PLATFORM_URL_TOKENS["ecommerce"]
+    ):
         return "generic_commerce"
     return None
 
@@ -316,7 +318,9 @@ def url_host_matches_platform_family(url: str | None, family: str | None) -> boo
     host = normalize_domain(urlparse(str(url or "")).netloc)
     if not host:
         return False
-    return any(_matches_domain(host, pattern) for pattern in platform_domain_patterns(family))
+    return any(
+        _matches_domain(host, pattern) for pattern in platform_domain_patterns(family)
+    )
 
 
 def requires_path_tenant_boundary_for_family(family: str | None) -> bool:
@@ -403,7 +407,9 @@ def _resolve_http_browser_escalation_policy(surface: str | None) -> dict[str, bo
     group = surface_group(normalized_surface)
     return {
         "js_shell_without_detail_signals": True,
-        "missing_detail_signals": bool(group and normalized_surface.endswith("_detail")),
+        "missing_detail_signals": bool(
+            group and normalized_surface.endswith("_detail")
+        ),
         "listing_shell_without_listing_signals": bool(
             group and normalized_surface.endswith("_listing")
         ),

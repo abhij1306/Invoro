@@ -20,7 +20,13 @@ def test_parse_rubric_payload_downgrades_missing_evidence_quote() -> None:
                     "recommendation": "Add clear product facts.",
                 }
             ],
-            "simulated_queries": [{"query": "best tee for summer India", "answerable": False, "gap": "fabric"}],
+            "simulated_queries": [
+                {
+                    "query": "best tee for summer India",
+                    "answerable": False,
+                    "gap": "fabric",
+                }
+            ],
             "error": "",
         },
         fallback_url="https://example.com/p/1",

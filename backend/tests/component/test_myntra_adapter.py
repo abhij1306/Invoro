@@ -99,7 +99,9 @@ async def test_myntra_adapter_extracts_listing_cards_from_dom() -> None:
 
 @pytest.mark.asyncio
 @pytest.mark.component
-async def test_myntra_adapter_extracts_listing_records_from_state_without_dom_cards() -> None:
+async def test_myntra_adapter_extracts_listing_records_from_state_without_dom_cards() -> (
+    None
+):
     html = """
     <html>
       <body>
@@ -140,7 +142,10 @@ async def test_myntra_adapter_extracts_listing_records_from_state_without_dom_ca
     )
 
     assert len(result.records) == 1
-    assert result.records[0]["title"] == "StyleCast x Revolte Men Wide Leg Mid-Rise Light Fade Jeans"
+    assert (
+        result.records[0]["title"]
+        == "StyleCast x Revolte Men Wide Leg Mid-Rise Light Fade Jeans"
+    )
     assert result.records[0]["brand"] == "StyleCast x Revolte"
     assert result.records[0]["price"] == "1439"
     assert result.records[0]["currency"] == "INR"

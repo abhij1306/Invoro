@@ -39,7 +39,9 @@ async def alert_create(
     try:
         monitor, _run_id = await create_alert(session, user=user, payload=payload)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
     return alert_response(monitor)
 
 
@@ -62,7 +64,9 @@ async def alert_get(
     try:
         monitor = await get_alert(session, alert_id, user_id=int(user.id))
     except LookupError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
     return alert_response(monitor)
 
 
@@ -81,9 +85,13 @@ async def alert_patch(
             payload=payload,
         )
     except LookupError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
     return alert_response(monitor)
 
 
@@ -96,7 +104,9 @@ async def alert_delete(
     try:
         await delete_alert(session, alert_id=alert_id, user_id=int(user.id))
     except LookupError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -117,7 +127,9 @@ async def alert_history_route(
             limit=page_size,
         )
     except LookupError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
     return {"items": items, "total": total, "page": page, "page_size": page_size}
 
 
@@ -128,11 +140,17 @@ async def alert_test(
     user: Annotated[User, Depends(get_current_user)],
 ) -> AlertTestResponse:
     try:
-        monitor, run_id = await test_alert(session, alert_id=alert_id, user_id=int(user.id))
+        monitor, run_id = await test_alert(
+            session, alert_id=alert_id, user_id=int(user.id)
+        )
     except LookupError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
     return AlertTestResponse(
         alert=alert_response(monitor),
         run_id=run_id,
@@ -150,6 +168,11 @@ async def alert_deliveries(
     try:
         monitor = await get_alert(session, alert_id, user_id=int(user.id))
     except LookupError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
     rows = await list_webhook_deliveries(session, monitor_id=int(monitor.id))
-    return [WebhookDeliveryResponse.model_validate(row, from_attributes=True) for row in rows]
+    return [
+        WebhookDeliveryResponse.model_validate(row, from_attributes=True)
+        for row in rows
+    ]

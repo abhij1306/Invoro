@@ -47,7 +47,9 @@ def _evaluate_clause(clause: str, values: dict[str, Any]) -> bool:
         raise ValueError(f"Unsupported condition operator: {operator}")
     actual = values.get(field)
     if field == "price":
-        return _compare_numbers(_decimal_value(actual), _decimal_value(raw_expected), operator)
+        return _compare_numbers(
+            _decimal_value(actual), _decimal_value(raw_expected), operator
+        )
     return _compare_strings(_text_value(actual), _text_value(raw_expected), operator)
 
 
@@ -131,7 +133,9 @@ def _text_value(value: Any) -> str:
     return " ".join(str(value or "").strip().strip("\"'").lower().split())
 
 
-def _compare_numbers(actual: Decimal | None, expected: Decimal | None, operator: str) -> bool:
+def _compare_numbers(
+    actual: Decimal | None, expected: Decimal | None, operator: str
+) -> bool:
     if actual is None or expected is None:
         return False
     if operator == "<":

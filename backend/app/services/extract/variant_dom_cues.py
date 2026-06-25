@@ -109,13 +109,9 @@ def variant_scope_roots(soup: Any) -> list[Any]:
         seen.add(node)
         if max_roots is not None and len(roots) >= max_roots:
             break
-    soft_limit = (
-        None if max_roots is None else max(0, max_roots - len(roots))
-    )
+    soft_limit = None if max_roots is None else max(0, max_roots - len(roots))
     soft_roots = (
-        _variant_soft_scope_roots(soup, max_roots=soft_limit)
-        if soft_limit != 0
-        else []
+        _variant_soft_scope_roots(soup, max_roots=soft_limit) if soft_limit != 0 else []
     )
     for node in soft_roots:
         if node in seen or _node_is_within_any_root(node, roots):

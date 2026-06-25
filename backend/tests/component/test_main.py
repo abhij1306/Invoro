@@ -166,7 +166,9 @@ def test_install_asyncio_exception_filter_delegates_unknown_errors() -> None:
 
 
 @pytest.mark.component
-def test_install_asyncio_exception_filter_preserves_original_context_for_previous_handler() -> None:
+def test_install_asyncio_exception_filter_preserves_original_context_for_previous_handler() -> (
+    None
+):
     previous_calls: list[object] = []
 
     class FakeLoop:
@@ -174,7 +176,9 @@ def test_install_asyncio_exception_filter_preserves_original_context_for_previou
             self.handler = None
 
         def get_exception_handler(self):
-            return lambda inner_loop, context: previous_calls.append((inner_loop, context))
+            return lambda inner_loop, context: previous_calls.append(
+                (inner_loop, context)
+            )
 
         def set_exception_handler(self, handler) -> None:
             self.handler = handler

@@ -879,10 +879,13 @@ def extract_variants_from_dom(
     for axis_name, value in single_value_attributes.items():
         record.setdefault(axis_name, value)
     if resolved_variants:
-        flat_variants = flatten_variants_for_public_output(
-            resolved_variants,
-            page_url=page_url,
-        ) or []
+        flat_variants = (
+            flatten_variants_for_public_output(
+                resolved_variants,
+                page_url=page_url,
+            )
+            or []
+        )
         if flat_variants:
             for variant in flat_variants:
                 variant["_validated"] = True

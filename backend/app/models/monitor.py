@@ -28,7 +28,12 @@ MONITOR_JOB_FK = "monitor_jobs.id"
 class MonitorJob(UpdatedAtMixin, Base):
     __tablename__ = "monitor_jobs"
     __table_args__ = (
-        Index("ix_monitor_jobs_status_priority_next_run", "status", "priority", "next_run_at"),
+        Index(
+            "ix_monitor_jobs_status_priority_next_run",
+            "status",
+            "priority",
+            "next_run_at",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -47,14 +52,22 @@ class MonitorJob(UpdatedAtMixin, Base):
     retention_days: Mapped[int] = mapped_column(Integer)
     settings: Mapped[dict] = mapped_column(JSONB, default=dict)
     requested_fields: Mapped[list] = mapped_column(JSONB, default=list)
-    status: Mapped[str] = mapped_column(String(32), default=MONITOR_STATUS_ACTIVE, index=True)
-    last_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    next_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    status: Mapped[str] = mapped_column(
+        String(32), default=MONITOR_STATUS_ACTIVE, index=True
+    )
+    last_run_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    next_run_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     condition: Mapped[str | None] = mapped_column(Text, nullable=True)
     webhook_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     poll_interval_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
     last_known_values: Mapped[dict] = mapped_column(JSONB, default=dict)
-    last_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_checked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     consecutive_failure_count: Mapped[int] = mapped_column(Integer, default=0)
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     last_crawl_method: Mapped[str | None] = mapped_column(String(32), nullable=True)
@@ -75,11 +88,15 @@ class MonitorEvent(Base):
     )
     source_url: Mapped[str] = mapped_column(Text)
     event_type: Mapped[str] = mapped_column(String(32), index=True)
-    field_name: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    field_name: Mapped[str | None] = mapped_column(
+        String(255), nullable=True, index=True
+    )
     old_value: Mapped[object | None] = mapped_column(JSONB, nullable=True)
     new_value: Mapped[object | None] = mapped_column(JSONB, nullable=True)
     detected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
-    notified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    notified_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     notification_status: Mapped[str] = mapped_column(
         String(32), default=NOTIFICATION_STATUS_PENDING, index=True
     )
@@ -96,7 +113,9 @@ class MonitorSnapshot(CreatedAtMixin, Base):
     monitor_id: Mapped[int] = mapped_column(
         ForeignKey(MONITOR_JOB_FK, ondelete=CASCADE), index=True
     )
-    run_id: Mapped[int] = mapped_column(ForeignKey(CRAWL_RUN_FK, ondelete=CASCADE), index=True)
+    run_id: Mapped[int] = mapped_column(
+        ForeignKey(CRAWL_RUN_FK, ondelete=CASCADE), index=True
+    )
     snapshot_data: Mapped[dict] = mapped_column(JSONB, default=dict)
     record_count: Mapped[int] = mapped_column(Integer, default=0)
     change_count: Mapped[int] = mapped_column(Integer, default=0)
@@ -148,7 +167,9 @@ class MonitorURLState(CreatedAtMixin, Base):
 class MonitorWebhookDelivery(CreatedAtMixin, Base):
     __tablename__ = "monitor_webhook_deliveries"
     __table_args__ = (
-        Index("ix_monitor_webhook_deliveries_monitor_created", "monitor_id", "created_at"),
+        Index(
+            "ix_monitor_webhook_deliveries_monitor_created", "monitor_id", "created_at"
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -158,9 +179,13 @@ class MonitorWebhookDelivery(CreatedAtMixin, Base):
     event_id: Mapped[int | None] = mapped_column(
         ForeignKey("monitor_events.id", ondelete=SET_NULL), nullable=True, index=True
     )
-    status: Mapped[str] = mapped_column(String(32), default=WEBHOOK_STATUS_PENDING, index=True)
+    status: Mapped[str] = mapped_column(
+        String(32), default=WEBHOOK_STATUS_PENDING, index=True
+    )
     attempt: Mapped[int] = mapped_column(Integer, default=1)
     response_code: Mapped[int | None] = mapped_column(Integer, nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     payload_preview: Mapped[dict] = mapped_column(JSONB, default=dict)
-    delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    delivered_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )

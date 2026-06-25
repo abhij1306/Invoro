@@ -528,7 +528,9 @@ async def _update_acquisition_contract_memory(
         verdict=verdict,
         blocked=_effective_blocked(acquisition_result),
         page_url=getattr(acquisition_result, "final_url", "") or context.url,
-        network_payloads=list(getattr(acquisition_result, "network_payloads", []) or []),
+        network_payloads=list(
+            getattr(acquisition_result, "network_payloads", []) or []
+        ),
     )
 
 

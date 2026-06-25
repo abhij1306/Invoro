@@ -1,4 +1,5 @@
 """Playground API — guided pipeline for non-technical users."""
+
 from __future__ import annotations
 
 from typing import Annotated
@@ -60,7 +61,9 @@ async def playground_create_session(
             category_limit=payload.category_limit,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
     response = _session_response(playground)
     await session.commit()
     return response
@@ -74,10 +77,7 @@ async def playground_list_sessions(
 ) -> list[PlaygroundSessionResponse]:
     """List recent playground sessions."""
     items = await list_sessions(session, user=user, limit=limit)
-    return [
-        _session_response(item)
-        for item in items
-    ]
+    return [_session_response(item) for item in items]
 
 
 @router.get("/sessions/{session_id}")
@@ -90,7 +90,9 @@ async def playground_get_session(
     try:
         playground = await get_session(session, session_id=session_id, user=user)
     except LookupError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
     response = _session_response(playground)
     await session.commit()
     return response
@@ -107,14 +109,16 @@ async def playground_discover(
         playground = await get_session(session, session_id=session_id, user=user)
         result = await start_discover(session, playground=playground, user=user)
     except LookupError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
     stage = str(result.get("stage", ""))
     if stage == "sitemap":
-        message = (
-            f"Sitemap returned {result.get('url_count', 0)} URL(s) — pick a category to crawl."
-        )
+        message = f"Sitemap returned {result.get('url_count', 0)} URL(s) — pick a category to crawl."
     elif stage == "detail":
         message = "Detail URL detected — extracting directly."
     else:
@@ -148,9 +152,13 @@ async def playground_select_category(
             urls=payload.selected_urls(),
         )
     except LookupError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
     await session.refresh(playground)
     response = _session_response(playground)
     await session.commit()
@@ -169,9 +177,13 @@ async def playground_select(
         playground = await get_session(session, session_id=session_id, user=user)
         await select_products(session, playground=playground, urls=payload.urls)
     except LookupError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
     await session.refresh(playground)
     response = _session_response(playground)
     await session.commit()
@@ -189,9 +201,13 @@ async def playground_extract(
         playground = await get_session(session, session_id=session_id, user=user)
         run_ids = await start_extract(session, playground=playground, user=user)
     except LookupError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
     url_count = len(playground.step_data.get("selected_urls", []))
     response = PlaygroundExtractResponse(
         session_id=playground.id,
@@ -224,9 +240,13 @@ async def playground_pipeline(
             audit=payload.audit,
         )
     except LookupError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
     response = PlaygroundPipelineResponse(
         session_id=playground.id,
         state=playground.state,
@@ -250,7 +270,9 @@ async def playground_results(
     try:
         playground = await get_session(session, session_id=session_id, user=user)
     except LookupError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
     results = await get_results(session, playground=playground)
     await session.commit()
     return results

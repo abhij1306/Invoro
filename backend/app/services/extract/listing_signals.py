@@ -360,7 +360,11 @@ def _select_primary_card_url(
     page_url: str,
 ) -> str:
     selectors = ",".join(f"[{attr}]" for attr in LISTING_CARD_URL_ATTRS)
-    candidates = [card, *_ancestor_anchor_nodes(card), *listing_node_css(card, selectors)]
+    candidates = [
+        card,
+        *_ancestor_anchor_nodes(card),
+        *listing_node_css(card, selectors),
+    ]
     for candidate in candidates:
         for attr_name in LISTING_CARD_URL_ATTRS:
             url = absolute_url(page_url, listing_node_attr(candidate, attr_name))

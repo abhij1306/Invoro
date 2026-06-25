@@ -23,7 +23,10 @@ from app.services.config.public_record_policy import (
     PUBLIC_RECORD_URL_BLOCKED_PATH_MARKERS,
     PUBLIC_RECORD_URL_MAX_LENGTH,
 )
-from app.services.config.design_system import DESIGN_SYSTEM_PUBLIC_FIELDS, DESIGN_SYSTEM_SURFACE
+from app.services.config.design_system import (
+    DESIGN_SYSTEM_PUBLIC_FIELDS,
+    DESIGN_SYSTEM_SURFACE,
+)
 from app.services.extract.variant_normalization.contract import (
     enforce_flat_variant_public_contract,
     flatten_variants_for_public_output,

@@ -1,4 +1,5 @@
 """Price and currency coercion helpers for public field shaping."""
+
 from __future__ import annotations
 
 import re
@@ -16,7 +17,11 @@ CURRENCY_SYMBOL_PATTERN = (
     "|".join(
         re.escape(symbol)
         for symbol in sorted(
-            (str(symbol) for symbol in dict(CURRENCY_SYMBOL_MAP or {}).keys() if symbol),
+            (
+                str(symbol)
+                for symbol in dict(CURRENCY_SYMBOL_MAP or {}).keys()
+                if symbol
+            ),
             key=len,
             reverse=True,
         )

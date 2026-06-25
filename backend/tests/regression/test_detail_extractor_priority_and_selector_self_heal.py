@@ -108,7 +108,9 @@ def testrequires_dom_completion_ignores_logo_only_image_cue() -> None:
 
 
 @pytest.mark.regression
-def test_requires_dom_completion_when_structured_category_conflicts_with_dom_breadcrumb() -> None:
+def test_requires_dom_completion_when_structured_category_conflicts_with_dom_breadcrumb() -> (
+    None
+):
     soup = BeautifulSoup(
         """
         <html><body>
@@ -242,7 +244,9 @@ def test_collect_structured_source_payloads_extracts_vtex_string_price_from_id_r
                     "lowPrice": 33.0,
                 }
             },
-            "items": [{"images": [{"imageUrl": "https://cdn.example.com/widget-two.jpg"}]}],
+            "items": [
+                {"images": [{"imageUrl": "https://cdn.example.com/widget-two.jpg"}]}
+            ],
         },
     }
     context = ExtractionContext(
@@ -276,7 +280,9 @@ def test_collect_structured_source_payloads_extracts_vtex_string_price_from_fall
             "productId": "1",
             "productName": "Widget One",
             "linkText": "widget-one",
-            "items": [{"images": [{"imageUrl": "https://cdn.example.com/widget-one.jpg"}]}],
+            "items": [
+                {"images": [{"imageUrl": "https://cdn.example.com/widget-one.jpg"}]}
+            ],
         },
         "$Product:sp-1.priceRange.sellingPrice": {
             "highPrice": "41.50",
@@ -285,7 +291,9 @@ def test_collect_structured_source_payloads_extracts_vtex_string_price_from_fall
             "productId": "2",
             "productName": "Widget Two",
             "linkText": "widget-two",
-            "items": [{"images": [{"imageUrl": "https://cdn.example.com/widget-two.jpg"}]}],
+            "items": [
+                {"images": [{"imageUrl": "https://cdn.example.com/widget-two.jpg"}]}
+            ],
         },
         "$Product:sp-2.items.0.sellers.0.commertialOffer": {
             "Price": "55.25",
@@ -894,7 +902,9 @@ def test_selector_self_heal_persists_valid_css_candidates_as_css_rules() -> None
 
 
 @pytest.mark.regression
-def test_extract_records_tracks_dom_observed_selector_traces_for_final_dom_fields() -> None:
+def test_extract_records_tracks_dom_observed_selector_traces_for_final_dom_fields() -> (
+    None
+):
     record = extract_records(
         """
         <html>

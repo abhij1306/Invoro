@@ -19,7 +19,9 @@ from app.services.config.domain_profiles import (
 )
 from app.services.config.runtime_settings import crawler_runtime_settings
 from app.services.domain_utils import normalize_domain
-from app.services.extract.network_listing_mapper import extract_listing_rows_from_network
+from app.services.extract.network_listing_mapper import (
+    extract_listing_rows_from_network,
+)
 from app.services.network_payload_mapper import map_network_payloads_to_fields
 from app.services.url_safety import validate_public_target
 
@@ -101,7 +103,9 @@ async def _replay_endpoint(
     surface: str,
     requested_fields: list[str],
 ) -> dict[str, object] | None:
-    method = str(endpoint.get(INTERNAL_API_ENDPOINT_METHOD_KEY) or "GET").strip().upper()
+    method = (
+        str(endpoint.get(INTERNAL_API_ENDPOINT_METHOD_KEY) or "GET").strip().upper()
+    )
     url = str(endpoint.get(INTERNAL_API_ENDPOINT_URL_KEY) or "").strip()
     if method not in INTERNAL_API_ENDPOINT_ALLOWED_METHODS or not url:
         return None

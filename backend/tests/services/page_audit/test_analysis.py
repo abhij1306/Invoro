@@ -48,7 +48,9 @@ def test_analyze_page_reports_source_metadata_and_structured_data() -> None:
 
 
 def test_analyze_page_reports_dom_performance_accessibility_and_form_failures() -> None:
-    source_html = "<html><head><title>Short</title></head><body><h1>Page</h1></body></html>"
+    source_html = (
+        "<html><head><title>Short</title></head><body><h1>Page</h1></body></html>"
+    )
     dom_html = """
     <html>
       <head>

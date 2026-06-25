@@ -32,7 +32,12 @@ class _FakeGateDecision:
 
     def __post_init__(self):
         if self.metrics is None:
-            self.metrics = {"record_count": 5, "cohort_homogeneity_ratio": 0.3, "sibling_category_count": 0, "support_signal_count": 2}
+            self.metrics = {
+                "record_count": 5,
+                "cohort_homogeneity_ratio": 0.3,
+                "sibling_category_count": 0,
+                "support_signal_count": 2,
+            }
 
 
 @dataclass
@@ -76,7 +81,9 @@ def _call(
     acq = _FakeAcquisitionResult(
         method=method,
         blocked=blocked,
-        browser_diagnostics={"browser_engine": browser_engine} if browser_engine else {},
+        browser_diagnostics={"browser_engine": browser_engine}
+        if browser_engine
+        else {},
     )
     gate = _FakeGateDecision(outcome=gate_outcome, reason=gate_reason)
     retry_state = _FakeRetryState(listing_integrity_retry_count=retry_count)

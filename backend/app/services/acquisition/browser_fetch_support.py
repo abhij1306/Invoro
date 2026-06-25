@@ -1,4 +1,5 @@
 """Small browser-fetch assembly helpers."""
+
 from __future__ import annotations
 
 import time
@@ -8,7 +9,9 @@ from app.services.acquisition.browser_diagnostics import (
     build_browser_diagnostics_contract,
     build_failed_browser_diagnostics,
 )
-from app.services.acquisition.browser_page_helpers import dismiss_safe_location_interstitial
+from app.services.acquisition.browser_page_helpers import (
+    dismiss_safe_location_interstitial,
+)
 from app.services.acquisition.runtime import PageFetchResult, copy_headers
 from app.services.shared.field_coerce import clean_text
 

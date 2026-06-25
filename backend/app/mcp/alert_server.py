@@ -20,9 +20,13 @@ logger = logging.getLogger(__name__)
 
 
 class AlertMCPServer:
-    def __init__(self, *, api_key: str | None = None, base_url: str | None = None) -> None:
+    def __init__(
+        self, *, api_key: str | None = None, base_url: str | None = None
+    ) -> None:
         self.api_key = api_key or os.environ.get(MCP_API_KEY_ENV, "")
-        self.base_url = (base_url or os.environ.get(MCP_API_BASE_URL_ENV, MCP_DEFAULT_API_BASE_URL)).rstrip("/")
+        self.base_url = (
+            base_url or os.environ.get(MCP_API_BASE_URL_ENV, MCP_DEFAULT_API_BASE_URL)
+        ).rstrip("/")
 
     @staticmethod
     def tools() -> list[dict[str, Any]]:
@@ -131,13 +135,18 @@ async def serve_stdio() -> None:
         sys.stdout.flush()
 
 
-async def _handle_message(server: AlertMCPServer, message: dict[str, Any]) -> dict[str, Any]:
+async def _handle_message(
+    server: AlertMCPServer, message: dict[str, Any]
+) -> dict[str, Any]:
     method = message.get("method")
     request_id = message.get("id")
     try:
         result: Any
         if method == "initialize":
-            result = {"protocolVersion": "2024-11-05", "serverInfo": {"name": "crawlerai", "version": "0.1.0"}}
+            result = {
+                "protocolVersion": "2024-11-05",
+                "serverInfo": {"name": "crawlerai", "version": "0.1.0"},
+            }
         elif method == "tools/list":
             result = {"tools": server.tools()}
         elif method == "tools/call":

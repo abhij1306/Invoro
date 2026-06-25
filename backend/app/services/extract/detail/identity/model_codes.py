@@ -54,8 +54,7 @@ def detail_small_numeric_model_tokens(value: object) -> set[str]:
     if not pattern:
         return set()
     return {
-        token.lstrip("0") or "0"
-        for token in re.findall(pattern, clean_text(value))
+        token.lstrip("0") or "0" for token in re.findall(pattern, clean_text(value))
     }
 
 

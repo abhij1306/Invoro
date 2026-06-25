@@ -11,6 +11,7 @@ from ._common import *
 
 logger = logging.getLogger(__name__)
 
+
 def _option_names(raw_options: object) -> list[str]:
     names: list[str] = []
     if isinstance(raw_options, list):
@@ -22,6 +23,7 @@ def _option_names(raw_options: object) -> list[str]:
                 if label:
                     names.append(str(label))
     return names
+
 
 def _normalize_variant(
     variant: dict[str, Any],
@@ -93,7 +95,9 @@ def _normalize_variant(
     image_url = next(
         iter(
             extract_urls(
-                variant.get("featured_image") or variant.get("featuredImage") or variant.get("image"),
+                variant.get("featured_image")
+                or variant.get("featuredImage")
+                or variant.get("image"),
                 page_url,
             )
         ),
@@ -129,6 +133,7 @@ def _normalize_variant(
             row["title" if field_name == "name" else field_name] = value
     return row or None
 
+
 def _variant_axis_raw_value(variant: dict[str, Any], field_name: str) -> Any:
     if field_name != "size":
         return variant.get(field_name)
@@ -138,6 +143,7 @@ def _variant_axis_raw_value(variant: dict[str, Any], field_name: str) -> Any:
         or variant.get("concatenatedDisplaySize")
         or _dict_label(variant.get("sizeDimension1"))
     )
+
 
 def _nested_variant_availability(variant: dict[str, Any]) -> str | None:
     for proposition in _nested_variant_propositions(variant):
@@ -159,6 +165,7 @@ def _nested_variant_availability(variant: dict[str, Any]) -> str | None:
                 return "out_of_stock"
     return None
 
+
 def _nested_variant_stock_quantity(variant: dict[str, Any]) -> int | None:
     for proposition in _nested_variant_propositions(variant):
         availability = proposition.get("availability")
@@ -179,6 +186,7 @@ def _nested_variant_stock_quantity(variant: dict[str, Any]) -> int | None:
             return max(numeric_quantities)
     return None
 
+
 def _nested_variant_price(variant: dict[str, Any], price_key: str) -> Any:
     for proposition in _nested_variant_propositions(variant):
         for pricing in as_list(proposition.get("pricings")):
@@ -188,6 +196,7 @@ def _nested_variant_price(variant: dict[str, Any], price_key: str) -> Any:
             if isinstance(price, dict) and price.get("price") not in (None, "", [], {}):
                 return price.get("price")
     return None
+
 
 def _nested_variant_propositions(variant: dict[str, Any]) -> list[dict[str, Any]]:
     sku = variant.get("sku")
@@ -199,13 +208,16 @@ def _nested_variant_propositions(variant: dict[str, Any]) -> list[dict[str, Any]
         if isinstance(proposition, dict)
     ]
 
+
 def _dict_label(value: Any) -> str | None:
     if not isinstance(value, dict):
         return None
     return text_or_none(value.get("label")) or text_or_none(value.get("name"))
 
+
 def _variant_url(page_url: str, variant_id: str) -> str:
     return variant_url_with_param(page_url, variant_id)
+
 
 def _connection_nodes(value: Any) -> list[dict[str, Any]]:
     if isinstance(value, dict):
@@ -222,6 +234,7 @@ def _connection_nodes(value: Any) -> list[dict[str, Any]]:
                 if isinstance(node, dict)
             ]
     return []
+
 
 def _name_or_value(value: Any) -> Any:
     if isinstance(value, dict):

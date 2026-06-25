@@ -17,9 +17,12 @@ from app.services.config.extraction_rules import (
 )
 from app.services.config.runtime_settings import crawler_runtime_settings
 from app.services.domain_memory_service import (
-    load_domain_memory, save_domain_memory,
-    selector_payload_from_rules, selector_rules_from_memory,
+    load_domain_memory,
+    save_domain_memory,
+    selector_payload_from_rules,
+    selector_rules_from_memory,
 )
+
 if TYPE_CHECKING:
     from app.models.domain_memory import DomainMemory
 from app.services.extraction_html_helpers import html_to_text
@@ -40,6 +43,7 @@ from app.services.dom.xpath_service import (
     validate_or_convert_xpath,
 )
 from app.services.url_safety import ensure_public_crawl_targets
+
 coerce_int = _coerce_int
 _HTML_PARSER = "html.parser"
 
@@ -70,7 +74,9 @@ async def fetch_selector_document(url: str) -> dict[str, object]:
     html = result.html
     promoted = False
     visited = {final_url}
-    for _ in range(max(1, int(crawler_runtime_settings.iframe_promotion_max_candidates))):
+    for _ in range(
+        max(1, int(crawler_runtime_settings.iframe_promotion_max_candidates))
+    ):
         candidate_url = _primary_iframe_candidate(final_url, html)
         if not candidate_url or candidate_url in visited:
             break
@@ -153,8 +159,12 @@ def _selector_record_from_memory(
     domain: str | None = None,
     surface: str | None = None,
 ) -> dict[str, object]:
-    resolved_domain = domain if domain is not None else (memory.domain if memory else "")
-    resolved_surface = surface if surface is not None else (memory.surface if memory else "")
+    resolved_domain = (
+        domain if domain is not None else (memory.domain if memory else "")
+    )
+    resolved_surface = (
+        surface if surface is not None else (memory.surface if memory else "")
+    )
     return {
         **dict(row),
         "id": _coerce_int(row.get("id"), default=0),
@@ -345,7 +355,9 @@ async def delete_selector_record(
     for memory in await _all_domain_memories(session):
         rules = selector_rules_from_memory(memory)
         next_rules = [
-            row for row in rules if _coerce_int(row.get("id"), default=0) != int(selector_id)
+            row
+            for row in rules
+            if _coerce_int(row.get("id"), default=0) != int(selector_id)
         ]
         if len(next_rules) == len(rules):
             continue
@@ -412,7 +424,9 @@ async def suggest_selectors(
         surface=resolved_surface,
     ):
         field_name = str(row.get("field_name") or "").strip().lower()
-        if field_name and field_name in {normalize_field_key(item) for item in expected_columns}:
+        if field_name and field_name in {
+            normalize_field_key(item) for item in expected_columns
+        }:
             suggestions[field_name].append(selector_suggestion_from_record(row))
 
     soup = BeautifulSoup(html, _HTML_PARSER)
@@ -462,9 +476,9 @@ async def suggest_selectors(
                 validated_xpath, _ = validate_or_convert_xpath(xpath)
                 if validated_xpath:
                     sample_value, _count, selector_used = extract_selector_value(
-                    html,
-                    xpath=validated_xpath,
-                )
+                        html,
+                        xpath=validated_xpath,
+                    )
                     if is_noise_value(sample_value, field_name):
                         xpath = None
                     elif sample_value or selector_used:
@@ -598,5 +612,3 @@ def _primary_iframe_candidate(page_url: str, html: str) -> str:
             continue
         return urljoin(page_url, src)
     return ""
-
-

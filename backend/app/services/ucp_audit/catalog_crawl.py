@@ -34,7 +34,9 @@ class CatalogCrawlResult:
 async def crawl_catalog(domain: str, *, sample_size: int = 5) -> CatalogCrawlResult:
     root_url = _root_url(domain)
     result = CatalogCrawlResult(domain=_hostname(root_url), pages_crawled=0)
-    bounded_sample_size = max(1, min(int(sample_size or 1), config.AID_AUDIT_MAX_SAMPLE_SIZE))
+    bounded_sample_size = max(
+        1, min(int(sample_size or 1), config.AID_AUDIT_MAX_SAMPLE_SIZE)
+    )
 
     listing = await _fetch(root_url, surface="ecommerce_listing", result=result)
     detail_urls: list[str] = []
@@ -42,7 +44,9 @@ async def crawl_catalog(domain: str, *, sample_size: int = 5) -> CatalogCrawlRes
         result.pages_crawled += 1
         listing_url = _final_url(listing, root_url)
         result.sampled_urls.append(listing_url)
-        _collect_page_signals(result, html=str(getattr(listing, "html", "") or ""), url=listing_url)
+        _collect_page_signals(
+            result, html=str(getattr(listing, "html", "") or ""), url=listing_url
+        )
         detail_urls, category_urls = _listing_candidate_urls(
             listing,
             listing_url,
@@ -74,7 +78,9 @@ async def crawl_catalog(domain: str, *, sample_size: int = 5) -> CatalogCrawlRes
             for record in records:
                 if len(result.product_records) >= bounded_sample_size:
                     break
-                result.product_records.append(_product_record(record, html=html, page_url=final_url))
+                result.product_records.append(
+                    _product_record(record, html=html, page_url=final_url)
+                )
         else:
             structured_record = _product_record({}, html=html, page_url=final_url)
             if _first_product_jsonld(structured_record.get("_jsonld") or []):
@@ -125,7 +131,9 @@ def _listing_candidate_urls(
             browser_diagnostics=dict(getattr(page, "browser_diagnostics", {}) or {}),
         )
     except Exception as exc:
-        result.crawl_errors.append(f"{page_url}: listing extraction {type(exc).__name__}: {exc}")
+        result.crawl_errors.append(
+            f"{page_url}: listing extraction {type(exc).__name__}: {exc}"
+        )
         return [], []
     detail_urls: list[str] = []
     category_urls: list[str] = []
@@ -186,16 +194,22 @@ def _extract_detail_records(page: object, page_url: str) -> list[dict[str, Any]]
                 network_payloads=list(getattr(page, "network_payloads", []) or []),
                 artifacts=dict(getattr(page, "artifacts", {}) or {}),
                 content_type=str(getattr(page, "content_type", "") or ""),
-                browser_diagnostics=dict(getattr(page, "browser_diagnostics", {}) or {}),
+                browser_diagnostics=dict(
+                    getattr(page, "browser_diagnostics", {}) or {}
+                ),
             )
             if isinstance(record, dict)
         ]
     except Exception as exc:
-        logger.warning("_extract_detail_records failed for %s: %s", page_url, exc, exc_info=True)
+        logger.warning(
+            "_extract_detail_records failed for %s: %s", page_url, exc, exc_info=True
+        )
         return []
 
 
-def _product_record(record: dict[str, Any], *, html: str, page_url: str) -> dict[str, Any]:
+def _product_record(
+    record: dict[str, Any], *, html: str, page_url: str
+) -> dict[str, Any]:
     soup = BeautifulSoup(html or "", "html.parser")
     shaped = dict(record or {})
     shaped.setdefault("source_url", page_url)
@@ -203,8 +217,12 @@ def _product_record(record: dict[str, Any], *, html: str, page_url: str) -> dict
     og_rows = parse_opengraph(soup, html or "", page_url)
     og_tags = _raw_og_tags(soup)
     for row in og_rows:
-        og_tags.update({str(key): _string_value(value) for key, value in row.items() if value})
-    _backfill_structured_product_fields(shaped, jsonld_rows=jsonld_rows, og_rows=og_rows)
+        og_tags.update(
+            {str(key): _string_value(value) for key, value in row.items() if value}
+        )
+    _backfill_structured_product_fields(
+        shaped, jsonld_rows=jsonld_rows, og_rows=og_rows
+    )
     shaped["_page_text"] = soup.get_text(" ", strip=True)
     shaped["_dom_price"] = _first_text(
         *_selector_texts(
@@ -236,15 +254,31 @@ def _backfill_structured_product_fields(
     if isinstance(brand, dict):
         brand = brand.get("name")
     _set_missing(record, "title", product.get("name") or og.get("name"))
-    _set_missing(record, "description", product.get("description") or og.get("description"))
+    _set_missing(
+        record, "description", product.get("description") or og.get("description")
+    )
     _set_missing(record, "image_url", product.get("image") or og.get("image"))
-    _set_missing(record, "price", offers.get("price") or product.get("price") or og.get("price"))
-    _set_missing(record, "currency", offers.get("priceCurrency") or product.get("priceCurrency"))
-    _set_missing(record, "availability", _availability_value(offers.get("availability") or product.get("availability")))
+    _set_missing(
+        record, "price", offers.get("price") or product.get("price") or og.get("price")
+    )
+    _set_missing(
+        record, "currency", offers.get("priceCurrency") or product.get("priceCurrency")
+    )
+    _set_missing(
+        record,
+        "availability",
+        _availability_value(offers.get("availability") or product.get("availability")),
+    )
     _set_missing(record, "sku", product.get("sku"))
-    _set_missing(record, "gtin", product.get("gtin") or product.get("gtin13") or product.get("gtin14"))
+    _set_missing(
+        record,
+        "gtin",
+        product.get("gtin") or product.get("gtin13") or product.get("gtin14"),
+    )
     _set_missing(record, "mpn", product.get("mpn"))
-    _set_missing(record, "product_id", product.get("productID") or product.get("productId"))
+    _set_missing(
+        record, "product_id", product.get("productID") or product.get("productId")
+    )
     _set_missing(record, "brand", brand or organization.get("name"))
 
 
@@ -262,11 +296,15 @@ def _first_product_jsonld(rows: list[dict[str, Any]]) -> dict[str, Any]:
     return _first_typed_jsonld(rows, "product")
 
 
-def _first_typed_jsonld(rows: list[dict[str, Any]], expected_type: str) -> dict[str, Any]:
+def _first_typed_jsonld(
+    rows: list[dict[str, Any]], expected_type: str
+) -> dict[str, Any]:
     for row in rows:
         raw_type = row.get("@type") or row.get("type")
         values = raw_type if isinstance(raw_type, list) else [raw_type]
-        if any(str(value or "").strip().lower().endswith(expected_type) for value in values):
+        if any(
+            str(value or "").strip().lower().endswith(expected_type) for value in values
+        ):
             return row
     return {}
 
@@ -308,7 +346,9 @@ async def _fetch(
         return None
 
 
-async def _fetch_robots(root_url: str, *, result: CatalogCrawlResult) -> dict[str, list[str]]:
+async def _fetch_robots(
+    root_url: str, *, result: CatalogCrawlResult
+) -> dict[str, list[str]]:
     page = await _fetch(
         urljoin(root_url + "/", "robots.txt"),
         surface="content_detail",
@@ -330,7 +370,9 @@ async def _fetch_sitemap(root_url: str, *, result: CatalogCrawlResult) -> bool:
     if page is None:
         return False
     status_code = int(getattr(page, "status_code", 0) or 0)
-    return 200 <= status_code < 300 and bool(str(getattr(page, "html", "") or "").strip())
+    return 200 <= status_code < 300 and bool(
+        str(getattr(page, "html", "") or "").strip()
+    )
 
 
 def parse_robots_txt(text: str) -> dict[str, list[str]]:
@@ -354,7 +396,9 @@ def parse_robots_txt(text: str) -> dict[str, list[str]]:
 
 def _jsonld_parse_errors(soup: BeautifulSoup, url: str) -> list[str]:
     errors: list[str] = []
-    for index, node in enumerate(soup.find_all("script", attrs={"type": "application/ld+json"})):
+    for index, node in enumerate(
+        soup.find_all("script", attrs={"type": "application/ld+json"})
+    ):
         raw = node.string or node.get_text()
         if not raw:
             continue
@@ -414,7 +458,9 @@ def _hostname(url: str) -> str:
 
 
 def _final_url(page: object, fallback: str) -> str:
-    return _clean_url(str(getattr(page, "final_url", "") or getattr(page, "url", "") or fallback))
+    return _clean_url(
+        str(getattr(page, "final_url", "") or getattr(page, "url", "") or fallback)
+    )
 
 
 def _clean_url(url: str) -> str:

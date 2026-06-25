@@ -36,7 +36,10 @@ from app.services.surface_resolver import resolve_auto_surface
 logger = logging.getLogger(__name__)
 
 _AUDIT_TERMINAL_STATUSES = {AID_AUDIT_JOB_STATUS_COMPLETE, AID_AUDIT_JOB_STATUS_FAILED}
-_PI_TERMINAL_STATUSES = {PRODUCT_INTELLIGENCE_JOB_STATUS_COMPLETE, PRODUCT_INTELLIGENCE_JOB_STATUS_FAILED}
+_PI_TERMINAL_STATUSES = {
+    PRODUCT_INTELLIGENCE_JOB_STATUS_COMPLETE,
+    PRODUCT_INTELLIGENCE_JOB_STATUS_FAILED,
+}
 _ENRICH_TERMINAL_STATUSES = set(DATA_ENRICHMENT_JOB_TERMINAL_STATUSES)
 
 MAX_PRODUCTS = 50
@@ -75,7 +78,9 @@ async def create_session(
     urls: list[str] | None = None,
     category_limit: int = PLAYGROUND_CATEGORY_DEFAULT_LIMIT,
 ) -> PlaygroundSession:
-    input_values: list[str] = [item for item in [url, *(urls or [])] if item is not None]
+    input_values: list[str] = [
+        item for item in [url, *(urls or [])] if item is not None
+    ]
     input_urls = _normalize_input_urls(input_values)
     if not input_urls:
         raise ValueError("URL is required")
@@ -433,6 +438,7 @@ async def start_pipeline(
                 create_data_enrichment_job,
                 run_data_enrichment_job,
             )
+
             try:
                 enrich_job = await create_data_enrichment_job(
                     session,
@@ -462,6 +468,7 @@ async def start_pipeline(
                 create_product_intelligence_job,
                 run_product_intelligence_job,
             )
+
             try:
                 compare_job = await create_product_intelligence_job(
                     session,
@@ -523,6 +530,7 @@ async def start_pipeline(
             create_ucp_audit_job,
             run_ucp_audit_job,
         )
+
         try:
             audit_job = await create_ucp_audit_job(
                 session,
@@ -732,9 +740,7 @@ async def _extract_discovered_products(
     run_id: int,
 ) -> list[dict[str, Any]]:
     rows = await session.scalars(
-        select(CrawlRecord)
-        .where(CrawlRecord.run_id == run_id)
-        .limit(MAX_PRODUCTS)
+        select(CrawlRecord).where(CrawlRecord.run_id == run_id).limit(MAX_PRODUCTS)
     )
     products = []
     for record in rows.all():
@@ -747,13 +753,15 @@ async def _extract_discovered_products(
             or record.source_url
         )
         if product_url:
-            products.append({
-                "url": str(product_url),
-                "title": str(data.get("title") or ""),
-                "brand": str(data.get("brand") or ""),
-                "price": str(data.get("price") or ""),
-                "image": str(data.get("image") or data.get("image_url") or ""),
-            })
+            products.append(
+                {
+                    "url": str(product_url),
+                    "title": str(data.get("title") or ""),
+                    "brand": str(data.get("brand") or ""),
+                    "price": str(data.get("price") or ""),
+                    "image": str(data.get("image") or data.get("image_url") or ""),
+                }
+            )
     return products
 
 
@@ -848,7 +856,11 @@ def _session_input_urls(playground: PlaygroundSession) -> list[str]:
 
 def _safe_category_limit(value: object) -> int:
     try:
-        candidate = int(value) if isinstance(value, (int, float, str)) else PLAYGROUND_CATEGORY_DEFAULT_LIMIT
+        candidate = (
+            int(value)
+            if isinstance(value, (int, float, str))
+            else PLAYGROUND_CATEGORY_DEFAULT_LIMIT
+        )
     except (TypeError, ValueError):
         candidate = PLAYGROUND_CATEGORY_DEFAULT_LIMIT
     return max(1, min(candidate, PLAYGROUND_CATEGORY_MAX_LIMIT))
@@ -873,7 +885,9 @@ def _merge_seed_detail_products(
         normalized = str(seed_url or "").strip()
         if not normalized or normalized in seen:
             continue
-        merged.append({"url": normalized, "title": "", "brand": "", "price": "", "image": ""})
+        merged.append(
+            {"url": normalized, "title": "", "brand": "", "price": "", "image": ""}
+        )
         seen.add(normalized)
     for product in discovered_products:
         normalized = str(product.get("url") or "").strip()
@@ -889,9 +903,7 @@ def _extract_run_ids(step_data: dict[str, Any]) -> list[int]:
     raw_run_ids = extract.get("run_ids")
     if isinstance(raw_run_ids, list):
         run_ids = [
-            run_id
-            for run_id in raw_run_ids
-            if isinstance(run_id, int) and run_id > 0
+            run_id for run_id in raw_run_ids if isinstance(run_id, int) and run_id > 0
         ]
         if run_ids:
             return run_ids
@@ -944,9 +956,7 @@ def _extract_selected_urls(step_data: dict[str, Any]) -> list[str]:
     if not isinstance(selected_urls, list):
         return []
     return [
-        url.strip()
-        for url in selected_urls
-        if isinstance(url, str) and url.strip()
+        url.strip() for url in selected_urls if isinstance(url, str) and url.strip()
     ]
 
 

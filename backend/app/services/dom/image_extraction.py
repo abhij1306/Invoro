@@ -51,7 +51,9 @@ _detail_text_scope_exclude_tokens = tuple(
     if str(token).strip()
 )
 _CDN_IMAGE_QUERY_PARAMS = frozenset(CDN_IMAGE_QUERY_PARAMS or ())
-_CDN_IMAGE_QUERY_KEY_REGEXES = compile_regex_patterns(CDN_IMAGE_QUERY_KEY_PATTERNS or ())
+_CDN_IMAGE_QUERY_KEY_REGEXES = compile_regex_patterns(
+    CDN_IMAGE_QUERY_KEY_PATTERNS or ()
+)
 _CDN_IMAGE_PATH_SUFFIX_RE = regex_lib.compile(
     getattr(CDN_IMAGE_PATH_SUFFIX_PATTERN, "pattern", CDN_IMAGE_PATH_SUFFIX_PATTERN),
     regex_lib.I,
@@ -262,10 +264,7 @@ def _dedupe_key_for_image_url(url: str) -> str:
     original_parsed = urlparse(_normalize_image_url_text(_effective_image_url(url)))
     original_path = _canonical_image_path(original_parsed.path or "")
     shopify_match = _SHOPIFY_IMAGE_FILE_PATH_RE.search(original_path)
-    if (
-        original_parsed.netloc == "cdn.shopify.com"
-        or shopify_match is not None
-    ):
+    if original_parsed.netloc == "cdn.shopify.com" or shopify_match is not None:
         if shopify_match is None:
             return canonical
         filename = unquote(shopify_match.group("filename")).casefold()

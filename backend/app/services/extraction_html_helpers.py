@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 
 from app.services.dom.html_parser import BeautifulSoup
 from app.services.dom.html_parser import Comment, NavigableString, PageElement, Tag
@@ -84,17 +84,13 @@ def prune_html_tree(
             tag.decompose()
             continue
         attrs = getattr(tag, "attrs", None)
-        if not isinstance(attrs, dict):
+        if not isinstance(attrs, Mapping):
             tag.attrs = {}
             continue
         tag.attrs = {
             key: value
             for key, value in attrs.items()
-            if (
-                key in allowed_attr_set
-                if allowed_attrs is not None
-                else True
-            )
+            if (key in allowed_attr_set if allowed_attrs is not None else True)
             and (attr_filter(key, value) if attr_filter else True)
         }
     return soup
@@ -126,7 +122,9 @@ def extract_job_sections(html: str) -> dict[str, str]:
         value = " ".join(collected).strip()
         if not value:
             continue
-        combined_parts = [mapped_value, value] if (mapped_value := mapped.get(section)) else [value]
+        combined_parts = (
+            [mapped_value, value] if (mapped_value := mapped.get(section)) else [value]
+        )
         combined = " ".join(
             piece for piece in combined_parts if str(piece or "").strip()
         )

@@ -13,7 +13,9 @@ from app.models.monitor import MONITOR_JOB_FK
 class InAppNotification(CreatedAtMixin, Base):
     __tablename__ = "in_app_notifications"
     __table_args__ = (
-        Index("ix_in_app_notifications_user_read_created", "user_id", "read", "created_at"),
+        Index(
+            "ix_in_app_notifications_user_read_created", "user_id", "read", "created_at"
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -26,4 +28,6 @@ class InAppNotification(CreatedAtMixin, Base):
     event_count: Mapped[int] = mapped_column(Integer)
     message: Mapped[str] = mapped_column(Text)
     read: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
-    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    read_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )

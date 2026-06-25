@@ -21,7 +21,10 @@ from app.schemas.monitor import (
     MonitorSnapshotResponse,
     MonitorUpdate,
 )
-from app.services.config.monitor_settings import MONITOR_STATUS_ARCHIVED, MONITOR_STATUS_PAUSED
+from app.services.config.monitor_settings import (
+    MONITOR_STATUS_ARCHIVED,
+    MONITOR_STATUS_PAUSED,
+)
 from app.services.monitor_scheduler_service import MonitorSchedulerService
 from app.services.monitor_service import (
     batch_monitor_change_counts,
@@ -52,7 +55,9 @@ async def monitor_create(
     try:
         monitor = await create_monitor(session, user=user, payload=payload.model_dump())
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
     return await _monitor_response(session, monitor)
 
 
@@ -64,9 +69,13 @@ async def monitor_list(
     priority: Annotated[str | None, Query()] = None,
 ) -> list[MonitorJobResponse]:
     if status_filter and status_filter not in MONITOR_STATUSES:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid status")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid status"
+        )
     if priority and priority not in MONITOR_PRIORITIES:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid priority")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid priority"
+        )
     monitors = await list_monitors(
         session,
         status=status_filter,
@@ -94,7 +103,9 @@ async def monitor_get(
     try:
         monitor = await get_monitor(session, monitor_id)
     except LookupError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
     return await _monitor_response(session, monitor)
 
 
@@ -112,9 +123,13 @@ async def monitor_patch(
             payload=payload.model_dump(exclude_unset=True),
         )
     except LookupError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
     return await _monitor_response(session, monitor)
 
 
@@ -127,7 +142,9 @@ async def monitor_delete(
     try:
         await delete_monitor(session, monitor_id)
     except LookupError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -140,11 +157,18 @@ async def monitor_run_now(
     try:
         monitor = await get_monitor(session, monitor_id)
     except LookupError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
     if monitor.status == MONITOR_STATUS_ARCHIVED:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Monitor not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Monitor not found"
+        )
     if monitor.status == MONITOR_STATUS_PAUSED:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Monitor is paused — resume it first")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Monitor is paused — resume it first",
+        )
     urls = list(monitor.urls or [])
     run_ids = await MonitorSchedulerService().dispatch_monitor_run(
         session,
@@ -155,7 +179,7 @@ async def monitor_run_now(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Monitor run was not dispatched",
-    )
+        )
     return MonitorRunNowResponse(
         run_id=run_ids[0],
         run_ids=run_ids,
@@ -176,7 +200,9 @@ async def monitor_events(
 ) -> dict[str, object]:
     await _require_monitor(session, monitor_id)
     if event_type and event_type not in MONITOR_EVENT_TYPES:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid event_type")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid event_type"
+        )
     rows, total = await list_events(
         session,
         monitor_id=monitor_id,
@@ -186,7 +212,10 @@ async def monitor_events(
         field_name=field_name,
     )
     return {
-        "items": [MonitorEventResponse.model_validate(row, from_attributes=True) for row in rows],
+        "items": [
+            MonitorEventResponse.model_validate(row, from_attributes=True)
+            for row in rows
+        ],
         "total": total,
         "page": page,
         "page_size": page_size,
@@ -202,9 +231,14 @@ async def monitor_history(
     page_size: Annotated[int, Query(ge=1, le=200)] = 50,
 ) -> dict[str, object]:
     await _require_monitor(session, monitor_id)
-    rows, total = await list_snapshots(session, monitor_id=monitor_id, page=page, limit=page_size)
+    rows, total = await list_snapshots(
+        session, monitor_id=monitor_id, page=page, limit=page_size
+    )
     return {
-        "items": [MonitorSnapshotResponse.model_validate(row, from_attributes=True) for row in rows],
+        "items": [
+            MonitorSnapshotResponse.model_validate(row, from_attributes=True)
+            for row in rows
+        ],
         "total": total,
         "page": page,
         "page_size": page_size,
@@ -219,7 +253,10 @@ async def monitor_current_snapshot(
 ) -> list[MonitorSnapshotRecordResponse]:
     await _require_monitor(session, monitor_id)
     rows = await current_snapshot_records(session, monitor_id=monitor_id)
-    return [MonitorSnapshotRecordResponse.model_validate(row, from_attributes=True) for row in rows]
+    return [
+        MonitorSnapshotRecordResponse.model_validate(row, from_attributes=True)
+        for row in rows
+    ]
 
 
 @router.get("/{monitor_id}/export/events.json")
@@ -237,7 +274,9 @@ async def monitor_export_events_json(
         page=page,
         limit=page_size,
     )
-    return [MonitorEventResponse.model_validate(row, from_attributes=True) for row in rows]
+    return [
+        MonitorEventResponse.model_validate(row, from_attributes=True) for row in rows
+    ]
 
 
 @router.get("/{monitor_id}/export/events.csv")
@@ -331,10 +370,14 @@ async def _require_monitor(session: AsyncSession, monitor_id: int):
     try:
         return await get_monitor(session, monitor_id)
     except LookupError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
 
 
 async def _monitor_response(session: AsyncSession, monitor) -> MonitorJobResponse:
     response = MonitorJobResponse.model_validate(monitor, from_attributes=True)
-    response.change_count = await monitor_change_count_since(session, monitor_id=monitor.id)
+    response.change_count = await monitor_change_count_since(
+        session, monitor_id=monitor.id
+    )
     return response

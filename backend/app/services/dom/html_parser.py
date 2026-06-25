@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Iterator, Mapping, MutableMapping
-from typing import Any
+from typing import Any, cast
 
 from selectolax.lexbor import LexborHTMLParser, LexborNode, SelectolaxError
 
@@ -92,7 +92,7 @@ def _direct_tag_nodes(node: LexborNode) -> Iterator[LexborNode]:
         current = current.next
 
 
-def _mutation_value(value: object) -> object:
+def _mutation_value(value: object) -> bytes | str | LexborNode:
     if isinstance(value, HtmlNode):
         return value.node
     if isinstance(value, HtmlText):
@@ -117,7 +117,7 @@ class HtmlAttributes(MutableMapping[str, str]):
         self._node = node
 
     def __getitem__(self, key: str) -> str:
-        return self._node.attrs[key]
+        return cast(str, self._node.attrs[key])
 
     def __setitem__(self, key: str, value: str) -> None:
         self._node.attrs[str(key)] = str(value)
@@ -139,6 +139,7 @@ class InvalidSelectorError(ValueError):
 class HtmlNode:
     def __init__(self, node: LexborNode) -> None:
         self.node = node
+        self._owner: object | None = None
 
     @property
     def name(self) -> str:
@@ -242,9 +243,7 @@ class HtmlNode:
             return []
         try:
             return [
-                HtmlNode(node)
-                for node in self.node.css(selector)
-                if node != self.node
+                HtmlNode(node) for node in self.node.css(selector) if node != self.node
             ]
         except SelectolaxError:
             logger.debug("Invalid CSS selector %r", selector, exc_info=True)
@@ -254,7 +253,9 @@ class HtmlNode:
         if not selector:
             return None
         try:
-            node = next((item for item in self.node.css(selector) if item != self.node), None)
+            node = next(
+                (item for item in self.node.css(selector) if item != self.node), None
+            )
         except SelectolaxError:
             logger.debug("Invalid CSS selector %r", selector, exc_info=True)
             return None
@@ -282,16 +283,16 @@ class HtmlNode:
         wanted_attrs = {**(attrs or {}), **kwargs}
         has_tag_filters = name is not None or bool(wanted_attrs)
         if string is not None and not has_tag_filters:
-            rows: list[HtmlText] = []
+            text_rows: list[HtmlText] = []
             items = self.descendants if recursive else self.children
             for item in items:
                 if isinstance(item, HtmlText) and string_matches(str(item)):
-                    rows.append(item)
-                    if limit is not None and len(rows) >= limit:
+                    text_rows.append(item)
+                    if limit is not None and len(text_rows) >= limit:
                         break
-            return rows
+            return text_rows
 
-        rows: list[HtmlNode] = []
+        node_rows: list[HtmlNode] = []
         raw_nodes = self.node.traverse() if recursive else _direct_tag_nodes(self.node)
         for raw in raw_nodes:
             if raw is self.node or _is_text(raw) or _is_comment(raw):
@@ -305,13 +306,19 @@ class HtmlNode:
                 candidate_string = candidate.string
                 if candidate_string is None or not string_matches(candidate_string):
                     continue
-            rows.append(candidate)
-            if limit is not None and len(rows) >= limit:
+            node_rows.append(candidate)
+            if limit is not None and len(node_rows) >= limit:
                 break
-        return rows
+        return node_rows
 
-    def find(self, name: object = None, attrs: Mapping[str, object] | None = None, **kwargs: object) -> Any | None:
-        rows = self.find_all(name, attrs, limit=1, **kwargs)
+    def find(
+        self,
+        name: object = None,
+        attrs: Mapping[str, object] | None = None,
+        **kwargs: object,
+    ) -> Any | None:
+        wanted_attrs = {**(attrs or {}), **kwargs}
+        rows = self.find_all(name=name, attrs=wanted_attrs, limit=1)
         return rows[0] if rows else None
 
     def find_parent(
@@ -396,7 +403,13 @@ class HtmlNode:
         self.node.insert_after(_mutation_value(value))
 
     def append(self, value: object) -> None:
+        template_inner_html: str | None = None
+        if isinstance(value, HtmlNode) and value.name == "template":
+            serialized = str(value)
+            template_inner_html = serialized.partition(">")[2].rsplit("</template>", 1)[0]
         self.node.insert_child(_mutation_value(value))
+        if template_inner_html is not None and self.node.last_child is not None:
+            self.node.last_child.inner_html = template_inner_html
 
     def insert(self, index: int, value: object) -> None:
         children = list(self.children)
@@ -480,10 +493,10 @@ def _attrs_match(node: HtmlNode, attrs: Mapping[str, object]) -> bool:
             if actual not in expected:
                 return False
         elif expected is True:
-            if actual is None:
+            if not node.has_attr(normalized_key):
                 return False
         elif expected is False:
-            if actual is not None:
+            if node.has_attr(normalized_key):
                 return False
         elif str(actual or "") != str(expected):
             return False
@@ -531,12 +544,8 @@ class HtmlDocument(HtmlNode):
         wrapper = wrappers.get(normalized_name)
         if wrapper:
             opening = "".join(f"<{part}>" for part in wrapper.split("><"))
-            closing = "".join(
-                f"</{part}>" for part in reversed(wrapper.split("><"))
-            )
-            fragment_html = (
-                f"{opening}<{normalized_name}></{normalized_name}>{closing}"
-            )
+            closing = "".join(f"</{part}>" for part in reversed(wrapper.split("><")))
+            fragment_html = f"{opening}<{normalized_name}></{normalized_name}>{closing}"
         else:
             fragment_html = f"<{normalized_name}></{normalized_name}>"
         fragment = LexborHTMLParser(fragment_html)

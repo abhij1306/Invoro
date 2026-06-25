@@ -67,7 +67,10 @@ def test_d_aid1_pass_uses_weighted_average() -> None:
     )
 
     expected = int(
-        sum(item.score * DIMENSION_WEIGHTS[item.dimension_id] for item in report.dimension_scores)
+        sum(
+            item.score * DIMENSION_WEIGHTS[item.dimension_id]
+            for item in report.dimension_scores
+        )
     )
     assert report.overall_score == expected
     assert report.d_ucp1_gate_applied is False
@@ -91,6 +94,9 @@ def test_d_aid3_zero_does_not_cap_overall_score() -> None:
     )
 
     assert report.overall_score == int(
-        sum(item.score * DIMENSION_WEIGHTS[item.dimension_id] for item in report.dimension_scores)
+        sum(
+            item.score * DIMENSION_WEIGHTS[item.dimension_id]
+            for item in report.dimension_scores
+        )
     )
     assert report.d_ucp3_gate_applied is False

@@ -6,8 +6,6 @@ from app.services.adapters.saashr import SaaSHRAdapter
 from app.services.adapters.ultipro import UltiProAdapter
 
 
-
-
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_saashr_detail_mode_filters_to_requested_job(
@@ -164,4 +162,3 @@ async def test_ultipro_adapter_extracts_listing_from_jobboard_api(
             "category": "Manufacturing",
         }
     ]
-

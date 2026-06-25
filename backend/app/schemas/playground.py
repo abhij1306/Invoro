@@ -1,4 +1,5 @@
 """Playground session schemas."""
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -39,11 +40,13 @@ class PlaygroundSessionCreate(BaseModel):
 
 class PlaygroundSelectRequest(BaseModel):
     """User selects which discovered product URLs to extract (max 50)."""
+
     urls: list[str] = Field(..., max_length=50)
 
 
 class PlaygroundPipelineRequest(BaseModel):
     """User selects which downstream operations to run."""
+
     enrich: bool = False
     compare: bool = False
     monitor: bool = False
@@ -78,6 +81,7 @@ class PlaygroundDiscoverResponse(BaseModel):
 
 class PlaygroundSelectCategoryRequest(BaseModel):
     """User picks one or more category URLs from the sitemap result."""
+
     url: str | None = None
     urls: list[str] = Field(default_factory=list, max_length=50)
 

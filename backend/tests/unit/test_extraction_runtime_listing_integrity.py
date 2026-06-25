@@ -12,7 +12,9 @@ import pytest
 
 import copy
 
-from app.services.pipeline.listing_integrity import propagate_listing_integrity_to_diagnostics
+from app.services.pipeline.listing_integrity import (
+    propagate_listing_integrity_to_diagnostics,
+)
 
 
 class TestPropagateListingIntegrityToDiagnostics:
@@ -21,7 +23,11 @@ class TestPropagateListingIntegrityToDiagnostics:
     @pytest.mark.unit
     def test_threads_decision_onto_browser_diagnostics(self):
         """Decision from artifacts is written to browser_diagnostics under listing_integrity."""
-        decision = {"outcome": "product_grid", "reason": "supported_set", "metrics": {"record_count": 5}}
+        decision = {
+            "outcome": "product_grid",
+            "reason": "supported_set",
+            "metrics": {"record_count": 5},
+        }
         artifacts = {"listing_integrity": decision}
         browser_diagnostics: dict = {}
 
@@ -39,7 +45,13 @@ class TestPropagateListingIntegrityToDiagnostics:
     @pytest.mark.unit
     def test_noop_when_browser_diagnostics_none(self):
         """No crash when browser_diagnostics is None."""
-        artifacts = {"listing_integrity": {"outcome": "product_grid", "reason": "supported_set", "metrics": {}}}
+        artifacts = {
+            "listing_integrity": {
+                "outcome": "product_grid",
+                "reason": "supported_set",
+                "metrics": {},
+            }
+        }
         propagate_listing_integrity_to_diagnostics(artifacts, None)
 
     @pytest.mark.unit
@@ -61,8 +73,16 @@ class TestPropagateListingIntegrityToDiagnostics:
     @pytest.mark.unit
     def test_retry_moves_prior_to_previous(self):
         """On retry, prior decision is preserved under listing_integrity.previous."""
-        first_decision = {"outcome": "promo_only_cluster", "reason": "cohort_heterogeneous", "metrics": {"record_count": 3}}
-        second_decision = {"outcome": "product_grid", "reason": "supported_set", "metrics": {"record_count": 20}}
+        first_decision = {
+            "outcome": "promo_only_cluster",
+            "reason": "cohort_heterogeneous",
+            "metrics": {"record_count": 3},
+        }
+        second_decision = {
+            "outcome": "product_grid",
+            "reason": "supported_set",
+            "metrics": {"record_count": 20},
+        }
 
         browser_diagnostics: dict = {"listing_integrity": first_decision}
         artifacts = {"listing_integrity": second_decision}
@@ -77,8 +97,16 @@ class TestPropagateListingIntegrityToDiagnostics:
     @pytest.mark.unit
     def test_retry_does_not_mutate_original_artifacts(self):
         """The original decision dict in artifacts is not mutated by the previous-merge."""
-        first_decision = {"outcome": "promo_only_cluster", "reason": "below_min_records", "metrics": {}}
-        second_decision = {"outcome": "product_grid", "reason": "supported_set", "metrics": {}}
+        first_decision = {
+            "outcome": "promo_only_cluster",
+            "reason": "below_min_records",
+            "metrics": {},
+        }
+        second_decision = {
+            "outcome": "product_grid",
+            "reason": "supported_set",
+            "metrics": {},
+        }
         second_decision_copy = copy.deepcopy(second_decision)
 
         browser_diagnostics: dict = {"listing_integrity": first_decision}

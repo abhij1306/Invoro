@@ -657,14 +657,14 @@ def _record_extraction_trace(
         trace_fields.update(str(field_name) for field_name in trace_field_names())
     for field_name in sorted(trace_fields):
         source_values = field_sources.get(field_name)
-        source_list = source_values if isinstance(source_values, list) else [source_values]
+        source_list = (
+            source_values if isinstance(source_values, list) else [source_values]
+        )
         trace.record_field_state(
             str(field_name),
             value=primary.get(field_name),
             candidate_sources=[
-                str(item)
-                for item in source_list
-                if str(item or "").strip()
+                str(item) for item in source_list if str(item or "").strip()
             ],
         )
 

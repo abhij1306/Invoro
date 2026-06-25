@@ -129,7 +129,10 @@ def _is_high_confidence_llm_finding(finding: Any) -> bool:
 
 
 def _llm_severity(finding: Any) -> str:
-    if finding.verdict == RubricVerdict.FAIL and finding.dimension in config.AID_LLM_BLOCKING_DIMENSIONS:
+    if (
+        finding.verdict == RubricVerdict.FAIL
+        and finding.dimension in config.AID_LLM_BLOCKING_DIMENSIONS
+    ):
         return config.AID_FINDING_BLOCKING
     if finding.verdict == RubricVerdict.FAIL:
         return config.AID_FINDING_WARNING
@@ -214,23 +217,77 @@ def _completeness_dimension(result: CatalogCrawlResult) -> UCPDimensionScore:
                     urls_by_field[field].append(url)
     total = len(records) * len(fields)
     if missing_by_field["title"]:
-        findings.append(_count_finding(config.FINDING_AID2_TITLE_MISSING, config.D_AID2_ID, config.AID_FINDING_BLOCKING, missing_by_field["title"], "Product title is missing on sampled pages.", affected_urls=urls_by_field["title"]))
+        findings.append(
+            _count_finding(
+                config.FINDING_AID2_TITLE_MISSING,
+                config.D_AID2_ID,
+                config.AID_FINDING_BLOCKING,
+                missing_by_field["title"],
+                "Product title is missing on sampled pages.",
+                affected_urls=urls_by_field["title"],
+            )
+        )
     if missing_by_field["price"]:
-        findings.append(_count_finding(config.FINDING_AID2_PRICE_MISSING, config.D_AID2_ID, config.AID_FINDING_BLOCKING, missing_by_field["price"], "Product price is missing on sampled pages.", affected_urls=urls_by_field["price"]))
+        findings.append(
+            _count_finding(
+                config.FINDING_AID2_PRICE_MISSING,
+                config.D_AID2_ID,
+                config.AID_FINDING_BLOCKING,
+                missing_by_field["price"],
+                "Product price is missing on sampled pages.",
+                affected_urls=urls_by_field["price"],
+            )
+        )
     if missing_by_field["description"]:
-        findings.append(_count_finding(config.FINDING_AID2_DESCRIPTION_SHORT, config.D_AID2_ID, config.AID_FINDING_WARNING, missing_by_field["description"], "Product description is missing or under 100 characters.", affected_urls=urls_by_field["description"]))
+        findings.append(
+            _count_finding(
+                config.FINDING_AID2_DESCRIPTION_SHORT,
+                config.D_AID2_ID,
+                config.AID_FINDING_WARNING,
+                missing_by_field["description"],
+                "Product description is missing or under 100 characters.",
+                affected_urls=urls_by_field["description"],
+            )
+        )
     if missing_by_field["images"]:
-        findings.append(_count_finding(config.FINDING_AID2_IMAGES_MISSING, config.D_AID2_ID, config.AID_FINDING_WARNING, missing_by_field["images"], "Product images are missing.", affected_urls=urls_by_field["images"]))
+        findings.append(
+            _count_finding(
+                config.FINDING_AID2_IMAGES_MISSING,
+                config.D_AID2_ID,
+                config.AID_FINDING_WARNING,
+                missing_by_field["images"],
+                "Product images are missing.",
+                affected_urls=urls_by_field["images"],
+            )
+        )
     if missing_by_field["identifiers"]:
-        findings.append(_count_finding(config.FINDING_AID2_IDENTIFIERS_MISSING, config.D_AID2_ID, config.AID_FINDING_WARNING, missing_by_field["identifiers"], "SKU, GTIN, or MPN is missing.", affected_urls=urls_by_field["identifiers"]))
-    return _dimension(config.D_AID2_ID, round((present / total) * 100) if total else 0, findings)
+        findings.append(
+            _count_finding(
+                config.FINDING_AID2_IDENTIFIERS_MISSING,
+                config.D_AID2_ID,
+                config.AID_FINDING_WARNING,
+                missing_by_field["identifiers"],
+                "SKU, GTIN, or MPN is missing.",
+                affected_urls=urls_by_field["identifiers"],
+            )
+        )
+    return _dimension(
+        config.D_AID2_ID, round((present / total) * 100) if total else 0, findings
+    )
 
 
 def _commerce_dimension(result: CatalogCrawlResult) -> UCPDimensionScore:
     findings: list[UCPFinding] = []
     score = 100
     if not any(_offers(block) for block in _product_blocks(result)):
-        findings.append(_finding(config.FINDING_AID3_OFFER_MISSING, config.D_AID3_ID, config.AID_FINDING_BLOCKING, "No schema.org Offer block was detected."))
+        findings.append(
+            _finding(
+                config.FINDING_AID3_OFFER_MISSING,
+                config.D_AID3_ID,
+                config.AID_FINDING_BLOCKING,
+                "No schema.org Offer block was detected.",
+            )
+        )
         score -= 40
     return _dimension(config.D_AID3_ID, score, findings)
 
@@ -240,7 +297,14 @@ def _freshness_dimension(result: CatalogCrawlResult) -> UCPDimensionScore:
     score = 100
     product_blocks = _product_blocks(result)
     if not any(_availability(block) for block in product_blocks):
-        findings.append(_finding(config.FINDING_AID4_AVAILABILITY_MISSING, config.D_AID4_ID, config.AID_FINDING_BLOCKING, "No schema.org availability signal was detected."))
+        findings.append(
+            _finding(
+                config.FINDING_AID4_AVAILABILITY_MISSING,
+                config.D_AID4_ID,
+                config.AID_FINDING_BLOCKING,
+                "No schema.org availability signal was detected.",
+            )
+        )
         score -= 40
     return _dimension(config.D_AID4_ID, score, findings)
 
@@ -249,16 +313,39 @@ def _trust_dimension(result: CatalogCrawlResult) -> UCPDimensionScore:
     findings: list[UCPFinding] = []
     ratings = [_rating(block) for block in _product_blocks(result)]
     ratings = [item for item in ratings if item]
-    record_rating_count = sum(1 for record in result.product_records if _record_has_rating(record))
+    record_rating_count = sum(
+        1 for record in result.product_records if _record_has_rating(record)
+    )
     score = 100
     if not ratings and not record_rating_count:
-        findings.append(_finding(config.FINDING_AID5_RATING_MISSING, config.D_AID5_ID, config.AID_FINDING_WARNING, "No aggregateRating was detected in structured data."))
+        findings.append(
+            _finding(
+                config.FINDING_AID5_RATING_MISSING,
+                config.D_AID5_ID,
+                config.AID_FINDING_WARNING,
+                "No aggregateRating was detected in structured data.",
+            )
+        )
         score = 70
     elif any(_review_count(item) == 0 for item in ratings):
-        findings.append(_finding(config.FINDING_AID5_REVIEW_COUNT_ZERO, config.D_AID5_ID, config.AID_FINDING_WARNING, "Rating is present but review count is zero."))
+        findings.append(
+            _finding(
+                config.FINDING_AID5_REVIEW_COUNT_ZERO,
+                config.D_AID5_ID,
+                config.AID_FINDING_WARNING,
+                "Rating is present but review count is zero.",
+            )
+        )
         score -= 15
     if any(_review_invalid(block) for block in _product_blocks(result)):
-        findings.append(_finding(config.FINDING_AID5_REVIEW_SCHEMA_INVALID, config.D_AID5_ID, config.AID_FINDING_INFO, "Review markup is malformed."))
+        findings.append(
+            _finding(
+                config.FINDING_AID5_REVIEW_SCHEMA_INVALID,
+                config.D_AID5_ID,
+                config.AID_FINDING_INFO,
+                "Review markup is malformed.",
+            )
+        )
         score -= 5
     return _dimension(config.D_AID5_ID, score, findings)
 
@@ -268,15 +355,32 @@ def _local_dimension(result: CatalogCrawlResult) -> UCPDimensionScore:
     score = 100
     blocked_agents = _blocked_ai_agents(result.robots_directives)
     if blocked_agents:
-        findings.append(_finding(config.FINDING_AID6_ROBOTS_BLOCKING_AI, config.D_AID6_ID, config.AID_FINDING_WARNING, "robots.txt blocks one or more AI crawlers.", evidence=[{"blocked_agents": blocked_agents}]))
+        findings.append(
+            _finding(
+                config.FINDING_AID6_ROBOTS_BLOCKING_AI,
+                config.D_AID6_ID,
+                config.AID_FINDING_WARNING,
+                "robots.txt blocks one or more AI crawlers.",
+                evidence=[{"blocked_agents": blocked_agents}],
+            )
+        )
         score -= 20
     if not result.sitemap_found:
-        findings.append(_finding(config.FINDING_AID6_SITEMAP_MISSING, config.D_AID6_ID, config.AID_FINDING_INFO, "No sitemap.xml was detected."))
+        findings.append(
+            _finding(
+                config.FINDING_AID6_SITEMAP_MISSING,
+                config.D_AID6_ID,
+                config.AID_FINDING_INFO,
+                "No sitemap.xml was detected.",
+            )
+        )
         score -= 5
     return _dimension(config.D_AID6_ID, score, findings)
 
 
-def _dimension(dimension_id: str, score: int, findings: list[UCPFinding]) -> UCPDimensionScore:
+def _dimension(
+    dimension_id: str, score: int, findings: list[UCPFinding]
+) -> UCPDimensionScore:
     bounded = max(0, min(100, int(score)))
     return UCPDimensionScore(
         dimension_id=dimension_id,
@@ -337,7 +441,9 @@ def _product_blocks(result: CatalogCrawlResult) -> list[dict[str, Any]]:
 def _type_matches(block: dict[str, Any], expected: str) -> bool:
     raw = block.get("@type") or block.get("type")
     values = raw if isinstance(raw, list) else [raw]
-    return any(str(value or "").strip().lower().endswith(expected.lower()) for value in values)
+    return any(
+        str(value or "").strip().lower().endswith(expected.lower()) for value in values
+    )
 
 
 def _has_product_og(result: CatalogCrawlResult) -> bool:
@@ -358,7 +464,9 @@ def _has_any(record: dict[str, Any], *keys: str) -> bool:
 
 
 def _has_images(record: dict[str, Any]) -> bool:
-    return _has_any(record, "image", "image_url", "primary_image", "images") or bool(record.get("additional_images"))
+    return _has_any(record, "image", "image_url", "primary_image", "images") or bool(
+        record.get("additional_images")
+    )
 
 
 def _has_description_evidence(record: dict[str, Any]) -> bool:
@@ -371,7 +479,9 @@ def _has_description_evidence(record: dict[str, Any]) -> bool:
     page_lower = page_text.lower()
     if title and title not in page_lower:
         return False
-    return any(term in page_lower for term in config.AID_VISIBLE_DESCRIPTION_SIGNAL_TERMS)
+    return any(
+        term in page_lower for term in config.AID_VISIBLE_DESCRIPTION_SIGNAL_TERMS
+    )
 
 
 def _has_identifiers(record: dict[str, Any]) -> bool:
@@ -423,14 +533,17 @@ def _review_count(rating: dict[str, Any]) -> int:
 
 
 def _record_has_rating(record: dict[str, Any]) -> bool:
-    return _number(record.get("rating") or record.get("rating_value")) is not None or _number(
-        record.get("review_count") or record.get("rating_count")
-    ) is not None
+    return (
+        _number(record.get("rating") or record.get("rating_value")) is not None
+        or _number(record.get("review_count") or record.get("rating_count")) is not None
+    )
 
 
 def _review_invalid(block: dict[str, Any]) -> bool:
     review = block.get("review")
-    return isinstance(review, dict) and not (review.get("author") and review.get("reviewRating"))
+    return isinstance(review, dict) and not (
+        review.get("author") and review.get("reviewRating")
+    )
 
 
 def _blocked_ai_agents(directives: dict[str, list[str]]) -> list[str]:

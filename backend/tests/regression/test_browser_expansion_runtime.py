@@ -379,8 +379,7 @@ async def test_probe_browser_readiness_detects_spaced_jsonld_detail_type() -> No
             "</body>",
             (
                 "<h1>Widget</h1>"
-                "<p>Detailed rendered product content. " * 12
-                + "</p></body>"
+                "<p>Detailed rendered product content. " * 12 + "</p></body>"
             ),
         ),
         detail_readiness_hint_count=lambda *_args, **_kwargs: 0,

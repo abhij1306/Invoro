@@ -47,7 +47,11 @@ def map_network_payloads_to_fields(
     normalized_surface = str(surface or "").strip().lower()
     surface_specs = NETWORK_PAYLOAD_SPECS.get(normalized_surface, ())
     # Cache identity codes once for all payloads instead of per-payload.
-    cached_identity_codes = _page_identity_codes(page_url) if normalized_surface == SURFACE_ECOMMERCE_DETAIL else set()
+    cached_identity_codes = (
+        _page_identity_codes(page_url)
+        if normalized_surface == SURFACE_ECOMMERCE_DETAIL
+        else set()
+    )
     rows: list[dict[str, Any]] = []
     for payload in _ordered_payloads(payloads, surface=normalized_surface):
         if not isinstance(payload, dict):
@@ -112,7 +116,9 @@ def _availability_payload_detail_result(
     variation_list = _first_present(body, VARIATION_KEYS)
     if not isinstance(variation_list, list) or not variation_list:
         return None
-    requested_codes = identity_codes if identity_codes is not None else _page_identity_codes(page_url)
+    requested_codes = (
+        identity_codes if identity_codes is not None else _page_identity_codes(page_url)
+    )
     normalized_product_id = _normalized_identity_code(product_id)
     if requested_codes and (
         normalized_product_id is None or normalized_product_id not in requested_codes
@@ -230,7 +236,9 @@ def _ordered_payloads(
         for index, payload in enumerate(list(payloads or []))
         if isinstance(payload, dict)
     ]
-    indexed.sort(key=lambda item: (-_payload_priority(item[1], surface=surface), item[0]))
+    indexed.sort(
+        key=lambda item: (-_payload_priority(item[1], surface=surface), item[0])
+    )
     return [payload for _, payload in indexed]
 
 
@@ -316,9 +324,7 @@ def _map_body_with_spec(
         if isinstance(field_name, str)
     }
     result = {
-        key: value
-        for key, value in mapped.items()
-        if value not in (None, "", [], {})
+        key: value for key, value in mapped.items() if value not in (None, "", [], {})
     }
     return _finalize_detail_result(result)
 
@@ -378,7 +384,9 @@ def _looks_like_job_api(body: object) -> bool:
 
 
 def _body_matches_signature_quick(body: dict[str, object]) -> bool:
-    return _matches_signature(body, NETWORK_PAYLOAD_PRODUCT_SIGNATURE, depth=1) or _matches_signature(
+    return _matches_signature(
+        body, NETWORK_PAYLOAD_PRODUCT_SIGNATURE, depth=1
+    ) or _matches_signature(
         body,
         NETWORK_PAYLOAD_JOB_SIGNATURE,
         depth=1,
@@ -458,7 +466,9 @@ def _matches_signature(
 def _looks_like_multi_record_collection(body: object) -> bool:
     if not isinstance(body, dict):
         return False
-    if any(isinstance(body.get(key), dict) for key in NETWORK_PAYLOAD_DETAIL_CONTAINER_KEYS):
+    if any(
+        isinstance(body.get(key), dict) for key in NETWORK_PAYLOAD_DETAIL_CONTAINER_KEYS
+    ):
         return False
     return _contains_multi_record_collection(body, depth=0)
 
@@ -468,9 +478,14 @@ def _contains_multi_record_collection(body: object, *, depth: int) -> bool:
         return False
     for key, value in body.items():
         normalized_key = str(key or "").strip().lower()
-        if normalized_key in NETWORK_PAYLOAD_LIST_COLLECTION_KEYS and _list_looks_like_records(value):
+        if (
+            normalized_key in NETWORK_PAYLOAD_LIST_COLLECTION_KEYS
+            and _list_looks_like_records(value)
+        ):
             return True
-        if isinstance(value, dict) and _contains_multi_record_collection(value, depth=depth + 1):
+        if isinstance(value, dict) and _contains_multi_record_collection(
+            value, depth=depth + 1
+        ):
             return True
     return False
 
@@ -567,9 +582,15 @@ def _has_detail_anchor(
     if inferred_surface == "job_detail":
         company = finalize_candidate_value("company", candidates.get("company", []))
         location = finalize_candidate_value("location", candidates.get("location", []))
-        apply_url = finalize_candidate_value("apply_url", candidates.get("apply_url", []))
-        description = finalize_candidate_value("description", candidates.get("description", []))
-        return bool(title and (company or location) and (apply_url or url or description))
+        apply_url = finalize_candidate_value(
+            "apply_url", candidates.get("apply_url", [])
+        )
+        description = finalize_candidate_value(
+            "description", candidates.get("description", [])
+        )
+        return bool(
+            title and (company or location) and (apply_url or url or description)
+        )
     return bool(title and url)
 
 
@@ -629,7 +650,9 @@ def _detail_url_matches_page(candidate_url: object, page_url: str) -> bool:
     overlap = candidate_tokens & page_tokens
     if not overlap:
         return False
-    if not any(len(token) >= 4 or any(char.isdigit() for char in token) for token in overlap):
+    if not any(
+        len(token) >= 4 or any(char.isdigit() for char in token) for token in overlap
+    ):
         return False
     return len(overlap) >= min(2, len(candidate_tokens))
 

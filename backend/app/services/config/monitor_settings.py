@@ -34,7 +34,9 @@ MONITOR_PRIORITY_BACKGROUND = "background"
 NOTIFICATION_STATUS_PENDING = "pending"
 NOTIFICATION_STATUS_SENT = "sent"
 NOTIFICATION_STATUS_SKIPPED = "skipped"
-MONITOR_NOTIFICATION_MESSAGE_TEMPLATE = "{monitor_name}: {event_count} tracked price change(s) detected"
+MONITOR_NOTIFICATION_MESSAGE_TEMPLATE = (
+    "{monitor_name}: {event_count} tracked price change(s) detected"
+)
 WEBHOOK_STATUS_PENDING = "pending"
 WEBHOOK_STATUS_SENT = "sent"
 WEBHOOK_STATUS_FAILED = "failed"
@@ -69,32 +71,36 @@ ALERT_RULE_OPERATOR_LESS_THAN_OR_EQUALS = "less_than_or_equals"
 ALERT_RULE_OPERATOR_GREATER_THAN_OR_EQUALS = "greater_than_or_equals"
 ALERT_RULE_OPERATOR_EXISTS = "exists"
 ALERT_RULE_OPERATOR_MISSING = "missing"
-ALERT_RULE_OPERATORS = frozenset({
-    ALERT_RULE_OPERATOR_CHANGED,
-    ALERT_RULE_OPERATOR_EQUALS,
-    ALERT_RULE_OPERATOR_NOT_EQUALS,
-    ALERT_RULE_OPERATOR_LESS_THAN,
-    ALERT_RULE_OPERATOR_GREATER_THAN,
-    ALERT_RULE_OPERATOR_LESS_THAN_OR_EQUALS,
-    ALERT_RULE_OPERATOR_GREATER_THAN_OR_EQUALS,
-    ALERT_RULE_OPERATOR_EXISTS,
-    ALERT_RULE_OPERATOR_MISSING,
-})
+ALERT_RULE_OPERATORS = frozenset(
+    {
+        ALERT_RULE_OPERATOR_CHANGED,
+        ALERT_RULE_OPERATOR_EQUALS,
+        ALERT_RULE_OPERATOR_NOT_EQUALS,
+        ALERT_RULE_OPERATOR_LESS_THAN,
+        ALERT_RULE_OPERATOR_GREATER_THAN,
+        ALERT_RULE_OPERATOR_LESS_THAN_OR_EQUALS,
+        ALERT_RULE_OPERATOR_GREATER_THAN_OR_EQUALS,
+        ALERT_RULE_OPERATOR_EXISTS,
+        ALERT_RULE_OPERATOR_MISSING,
+    }
+)
 ALERT_VARIANT_COLLECTION_FIELD = "variants"
 ALERT_VARIANT_WILDCARD_PATH_PREFIX = "variants[*]."
 ALERT_VARIANT_IDENTITY_FIELDS = ("sku", "url", "size", "color")
-ALERT_ALLOWED_FIELDS = frozenset({
-    "price",
-    "availability",
-    "sku",
-    "title",
-    "brand",
-    "color",
-    "size",
-    "currency",
-    "image_url",
-    ALERT_VARIANT_COLLECTION_FIELD,
-})
+ALERT_ALLOWED_FIELDS = frozenset(
+    {
+        "price",
+        "availability",
+        "sku",
+        "title",
+        "brand",
+        "color",
+        "size",
+        "currency",
+        "image_url",
+        ALERT_VARIANT_COLLECTION_FIELD,
+    }
+)
 ALERT_CONDITION_FIELDS = frozenset({"price", "availability"})
 ALERT_CONDITION_OPERATORS = frozenset({"<", ">", "<=", ">=", "==", "!="})
 MCP_API_KEY_ENV = "CRAWLERAI_API_KEY"
@@ -102,10 +108,12 @@ MCP_API_BASE_URL_ENV = "CRAWLERAI_API_BASE_URL"
 MCP_DEFAULT_API_BASE_URL = "http://127.0.0.1:8000/api/v1"
 
 # Surfaces where HEAD pre-check should be skipped by default (CDN ETags unreliable)
-ECOMMERCE_SURFACES = frozenset({
-    "ecommerce_detail",
-    "ecommerce_listing",
-})
+ECOMMERCE_SURFACES = frozenset(
+    {
+        "ecommerce_detail",
+        "ecommerce_listing",
+    }
+)
 
 # Maps raw extraction field names to standard monitored field names
 TRACKED_FIELD_ALIASES: dict[str, str] = {

@@ -35,7 +35,12 @@ from app.services.crawl.state import CrawlStatus, update_run_status
 from app.services.crawl.utils import normalize_target_url
 from app.services.domain_utils import normalize_domain
 from app.services.llm.runtime import run_prompt_task
-from app.services.pipeline.runtime_helpers import STAGE_ACQUIRE, STAGE_EXTRACT, STAGE_PERSIST, set_stage
+from app.services.pipeline.runtime_helpers import (
+    STAGE_ACQUIRE,
+    STAGE_EXTRACT,
+    STAGE_PERSIST,
+    set_stage,
+)
 from app.services.publish import VERDICT_EMPTY, VERDICT_SUCCESS, build_url_metrics
 from app.services.robots_policy import check_url_crawlability
 
@@ -84,7 +89,12 @@ async def process_design_system_run(session: AsyncSession, run: CrawlRun) -> Non
         try:
             acquisition = await acquire(_build_design_acquisition_request(run, url))
         except Exception as exc:
-            logger.warning("Design crawl acquisition failed for run=%s url=%s", run.id, url, exc_info=True)
+            logger.warning(
+                "Design crawl acquisition failed for run=%s url=%s",
+                run.id,
+                url,
+                exc_info=True,
+            )
             await append_log_event(
                 run.id,
                 "warning",
@@ -92,7 +102,11 @@ async def process_design_system_run(session: AsyncSession, run: CrawlRun) -> Non
                 session=session,
             )
             continue
-        url_metrics.append(build_url_metrics(acquisition, requested_fields=list(run.requested_fields or [])))
+        url_metrics.append(
+            build_url_metrics(
+                acquisition, requested_fields=list(run.requested_fields or [])
+            )
+        )
         snapshot = _snapshot_from_acquisition(acquisition)
         if snapshot:
             snapshots.append(snapshot)
@@ -171,7 +185,11 @@ async def sample_design_system_urls(url: str) -> list[str]:
         sitemap_urls = []
     for candidate in sitemap_urls:
         normalized = normalize_target_url(candidate)
-        if not normalized or normalize_domain(normalized) != domain or normalized in urls:
+        if (
+            not normalized
+            or normalize_domain(normalized) != domain
+            or normalized in urls
+        ):
             continue
         urls.append(normalized)
         if len(urls) >= limit:
@@ -194,7 +212,16 @@ def build_design_tokens(snapshots: list[dict[str, Any]]) -> dict[str, Any]:
             if text and _is_design_css_variable(var_name, text):
                 css_variables[var_name] = text
         values = dict(snapshot.get("values") or {})
-        for key in ("colors", "fonts", "fontSizes", "fontWeights", "lineHeights", "spacing", "radius", "shadows"):
+        for key in (
+            "colors",
+            "fonts",
+            "fontSizes",
+            "fontWeights",
+            "lineHeights",
+            "spacing",
+            "radius",
+            "shadows",
+        ):
             for value in _list(values.get(key)):
                 text = _normalize_observed_value(key, value)
                 if text:
@@ -220,9 +247,13 @@ def build_design_tokens(snapshots: list[dict[str, Any]]) -> dict[str, Any]:
             components[kind][signature] += 1
     color_tokens = _color_tokens(css_variables, counters["colors"])
     typography_tokens = _typography_tokens(counters)
-    spacing_tokens = _scale_tokens(counters["spacing"], DESIGN_SYSTEM_SPACING_TOKEN_NAMES)
+    spacing_tokens = _scale_tokens(
+        counters["spacing"], DESIGN_SYSTEM_SPACING_TOKEN_NAMES
+    )
     rounded_tokens = _rounded_tokens(counters["radius"])
-    component_tokens = _component_tokens(components, color_tokens, typography_tokens, rounded_tokens)
+    component_tokens = _component_tokens(
+        components, color_tokens, typography_tokens, rounded_tokens
+    )
     return {
         "page_titles": titles[:5],
         "css_variables": _resolved_css_variables(css_variables),
@@ -245,7 +276,10 @@ def build_design_tokens(snapshots: list[dict[str, Any]]) -> dict[str, Any]:
         "radii": _top(counters["radius"], 12),
         "shadows": _top(counters["shadows"], 10),
         "components": {
-            kind: [_component_payload(signature, count) for signature, count in counter.most_common(6)]
+            kind: [
+                _component_payload(signature, count)
+                for signature, count in counter.most_common(6)
+            ]
             for kind, counter in sorted(components.items())
         },
     }
@@ -261,7 +295,8 @@ def build_design_markdown(
     frontmatter = dict(tokens.get("frontmatter") or {})
     yaml = _frontmatter_yaml(
         name=_text(sections.get("name")) or _design_name(source_urls),
-        description=_text(sections.get("description")) or "Generated from rendered website evidence. Token values are deterministic observations.",
+        description=_text(sections.get("description"))
+        or "Generated from rendered website evidence. Token values are deterministic observations.",
         frontmatter=frontmatter,
     )
     lines = [
@@ -306,7 +341,11 @@ def build_design_markdown(
         "",
         "## Do's and Don'ts",
     ]
-    notes = [str(item).strip() for item in _list(sections.get("usage_notes")) if str(item).strip()]
+    notes = [
+        str(item).strip()
+        for item in _list(sections.get("usage_notes"))
+        if str(item).strip()
+    ]
     if notes:
         lines.extend(["", *[f"- {note}" for note in notes]])
     else:
@@ -318,7 +357,11 @@ def build_design_markdown(
                 "- Don't introduce colors, type sizes, spacing, or radii that are not present in the YAML tokens unless deliberately extending the system.",
             ]
         )
-    caveats = [str(item).strip() for item in _list(sections.get("caveats")) if str(item).strip()]
+    caveats = [
+        str(item).strip()
+        for item in _list(sections.get("caveats"))
+        if str(item).strip()
+    ]
     if caveats:
         lines.extend(["", "### Caveats", "", *[f"- {note}" for note in caveats]])
     return "\n".join(lines).strip() + "\n"
@@ -343,7 +386,9 @@ async def design_markdown_for_run(session: AsyncSession, run_id: int) -> str:
 def _build_design_acquisition_request(run: CrawlRun, url: str) -> AcquisitionRequest:
     settings_view = run.settings_view
     profile = settings_view.acquisition_profile()
-    profile.update({"fetch_mode": "browser_only", "prefer_browser": True, "requires_browser": True})
+    profile.update(
+        {"fetch_mode": "browser_only", "prefer_browser": True, "requires_browser": True}
+    )
     policy = AcquisitionPolicy.from_profile(profile)
     return AcquisitionRequest(
         run_id=run.id,
@@ -446,7 +491,10 @@ async def _replace_design_record(
             source_trace={
                 "field_discovery": {
                     "markdown": {"status": "found", "sources": [DESIGN_SYSTEM_SOURCE]},
-                    "design_tokens": {"status": "found", "sources": [DESIGN_SYSTEM_SOURCE]},
+                    "design_tokens": {
+                        "status": "found",
+                        "sources": [DESIGN_SYSTEM_SOURCE],
+                    },
                 }
             },
         )
@@ -491,7 +539,9 @@ def _normalize_observed_value(key: str, value: object) -> str:
 
 
 def _top(counter: Counter[str], limit: int) -> list[dict[str, object]]:
-    return [{"value": value, "count": count} for value, count in counter.most_common(limit)]
+    return [
+        {"value": value, "count": count} for value, count in counter.most_common(limit)
+    ]
 
 
 def _component_payload(signature: str, count: int) -> dict[str, object]:
@@ -503,7 +553,9 @@ def _component_payload(signature: str, count: int) -> dict[str, object]:
 
 
 def _value_list(values: object, *, empty: str) -> list[str]:
-    rows = [item for item in _list(values) if isinstance(item, dict) and item.get("value")]
+    rows = [
+        item for item in _list(values) if isinstance(item, dict) and item.get("value")
+    ]
     if not rows:
         return [empty]
     return [f"- `{item.get('value')}`" for item in rows[:3]]
@@ -521,7 +573,9 @@ def _component_rows(components: dict[str, object]) -> list[str]:
     return lines
 
 
-def _frontmatter_yaml(*, name: str, description: str, frontmatter: dict[str, Any]) -> list[str]:
+def _frontmatter_yaml(
+    *, name: str, description: str, frontmatter: dict[str, Any]
+) -> list[str]:
     lines = [
         "version: alpha",
         f"name: {_yaml_string(name)}",
@@ -540,7 +594,11 @@ def _frontmatter_yaml(*, name: str, description: str, frontmatter: dict[str, Any
                 continue
             lines.append(f"  {key}:")
             for prop, prop_value in value.items():
-                rendered = str(prop_value) if prop == "fontWeight" and str(prop_value).isdigit() else _yaml_string(str(prop_value))
+                rendered = (
+                    str(prop_value)
+                    if prop == "fontWeight" and str(prop_value).isdigit()
+                    else _yaml_string(str(prop_value))
+                )
                 lines.append(f"    {prop}: {rendered}")
     rounded = dict(frontmatter.get("rounded") or {})
     if rounded:
@@ -579,7 +637,9 @@ def _color_token_rows(color_tokens: object) -> list[str]:
         "muted": "Low-emphasis text or disabled treatments.",
     }
     for key, value in colors.items():
-        lines.append(f"| `{key}` | `{value}` | {guidance.get(key, 'Observed reusable color role.')} |")
+        lines.append(
+            f"| `{key}` | `{value}` | {guidance.get(key, 'Observed reusable color role.')} |"
+        )
     return lines
 
 
@@ -587,7 +647,10 @@ def _typography_token_rows(typography_tokens: object) -> list[str]:
     typography = _dict_value(typography_tokens)
     if not typography:
         return ["No stable typography tokens found."]
-    lines = ["| Token | Font | Size | Weight | Line Height |", "|---|---|---:|---:|---:|"]
+    lines = [
+        "| Token | Font | Size | Weight | Line Height |",
+        "|---|---|---:|---:|---:|",
+    ]
     for key, value in typography.items():
         if not isinstance(value, dict):
             continue
@@ -624,13 +687,17 @@ def _dict_value(value: object) -> dict[str, Any]:
 def _sort_css_variables_for_role(
     css_variables: dict[str, str], hints: tuple[str, ...]
 ) -> list[tuple[str, str]]:
-    def sort_key(item: tuple[str, str], role_hints: tuple[str, ...] = hints) -> tuple[int, str]:
+    def sort_key(
+        item: tuple[str, str], role_hints: tuple[str, ...] = hints
+    ) -> tuple[int, str]:
         return _var_score(item[0], role_hints)
 
     return sorted(css_variables.items(), key=sort_key)
 
 
-def _color_tokens(css_variables: dict[str, str], color_counter: Counter[str]) -> dict[str, str]:
+def _color_tokens(
+    css_variables: dict[str, str], color_counter: Counter[str]
+) -> dict[str, str]:
     tokens: dict[str, str] = {}
     for role, hints in DESIGN_SYSTEM_COLOR_ROLE_HINTS.items():
         for name, value in _sort_css_variables_for_role(css_variables, hints):
@@ -640,9 +707,18 @@ def _color_tokens(css_variables: dict[str, str], color_counter: Counter[str]) ->
             if resolved:
                 tokens[role] = resolved
                 break
-    fallback_roles = ["primary", "secondary", "tertiary", "neutral", "surface", "border"]
+    fallback_roles = [
+        "primary",
+        "secondary",
+        "tertiary",
+        "neutral",
+        "surface",
+        "border",
+    ]
     for value, _count in color_counter.most_common(12):
-        role = next((candidate for candidate in fallback_roles if candidate not in tokens), "")
+        role = next(
+            (candidate for candidate in fallback_roles if candidate not in tokens), ""
+        )
         if not role:
             break
         color = _resolve_css_color(value, css_variables)
@@ -651,7 +727,9 @@ def _color_tokens(css_variables: dict[str, str], color_counter: Counter[str]) ->
     return tokens
 
 
-def _typography_tokens(counters: dict[str, Counter[str]]) -> dict[str, dict[str, object]]:
+def _typography_tokens(
+    counters: dict[str, Counter[str]],
+) -> dict[str, dict[str, object]]:
     font = _first_counter_value(counters["fonts"])
     body_size = _first_counter_value(counters["fontSizes"]) or "16px"
     body_weight = _first_counter_value(counters["fontWeights"]) or "400"
@@ -676,7 +754,9 @@ def _typography_tokens(counters: dict[str, Counter[str]]) -> dict[str, dict[str,
             tokens[name] = {
                 "fontFamily": font,
                 "fontSize": size,
-                "fontWeight": int(body_weight) if body_weight.isdigit() else body_weight,
+                "fontWeight": int(body_weight)
+                if body_weight.isdigit()
+                else body_weight,
                 "lineHeight": body_line,
             }
     return tokens
@@ -698,7 +778,10 @@ def _rounded_tokens(counter: Counter[str]) -> dict[str, str]:
         if _is_simple_dimension(value) and value != "9999px"
     ]
     simple = sorted(set(simple), key=lambda item: _px_number(item) or 0)
-    tokens = {name: value for name, value in zip(DESIGN_SYSTEM_ROUNDED_TOKEN_NAMES, simple, strict=False)}
+    tokens = {
+        name: value
+        for name, value in zip(DESIGN_SYSTEM_ROUNDED_TOKEN_NAMES, simple, strict=False)
+    }
     if "9999px" in counter:
         tokens["full"] = "9999px"
     return tokens
@@ -717,7 +800,9 @@ def _component_tokens(
     for kind, counter in components.items():
         if kind not in {"button", "input", "card", "nav", "table"}:
             continue
-        row = _component_payload(counter.most_common(1)[0][0], counter.most_common(1)[0][1])
+        row = _component_payload(
+            counter.most_common(1)[0][0], counter.most_common(1)[0][1]
+        )
         token: dict[str, str] = {}
         background = _resolve_css_color(_text(row.get("background")), {})
         color = _resolve_css_color(_text(row.get("color")), {})
@@ -763,11 +848,19 @@ def _yaml_string(value: str) -> str:
 def _is_design_css_variable(name: str, value: str) -> bool:
     if not name.startswith("--"):
         return False
-    if any(name.startswith(prefix) for prefix in DESIGN_SYSTEM_INTERNAL_VARIABLE_PREFIXES):
+    if any(
+        name.startswith(prefix) for prefix in DESIGN_SYSTEM_INTERNAL_VARIABLE_PREFIXES
+    ):
         return False
-    if any(f"var({prefix}" in value for prefix in DESIGN_SYSTEM_INTERNAL_VARIABLE_PREFIXES):
+    if any(
+        f"var({prefix}" in value for prefix in DESIGN_SYSTEM_INTERNAL_VARIABLE_PREFIXES
+    ):
         return False
-    return bool(_resolve_css_color(value, {}) or _normalize_dimension(value, max_px=240, allow_negative=True) or "font" in name.lower())
+    return bool(
+        _resolve_css_color(value, {})
+        or _normalize_dimension(value, max_px=240, allow_negative=True)
+        or "font" in name.lower()
+    )
 
 
 def _matches_hint(name: str, hints: tuple[str, ...]) -> bool:
@@ -783,7 +876,9 @@ def _var_score(name: str, hints: tuple[str, ...]) -> tuple[int, str]:
     return (len(hints), normalized)
 
 
-def _resolve_css_color(value: object, css_variables: dict[str, str], seen: set[str] | None = None) -> str:
+def _resolve_css_color(
+    value: object, css_variables: dict[str, str], seen: set[str] | None = None
+) -> str:
     text = _text(value)
     if not text or _is_transparent_color(text):
         return ""
@@ -849,7 +944,9 @@ def _normalize_radius(value: str) -> str:
     parts = value.split()
     if not parts:
         return ""
-    normalized = [_normalize_dimension(part, max_px=9999, allow_negative=False) for part in parts]
+    normalized = [
+        _normalize_dimension(part, max_px=9999, allow_negative=False) for part in parts
+    ]
     if not all(normalized):
         return ""
     if all(part == normalized[0] for part in normalized):
@@ -870,12 +967,19 @@ def _is_simple_dimension(value: str) -> bool:
 
 def _is_transparent_color(value: str) -> bool:
     text = _text(value).lower()
-    return text in {"transparent", "rgba(0, 0, 0, 0)"} or text.endswith(", 0)") or text.endswith(",0)")
+    return (
+        text in {"transparent", "rgba(0, 0, 0, 0)"}
+        or text.endswith(", 0)")
+        or text.endswith(",0)")
+    )
 
 
 def _is_empty_shadow(value: str) -> bool:
     text = _text(value).lower()
-    return text in {"none", "rgba(0, 0, 0, 0) 0px 0px 0px 0px"} or "rgba(0, 0, 0, 0) 0px 0px 0px 0px" == text
+    return (
+        text in {"none", "rgba(0, 0, 0, 0) 0px 0px 0px 0px"}
+        or "rgba(0, 0, 0, 0) 0px 0px 0px 0px" == text
+    )
 
 
 def _first_counter_value(counter: Counter[str]) -> str:
@@ -883,7 +987,10 @@ def _first_counter_value(counter: Counter[str]) -> str:
 
 
 def _component_padding(value: str) -> str:
-    parts = [_normalize_dimension(part, max_px=96, allow_negative=False) for part in value.split()]
+    parts = [
+        _normalize_dimension(part, max_px=96, allow_negative=False)
+        for part in value.split()
+    ]
     usable = [part for part in parts if part]
     if not usable:
         return ""
@@ -891,7 +998,9 @@ def _component_padding(value: str) -> str:
     return counts.most_common(1)[0][0]
 
 
-def _clean_llm_sections(sections: dict[str, Any], tokens: dict[str, Any]) -> dict[str, Any]:
+def _clean_llm_sections(
+    sections: dict[str, Any], tokens: dict[str, Any]
+) -> dict[str, Any]:
     allowed = _allowed_token_literals(tokens)
     cleaned: dict[str, Any] = {}
     for key in ("name", "description", "overview"):

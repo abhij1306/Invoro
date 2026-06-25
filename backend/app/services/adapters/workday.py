@@ -21,7 +21,9 @@ class WorkdayAdapter(BaseAdapter):
     async def can_handle(self, url: str, html: str) -> bool:
         return self._matches_platform_family(url, html)
 
-    async def extract(self, url: str, html: str, surface: str, proxy: str | None = None) -> AdapterResult:
+    async def extract(
+        self, url: str, html: str, surface: str, proxy: str | None = None
+    ) -> AdapterResult:
         if self._looks_like_detail(url, surface):
             record = await self._extract_detail(url, html)
             records = [record] if record else []
@@ -181,13 +183,14 @@ class WorkdayAdapter(BaseAdapter):
             return None
         normalized_prefix = "/" + str(context["localized_prefix"]).strip("/")
         normalized_path = "/" + external_path.lstrip("/")
-        if normalized_path.startswith(normalized_prefix + "/") or normalized_path == normalized_prefix:
+        if (
+            normalized_path.startswith(normalized_prefix + "/")
+            or normalized_path == normalized_prefix
+        ):
             detail_path = normalized_path
         else:
             detail_path = f"{normalized_prefix}{normalized_path}"
-        detail_url = (
-            f"{context['base_url']}{detail_path}"
-        )
+        detail_url = f"{context['base_url']}{detail_path}"
         record = {
             "title": title,
             "url": detail_url,

@@ -59,7 +59,10 @@ async def test_create_crawl_run_stamps_llm_and_extraction_snapshots(
     )
 
     assert run.settings["llm_config_snapshot"]["general"]["model"] == "llama"
-    assert run.settings["extraction_runtime_snapshot"]["selector_self_heal"]["enabled"] is False
+    assert (
+        run.settings["extraction_runtime_snapshot"]["selector_self_heal"]["enabled"]
+        is False
+    )
 
 
 @pytest.mark.asyncio
@@ -272,14 +275,18 @@ async def test_snapshot_active_configs_includes_direct_record_extraction(
 
     snapshot = await snapshot_active_configs(db_session)
 
-    assert snapshot["direct_record_extraction"]["task_type"] == "direct_record_extraction"
+    assert (
+        snapshot["direct_record_extraction"]["task_type"] == "direct_record_extraction"
+    )
 
 
 @pytest.mark.component
 def test_runtime_settings_reject_invalid_llm_confidence_threshold() -> None:
     from app.services.config.runtime_settings import CrawlerRuntimeSettings
 
-    with pytest.raises(ValueError, match="llm_confidence_threshold must be between 0 and 1"):
+    with pytest.raises(
+        ValueError, match="llm_confidence_threshold must be between 0 and 1"
+    ):
         CrawlerRuntimeSettings(llm_confidence_threshold=1.2)
 
 
