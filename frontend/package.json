@@ -6,7 +6,7 @@
     "dev": "next dev --hostname 127.0.0.1 --port 3000",
     "build": "next build",
     "start": "next start --port 3000",
-    "lint": "npm run lint:eslint && npm run check:tokens && npm run check:crawl-architecture",
+    "lint": "pnpm run lint:eslint && pnpm run check:tokens && pnpm run check:crawl-architecture",
     "lint:eslint": "eslint . --max-warnings=0",
     "check:tokens": "node scripts/check-token-escapes.mjs",
     "check:crawl-architecture": "node scripts/check-crawl-architecture.mjs",
@@ -64,5 +64,6 @@
   },
   "overrides": {
     "postcss": "^8.5.10"
-  }
+  },
+  "packageManager": "pnpm@11.9.0"
 }

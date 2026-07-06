@@ -63,102 +63,82 @@ function useLogViewport(_logCount: number, ref?: RefObject<HTMLDivElement | null
 
   return targetRef;
 }
-function getLogIcon(level: string, message: string) {
+function getLogIconDescriptor(level: string, message: string) {
   const msg = message.toLowerCase();
-  const isWarn = level === 'warning' || level === 'warn';
+  const isWarning = level === 'warning' || level === 'warn';
   const isError = logMessageIsError(level, message);
   const hasUrl = /https?:\/\//i.test(message);
-
-  if (isError) return XCircle;
-  if (isWarn) return AlertTriangle;
-
-  if (msg.includes('starting crawl')) return Activity;
-  if (msg.includes('ignoring robots.txt')) return ShieldAlert;
-  if (msg.includes('extracted')) return Database;
-  if (msg.includes('normalized') || msg.includes('normalised')) return Layers;
-  if (msg.includes('persisted')) return HardDrive;
-  if (msg.includes('acquiring') || msg.includes('fetching')) return Globe;
-  if (
+  const isBrowser =
     msg.includes('browser') ||
     msg.includes('playwright') ||
     msg.includes('patchright') ||
-    msg.includes('headless')
-  )
-    return Monitor;
-  if (msg.includes('record')) return Database;
-  if (msg.includes('page loaded') || msg.includes('page load')) return Zap;
-  if (
+    msg.includes('headless');
+  const isChallenge =
     msg.includes('challenge') ||
     msg.includes('blocked') ||
     msg.includes('captcha') ||
-    msg.includes('bot check')
-  )
-    return ShieldAlert;
-  if (hasUrl) return Globe;
-  if (msg.includes('retry') || msg.includes('retrying') || msg.includes('refresh'))
-    return RefreshCw;
-  if (
+    msg.includes('bot check');
+  const isComplete =
     msg.includes('complete') ||
     msg.includes('success') ||
     msg.includes('done') ||
-    msg.includes('finished')
-  )
-    return CheckCircle2;
-  return Dot;
-}
+    msg.includes('finished');
+  const isRetry = msg.includes('retry') || msg.includes('retrying');
 
-function getLogIconStyle(level: string, message: string): { iconCls: string; bgCls: string } {
-  const msg = message.toLowerCase();
-  const isError = logMessageIsError(level, message);
-  const hasUrl = /https?:\/\//i.test(message);
+  let Icon = Dot;
+  if (isError) Icon = XCircle;
+  else if (isWarning) Icon = AlertTriangle;
+  else if (msg.includes('starting crawl')) Icon = Activity;
+  else if (msg.includes('ignoring robots.txt')) Icon = ShieldAlert;
+  else if (msg.includes('extracted')) Icon = Database;
+  else if (msg.includes('normalized') || msg.includes('normalised')) Icon = Layers;
+  else if (msg.includes('persisted')) Icon = HardDrive;
+  else if (msg.includes('acquiring') || msg.includes('fetching')) Icon = Globe;
+  else if (isBrowser) Icon = Monitor;
+  else if (msg.includes('record')) Icon = Database;
+  else if (msg.includes('page loaded') || msg.includes('page load')) Icon = Zap;
+  else if (isChallenge) Icon = ShieldAlert;
+  else if (hasUrl) Icon = Globe;
+  else if (isRetry || msg.includes('refresh')) Icon = RefreshCw;
+  else if (isComplete) Icon = CheckCircle2;
 
-  if (isError) return { iconCls: 'text-danger', bgCls: 'bg-danger-bg' };
-  if (level === 'warning' || level === 'warn')
-    return { iconCls: 'text-warning', bgCls: 'bg-warning-bg' };
+  let iconCls = 'text-secondary';
+  if (isError || isChallenge) {
+    iconCls = 'text-danger';
+  } else if (isWarning || msg.includes('ignoring robots.txt')) {
+    iconCls = 'text-warning';
+  } else if (msg.includes('resolved')) {
+    iconCls = 'text-muted ';
+  } else if (
+    msg.includes('starting crawl') ||
+    msg.includes('acquired') ||
+    msg.includes('acquiring') ||
+    msg.includes('fetching') ||
+    isBrowser ||
+    hasUrl
+  ) {
+    iconCls = 'text-info';
+  } else if (
+    msg.includes('extracted') ||
+    msg.includes('persisted') ||
+    msg.includes('record') ||
+    isComplete
+  ) {
+    iconCls = 'text-success';
+  } else if (
+    msg.includes('normalized') ||
+    msg.includes('normalised') ||
+    msg.includes('page loaded') ||
+    msg.includes('page load')
+  ) {
+    iconCls = 'text-warning';
+  } else if (isRetry) {
+    iconCls = 'text-info';
+  } else if (level === 'debug') {
+    iconCls = 'text-muted';
+  }
 
-  if (msg.includes('starting crawl')) return { iconCls: 'text-info', bgCls: 'bg-info-bg' };
-  if (msg.includes('ignoring robots.txt'))
-    return { iconCls: 'text-warning', bgCls: 'bg-warning-bg' };
-  if (msg.includes('resolved')) return { iconCls: 'text-muted ', bgCls: 'bg-zinc-500/10' };
-  if (msg.includes('acquired')) return { iconCls: 'text-info', bgCls: 'bg-info-bg' };
-  if (msg.includes('extracted')) return { iconCls: 'text-success', bgCls: 'bg-success-bg' };
-  if (msg.includes('normalized') || msg.includes('normalised'))
-    return { iconCls: 'text-warning', bgCls: 'bg-warning-bg' };
-  if (msg.includes('persisted')) return { iconCls: 'text-success', bgCls: 'bg-success-bg' };
-  if (msg.includes('page loaded') || msg.includes('page load'))
-    return { iconCls: 'text-warning', bgCls: 'bg-warning-bg' };
-  if (
-    msg.includes('challenge') ||
-    msg.includes('blocked') ||
-    msg.includes('captcha') ||
-    msg.includes('bot check')
-  )
-    return { iconCls: 'text-danger', bgCls: 'bg-danger-bg' };
-  if (msg.includes('acquiring') || msg.includes('fetching'))
-    return { iconCls: 'text-info', bgCls: 'bg-info-bg' };
-  if (
-    msg.includes('browser') ||
-    msg.includes('patchright') ||
-    msg.includes('playwright') ||
-    msg.includes('headless')
-  )
-    return { iconCls: 'text-info', bgCls: 'bg-info-bg' };
-  if (msg.includes('record')) return { iconCls: 'text-success', bgCls: 'bg-success-bg' };
-  if (hasUrl) return { iconCls: 'text-info', bgCls: 'bg-info-bg' };
-  if (
-    msg.includes('complete') ||
-    msg.includes('success') ||
-    msg.includes('done') ||
-    msg.includes('finished')
-  )
-    return { iconCls: 'text-success', bgCls: 'bg-success-bg' };
-  if (msg.includes('retry') || msg.includes('retrying'))
-    return { iconCls: 'text-info', bgCls: 'bg-info-bg' };
-  if (level === 'debug') return { iconCls: 'text-muted', bgCls: 'bg-transparent' };
-  return {
-    iconCls: 'text-secondary',
-    bgCls: 'bg-[color-mix(in_srgb,var(--bg-alt)_50%,transparent)]',
-  };
+  return { Icon, iconCls };
 }
 
 function StageChip({ stage, showIcon = true }: { stage: LogStage; showIcon?: boolean }) {
@@ -215,13 +195,9 @@ function publicFieldNames(record: CrawlRecord) {
   );
 }
 
-function recordConfidence(record: CrawlRecord): { score: number; level: string } | null {
-  return recordConfidenceSummary(record);
-}
-
 function groupConfidence(group: LogSiteGroup): { score: number; level: string } | null {
   const scores = group.records
-    .map(recordConfidence)
+    .map(recordConfidenceSummary)
     .filter((value): value is { score: number; level: string } => value !== null);
   if (!scores.length) {
     return null;
@@ -519,6 +495,7 @@ export const LogTerminal = memo(function LogTerminal({
       ? JSON.stringify(cleanRecordForDisplay(peekedGroup.records[safePeekedRecordIndex]), null, 2)
       : '';
   const safeTriageCursor = issueGroups.length ? Math.min(triageCursor, issueGroups.length - 1) : 0;
+  const activeGroupKey = live && groups.length > 0 ? groups[groups.length - 1].key : null;
 
   useEffect(() => {
     if (!live) {
@@ -584,7 +561,7 @@ export const LogTerminal = memo(function LogTerminal({
   };
 
   const toggleGroup = (groupKey: string) => {
-    if (live && groups.length > 0 && groupKey === groups[groups.length - 1].key) {
+    if (groupKey === activeGroupKey) {
       return;
     }
     setExpandedGroupPreference((current) => (current === groupKey ? null : groupKey));
@@ -678,13 +655,13 @@ export const LogTerminal = memo(function LogTerminal({
       >
         {groups.length ? (
           groups.map((group, index) => {
-            const activeKey = live && groups.length > 0 ? groups[groups.length - 1].key : null;
-            const expanded = expandedGroupKey === group.key || group.key === activeKey;
+            const isLiveActive = group.key === activeGroupKey;
+            const expanded = expandedGroupKey === group.key || isLiveActive;
             const isRunEventGroup = !group.url;
             const payload = payloadSnapshot(group);
             const confidence = groupConfidence(group);
             const coverage = groupFieldCoverage(group, requestedFields);
-            const activeGroup = live && (group.key === activeKey || groupStillActive(group));
+            const activeGroup = live && (isLiveActive || groupStillActive(group));
             const durationMs = groupDurationMs(group, activeGroup ? nowMs : undefined);
             const lastLog = group.logs.at(-1);
             const summaryLog =
@@ -825,7 +802,7 @@ export const LogTerminal = memo(function LogTerminal({
                   ) : null}
                   <div className="flex items-center justify-end gap-1.5 pr-2">
                     <span className="text-muted font-mono text-xs uppercase">
-                      {live && groups.length > 0 && group.key === groups[groups.length - 1].key ? (
+                      {isLiveActive ? (
                         <span className="text-accent flex items-center gap-1.5 font-semibold">
                           <span className="relative flex size-1.5">
                             <span className="bg-accent absolute inline-flex h-full w-full animate-ping rounded-full opacity-75"></span>
@@ -839,11 +816,7 @@ export const LogTerminal = memo(function LogTerminal({
                         'More'
                       )}
                     </span>
-                    {!(
-                      live &&
-                      groups.length > 0 &&
-                      group.key === groups[groups.length - 1].key
-                    ) && (
+                    {!isLiveActive && (
                       <ChevronDown
                         className={cn(
                           'text-muted size-3.5 transition-transform duration-200',
@@ -859,8 +832,10 @@ export const LogTerminal = memo(function LogTerminal({
                     <div className="overflow-hidden">
                       {expandedRows.length ? (
                         expandedRows.map((row, expandedIndex) => {
-                          const IconComponent = getLogIcon(row.level, row.message);
-                          const iconStyle = getLogIconStyle(row.level, row.message);
+                          const { Icon: IconComponent, iconCls } = getLogIconDescriptor(
+                            row.level,
+                            row.message,
+                          );
                           return (
                             <div
                               key={row.key}
@@ -875,7 +850,7 @@ export const LogTerminal = memo(function LogTerminal({
                                 {row.createdAt ? formatTimeHms(row.createdAt) : '--'}
                               </span>
                               <div className="flex justify-center">
-                                <IconComponent className={cn('size-3.5', iconStyle.iconCls)} />
+                                <IconComponent className={cn('size-3.5', iconCls)} />
                               </div>
                               <div className="flex">
                                 <StageChip stage={row.stage} showIcon={false} />
