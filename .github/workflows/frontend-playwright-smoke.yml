@@ -84,7 +84,16 @@ jobs:
       - name: Apply backend migrations
         working-directory: backend
         run: |
-          python -c "from app.core.migrations import apply_pending_migrations; apply_pending_migrations()"
+          python - <<'PY'
+          from pathlib import Path
+
+          from alembic import command
+          from alembic.config import Config
+
+          config = Config()
+          config.set_main_option("script_location", str(Path.cwd() / "alembic"))
+          command.upgrade(config, "head")
+          PY
 
       - name: Start backend API server
         working-directory: backend
