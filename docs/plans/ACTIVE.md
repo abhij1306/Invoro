@@ -1,8 +1,9 @@
 # Active Plan
 
-**Current:** None
-**Status:** IDLE
-**Last completed:** Frontend Design System v4 And Debt Reduction — 2026-08-10
+**Current:** Backend Acquisition, Extraction, and Test Debt Refactor → `docs/plans/backend-core-debt-refactor-plan.md`
+**Status:** IN PROGRESS
+**Started:** 2026-08-10
+**Last slice completed:** Slice 1 — Start plan and capture baselines
 
 ## Queue
 
