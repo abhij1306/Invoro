@@ -4,6 +4,7 @@ import asyncio
 import re
 import time
 from collections.abc import Callable
+from dataclasses import dataclass, field
 from typing import Any
 from patchright.async_api import TimeoutError as PlaywrightTimeoutError
 
@@ -197,6 +198,414 @@ def _finish_expansion_diagnostics(
     return diagnostics
 
 
+@dataclass(slots=True)
+class _DomExpansionState:
+    started_at: float
+    max_interactions: int
+    max_per_selector: int
+    max_elapsed_ms: int | None
+    elapsed_ms: Callable[[float], int]
+    diagnostics: dict[str, object]
+    clicked_count: int = 0
+    expanded_elements: list[str] = field(default_factory=list)
+    interaction_failures: list[str] = field(default_factory=list)
+    seen_candidates: set[tuple[str, str, str]] = field(default_factory=set)
+
+    def time_budget_reached(self) -> bool:
+        return bool(
+            self.max_elapsed_ms is not None
+            and self.elapsed_ms(self.started_at) >= int(self.max_elapsed_ms)
+        )
+
+    def stop_status(self, *, selector_clicks: int | None = None) -> str | None:
+        if self.clicked_count >= self.max_interactions:
+            return DETAIL_EXPANSION_STATUS_INTERACTION_LIMIT_REACHED
+        if self.time_budget_reached():
+            return DETAIL_EXPANSION_STATUS_TIME_BUDGET_REACHED
+        if selector_clicks is not None and selector_clicks >= self.max_per_selector:
+            return "selector_limit_reached"
+        return None
+
+
+@dataclass(frozen=True, slots=True)
+class _ExpansionCandidate:
+    label: str
+    probe: str
+    aria_expanded: str
+    href: str
+    aria_controls: str
+    data_qa_action: str
+    class_name: str
+    tag_name: str
+    inside_main: bool
+    inside_header: bool
+    inside_nav: bool
+    inside_footer: bool
+    inside_aside: bool
+    visible: bool
+    actionable: bool
+
+    @property
+    def key(self) -> tuple[str, str, str]:
+        return self.label or self.probe, self.aria_controls, self.tag_name
+
+
+@dataclass(frozen=True, slots=True)
+class _ExpansionMatches:
+    requested: bool
+    fallback_requested: bool
+    generic: bool
+    generic_requested_toggle: bool
+    size_toggle: bool
+
+
+def _new_dom_expansion_state(
+    *,
+    started_at: float,
+    max_elapsed_ms: int | None,
+    elapsed_ms: Callable[[float], int],
+) -> _DomExpansionState:
+    max_interactions = max(
+        0,
+        min(
+            int(crawler_runtime_settings.detail_expand_max_interactions),
+            int(crawler_runtime_settings.accordion_expand_max),
+        ),
+    )
+    return _DomExpansionState(
+        started_at=started_at,
+        max_interactions=max_interactions,
+        max_per_selector=max(
+            1, int(crawler_runtime_settings.detail_expand_max_per_selector)
+        ),
+        max_elapsed_ms=max_elapsed_ms,
+        elapsed_ms=elapsed_ms,
+        diagnostics={
+            "status": DETAIL_EXPANSION_STATUS_ATTEMPTED,
+            "buttons_found": 0,
+            "clicked_count": 0,
+            "expanded_elements": [],
+            "interaction_failures": [],
+            "limit": int(crawler_runtime_settings.detail_expand_max_interactions),
+            "max_elapsed_ms": max_elapsed_ms,
+        },
+    )
+
+
+async def _selector_candidate_rows(
+    page: Any,
+    selector: str,
+    *,
+    requested_keywords: tuple[str, ...],
+    interactive_candidate_snapshot,
+    state: _DomExpansionState,
+) -> list[tuple[Any, dict[str, object] | None]]:
+    try:
+        candidates = await page.locator(selector).element_handles()
+    except Exception as exc:
+        state.interaction_failures.append(f"locator_failed:{selector}:{exc}")
+        return []
+    state.diagnostics["buttons_found"] = _coerce_int(
+        state.diagnostics["buttons_found"]
+    ) + len(candidates)
+    if not requested_keywords:
+        return [(handle, None) for handle in candidates]
+    prioritized_rows: list[tuple[tuple[int, str], Any, dict[str, object]]] = []
+    for handle in candidates:
+        if state.time_budget_reached():
+            state.diagnostics["status"] = DETAIL_EXPANSION_STATUS_TIME_BUDGET_REACHED
+            break
+        try:
+            snapshot = await interactive_candidate_snapshot(handle)
+        except Exception as exc:
+            state.interaction_failures.append(str(exc))
+            continue
+        prioritized_rows.append(
+            (
+                _requested_match_priority(
+                    snapshot,
+                    requested_keywords=requested_keywords,
+                ),
+                handle,
+                snapshot,
+            )
+        )
+    return [
+        (handle, snapshot)
+        for _priority, handle, snapshot in sorted(
+            prioritized_rows,
+            key=lambda row: row[0],
+        )
+    ]
+
+
+def _candidate_action_label(
+    snapshot: dict[str, object],
+    *,
+    selector: str,
+    requested_fields: list[str] | None,
+    requested_keywords: tuple[str, ...],
+    keywords: tuple[str, ...],
+    seen_candidates: set[tuple[str, str, str]],
+) -> tuple[bool, str]:
+    candidate = _normalized_expansion_candidate(snapshot)
+    if not candidate.visible or not candidate.actionable:
+        return False, ""
+    if candidate.key in seen_candidates:
+        return False, ""
+    seen_candidates.add(candidate.key)
+    matches = _expansion_candidate_matches(
+        candidate,
+        requested_fields=requested_fields,
+        requested_keywords=requested_keywords,
+        keywords=keywords,
+    )
+    if _expansion_candidate_is_blocked(candidate, size_toggle=matches.size_toggle):
+        return False, ""
+    if requested_fields and not (
+        matches.requested
+        or matches.fallback_requested
+        or matches.generic_requested_toggle
+        or matches.size_toggle
+    ):
+        return False, ""
+    if not _expansion_candidate_is_expandable(candidate, selector, matches):
+        return False, ""
+    if not _expansion_candidate_is_in_safe_context(candidate, matches):
+        return False, ""
+    return True, candidate.label or candidate.probe
+
+
+def _normalized_expansion_candidate(
+    snapshot: dict[str, object],
+) -> _ExpansionCandidate:
+    def normalized(key: str) -> str:
+        return str(snapshot.get(key) or "").strip().lower()
+
+    return _ExpansionCandidate(
+        label=normalized("label"),
+        probe=normalized("probe"),
+        aria_expanded=normalized("aria_expanded"),
+        href=normalized("href"),
+        aria_controls=normalized("aria_controls"),
+        data_qa_action=normalized("data_qa_action"),
+        class_name=normalized("class_name"),
+        tag_name=normalized("tag_name"),
+        inside_main=bool(snapshot.get("inside_main")),
+        inside_header=bool(snapshot.get("inside_header")),
+        inside_nav=bool(snapshot.get("inside_nav")),
+        inside_footer=bool(snapshot.get("inside_footer")),
+        inside_aside=bool(snapshot.get("inside_aside")),
+        visible=bool(snapshot.get("visible")),
+        actionable=bool(snapshot.get("actionable")),
+    )
+
+
+def _expansion_candidate_matches(
+    candidate: _ExpansionCandidate,
+    *,
+    requested_fields: list[str] | None,
+    requested_keywords: tuple[str, ...],
+    keywords: tuple[str, ...],
+) -> _ExpansionMatches:
+    requested_probe = " ".join(
+        part
+        for part in (
+            candidate.label,
+            candidate.aria_controls,
+            candidate.data_qa_action,
+        )
+        if part
+    ).strip()
+    generic_probe = " ".join(
+        part
+        for part in (
+            candidate.label,
+            candidate.probe,
+            candidate.data_qa_action,
+            candidate.class_name,
+        )
+        if part
+    ).strip()
+    size_toggle = any(
+        token in f"{candidate.data_qa_action} {candidate.class_name}"
+        for token in ("size selector", "size-selector", "open-size-selector")
+    )
+    return _ExpansionMatches(
+        requested=bool(
+            requested_keywords
+            and any(keyword in requested_probe for keyword in requested_keywords)
+        ),
+        fallback_requested=any(keyword in requested_probe for keyword in keywords),
+        generic=any(keyword in generic_probe for keyword in keywords),
+        generic_requested_toggle=bool(
+            requested_fields
+            and candidate.aria_controls
+            and candidate.label in BROWSER_REQUESTED_DETAIL_GENERIC_TOGGLE_LABELS
+        ),
+        size_toggle=size_toggle,
+    )
+
+
+def _expansion_candidate_is_blocked(
+    candidate: _ExpansionCandidate,
+    *,
+    size_toggle: bool,
+) -> bool:
+    keyword_probe = " ".join(
+        part
+        for part in (
+            candidate.label,
+            candidate.probe,
+            candidate.data_qa_action,
+            candidate.class_name,
+        )
+        if part
+    ).strip()
+    navigational_anchor = bool(
+        candidate.tag_name == "a"
+        and candidate.href
+        and not candidate.href.startswith(("#", "javascript:", "mailto:", "tel:"))
+        and not candidate.aria_controls
+        and not size_toggle
+    )
+    chrome_token = any(
+        token in keyword_probe
+        for token in (
+            "add-to-wishlist",
+            "gallery",
+            "media-zoom",
+            "thumbnail",
+            "wishlist",
+        )
+    )
+    blocked_token = any(token in keyword_probe for token in DETAIL_BLOCKED_TOKENS)
+    return navigational_anchor or chrome_token or (blocked_token and not size_toggle)
+
+
+def _expansion_candidate_is_expandable(
+    candidate: _ExpansionCandidate,
+    selector: str,
+    matches: _ExpansionMatches,
+) -> bool:
+    expandable_selectors = {
+        "summary",
+        "details > summary",
+        "[aria-expanded='false']",
+        "button[aria-controls]",
+        "[role='button'][aria-controls]",
+        "[role='tab'][aria-controls]",
+    }
+    return bool(
+        selector in expandable_selectors
+        or candidate.aria_expanded == "false"
+        or candidate.aria_controls
+        or candidate.tag_name == "summary"
+        or matches.requested
+        or matches.generic
+    )
+
+
+def _expansion_candidate_is_in_safe_context(
+    candidate: _ExpansionCandidate,
+    matches: _ExpansionMatches,
+) -> bool:
+    outside_main_chrome = bool(
+        not candidate.inside_main
+        and (candidate.inside_header or candidate.inside_nav or candidate.inside_footer)
+    )
+    if outside_main_chrome and not (matches.requested or matches.size_toggle):
+        return False
+    if not candidate.inside_aside:
+        return True
+    return bool(
+        candidate.aria_controls
+        or candidate.aria_expanded == "false"
+        or matches.requested
+        or matches.fallback_requested
+        or matches.generic
+        or matches.size_toggle
+    )
+
+
+async def _execute_expansion_action(
+    page: Any,
+    handle: Any,
+    *,
+    click_timeout_ms: int,
+) -> None:
+    await handle.scroll_into_view_if_needed()
+    try:
+        await handle.click(timeout=click_timeout_ms)
+    except Exception:
+        await handle.evaluate("(node) => node instanceof HTMLElement && node.click()")
+    wait_ms = int(crawler_runtime_settings.accordion_expand_wait_ms)
+    if wait_ms > 0:
+        await page.wait_for_timeout(wait_ms)
+
+
+async def _expand_selector_candidates(
+    page: Any,
+    selector: str,
+    *,
+    requested_fields: list[str] | None,
+    requested_keywords: tuple[str, ...],
+    keywords: tuple[str, ...],
+    interactive_candidate_snapshot,
+    click_timeout_ms: int,
+    state: _DomExpansionState,
+) -> None:
+    candidate_rows = await _selector_candidate_rows(
+        page,
+        selector,
+        requested_keywords=requested_keywords,
+        interactive_candidate_snapshot=interactive_candidate_snapshot,
+        state=state,
+    )
+    selector_clicks = 0
+    for handle, prefetched_snapshot in candidate_rows:
+        stop_status = state.stop_status(selector_clicks=selector_clicks)
+        if stop_status:
+            if stop_status != "selector_limit_reached":
+                state.diagnostics["status"] = stop_status
+            break
+        try:
+            snapshot = prefetched_snapshot or await interactive_candidate_snapshot(
+                handle
+            )
+            should_click, expanded_label = _candidate_action_label(
+                snapshot,
+                selector=selector,
+                requested_fields=requested_fields,
+                requested_keywords=requested_keywords,
+                keywords=keywords,
+                seen_candidates=state.seen_candidates,
+            )
+            if not should_click:
+                continue
+            if state.time_budget_reached():
+                state.diagnostics["status"] = (
+                    DETAIL_EXPANSION_STATUS_TIME_BUDGET_REACHED
+                )
+                break
+            await _execute_expansion_action(
+                page,
+                handle,
+                click_timeout_ms=click_timeout_ms,
+            )
+            state.clicked_count += 1
+            selector_clicks += 1
+            if expanded_label:
+                state.expanded_elements.append(expanded_label)
+            if state.time_budget_reached():
+                state.diagnostics["status"] = (
+                    DETAIL_EXPANSION_STATUS_TIME_BUDGET_REACHED
+                )
+                break
+        except Exception as exc:
+            state.interaction_failures.append(str(exc))
+
+
 async def expand_all_interactive_elements_impl(
     page: Any,
     *,
@@ -210,31 +619,13 @@ async def expand_all_interactive_elements_impl(
 ) -> dict[str, object]:
     started_at = time.perf_counter()
     click_timeout_ms = int(crawler_runtime_settings.detail_expand_click_timeout_ms)
-    diagnostics: dict[str, object] = {
-        "status": DETAIL_EXPANSION_STATUS_ATTEMPTED,
-        "buttons_found": 0,
-        "clicked_count": 0,
-        "expanded_elements": [],
-        "interaction_failures": [],
-        "limit": int(crawler_runtime_settings.detail_expand_max_interactions),
-        "max_elapsed_ms": max_elapsed_ms,
-    }
+    state = _new_dom_expansion_state(
+        started_at=started_at,
+        max_elapsed_ms=max_elapsed_ms,
+        elapsed_ms=elapsed_ms,
+    )
     keywords = detail_expansion_keywords(surface, requested_fields=requested_fields)
     requested_keywords = requested_field_tokens(requested_fields)
-    expanded_elements: list[str] = []
-    interaction_failures: list[str] = []
-    max_interactions = max(
-        0,
-        min(
-            int(crawler_runtime_settings.detail_expand_max_interactions),
-            int(crawler_runtime_settings.accordion_expand_max),
-        ),
-    )
-    max_per_selector = max(
-        1, int(crawler_runtime_settings.detail_expand_max_per_selector)
-    )
-    clicked_count = 0
-    seen_candidates: set[tuple[str, str, str]] = set()
     selectors = [
         str(selector).strip()
         for selector in detail_expand_selectors or []
@@ -245,224 +636,25 @@ async def expand_all_interactive_elements_impl(
         requested_keywords=requested_keywords,
     )
     for selector in selectors:
-        if clicked_count >= max_interactions:
-            diagnostics["status"] = DETAIL_EXPANSION_STATUS_INTERACTION_LIMIT_REACHED
+        stop_status = state.stop_status()
+        if stop_status:
+            state.diagnostics["status"] = stop_status
             break
-        if max_elapsed_ms is not None and elapsed_ms(started_at) >= int(max_elapsed_ms):
-            diagnostics["status"] = DETAIL_EXPANSION_STATUS_TIME_BUDGET_REACHED
-            break
-        try:
-            candidates = await page.locator(selector).element_handles()
-        except Exception as exc:
-            interaction_failures.append(f"locator_failed:{selector}:{exc}")
-            continue
-        diagnostics["buttons_found"] = _coerce_int(diagnostics["buttons_found"]) + len(
-            candidates
+        await _expand_selector_candidates(
+            page,
+            selector,
+            requested_fields=requested_fields,
+            requested_keywords=requested_keywords,
+            keywords=keywords,
+            interactive_candidate_snapshot=interactive_candidate_snapshot,
+            click_timeout_ms=click_timeout_ms,
+            state=state,
         )
-        candidate_rows: list[tuple[Any, dict[str, object] | None]] = [
-            (handle, None) for handle in candidates
-        ]
-        if requested_keywords:
-            prioritized_rows: list[tuple[tuple[int, str], Any, dict[str, object]]] = []
-            for handle in candidates:
-                if max_elapsed_ms is not None and elapsed_ms(started_at) >= int(
-                    max_elapsed_ms
-                ):
-                    diagnostics["status"] = DETAIL_EXPANSION_STATUS_TIME_BUDGET_REACHED
-                    break
-                try:
-                    snapshot = await interactive_candidate_snapshot(handle)
-                except Exception as exc:
-                    interaction_failures.append(str(exc))
-                    continue
-                prioritized_rows.append(
-                    (
-                        _requested_match_priority(
-                            snapshot,
-                            requested_keywords=requested_keywords,
-                        ),
-                        handle,
-                        snapshot,
-                    )
-                )
-            candidate_rows = [
-                (handle, snapshot)
-                for _priority, handle, snapshot in sorted(
-                    prioritized_rows,
-                    key=lambda row: row[0],
-                )
-            ]
-        selector_clicks = 0
-        for handle, prefetched_snapshot in candidate_rows:
-            if clicked_count >= max_interactions:
-                diagnostics["status"] = (
-                    DETAIL_EXPANSION_STATUS_INTERACTION_LIMIT_REACHED
-                )
-                break
-            if max_elapsed_ms is not None and elapsed_ms(started_at) >= int(
-                max_elapsed_ms
-            ):
-                diagnostics["status"] = DETAIL_EXPANSION_STATUS_TIME_BUDGET_REACHED
-                break
-            if selector_clicks >= max_per_selector:
-                break
-            try:
-                snapshot = prefetched_snapshot or await interactive_candidate_snapshot(
-                    handle
-                )
-                if not bool(snapshot.get("visible")) or not bool(
-                    snapshot.get("actionable")
-                ):
-                    continue
-                probe = str(snapshot.get("probe") or "").strip().lower()
-                label = str(snapshot.get("label") or "").strip().lower()
-                aria_expanded = str(snapshot.get("aria_expanded") or "").strip().lower()
-                href = str(snapshot.get("href") or "").strip().lower()
-                aria_controls = str(snapshot.get("aria_controls") or "").strip()
-                data_qa_action = (
-                    str(snapshot.get("data_qa_action") or "").strip().lower()
-                )
-                class_name = str(snapshot.get("class_name") or "").strip().lower()
-                tag_name = str(snapshot.get("tag_name") or "").strip().lower()
-                inside_main = bool(snapshot.get("inside_main"))
-                inside_header = bool(snapshot.get("inside_header"))
-                inside_nav = bool(snapshot.get("inside_nav"))
-                inside_footer = bool(snapshot.get("inside_footer"))
-                inside_aside = bool(snapshot.get("inside_aside"))
-                requested_keyword_probe = " ".join(
-                    part for part in (label, aria_controls, data_qa_action) if part
-                ).strip()
-                keyword_probe = " ".join(
-                    part for part in (label, probe, data_qa_action, class_name) if part
-                ).strip()
-                candidate_key = (label or probe, aria_controls, tag_name)
-                if candidate_key in seen_candidates:
-                    continue
-                seen_candidates.add(candidate_key)
-                size_toggle_hint = any(
-                    token in f"{data_qa_action} {class_name}"
-                    for token in (
-                        "size selector",
-                        "size-selector",
-                        "open-size-selector",
-                    )
-                )
-                navigational_anchor = bool(
-                    tag_name == "a"
-                    and href
-                    and not href.startswith(("#", "javascript:", "mailto:", "tel:"))
-                    and not aria_controls
-                    and not size_toggle_hint
-                )
-                if any(
-                    token in keyword_probe
-                    for token in (
-                        "add-to-wishlist",
-                        "gallery",
-                        "media-zoom",
-                        "thumbnail",
-                        "wishlist",
-                    )
-                ):
-                    continue
-                if navigational_anchor:
-                    continue
-                if (
-                    any(token in keyword_probe for token in DETAIL_BLOCKED_TOKENS)
-                    and not size_toggle_hint
-                ):
-                    continue
-                matches_requested_keywords = bool(
-                    requested_keywords
-                    and any(
-                        keyword in requested_keyword_probe
-                        for keyword in requested_keywords
-                    )
-                )
-                fallback_requested_match = any(
-                    keyword in requested_keyword_probe for keyword in keywords
-                )
-                generic_requested_detail_toggle = bool(
-                    list(requested_fields or [])
-                    and aria_controls
-                    and label in BROWSER_REQUESTED_DETAIL_GENERIC_TOGGLE_LABELS
-                )
-                matches_generic_keywords = any(
-                    keyword in keyword_probe for keyword in keywords
-                )
-                if list(requested_fields or []) and not (
-                    matches_requested_keywords
-                    or fallback_requested_match
-                    or generic_requested_detail_toggle
-                    or size_toggle_hint
-                ):
-                    continue
-                looks_expandable = bool(
-                    selector
-                    in {
-                        "summary",
-                        "details > summary",
-                        "[aria-expanded='false']",
-                        "button[aria-controls]",
-                        "[role='button'][aria-controls]",
-                        "[role='tab'][aria-controls]",
-                    }
-                    or aria_expanded == "false"
-                    or aria_controls
-                    or tag_name == "summary"
-                    or matches_requested_keywords
-                    or matches_generic_keywords
-                )
-                if not looks_expandable:
-                    continue
-                if (
-                    not inside_main
-                    and (inside_header or inside_nav or inside_footer)
-                    and not (matches_requested_keywords or size_toggle_hint)
-                ):
-                    continue
-                if inside_aside and not (
-                    aria_controls
-                    or aria_expanded == "false"
-                    or matches_requested_keywords
-                    or fallback_requested_match
-                    or matches_generic_keywords
-                    or size_toggle_hint
-                ):
-                    continue
-                if max_elapsed_ms is not None and elapsed_ms(started_at) >= int(
-                    max_elapsed_ms
-                ):
-                    diagnostics["status"] = DETAIL_EXPANSION_STATUS_TIME_BUDGET_REACHED
-                    break
-                await handle.scroll_into_view_if_needed()
-                try:
-                    await handle.click(timeout=click_timeout_ms)
-                except Exception:
-                    await handle.evaluate(
-                        "(node) => node instanceof HTMLElement && node.click()"
-                    )
-                if int(crawler_runtime_settings.accordion_expand_wait_ms) > 0:
-                    await page.wait_for_timeout(
-                        int(crawler_runtime_settings.accordion_expand_wait_ms)
-                    )
-                clicked_count += 1
-                selector_clicks += 1
-                expanded_label = label or probe
-                if expanded_label:
-                    expanded_elements.append(expanded_label)
-                if max_elapsed_ms is not None and elapsed_ms(started_at) >= int(
-                    max_elapsed_ms
-                ):
-                    diagnostics["status"] = DETAIL_EXPANSION_STATUS_TIME_BUDGET_REACHED
-                    break
-            except Exception as exc:
-                interaction_failures.append(str(exc))
     return _finish_expansion_diagnostics(
-        diagnostics,
-        clicked_count=clicked_count,
-        expanded_elements=expanded_elements,
-        interaction_failures=interaction_failures,
+        state.diagnostics,
+        clicked_count=state.clicked_count,
+        expanded_elements=state.expanded_elements,
+        interaction_failures=state.interaction_failures,
         started_at=started_at,
         elapsed_ms=elapsed_ms,
     )

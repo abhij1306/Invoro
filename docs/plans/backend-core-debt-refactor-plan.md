@@ -69,7 +69,7 @@ Reduce backend acquisition, extraction, and critical-test debt without changing 
 **Verify:** Parser-construction-count tests for detail, listing, price repair, original-DOM fallback, rendered-fragment fallback; static scans; one safe full suite.
 
 ### Slice 5: Simplify blocker and expansion hotspots
-**Status:** TODO
+**Status:** DONE
 **Files:** acquisition runtime blocker owner, detail expansion owner, focused public-behavior tests
 **What:** Separate evidence collection/classification and candidate discovery/safety/action/diagnostics. Preserve usable-content precedence, challenge recovery, chrome safety, action order, budgets, and evidence.
 **Verify:** Focused acquisition tests; touched orchestration functions Radon C/20 or lower; Vulture/jscpd; one safe full suite.
@@ -137,3 +137,8 @@ Reduce backend acquisition, extraction, and critical-test debt without changing 
   - Focused extraction selected 598 tests: 567 passed, 25 skipped, and 6 failed initially. Four breadcrumb regressions caused by over-lazy original-DOM access were fixed; their reported nodes and all seven parser-contract nodes pass. The two pre-existing variant fixtures remain assigned to Slice 6.
   - Ruff clean; Vulture found no 80%-confidence dead code; touched-path Radon average B/7.78; touched jscpd reports two clones / 23 lines.
   - Required safe full suite ran exactly once: 2,417 selected / 17 deselected; 2,386 passed, 25 skipped, and 6 failed in 750.48s. Two fallback-seam unit regressions were fixed and their reported nodes pass. Remaining failures are the two Slice 6 variant fixtures and two Slice 7 structure ratchets. The full suite was not rerun.
+- Slice 5 verification (2026-08-10):
+  - Block classification now separates status handling, evidence collection, verdict rules, usable-content override, and result assembly. Detail expansion now separates ordered discovery, snapshot priority, dedupe/safety/relevance filtering, action execution, budget/cap state, and diagnostic finalization.
+  - Public blocker/expansion contract set: 187 passed. Full focused acquisition set: 311 passed / 10 deselected in 31.73s. Action order, chrome filtering, requested-field priority, caps, time budget, fallback click, usable-content precedence, and evidence diagnostics remain covered.
+  - Radon drops `classify_blocked_page` from F/82 to B/9 and `expand_all_interactive_elements_impl` from F/90 to B/6. All extracted blocker/DOM-expansion helpers are C/14 or lower. Ruff clean; Vulture found no 80%-confidence dead code; touched average B/6.0; touched jscpd reports zero clones.
+  - Required safe full suite ran exactly once: 2,417 selected / 17 deselected; 2,388 passed, 25 skipped, and only the two known Slice 6 variant fixtures plus two Slice 7 structure ratchets failed in 475.04s. No full rerun was performed.
