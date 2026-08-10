@@ -47,13 +47,15 @@ def backfill_detail_price_from_html(
     record: dict[str, Any],
     *,
     html: str,
+    soup: BeautifulSoup | None = None,
 ) -> None:
     selected_variant = record.get("selected_variant")
     record_price_is_low_signal = _detail_price_value_is_low_signal(record.get("price"))
-    if not str(html or "").strip():
+    if soup is None and not str(html or "").strip():
         return
 
-    soup = BeautifulSoup(str(html or ""), "html.parser")
+    if soup is None:
+        soup = BeautifulSoup(str(html or ""), "html.parser")
     jsonld_price_bundle = detail_jsonld_price_bundle(soup, currency=None)
     html_currency = detail_currency_from_html(
         soup,

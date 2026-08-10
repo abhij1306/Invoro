@@ -32,6 +32,8 @@ class ExtractionContext:
     _soup: HtmlDocument | None = None
     _original_soup: HtmlDocument | None = None
     _original_dom_parser: LexborHTMLParser | None = None
+    _pruned_soup: HtmlDocument | None = None
+    _pruned_dom_parser: LexborHTMLParser | None = None
     _js_state_objects: dict[str, Any] | None = None
 
     @property
@@ -56,6 +58,15 @@ class ExtractionContext:
         if current is None:
             current = LexborHTMLParser(self.original_html)
             object.__setattr__(self, "_original_dom_parser", current)
+        return current
+
+    def pruned_soup(self, source_soup: HtmlDocument) -> HtmlDocument:
+        current = self._pruned_soup
+        if current is None:
+            parser = LexborHTMLParser(str(source_soup))
+            current = HtmlDocument.from_parser(parser)
+            object.__setattr__(self, "_pruned_dom_parser", parser)
+            object.__setattr__(self, "_pruned_soup", current)
         return current
 
     @property

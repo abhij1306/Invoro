@@ -10,6 +10,7 @@ from app.services.config.extraction_rules import (
 )
 from app.services.config.runtime_settings import crawler_runtime_settings
 from app.services.extraction_context import (
+    ExtractionContext,
     collect_structured_source_payloads,
     prepare_extraction_context,
 )
@@ -601,6 +602,7 @@ def extract_listing_records(
     selector_rules: list[dict[str, object]] | None = None,
     network_payloads: list[dict[str, object]] | None = None,
     record_dom_observed_selectors: bool = False,
+    context: ExtractionContext | None = None,
 ) -> list[dict[str, Any]]:
     del network_payloads
     if surface == "content_listing":
@@ -611,7 +613,7 @@ def extract_listing_records(
         table_row_intent = has_table_row_intent(html)
     else:
         table_row_intent = False
-    context = prepare_extraction_context(html)
+    context = context or prepare_extraction_context(html)
     dom_parser = context.dom_parser
     is_job_surface = surface.startswith("job_")
     listing_fallback_fragment_limit = int(
@@ -697,9 +699,10 @@ def extract_listing_records(
             if fragment
         )
         if rendered_fragment_html:
-            rendered_parser = LexborHTMLParser(
+            rendered_context = prepare_extraction_context(
                 f"<html><body>{rendered_fragment_html}</body></html>"
             )
+            rendered_parser = rendered_context.dom_parser
             rendered_dom_records = _dom_listing_stage(
                 rendered_parser,
                 page_url=page_url,

@@ -63,7 +63,7 @@ Reduce backend acquisition, extraction, and critical-test debt without changing 
 **Verify:** Focused tests prove one parse per snapshot, unique adapter calls, source ordering, and exhausted-deadline behavior; static scans; one safe full suite.
 
 ### Slice 4: Reuse canonical Selectolax documents
-**Status:** TODO
+**Status:** DONE
 **Files:** DOM parser/context owner, listing/detail extractors, price/final-cleanup owners, focused extraction tests
 **What:** Create optional `ExtractionContext`; parse cleaned/original/pruned and each unique rendered artifact once; thread prepared soups into price repair and cleanup; preserve raw-HTML compatibility and existing fallbacks.
 **Verify:** Parser-construction-count tests for detail, listing, price repair, original-DOM fallback, rendered-fragment fallback; static scans; one safe full suite.
@@ -131,3 +131,9 @@ Reduce backend acquisition, extraction, and critical-test debt without changing 
   - Existing adapter spans now record input, empty-skip, duplicate-skip, call-count, and elapsed-millisecond attributes. Browser attempts already enforced the shared deadline before and after host-slot waiting; a public orchestration test now locks the zero-budget behavior.
   - Focused adapter/readiness/deadline nodes: 4 passed. Focused acquisition set: 311 passed / 10 deselected in 74.71s. Ruff clean; Vulture found no 80%-confidence dead code; touched Radon average B/8.13; touched jscpd reports one clone / 11 lines.
   - Required safe full suite ran exactly once: 2,412 selected / 17 deselected; 2,383 passed, 25 skipped, and 4 failed in 819.37s. Two variant fixtures remain reproducibly red in the existing DOM-variant owner and are assigned to Slice 6. Two structure ratchets remain red and are assigned to Slice 7. Per protocol, the full suite was not rerun; the two reported variant nodes were rerun directly and remained red.
+- Slice 4 verification (2026-08-10):
+  - `ExtractionContext` now owns cached cleaned, original, and pruned DOMs. Detail/listing internal entry points accept an optional context; raw-HTML callers still create one. Rendered listing fragments use a separate context for their single composed artifact.
+  - Detail cleanup passes its prepared soup into price repair. Prepared-soup price repair performs zero parser builds; raw-HTML compatibility still parses once. Representative detail extraction drops from four parser builds to three while retaining the original breadcrumb/cleaned-loss fallback. New parser-count and object-identity tests cover detail, pruned-cache, rendered-fragment, visible-price, and cleanup handoff paths.
+  - Focused extraction selected 598 tests: 567 passed, 25 skipped, and 6 failed initially. Four breadcrumb regressions caused by over-lazy original-DOM access were fixed; their reported nodes and all seven parser-contract nodes pass. The two pre-existing variant fixtures remain assigned to Slice 6.
+  - Ruff clean; Vulture found no 80%-confidence dead code; touched-path Radon average B/7.78; touched jscpd reports two clones / 23 lines.
+  - Required safe full suite ran exactly once: 2,417 selected / 17 deselected; 2,386 passed, 25 skipped, and 6 failed in 750.48s. Two fallback-seam unit regressions were fixed and their reported nodes pass. Remaining failures are the two Slice 6 variant fixtures and two Slice 7 structure ratchets. The full suite was not rerun.

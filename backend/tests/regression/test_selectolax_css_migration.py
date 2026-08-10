@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 from selectolax.lexbor import LexborHTMLParser
 
+from app.services import extraction_context as extraction_context_module
 from app.services.adapters import amazon
 from app.services.adapters.adp import ADPAdapter
 from app.services.adapters.amazon import AmazonAdapter
@@ -24,6 +25,7 @@ from app.services.extract.field_candidates.variant_rows import (
     _structured_variants_from_product_payload,
 )
 from app.services.extraction_html_helpers import extract_job_sections
+from app.services.extraction_context import prepare_extraction_context
 from app.services.listing_extractor import extract_listing_records
 from app.services.pipeline.extract_records import extract_records
 from app.services.dom.xpath_service import extract_selector_value
@@ -62,6 +64,50 @@ def test_detail_extractor_preserves_css_dom_field_output() -> None:
     assert record["price"] == "19.99"
     assert record["rating"] == pytest.approx(4.8)
     assert record["review_count"] == 128
+
+
+@pytest.mark.regression
+def test_detail_extractor_builds_each_working_dom_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    parser_builds = 0
+    real_parser = extraction_context_module.LexborHTMLParser
+
+    def _counting_parser(html: str):
+        nonlocal parser_builds
+        parser_builds += 1
+        return real_parser(html)
+
+    monkeypatch.setattr(extraction_context_module, "LexborHTMLParser", _counting_parser)
+    record = build_detail_record(
+        "<html><body><main><h1>Widget Prime</h1></main></body></html>",
+        "https://example.com/products/widget-prime",
+        "ecommerce_detail",
+        ["title", "variants"],
+        adapter_records=[
+            {
+                "title": "Widget Prime",
+                "variants": [
+                    {"sku": "W-1", "size": "Small", "price": "19.99"},
+                    {"sku": "W-2", "size": "Large", "price": "21.99"},
+                ],
+            }
+        ],
+    )
+
+    assert record["variant_count"] == 2
+    assert parser_builds == 3
+
+
+@pytest.mark.regression
+def test_extraction_context_caches_pruned_dom() -> None:
+    context = prepare_extraction_context(
+        "<html><body><main><h1>Widget</h1></main></body></html>"
+    )
+
+    pruned_soup = context.pruned_soup(context.soup)
+
+    assert context.pruned_soup(context.soup) is pruned_soup
 
 
 @pytest.mark.regression
@@ -105,6 +151,36 @@ def test_listing_extractor_preserves_css_card_field_output() -> None:
     assert rows[0]["image_url"] == "https://example.com/images/widget-prime.jpg"
     assert rows[0]["rating"] == pytest.approx(4.7)
     assert rows[0]["review_count"] == 128
+
+
+@pytest.mark.regression
+def test_listing_extractor_parses_composed_rendered_artifact_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    parser_builds = 0
+    real_parser = extraction_context_module.LexborHTMLParser
+
+    def _counting_parser(html: str):
+        nonlocal parser_builds
+        parser_builds += 1
+        return real_parser(html)
+
+    monkeypatch.setattr(extraction_context_module, "LexborHTMLParser", _counting_parser)
+    fragments = [
+        "<article><a href='/products/one'><h2>Widget One</h2></a><span>$10.00</span></article>",
+        "<article><a href='/products/two'><h2>Widget Two</h2></a><span>$20.00</span></article>",
+    ]
+
+    rows = extract_listing_records(
+        "<html><body><main><h1>Widgets</h1></main></body></html>",
+        "https://example.com/collections/widgets",
+        "ecommerce_listing",
+        max_records=10,
+        artifacts={"rendered_listing_fragments": fragments},
+    )
+
+    assert len(rows) == 2
+    assert parser_builds == 3
 
 
 @pytest.mark.regression
