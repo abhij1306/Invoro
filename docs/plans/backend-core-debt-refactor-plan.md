@@ -2,7 +2,7 @@
 
 **Created:** 2026-08-10
 **Agent:** Codex
-**Status:** IN PROGRESS
+**Status:** COMPLETE
 **Touches buckets:** Acquisition + Browser Runtime; Extraction; Backend Tests; Architecture Docs
 
 ## Goal
@@ -11,16 +11,16 @@ Reduce backend acquisition, extraction, and critical-test debt without changing 
 
 ## Acceptance Criteria
 
-- [ ] `fetch_page()` and acquisition result contracts remain unchanged; policy owns pure attempt/proxy/deadline decisions.
-- [ ] Readiness reuses cached `HtmlAnalysis`; adapters receive one ordered, unique evidence sequence.
-- [ ] Listing/detail extraction can reuse one `ExtractionContext` per HTML artifact while raw-HTML callers remain compatible.
-- [ ] Touched acquisition and extraction hotspot orchestration functions are Radon C/20 or lower.
-- [ ] Dead `original_value` and stale page-flow forwarding wrappers are removed.
-- [ ] Default safe pytest suite is `unit or component or regression`; live/integration/e2e stay excluded.
-- [ ] Parser-construction and adapter-call tests prove reduced work with unchanged public behavior.
-- [ ] Reduced LOC, private-import debt, and verified duplication are ratcheted without relaxing existing caps.
-- [ ] For each code/test commit, the safe full suite is run exactly once with `python -m pytest tests -q -m "unit or component or regression"`; reported failures are rerun only by node/file.
-- [ ] No live, test-site, or network acceptance command is run.
+- [x] `fetch_page()` and acquisition result contracts remain unchanged; policy owns pure attempt/proxy/deadline decisions.
+- [x] Readiness reuses cached `HtmlAnalysis`; adapters receive one ordered, unique evidence sequence.
+- [x] Listing/detail extraction can reuse one `ExtractionContext` per HTML artifact while raw-HTML callers remain compatible.
+- [x] Touched acquisition and extraction hotspot orchestration functions are Radon C/20 or lower.
+- [x] Dead `original_value` and stale page-flow forwarding wrappers are removed.
+- [x] Default safe pytest suite is `unit or component or regression`; live/integration/e2e stay excluded.
+- [x] Parser-construction and adapter-call tests prove reduced work with unchanged public behavior.
+- [x] Reduced LOC, private-import debt, and verified duplication are ratcheted without relaxing existing caps.
+- [x] For each code/test commit, the safe full suite is run exactly once with `python -m pytest tests -q -m "unit or component or regression"`; reported failures are rerun only by node/file.
+- [x] No live, test-site, or network acceptance command is run.
 
 ## Baseline
 
@@ -87,7 +87,7 @@ Reduce backend acquisition, extraction, and critical-test debt without changing 
 **Verify:** Focused tests, structure tests, static scans, one safe full suite.
 
 ### Slice 8: Close plan and update architecture docs
-**Status:** TODO
+**Status:** DONE
 **Files:** this plan, `docs/plans/ACTIVE.md`, `docs/CODEBASE_MAP.md`, `docs/backend-architecture.md`
 **What:** Record before/after metrics and ownership. Mark complete. Leave invariants unchanged unless a contract correction was required.
 **Verify:** Documentation inspection only; no pytest.
@@ -101,10 +101,10 @@ Reduce backend acquisition, extraction, and critical-test debt without changing 
 
 ## Doc Updates Required
 
-- [ ] `docs/backend-architecture.md` — changed acquisition/extraction ownership and reusable context.
-- [ ] `docs/CODEBASE_MAP.md` — changed page-flow/policy/context ownership.
-- [ ] `docs/INVARIANTS.md` — only if implementation discovers a real contract correction.
-- [ ] `docs/ENGINEERING_STRATEGY.md` — only if a new enforceable anti-pattern is discovered.
+- [x] `docs/backend-architecture.md` — changed acquisition/extraction ownership and reusable context.
+- [x] `docs/CODEBASE_MAP.md` — changed page-flow/policy/context ownership.
+- [x] `docs/INVARIANTS.md` — safe-suite verification command corrected; runtime invariants unchanged.
+- [x] `docs/ENGINEERING_STRATEGY.md` — safe-suite verification command corrected; architecture strategy unchanged.
 
 ## Notes
 
@@ -154,3 +154,9 @@ Reduce backend acquisition, extraction, and critical-test debt without changing 
   - Two tests moved off private DOM helpers to public `extract_section_content` and `extract_node_value` contracts. The private-test import allowlist did not grow. Structure LOC checks now measure source LOC consistently and grandfather only exact pre-existing overages while preserving their original target budgets.
   - Five-critical-suite jscpd falls from the reproducible base of 111 clones / 1,924 lines to 108 clones / 1,895 lines. Ruff clean; Vulture found no 80%-confidence dead code in touched tests; touched test Radon has one existing C/16 structure helper and no higher block.
   - Focused fetch suite: 91 passed. Public DOM plus structure set: 37 passed. Required safe full suite completed once after an initial runner-timeout launch produced no pytest output: 2,418 selected / 17 deselected; 2,393 passed and 25 fixture skips in 770.10s.
+- Slice 8 closeout (2026-08-10):
+  - Final hotspot complexity: expansion B/6 (from F/90), blocker classification B/9 (from F/82), DOM variants B/6 (from F/116), and price backfill B/6 (from F/93). Vulture's sole 100%-confidence `original_value` finding is gone.
+  - Parser-count contracts lock one cleaned and one pruned detail document, lazy original-DOM construction only on existing loss fallback, one composed rendered-listing artifact document, and zero price-parser builds when a prepared soup is supplied. Adapter contracts lock global empty/duplicate skips, ordered unique calls, detail all-source behavior, and listing sufficiency short-circuit.
+  - Final pinned jscpd: full backend app 55 clones / 1,003 lines versus 55 / 1,000; critical runtime folders 16 / 207 versus 16 / 204; five critical test files improve from reproducible 111 / 1,924 to 108 / 1,895. The small runtime-line movement accompanies the explicit helper decomposition; touched hotspot complexity and repeated work fall as targeted.
+  - Physical LOC ends at 461 app Python files / 116,746 lines and 137 test files / 81,304 lines. The critical fetch suite shrinks 3,800 to 3,753 lines; shared fixture ownership and exact structure ratchets prevent regrowth. Local focused fixture timings remained inside their observed run-to-run range; no hard latency percentage was imposed.
+  - Public HTTP, schema, persistence, export, extraction-order, and LLM-gating contracts remain unchanged. No live smoke or test-site acceptance command was run; final external acceptance remains user-owned.

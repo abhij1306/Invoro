@@ -236,7 +236,9 @@ Primary files:
 - `acquisition/traversal.py`
 - `acquisition/traversal_helpers.py`
 - `acquisition/traversal_recovery.py`
-- `crawl_fetch_runtime.py`
+- `fetch/fetch_context.py`
+- `fetch/browser_policy.py`
+- `fetch/types.py`
 - `config/runtime_settings.py`
 - `config/browser_fingerprint_profiles.py`
 - `robots_policy.py`
@@ -269,6 +271,7 @@ Current live behavior:
 - blocked browser runs also do not rewrite per-run Playwright storage snapshots, so one challenged detail page does not poison later URLs in the same batch run
 - browser-to-HTTP handoff is guarded: only sanitized engine-scoped session state is exported, direct-lane reuse is allowed, proxy-scoped replay is skipped unless proxy affinity is explicit, and drift/challenge re-entry falls back to browser
 - shared HTTP acquisition is intentionally shallow: one `curl_cffi` attempt, one `httpx` fallback attempt when curl transport fails, then browser escalation; there is no hidden multi-attempt HTTP backoff loop inside `fetch_context.py`
+- `fetch_context.py` owns attempt I/O and state transitions; `fetch/browser_policy.py` owns pure proxy, engine-order, escalation, handoff, and remaining-deadline decisions through typed plans from `fetch/types.py`
 - successful acquisition paths can autosave an editable `DomainRunProfile.acquisition_contract`; future runs may reuse a proven browser engine, mark whether curl-cookie handoff is actually eligible, and record whether rendering, traversal, or network payloads were required. Host memory no longer owns the durable success path; it only biases short-lived protection/backoff choices.
 - browser diagnostics now persist explicit lane identity (`browser_engine`, `browser_profile`, launch mode, native-context flag, stealth-enabled flag) so metrics and audits can distinguish shaped Chromium from native real Chrome without inferring from free-form logs
 - traversal is explicit and separate from browser escalation; only explicit traversal modes are supported
@@ -282,6 +285,7 @@ Current live behavior:
 - acquisition timeout budget is staged: HTTP/curl attempts are capped at `http_timeout_seconds` (10s) per attempt, leaving the rest of the `acquisition_attempt_timeout_seconds` (90s) budget for browser launch, navigation, and settling. `browser_only` mode skips the HTTP tier and allocates the full budget to the browser path. The outer URL-processing timeout (`url_timeout_seconds` + buffer, default 105s) enforces the ceiling across all acquisition tiers
 - shared browser runtimes now recycle once when the driver disconnects during `new_context` / page bootstrap, so a dead browser process does not poison later URLs in the same run
 - browser rendering probes extractability at `domcontentloaded`, caps primary `networkidle` navigation to a configured budget slice, uses a short-circuit readiness wait instead of fixed optimistic sleep, reuses settled HTML/analysis for serialization, and limits detail expansion with bounded DOM-first then accessibility-assisted fallback
+- readiness probing receives the already-built `HtmlAnalysis` for the settled snapshot, so page settling does not parse the same HTML twice
 - browser rendering behavior:
   - checks extractability at `domcontentloaded`
   - caps primary `networkidle` navigation to a configured budget slice
@@ -331,6 +335,7 @@ Primary files:
 - `detail_extractor.py`
 - `extract/detail/assembly/tiers.py`
 - `listing_extractor.py`
+- `extraction_context.py`
 - `extract/structured_listing_handler.py`
 - `extract/article_card_parser.py`
 - `extract/network_listing_mapper.py`
@@ -356,6 +361,10 @@ Responsibilities:
 - normalize field values before publish
 
 Important implemented features:
+
+- each extracted HTML artifact has one `ExtractionContext`: cleaned, original-loss fallback, and pruned working DOMs are independently cached, while rendered listing compositions keep a separate per-artifact context
+- price repair and final detail cleanup accept the prepared soup, avoiding a second parse when the caller already owns the working DOM; raw-HTML entry points remain compatible
+- adapter evidence is ordered once across primary HTML, rendered artifacts, and network payloads; empty and content-identical inputs are skipped globally, sufficient listings retain their early stop, and detail extraction still consumes every unique source
 
 - `structured_sources.py` now integrates extruct-backed microdata and Open Graph extraction, with fallback parsing when dependencies are unavailable
 - Nuxt `__NUXT_DATA__` payload revival is live in structured-source harvesting

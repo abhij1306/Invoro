@@ -1,9 +1,9 @@
 # Active Plan
 
 **Current:** Backend Acquisition, Extraction, and Test Debt Refactor → `docs/plans/backend-core-debt-refactor-plan.md`
-**Status:** IN PROGRESS
+**Status:** COMPLETE
 **Started:** 2026-08-10
-**Last slice completed:** Slice 7 — Reduce critical-suite debt
+**Last slice completed:** Slice 8 — Close plan and update architecture docs
 
 ## Queue
 
