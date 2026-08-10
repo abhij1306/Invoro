@@ -3,7 +3,7 @@
 **Current:** Backend Acquisition, Extraction, and Test Debt Refactor → `docs/plans/backend-core-debt-refactor-plan.md`
 **Status:** IN PROGRESS
 **Started:** 2026-08-10
-**Last slice completed:** Slice 5 — Simplify blocker and expansion hotspots
+**Last slice completed:** Slice 6 — Simplify price and variant hotspots
 
 ## Queue
 

@@ -75,7 +75,7 @@ Reduce backend acquisition, extraction, and critical-test debt without changing 
 **Verify:** Focused acquisition tests; touched orchestration functions Radon C/20 or lower; Vulture/jscpd; one safe full suite.
 
 ### Slice 6: Simplify price and variant hotspots
-**Status:** TODO
+**Status:** DONE
 **Files:** existing detail price and DOM variant owners, focused extraction tests
 **What:** Split price evidence/currency/selection/application and variant collection/validation/assembly/fallback merge. Delete dead `original_value` and unreachable branches. Preserve field candidates, source priority, structured multi-source finalization, DOM completion, every-return price repair, flat variants, and LLM gating.
 **Verify:** `backfill_detail_price_from_html` and `extract_variants_from_dom` Radon C/20 or lower; focused extraction tests; Vulture/jscpd; one safe full suite.
@@ -142,3 +142,9 @@ Reduce backend acquisition, extraction, and critical-test debt without changing 
   - Public blocker/expansion contract set: 187 passed. Full focused acquisition set: 311 passed / 10 deselected in 31.73s. Action order, chrome filtering, requested-field priority, caps, time budget, fallback click, usable-content precedence, and evidence diagnostics remain covered.
   - Radon drops `classify_blocked_page` from F/82 to B/9 and `expand_all_interactive_elements_impl` from F/90 to B/6. All extracted blocker/DOM-expansion helpers are C/14 or lower. Ruff clean; Vulture found no 80%-confidence dead code; touched average B/6.0; touched jscpd reports zero clones.
   - Required safe full suite ran exactly once: 2,417 selected / 17 deselected; 2,388 passed, 25 skipped, and only the two known Slice 6 variant fixtures plus two Slice 7 structure ratchets failed in 475.04s. No full rerun was performed.
+- Slice 6 verification (2026-08-10):
+  - Price repair now separates evidence collection, currency reconciliation, price selection, record/variant application, and original-price completion. DOM variants now separate select/choice collection, validation/compound expansion, group merge, state metadata, Cartesian/axis-only row assembly, and final public materialization.
+  - Removed dead `original_value`. Fixed the two standing variant fixtures at their shared upstream cause: the nonstandard CSS `[aria-pressed!='']` invalidated the entire strong-option selector under Lexbor. The standards-compatible `[aria-pressed]` preserves the intended evidence and lets radio/data-selected choices reach validation.
+  - Focused extraction set: 573 passed, 25 fixture skips, 4 deselected in 43.53s. Additional structured/selectolax/variant contract set: 373 passed, 18 fixture skips, 2 deselected. Both formerly red variant fixtures pass.
+  - Radon drops `backfill_detail_price_from_html` from F/93 to B/6 and `extract_variants_from_dom` from F/116 to B/6; extracted helpers top out at C/20. Ruff clean; Vulture found no 80%-confidence dead code; touched average B/7.74; touched jscpd reports one clone / 21 lines.
+  - Required safe full suite ran exactly once: 2,417 selected / 17 deselected; 2,390 passed, 25 skipped, and only the two Slice 7 structure ratchets failed in 563.83s. No full rerun was performed.
