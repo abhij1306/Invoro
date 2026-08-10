@@ -106,7 +106,7 @@ function CandidateCard({
   return (
     <div
       className={cn(
-        'group/card border-border bg-panel hover:border-accent/40 hover:shadow-card relative flex flex-col justify-between rounded-md border p-3 transition-all',
+        'group/card border-border bg-panel hover:border-accent/40 hover:shadow-card relative flex flex-col justify-between rounded-md border p-3 transition-[background-color,border-color,box-shadow]',
         selected && 'border-accent/60 bg-accent-soft shadow-card',
       )}
     >

@@ -7,13 +7,28 @@ import { Slot } from '@radix-ui/react-slot';
 import { cn } from '../../lib/utils';
 import { buttonVariants } from './button-variants';
 
-export interface ButtonProps
-  extends ComponentPropsWithoutRef<'button'>, VariantProps<typeof buttonVariants> {
-  asChild?: boolean;
-  ref?: Ref<HTMLButtonElement>;
-}
+export type ButtonProps = ComponentPropsWithoutRef<'button'> &
+  VariantProps<typeof buttonVariants> & {
+    asChild?: boolean;
+    ref?: Ref<HTMLButtonElement>;
+  };
 
-export function Button({ className, variant, size, asChild = false, ref, ...props }: ButtonProps) {
+export function Button({
+  className,
+  variant,
+  size,
+  asChild = false,
+  type,
+  ref,
+  ...props
+}: Readonly<ButtonProps>) {
   const Comp = asChild ? Slot : 'button';
-  return <Comp ref={ref} {...props} className={cn(buttonVariants({ variant, size }), className)} />;
+  return (
+    <Comp
+      ref={ref}
+      type={asChild ? undefined : (type ?? 'button')}
+      className={cn(buttonVariants({ variant, size }), className)}
+      {...props}
+    />
+  );
 }

@@ -2,7 +2,7 @@ import { render } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { TopBarProvider } from '../layout/top-bar-context';
-import { PageHeader, RunSummaryChips } from './patterns';
+import { PageHeader, ProgressBar, RunSummaryChips } from './patterns';
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/playground',
@@ -22,6 +22,19 @@ describe('RunSummaryChips', () => {
       call.some((entry) => String(entry).includes('Encountered two children with the same key')),
     );
     expect(duplicateKeyWarning).toBe(false);
+    expect(document.querySelector('[aria-label="verdict: unknown"]')).toHaveClass('text-muted');
+  });
+});
+
+describe('ProgressBar', () => {
+  it('clamps display and semantics to the valid range', () => {
+    const { rerender } = render(<ProgressBar percent={-10} />);
+    expect(document.querySelector('[role="progressbar"]')).toHaveAttribute('aria-valuenow', '0');
+    expect(document.body).toHaveTextContent('0%');
+
+    rerender(<ProgressBar percent={150} />);
+    expect(document.querySelector('[role="progressbar"]')).toHaveAttribute('aria-valuenow', '100');
+    expect(document.body).toHaveTextContent('100%');
   });
 });
 

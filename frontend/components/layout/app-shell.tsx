@@ -1,111 +1,29 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import Image from 'next/image';
 import Link from 'next/link';
 import type { Route } from 'next';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import type { ComponentType, ReactNode } from 'react';
-import {
-  BrainCircuit,
-  BriefcaseBusiness,
-  Bell,
-  Check,
-  ClipboardCheck,
-  ChevronLeft,
-  ChevronRight,
-  Clock3,
-  DatabaseZap,
-  FileChartColumn,
-  FolderKanban,
-  Grid2x2,
-  Network,
-  Radar,
-  SearchCheck,
-  Settings2,
-  ShieldCheck,
-  Trash2,
-  WandSparkles,
-} from 'lucide-react';
+import type { ReactNode } from 'react';
+import { Bell, Check, Trash2 } from 'lucide-react';
 
-import { api, monitorsApi } from '../../lib/api';
+import { api } from '../../lib/api';
 import { httpErrorStatus } from '../../lib/api/client';
-import { STORAGE_KEYS } from '../../lib/constants/storage-keys';
 import { trapFocus } from '../../lib/focus-trap';
 import { formatRelativeTime } from '../../lib/format/date';
-import { cn } from '../../lib/utils';
 import { getAuthSessionQueryOptions, isAuthRoute } from './auth-session-query';
 import { Button } from '../ui/button';
 import { ConfirmDialog } from '../ui/confirm-dialog';
 import type { TopBarState } from './top-bar-context';
 import { TopBarProvider, useTopBarHeader } from './top-bar-context';
 import { ThemeToggle } from '../ui/theme-toggle';
+import { LogoMark } from './logo-mark';
+import { Sidebar, SidebarSkeletonNavigation } from './sidebar';
 import './app-shell.module.css';
 import './auth-shell.module.css';
 
-const navGroups = [
-  {
-    label: 'Primary',
-    items: [
-      { href: '/dashboard', label: 'Dashboard', icon: Grid2x2 },
-      { href: '/playground', label: 'Playground', icon: FolderKanban },
-      { href: '/crawl', label: 'Crawl Studio', icon: WandSparkles },
-      { href: '/runs', label: 'History', icon: Clock3 },
-      { href: '/jobs', label: 'Jobs', icon: BriefcaseBusiness },
-    ],
-  },
-  {
-    label: 'Monitoring',
-    items: [
-      { href: '/monitors', label: 'Monitors', icon: Radar },
-      { href: '/alerts', label: 'Product Alerts', icon: Bell },
-      { href: '/run-trace', label: 'Run Trace', icon: Network },
-    ],
-  },
-  {
-    label: 'Intelligence',
-    items: [
-      { href: '/data-enrichment', label: 'Data Enrichment', icon: FileChartColumn },
-      { href: '/product-intelligence', label: 'Product Intelligence', icon: BrainCircuit },
-      { href: '/ucp-audit', label: 'AI Discoverability', icon: ClipboardCheck },
-    ],
-  },
-  {
-    label: 'Memory',
-    items: [
-      { href: '/selectors', label: 'Selector Tool', icon: SearchCheck, exactMatch: true },
-      { href: '/selectors/manage', label: 'Domain Memory', icon: DatabaseZap },
-    ],
-  },
-  {
-    label: 'Admin',
-    items: [
-      { href: '/admin/users', label: 'Users', icon: ShieldCheck },
-      { href: '/admin/llm', label: 'LLM Config', icon: Settings2 },
-    ],
-  },
-] as const satisfies ReadonlyArray<{
-  label: string;
-  items: ReadonlyArray<{
-    href: string;
-    label: string;
-    icon: ComponentType<{ className?: string }>;
-    exactMatch?: boolean;
-  }>;
-}>;
-
-function isNavItemActive(
-  pathname: string,
-  item: (typeof navGroups)[number]['items'][number],
-): boolean {
-  if ('exactMatch' in item && item.exactMatch) {
-    return pathname === item.href;
-  }
-  return pathname === item.href || pathname.startsWith(`${item.href}/`);
-}
-
-const navItemCount = navGroups.reduce((total, group) => total + group.items.length, 0);
+const metricSkeletonKeys = ['metric-crawls', 'metric-records', 'metric-domains', 'metric-health'];
 
 const resetDialogCopy = {
   title: 'Reset workspace data',
@@ -143,9 +61,7 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
               <LogoMark />
             </div>
             <div className="app-sidebar-nav">
-              {Array.from({ length: navItemCount }, (_, index) => (
-                <div key={index} className="skeleton h-8 w-full rounded-md" />
-              ))}
+              <SidebarSkeletonNavigation />
             </div>
           </aside>
           <div className="app-main-col">
@@ -155,9 +71,9 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
             <main className="app-page-frame">
               <div className="app-page-inner page-stack-lg">
                 <div className="grid grid-cols-4 gap-3">
-                  {Array.from({ length: 4 }, (_, index) => (
+                  {metricSkeletonKeys.map((key) => (
                     <div
-                      key={index}
+                      key={key}
                       className="border-border card-gradient space-y-3 rounded-lg border p-4"
                     >
                       <div className="skeleton h-3 w-20" />
@@ -234,138 +150,6 @@ function AuthShell({ children }: Readonly<{ children: ReactNode }>) {
         {children}
       </div>
     </div>
-  );
-}
-
-function LogoMark({
-  collapsed = false,
-  auth = false,
-}: Readonly<{ collapsed?: boolean; auth?: boolean }>) {
-  const mark = (
-    <Image
-      src="/invoro-logo.svg"
-      className="app-logo-image"
-      alt=""
-      width={96}
-      height={96}
-      aria-hidden="true"
-      draggable={false}
-    />
-  );
-
-  if (collapsed) {
-    return (
-      <div className="app-logo app-logo-collapsed">
-        <div className="app-logo-mark">{mark}</div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="app-logo">
-      <div className={cn('app-logo-mark', auth && 'app-logo-mark-large')}>{mark}</div>
-      <div className="app-logo-copy">
-        <span className="app-logo-title">Invoro</span>
-      </div>
-    </div>
-  );
-}
-
-// skipcq: JS-0067
-function Sidebar({ pathname }: Readonly<{ pathname: string }>) {
-  const [collapsed, setCollapsed] = useState(() => {
-    if (typeof window === 'undefined') return false;
-    const stored = window.localStorage.getItem(STORAGE_KEYS.SIDEBAR_COLLAPSED);
-    if (stored === 'true' || stored === 'false') return stored === 'true';
-    return window.matchMedia('(max-width: 1279px)').matches;
-  });
-
-  useEffect(() => {
-    window.localStorage.setItem(STORAGE_KEYS.SIDEBAR_COLLAPSED, String(collapsed));
-  }, [collapsed]);
-
-  const monitorLastVisit =
-    typeof window === 'undefined'
-      ? ''
-      : (window.localStorage.getItem(STORAGE_KEYS.MONITORS_LAST_VISIT) ?? '');
-  const monitorsQuery = useQuery({
-    queryKey: ['sidebar-monitors'],
-    queryFn: () => monitorsApi.list({ status: 'active' }),
-    staleTime: 60_000,
-  });
-  const monitorPulse = Boolean(
-    monitorsQuery.data?.some((monitor) => {
-      if (!monitor.change_count) return false;
-      if (!monitorLastVisit) return true;
-      return new Date(monitor.updated_at).getTime() > new Date(monitorLastVisit).getTime();
-    }),
-  );
-
-  return (
-    <aside className={cn('app-sidebar', collapsed && 'is-collapsed')}>
-      <div className="app-sidebar-header">
-        <LogoMark collapsed={collapsed} />
-        <button
-          id="app-sidebar-toggle"
-          data-testid="app-sidebar-toggle"
-          type="button"
-          onClick={() => setCollapsed((value) => !value)}
-          className="app-icon-button"
-          aria-controls="app-sidebar-navigation"
-          aria-expanded={!collapsed}
-          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        >
-          {collapsed ? <ChevronRight className="size-3.5" /> : <ChevronLeft className="size-3.5" />}
-        </button>
-      </div>
-
-      <nav id="app-sidebar-navigation" className="app-sidebar-nav" aria-label="Main navigation">
-        {navGroups.map((group) => (
-          <div key={group.label} className="app-sidebar-group">
-            <div className="space-y-1">
-              {group.items.map((item) => {
-                const active = isNavItemActive(pathname, item);
-                const Icon = item.icon;
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href as Route}
-                    title={collapsed ? item.label : undefined}
-                    className={cn(
-                      'app-nav-item relative',
-                      active && 'is-active',
-                      collapsed && 'is-collapsed',
-                    )}
-                  >
-                    <Icon className="app-nav-icon" />
-                    {item.href === '/monitors' && monitorPulse ? (
-                      <span
-                        className="bg-accent absolute right-2 size-1.5 rounded-full"
-                        aria-hidden
-                      />
-                    ) : null}
-                    {!collapsed && <span className="truncate">{item.label}</span>}
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-        ))}
-      </nav>
-
-      {!collapsed && (
-        <div className="app-sidebar-footer">
-          <div className="app-sidebar-footer-row">
-            <div>
-              <div className="app-sidebar-footer-title">Display</div>
-              <div className="app-sidebar-footer-subtitle">Theme preference</div>
-            </div>
-            <ThemeToggle compact />
-          </div>
-        </div>
-      )}
-    </aside>
   );
 }
 

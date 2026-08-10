@@ -147,8 +147,10 @@ export default function PlaygroundPage() {
                   max={50}
                   value={categoryLimit}
                   onChange={(e) => {
-                    const nextValue = Number(e.target.value);
-                    setCategoryLimit(clampCategoryLimit(nextValue));
+                    const nextValue = e.target.value ? Number(e.target.value) : 1;
+                    setCategoryLimit(
+                      clampCategoryLimit(Number.isFinite(nextValue) ? nextValue : 1),
+                    );
                   }}
                   className="border-divider focus-ring bg-panel rounded-md border px-3 py-2 text-sm"
                 />
@@ -817,18 +819,21 @@ function NavTreeNode({
       </div>
       {hasChildren && isOpen && (
         <div className="space-y-1">
-          {node.children.map((child, index) => (
-            <NavTreeNode
-              key={`${nodeKey}-${index}`}
-              node={child}
-              nodeKey={`${nodeKey}-${index}`}
-              selected={selected}
-              open={open}
-              setOpen={setOpen}
-              onToggleUrls={onToggleUrls}
-              depth={depth + 1}
-            />
-          ))}
+          {node.children.map((child, childIndex) => {
+            const childKey = `${nodeKey}-${child.url ?? child.label}-${childIndex}`;
+            return (
+              <NavTreeNode
+                key={childKey}
+                node={child}
+                nodeKey={childKey}
+                selected={selected}
+                open={open}
+                setOpen={setOpen}
+                onToggleUrls={onToggleUrls}
+                depth={depth + 1}
+              />
+            );
+          })}
         </div>
       )}
     </div>

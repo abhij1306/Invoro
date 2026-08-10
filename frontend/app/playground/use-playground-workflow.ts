@@ -139,7 +139,7 @@ export function usePlaygroundWorkflow() {
     if (state === previousSelectionStageRef.current) return;
     previousSelectionStageRef.current = state;
     if (state === 'sitemap_listed' || state === 'discovered') {
-      setSelectedUrls(new Set());
+      queueMicrotask(() => setSelectedUrls(new Set()));
     }
   }, [state]);
 

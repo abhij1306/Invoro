@@ -63,7 +63,7 @@ export const STAGE_CONFIG: Record<LogStage, LogStageConfig> = {
     borderClass: 'border-border-strong',
     chipClass: 'bg-zinc-700 text-white font-medium',
     textOnlyClass: 'text-muted font-medium',
-    panelClass: 'border-border bg-subtle-panel-bg',
+    panelClass: 'border-border bg-subtle-panel',
   },
 };
 

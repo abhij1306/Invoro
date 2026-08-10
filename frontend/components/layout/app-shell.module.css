@@ -35,7 +35,7 @@
 }
 
 :global(.app-sidebar) {
-  width: 220px;
+  width: 232px;
   position: sticky;
   top: 0;
   z-index: 10;
@@ -54,8 +54,8 @@
 }
 
 :global(.app-sidebar-header) {
-  height: 64px;
-  padding: 0 18px;
+  height: 48px;
+  padding: 0 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -87,15 +87,13 @@
   width: 24px;
   height: 24px;
   border-radius: var(--radius-md);
-  background: linear-gradient(135deg, #2858ff 0%, #7c5cff 100%);
+  background: var(--logo-mark-bg);
   color: var(--logo-mark-fg, var(--bg-panel));
   display: grid;
   place-items: center;
   flex-shrink: 0;
   overflow: hidden;
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.22),
-    0 8px 18px rgba(53, 87, 246, 0.22);
+  box-shadow: var(--shadow-xs-value);
 }
 
 :global(.app-logo-mark-large) {
@@ -176,7 +174,7 @@
 }
 
 :global(.app-nav-item:hover) {
-  background: rgba(255, 255, 255, 0.72);
+  background: var(--bg-alt);
   color: var(--text-primary);
   text-decoration: none;
 }
@@ -197,11 +195,11 @@
 }
 
 :global(.app-nav-item.is-active) {
-  background: var(--bg-panel) !important;
+  background: var(--bg-alt) !important;
   color: var(--text-primary) !important;
   font-weight: var(--weight-semibold);
   border-left: 0;
-  box-shadow: 0 1px 2px rgba(18, 18, 22, 0.04);
+  box-shadow: var(--shadow-xs-value);
 }
 
 :global(html[data-theme='dark'] .app-nav-item.is-active) {
@@ -250,14 +248,13 @@
 :global(.app-topbar) {
   position: sticky;
   top: 0;
-  height: 58px;
-  padding: 0 22px;
+  height: 48px;
+  padding: 0 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
   background: var(--surface-header);
-  backdrop-filter: blur(14px);
   border-bottom: 1px solid var(--border-subtle);
   flex-shrink: 0;
   z-index: 30;

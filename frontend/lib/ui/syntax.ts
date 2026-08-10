@@ -62,7 +62,7 @@ export function syntaxHighlightJson(json: string) {
   return highlighted
     .split('\n')
     .map((line) => {
-      const spaces = line.match(/^(\s*)/)![1].length;
+      const spaces = line.match(/^(\s*)/)?.[1]?.length ?? 0;
       const indent = spaces + WRAP_ALIGN_EXTRA;
       return `<span style="display: block; padding-left: ${indent}ch; text-indent: -${indent}ch;">${line}</span>`;
     })
@@ -118,7 +118,7 @@ function syntaxHighlightJsonLineNodes(line: string, lineIndex: number): ReactNod
 export function syntaxHighlightJsonNodes(json: string): ReactNode[] {
   if (!json) return [];
   return json.split('\n').map((line, index) => {
-    const spaces = line.match(/^(\s*)/)![1].length;
+    const spaces = line.match(/^(\s*)/)?.[1]?.length ?? 0;
     const indent = spaces + WRAP_ALIGN_EXTRA;
     return createElement(
       'span',

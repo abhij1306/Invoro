@@ -47,17 +47,29 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Resolve pnpm store
+        id: pnpm-cache
+        run: echo "store-path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.store-path }}
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('frontend/pnpm-lock.yaml') }}
+          restore-keys: ${{ runner.os }}-pnpm-
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
-      - name: Dependency vulnerability scan
-        run: npm audit --audit-level=high
+      - name: Audit dependencies
+        run: pnpm audit --audit-level=high
 
       - name: Install Playwright browser
-        run: npx playwright install --with-deps chromium
+        run: pnpm exec playwright install --with-deps chromium
 
       - name: Setup Python
         uses: actions/setup-python@v6
@@ -75,7 +87,16 @@ jobs:
       - name: Apply backend migrations
         working-directory: backend
         run: |
-          python -c "from app.core.migrations import apply_pending_migrations; apply_pending_migrations()"
+          python - <<'PY'
+          from pathlib import Path
+
+          from alembic import command
+          from alembic.config import Config
+
+          config = Config()
+          config.set_main_option("script_location", str(Path.cwd() / "alembic"))
+          command.upgrade(config, "head")
+          PY
 
       - name: Start backend API server
         working-directory: backend
@@ -98,7 +119,7 @@ jobs:
         env:
           NEXT_PUBLIC_API_BASE_URL: http://127.0.0.1:8000
         run: |
-          nohup npm run dev -- --hostname 127.0.0.1 --port 3000 > /tmp/frontend.log 2>&1 &
+          nohup pnpm run dev > /tmp/frontend.log 2>&1 &
 
       - name: Wait for frontend root URL
         run: |
@@ -116,4 +137,4 @@ jobs:
         env:
           CI: true
           NEXT_PUBLIC_API_BASE_URL: http://127.0.0.1:8000
-        run: npm run test:e2e -- smoke.spec.ts
+        run: pnpm run test:e2e -- smoke.spec.ts

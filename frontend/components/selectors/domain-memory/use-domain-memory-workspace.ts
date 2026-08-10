@@ -163,21 +163,24 @@ export function useDomainMemoryWorkspace() {
   useEffect(() => {
     if (!resolvedSelectedDomain || loadedSelectorDomain === resolvedSelectedDomain) return;
     let cancelled = false;
-    async function loadSelectedDomainSelectors() {
-      setSelectorLoading(true);
-      try {
-        const selectorData = await api.listSelectors({ domain: resolvedSelectedDomain });
+    queueMicrotask(() => {
+      if (!cancelled) setSelectorLoading(true);
+    });
+    void api
+      .listSelectors({ domain: resolvedSelectedDomain })
+      .then((selectorData) => {
         if (cancelled) return;
         setRecords(toLocalRecords(selectorData));
         setLoadedSelectorDomain(resolvedSelectedDomain);
-      } catch (nextError) {
-        if (!cancelled)
+      })
+      .catch((nextError: unknown) => {
+        if (!cancelled) {
           setError(nextError instanceof Error ? nextError.message : 'Unable to load selectors.');
-      } finally {
+        }
+      })
+      .finally(() => {
         if (!cancelled) setSelectorLoading(false);
-      }
-    }
-    void loadSelectedDomainSelectors();
+      });
     return () => {
       cancelled = true;
     };

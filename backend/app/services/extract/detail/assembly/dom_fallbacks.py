@@ -165,7 +165,7 @@ def apply_dom_fallbacks(
             source="dom_images",
         )
     alias_lookup = surface_alias_lookup(surface, requested_fields)
-    inline_scalar_target_fields = {
+    inline_scalar_target_fields: set[str] = {
         field_name
         for field_name in ("color", "size")
         if field_name in fields and not candidates.get(field_name)

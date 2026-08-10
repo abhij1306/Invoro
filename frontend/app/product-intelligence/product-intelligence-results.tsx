@@ -198,7 +198,7 @@ function SourceRecordsPreview({ controller }: ProductIntelligenceResultsProps) {
           typeof data.currency === 'string' ? data.currency : '',
         );
         const url = (typeof data.url === 'string' && data.url) || record.source_url || '';
-        const rowKey = record.id ?? (url || title || index);
+        const rowKey = record.id == null ? `record-index-${index}` : `record-${record.id}`;
         return (
           <div
             key={String(rowKey)}

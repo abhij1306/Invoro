@@ -144,7 +144,7 @@ export function SliderRow({
           type="button"
           onClick={onReset}
           aria-label={`Reset ${label}`}
-          className="text-muted hover:text-primary transition-colors"
+          className="text-muted hover:text-foreground transition-colors"
         >
           <RotateCcw className="size-3" aria-hidden="true" />
         </button>
@@ -410,7 +410,7 @@ export function ManualFieldEditor({
           <span className={cn('field-label', !showLabels && 'sr-only')}>Field</span>
           <Input
             id={fieldNameId}
-            aria-label="Field"
+            aria-label="Manual field name"
             value={row.fieldName}
             onChange={(event) => onChange({ fieldName: event.target.value })}
             placeholder="price"

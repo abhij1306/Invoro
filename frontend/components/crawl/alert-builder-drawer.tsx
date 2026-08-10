@@ -545,7 +545,7 @@ function AlertFieldCard({
       type="button"
       onClick={onClick}
       className={cn(
-        'group border-border bg-panel rounded-md border p-3.5 text-left transition-all',
+        'group border-border bg-panel rounded-md border p-3.5 text-left transition-[background-color,border-color,box-shadow]',
         'hover:shadow-card hover:border-accent/50',
         active && 'border-accent bg-accent-subtle shadow-card',
       )}

@@ -3,8 +3,9 @@
 import { History, X } from 'lucide-react';
 import React, { useEffect, useEffectEvent } from 'react';
 
-import { Badge, Button } from './primitives';
 import { cn } from '../../lib/utils';
+import { Badge } from './badge';
+import { Button } from './button';
 
 export type HistoryItem = {
   id: number;
@@ -130,5 +131,9 @@ export function HistoryDrawer({
 function formatShortDate(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  });
 }

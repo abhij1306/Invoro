@@ -2,3 +2,24 @@ allowBuilds:
   msw: true
   sharp: true
   unrs-resolver: true
+minimumReleaseAge: 10080
+minimumReleaseAgeExclude:
+  - postcss@8.5.10 || 8.5.12 || 8.5.18 || 8.5.23
+  - brace-expansion@1.1.16 || 1.1.17 || 1.1.18 || 5.0.7 || 5.0.8 || 5.0.9
+  - js-yaml@4.3.0 || 4.3.1
+  - sharp@0.35.0
+  - next@16.2.11
+  - undici@7.29.0
+  - nanoid@3.3.16 || 3.3.17
+overrides:
+  postcss@<8.5.10: ^8.5.10
+  postcss@<=8.5.11: ^8.5.12
+  postcss@<=8.5.17: ^8.5.18
+  postcss@<=8.5.22: ^8.5.23
+  sharp@<0.35.0: ^0.35.0
+trustPolicy: no-downgrade
+trustPolicyExclude:
+  - ast-v8-to-istanbul@1.0.2
+  - eslint-import-resolver-typescript@3.10.1
+  - reselect@5.1.1
+  - semver@6.3.1

@@ -57,14 +57,14 @@ export function useUcpFixChecklist({ report, roadmap }: UseUcpFixChecklistArgs) 
 
   function toggle(id: string) {
     if (!storageKey) return;
-    setChecklists((current) => {
-      const currentDone = current[storageKey] ?? readChecklist(storageKey);
-      const next = { ...currentDone, [id]: !currentDone[id] };
-      if (typeof globalThis.window !== 'undefined') {
-        globalThis.window.localStorage.setItem(storageKey, JSON.stringify(next));
-      }
-      return { ...current, [storageKey]: next };
-    });
+    const next = { ...done, [id]: !done[id] };
+    setChecklists((current) => ({ ...current, [storageKey]: next }));
+    if (typeof globalThis.window === 'undefined') return;
+    try {
+      globalThis.window.localStorage.setItem(storageKey, JSON.stringify(next));
+    } catch {
+      // The in-memory update remains authoritative when storage is unavailable.
+    }
   }
 
   function exportPlan() {

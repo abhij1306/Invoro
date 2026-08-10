@@ -671,17 +671,6 @@ export const LogTerminal = memo(function LogTerminal({
             return (
               <section key={group.key} id={siteDomId(group.key)} className="overflow-hidden">
                 <div
-                  role="button"
-                  tabIndex={0}
-                  aria-expanded={expanded}
-                  aria-label={`${expanded ? 'Collapse' : 'Expand'} logs for ${group.url || group.label}`}
-                  onClick={() => toggleGroup(group.key)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      toggleGroup(group.key);
-                    }
-                  }}
                   className={cn(
                     'group/row grid w-full cursor-pointer items-center gap-3 px-6 py-1 text-left text-xs transition-colors outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-inset',
                     isRunEventGroup
@@ -800,7 +789,18 @@ export const LogTerminal = memo(function LogTerminal({
                       )}
                     </div>
                   ) : null}
-                  <div className="flex items-center justify-end gap-1.5 pr-2">
+                  <button
+                    type="button"
+                    aria-expanded={isLiveActive ? undefined : expanded}
+                    aria-label={
+                      isLiveActive
+                        ? `Active logs for ${group.url || group.label}`
+                        : `${expanded ? 'Collapse' : 'Expand'} logs for ${group.url || group.label}`
+                    }
+                    disabled={isLiveActive}
+                    onClick={() => toggleGroup(group.key)}
+                    className="focus-ring flex items-center justify-end gap-1.5 rounded-sm pr-2"
+                  >
                     <span className="text-muted font-mono text-xs uppercase">
                       {isLiveActive ? (
                         <span className="text-accent flex items-center gap-1.5 font-semibold">
@@ -824,7 +824,7 @@ export const LogTerminal = memo(function LogTerminal({
                         )}
                       />
                     )}
-                  </div>
+                  </button>
                 </div>
 
                 {expanded ? (
@@ -936,7 +936,7 @@ export const LogTerminal = memo(function LogTerminal({
             </div>
             <div className="relative h-[calc(100%-56px)] overflow-hidden p-6">
               <div className="group relative h-full">
-                <div className="absolute top-3 right-3 z-10 opacity-0 transition-all group-hover:opacity-100">
+                <div className="absolute top-3 right-3 z-10 opacity-0 transition-opacity group-hover:opacity-100">
                   <Button
                     type="button"
                     variant="quiet"
