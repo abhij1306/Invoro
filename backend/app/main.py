@@ -245,28 +245,28 @@ def _crawler_app_state(fastapi_app: FastAPI | None = None) -> CrawlerAppState:
 async def _public_auth_session(request: Request):
     override = request.app.dependency_overrides.get(get_db)
     if override is None:
-        async with SessionLocal() as session:
-            yield session
+        async with SessionLocal() as default_session:
+            yield default_session
         return
     value = override()
     if inspect.isawaitable(value):
         value = await value
     if inspect.isasyncgen(value):
-        session = await anext(value)
+        override_session = await anext(value)
         try:
-            yield session
+            yield override_session
         finally:
             await value.aclose()
         return
     if inspect.isgenerator(value):
         try:
-            session = value.send(None)
+            override_session = next(value)
         except StopIteration as exc:
             raise RuntimeError("Database session dependency did not yield") from exc
-        if session is None:
+        if override_session is None:
             raise RuntimeError("Database session dependency did not yield")
         try:
-            yield session
+            yield override_session
         finally:
             value.close()
         return
