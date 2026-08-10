@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 
 import { cn } from '../../../lib/utils';
 import { Card } from '../card';
-import { Skeleton } from '../primitives';
+import { Skeleton } from '../skeleton';
 
 export function SectionHeader({
   title,
@@ -47,19 +47,21 @@ export function EmptyPanel({
 export function SectionCard({
   title,
   description,
+  icon: Icon,
   action,
   children,
   className,
 }: Readonly<{
   title: string;
   description?: ReactNode;
+  icon?: LucideIcon;
   action?: ReactNode;
   children: ReactNode;
   className?: string;
 }>) {
   return (
     <Card className={cn('section-card', className)}>
-      <SectionHeader title={title} description={description} action={action} />
+      <SectionHeader title={title} description={description} icon={Icon} action={action} />
       {children}
     </Card>
   );

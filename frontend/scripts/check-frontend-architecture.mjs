@@ -26,7 +26,7 @@ function read(relativePath) {
 for (const [relativePath, maxLines] of lineBudgets) {
   const content = read(relativePath);
   if (content === null) continue;
-  const lines = content.split(/\r?\n/).length;
+  const lines = content === '' ? 0 : content.replace(/\r?\n$/, '').split(/\r?\n/).length;
   if (lines > maxLines) {
     failures.push(`${relativePath} has ${lines} lines; limit is ${maxLines}.`);
   }

@@ -130,7 +130,7 @@ function RunRow({
             <Tooltip content={run.url} align="start">
               <Link
                 href={`/crawl?run_id=${run.id}`}
-                className="link-accent text-primary block max-w-[280px] truncate text-sm font-medium no-underline transition-colors"
+                className="link-accent text-foreground block max-w-[280px] truncate text-sm font-medium no-underline transition-colors"
               >
                 {domain || `Run #${run.id}`}
               </Link>
@@ -187,7 +187,7 @@ function RunRow({
       {/* Records */}
       <TableCell className="text-right">
         <span
-          className={cn('text-sm tabular-nums', recordCount > 0 ? 'text-primary' : 'text-muted')}
+          className={cn('text-sm tabular-nums', recordCount > 0 ? 'text-foreground' : 'text-muted')}
         >
           {recordCount > 0 ? recordCount.toLocaleString() : '—'}
         </span>

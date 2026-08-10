@@ -61,7 +61,9 @@ export function RunSummaryChips({
       ? TINT_BOX.success
       : normalizedVerdict === 'partial'
         ? TINT_BOX.warning
-        : TINT_BOX.danger;
+        : ['blocked', 'proxy_exhausted', 'error'].includes(normalizedVerdict)
+          ? TINT_BOX.danger
+          : NEUTRAL_MUTED_BOX;
   const qualityBox =
     normalizedQuality === 'high'
       ? TINT_BOX.success
@@ -83,6 +85,7 @@ export function RunSummaryChips({
         return (
           <div
             key={chip.key}
+            aria-label={`${chip.key}: ${chip.value}`}
             className={cn(
               'inline-flex h-6 items-center gap-1.5 rounded-full border px-2.5',
               chip.box,

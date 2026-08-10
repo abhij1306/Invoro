@@ -195,7 +195,7 @@
 }
 
 :global(.app-nav-item.is-active) {
-  background: var(--bg-panel) !important;
+  background: var(--bg-alt) !important;
   color: var(--text-primary) !important;
   font-weight: var(--weight-semibold);
   border-left: 0;

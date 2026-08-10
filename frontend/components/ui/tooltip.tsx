@@ -22,19 +22,37 @@ export function Tooltip({
   align?: 'center' | 'start';
 }>) {
   const tooltipId = useId();
-  const child = React.Children.only(children);
+  const childArray = React.Children.toArray(children);
+  const child =
+    childArray.length === 1 && React.isValidElement(childArray[0]) ? childArray[0] : null;
   const anchorRef = React.useRef<HTMLDivElement>(null);
   const tooltipRef = React.useRef<HTMLDivElement>(null);
+  const closeTimerRef = React.useRef<number | undefined>(undefined);
   const [open, setOpen] = React.useState(false);
   const [position, setPosition] = React.useState<{ left: number; top: number }>({
     left: 0,
     top: 0,
   });
-  const enhancedChild = React.isValidElement(child)
-    ? React.cloneElement(child, {
-        'aria-describedby': tooltipId,
-      } as React.HTMLAttributes<HTMLElement>)
-    : child;
+  const [placement, setPlacement] = React.useState<'top' | 'bottom'>('top');
+  const enhancedChild = child ? (
+    React.cloneElement(child, {
+      'aria-describedby': open ? tooltipId : undefined,
+    } as React.HTMLAttributes<HTMLElement>)
+  ) : (
+    <span>{children}</span>
+  );
+
+  function cancelClose() {
+    if (closeTimerRef.current !== undefined) {
+      window.clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = undefined;
+    }
+  }
+
+  function scheduleClose() {
+    cancelClose();
+    closeTimerRef.current = window.setTimeout(() => setOpen(false), 100);
+  }
 
   const updatePosition = React.useCallback(() => {
     if (!anchorRef.current || !tooltipRef.current) {
@@ -49,7 +67,13 @@ export function Tooltip({
         : anchorRect.left + anchorRect.width / 2 - tooltipRect.width / 2;
     const maxLeft = window.innerWidth - tooltipRect.width - margin;
     const nextLeft = Math.min(Math.max(idealLeft, margin), Math.max(margin, maxLeft));
-    const nextTop = Math.max(margin, anchorRect.top - tooltipRect.height - 8);
+    const gap = 8;
+    const fitsAbove = anchorRect.top - tooltipRect.height - gap >= margin;
+    const nextPlacement = fitsAbove ? 'top' : 'bottom';
+    const nextTop = fitsAbove
+      ? anchorRect.top - tooltipRect.height - gap
+      : Math.min(window.innerHeight - tooltipRect.height - margin, anchorRect.bottom + gap);
+    setPlacement(nextPlacement);
     setPosition({ left: nextLeft, top: nextTop });
   }, [align, setPosition]);
   const updatePositionEvent = React.useEffectEvent(updatePosition);
@@ -66,20 +90,35 @@ export function Tooltip({
       return;
     }
     const handleLayout = () => updatePositionEvent();
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
     window.addEventListener('resize', handleLayout);
     window.addEventListener('scroll', handleLayout, true);
+    document.addEventListener('keydown', handleKeyDown);
     return () => {
       window.removeEventListener('resize', handleLayout);
       window.removeEventListener('scroll', handleLayout, true);
+      document.removeEventListener('keydown', handleKeyDown);
     };
   }, [open]);
+
+  React.useEffect(() => {
+    const closeTimer = closeTimerRef;
+    return () => {
+      if (closeTimer.current !== undefined) window.clearTimeout(closeTimer.current);
+    };
+  }, []);
 
   return (
     <div
       ref={anchorRef}
       className={cn('relative flex items-center', className)}
-      onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
+      onMouseEnter={() => {
+        cancelClose();
+        setOpen(true);
+      }}
+      onMouseLeave={scheduleClose}
       onFocus={() => setOpen(true)}
       onBlur={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
@@ -94,8 +133,10 @@ export function Tooltip({
               ref={tooltipRef}
               id={tooltipId}
               role="tooltip"
+              onMouseEnter={cancelClose}
+              onMouseLeave={scheduleClose}
               className={cn(
-                'pointer-events-none fixed w-max max-w-[min(320px,calc(100vw-24px))]',
+                'fixed w-max max-w-[min(320px,calc(100vw-24px))]',
                 'bg-panel-strong border-border-strong rounded-md border px-2 py-1 shadow-sm',
                 'text-foreground z-[200] text-xs leading-normal font-medium break-words',
               )}
@@ -103,7 +144,12 @@ export function Tooltip({
             >
               {content}
               <div
-                className="border-border-strong bg-panel-strong absolute -bottom-[5px] size-2.5 border-r border-b"
+                className={cn(
+                  'border-border-strong bg-panel-strong absolute size-2.5',
+                  placement === 'top'
+                    ? '-bottom-[5px] border-r border-b'
+                    : '-top-[5px] border-t border-l',
+                )}
                 style={{
                   left: align === 'start' ? '12px' : '50%',
                   transform: align === 'start' ? 'rotate(45deg)' : 'translateX(-50%) rotate(45deg)',

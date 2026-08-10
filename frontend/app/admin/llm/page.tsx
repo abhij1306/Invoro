@@ -498,9 +498,11 @@ export default function AdminLlmPage() {
                   <TableBody>
                     {(() => {
                       const now = nowMs !== null ? new Date(nowMs) : null;
-                      const todayStr = now?.toDateString();
+                      const utcDay = (date: Date) =>
+                        date.toLocaleDateString('en-CA', { timeZone: 'UTC' });
+                      const todayStr = now ? utcDay(now) : undefined;
                       const yesterdayStr = now
-                        ? new Date(nowMs! - 86_400_000).toDateString()
+                        ? utcDay(new Date(now.getTime() - 86_400_000))
                         : undefined;
                       return costLog.slice(0, 40).map((entry) => {
                         const totalTokens = entry.input_tokens + entry.output_tokens;
@@ -554,7 +556,7 @@ export default function AdminLlmPage() {
                               <span className="type-caption-mono group-hover:text-foreground transition-colors">
                                 {(() => {
                                   const d = new Date(entry.created_at);
-                                  const dStr = d.toDateString();
+                                  const dStr = utcDay(d);
                                   const isToday = dStr === todayStr;
                                   const isYesterday = dStr === yesterdayStr;
 

@@ -1,7 +1,7 @@
 'use client';
 
-import { useId } from 'react';
-import type { ReactNode } from 'react';
+import { cloneElement, isValidElement, useId } from 'react';
+import type { HTMLAttributes, ReactNode } from 'react';
 
 import { cn } from '../../lib/utils';
 
@@ -10,23 +10,7 @@ import { cn } from '../../lib/utils';
  * error. Supports both standard nested child elements (for CrawlerAI backwards
  * compatibility) and the modern accessible render-prop pattern.
  */
-export function Field({
-  label,
-  hint,
-  error,
-  required,
-  className,
-  children,
-}: Readonly<{
-  label: string;
-  hint?: string;
-  error?: ReactNode;
-  required?: boolean;
-  className?: string;
-  children:
-    | ReactNode
-    | ((props: { id: string; 'aria-invalid'?: boolean; 'aria-describedby'?: string }) => ReactNode);
-}>) {
+export function Field({ label, hint, error, required, className, children }: Readonly<FieldProps>) {
   const id = useId();
   const hintId = `${id}-hint`;
   const errorId = `${id}-error`;
@@ -61,21 +45,33 @@ export function Field({
     );
   }
 
-  // Backwards compatibility fallback with native implicit labeling
+  const control = isValidElement(children)
+    ? cloneElement(children, {
+        id,
+        'aria-invalid': error ? true : undefined,
+        'aria-describedby': describedBy,
+      } as HTMLAttributes<HTMLElement>)
+    : children;
+
+  // Backwards compatibility fallback with an explicit label and description.
   return (
-    <label className={cn('grid cursor-text gap-1.5', className)}>
-      <span className="text-secondary text-sm font-medium">
+    <div className={cn('grid gap-1.5', className)}>
+      <label htmlFor={id} className="text-secondary cursor-text text-sm font-medium">
         {label}
         {required ? <span className="text-danger ml-0.5">*</span> : null}
-      </span>
-      {children}
-      {hint && !error ? <span className="text-muted text-xs">{hint}</span> : null}
+      </label>
+      {control}
+      {hint && !error ? (
+        <span id={hintId} className="text-muted text-xs">
+          {hint}
+        </span>
+      ) : null}
       {error ? (
-        <span role="alert" className="text-danger-text text-xs">
+        <span id={errorId} role="alert" className="text-danger-text text-xs">
           {error}
         </span>
       ) : null}
-    </label>
+    </div>
   );
 }
 export type FieldProps = {

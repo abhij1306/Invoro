@@ -14,6 +14,11 @@ export function Title({
   );
 }
 
-export function Subtitle({ children }: Readonly<{ children: ReactNode }>) {
-  return <p className="text-muted mt-1.5 max-w-2xl text-sm leading-relaxed">{children}</p>;
+export function Subtitle({
+  children,
+  className,
+}: Readonly<{ children: ReactNode; className?: string }>) {
+  return (
+    <p className={cn('type-body-sm mt-1.5 max-w-2xl leading-relaxed', className)}>{children}</p>
+  );
 }

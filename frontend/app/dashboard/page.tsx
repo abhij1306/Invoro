@@ -260,7 +260,7 @@ export default function DashboardPage() {
                   <Badge tone={statusTone(status)} flat={isSubduedStatus(status)}>
                     {statusLabel(status)}
                   </Badge>
-                  <span className="text-primary font-mono text-sm tabular-nums">{count}</span>
+                  <span className="text-foreground font-mono text-sm tabular-nums">{count}</span>
                 </div>
               ))}
             </div>

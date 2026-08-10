@@ -104,7 +104,8 @@ Primary files:
 - `components/crawl/use-crawl-config-lifecycle.ts`
 - `components/crawl/domain-surface-config.ts`
 - `components/crawl/crawl.module.css`
-- `components/crawl/shared.tsx`
+- `components/crawl/shared.ts` for pure types and helpers
+- `components/crawl/shared-components.tsx` for the compatibility component surface
 - `lib/constants/crawl-defaults.ts`
 
 Responsibilities:
@@ -141,7 +142,8 @@ Primary files:
 - `components/crawl/use-run-polling.ts`
 - `components/crawl/crawl-run-store.ts`
 - `components/crawl/alert-builder-drawer.tsx`
-- `components/crawl/shared.tsx`
+- `components/crawl/shared.ts` for pure types and helpers
+- `components/crawl/shared-components.tsx` for the compatibility component surface
 
 Responsibilities:
 

@@ -3,8 +3,9 @@
 import { History, X } from 'lucide-react';
 import React, { useEffect, useEffectEvent } from 'react';
 
-import { Badge, Button } from './primitives';
 import { cn } from '../../lib/utils';
+import { Badge } from './badge';
+import { Button } from './button';
 
 export type HistoryItem = {
   id: number;

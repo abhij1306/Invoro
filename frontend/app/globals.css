@@ -82,7 +82,7 @@
   --font-sans: var(--font-primary-family);
   --font-display: var(--font-display-family);
   --font-mono: var(--font-mono-family);
-  --text-2xs: var(--text-2xs);
+  --text-2xs: 0.625rem;
   --font-size-xs: var(--text-xs);
   --font-size-sm: var(--text-sm);
   --font-size-base: var(--text-base);
@@ -440,8 +440,6 @@ body {
   background-color: var(--bg-base);
   /* Refined-minimal: flat surfaces — no background imagery in either theme. */
   background-image: none;
-  background-position: center top;
-  /* background-attachment: fixed applied via @supports below (iOS Safari jank fix) */
   color: var(--text-primary);
   font-family: var(--font-primary-family);
   font-size: var(--text-base);
@@ -455,14 +453,6 @@ body {
   -moz-osx-font-smoothing: grayscale;
   isolation: isolate;
   text-size-adjust: 100%;
-}
-
-/* Fixed background: scoped to non-iOS to avoid GPU compositing jank on Safari */
-@supports not (-webkit-overflow-scrolling: touch) {
-  body,
-  html[data-theme='dark'] body {
-    background-attachment: fixed;
-  }
 }
 
 h1,
@@ -728,6 +718,17 @@ textarea:disabled {
   color: var(--text-primary);
 }
 
+.type-metric-display {
+  font-family: var(--font-mono-family);
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-semibold);
+  line-height: 1;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+  font-synthesis: none;
+  color: var(--text-primary);
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    FORM FIELD HELPERS
 ═══════════════════════════════════════════════════════════════════════ */
@@ -883,7 +884,8 @@ a.bg-success,
 }
 
 .surface-muted {
-  border: 1px solid var(--border);
+  border-width: 1px;
+  border-color: var(--border);
   background: var(--bg-alt);
 }
 
@@ -1236,6 +1238,11 @@ html:not([data-theme='dark']) .compact-data-table {
   select:focus-visible,
   textarea:focus-visible {
     outline: 3px solid ButtonText;
+  }
+
+  .slider-control:focus-visible {
+    outline: 3px solid ButtonText;
+    outline-offset: 2px;
   }
 
   .skeleton {

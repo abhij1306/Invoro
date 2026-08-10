@@ -1,5 +1,5 @@
 import { Children, isValidElement } from 'react';
-import type { ComponentPropsWithoutRef, ReactNode } from 'react';
+import type { ComponentPropsWithoutRef } from 'react';
 
 import { cn } from '../../lib/utils';
 
@@ -12,20 +12,22 @@ export function Card({
   children,
   className,
   animate,
+  padded,
   ...props
-}: Readonly<ComponentPropsWithoutRef<'section'> & { animate?: boolean }>) {
+}: Readonly<ComponentPropsWithoutRef<'section'> & { animate?: boolean; padded?: boolean }>) {
   const hasCompound = Children.toArray(children).some(
     (child) =>
       isValidElement(child) &&
       (child.type === CardHeader || child.type === CardContent || child.type === CardFooter),
   );
+  const shouldPad = padded ?? !hasCompound;
 
   return (
     <section
       {...props}
       className={cn(
         'border-border bg-panel shadow-card rounded-lg border',
-        hasCompound ? 'p-0' : 'p-[var(--card-padding)]',
+        shouldPad ? 'p-[var(--card-padding)]' : 'p-0',
         animate && 'animate-fade-in',
         className,
       )}
@@ -81,7 +83,7 @@ export function CardContent({
   children,
   className,
   ...props
-}: Readonly<ComponentPropsWithoutRef<'div'> & { children: ReactNode }>) {
+}: Readonly<ComponentPropsWithoutRef<'div'>>) {
   return (
     <div {...props} className={cn('p-[var(--card-padding)]', className)}>
       {children}

@@ -162,6 +162,7 @@ export function Sidebar({ pathname }: Readonly<{ pathname: string }>) {
                   <Link
                     key={item.href}
                     href={item.href as Route}
+                    aria-label={item.label}
                     title={collapsed ? item.label : undefined}
                     className={cn(
                       'app-nav-item relative',

@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 
 import { cn } from '../../../lib/utils';
 import { InlineAlert } from '../alert';
-import { Skeleton } from '../primitives';
+import { Skeleton } from '../skeleton';
 import { EmptyPanel, SkeletonRows, SurfacePanel } from './sections';
 
 export function TableSurface({
@@ -84,7 +84,7 @@ export function NavList<T>({
           <button
             key={key}
             type="button"
-            aria-pressed={isActive}
+            aria-current={isActive ? 'true' : undefined}
             onClick={() => onSelect(key)}
             className={cn(
               'w-full rounded-lg border p-3 text-left transition-colors',
@@ -132,7 +132,7 @@ export function KVTile({
       <div
         className={cn(
           'text-foreground pt-1',
-          mono ? 'type-caption-mono !text-foreground font-medium' : 'type-control',
+          mono ? 'type-caption-mono text-foreground! font-medium' : 'type-control',
         )}
       >
         {value}
@@ -160,7 +160,7 @@ export function MetricPulseItem({
 }>) {
   return (
     <div className="border-border bg-panel shadow-card relative flex flex-col gap-2 rounded-lg border px-4 py-3.5">
-      <div className="text-muted flex items-center gap-2 text-xs font-medium tracking-[0.07em] uppercase">
+      <div className="type-micro-label flex items-center gap-2">
         {Icon && <Icon className="text-subtle size-3.5" />}
         {label}
         {pulse ? (
@@ -170,9 +170,7 @@ export function MetricPulseItem({
           />
         ) : null}
       </div>
-      <div className="text-foreground text-[27px] leading-none font-semibold tracking-[-0.03em] tabular-nums">
-        {value}
-      </div>
+      <div className="type-metric-display">{value}</div>
       {trend ? <div className="mt-auto">{trend}</div> : null}
     </div>
   );

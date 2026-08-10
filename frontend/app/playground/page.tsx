@@ -819,8 +819,8 @@ function NavTreeNode({
       </div>
       {hasChildren && isOpen && (
         <div className="space-y-1">
-          {node.children.map((child) => {
-            const childKey = `${nodeKey}-${child.url ?? child.label}`;
+          {node.children.map((child, childIndex) => {
+            const childKey = `${nodeKey}-${child.url ?? child.label}-${childIndex}`;
             return (
               <NavTreeNode
                 key={childKey}

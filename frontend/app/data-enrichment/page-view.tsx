@@ -511,7 +511,7 @@ export default function DataEnrichmentPage() {
               const badgeValue = record.id ?? record.source_url;
               return (
                 <div
-                  key={record.id ?? record.source_url ?? JSON.stringify(record.data)}
+                  key={record.id == null ? `record-index-${index}` : `record-${record.id}`}
                   className="hover:bg-accent/[0.04] flex items-center gap-3 px-4 py-2.5 transition-colors"
                 >
                   <span className="text-muted w-6 shrink-0 font-mono text-xs">{index + 1}</span>

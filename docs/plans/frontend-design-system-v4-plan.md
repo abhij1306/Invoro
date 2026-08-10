@@ -31,7 +31,7 @@ Port CrawlerAI's v4 visual system and shell to Invoro's Next.js frontend, use lo
 ### Slice 1: Baseline And Canonical Foundations
 
 **Status:** DONE
-**Files:** `frontend/app/globals.css`, `frontend/app/layout.tsx`, `frontend/app/fonts/*`, `docs/DESIGN.md`
+**Files:** `frontend/app/globals.css`, `frontend/app/layout.tsx`, `frontend/app/fonts/*`, `docs/design.md`
 **What:** Record LOC and React Doctor baselines, port v4 tokens and global rules, install approved local fonts, and synchronize design documentation.
 **Verify:** formatting, typecheck, build, token guard, font asset inventory.
 
@@ -63,9 +63,16 @@ Port CrawlerAI's v4 visual system and shell to Invoro's Next.js frontend, use lo
 **What:** Commit scoped changes, push, open a non-draft PR, wait for green CI, merge, and synchronize local main.
 **Verify:** merged PR; local HEAD equals origin/main; user deletions remain preserved.
 
+### Slice 6: Review, Dependency, And Environment Hygiene
+
+**Status:** DONE
+**Files:** reviewed frontend owners, dependency manifests and locks, Python/tooling pins, frontend smoke workflow
+**What:** Validate and resolve PR bot feedback, harden affected UI behavior, remove unused frontend dependencies, upgrade compatible locks, pin Python to 3.12, and rebuild local environments from clean generated state.
+**Verify:** focused UI tests, frontend lint/type/architecture/build, Python 3.12 config tests, frozen lock validation, and green CI.
+
 ## Doc Updates Required
 
-- [x] `docs/DESIGN.md` -- canonical v4 system and typography.
+- [x] `docs/design.md` -- canonical v4 system and typography.
 - [x] `docs/frontend-architecture.md` -- shared UI ownership and CI guard.
 - [ ] `docs/CODEBASE_MAP.md` -- only if ownership paths change.
 
@@ -73,7 +80,9 @@ Port CrawlerAI's v4 visual system and shell to Invoro's Next.js frontend, use lo
 
 - Baseline worktree contained user deletions of `.codacy.yaml` and `.deepsource.toml`.
 - CrawlerAI is Vite; only visual system, shell geometry, and reusable patterns port to Next.js.
-- React Doctor: 59/100 with 81 findings before; 84/100 with 15 warnings and zero errors after. Correctness, accessibility, and security are all zero.
-- Non-test frontend app/components LOC: 28,582 on `main` to 26,381, a reduction of 2,201 lines (7.7%). The 15% target remained directional.
+- React Doctor: 59/100 with 81 findings before; 81/100 with 17 warnings and zero errors after the review pass. The <=40 target remains met.
+- Non-test frontend app/components LOC: 28,582 on `main` to 26,516, a reduction of 2,066 lines (7.23%). The 15% target remained directional.
 - Local verification: formatting, ESLint, typecheck, token/crawl/frontend architecture guards, production build, nine focused Vitest cases, and Impeccable detector all passed.
 - Browser-control runtime was unavailable in this session; responsive/theme behavior is covered by focused shell tests and production build, with full Playwright smoke retained in CI.
+- PR review follow-up fixed valid bot findings across identity keys, UTC formatting, storage resilience, accessible controls, dropdown/tooltip behavior, semantic typography, forced-colors focus, table borders, and architecture line counting. Invalid findings were documented rather than implemented.
+- Dependency hygiene removed five unused frontend direct dependencies, upgraded compatible frontend/backend locks, pinned Python to the 3.12 family, and rebuilt `.env`, `node_modules`, and `.venv` after deleting generated caches.

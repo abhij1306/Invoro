@@ -68,7 +68,7 @@ User/API request
 
 ## Prerequisites
 
-- Python 3.12+
+- Python 3.12
 - Node.js 20+
 - PostgreSQL 15+
 - Redis 7+

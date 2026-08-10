@@ -1,26 +1,28 @@
 import { cva } from 'class-variance-authority';
 
+const PRIMARY_VARIANT = 'border-transparent bg-accent text-accent-fg hover:bg-accent-hover';
+const GHOST_VARIANT =
+  'border-transparent bg-transparent text-secondary hover:bg-background-alt hover:text-foreground';
+const DESTRUCTIVE_VARIANT = 'border-transparent bg-transparent text-danger-text hover:bg-danger-bg';
+
 export const buttonVariants = cva(
-  'focus-ring inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-sm border font-sans font-medium leading-none no-underline transition-[background-color,color,border-color,box-shadow] disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50',
+  'focus-ring inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-sm border font-sans font-medium leading-none no-underline transition-[background-color,color,border-color,box-shadow] disabled:cursor-not-allowed disabled:opacity-50',
   {
     variants: {
       variant: {
-        primary: 'border-transparent bg-accent text-accent-fg hover:bg-accent-hover',
+        primary: PRIMARY_VARIANT,
         secondary: 'border-border-strong bg-panel text-foreground hover:bg-background-alt',
         neutral: 'border-border bg-background-alt text-foreground hover:bg-panel-strong',
-        ghost:
-          'border-transparent bg-transparent text-secondary hover:bg-background-alt hover:text-foreground',
-        destructive: 'border-transparent bg-transparent text-danger-text hover:bg-danger-bg',
-        topbar:
-          'border-transparent bg-transparent text-secondary hover:bg-background-alt hover:text-foreground',
+        ghost: GHOST_VARIANT,
+        destructive: DESTRUCTIVE_VARIANT,
+        topbar: GHOST_VARIANT,
         underline:
           'border-transparent bg-transparent text-accent-text underline hover:text-accent-hover',
-        action: 'border-transparent bg-accent text-accent-fg hover:bg-accent-hover',
-        accent: 'border-transparent bg-accent text-accent-fg hover:bg-accent-hover',
-        quiet:
-          'border-transparent bg-transparent text-secondary hover:bg-background-alt hover:text-foreground',
+        action: PRIMARY_VARIANT,
+        accent: PRIMARY_VARIANT,
+        quiet: GHOST_VARIANT,
         download: 'border-border bg-background-alt text-foreground hover:bg-panel-strong',
-        danger: 'border-transparent bg-transparent text-danger-text hover:bg-danger-bg',
+        danger: DESTRUCTIVE_VARIANT,
       },
       size: {
         sm: 'h-[var(--control-height-sm)] px-2.5 text-xs',

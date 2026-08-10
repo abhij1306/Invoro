@@ -22,7 +22,11 @@ export function Dropdown<T extends string>({
   onChange,
   options,
   ariaLabel,
+  id,
+  'aria-describedby': ariaDescribedBy,
+  'aria-invalid': ariaInvalid,
   className,
+  triggerClassName,
   disabled = false,
   align = 'left',
   size = 'md',
@@ -32,13 +36,18 @@ export function Dropdown<T extends string>({
   onChange: (value: T) => void;
   options: Array<{ value: T; label: string }>;
   ariaLabel?: string;
+  id?: string;
+  'aria-describedby'?: string;
+  'aria-invalid'?: boolean | 'true' | 'false';
   className?: string;
+  triggerClassName?: string;
   disabled?: boolean;
   align?: 'left' | 'center';
   size?: 'sm' | 'md';
   portal?: boolean;
 }>) {
   const [open, setOpen] = React.useState(false);
+  const [highlightedIndex, setHighlightedIndex] = React.useState(-1);
   const containerRef = React.useRef<HTMLDivElement>(null);
   const listboxRef = React.useRef<HTMLDivElement>(null);
   const [listboxPosition, setListboxPosition] = React.useState<{
@@ -52,8 +61,8 @@ export function Dropdown<T extends string>({
   const activeIndex = options.findIndex((o) => o.value === value);
   const listboxId = `${dropdownId}-listbox`;
   const activeDescendant =
-    activeIndex >= 0
-      ? `${dropdownId}-option-${activeIndex}-${sanitizeIdSegment(options[activeIndex].value)}`
+    open && highlightedIndex >= 0 && options[highlightedIndex]
+      ? `${dropdownId}-option-${highlightedIndex}-${sanitizeIdSegment(options[highlightedIndex].value)}`
       : undefined;
 
   if (process.env.NODE_ENV === 'development' && activeIndex === -1 && options.length > 0) {
@@ -90,14 +99,21 @@ export function Dropdown<T extends string>({
 
   React.useLayoutEffect(() => {
     if (open) {
-      updatePosition();
-      const handleResize = () => updatePosition();
-      const handleScroll = () => updatePosition();
-      window.addEventListener('resize', handleResize);
-      window.addEventListener('scroll', handleScroll, true);
+      let frameId: number | undefined;
+      const schedulePositionUpdate = () => {
+        if (frameId !== undefined) return;
+        frameId = window.requestAnimationFrame(() => {
+          frameId = undefined;
+          updatePosition();
+        });
+      };
+      schedulePositionUpdate();
+      window.addEventListener('resize', schedulePositionUpdate);
+      window.addEventListener('scroll', schedulePositionUpdate, { passive: true, capture: true });
       return () => {
-        window.removeEventListener('resize', handleResize);
-        window.removeEventListener('scroll', handleScroll, true);
+        if (frameId !== undefined) window.cancelAnimationFrame(frameId);
+        window.removeEventListener('resize', schedulePositionUpdate);
+        window.removeEventListener('scroll', schedulePositionUpdate, { capture: true });
       };
     }
   }, [open, updatePosition]);
@@ -135,20 +151,28 @@ export function Dropdown<T extends string>({
   function handleKeyDown(e: React.KeyboardEvent) {
     if (!open && (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown')) {
       e.preventDefault();
+      setHighlightedIndex(activeIndex >= 0 ? activeIndex : 0);
       setOpen(true);
       return;
     }
     if (!open) return;
+    if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && options.length === 0) {
+      e.preventDefault();
+      return;
+    }
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      const next = (activeIndex + 1) % options.length;
-      onChange(options[next].value);
+      setHighlightedIndex((current) => (current < 0 ? 0 : (current + 1) % options.length));
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      const prev = (activeIndex - 1 + options.length) % options.length;
-      onChange(options[prev].value);
+      setHighlightedIndex((current) =>
+        current < 0 ? 0 : (current - 1 + options.length) % options.length,
+      );
     } else if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
+      if (highlightedIndex >= 0 && options[highlightedIndex]) {
+        onChange(options[highlightedIndex].value);
+      }
       setOpen(false);
     }
   }
@@ -194,17 +218,19 @@ export function Dropdown<T extends string>({
             type="button"
             role="option"
             aria-selected={option.value === value}
+            data-highlighted={index === highlightedIndex ? '' : undefined}
             onClick={() => {
               onChange(option.value);
               setOpen(false);
             }}
             onMouseDown={(e) => e.preventDefault()}
+            onMouseEnter={() => setHighlightedIndex(index)}
             className={cn(
               'text-2xs flex w-full items-center py-2 leading-snug transition-colors',
               align === 'center' ? 'justify-center px-8' : 'justify-start px-3',
               option.value === value
                 ? 'bg-accent-subtle text-accent font-medium'
-                : 'text-foreground hover:bg-background-alt',
+                : 'text-foreground hover:bg-background-alt data-[highlighted]:bg-background-alt',
             )}
           >
             {option.label}
@@ -221,6 +247,7 @@ export function Dropdown<T extends string>({
       onMouseEnter={() => {
         if (!disabled) {
           cancelClose();
+          setHighlightedIndex(activeIndex >= 0 ? activeIndex : 0);
           setOpen(true);
         }
       }}
@@ -229,21 +256,27 @@ export function Dropdown<T extends string>({
       }}
     >
       <button
+        id={id}
         type="button"
         role="combobox"
         aria-expanded={open}
         aria-label={ariaLabel}
+        aria-describedby={ariaDescribedBy}
+        aria-invalid={ariaInvalid}
         aria-haspopup="listbox"
         aria-controls={listboxId}
         aria-activedescendant={activeDescendant}
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          if (!open) setHighlightedIndex(activeIndex >= 0 ? activeIndex : 0);
+          setOpen((current) => !current);
+        }}
         disabled={disabled}
         onKeyDown={handleKeyDown}
         className={cn(
           'focus-ring border-border bg-panel text-foreground hover:border-border-strong focus:border-accent flex w-full items-center gap-2 rounded-sm border px-3 text-xs leading-snug font-normal transition-[background-color,border-color]',
           size === 'sm' ? 'h-8' : 'h-[var(--control-height)]',
           align === 'center' ? 'justify-center text-center' : 'justify-between text-left',
-          className,
+          triggerClassName,
         )}
       >
         <span className="truncate">{selectedLabel}</span>

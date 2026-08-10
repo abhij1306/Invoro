@@ -791,8 +791,13 @@ export const LogTerminal = memo(function LogTerminal({
                   ) : null}
                   <button
                     type="button"
-                    aria-expanded={expanded}
-                    aria-label={`${expanded ? 'Collapse' : 'Expand'} logs for ${group.url || group.label}`}
+                    aria-expanded={isLiveActive ? undefined : expanded}
+                    aria-label={
+                      isLiveActive
+                        ? `Active logs for ${group.url || group.label}`
+                        : `${expanded ? 'Collapse' : 'Expand'} logs for ${group.url || group.label}`
+                    }
+                    disabled={isLiveActive}
                     onClick={() => toggleGroup(group.key)}
                     className="focus-ring flex items-center justify-end gap-1.5 rounded-sm pr-2"
                   >
