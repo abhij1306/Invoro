@@ -3286,6 +3286,30 @@ async def test_fetch_page_uses_remaining_timeout_budget_across_http_and_browser_
 
 @pytest.mark.asyncio
 @pytest.mark.component
+async def test_run_browser_attempts_skips_engine_when_shared_deadline_expired(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    context = _default_fetch_context()
+    context.deadline_monotonic = time.perf_counter() - 1.0
+    browser_fetch = AsyncMock()
+    host_slot = AsyncMock()
+
+    monkeypatch.setattr(crawl_fetch_runtime, "_browser_fetch", browser_fetch)
+    monkeypatch.setattr(crawl_fetch_runtime, "wait_for_host_slot", host_slot)
+
+    with pytest.raises(TimeoutError, match="budget exhausted before patchright"):
+        await crawl_fetch_runtime.run_browser_attempts(
+            context,
+            reason="test shared deadline",
+            host_policy=HostProtectionPolicy(host="example.com"),
+        )
+
+    host_slot.assert_not_awaited()
+    browser_fetch.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.component
 async def test_run_browser_attempts_caps_patchright_probe_timeout_for_vendor_block(
     monkeypatch: pytest.MonkeyPatch,
     patch_settings,

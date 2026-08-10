@@ -57,7 +57,7 @@ Reduce backend acquisition, extraction, and critical-test debt without changing 
 **Verify:** Focused acquisition set, touched-path static scans, then one safe full suite.
 
 ### Slice 3: Remove duplicate analysis and adapter work
-**Status:** TODO
+**Status:** DONE
 **Files:** readiness/page flow, extraction adapter orchestration, focused acquisition/extraction tests
 **What:** Reuse cached `HtmlAnalysis`; build one ordered unique adapter-evidence stream; keep listing short-circuit and detail all-source behavior; add existing-span work attributes; stop attempts when the shared deadline has no usable budget.
 **Verify:** Focused tests prove one parse per snapshot, unique adapter calls, source ordering, and exhausted-deadline behavior; static scans; one safe full suite.
@@ -126,3 +126,8 @@ Reduce backend acquisition, extraction, and critical-test debt without changing 
   - Static scans: Ruff clean; Vulture found no 100%-confidence dead code; touched-path Radon average B/6.97; touched-path jscpd reports 55 clones / 959 lines. `browser_policy.py` tops out at C/13; public result-builder helpers top out at C/19.
   - Required safe full suite ran exactly once: 2,411 selected / 17 deselected. It reached 51%, then exposed one selector-synthesis assertion and a repeatable native access violation in the microdata fallback. Per protocol, the full suite was not rerun. Only the reported nodes were fixed and rerun.
   - Safe-suite blocker fixes: declarative shadow-root content now survives reduced-HTML cloning; microdata ancestor checks use the DOM wrapper's safe `has_attr` contract instead of mapping access. Both reported nodes pass. The worktree venv is pinned to installed Python 3.14.6; Python 3.14.0 reproduced the same native microdata crash before the safe wrapper fix.
+- Slice 3 verification (2026-08-10):
+  - Browser settling passes its cached `HtmlAnalysis` into readiness probing. Adapter orchestration now strips empty evidence and globally deduplicates primary HTML, full rendered HTML, composed listing fragments, and serialized network payloads in that order. Detail still evaluates every unique source; sufficient listings still stop early.
+  - Existing adapter spans now record input, empty-skip, duplicate-skip, call-count, and elapsed-millisecond attributes. Browser attempts already enforced the shared deadline before and after host-slot waiting; a public orchestration test now locks the zero-budget behavior.
+  - Focused adapter/readiness/deadline nodes: 4 passed. Focused acquisition set: 311 passed / 10 deselected in 74.71s. Ruff clean; Vulture found no 80%-confidence dead code; touched Radon average B/8.13; touched jscpd reports one clone / 11 lines.
+  - Required safe full suite ran exactly once: 2,412 selected / 17 deselected; 2,383 passed, 25 skipped, and 4 failed in 819.37s. Two variant fixtures remain reproducibly red in the existing DOM-variant owner and are assigned to Slice 6. Two structure ratchets remain red and are assigned to Slice 7. Per protocol, the full suite was not rerun; the two reported variant nodes were rerun directly and remained red.

@@ -305,6 +305,7 @@ async def settle_browser_page_impl(
             surface=surface,
             listing_override=readiness_override,
             html=cached_html,
+            analysis=cached_analysis,
         )
 
     current_probe = await _cached_probe(refresh_html=True)

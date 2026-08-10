@@ -772,14 +772,16 @@ async def test_settle_browser_page_skips_platform_selector_when_probe_is_ready()
     None
 ):
     calls = {"probe": 0, "wait": 0}
+    probe_analyses: list[object] = []
 
     async def get_page_html_impl(_page):
         await _async_checkpoint()
         return "<html><body>Searching...</body></html>"
 
-    async def probe_browser_readiness(*_args, **_kwargs):
+    async def probe_browser_readiness(*_args, **kwargs):
         await _async_checkpoint()
         calls["probe"] += 1
+        probe_analyses.append(kwargs.get("analysis"))
         return {
             "is_ready": True,
             "matched_listing_selectors": 0 if calls["probe"] == 1 else 1,
@@ -816,6 +818,7 @@ async def test_settle_browser_page_skips_platform_selector_when_probe_is_ready()
     _current_probe, readiness_probes, *_rest = result
 
     assert calls["wait"] == 0
+    assert probe_analyses and all(analysis is not None for analysis in probe_analyses)
     assert [probe["stage"] for probe in readiness_probes] == [
         "after_navigation",
     ]
