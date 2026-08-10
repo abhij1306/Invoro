@@ -1,12 +1,18 @@
 # Active Plan
 
-No active plan.
+**Current:** None
+**Status:** IDLE
+**Last completed:** Frontend Design System v4 And Debt Reduction — 2026-08-10
 
 ## Queue
+
 1. LOC and Complexity Reduction from Duplication Audits → `docs/plans/loc-complexity-reduction-plan.md` — blocked on external extraction smoke DNS/browser failure
 2. Agentic Browser Playground → `docs/plans/agentic-browser-playground-plan.md` — queued, not yet started
 
 ## Previously Completed
+
+- Frontend Design System v4 And Debt Reduction → `docs/plans/frontend-design-system-v4-plan.md`
+  (DONE 2026-08-10; CrawlerAI v4 system and shell standardized; Satoshi/Switzer local fonts; shared UI hubs split; React Doctor 81 → 15; frontend LOC -7.7%; pnpm CI repaired)
 - Core Architecture Production Hardening → `docs/plans/core-architecture-production-hardening-plan.md`
   (DONE 2026-06-11; core-only architecture hardening; private reach-ins removed from pipeline, Product Intelligence, and detail identity tests; fetch compatibility shim removed; config export magic reduced; backend `pytest tests -q` 1364 passed)
 - Site-Link Category Discovery for Crawl Studio → `docs/plans/site-link-category-discovery-plan.md`

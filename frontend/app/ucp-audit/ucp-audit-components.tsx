@@ -802,7 +802,7 @@ export function UcpFixSequence({ report }: Readonly<{ report: UcpAuditReport | n
             </div>
             <div className="bg-border h-2 w-full shrink-0 overflow-hidden rounded-full md:w-48">
               <div
-                className="bg-success h-full rounded-full transition-all duration-500"
+                className="bg-success h-full rounded-full transition-[width] duration-500"
                 style={{ width: `${progressPercent}%` }}
               />
             </div>
@@ -816,7 +816,7 @@ export function UcpFixSequence({ report }: Readonly<{ report: UcpAuditReport | n
                 <li
                   key={item.id}
                   className={cn(
-                    'grid gap-3 px-4 py-3.5 transition-all sm:grid-cols-[auto_1fr_auto] sm:items-start',
+                    'grid gap-3 px-4 py-3.5 transition-[background-color,border-color,color] sm:grid-cols-[auto_1fr_auto] sm:items-start',
                     isChecked ? 'bg-background/10 opacity-70' : 'hover:bg-background/20',
                   )}
                 >
@@ -824,7 +824,7 @@ export function UcpFixSequence({ report }: Readonly<{ report: UcpAuditReport | n
                     type="button"
                     onClick={() => toggle(item.id)}
                     className={cn(
-                      'border-border mt-0.5 flex size-5 cursor-pointer items-center justify-center rounded-sm border transition-all',
+                      'border-border mt-0.5 flex size-5 cursor-pointer items-center justify-center rounded-sm border transition-[background-color,border-color,color]',
                       isChecked
                         ? 'bg-success border-success text-white'
                         : 'bg-background hover:border-accent',

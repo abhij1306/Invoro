@@ -9,7 +9,7 @@ import { api } from '../../lib/api';
 import type { PageAuditContext } from '../../lib/api/types';
 import { PageHeader, TabBar } from '../ui/patterns';
 import { Badge, Button, Card, Dropdown } from '../ui/primitives';
-import { TargetUrlField } from './shared';
+import { TargetUrlField } from './shared-components';
 
 export function CrawlWorkspaceTabs({
   value,

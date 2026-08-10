@@ -24,32 +24,38 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Enable Corepack
+        run: corepack enable
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Dependency vulnerability scan
-        run: npm audit --audit-level=high
+        run: pnpm audit --audit-level=high
 
       - name: Check formatting
-        run: npm run format:check
+        run: pnpm run format:check
 
       - name: Run ESLint
-        run: npm run lint:eslint
+        run: pnpm run lint:eslint
 
       - name: Check token escapes
-        run: npm run check:tokens
+        run: pnpm run check:tokens
 
       - name: Check crawl architecture
-        run: npm run check:crawl-architecture
+        run: pnpm run check:crawl-architecture
+
+      - name: Check frontend architecture
+        run: pnpm run check:frontend-architecture
 
       - name: Typecheck
-        run: npm run typecheck
+        run: pnpm run typecheck
 
       - name: Run unit tests
-        run: npm test
+        run: pnpm test
 
       - name: Build
-        run: npm run build
+        run: pnpm run build

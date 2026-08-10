@@ -13,21 +13,23 @@ import { getNormalizedDomain } from '../../lib/format/domain';
 import { telemetryErrorPayload, trackEvent } from '../../lib/telemetry/events';
 import {
   AdditionalFieldInput,
-  clampNumber,
   CsvFileField,
-  deriveSurface,
   FieldEditorHeader,
-  type FieldRow,
   ManualFieldEditor,
-  parseRequestedCategoryMode,
-  parseRequestedCrawlTab,
-  parseLines,
-  parseRequestedPdpMode,
   SettingSection,
   SliderRow,
   SitemapConfigFields,
   TargetUrlField,
+} from './shared-components';
+import {
+  clampNumber,
+  deriveSurface,
+  type FieldRow,
   normalizeField,
+  parseLines,
+  parseRequestedCategoryMode,
+  parseRequestedCrawlTab,
+  parseRequestedPdpMode,
   uniqueRequestedFields,
 } from './shared';
 import {

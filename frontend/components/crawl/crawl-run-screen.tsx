@@ -37,8 +37,8 @@ import { POLLING_INTERVALS, RETRY_LIMITS } from '../../lib/constants/timing';
 import { getDomain } from '../../lib/format/domain';
 import { telemetryErrorPayload, trackEvent } from '../../lib/telemetry/events';
 import { parseApiDate } from '../../lib/format/date';
+import { ActionButton, LogTerminal, RecordsTable } from './shared-components';
 import {
-  ActionButton,
   cleanRecordForDisplay,
   copyJson,
   extractRecordUrl,
@@ -50,10 +50,8 @@ import {
   humanizeQuality,
   inferDomainFromSurface,
   isListingRun,
-  LogTerminal,
   mergeLogs,
   type OutputTabKey,
-  RecordsTable,
   scrollViewportToBottom,
   selectorWinnerLabel,
   uniqueStrings,
@@ -865,9 +863,7 @@ export function CrawlRunScreen({ runId }: Readonly<CrawlRunScreenProps>) {
                             visibleColumns={visibleColumns}
                             selectedIds={visibleSelectedIds}
                             onSelectAll={(checked) =>
-                              selectAll(
-                                checked ? tableRecords.map((record) => record.id) : [],
-                              )
+                              selectAll(checked ? tableRecords.map((record) => record.id) : [])
                             }
                             onToggleRow={toggleRecord}
                           />

@@ -130,5 +130,9 @@ export function HistoryDrawer({
 function formatShortDate(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  });
 }

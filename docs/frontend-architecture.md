@@ -194,9 +194,9 @@ Responsibilities:
 Primary files:
 
 - `components/ui/button.tsx`, `badge.tsx`, `input.tsx`, `card.tsx`, `metric.tsx`, `table.tsx`, `alert.tsx`, and `dialog.tsx` for typed primitive owners
-- `components/ui/primitives.tsx` as the compatibility barrel plus dropdown, toggle, tooltip, skeleton, and field helpers
-- `components/ui/patterns.tsx` for shared operator-page patterns
-- `components/ui/table.module.css` for compact and commerce table styling
+- `components/ui/primitives.tsx` as a thin compatibility barrel; dropdown, field, skeleton, toggle, tooltip, and typography each have focused owners
+- `components/ui/patterns.tsx` as a thin compatibility barrel over focused control, data-display, page-header, run-workspace, and section modules
+- `components/layout/app-shell.tsx`, `sidebar.tsx`, and `logo-mark.tsx` for separate shell, navigation, and brand ownership
 - `app/product-intelligence/product-intelligence-components.tsx`, `product-intelligence-results.tsx`, and `product-intelligence-candidate-card.tsx` for Product Intelligence local UI pieces, result summaries, source-vs-candidate comparison rows, confidence reason chips, and URL selection actions; crawl result screens can prefill Product Intelligence from both listing and ecommerce detail records
 - `components/monitors/*` for Monitor and Alert Management list/detail/form/event/history/snapshot components
 - `app/ucp-audit/ucp-audit-components.tsx` for UCP audit report UI pieces
@@ -206,8 +206,9 @@ Global CSS policy:
 - `app/globals.css` owns tokens, reset, shared browser defaults, animations, and cross-feature utilities only.
 - App/auth shell CSS lives under `components/layout/`.
 - Crawl Studio feature CSS lives under `components/crawl/`.
-- Table CSS lives under `components/ui/table.module.css`.
+- Dense table geometry and semantic styling live in the table primitive and global design tokens.
 - New JSX should use semantic Tailwind tokens such as `bg-background`, `text-muted`, `border-border`, and `shadow-card`. Raw `bg-[var(--...)]`, `text-[var(--...)]`, `border-[var(--...)]`, and `shadow-[var(--...)]` escapes are blocked by `frontend/scripts/check-token-escapes.mjs`.
+- `frontend/scripts/check-frontend-architecture.mjs` ratchets shared-owner sizes, required design-system owners, local font assets, and explicit transition properties. Frontend CI runs both guards through pnpm.
 
 ## 4. Live Backend API Usage
 
@@ -319,10 +320,9 @@ There is also Playwright e2e coverage under `frontend/e2e`.
 
 - The frontend is intentionally thin on domain logic; the backend owns crawl semantics.
 - `lib/api/index.ts` should remain the single access layer for backend calls.
-- `components/crawl/shared.tsx` is a real shared hub and should not quietly become a second application framework.
-- `components/ui/patterns.tsx` now owns the shared operator-page section framing (`SectionCard`, `SurfaceSection`, `MutedPanelMessage`) so dashboard/admin/tool pages do not hand-roll their own section chrome.
+- `components/crawl/shared.ts` owns pure crawl types and helpers; `shared-components.tsx` owns the compatibility component surface. Do not recombine them.
+- `components/ui/patterns/` owns shared operator-page framing while `patterns.tsx` remains re-exports only.
 - `components/ui/dialog.tsx` owns destructive confirmations; browser `alert()` and `confirm()` are not used in app/components code.
-- `components/ui/table.module.css` owns compact and commerce table styling while table call sites keep grep-friendly class names during migration.
 - When backend record contracts change, update `lib/api/types.ts` and this doc together.
 
 ## 9. Companion Docs

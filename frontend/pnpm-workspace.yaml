@@ -2,3 +2,10 @@ allowBuilds:
   msw: true
   sharp: true
   unrs-resolver: true
+minimumReleaseAge: 10080
+trustPolicy: no-downgrade
+trustPolicyExclude:
+  - ast-v8-to-istanbul@1.0.2
+  - eslint-import-resolver-typescript@3.10.1
+  - reselect@5.1.1
+  - semver@6.3.1

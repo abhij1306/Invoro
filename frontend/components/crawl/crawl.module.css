@@ -45,11 +45,11 @@
 }
 
 :global(.cs-live-dot.is-error) {
-  background: var(--color-danger, #ef4444);
+  background: var(--danger);
 }
 
 :global(.cs-live-dot.is-success) {
-  background: var(--color-success, #22c55e);
+  background: var(--success);
 }
 
 :global(.cs-panel-header) {

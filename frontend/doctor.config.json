@@ -1,8 +1,9 @@
 {
+  "$schema": "https://react.doctor/schema/config.json",
   "lint": true,
   "deadCode": false,
   "verbose": false,
-  "failOn": "none",
+  "blocking": "error",
   "ignore": {
     "rules": [
       "react-doctor/no-giant-component",

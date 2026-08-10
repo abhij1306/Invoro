@@ -410,7 +410,7 @@ export function ManualFieldEditor({
           <span className={cn('field-label', !showLabels && 'sr-only')}>Field</span>
           <Input
             id={fieldNameId}
-            aria-label="Field"
+            aria-label="Manual field name"
             value={row.fieldName}
             onChange={(event) => onChange({ fieldName: event.target.value })}
             placeholder="price"
