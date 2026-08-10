@@ -1395,6 +1395,7 @@ function roadmapPriorityTone(priority: string) {
 function statusTone(status?: string) {
   if (status === 'complete') return 'success';
   if (status === 'failed') return 'danger';
+  if (status === 'cancelled') return 'neutral';
   if (status === 'queued' || status === 'running') return 'warning';
   return 'neutral';
 }

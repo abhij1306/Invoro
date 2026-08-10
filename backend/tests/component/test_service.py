@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.ucp_audit import UCPAuditPageResult, UCPAuditReport
 from app.services.config.aid_score import (
+    AID_AUDIT_JOB_STATUS_CANCELLED,
     AID_AUDIT_JOB_STATUS_COMPLETE,
     AID_AUDIT_JOB_STATUS_QUEUED,
     AID_CATALOG_MODE,
@@ -21,6 +22,7 @@ from app.services.ucp_audit.catalog_crawl import CatalogCrawlResult
 from app.services.ucp_audit.service import (
     build_ucp_audit_job_payload,
     build_ucp_report_for_domain,
+    cancel_ucp_audit_job,
     create_ucp_audit_job,
     get_ucp_audit_job,
     list_ucp_audit_jobs,
@@ -120,6 +122,60 @@ async def test_aid_audit_run_job_persists_report_and_catalog_result(
     assert report.report_json["ucp_contract"]["catalog"]["pages_crawled"] == 2
     assert page_result.url == "https://example.com/"
     assert page_result.acquisition_mode == AID_CATALOG_MODE
+
+
+@pytest.mark.asyncio
+@pytest.mark.component
+async def test_aid_audit_cancel_marks_running_job_terminal(
+    db_session: AsyncSession,
+    test_user,
+) -> None:
+    job = await create_ucp_audit_job(
+        db_session,
+        user=test_user,
+        payload={"domain": "example.com"},
+    )
+
+    cancelled = await cancel_ucp_audit_job(db_session, user=test_user, job_id=job.id)
+
+    assert cancelled.status == AID_AUDIT_JOB_STATUS_CANCELLED
+    assert cancelled.completed_at is not None
+    assert "cancelled_at" in cancelled.summary
+
+
+@pytest.mark.asyncio
+@pytest.mark.component
+async def test_aid_audit_run_job_does_not_complete_cancelled_job(
+    db_session: AsyncSession,
+    test_user,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_report(
+        domain: str,
+        audit_id: str,
+        options: dict[str, object],
+        **kwargs,
+    ):
+        await cancel_ucp_audit_job(db_session, user=test_user, job_id=job.id)
+        return _sample_report(audit_id=audit_id)
+
+    monkeypatch.setattr(
+        "app.services.ucp_audit.service.build_ucp_report_for_domain",
+        fake_report,
+    )
+    job = await create_ucp_audit_job(
+        db_session,
+        user=test_user,
+        payload={"domain": "example.com"},
+    )
+
+    await run_job(db_session, job)
+
+    assert job.status == AID_AUDIT_JOB_STATUS_CANCELLED
+    report = await db_session.scalar(
+        select(UCPAuditReport).where(UCPAuditReport.job_id == job.id)
+    )
+    assert report is None
 
 
 @pytest.mark.asyncio

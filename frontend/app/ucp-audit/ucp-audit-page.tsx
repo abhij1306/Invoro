@@ -1,7 +1,16 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Download, Play, RefreshCcw, Layers, CheckSquare, History, Network } from 'lucide-react';
+import {
+  Download,
+  Play,
+  RefreshCcw,
+  Layers,
+  CheckSquare,
+  History,
+  Network,
+  Square,
+} from 'lucide-react';
 
 import { InlineAlert, PageHeader, TabBar } from '../../components/ui/patterns';
 import { Button, Input, Field, Toggle } from '../../components/ui/primitives';
@@ -90,6 +99,18 @@ export default function UcpAuditPage() {
                 Export report
               </Button>
             )}
+            {controller.isRunning ? (
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                onClick={controller.cancelAudit}
+                disabled={controller.cancelPending}
+              >
+                <Square className="size-3" />
+                {controller.cancelPending ? 'Stopping...' : 'Stop'}
+              </Button>
+            ) : null}
             <Button
               type="button"
               variant="action"

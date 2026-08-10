@@ -16,6 +16,7 @@ from app.schemas.ucp_audit import (
 )
 from app.services.ucp_audit.service import (
     build_ucp_audit_job_payload,
+    cancel_ucp_audit_job,
     create_ucp_audit_job,
     get_ucp_audit_job,
     get_ucp_audit_report,
@@ -74,6 +75,26 @@ async def get_job(
         ) from exc
     payload = await build_ucp_audit_job_payload(session, job=job)
     return UCPAuditJobDetailResponse.model_validate(payload)
+
+
+@router.post("/jobs/{job_id}/cancel")
+async def cancel_job(
+    job_id: int,
+    session: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+) -> UCPAuditJobResponse:
+    try:
+        job = await cancel_ucp_audit_job(session, user=user, job_id=job_id)
+    except LookupError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+    return UCPAuditJobResponse.model_validate(job, from_attributes=True)
 
 
 @router.get("/jobs/{job_id}/export.json")

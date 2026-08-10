@@ -6,7 +6,10 @@ from httpx import ASGITransport, AsyncClient
 
 from app.core.dependencies import get_current_user, get_db
 from app.main import app
-from app.services.config.ucp_audit import UCP_AUDIT_JOB_STATUS_QUEUED
+from app.services.config.ucp_audit import (
+    UCP_AUDIT_JOB_STATUS_CANCELLED,
+    UCP_AUDIT_JOB_STATUS_QUEUED,
+)
 
 
 @pytest_asyncio.fixture
@@ -55,6 +58,12 @@ async def test_ucp_audit_api_creates_and_reads_job(
     )
     assert detail_response.status_code == 200
     assert detail_response.json()["job"]["id"] == created["id"]
+
+    cancel_response = await ucp_audit_api_client.post(
+        f"/api/ucp-audit/jobs/{created['id']}/cancel"
+    )
+    assert cancel_response.status_code == 200
+    assert cancel_response.json()["status"] == UCP_AUDIT_JOB_STATUS_CANCELLED
 
 
 @pytest.mark.asyncio

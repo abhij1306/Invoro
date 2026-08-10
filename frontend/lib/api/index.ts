@@ -214,6 +214,8 @@ export const api = {
   },
   getUcpAuditJob: (jobId: number) =>
     apiClient.get<UcpAuditJobDetail>(`/api/ucp-audit/jobs/${jobId}`),
+  cancelUcpAuditJob: (jobId: number) =>
+    apiClient.post<UcpAuditJob>(`/api/ucp-audit/jobs/${jobId}/cancel`, {}),
   exportUcpAuditJson: (jobId: number) =>
     `${getApiBaseUrl()}/api/ucp-audit/jobs/${jobId}/export.json`,
   exportUcpAuditMarkdown: (jobId: number) =>

@@ -75,6 +75,8 @@ async def run_ucp_audit_job(job_id: int) -> None:
 
 
 async def run_job(session: AsyncSession, job: UCPAuditJob) -> None:
+    if job.status == config.AID_AUDIT_JOB_STATUS_CANCELLED:
+        return
     job.status = config.AID_AUDIT_JOB_STATUS_RUNNING
     job.summary = {
         **dict(job.summary or {}),
@@ -89,6 +91,11 @@ async def run_job(session: AsyncSession, job: UCPAuditJob) -> None:
         dict(job.options or {}),
         session=session,
     )
+
+    await session.refresh(job)
+    if job.status == config.AID_AUDIT_JOB_STATUS_CANCELLED:
+        return
+
     payload = build_report_payload(report)
     markdown = build_markdown_report(report)
 
@@ -121,6 +128,29 @@ async def run_job(session: AsyncSession, job: UCPAuditJob) -> None:
     }
     job.completed_at = datetime.now(UTC)
     await session.commit()
+
+
+async def cancel_ucp_audit_job(
+    session: AsyncSession,
+    *,
+    user: User,
+    job_id: int,
+) -> UCPAuditJob:
+    job = await get_ucp_audit_job(session, user=user, job_id=job_id)
+    if job.status not in {
+        config.AID_AUDIT_JOB_STATUS_QUEUED,
+        config.AID_AUDIT_JOB_STATUS_RUNNING,
+    }:
+        raise ValueError("Only queued or running audit jobs can be cancelled")
+    job.status = config.AID_AUDIT_JOB_STATUS_CANCELLED
+    job.summary = {
+        **dict(job.summary or {}),
+        "cancelled_at": datetime.now(UTC).isoformat(),
+    }
+    job.completed_at = datetime.now(UTC)
+    await session.commit()
+    await session.refresh(job)
+    return job
 
 
 async def build_ucp_report_for_domain(

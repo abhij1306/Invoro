@@ -4,7 +4,7 @@ setlocal
 set "ROOT=%~dp0"
 cd /d "%ROOT%"
 
-set "REDIS_URL=redis://localhost:6380/0"
+set "REDIS_URL=redis://localhost:6379/0"
 set "REDIS_STATE_ENABLED=false"
 set "CELERY_DISPATCH_ENABLED=true"
 set "INVORO_WORKER_COUNT=2"
@@ -85,7 +85,7 @@ goto :eof
 REM ------------------------------------------------------------------
 :check_redis
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-    "try { $u = [Uri]'%~1'; $port = if ($u.Port -gt 0) { $u.Port } else { 6380 }; $c = New-Object System.Net.Sockets.TcpClient($u.Host, $port); $c.Close(); exit 0 } catch { exit 1 }"
+    "try { $u = [Uri]'%~1'; $port = if ($u.Port -gt 0) { $u.Port } else { 6379 }; $c = New-Object System.Net.Sockets.TcpClient($u.Host, $port); $c.Close(); exit 0 } catch { exit 1 }"
 exit /b %errorlevel%
 
 :kill_window

@@ -68,6 +68,21 @@ export function useUcpAudit() {
     },
   });
 
+  const cancelMutation = useMutation({
+    mutationFn: (jobId: number) => api.cancelUcpAuditJob(jobId),
+    onSuccess: async (job) => {
+      setError('');
+      setActiveJobId(job.id);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['ucp-audit-jobs'] }),
+        queryClient.invalidateQueries({ queryKey: ['ucp-audit-job', job.id] }),
+      ]);
+    },
+    onError: (mutationError) => {
+      setError(mutationError instanceof Error ? mutationError.message : 'Unable to cancel audit.');
+    },
+  });
+
   function startAudit() {
     const validationError = validateDomain(domain);
     if (validationError) {
@@ -75,6 +90,12 @@ export function useUcpAudit() {
       return;
     }
     createMutation.mutate();
+  }
+
+  function cancelAudit() {
+    if (activeJob?.id && isRunning) {
+      cancelMutation.mutate(activeJob.id);
+    }
   }
 
   function updateDomain(value: string) {
@@ -91,6 +112,8 @@ export function useUcpAudit() {
 
   return {
     activeJob,
+    cancelAudit,
+    cancelPending: cancelMutation.isPending,
     createPending: createMutation.isPending,
     detail: detailQuery.data,
     detailQuery,
