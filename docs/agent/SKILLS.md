@@ -39,8 +39,8 @@ Use the smallest relevant verify step first, then broaden if shared behavior cha
    - alias or eligibility: `config/field_mappings.py`, `field_policy.py`
    - normalization: `field_value_core.py` or `field_value_*.py`
 3. Fix it there. Do not patch downstream.
-4. Run `pytest tests/regression/test_crawl_engine.py -q -m regression`
-5. Run `pytest tests -q -m "unit or component or regression"`
+4. Run `.\.venv\Scripts\python.exe -m pytest tests/regression/test_crawl_engine.py -q -m regression`
+5. Run `.\.venv\Scripts\python.exe -m pytest tests -q -m "unit or component or regression"`
 6. Update the active plan slice if one exists.
 
 Never fix extraction bugs in `pipeline/core.py`, `publish/verdict.py`, or `publish/metrics.py`.
@@ -91,7 +91,7 @@ Do not hardcode platform names in generic runtime paths.
 1. Grep all callers.
 2. Delete the dead symbol or file.
 3. Delete tests that only verify that dead private implementation.
-4. Run `pytest tests -q -m "unit or component or regression"`
+4. Run `.\.venv\Scripts\python.exe -m pytest tests -q -m "unit or component or regression"`
 5. Remove stale doc references.
 6. Do not leave re-export stubs.
 

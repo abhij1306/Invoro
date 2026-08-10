@@ -233,6 +233,7 @@ class _DomExpansionState:
 
 @dataclass(frozen=True, slots=True)
 class _ExpansionCandidate:
+    element_identity: str
     label: str
     probe: str
     aria_expanded: str
@@ -251,6 +252,8 @@ class _ExpansionCandidate:
 
     @property
     def key(self) -> tuple[str, str, str]:
+        if self.element_identity:
+            return self.element_identity, "", ""
         return self.label or self.probe, self.aria_controls, self.tag_name
 
 
@@ -290,7 +293,7 @@ def _new_dom_expansion_state(
             "clicked_count": 0,
             "expanded_elements": [],
             "interaction_failures": [],
-            "limit": int(crawler_runtime_settings.detail_expand_max_interactions),
+            "limit": max_interactions,
             "max_elapsed_ms": max_elapsed_ms,
         },
     )
@@ -357,7 +360,6 @@ def _candidate_action_label(
         return False, ""
     if candidate.key in seen_candidates:
         return False, ""
-    seen_candidates.add(candidate.key)
     matches = _expansion_candidate_matches(
         candidate,
         requested_fields=requested_fields,
@@ -377,6 +379,7 @@ def _candidate_action_label(
         return False, ""
     if not _expansion_candidate_is_in_safe_context(candidate, matches):
         return False, ""
+    seen_candidates.add(candidate.key)
     return True, candidate.label or candidate.probe
 
 
@@ -387,6 +390,7 @@ def _normalized_expansion_candidate(
         return str(snapshot.get(key) or "").strip().lower()
 
     return _ExpansionCandidate(
+        element_identity=normalized("element_identity"),
         label=normalized("label"),
         probe=normalized("probe"),
         aria_expanded=normalized("aria_expanded"),
@@ -947,17 +951,23 @@ async def _interactive_handle_is_visible(handle: Any) -> bool:
         return False
 
 
-async def _interactive_handle_context_flags(handle: Any) -> dict[str, bool]:
+async def _interactive_handle_context_flags(handle: Any) -> dict[str, object]:
     try:
         value = await handle.evaluate(
             """(node) => {
                 const flags = {
+                    elementIdentity: '',
                     insideMain: false,
                     insideHeader: false,
                     insideNav: false,
                     insideFooter: false,
                     insideAside: false,
                 };
+                const store = globalThis.__invoroDetailExpansionCandidates ??=
+                    {nodes: new WeakMap(), nextId: 1};
+                let identity = store.nodes.get(node);
+                if (!identity) { identity = `node-${store.nextId++}`; store.nodes.set(node, identity); }
+                flags.elementIdentity = identity;
                 let current = node instanceof Element ? node : null;
                 while (current) {
                     const tag = (current.tagName || '').toLowerCase();
@@ -977,6 +987,7 @@ async def _interactive_handle_context_flags(handle: Any) -> dict[str, bool]:
     if not isinstance(value, dict):
         return {}
     return {
+        "element_identity": str(value.get("elementIdentity") or ""),
         "inside_main": bool(value.get("insideMain")),
         "inside_header": bool(value.get("insideHeader")),
         "inside_nav": bool(value.get("insideNav")),

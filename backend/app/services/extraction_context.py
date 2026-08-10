@@ -29,12 +29,13 @@ class ExtractionContext:
     original_html: str
     cleaned_html: str
     dom_parser: LexborHTMLParser
+    noise_removed: bool = False
     _soup: HtmlDocument | None = None
     _original_soup: HtmlDocument | None = None
     _original_dom_parser: LexborHTMLParser | None = None
     _pruned_soup: HtmlDocument | None = None
     _pruned_dom_parser: LexborHTMLParser | None = None
-    _pruned_source_id: int | None = None
+    _pruned_source: HtmlDocument | None = None
     _pruned_page_url: str | None = None
     _js_state_objects: dict[str, Any] | None = None
 
@@ -69,19 +70,33 @@ class ExtractionContext:
         requested_page_url: str | None = None,
     ) -> HtmlDocument:
         current = self._pruned_soup
-        source_id = id(source_soup)
         if (
             current is None
-            or self._pruned_source_id != source_id
+            or self._pruned_source is not source_soup
             or self._pruned_page_url != requested_page_url
         ):
             parser = LexborHTMLParser(str(source_soup))
             current = HtmlDocument.from_parser(parser)
             object.__setattr__(self, "_pruned_dom_parser", parser)
             object.__setattr__(self, "_pruned_soup", current)
-            object.__setattr__(self, "_pruned_source_id", source_id)
+            object.__setattr__(self, "_pruned_source", source_soup)
             object.__setattr__(self, "_pruned_page_url", requested_page_url)
         return current
+
+    def pruned_dom_context(
+        self,
+        source_soup: HtmlDocument,
+        *,
+        requested_page_url: str | None = None,
+    ) -> tuple[LexborHTMLParser, HtmlDocument]:
+        soup = self.pruned_soup(
+            source_soup,
+            requested_page_url=requested_page_url,
+        )
+        parser = self._pruned_dom_parser
+        if parser is None:
+            raise RuntimeError("Pruned DOM parser was not initialized")
+        return parser, soup
 
     @property
     def js_state_objects(self) -> dict[str, Any]:
@@ -94,12 +109,14 @@ class ExtractionContext:
 
 def prepare_extraction_context(html: str) -> ExtractionContext:
     parser = LexborHTMLParser(html)
+    noise_removed = False
     try:
         for node in parser.css(NOISE_CONTAINER_REMOVAL_SELECTOR):
             tag = str(getattr(node, "tag", "") or "").strip().lower()
             if tag in {"html", "body"}:
                 continue
             node.decompose()
+            noise_removed = True
     except Exception as exc:
         logger.debug(
             "noise_removal_failed selector=%s error=%s",
@@ -111,6 +128,7 @@ def prepare_extraction_context(html: str) -> ExtractionContext:
         original_html=html,
         cleaned_html=cleaned_html or "",
         dom_parser=parser,
+        noise_removed=noise_removed,
     )
 
 

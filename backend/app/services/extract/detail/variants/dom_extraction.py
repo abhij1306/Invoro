@@ -175,52 +175,54 @@ def _collect_variant_choice_entries(
         50,
         "VARIANT_CHOICE_OPTION_LIMIT",
     )
-    option_nodes = list(container.select(str(VARIANT_STRONG_OPTION_SELECTOR)))[
-        :option_limit
-    ]
-    if len(option_nodes) < 2:
-        option_nodes = list(container.select(str(VARIANT_WEAK_OPTION_SELECTOR)))[
-            :option_limit
-        ]
-    for node in option_nodes:
-        if not weak_variant_option_node_allowed(
-            node,
-            container=container,
-            page_url=page_url,
-        ):
-            continue
-        raw_value = _variant_choice_entry_value(
-            container,
-            node,
-            axis_name=coercion_axis,
-            visible_text_cache=visible_text_cache,
-        )
-        cleaned = _resolved_variant_option_value(
-            coercion_axis,
-            raw_value,
-            page_url=page_url,
-        )
-        if not clean_text(cleaned) and coercion_axis == "color":
-            option_url = variant_option_url(
+
+    def candidate_rows(selector: str) -> list[tuple[Any, str]]:
+        rows: list[tuple[Any, str]] = []
+        for node in container.select(selector):
+            if not weak_variant_option_node_allowed(
+                node,
                 container=container,
-                node=node,
-                label_node=None,
+                page_url=page_url,
+            ):
+                continue
+            raw_value = _variant_choice_entry_value(
+                container,
+                node,
+                axis_name=coercion_axis,
+                visible_text_cache=visible_text_cache,
+            )
+            cleaned = _resolved_variant_option_value(
+                coercion_axis,
+                raw_value,
                 page_url=page_url,
             )
-            cleaned = _color_value_from_option_url(
-                option_url,
-                page_url=page_url,
-                title_hint=title_hint,
-            )
-            _log_url_color_fallback(
-                cleaned,
-                page_url=page_url,
-                option_url=str(option_url or ""),
-                title_hint=title_hint,
-            )
-        cleaned = _strip_variant_option_value_suffix_noise(cleaned)
-        if variant_option_value_is_noise(cleaned):
-            continue
+            if not clean_text(cleaned) and coercion_axis == "color":
+                option_url = variant_option_url(
+                    container=container,
+                    node=node,
+                    label_node=None,
+                    page_url=page_url,
+                )
+                cleaned = _color_value_from_option_url(
+                    option_url,
+                    page_url=page_url,
+                    title_hint=title_hint,
+                )
+                _log_url_color_fallback(
+                    cleaned,
+                    page_url=page_url,
+                    option_url=str(option_url or ""),
+                    title_hint=title_hint,
+                )
+            cleaned = _strip_variant_option_value_suffix_noise(cleaned)
+            if not variant_option_value_is_noise(cleaned):
+                rows.append((node, cleaned))
+        return rows
+
+    option_rows = candidate_rows(str(VARIANT_STRONG_OPTION_SELECTOR))
+    if len(option_rows) < 2:
+        option_rows = candidate_rows(str(VARIANT_WEAK_OPTION_SELECTOR))
+    for node, cleaned in option_rows[:option_limit]:
         entry = entries_by_value.setdefault(cleaned, {"value": cleaned})
         merge_variant_option_state(
             entry,
@@ -815,7 +817,10 @@ def _merge_state_axis_metadata(
     state_targets: dict[str, Any],
 ) -> None:
     for option_value, state_metadata in state_targets.items():
-        merged_metadata = axis_metadata.setdefault(option_value, {})
+        normalized_option_value = clean_text(option_value)
+        if not normalized_option_value:
+            continue
+        merged_metadata = axis_metadata.setdefault(normalized_option_value, {})
         for key in ("url", "variant_id", "image_url"):
             if state_metadata.get(key) not in (
                 None,

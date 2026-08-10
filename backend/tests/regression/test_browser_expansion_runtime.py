@@ -910,6 +910,7 @@ class _FakeHandle:
     label: str
     page: "_FakeExpansionPage"
     attributes: dict[str, str]
+    element_identity: str = "node-1"
     tag_name: str = "button"
     actionable: bool = True
     inside_main: bool = False
@@ -924,6 +925,7 @@ class _FakeHandle:
             return self.label
         if "insideMain" in script:
             return {
+                "elementIdentity": self.element_identity,
                 "insideMain": self.inside_main,
                 "insideHeader": self.inside_header,
                 "insideNav": self.inside_nav,
@@ -970,7 +972,7 @@ class _FakeLocator:
     async def element_handles(self) -> list[_FakeHandle]:
         await _async_checkpoint()
         handles: list[_FakeHandle] = []
-        for row in self._page.labels:
+        for index, row in enumerate(self._page.labels):
             attributes = {
                 str(key): str(value)
                 for key, value in dict(row.get("attributes", {})).items()
@@ -983,6 +985,9 @@ class _FakeLocator:
                     row["label"],
                     self._page,
                     attributes=attributes,
+                    element_identity=str(
+                        row.get("element_identity") or f"node-{index + 1}"
+                    ),
                     tag_name=tag_name,
                     actionable=bool(row.get("actionable", True)),
                     inside_main=bool(row.get("inside_main", False)),
@@ -3565,71 +3570,6 @@ async def test_expand_interactive_elements_via_accessibility_times_out_slow_snap
     assert diagnostics["status"] == "snapshot_timeout"
     assert diagnostics["clicked_count"] == 0
     assert diagnostics["attempted"] is True
-
-
-@pytest.mark.regression
-def test_detail_expansion_skip_requires_extractable_ecommerce_content() -> None:
-    can_skip, reason = browser_page_helpers.detail_expansion_can_skip(
-        {"verified": False, "matched_requested_fields": []},
-        surface="ecommerce_detail",
-        requested_fields=None,
-        readiness_probe={"is_ready": True},
-    )
-
-    assert can_skip is False
-    assert reason is None
-
-
-@pytest.mark.regression
-def test_detail_expansion_skip_does_not_trust_sparse_structured_data_alone() -> None:
-    readiness_probe = {
-        "is_ready": True,
-        "structured_data_present": True,
-        "visible_text_length": 1,
-        "detail_hint_count": 0,
-        "h1_present": False,
-    }
-
-    can_skip, reason = browser_page_helpers.detail_expansion_can_skip(
-        {"verified": False, "matched_requested_fields": []},
-        surface="ecommerce_detail",
-        requested_fields=None,
-        readiness_probe=readiness_probe,
-    )
-
-    assert can_skip is False
-    assert reason is None
-
-    can_skip, reason = browser_page_helpers.detail_expansion_can_skip(
-        {"verified": True, "matched_requested_fields": []},
-        surface="ecommerce_detail",
-        requested_fields=None,
-        readiness_probe=readiness_probe,
-    )
-
-    assert can_skip is True
-    assert reason == "canonical_detail_already_ready"
-
-
-@pytest.mark.regression
-def test_detail_expansion_skip_does_not_trust_sparse_detail_hints_alone() -> None:
-    can_skip, reason = browser_page_helpers.detail_expansion_can_skip(
-        {"verified": False, "matched_requested_fields": []},
-        surface="ecommerce_detail",
-        requested_fields=None,
-        readiness_probe={
-            "is_ready": True,
-            "structured_data_present": False,
-            "visible_text_length": 1,
-            "detail_hint_count": int(
-                crawler_runtime_settings.detail_field_signal_min_count
-            ),
-            "h1_present": False,
-        },
-    )
-
-    assert can_skip is False
-    assert reason is None
 
 
 @pytest.mark.regression

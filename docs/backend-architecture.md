@@ -260,7 +260,7 @@ Responsibilities:
 Current live behavior:
 
 - fetch results carry headers, blocked state, browser diagnostics, transient browser artifacts, and network payload metadata
-- callers pass an explicit `AcquisitionPolicy`; `acquirer.py` translates that policy to `crawl_fetch_runtime.fetch_page` knobs so raw fetch-runtime controls stay inside acquisition
+- callers pass an explicit `AcquisitionPolicy`; `acquirer.py` translates that policy to `fetch_context.fetch_page` knobs so raw fetch-runtime controls stay inside acquisition
 - browser runtime is pooled and exposes runtime snapshots
 - browser context identity is a minimal, host-OS-coherent UA de-headlessification (no `browserforge`, no fingerprint generator): `build_playwright_context_spec` rewrites the headless `HeadlessChrome` UA token to plain `Chrome` and emits matching `sec-ch-ua` client hints keyed off the host OS, because the engine runs headless bundled Chromium (see `docs/INVARIANTS.md` Rule 6, "Patchright runs headless bundled Chromium")
 - browser fetch uses `patchright` as the primary acquisition engine. There is no legacy `playwright-stealth` stack and no silent generic Chromium fallback. Explicit `real_chrome` remains an escalation lane for protected ecommerce detail pages and Product Intelligence native Google discovery when `C:\Program Files\Google\Chrome\Application\chrome.exe` (or `CRAWLER_RUNTIME_BROWSER_REAL_CHROME_EXECUTABLE_PATH`) is available.
@@ -322,10 +322,10 @@ Current live behavior:
 - `is_non_retryable_http_status` keeps `401` out of browser escalation (auth walls) while still escalating `403`/`429` challenges, and `classify_blocked_page` emits typed `BlockPageClassification` outcomes (`auth_wall`, `rate_limited`, `challenge_page`, ...) distinct from network failures
 - `classify_blocked_page` must keep provider/body evidence even on forced `403` / `429` outcomes; status-only early returns are not enough because recovery, diagnostics, and regression triage need the concrete blocker family
 - platform/runtime policy no longer hardcodes vendor-owned domains just to force browser usage; escalation is driven by runtime policy, response/header evidence, and structured blocker signatures
-- host pacing is now enforced before both HTTP and browser attempts in `crawl_fetch_runtime.py`, and protection evidence can temporarily widen the per-host interval instead of hammering the same blocked edge
+- host pacing is now enforced before both HTTP and browser attempts in `fetch/fetch_context.py`, and protection evidence can temporarily widen the per-host interval instead of hammering the same blocked edge
 - after browser navigation, blocked challenge pages now get one bounded recovery window: the runtime polls for clearance, checks Akamai-style `_abck` issuance when relevant, and only then performs a single paced reload before surfacing the failure
 - real-Chrome behavior realism is timeout bounded by `browser_behavior_realism_timeout_seconds`; the browser stage records timeout diagnostics and continues instead of letting mouse/scroll simulation consume the URL budget
-- the legacy `async def fetch_page` trampoline in `acquisition/runtime.py` has been removed; callers import `fetch_page` from `crawl_fetch_runtime` directly
+- the legacy `async def fetch_page` trampoline in `acquisition/runtime.py` has been removed; callers import `fetch_page` from `app.services.fetch.fetch_context` directly
 
 ### 6.4 Extraction
 

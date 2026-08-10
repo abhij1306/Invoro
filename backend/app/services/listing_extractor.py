@@ -692,6 +692,7 @@ def extract_listing_records(
         else None
     )
     rendered_dom_records: list[dict[str, Any]] = []
+    rendered_original_dom_records: list[dict[str, Any]] = []
     if isinstance(rendered_fragments, list):
         rendered_fragment_html = "\n".join(
             fragment
@@ -713,8 +714,37 @@ def extract_listing_records(
                 selector_rules=selector_rules,
                 record_dom_observed_selectors=record_dom_observed_selectors,
             )
-            if not rendered_dom_records:
-                rendered_dom_records = _dom_listing_stage(
+            if rendered_context.noise_removed:
+                rendered_original_parser = rendered_context.original_dom_parser
+                cleaned_detail_anchor_count = _detail_anchor_count(
+                    rendered_parser,
+                    page_url=page_url,
+                    surface=surface,
+                    fallback_fragment_limit=listing_fallback_fragment_limit,
+                )
+                original_detail_anchor_count = _detail_anchor_count(
+                    rendered_original_parser,
+                    page_url=page_url,
+                    surface=surface,
+                    fallback_fragment_limit=listing_fallback_fragment_limit,
+                )
+                original_materially_stronger = original_detail_anchor_count >= max(
+                    3,
+                    cleaned_detail_anchor_count + 2,
+                )
+                if not rendered_dom_records or original_materially_stronger:
+                    rendered_original_dom_records = _dom_listing_stage(
+                        rendered_original_parser,
+                        page_url=page_url,
+                        surface=surface,
+                        is_job_surface=is_job_surface,
+                        max_records=max_records,
+                        fallback_fragment_limit=listing_fallback_fragment_limit,
+                        selector_rules=selector_rules,
+                        record_dom_observed_selectors=record_dom_observed_selectors,
+                    )
+            elif not rendered_dom_records:
+                rendered_original_dom_records = _dom_listing_stage(
                     rendered_context.original_dom_parser,
                     page_url=page_url,
                     surface=surface,
@@ -763,6 +793,8 @@ def extract_listing_records(
         candidate_sets.append(("original_dom", original_dom_records))
     if rendered_dom_records:
         candidate_sets.append(("rendered_dom", rendered_dom_records))
+    if rendered_original_dom_records:
+        candidate_sets.append(("rendered_original_dom", rendered_original_dom_records))
     if visual_records:
         candidate_sets.append(("visual", visual_records))
     best_records = best_listing_candidate_set(

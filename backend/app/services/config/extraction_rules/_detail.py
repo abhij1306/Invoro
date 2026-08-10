@@ -165,9 +165,7 @@ DETAIL_LONG_TEXT_DISCLAIMER_PATTERNS = (
     r"\bshipping\s+and\s+returns?\b.{0,240}\b(?:orders?|privacy|policy|refunds?|returns?)\b",
     r"\bcookie\s+(?:notice|policy|preferences?)\b",
     r"\bprivacy\s+policy\b",
-    # Audit 2026-05-03 3.2: Shipping/fulfillment status blurbs leaked into
-    # Jordan 5 description. Context-bound so legitimate prose that mentions
-    # tracking or shipping is not rejected.
+    # Context-bound shipping filters avoid rejecting legitimate prose.
     r"\btracking\s+status\s+reads\b",
     r"\border\s+is\s+shipped\b.{0,120}\b(?:tracking|email)\b",
     r"\blabel\s+created\b.{0,80}\b(?:tracking|carrier|status|shipping|hours)\b",

@@ -718,6 +718,8 @@ async def _try_browser_http_handoff(
                 float(crawler_runtime_settings.browser_http_handoff_timeout_seconds),
                 resolve_http_timeout(context),
             )
+            if handoff_timeout <= 0:
+                return None
             try:
                 result = await _curl_fetch(
                     context.url,
@@ -805,16 +807,21 @@ async def _attempt_http_fetch(
             context.url,
             ttl_seconds=context.host_memory_ttl_seconds,
         )
-        http_timeout = resolve_http_timeout(context)
+        logged_timeout = resolve_http_timeout(context)
+        if logged_timeout <= 0:
+            return _http_attempt_failed
         await _emit_fetch_event(
             context.on_event,
             "info",
             (
                 f"HTTP fetch via {fetcher.__name__} "
-                f"(timeout={http_timeout:.1f}s, proxy={display_proxy(proxy)})"
+                f"(timeout={logged_timeout:.1f}s, proxy={display_proxy(proxy)})"
             ),
         )
+        # Event callbacks are awaited and may consume the remaining deadline.
         http_timeout = resolve_http_timeout(context)
+        if http_timeout <= 0:
+            return _http_attempt_failed
         if proxy is not None:
             return await fetcher(context.url, http_timeout, proxy=proxy)
         return await fetcher(context.url, http_timeout)

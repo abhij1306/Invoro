@@ -189,7 +189,7 @@ def _prepare_detail_extraction(
     raw_soup = context.original_soup
     if str(surface or "").strip().lower() == "ecommerce_detail":
         resolved_requested_page_url = text_or_none(requested_page_url) or page_url
-        soup = context.pruned_soup(
+        dom_parser, soup = context.pruned_dom_context(
             soup,
             requested_page_url=resolved_requested_page_url,
         )
