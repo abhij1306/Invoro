@@ -313,7 +313,7 @@ def _detail_title_matches_url(
 
 
 def _ecommerce_ready_card_count(soup: BeautifulSoup) -> int:
-    seen: set[int] = set()
+    seen: set[Any] = set()
     count = 0
     for selector in _ECOMMERCE_READY_CARD_SELECTORS:
         try:
@@ -321,10 +321,9 @@ def _ecommerce_ready_card_count(soup: BeautifulSoup) -> int:
         except Exception:
             nodes = []
         for node in nodes:
-            node_id = id(node)
-            if node_id in seen:
+            if node in seen:
                 continue
-            seen.add(node_id)
+            seen.add(node)
             if _ecommerce_node_has_product_evidence(node):
                 count += 1
     return count

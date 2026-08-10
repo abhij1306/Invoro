@@ -100,7 +100,12 @@ def _append_reduced_node(
     if node.name == "template" and not node.has_attr("shadowrootmode"):
         return 0
     serialized = str(node)
-    if len(serialized) <= budget:
+    contains_declarative_shadow_dom = (
+        node.name != "template"
+        and "<template" in serialized.lower()
+        and "shadowrootmode=" in serialized.lower()
+    )
+    if len(serialized) <= budget and not contains_declarative_shadow_dom:
         target_parent.append(deepcopy(node))
         return len(serialized)
     clone_attrs = {

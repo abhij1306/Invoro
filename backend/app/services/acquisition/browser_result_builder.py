@@ -12,13 +12,12 @@ from patchright.async_api import Error as PlaywrightError
 from patchright.async_api import TimeoutError as PlaywrightTimeoutError
 
 from app.services.acquisition.browser_capture import is_response_closed_error
+from app.services.acquisition import browser_page_helpers, browser_recovery
 from app.services.acquisition.browser_page_helpers import (
-    capture_listing_visual_elements as _capture_listing_visual_elements,
     location_interstitial_detected,
     object_int as _object_int,
 )
 from app.services.acquisition.browser_readiness import HtmlAnalysis
-from app.services.acquisition.browser_recovery import capture_rendered_listing_fragments
 from app.services.acquisition.runtime import BlockPageClassification, copy_headers
 from app.services.config.design_system import (
     DESIGN_SYSTEM_BROWSER_SNAPSHOT_SCRIPT,
@@ -412,7 +411,7 @@ class BrowserAcquisitionResultBuilder:
     ) -> tuple[list[object], dict[str, object]]:
         payload = self.payload
         started_at = time.perf_counter()
-        artifacts, capture_diagnostics = await _capture_listing_artifact_with_timeout(
+        artifacts, capture_diagnostics = await capture_listing_artifact_with_timeout(
             operation,
             stage=stage,
             url=payload.url,
@@ -423,7 +422,7 @@ class BrowserAcquisitionResultBuilder:
         return artifacts, capture_diagnostics
 
 
-async def _capture_listing_artifact_with_timeout(
+async def capture_listing_artifact_with_timeout(
     operation,
     *,
     stage: str,
@@ -575,7 +574,7 @@ def build_browser_artifacts(
     return artifacts
 
 
-def _ready_probe_supports_fast_finalize(
+def ready_probe_supports_fast_finalize(
     readiness_probes: list[dict[str, object]],
     *,
     surface: str | None,
@@ -634,9 +633,9 @@ async def finalize_browser_fetch(
     elapsed_ms,
     build_browser_diagnostics_impl=build_browser_diagnostics,
     build_browser_artifacts_impl=build_browser_artifacts,
-    capture_rendered_listing_fragments_impl=capture_rendered_listing_fragments,
-    capture_listing_visual_elements_impl=_capture_listing_visual_elements,
-    ready_probe_supports_fast_finalize_impl=_ready_probe_supports_fast_finalize,
+    capture_rendered_listing_fragments_impl=None,
+    capture_listing_visual_elements_impl=None,
+    ready_probe_supports_fast_finalize_impl=ready_probe_supports_fast_finalize,
     logger_impl=logger,
 ) -> dict[str, object]:
     builder = BrowserAcquisitionResultBuilder(
@@ -650,8 +649,14 @@ async def finalize_browser_fetch(
         elapsed_ms=elapsed_ms,
         build_browser_diagnostics_impl=build_browser_diagnostics_impl,
         build_browser_artifacts_impl=build_browser_artifacts_impl,
-        capture_rendered_listing_fragments_impl=capture_rendered_listing_fragments_impl,
-        capture_listing_visual_elements_impl=capture_listing_visual_elements_impl,
+        capture_rendered_listing_fragments_impl=(
+            capture_rendered_listing_fragments_impl
+            or browser_recovery.capture_rendered_listing_fragments
+        ),
+        capture_listing_visual_elements_impl=(
+            capture_listing_visual_elements_impl
+            or browser_page_helpers.capture_listing_visual_elements
+        ),
         ready_probe_supports_fast_finalize_impl=ready_probe_supports_fast_finalize_impl,
         logger_impl=logger_impl,
     )

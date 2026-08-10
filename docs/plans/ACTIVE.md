@@ -3,7 +3,7 @@
 **Current:** Backend Acquisition, Extraction, and Test Debt Refactor → `docs/plans/backend-core-debt-refactor-plan.md`
 **Status:** IN PROGRESS
 **Started:** 2026-08-10
-**Last slice completed:** Slice 1 — Start plan and capture baselines
+**Last slice completed:** Slice 2 — Clarify acquisition attempt and page-flow ownership
 
 ## Queue
 

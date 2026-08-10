@@ -51,7 +51,7 @@ Reduce backend acquisition, extraction, and critical-test debt without changing 
 **Verify:** Documentation inspection only; no pytest.
 
 ### Slice 2: Clarify acquisition attempt and page-flow ownership
-**Status:** TODO
+**Status:** DONE
 **Files:** `app/services/fetch/{fetch_context,browser_policy,types}.py`, acquisition browser page owners, nearby public-behavior tests
 **What:** Move pure attempt/proxy/deadline decisions into policy, retain typed state in types, keep fetch context orchestration-only, delete stale page-flow forwarding wrappers, and replace private-alias tests.
 **Verify:** Focused acquisition set, touched-path static scans, then one safe full suite.
@@ -119,3 +119,10 @@ Reduce backend acquisition, extraction, and critical-test debt without changing 
   - Parser construction by inspected representative path: ecommerce detail builds cleaned + original + pruned DOMs and reparses HTML once per quality-repair pass (4 builds when primary DOM supplies variants; 5 when original-DOM quality fallback runs); listing builds cleaned + original comparison DOMs (2), plus one composed rendered-fragment DOM when present (3); standalone visible-price repair builds one DOM. Slice 4 will replace this inspection baseline with construction-count tests.
   - Adapter invocation by inspected orchestration: one call per primary/browser-artifact/network input after separate per-category dedupe; duplicates are not eliminated across the whole evidence stream. Existing sufficient-listing fixture asserts one call. Detail has no global call-count guard and intentionally processes every source. Slice 3 will add ordered unique-input counters and contract tests.
   - No completed pytest baseline is recorded for this documentation-only commit. A delegated focused-acquisition attempt exceeded 64 seconds before producing a result and was stopped; static focused-suite baselines above are definition/LOC counts. Code slices own test execution.
+- Slice 2 verification (2026-08-10):
+  - Fetch policy now owns typed browser attempt plans, engine order/extension, deadline budgeting, HTTP timeout choice, handoff engine choice, and Patchright retry decisions. `fetch_context.py` retains I/O orchestration and host-memory updates.
+  - Removed page-flow forwarding/re-export debt. Runtime and tests call `browser_page_helpers.py` and `browser_result_builder.py` public owners. Page-flow dropped 68 lines; total slice delta is 321 additions / 411 deletions.
+  - Focused acquisition command selected 310 tests: 310 passed, 10 deselected in 49.97s.
+  - Static scans: Ruff clean; Vulture found no 100%-confidence dead code; touched-path Radon average B/6.97; touched-path jscpd reports 55 clones / 959 lines. `browser_policy.py` tops out at C/13; public result-builder helpers top out at C/19.
+  - Required safe full suite ran exactly once: 2,411 selected / 17 deselected. It reached 51%, then exposed one selector-synthesis assertion and a repeatable native access violation in the microdata fallback. Per protocol, the full suite was not rerun. Only the reported nodes were fixed and rerun.
+  - Safe-suite blocker fixes: declarative shadow-root content now survives reduced-HTML cloning; microdata ancestor checks use the DOM wrapper's safe `has_attr` contract instead of mapping access. Both reported nodes pass. The worktree venv is pinned to installed Python 3.14.6; Python 3.14.0 reproduced the same native microdata crash before the safe wrapper fix.

@@ -55,33 +55,33 @@ from app.services.config.runtime_settings import (
 )
 from app.services.platform_policy import resolve_platform_runtime_policy
 from app.services.fetch.browser_policy import (
-    browser_engine_attempts as _browser_engine_attempts_impl,
+    browser_attempt_timeout_seconds,
+    browser_engine_attempts,
+    build_browser_attempt_plan,
     browser_escalation_allowed as _browser_escalation_allowed,
-    browser_escalation_lane as _browser_escalation_lane,
     browser_escalation_proxies as _browser_escalation_proxies,
     browser_first_decision as _browser_first_decision,
     browser_first_reason as _browser_first_reason,
     attach_browser_attempt_diagnostics as _attach_browser_attempt_diagnostics,
     attach_exception_browser_diagnostics as _attach_exception_browser_diagnostics,
-    durable_vendor_block_engine_attempts as _durable_vendor_block_engine_attempts,
+    extend_browser_engine_attempts_after_block,
     extract_vendor_from_reason as _extract_vendor_from_reason,
     hard_browser_requirement as _hard_browser_requirement,
     host_policy_snapshot as _host_policy_snapshot,
     is_vendor_block_reason as _is_vendor_block_reason,
     normalize_fetch_mode as _normalize_fetch_mode,
     normalize_proxy_profile as _normalize_proxy_profile,
+    handoff_cookie_engines,
+    resolve_http_timeout,
     resolve_browser_reason as _resolve_browser_reason,
     resolve_proxy_attempts as _resolve_proxy_attempts,
+    should_retry_patchright_with_real_chrome,
     vendor_confirmed_block as _vendor_confirmed_block,
 )
 from app.services.fetch.types import FetchPageCall, FetchRuntimeContext
 from app.services.shared.url_utils import ensure_scheme
 
 logger = logging.getLogger(__name__)
-
-_FetchRuntimeContext = FetchRuntimeContext
-_FetchPageCall = FetchPageCall
-
 
 async def _emit_fetch_event(on_event: Any | None, level: str, message: str) -> None:
     if not callable(on_event):
@@ -90,26 +90,6 @@ async def _emit_fetch_event(on_event: Any | None, level: str, message: str) -> N
         await on_event(level, message)
     except Exception:
         logger.debug("Fetch event callback failed", exc_info=True)
-
-
-def _should_retry_patchright_with_real_chrome(
-    *,
-    context: "_FetchRuntimeContext",
-    exc: Exception,
-    browser_engine: str,
-    engine_attempts: list[str],
-) -> bool:
-    if str(context.forced_browser_engine or "").strip():
-        return False
-    if browser_engine != "patchright":
-        return False
-    if "real_chrome" in engine_attempts:
-        return False
-    if not bool(crawler_runtime_settings.browser_real_chrome_enabled):
-        return False
-    if not real_chrome_browser_available():
-        return False
-    return "ERR_HTTP2_PROTOCOL_ERROR" in str(exc or "").upper()
 
 
 async def _get_shared_http_client(*, proxy: str | None = None):
@@ -162,7 +142,7 @@ async def reset_fetch_runtime_state() -> None:
     await close_adapter_shared_http_client()
 
 
-def _build_fetch_runtime_context(call: _FetchPageCall) -> _FetchRuntimeContext:
+def _build_fetch_runtime_context(call: FetchPageCall) -> FetchRuntimeContext:
     resolved_timeout_source = call.timeout_seconds
     if resolved_timeout_source is None:
         resolved_timeout_source = (
@@ -173,7 +153,7 @@ def _build_fetch_runtime_context(call: _FetchPageCall) -> _FetchRuntimeContext:
             "fetch_page requires timeout_seconds or "
             "crawler_runtime_settings.acquisition_attempt_timeout_seconds"
         )
-    return _FetchRuntimeContext(
+    return FetchRuntimeContext(
         url=call.url,
         resolved_timeout=float(resolved_timeout_source),
         deadline_monotonic=time.perf_counter() + float(resolved_timeout_source),
@@ -212,64 +192,6 @@ def _build_fetch_runtime_context(call: _FetchPageCall) -> _FetchRuntimeContext:
     )
 
 
-def _remaining_browser_timeout_seconds(context: _FetchRuntimeContext) -> float:
-    return context.deadline_monotonic - time.perf_counter()
-
-
-def _browser_attempt_timeout_seconds(
-    context: _FetchRuntimeContext,
-    *,
-    reason: str,
-    browser_engine: str,
-    engine_index: int,
-    engine_attempts: list[str],
-    host_policy: HostProtectionPolicy | None = None,
-) -> float:
-    remaining_timeout = _remaining_browser_timeout_seconds(context)
-    if (
-        browser_engine == "patchright"
-        and _is_vendor_block_reason(reason)
-        and not str(context.forced_browser_engine or "").strip()
-        and _patchright_probe_cap_applies(
-            host_policy=host_policy,
-            reason=reason,
-            engine_attempts=engine_attempts,
-        )
-    ):
-        return min(
-            remaining_timeout,
-            float(crawler_runtime_settings.browser_vendor_block_probe_timeout_seconds),
-        )
-    return remaining_timeout
-
-
-def _patchright_probe_cap_applies(
-    *,
-    host_policy: HostProtectionPolicy | None,
-    reason: str,
-    engine_attempts: list[str],
-) -> bool:
-    """Probe-cap Patchright when real Chrome is already queued.
-
-    Vendor-blocked pages need enough remaining acquisition budget for the
-    stronger engine. Without this cap Patchright can burn most of the URL-local
-    budget and leave real Chrome too little time to navigate.
-    """
-    expected_vendor = _extract_vendor_from_reason(reason) or ""
-    if not expected_vendor:
-        return False
-    if "real_chrome" in engine_attempts:
-        return True
-    if host_policy is None:
-        return False
-    if not bool(host_policy.patchright_blocked):
-        return False
-    if not bool(host_policy.prefer_browser):
-        return False
-    last_vendor = str(host_policy.last_block_vendor or "").strip().lower()
-    return expected_vendor == last_vendor
-
-
 async def fetch_page(
     url: str,
     *,
@@ -295,7 +217,7 @@ async def fetch_page(
     max_records: int | None = None,
     on_event: Any | None = None,
 ) -> PageFetchResult:
-    call = _FetchPageCall(
+    call = FetchPageCall(
         url=ensure_scheme(url),
         run_id=run_id,
         timeout_seconds=timeout_seconds,
@@ -438,7 +360,7 @@ async def fetch_page(
 
 def _acquisition_strategy_message(
     *,
-    context: _FetchRuntimeContext,
+    context: FetchRuntimeContext,
     prefer_browser: bool,
     host_preference_enabled: bool,
     browser_first: bool,
@@ -452,55 +374,18 @@ def _acquisition_strategy_message(
     if not crawler_runtime_settings.force_httpx:
         return (
             "Acquisition strategy: http-first "
-            f"(fetch_mode={context.fetch_mode}, timeout={_resolve_http_timeout(context):.1f}s, "
+            f"(fetch_mode={context.fetch_mode}, timeout={resolve_http_timeout(context):.1f}s, "
             "curl=primary, httpx_fallback=on_transport_failure)"
         )
     return (
         "Acquisition strategy: http-first "
-        f"(fetch_mode={context.fetch_mode}, timeout={_resolve_http_timeout(context):.1f}s, "
+        f"(fetch_mode={context.fetch_mode}, timeout={resolve_http_timeout(context):.1f}s, "
         "httpx=primary)"
     )
 
 
-def _attach_proxy_run_session(proxy_url: str, *, run_id: int | None) -> str:
-    from app.services.fetch.browser_policy import attach_proxy_run_session
-
-    return attach_proxy_run_session(proxy_url, run_id=run_id)
-
-
-def _browser_engine_attempts(
-    *,
-    context: _FetchRuntimeContext,
-    host_policy: HostProtectionPolicy,
-) -> list[str]:
-    return _browser_engine_attempts_impl(
-        context=context,
-        host_policy=host_policy,
-        real_chrome_available=real_chrome_browser_available(),
-    )
-
-
-def _extend_browser_engine_attempts_after_block(
-    *,
-    engine_attempts: list[str],
-    attempted_engine: str,
-    context: _FetchRuntimeContext,
-    host_policy: HostProtectionPolicy,
-) -> list[str]:
-    refreshed_attempts = _browser_engine_attempts(
-        context=context,
-        host_policy=host_policy,
-    )
-    appended = list(engine_attempts)
-    for engine in refreshed_attempts:
-        if engine == attempted_engine or engine in appended:
-            continue
-        appended.append(engine)
-    return appended
-
-
 async def _run_browser_attempts(
-    context: _FetchRuntimeContext,
+    context: FetchRuntimeContext,
     *,
     reason: str,
     requested_fields: list[str] | None = None,
@@ -531,31 +416,26 @@ async def _run_browser_attempts(
     context.host_policy = active_host_policy
     browser_proxies = list(proxies or context.proxies)
     for proxy_attempt_index, proxy in enumerate(browser_proxies, start=1):
-        engine_attempts = _browser_engine_attempts(
+        attempt_plan = build_browser_attempt_plan(
             context=context,
             host_policy=active_host_policy,
-        )
-        engine_attempts = _durable_vendor_block_engine_attempts(
-            engine_attempts=engine_attempts,
-            host_policy=active_host_policy,
-            forced_engine=context.forced_browser_engine,
-        )
-        escalation_lane = _browser_escalation_lane(
-            context=context,
             reason=reason,
-            host_policy=active_host_policy,
             proxy=proxy,
+            proxy_attempt_index=proxy_attempt_index,
+            real_chrome_available=real_chrome_browser_available(),
+            engine_selector=browser_engine_attempts,
         )
+        engine_attempts = list(attempt_plan.engine_attempts)
+        escalation_lane = attempt_plan.escalation_lane
         engine_index = 0
         while engine_index < len(engine_attempts):
             browser_engine = engine_attempts[engine_index]
             engine_index += 1
             host_policy_snapshot = _host_policy_snapshot(active_host_policy)
-            remaining_timeout = _browser_attempt_timeout_seconds(
+            remaining_timeout = browser_attempt_timeout_seconds(
                 context,
                 reason=reason,
                 browser_engine=browser_engine,
-                engine_index=engine_index,
                 engine_attempts=engine_attempts,
                 host_policy=active_host_policy,
             )
@@ -569,11 +449,10 @@ async def _run_browser_attempts(
                     context.url,
                     ttl_seconds=context.host_memory_ttl_seconds,
                 )
-                remaining_timeout = _browser_attempt_timeout_seconds(
+                remaining_timeout = browser_attempt_timeout_seconds(
                     context,
                     reason=reason,
                     browser_engine=browser_engine,
-                    engine_index=engine_index,
                     engine_attempts=engine_attempts,
                     host_policy=active_host_policy,
                 )
@@ -623,11 +502,13 @@ async def _run_browser_attempts(
                         ttl_seconds=context.host_memory_ttl_seconds,
                     )
                     context.host_policy = active_host_policy
-                    engine_attempts = _extend_browser_engine_attempts_after_block(
+                    engine_attempts = extend_browser_engine_attempts_after_block(
                         engine_attempts=engine_attempts,
                         attempted_engine=browser_engine,
                         context=context,
                         host_policy=active_host_policy,
+                        real_chrome_available=real_chrome_browser_available(),
+                        engine_selector=browser_engine_attempts,
                     )
                     if engine_index < len(engine_attempts):
                         cooldown_ms = max(
@@ -668,11 +549,12 @@ async def _run_browser_attempts(
                     browser_engine,
                     exc_info=True,
                 )
-                if _should_retry_patchright_with_real_chrome(
+                if should_retry_patchright_with_real_chrome(
                     context=context,
                     exc=exc,
                     browser_engine=browser_engine,
                     engine_attempts=engine_attempts,
+                    real_chrome_available=real_chrome_browser_available(),
                 ):
                     engine_attempts.append("real_chrome")
                     await _emit_fetch_event(
@@ -706,11 +588,13 @@ async def _run_browser_attempts(
                         ttl_seconds=context.host_memory_ttl_seconds,
                     )
                     context.host_policy = active_host_policy
-                    engine_attempts = _extend_browser_engine_attempts_after_block(
+                    engine_attempts = extend_browser_engine_attempts_after_block(
                         engine_attempts=engine_attempts,
                         attempted_engine=browser_engine,
                         context=context,
                         host_policy=active_host_policy,
+                        real_chrome_available=real_chrome_browser_available(),
+                        engine_selector=browser_engine_attempts,
                     )
                     if engine_index < len(engine_attempts):
                         cooldown_ms = max(
@@ -738,7 +622,7 @@ run_browser_attempts = _run_browser_attempts
 
 
 async def _run_http_fetch_chain(
-    context: _FetchRuntimeContext,
+    context: FetchRuntimeContext,
 ) -> tuple[PageFetchResult | None, bool]:
     vendor_block_confirmed = False
     primary_fetcher = _select_http_fetcher(context)
@@ -774,7 +658,7 @@ async def _run_http_fetch_chain(
 
 
 async def _run_http_fetch_chain_with_fetcher(
-    context: _FetchRuntimeContext,
+    context: FetchRuntimeContext,
     *,
     fetcher,
 ) -> tuple[PageFetchResult | None, bool]:
@@ -792,7 +676,7 @@ async def _run_http_fetch_chain_with_fetcher(
 
 
 async def _try_browser_http_handoff(
-    context: _FetchRuntimeContext,
+    context: FetchRuntimeContext,
 ) -> PageFetchResult | None:
     host_policy = context.host_policy
     if host_policy is None:
@@ -807,8 +691,7 @@ async def _try_browser_http_handoff(
         return None
     if not (host_policy.prefer_browser or context.prefer_curl_handoff):
         return None
-    engines = _handoff_cookie_engines(
-        host_policy,
+    engines = handoff_cookie_engines(
         preferred_engine=context.handoff_cookie_engine,
     )
     for proxy in context.proxies:
@@ -832,7 +715,7 @@ async def _try_browser_http_handoff(
                 continue
             handoff_timeout = min(
                 float(crawler_runtime_settings.browser_http_handoff_timeout_seconds),
-                _resolve_http_timeout(context),
+                resolve_http_timeout(context),
             )
             try:
                 result = await _curl_fetch(
@@ -877,51 +760,15 @@ async def _try_browser_http_handoff(
 try_browser_http_handoff = _try_browser_http_handoff
 
 
-def _handoff_cookie_engines(
-    _host_policy: HostProtectionPolicy,
-    *,
-    preferred_engine: str | None = None,
-) -> tuple[str, ...]:
-    configured = tuple(
-        str(engine or "").strip().lower()
-        for engine in tuple(
-            crawler_runtime_settings.browser_http_handoff_cookie_engines or ()
-        )
-        if str(engine or "").strip()
-    )
-    preferred: list[str] = []
-    normalized_preferred = str(preferred_engine or "").strip().lower()
-    if normalized_preferred in {"real_chrome", "patchright"}:
-        preferred.append(normalized_preferred)
-    for engine in configured:
-        if engine in {"real_chrome", "patchright"} and engine not in preferred:
-            preferred.append(engine)
-    return tuple(preferred)
-
-
-def _select_http_fetcher(context: _FetchRuntimeContext):
+def _select_http_fetcher(context: FetchRuntimeContext):
     del context
     if crawler_runtime_settings.force_httpx:
         return _http_fetch
     return _curl_fetch
 
 
-def _resolve_http_timeout(context: _FetchRuntimeContext) -> float:
-    raw_timeout = crawler_runtime_settings.http_timeout_seconds
-    if raw_timeout is None:
-        return context.resolved_timeout
-    try:
-        return min(float(raw_timeout), context.resolved_timeout)
-    except (TypeError, ValueError):
-        logger.warning(
-            "Invalid http_timeout_seconds=%r; using resolved timeout",
-            raw_timeout,
-        )
-        return context.resolved_timeout
-
-
 async def _run_http_fetcher_attempts(
-    context: _FetchRuntimeContext,
+    context: FetchRuntimeContext,
     *,
     fetcher,
     proxy: str | None,
@@ -947,12 +794,12 @@ _http_attempt_failed = object()
 
 
 async def _attempt_http_fetch(
-    context: _FetchRuntimeContext,
+    context: FetchRuntimeContext,
     *,
     fetcher,
     proxy: str | None,
 ) -> PageFetchResult | object:
-    http_timeout = _resolve_http_timeout(context)
+    http_timeout = resolve_http_timeout(context)
     await _emit_fetch_event(
         context.on_event,
         "info",
@@ -1002,7 +849,7 @@ async def _attempt_http_fetch(
 
 
 async def _handle_http_result(
-    context: _FetchRuntimeContext,
+    context: FetchRuntimeContext,
     *,
     result: PageFetchResult,
     proxy: str | None,
@@ -1102,7 +949,7 @@ async def _handle_http_result(
 
 
 async def _update_host_result_memory(
-    context: _FetchRuntimeContext,
+    context: FetchRuntimeContext,
     *,
     result: PageFetchResult,
 ) -> None:
