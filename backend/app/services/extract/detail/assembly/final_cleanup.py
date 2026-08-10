@@ -119,7 +119,7 @@ def repair_ecommerce_detail_record_quality(
         variant_parent_image=variant_parent_image,
         variant_parent_availability=variant_parent_availability,
     )
-    backfill_detail_price_from_html(record, html=html)
+    backfill_detail_price_from_html(record, html=html, soup=soup)
     reconcile_detail_currency_with_url(record, page_url=page_url)
     reconcile_detail_price_magnitudes(record)
     reconcile_parent_price_against_variant_range(record)

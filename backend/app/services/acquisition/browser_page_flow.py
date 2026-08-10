@@ -13,7 +13,6 @@ from app.services.acquisition.browser_readiness import (
     looks_like_low_content_shell,
 )
 from app.services.acquisition.browser_page_helpers import (
-    capture_listing_visual_elements,
     detail_expansion_can_skip,
     detail_expansion_extractability,
     dismiss_safe_location_interstitial,
@@ -22,20 +21,14 @@ from app.services.acquisition.browser_page_helpers import (
     page_might_have_location_interstitial,
     select_primary_browser_html as _select_primary_browser_html,
 )
-from app.services.acquisition.browser_page_helpers import (
-    requested_content_extractability,
-)
-from app.services.acquisition.browser_page_helpers import BeautifulSoup
 from app.services.acquisition.dom_runtime import get_page_html
 from app.services.acquisition.browser_recovery import (
-    capture_rendered_listing_fragments,
     recover_browser_challenge,
 )
 from app.services.acquisition.runtime import (
     BlockPageClassification,
     classify_blocked_page_async,
 )
-from app.services.acquisition import browser_result_builder as _browser_result_builder
 from app.services.config.selectors import (
     CARD_SELECTORS,
 )
@@ -48,30 +41,10 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     "BlockPageClassification",
-    "BrowserFinalizeInput",
     "dismiss_safe_location_interstitial",
-    "finalize_browser_fetch",
     "location_interstitial_detected",
     "page_might_have_location_interstitial",
 ]
-
-_capture_listing_visual_elements = capture_listing_visual_elements
-build_browser_diagnostics = _browser_result_builder.build_browser_diagnostics
-build_browser_artifacts = _browser_result_builder.build_browser_artifacts
-BrowserFinalizeInput = _browser_result_builder.BrowserFinalizeInput
-
-
-def _detail_expansion_extractability(*args, **kwargs):
-    kwargs.setdefault(
-        "requested_content_extractability_impl",
-        requested_content_extractability,
-    )
-    kwargs.setdefault("beautiful_soup_factory", BeautifulSoup)
-    return detail_expansion_extractability(*args, **kwargs)
-
-
-def _detail_expansion_can_skip(*args, **kwargs):
-    return detail_expansion_can_skip(*args, **kwargs)
 
 
 def _generic_card_selectors_for_surface(surface: str | None) -> list[str]:
@@ -333,6 +306,7 @@ async def settle_browser_page_impl(
             surface=surface,
             listing_override=readiness_override,
             html=cached_html,
+            analysis=cached_analysis,
         )
 
     current_probe = await _cached_probe(refresh_html=True)
@@ -549,13 +523,13 @@ async def settle_browser_page_impl(
         }
         phase_timings_ms["expansion"] = 0
     else:
-        initial_extractability = _detail_expansion_extractability(
+        initial_extractability = detail_expansion_extractability(
             html=cached_html or "",
             soup=cached_analysis.soup if cached_analysis is not None else None,
             surface=surface or "",
             requested_fields=requested_fields,
         )
-        skip_expansion, skip_reason = _detail_expansion_can_skip(
+        skip_expansion, skip_reason = detail_expansion_can_skip(
             initial_extractability,
             surface=surface,
             requested_fields=requested_fields,
@@ -589,7 +563,7 @@ async def settle_browser_page_impl(
                 stage="after_detail_expansion",
                 probe=current_probe,
             )
-            expansion_diagnostics["extractability"] = _detail_expansion_extractability(
+            expansion_diagnostics["extractability"] = detail_expansion_extractability(
                 html=cached_html or "",
                 soup=cached_analysis.soup if cached_analysis is not None else None,
                 surface=surface or "",
@@ -719,40 +693,6 @@ def resolve_browser_fetch_policy(
     )
     readiness_override = readiness_policy.get("listing_override")
     return traversal_active, readiness_policy, readiness_override
-
-
-_ready_probe_supports_fast_finalize = (
-    _browser_result_builder._ready_probe_supports_fast_finalize
-)
-
-
-async def _capture_listing_artifact_with_timeout(*args, **kwargs):
-    kwargs.setdefault("logger_impl", logger)
-    # skipcq: PYL-E1125 - wrapper preserves test monkeypatch seam and forwards required keywords.
-    return await _browser_result_builder._capture_listing_artifact_with_timeout(
-        *args,
-        **kwargs,
-    )
-
-
-async def finalize_browser_fetch(*args, **kwargs):
-    kwargs.setdefault("build_browser_diagnostics_impl", build_browser_diagnostics)
-    kwargs.setdefault("build_browser_artifacts_impl", build_browser_artifacts)
-    kwargs.setdefault(
-        "capture_rendered_listing_fragments_impl",
-        capture_rendered_listing_fragments,
-    )
-    kwargs.setdefault(
-        "capture_listing_visual_elements_impl",
-        _capture_listing_visual_elements,
-    )
-    kwargs.setdefault(
-        "ready_probe_supports_fast_finalize_impl",
-        _ready_probe_supports_fast_finalize,
-    )
-    kwargs.setdefault("logger_impl", logger)
-    # skipcq: PYL-E1125 - wrapper injects defaults while callers provide finalize dependencies.
-    return await _browser_result_builder.finalize_browser_fetch(*args, **kwargs)
 
 
 def append_readiness_probe(

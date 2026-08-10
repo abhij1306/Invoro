@@ -1377,25 +1377,38 @@ async def test_process_single_url_runs_adapter_against_network_payloads(
             "sku_upc": ["0019783000001"],
         }
     }
+    primary_html = "<html><body><h1>Example Pants</h1></body></html>"
+    fragment = "<article>Example Pants supplemental evidence</article>"
+    adapter_inputs: list[str] = []
 
     @_as_async
     def _fake_acquire(request):
         return _fake_acquire_result(
             request,
-            html="<html><body><h1>Example Pants</h1></body></html>",
+            html=primary_html,
             method="browser",
+            artifacts={
+                "full_rendered_html": primary_html,
+                "rendered_listing_fragments": [fragment],
+            },
             network_payloads=[
                 {
                     "url": "https://www.belk.com/_next/payload",
                     "content_type": "text/x-component",
                     "body": payload_body,
-                }
+                },
+                {
+                    "url": "https://www.belk.com/_next/payload-copy",
+                    "content_type": "application/json",
+                    "body": payload_body,
+                },
             ],
         )
 
     @_as_async
     def _fake_run_adapter(url, html, surface):
         del url, surface
+        adapter_inputs.append(html)
         if "utag_data" not in html:
             return None
         return AdapterResult(
@@ -1444,6 +1457,11 @@ async def test_process_single_url_runs_adapter_against_network_payloads(
     result = await process_single_url(db_session, run, run.url)
 
     assert result.url_metrics["adapter_name"] == "belk"
+    assert adapter_inputs == [
+        primary_html,
+        f"<html><body>{fragment}</body></html>",
+        json.dumps(payload_body, ensure_ascii=True, separators=(",", ":")),
+    ]
     assert result.records[0]["variants"] == [
         {"sku": "0438651111111", "barcode": "0019783000001"}
     ]

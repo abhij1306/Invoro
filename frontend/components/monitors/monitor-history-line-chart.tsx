@@ -28,8 +28,14 @@ export default function MonitorHistoryLineChart({
     <ResponsiveContainer width="100%" height="100%">
       <LineChart data={rows} margin={{ top: 12, right: 20, bottom: 8, left: 0 }}>
         <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
-        <XAxis dataKey="time" tick={{ fill: 'var(--muted)', fontSize: 11 }} />
-        <YAxis tick={{ fill: 'var(--muted)', fontSize: 11 }} allowDecimals={false} />
+        <XAxis
+          dataKey="time"
+          tick={{ fill: 'var(--muted)', fontSize: 'var(--type-scale-caption)' }}
+        />
+        <YAxis
+          tick={{ fill: 'var(--muted)', fontSize: 'var(--type-scale-caption)' }}
+          allowDecimals={false}
+        />
         <Tooltip
           contentStyle={{
             background: 'var(--bg-panel)',

@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import pytest
 
+from app.services.dom.html_parser import BeautifulSoup
 from app.services.dom.image_extraction import dedupe_image_urls
+from app.services.extract.detail.assembly import final_cleanup as final_cleanup_module
+from app.services.extract.detail.price import core as price_core
 from app.services.extract.detail.assembly.final_cleanup import (
     repair_ecommerce_detail_record_quality,
 )
@@ -12,6 +15,60 @@ from app.services.extract.detail.text.sanitizer import sanitize_detail_long_text
 def _repair(record: dict[str, object], page_url: str) -> dict[str, object]:
     repair_ecommerce_detail_record_quality(record, html="", page_url=page_url)
     return record
+
+
+@pytest.mark.unit
+def test_visible_price_repair_reuses_prepared_soup(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    soup = BeautifulSoup(
+        "<html><body><main><span class='price'>$19.99</span></main></body></html>",
+        "html.parser",
+    )
+
+    def _unexpected_parse(*_args, **_kwargs):
+        raise AssertionError("prepared soup must be reused")
+
+    monkeypatch.setattr(price_core, "BeautifulSoup", _unexpected_parse)
+    record: dict[str, object] = {
+        "url": "https://example.com/products/widget",
+        "title": "Widget",
+    }
+
+    price_core.backfill_detail_price_from_html(record, html="", soup=soup)
+
+    assert record["price"] == "19.99"
+
+
+@pytest.mark.unit
+def test_detail_cleanup_passes_prepared_soup_to_price_repair(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    soup = BeautifulSoup(
+        "<html><body><main><span class='price'>$19.99</span></main></body></html>",
+        "html.parser",
+    )
+    received_soup = None
+
+    def _capture_price_soup(record, *, html, soup=None):
+        del record, html
+        nonlocal received_soup
+        received_soup = soup
+
+    monkeypatch.setattr(
+        final_cleanup_module,
+        "backfill_detail_price_from_html",
+        _capture_price_soup,
+    )
+
+    final_cleanup_module.repair_ecommerce_detail_record_quality(
+        {"title": "Widget"},
+        html=str(soup),
+        page_url="https://example.com/products/widget",
+        soup=soup,
+    )
+
+    assert received_soup is soup
 
 
 @pytest.mark.unit

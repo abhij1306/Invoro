@@ -52,6 +52,12 @@ VALID_FETCH_MODES = frozenset(
 )
 BROWSER_CONCURRENCY_EXEMPT_FETCH_MODES = frozenset({"http_only"})
 CELERY_TASK_ID_KEY = "celery_task_id"
+PATCHRIGHT_BROWSER_ENGINE = "patchright"
+REAL_CHROME_BROWSER_ENGINE = "real_chrome"
+SUPPORTED_FORCED_BROWSER_ENGINES = frozenset(
+    {PATCHRIGHT_BROWSER_ENGINE, REAL_CHROME_BROWSER_ENGINE}
+)
+PATCHRIGHT_HTTP2_PROTOCOL_ERROR_TOKEN = "ERR_HTTP2_PROTOCOL_ERROR"
 
 
 def _coerce_float(value: object) -> float:
@@ -259,8 +265,8 @@ class CrawlerRuntimeSettings(BaseSettings):
     browser_http_handoff_enabled: bool = True
     browser_http_handoff_timeout_seconds: float = 3.0
     browser_http_handoff_cookie_engines: tuple[str, ...] = (
-        "real_chrome",
-        "patchright",
+        REAL_CHROME_BROWSER_ENGINE,
+        PATCHRIGHT_BROWSER_ENGINE,
     )
     proxy_rotation_sticky_tokens: tuple[str, ...] = ("sticky", "session", "affinity")
     proxy_rotation_rotating_tokens: tuple[str, ...] = ("rotating", "rotate", "random")

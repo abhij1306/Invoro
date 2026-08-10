@@ -1,8 +1,6 @@
 # Active Plan
 
-**Current:** None
-**Status:** IDLE
-**Last completed:** Frontend Design System v4 And Debt Reduction — 2026-08-10
+No active plan.
 
 ## Queue
 
@@ -11,6 +9,10 @@
 
 ## Previously Completed
 
+- Review Findings Remediation → `docs/plans/review-findings-remediation-plan.md`
+  (COMPLETE 2026-08-10; supplied review findings resolved or evidence-skipped; login fonts, crawl thumbnails, and protected-host browser budget fixed; backend safe suite 2,402 passed with 19 fixture skips; frontend 187 passed and production build succeeded)
+- Backend Acquisition, Extraction, and Test Debt Refactor → `docs/plans/backend-core-debt-refactor-plan.md`
+  (COMPLETE 2026-08-10; acquisition/extraction hotspots simplified; repeated parser and adapter work reduced; safe suite 2,393 passed with 25 fixture skips)
 - Frontend Design System v4 And Debt Reduction → `docs/plans/frontend-design-system-v4-plan.md`
   (DONE 2026-08-10; CrawlerAI v4 system and shell standardized; Satoshi/Switzer local fonts; shared UI hubs split; React Doctor 81 → 15; frontend LOC -7.7%; pnpm CI repaired)
 - Core Architecture Production Hardening → `docs/plans/core-architecture-production-hardening-plan.md`

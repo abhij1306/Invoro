@@ -330,7 +330,7 @@ The playground flow creates normal `CrawlRun` rows for discover/extract, launche
 
 ## 14. Plans Must Be Verified, Not Just Written
 
-**Rule:** A plan slice is not done until its verify step passes. A plan is not closed until `pytest tests -q` passes. Plans that are not verified are not done — they are abandoned, and their changes must be treated as untrusted.
+**Rule:** A plan slice is not done until its verify step passes. A plan is not closed until `pytest tests -q -m "unit or component or regression"` passes. Plans that are not verified are not done — they are abandoned, and their changes must be treated as untrusted.
 
 **VIOLATION signatures:**
 - A slice is marked DONE without running the verify command

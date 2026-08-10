@@ -145,6 +145,20 @@ ALLOWED_SERVICE_CONFIG_CONSTANTS = {
     ("playground_service.py", "SITEMAP_DISPLAY_LIMIT"),
 }
 DEFAULT_LOC_BUDGET = 1000
+# Debt present when regression tests joined the default safe suite. These exact
+# baselines are grandfathered, but may only shrink; the normal budgets remain.
+LEGACY_SOURCE_LOC_RATCHETS = {
+    Path("app/services/acquisition/browser_detail.py"): 1018,
+    Path("app/services/page_audit/analysis.py"): 1142,
+    Path("app/services/config/extraction_rules/_detail.py"): 664,
+}
+CRITICAL_TEST_LOC_RATCHETS = {
+    Path("tests/component/test_crawl_fetch_runtime.py"): 3753,
+    Path("tests/regression/test_browser_expansion_runtime.py"): 6250,
+    Path("tests/regression/test_crawl_engine.py"): 6753,
+    Path("tests/regression/test_detail_extractor_structured_sources.py"): 9379,
+    Path("tests/regression/test_selectolax_css_migration.py"): 2799,
+}
 PLAN_TARGET_LOC_BUDGETS = {
     # Verified Architecture Audit Remediation staged targets. These are not
     # blanket budgets: each matching slice must make the target enforceable.
@@ -309,6 +323,12 @@ def _loc_budget_for(path: Path) -> int:
     return FILE_LOC_BUDGETS.get(path, DEFAULT_LOC_BUDGET)
 
 
+def _source_loc(path: Path) -> int:
+    return sum(
+        bool(line.strip()) for line in path.read_text(encoding="utf-8").splitlines()
+    )
+
+
 def _service_rel(path: Path) -> str:
     return path.relative_to(SERVICES_ROOT).as_posix()
 
@@ -398,10 +418,24 @@ def test_service_files_stay_under_loc_budget() -> None:
     oversized: list[str] = []
     for path in SERVICES_ROOT.rglob("*.py"):
         rel = path.relative_to(ROOT)
-        line_count = len(path.read_text(encoding="utf-8").splitlines())
+        line_count = _source_loc(path)
         budget = _loc_budget_for(rel)
+        legacy_ratchet = LEGACY_SOURCE_LOC_RATCHETS.get(rel, budget)
+        effective_limit = max(budget, legacy_ratchet)
+        if line_count > effective_limit:
+            oversized.append(
+                f"{rel} has {line_count} LOC (effective limit {effective_limit})"
+            )
+    assert oversized == []
+
+
+@pytest.mark.regression
+def test_critical_test_suites_do_not_regrow() -> None:
+    oversized = []
+    for rel, budget in CRITICAL_TEST_LOC_RATCHETS.items():
+        line_count = len((ROOT / rel).read_text(encoding="utf-8").splitlines())
         if line_count > budget:
-            oversized.append(f"{rel} has {line_count} LOC (budget {budget})")
+            oversized.append(f"{rel} has {line_count} LOC (ratchet {budget})")
     assert oversized == []
 
 

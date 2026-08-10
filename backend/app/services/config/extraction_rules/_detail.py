@@ -165,9 +165,7 @@ DETAIL_LONG_TEXT_DISCLAIMER_PATTERNS = (
     r"\bshipping\s+and\s+returns?\b.{0,240}\b(?:orders?|privacy|policy|refunds?|returns?)\b",
     r"\bcookie\s+(?:notice|policy|preferences?)\b",
     r"\bprivacy\s+policy\b",
-    # Audit 2026-05-03 3.2: Shipping/fulfillment status blurbs leaked into
-    # Jordan 5 description. Context-bound so legitimate prose that mentions
-    # tracking or shipping is not rejected.
+    # Context-bound shipping filters avoid rejecting legitimate prose.
     r"\btracking\s+status\s+reads\b",
     r"\border\s+is\s+shipped\b.{0,120}\b(?:tracking|email)\b",
     r"\blabel\s+created\b.{0,80}\b(?:tracking|carrier|status|shipping|hours)\b",
@@ -275,6 +273,7 @@ DETAIL_EXPANSION_STATUS_ATTEMPTED = "attempted"
 DETAIL_EXPANSION_STATUS_EXPANDED = "expanded"
 DETAIL_EXPANSION_STATUS_INTERACTION_FAILED = "interaction_failed"
 DETAIL_EXPANSION_STATUS_INTERACTION_LIMIT_REACHED = "interaction_limit_reached"
+DETAIL_EXPANSION_STATUS_SELECTOR_LIMIT_REACHED = "selector_limit_reached"
 DETAIL_EXPANSION_STATUS_NO_MATCHES = "no_matches"
 DETAIL_EXPANSION_STATUS_SKIPPED = "skipped"
 DETAIL_EXPANSION_STATUS_TIME_BUDGET_REACHED = "time_budget_reached"
@@ -611,6 +610,7 @@ _LOCAL_EXPORTS = (
     "DETAIL_EXPANSION_STATUS_EXPANDED",
     "DETAIL_EXPANSION_STATUS_INTERACTION_FAILED",
     "DETAIL_EXPANSION_STATUS_INTERACTION_LIMIT_REACHED",
+    "DETAIL_EXPANSION_STATUS_SELECTOR_LIMIT_REACHED",
     "DETAIL_EXPANSION_STATUS_NO_MATCHES",
     "DETAIL_EXPANSION_STATUS_SKIPPED",
     "DETAIL_EXPANSION_STATUS_TIME_BUDGET_REACHED",

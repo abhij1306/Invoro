@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import json
+import time
 
 from app.services.acquisition.acquirer import AcquisitionResult
 from app.services.acquisition_plan import AcquisitionPlan
@@ -89,6 +90,7 @@ async def _populate_adapter_records(
     acquisition_result.adapter_source_type = None
 
     adapter_results = []
+    adapter_started_at = time.perf_counter()
     adapter_proxy = next(
         (
             str(proxy).strip()
@@ -104,20 +106,20 @@ async def _populate_adapter_records(
         surface=context.surface,
         proxy_configured=bool(adapter_proxy),
     ) as span:
-        for html in [
-            str(acquisition_result.html or ""),
-            *_adapter_browser_artifact_htmls(acquisition_result),
-            *_adapter_network_payload_inputs(acquisition_result),
-        ]:
-            from app.services.pipeline import extraction_loop
+        evidence_inputs, empty_skips, duplicate_skips = _ordered_adapter_evidence(
+            acquisition_result
+        )
+        from app.services.pipeline import extraction_loop
 
-            adapter_runner = getattr(extraction_loop, "run_adapter", run_adapter)
-            adapter_kwargs = (
-                {"proxy": adapter_proxy}
-                if adapter_proxy
-                and "proxy" in inspect.signature(adapter_runner).parameters
-                else {}
-            )
+        adapter_runner = getattr(extraction_loop, "run_adapter", run_adapter)
+        adapter_kwargs = (
+            {"proxy": adapter_proxy}
+            if adapter_proxy and "proxy" in inspect.signature(adapter_runner).parameters
+            else {}
+        )
+        adapter_calls = 0
+        for html in evidence_inputs:
+            adapter_calls += 1
             adapter_result = await adapter_runner(
                 acquisition_result.final_url,
                 html,
@@ -135,6 +137,14 @@ async def _populate_adapter_records(
         set_logfire_attributes(
             span,
             adapter_result_count=len(adapter_results),
+            adapter_input_count=len(evidence_inputs) + empty_skips + duplicate_skips,
+            adapter_empty_skip_count=empty_skips,
+            adapter_duplicate_skip_count=duplicate_skips,
+            adapter_call_count=adapter_calls,
+            adapter_elapsed_ms=max(
+                0,
+                int(round((time.perf_counter() - adapter_started_at) * 1000)),
+            ),
             adapter_names=[
                 str(result.adapter_name or "")
                 for result in adapter_results
@@ -263,29 +273,37 @@ def _positive_int(value: object) -> int:
     return max(0, parsed)
 
 
-def _adapter_browser_artifact_htmls(
+def _ordered_adapter_evidence(
     acquisition_result: AcquisitionResult,
-) -> list[str]:
+) -> tuple[list[str], int, int]:
     artifacts = mapping_or_empty(getattr(acquisition_result, "artifacts", {}))
-    seen = {str(getattr(acquisition_result, "html", "") or "").strip()}
-    htmls: list[str] = []
-    for value in (
+    candidates = [
+        str(getattr(acquisition_result, "html", "") or ""),
         artifacts.get("full_rendered_html"),
         _rendered_listing_fragments_html(artifacts.get("rendered_listing_fragments")),
-    ):
-        html = str(value or "").strip()
-        if not html or html in seen:
+        *_adapter_network_payload_inputs(acquisition_result),
+    ]
+    evidence: list[str] = []
+    seen: set[str] = set()
+    empty_skips = 0
+    duplicate_skips = 0
+    for value in candidates:
+        normalized = str(value or "").strip()
+        if not normalized:
+            empty_skips += 1
             continue
-        seen.add(html)
-        htmls.append(html)
-    return htmls
+        if normalized in seen:
+            duplicate_skips += 1
+            continue
+        seen.add(normalized)
+        evidence.append(normalized)
+    return evidence, empty_skips, duplicate_skips
 
 
 def _adapter_network_payload_inputs(
     acquisition_result: AcquisitionResult,
 ) -> list[str]:
     inputs: list[str] = []
-    seen: set[str] = set()
     identity_tokens = _adapter_payload_identity_tokens(acquisition_result.final_url)
     for payload in list(getattr(acquisition_result, "network_payloads", []) or []):
         if not isinstance(payload, dict):
@@ -302,9 +320,6 @@ def _adapter_network_payload_inputs(
             token in serialized_key for token in identity_tokens
         ):
             continue
-        if not serialized or serialized in seen:
-            continue
-        seen.add(serialized)
         inputs.append(serialized)
     return inputs
 

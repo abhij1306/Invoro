@@ -406,7 +406,9 @@ class HtmlNode:
         template_inner_html: str | None = None
         if isinstance(value, HtmlNode) and value.name == "template":
             serialized = str(value)
-            template_inner_html = serialized.partition(">")[2].rsplit("</template>", 1)[0]
+            template_inner_html = serialized.partition(">")[2].rsplit("</template>", 1)[
+                0
+            ]
         self.node.insert_child(_mutation_value(value))
         if template_inner_html is not None and self.node.last_child is not None:
             self.node.last_child.inner_html = template_inner_html

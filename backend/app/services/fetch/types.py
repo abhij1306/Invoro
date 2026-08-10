@@ -8,6 +8,14 @@ from app.services.acquisition.host_protection_memory import HostProtectionPolicy
 FetchEventHandler = Callable[[str, str], Awaitable[None] | None]
 
 
+@dataclass(frozen=True, slots=True)
+class BrowserAttemptPlan:
+    proxy: str | None
+    proxy_attempt_index: int
+    engine_attempts: tuple[str, ...]
+    escalation_lane: str
+
+
 @dataclass(slots=True)
 class FetchRuntimeContext:
     url: str

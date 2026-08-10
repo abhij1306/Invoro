@@ -13,7 +13,7 @@ from app.services.dom.html_parser import BeautifulSoup
 
 from app.services.acquisition.browser_readiness import HtmlAnalysis, analyze_html
 from app.core.config import settings
-from app.services.config.block_signatures import BLOCK_SIGNATURES
+from app.services.config.block_signatures import BLOCK_SIGNATURES, CAPTCHA_MARKER
 from app.services.config.content_types import HTML_CONTENT_TYPE
 from app.services.config.extraction_rules import (
     ACTION_BUY_NOW,
@@ -94,6 +94,18 @@ class BlockPageClassification:
     challenge_element_hits: list[str] = field(default_factory=list)
 
 
+@dataclass(frozen=True, slots=True)
+class _BlockPageEvidence:
+    title_matches: list[str]
+    strong_hits: set[str]
+    weak_hits: set[str]
+    provider_hits: set[str]
+    active_provider_hits: set[str]
+    challenge_element_hits: set[str]
+    hard_strong_hits: set[str]
+    has_extractable_content: bool
+
+
 _BOT_VENDOR_HEADER_MARKERS: tuple[tuple[str, str, str], ...] = (
     ("x-datadome", "", "datadome"),
     ("x-datadome-cid", "", "datadome"),
@@ -158,23 +170,13 @@ def classify_blocked_page(
     analysis: HtmlAnalysis | None = None,
 ) -> BlockPageClassification:
     code = int(status_code or 0)
-    forced_blocked = False
-    forced_outcome = ""
-    base_evidence: list[str] = []
     if code == 401:
         return BlockPageClassification(
             blocked=False,
             outcome="auth_wall",
             evidence=[f"http_status:{code}"],
         )
-    if code == 429:
-        forced_blocked = True
-        forced_outcome = "rate_limited"
-        base_evidence.append(f"http_status:{code}")
-    if code == 403:
-        forced_blocked = True
-        forced_outcome = "challenge_page"
-        base_evidence.append(f"http_status:{code}")
+    forced_blocked, forced_outcome, base_evidence = _forced_block_status(code)
     lowered = str(html or "").lower()
     if not lowered.strip():
         if forced_blocked:
@@ -186,90 +188,124 @@ def classify_blocked_page(
         return BlockPageClassification(blocked=False, outcome="empty")
 
     analysis = analysis or analyze_html(html)
-    soup = analysis.soup
-    visible_text = analysis.visible_text.lower()
-    title_text = analysis.title_text.lower()
-    has_extractable_content = _has_extractable_detail_signals(
+    block_evidence = _collect_block_page_evidence(
         html,
-        analysis=analysis,
-    ) or _has_extractable_listing_signals(
-        html,
+        lowered=lowered,
         analysis=analysis,
     )
+    blocked = forced_blocked or _block_evidence_indicates_block(block_evidence)
+    if _usable_content_overrides_block(blocked, block_evidence):
+        blocked = False
+    return _build_block_page_classification(
+        blocked=blocked,
+        forced_blocked=forced_blocked,
+        forced_outcome=forced_outcome,
+        base_evidence=base_evidence,
+        block_evidence=block_evidence,
+    )
 
-    title_patterns = _string_sequence(BLOCK_SIGNATURES.get("title_regexes"))
-    title_matches: list[str] = []
-    for pattern in title_patterns:
+
+def _forced_block_status(code: int) -> tuple[bool, str, list[str]]:
+    if code == 429:
+        return True, "rate_limited", [f"http_status:{code}"]
+    if code == 403:
+        return True, "challenge_page", [f"http_status:{code}"]
+    return False, "", []
+
+
+def _collect_block_page_evidence(
+    html: str,
+    *,
+    lowered: str,
+    analysis: HtmlAnalysis,
+) -> _BlockPageEvidence:
+    visible_text = analysis.visible_text.lower()
+    title_text = analysis.title_text.lower()
+    strong_markers = _normalized_mapping_keys("browser_challenge_strong_markers")
+    weak_markers = _normalized_mapping_keys("browser_challenge_weak_markers")
+    provider_markers = _normalized_signature_strings("provider_markers")
+    content_tolerant_strong_markers = set(
+        _normalized_signature_strings("content_tolerant_strong_markers")
+    )
+    strong_hits = {
+        marker
+        for marker in strong_markers
+        if marker in visible_text or marker in title_text
+    }
+    return _BlockPageEvidence(
+        title_matches=_block_title_matches(title_text),
+        strong_hits=strong_hits,
+        weak_hits={
+            marker
+            for marker in weak_markers
+            if marker in visible_text or marker in title_text
+        },
+        provider_hits={marker for marker in provider_markers if marker in lowered},
+        active_provider_hits=_active_provider_hits(lowered),
+        challenge_element_hits=set(_challenge_element_hits(analysis.soup, lowered)),
+        hard_strong_hits=strong_hits - content_tolerant_strong_markers,
+        has_extractable_content=(
+            _has_extractable_detail_signals(html, analysis=analysis)
+            or _has_extractable_listing_signals(html, analysis=analysis)
+        ),
+    )
+
+
+def _normalized_mapping_keys(signature_name: str) -> list[str]:
+    return [
+        normalized
+        for marker in mapping_or_empty(BLOCK_SIGNATURES.get(signature_name)).keys()
+        if (normalized := str(marker or "").strip().lower())
+    ]
+
+
+def _active_provider_hits(lowered: str) -> set[str]:
+    return {
+        marker
+        for item in _mapping_sequence(BLOCK_SIGNATURES.get("active_provider_markers"))
+        if (marker := str(item.get("marker") or "").strip().lower())
+        and marker in lowered
+    }
+
+
+def _normalized_signature_strings(signature_name: str) -> list[str]:
+    return [
+        normalized
+        for marker in _string_sequence(BLOCK_SIGNATURES.get(signature_name))
+        if (normalized := str(marker or "").strip().lower())
+    ]
+
+
+def _block_title_matches(title_text: str) -> list[str]:
+    matches: list[str] = []
+    for pattern in _string_sequence(BLOCK_SIGNATURES.get("title_regexes")):
         raw_pattern = str(pattern or "").strip()
         if not raw_pattern:
             continue
         try:
             if re.search(raw_pattern, title_text, re.IGNORECASE):
-                title_matches.append(raw_pattern)
+                matches.append(raw_pattern)
         except re.error as exc:
             logger.warning(
                 "Skipping invalid block signature title regex %r: %s",
                 raw_pattern,
                 exc,
             )
+    return matches
 
-    strong_markers = [
-        str(marker or "").strip().lower()
-        for marker in mapping_or_empty(
-            BLOCK_SIGNATURES.get("browser_challenge_strong_markers")
-        ).keys()
-        if str(marker or "").strip()
-    ]
-    weak_markers = [
-        str(marker or "").strip().lower()
-        for marker in mapping_or_empty(
-            BLOCK_SIGNATURES.get("browser_challenge_weak_markers")
-        ).keys()
-        if str(marker or "").strip()
-    ]
-    content_tolerant_strong_markers = {
-        str(marker or "").strip().lower()
-        for marker in _string_sequence(
-            BLOCK_SIGNATURES.get("content_tolerant_strong_markers")
-        )
-        if str(marker or "").strip()
-    }
-    provider_markers = [
-        str(marker or "").strip().lower()
-        for marker in _string_sequence(BLOCK_SIGNATURES.get("provider_markers"))
-        if str(marker or "").strip()
-    ]
 
-    strong_hits = {
-        marker
-        for marker in strong_markers
-        if marker in visible_text or marker in title_text
-    }
-    weak_hits = {
-        marker
-        for marker in weak_markers
-        if marker in visible_text or marker in title_text
-    }
-    provider_hits = {marker for marker in provider_markers if marker in lowered}
-    active_provider_hits = {
-        str(item.get("marker") or "").strip().lower()
-        for item in _mapping_sequence(BLOCK_SIGNATURES.get("active_provider_markers"))
-        if str(item.get("marker") or "").strip()
-        and str(item.get("marker") or "").strip().lower() in lowered
-    }
-    challenge_element_hits = set(_challenge_element_hits(soup, lowered))
-    hard_strong_hits = strong_hits - content_tolerant_strong_markers
-    evidence = [
-        *base_evidence,
-        *sorted(f"title:{pattern}" for pattern in title_matches),
-        *sorted(f"strong:{marker}" for marker in strong_hits),
-        *sorted(f"weak:{marker}" for marker in weak_hits),
-        *sorted(f"provider:{marker}" for marker in provider_hits),
-        *sorted(f"active_provider:{marker}" for marker in active_provider_hits),
-        *sorted(f"challenge_element:{marker}" for marker in challenge_element_hits),
-    ]
+def _block_evidence_indicates_block(evidence: _BlockPageEvidence) -> bool:
+    return _strong_block_evidence(evidence) or _combined_block_evidence(evidence)
 
-    blocked = forced_blocked or bool(
+
+def _strong_block_evidence(evidence: _BlockPageEvidence) -> bool:
+    hard_strong_hits = evidence.hard_strong_hits
+    strong_hits = evidence.strong_hits
+    provider_hits = evidence.provider_hits
+    active_provider_hits = evidence.active_provider_hits
+    challenge_element_hits = evidence.challenge_element_hits
+    title_matches = evidence.title_matches
+    return bool(
         len(hard_strong_hits) >= 2
         or (
             hard_strong_hits
@@ -289,38 +325,77 @@ def classify_blocked_page(
                 or "cf-browser-verification" in active_provider_hits
             )
         )
-        or (challenge_element_hits and (provider_hits or active_provider_hits))
-        or (title_matches and challenge_element_hits)
-        or (hard_strong_hits and weak_hits and provider_hits)
+    )
+
+
+def _combined_block_evidence(evidence: _BlockPageEvidence) -> bool:
+    return bool(
+        (
+            evidence.challenge_element_hits
+            and (evidence.provider_hits or evidence.active_provider_hits)
+        )
+        or (evidence.title_matches and evidence.challenge_element_hits)
+        or (evidence.hard_strong_hits and evidence.weak_hits and evidence.provider_hits)
         or (
-            "captcha" in strong_hits
-            and provider_hits
-            and (not has_extractable_content or bool(title_matches))
+            CAPTCHA_MARKER in evidence.strong_hits
+            and evidence.provider_hits
+            and (not evidence.has_extractable_content or bool(evidence.title_matches))
         )
     )
-    if (
+
+
+def _usable_content_overrides_block(
+    blocked: bool,
+    evidence: _BlockPageEvidence,
+) -> bool:
+    return bool(
         blocked
-        and has_extractable_content
-        and not title_matches
-        and (not hard_strong_hits or hard_strong_hits <= {"captcha"})
-    ):
-        blocked = False
+        and evidence.has_extractable_content
+        and not evidence.title_matches
+        and not evidence.hard_strong_hits
+    )
+
+
+def _build_block_page_classification(
+    *,
+    blocked: bool,
+    forced_blocked: bool,
+    forced_outcome: str,
+    base_evidence: list[str],
+    block_evidence: _BlockPageEvidence,
+) -> BlockPageClassification:
+    evidence = [
+        *base_evidence,
+        *sorted(f"title:{pattern}" for pattern in block_evidence.title_matches),
+        *sorted(f"strong:{marker}" for marker in block_evidence.strong_hits),
+        *sorted(f"weak:{marker}" for marker in block_evidence.weak_hits),
+        *sorted(f"provider:{marker}" for marker in block_evidence.provider_hits),
+        *sorted(
+            f"active_provider:{marker}"
+            for marker in block_evidence.active_provider_hits
+        ),
+        *sorted(
+            f"challenge_element:{marker}"
+            for marker in block_evidence.challenge_element_hits
+        ),
+    ]
+    outcome = (
+        forced_outcome
+        if blocked and forced_blocked
+        else "challenge_page"
+        if blocked
+        else "ok"
+    )
     return BlockPageClassification(
         blocked=blocked,
-        outcome=(
-            forced_outcome
-            if blocked and forced_blocked
-            else "challenge_page"
-            if blocked
-            else "ok"
-        ),
+        outcome=outcome,
         evidence=evidence,
-        provider_hits=sorted(provider_hits),
-        active_provider_hits=sorted(active_provider_hits),
-        strong_hits=sorted(strong_hits),
-        weak_hits=sorted(weak_hits),
-        title_matches=title_matches,
-        challenge_element_hits=sorted(challenge_element_hits),
+        provider_hits=sorted(block_evidence.provider_hits),
+        active_provider_hits=sorted(block_evidence.active_provider_hits),
+        strong_hits=sorted(block_evidence.strong_hits),
+        weak_hits=sorted(block_evidence.weak_hits),
+        title_matches=block_evidence.title_matches,
+        challenge_element_hits=sorted(block_evidence.challenge_element_hits),
     )
 
 

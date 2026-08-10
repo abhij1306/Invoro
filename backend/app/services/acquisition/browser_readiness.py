@@ -163,10 +163,12 @@ async def probe_browser_readiness_impl(
     surface: str,
     listing_override: dict[str, object] | None = None,
     html: str | None = None,
+    analysis: HtmlAnalysis | None = None,
     detail_readiness_hint_count,
 ) -> dict[str, object]:
-    html_text = html if html is not None else await get_page_html(page)
-    analysis = analyze_html(html_text or "")
+    if analysis is None:
+        html_text = html if html is not None else await get_page_html(page)
+        analysis = analyze_html(html_text or "")
     visible_text_length = len(analysis.normalized_text)
     is_detail = "detail" in surface
     is_listing = "listing" in surface
@@ -321,10 +323,10 @@ def _ecommerce_ready_card_count(soup: BeautifulSoup) -> int:
         except Exception:
             nodes = []
         for node in nodes:
-            node_id = id(node)
-            if node_id in seen:
+            node_identity = int(node.node.mem_id)
+            if node_identity in seen:
                 continue
-            seen.add(node_id)
+            seen.add(node_identity)
             if _ecommerce_node_has_product_evidence(node):
                 count += 1
     return count
@@ -501,6 +503,7 @@ async def probe_browser_readiness(
     surface: str,
     listing_override: dict[str, object] | None = None,
     html: str | None = None,
+    analysis: HtmlAnalysis | None = None,
 ) -> dict[str, object]:
     return await probe_browser_readiness_impl(
         page,
@@ -508,6 +511,7 @@ async def probe_browser_readiness(
         surface=surface,
         listing_override=listing_override,
         html=html,
+        analysis=analysis,
         detail_readiness_hint_count=detail_readiness_hint_count,
     )
 

@@ -35,7 +35,7 @@ One paragraph. What problem does this solve and what does done look like?
 
 - [ ] Specific, testable outcome 1
 - [ ] Specific, testable outcome 2
-- [ ] `python -m pytest tests -q` exits 0
+- [ ] `python -m pytest tests -q -m "unit or component or regression"` exits 0
 
 ## Do Not Touch
 
@@ -82,7 +82,7 @@ Running notes as execution proceeds: blockers, decisions made, things discovered
 Before marking a plan `DONE`:
 
 1. All acceptance criteria are checked off.
-2. `python -m pytest tests -q` passes.
+2. `python -m pytest tests -q -m "unit or component or regression"` passes.
 3. All "Doc Updates Required" items are completed.
 4. Update `docs/plans/ACTIVE.md` to reflect completion (or point to next plan).
 

@@ -5,10 +5,10 @@ import pytest
 from app.services.dom.html_parser import BeautifulSoup, InvalidSelectorError
 from app.services.dom.query import safe_select
 from app.services.dom.section_extraction import (
-    _css_attribute_string,
     extract_heading_sections,
+    extract_section_content,
 )
-from app.services.dom.selector_engine import _variant_option_node_text
+from app.services.dom.selector_engine import extract_node_value
 
 pytestmark = pytest.mark.unit
 
@@ -63,17 +63,15 @@ def test_find_all_class_alias_matches_class_tokens() -> None:
 
 
 def test_css_attribute_string_handles_quotes_backslashes_and_controls() -> None:
-    target_id = "details'panel\\main\n"
-    escaped = _css_attribute_string(target_id)
     soup = BeautifulSoup(
+        '<button aria-controls="details\'panel\\main&#10;">Materials</button>'
         '<section id="details\'panel\\main&#10;">Material and care instructions.</section>',
         "html.parser",
     )
+    trigger = soup.find("button")
+    assert trigger is not None
 
-    target = soup.select_one(f"[id='{escaped}']")
-
-    assert target is not None
-    assert "Material and care" in target.get_text(" ", strip=True)
+    assert "Material and care" in extract_section_content(trigger, soup)
 
 
 def test_navigation_anchor_is_not_extracted_as_section() -> None:
@@ -98,4 +96,6 @@ def test_variant_option_text_keeps_direct_text_without_dropped_child_text() -> N
     node = soup.find("button")
     assert node is not None
 
-    assert _variant_option_node_text(node, "color") == "Blue Limited edition"
+    assert extract_node_value(node, "color", "https://example.com/item") == (
+        "Blue Limited edition"
+    )

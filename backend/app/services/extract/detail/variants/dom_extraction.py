@@ -20,6 +20,7 @@ from app.services.config.extraction_rules import (
     DOM_VARIANT_CARTESIAN_COMBO_LIMIT,
     DOM_VARIANT_GROUP_LIMIT,
     VARIANT_CHOICE_OPTION_LIMIT,
+    VARIANT_OPTION_CONTROL_SCAN_LIMIT,
 )
 from app.services.config.variant_migration_rules import (
     VARIANT_STRONG_OPTION_SELECTOR,
@@ -175,54 +176,61 @@ def _collect_variant_choice_entries(
         50,
         "VARIANT_CHOICE_OPTION_LIMIT",
     )
-    option_nodes = list(container.select(str(VARIANT_STRONG_OPTION_SELECTOR)))[
-        :option_limit
-    ]
-    if len(option_nodes) < 2:
-        option_nodes = list(container.select(str(VARIANT_WEAK_OPTION_SELECTOR)))[
-            :option_limit
-        ]
-    for node in option_nodes:
-        if not weak_variant_option_node_allowed(
-            node,
-            container=container,
-            page_url=page_url,
-        ):
-            continue
-        raw_value = _variant_choice_entry_value(
-            container,
-            node,
-            axis_name=coercion_axis,
-            visible_text_cache=visible_text_cache,
+
+    def candidate_rows(selector: str) -> list[tuple[Any, str]]:
+        rows: list[tuple[Any, str]] = []
+        scan_limit = _safe_int_config(
+            VARIANT_OPTION_CONTROL_SCAN_LIMIT,
+            300,
+            "VARIANT_OPTION_CONTROL_SCAN_LIMIT",
         )
-        cleaned = _resolved_variant_option_value(
-            coercion_axis,
-            raw_value,
-            page_url=page_url,
-        )
-        if not clean_text(cleaned) and coercion_axis == "color":
-            original_cleaned = cleaned
-            option_url = variant_option_url(
+        for node in container.select(selector)[:scan_limit]:
+            if not weak_variant_option_node_allowed(
+                node,
                 container=container,
-                node=node,
-                label_node=None,
+                page_url=page_url,
+            ):
+                continue
+            raw_value = _variant_choice_entry_value(
+                container,
+                node,
+                axis_name=coercion_axis,
+                visible_text_cache=visible_text_cache,
+            )
+            cleaned = _resolved_variant_option_value(
+                coercion_axis,
+                raw_value,
                 page_url=page_url,
             )
-            cleaned = _color_value_from_option_url(
-                option_url,
-                page_url=page_url,
-                title_hint=title_hint,
-            )
-            _log_url_color_fallback(
-                cleaned,
-                page_url=page_url,
-                option_url=str(option_url or ""),
-                title_hint=title_hint,
-                original_value=original_cleaned,
-            )
-        cleaned = _strip_variant_option_value_suffix_noise(cleaned)
-        if variant_option_value_is_noise(cleaned):
-            continue
+            if not clean_text(cleaned) and coercion_axis == "color":
+                option_url = variant_option_url(
+                    container=container,
+                    node=node,
+                    label_node=None,
+                    page_url=page_url,
+                )
+                cleaned = _color_value_from_option_url(
+                    option_url,
+                    page_url=page_url,
+                    title_hint=title_hint,
+                )
+                _log_url_color_fallback(
+                    cleaned,
+                    page_url=page_url,
+                    option_url=str(option_url or ""),
+                    title_hint=title_hint,
+                )
+            cleaned = _strip_variant_option_value_suffix_noise(cleaned)
+            if not variant_option_value_is_noise(cleaned):
+                rows.append((node, cleaned))
+                if len(rows) >= option_limit:
+                    break
+        return rows
+
+    option_rows = candidate_rows(str(VARIANT_STRONG_OPTION_SELECTOR))
+    if len(option_rows) < 2:
+        option_rows = candidate_rows(str(VARIANT_WEAK_OPTION_SELECTOR))
+    for node, cleaned in option_rows[:option_limit]:
         entry = entries_by_value.setdefault(cleaned, {"value": cleaned})
         merge_variant_option_state(
             entry,
@@ -254,7 +262,6 @@ def _collect_variant_choice_entries(
             page_url=page_url,
         )
         if not clean_text(cleaned) and coercion_axis == "color":
-            original_cleaned = cleaned
             option_url = variant_option_url(
                 container=container,
                 node=input_node,
@@ -271,7 +278,6 @@ def _collect_variant_choice_entries(
                 page_url=page_url,
                 option_url=str(option_url or ""),
                 title_hint=title_hint,
-                original_value=original_cleaned,
             )
         cleaned = _strip_variant_option_value_suffix_noise(cleaned)
         if variant_option_value_is_noise(cleaned):
@@ -442,7 +448,6 @@ def _log_url_color_fallback(
     page_url: str,
     option_url: str,
     title_hint: str,
-    original_value: object,
 ) -> None:
     if not color:
         return
@@ -502,20 +507,12 @@ def _stock_quantity_from_selected_options(
     return None
 
 
-# skipcq: PY-R1000
-def extract_variants_from_dom(
+def _collect_select_candidate_groups(
     soup: BeautifulSoup,
     *,
     page_url: str,
-    js_state_objects: dict[str, Any] | None = None,
-) -> dict[str, object]:
-    # TODO: profile cache-key cost if callers start mutating soup before reuse.
-    cache_key = (str(page_url or ""), id(js_state_objects), id(soup))
-    cached = _cached_dom_variant_record(soup, cache_key)
-    if cached is not None:
-        return cached
-    candidate_groups = []
-    title_hint = clean_text(soup.h1.get_text(" ", strip=True) if soup.h1 else "")
+) -> list[Any]:
+    candidate_groups: list[Any] = []
     for select in iter_variant_select_groups(soup):
         raw_option_values = [
             clean_text(option.get_text(" ", strip=True))
@@ -536,50 +533,22 @@ def extract_variants_from_dom(
         ) or _component_size_style_from_group_name(next(iter(raw_option_values), ""))
         if component_style:
             cleaned_name = "size"
-        option_entries: list[dict[str, object]] = []
-        axis_key = normalized_variant_axis_key(cleaned_name)
         if not _dom_variant_group_name_allowed(cleaned_name):
             continue
-        select_options = list(select.find_all("option"))
-        for option_index, option in enumerate(select_options):
-            raw_value_attr = text_or_none(option.get("value"))
-            cleaned_value = _resolved_variant_option_value(
-                axis_key,
-                option.get_text(" ", strip=True) or raw_value_attr,
-                page_url=page_url,
-            ) or clean_text(option.get_text(" ", strip=True))
-            cleaned_value = _strip_variant_option_value_suffix_noise(cleaned_value)
+        axis_key = normalized_variant_axis_key(cleaned_name)
+        option_entries = [
+            entry
+            for option in select.find_all("option")
             if (
-                not cleaned_value
-                or variant_option_value_is_noise(cleaned_value)
-                or (
-                    raw_value_attr is not None
-                    and raw_value_attr.lower() in {"select", "choose"}
+                entry := _select_option_entry(
+                    select,
+                    option,
+                    axis_key=axis_key,
+                    component_style=component_style,
+                    page_url=page_url,
                 )
-            ):
-                continue
-            entry: dict[str, object] = {"value": cleaned_value}
-            if node_attr_is_truthy(option, "selected", "aria-selected"):
-                entry["selected"] = True
-            availability, stock_quantity = variant_option_availability(
-                node=option,
-                label_node=None,
             )
-            if availability:
-                entry["availability"] = availability
-            if stock_quantity is not None:
-                entry["stock_quantity"] = stock_quantity
-            variant_url = variant_option_url(
-                container=select,
-                node=option,
-                label_node=None,
-                page_url=page_url,
-            )
-            if variant_url:
-                entry["url"] = variant_url
-            if component_style:
-                entry["style"] = component_style
-            option_entries.append(entry)
+        ]
         deduped_values = list(
             dict.fromkeys(
                 str(entry["value"])
@@ -597,7 +566,65 @@ def extract_variants_from_dom(
                     extractor_path="select",
                 )
             )
+    return candidate_groups
 
+
+def _select_option_entry(
+    select: Any,
+    option: Any,
+    *,
+    axis_key: str,
+    component_style: str,
+    page_url: str,
+) -> dict[str, object] | None:
+    raw_value_attr = text_or_none(option.get("value"))
+    option_text = option.get_text(" ", strip=True)
+    cleaned_value = _resolved_variant_option_value(
+        axis_key,
+        option_text or raw_value_attr,
+        page_url=page_url,
+    ) or clean_text(option_text)
+    cleaned_value = _strip_variant_option_value_suffix_noise(cleaned_value)
+    if (
+        not cleaned_value
+        or variant_option_value_is_noise(cleaned_value)
+        or (
+            raw_value_attr is not None
+            and raw_value_attr.lower() in {"select", "choose"}
+        )
+    ):
+        return None
+    entry: dict[str, object] = {"value": cleaned_value}
+    if node_attr_is_truthy(option, "selected", "aria-selected"):
+        entry["selected"] = True
+    availability, stock_quantity = variant_option_availability(
+        node=option,
+        label_node=None,
+    )
+    if availability:
+        entry["availability"] = availability
+    if stock_quantity is not None:
+        entry["stock_quantity"] = stock_quantity
+    variant_url = variant_option_url(
+        container=select,
+        node=option,
+        label_node=None,
+        page_url=page_url,
+    )
+    if variant_url:
+        entry["url"] = variant_url
+    if component_style:
+        entry["style"] = component_style
+    return entry
+
+
+def _collect_choice_candidate_groups(
+    soup: BeautifulSoup,
+    *,
+    page_url: str,
+    title_hint: str,
+) -> list[Any]:
+    candidate_groups: list[Any] = []
     for container in iter_variant_choice_groups(soup):
         cleaned_name = _resolve_dom_variant_group_name(container)
         if not cleaned_name:
@@ -607,111 +634,121 @@ def extract_variants_from_dom(
             page_url=page_url,
             title_hint=title_hint,
         )
-        deduped_values = [
+        values = [
             str(entry["value"])
             for entry in option_entries
             if text_or_none(entry.get("value"))
         ]
-        cleaned_name = _prefer_axis_inferred_from_values(
-            cleaned_name,
-            deduped_values,
+        cleaned_name = _prefer_axis_inferred_from_values(cleaned_name, values)
+        if len(values) < 2:
+            continue
+        option_node_types = variant_option_node_types(
+            container,
+            extractor_path="choice",
         )
-        if len(deduped_values) >= 2:
-            candidate_groups.append(
-                build_variant_candidate_group(
-                    container,
-                    name=cleaned_name,
-                    values=deduped_values,
-                    entries=option_entries,
-                    extractor_path=(
-                        "choice_radio"
-                        if any(
-                            item in {"input_radio", "role_radio"}
-                            for item in variant_option_node_types(
-                                container,
-                                extractor_path="choice",
-                            )
-                        )
-                        else "choice_button"
-                    ),
-                )
+        extractor_path = (
+            "choice_radio"
+            if any(item in {"input_radio", "role_radio"} for item in option_node_types)
+            else "choice_button"
+        )
+        candidate_groups.append(
+            build_variant_candidate_group(
+                container,
+                name=cleaned_name,
+                values=values,
+                entries=option_entries,
+                extractor_path=extractor_path,
             )
+        )
+    return candidate_groups
 
+
+def _validated_dom_option_groups(
+    candidate_groups: list[Any],
+    *,
+    page_url: str,
+) -> list[dict[str, object]]:
     validator = VariantGroupValidator()
     option_groups = [
         group.as_option_group()
         for group in candidate_groups
         if validator.validate(group, page_url=page_url)
     ]
-    expanded_option_groups: list[dict[str, object]] = []
+    expanded_groups: list[dict[str, object]] = []
     for group in option_groups:
         compound_groups = _expand_compound_option_group(group)
-        if compound_groups:
-            expanded_option_groups.extend(compound_groups)
-            continue
-        expanded_option_groups.append(group)
+        expanded_groups.extend(compound_groups or [group])
+    return _merge_dom_option_groups(expanded_groups)
 
-    deduped_groups: list[dict[str, object]] = []
+
+def _merge_dom_option_groups(
+    groups: list[dict[str, object]],
+) -> list[dict[str, object]]:
     merged_groups: dict[str, dict[str, object]] = {}
-    for group in expanded_option_groups:
+    for group in groups:
         values = [
             clean_text(value)
             for value in _object_list(group.get("values"))
             if clean_text(value)
         ]
-        if len(values) < 2:
-            continue
         name = clean_text(group.get("name"))
         axis_key = normalized_variant_axis_key(name)
-        if not axis_key:
+        if len(values) < 2 or not axis_key:
             continue
         merged = merged_groups.setdefault(
-            axis_key, {"name": name or axis_key, "values": [], "entries": {}}
+            axis_key,
+            {"name": name or axis_key, "values": [], "entries": {}},
         )
         if len(name) > len(str(merged.get("name") or "")):
             merged["name"] = name
-        existing_values = _object_list(merged.get("values"))
-        merged["values"] = list(dict.fromkeys([*existing_values, *values]))
+        merged["values"] = list(
+            dict.fromkeys([*_object_list(merged.get("values")), *values])
+        )
         merged_entries = merged.setdefault("entries", {})
         if not isinstance(merged_entries, dict):
             merged_entries = {}
             merged["entries"] = merged_entries
         for group_entry in _object_list(group.get("entries")):
-            if not isinstance(group_entry, dict):
-                continue
-            value = clean_text(group_entry.get("value"))
-            if not value:
-                continue
-            existing = _object_dict(merged_entries.get(value, {"value": value}))
-            availability = text_or_none(group_entry.get("availability"))
-            if availability and existing.get("availability") in (None, "", [], {}):
-                existing["availability"] = availability
-            if group_entry.get("stock_quantity") not in (None, "", [], {}):
-                existing["stock_quantity"] = group_entry.get("stock_quantity")
-            if group_entry.get("style") not in (None, "", [], {}) and existing.get(
-                "style"
-            ) in (None, "", [], {}):
-                existing["style"] = group_entry.get("style")
-            if group_entry.get("selected"):
-                existing["selected"] = True
-            if group_entry.get("url") not in (None, "", [], {}) and existing.get(
-                "url"
-            ) in (None, "", [], {}):
-                existing["url"] = group_entry.get("url")
-            if group_entry.get("variant_id") not in (None, "", [], {}) and existing.get(
-                "variant_id"
-            ) in (None, "", [], {}):
-                existing["variant_id"] = group_entry.get("variant_id")
-            if group_entry.get("image_url") not in (None, "", [], {}) and existing.get(
-                "image_url"
-            ) in (None, "", [], {}):
-                existing["image_url"] = group_entry.get("image_url")
-            merged_entries[value] = existing
+            if isinstance(group_entry, dict):
+                _merge_dom_option_entry(merged_entries, group_entry)
+    return _limited_dom_option_groups(merged_groups)
+
+
+def _merge_dom_option_entry(
+    merged_entries: dict[str, object],
+    group_entry: dict[str, object],
+) -> None:
+    value = clean_text(group_entry.get("value"))
+    if not value:
+        return
+    existing = _object_dict(merged_entries.get(value, {"value": value}))
+    availability = text_or_none(group_entry.get("availability"))
+    if availability and existing.get("availability") in (None, "", [], {}):
+        existing["availability"] = availability
+    if group_entry.get("stock_quantity") not in (None, "", [], {}):
+        existing["stock_quantity"] = group_entry.get("stock_quantity")
+    for key in ("style", "url", "variant_id", "image_url"):
+        if group_entry.get(key) not in (None, "", [], {}) and existing.get(key) in (
+            None,
+            "",
+            [],
+            {},
+        ):
+            existing[key] = group_entry.get(key)
+    if group_entry.get("selected"):
+        existing["selected"] = True
+    merged_entries[value] = existing
+
+
+def _limited_dom_option_groups(
+    merged_groups: dict[str, dict[str, object]],
+) -> list[dict[str, object]]:
     group_limit = _safe_int_config(
         DOM_VARIANT_GROUP_LIMIT,
         1,
         "DOM_VARIANT_GROUP_LIMIT",
     )
+    groups: list[dict[str, object]] = []
     for group in merged_groups.values():
         values = [
             clean_text(value)
@@ -720,72 +757,94 @@ def extract_variants_from_dom(
         ]
         if len(values) < 2:
             continue
-        merged_entries = _object_dict(group.get("entries"))
-        deduped_groups.append(
+        groups.append(
             {
                 "name": clean_text(group.get("name")),
                 "values": values,
-                "entries": list(merged_entries.values()),
+                "entries": list(_object_dict(group.get("entries")).values()),
             }
         )
-        if len(deduped_groups) >= group_limit:
+        if len(groups) >= group_limit:
             break
+    return groups
 
-    if not deduped_groups:
-        return _cache_dom_variant_record(soup, cache_key, {})
 
-    state_axis_targets, state_combo_targets = _state_variant_targets(
-        js_state_objects,
-        page_url=page_url,
-    )
-    record: dict[str, object] = {}
+def _build_dom_variant_axes(
+    groups: list[dict[str, object]],
+    *,
+    state_axis_targets: dict[str, Any],
+) -> tuple[
+    dict[str, list[str]],
+    dict[str, dict[str, dict[str, object]]],
+    list[tuple[str, str, list[str]]],
+]:
     axis_values_by_name: dict[str, list[str]] = {}
     axis_option_metadata: dict[str, dict[str, dict[str, object]]] = {}
     axis_order: list[tuple[str, str, list[str]]] = []
-    for group in deduped_groups:
+    for group in groups:
         name = clean_text(group.get("name"))
         values = [str(value) for value in _object_list(group.get("values"))]
         axis_key = normalized_variant_axis_key(name)
         if not _dom_variant_axis_allowed(axis_key):
             continue
         axis_values_by_name[axis_key] = values
-        axis_option_metadata[axis_key] = {
-            clean_text(entry.get("value")): {
-                key: entry.get(key)
-                for key in (
-                    "availability",
-                    "selected",
-                    "style",
-                    "stock_quantity",
-                    "url",
-                    "variant_id",
-                    "image_url",
-                )
-                if entry.get(key) not in (None, "", [], {})
-            }
-            for entry in _object_list(group.get("entries"))
-            if isinstance(entry, dict)
-            if clean_text(entry.get("value"))
-        }
-        for option_value, state_metadata in dict(
-            state_axis_targets.get(axis_key) or {}
-        ).items():
-            merged_metadata = axis_option_metadata[axis_key].setdefault(
-                option_value, {}
-            )
-            for key in ("url", "variant_id", "image_url"):
-                if state_metadata.get(key) not in (
-                    None,
-                    "",
-                    [],
-                    {},
-                ) and merged_metadata.get(key) in (None, "", [], {}):
-                    merged_metadata[key] = state_metadata[key]
+        axis_option_metadata[axis_key] = _axis_group_metadata(group)
+        _merge_state_axis_metadata(
+            axis_option_metadata[axis_key],
+            dict(state_axis_targets.get(axis_key) or {}),
+        )
         axis_order.append((axis_key, name, values))
-    if not axis_values_by_name:
-        return _cache_dom_variant_record(soup, cache_key, {})
+    return axis_values_by_name, axis_option_metadata, axis_order
 
-    variants: list[dict[str, object]] = []
+
+def _axis_group_metadata(
+    group: dict[str, object],
+) -> dict[str, dict[str, object]]:
+    return {
+        clean_text(entry.get("value")): {
+            key: entry.get(key)
+            for key in (
+                "availability",
+                "selected",
+                "style",
+                "stock_quantity",
+                "url",
+                "variant_id",
+                "image_url",
+            )
+            if entry.get(key) not in (None, "", [], {})
+        }
+        for entry in _object_list(group.get("entries"))
+        if isinstance(entry, dict)
+        if clean_text(entry.get("value"))
+    }
+
+
+def _merge_state_axis_metadata(
+    axis_metadata: dict[str, dict[str, object]],
+    state_targets: dict[str, Any],
+) -> None:
+    for option_value, state_metadata in state_targets.items():
+        normalized_option_value = clean_text(option_value)
+        if not normalized_option_value:
+            continue
+        merged_metadata = axis_metadata.setdefault(normalized_option_value, {})
+        for key in ("url", "variant_id", "image_url"):
+            if state_metadata.get(key) not in (
+                None,
+                "",
+                [],
+                {},
+            ) and merged_metadata.get(key) in (None, "", [], {}):
+                merged_metadata[key] = state_metadata[key]
+
+
+def _assemble_dom_variant_rows(
+    axis_order: list[tuple[str, str, list[str]]],
+    axis_option_metadata: dict[str, dict[str, dict[str, object]]],
+    *,
+    state_combo_targets: dict[tuple[tuple[str, str], ...], dict[str, object]],
+) -> list[dict[str, object]]:
     axis_names = [axis_key for axis_key, _label, _values in axis_order]
     axis_value_lists = [values for _axis_key, _label, values in axis_order]
     combo_limit = _safe_int_config(
@@ -794,49 +853,75 @@ def extract_variants_from_dom(
         "DOM_VARIANT_CARTESIAN_COMBO_LIMIT",
     )
     if _dom_variant_combo_count(axis_value_lists) > combo_limit:
-        variants = _axis_only_dom_variants(axis_order, axis_option_metadata)
-    else:
-        for combo in product(*axis_value_lists):
-            option_values = {
-                axis_name: value
-                for axis_name, value in zip(axis_names, combo, strict=False)
-                if clean_text(value)
-            }
-            if not option_values:
-                continue
-            variant: dict[str, object] = {
-                "option_values": option_values,
-            }
-            for axis_name, value in option_values.items():
-                variant[axis_name] = value
-            selected_metadata = _selected_option_metadata(
-                axis_option_metadata,
-                option_values,
-            )
-            availability = _availability_from_selected_options(selected_metadata)
-            if availability:
-                variant["availability"] = availability
-            stock_quantity = _stock_quantity_from_selected_options(selected_metadata)
-            if stock_quantity is not None:
-                variant["stock_quantity"] = stock_quantity
-            combo_metadata = state_combo_targets.get(
-                tuple(sorted(option_values.items())), {}
-            )
-            for key in ("url", "variant_id", "image_url"):
-                if combo_metadata.get(key) not in (None, "", [], {}):
-                    variant[key] = combo_metadata[key]
-            if len(axis_names) == 1:
-                axis_key = axis_names[0]
-                option_metadata = axis_option_metadata.get(axis_key, {}).get(
-                    str(combo[0]), {}
+        return _axis_only_dom_variants(axis_order, axis_option_metadata)
+    rows: list[dict[str, object]] = []
+    for combo in product(*axis_value_lists):
+        option_values = {
+            axis_name: value
+            for axis_name, value in zip(axis_names, combo, strict=False)
+            if clean_text(value)
+        }
+        if option_values:
+            rows.append(
+                _assemble_dom_variant_row(
+                    option_values,
+                    combo=combo,
+                    axis_names=axis_names,
+                    axis_option_metadata=axis_option_metadata,
+                    state_combo_targets=state_combo_targets,
                 )
-                if option_metadata.get("style") not in (None, "", [], {}):
-                    variant["style"] = option_metadata.get("style")
-                for key in ("url", "variant_id", "image_url"):
-                    if option_metadata.get(key) not in (None, "", [], {}):
-                        variant[key] = option_metadata.get(key)
-            variants.append(variant)
+            )
+    return rows
 
+
+def _assemble_dom_variant_row(
+    option_values: dict[str, str],
+    *,
+    combo: tuple[str, ...],
+    axis_names: list[str],
+    axis_option_metadata: dict[str, dict[str, dict[str, object]]],
+    state_combo_targets: dict[tuple[tuple[str, str], ...], dict[str, object]],
+) -> dict[str, object]:
+    variant: dict[str, object] = {
+        "option_values": option_values,
+        **option_values,
+    }
+    selected_metadata = _selected_option_metadata(
+        axis_option_metadata,
+        option_values,
+    )
+    availability = _availability_from_selected_options(selected_metadata)
+    if availability:
+        variant["availability"] = availability
+    stock_quantity = _stock_quantity_from_selected_options(selected_metadata)
+    if stock_quantity is not None:
+        variant["stock_quantity"] = stock_quantity
+    combo_metadata = state_combo_targets.get(tuple(sorted(option_values.items())), {})
+    for key in ("url", "variant_id", "image_url"):
+        if combo_metadata.get(key) not in (None, "", [], {}):
+            variant[key] = combo_metadata[key]
+    if len(axis_names) == 1:
+        option_metadata = axis_option_metadata.get(axis_names[0], {}).get(
+            str(combo[0]),
+            {},
+        )
+        if option_metadata.get("style") not in (None, "", [], {}):
+            variant["style"] = option_metadata.get("style")
+        for key in ("url", "variant_id", "image_url"):
+            if option_metadata.get(key) not in (None, "", [], {}):
+                variant[key] = option_metadata.get(key)
+    return variant
+
+
+def _materialize_dom_variant_record(
+    axis_values_by_name: dict[str, list[str]],
+    axis_option_metadata: dict[str, dict[str, dict[str, object]]],
+    axis_order: list[tuple[str, str, list[str]]],
+    variants: list[dict[str, object]],
+    *,
+    page_url: str,
+) -> dict[str, object]:
+    record: dict[str, object] = {}
     selectable_axes, single_value_attributes = split_variant_axes(
         axis_values_by_name,
         always_selectable_axes=frozenset({"size"}),
@@ -847,26 +932,10 @@ def extract_variants_from_dom(
         else []
     )
     active_variant = select_variant(resolved_variants, page_url=page_url)
-    selected_option_values = {
-        axis_name: option_value
-        for axis_name, option_value in (
-            (
-                axis_name,
-                next(
-                    (
-                        value
-                        for value, metadata in axis_option_metadata.get(
-                            axis_name, {}
-                        ).items()
-                        if metadata.get("selected")
-                    ),
-                    None,
-                ),
-            )
-            for axis_name in axis_names
-        )
-        if option_value
-    }
+    selected_option_values = _selected_dom_option_values(
+        [axis_key for axis_key, _label, _values in axis_order],
+        axis_option_metadata,
+    )
     if selected_option_values:
         active_variant = next(
             (
@@ -878,24 +947,88 @@ def extract_variants_from_dom(
         )
     for axis_name, value in single_value_attributes.items():
         record.setdefault(axis_name, value)
-    if resolved_variants:
-        flat_variants = (
-            flatten_variants_for_public_output(
-                resolved_variants,
-                page_url=page_url,
-            )
-            or []
+    flat_variants = (
+        flatten_variants_for_public_output(
+            resolved_variants,
+            page_url=page_url,
         )
-        if flat_variants:
-            for variant in flat_variants:
-                variant["_validated"] = True
-            record["variants"] = flat_variants
-            record["variant_count"] = len(flat_variants)
-        if active_variant:
-            if record.get("availability") in (None, "", [], {}):
-                selected_availability = text_or_none(active_variant.get("availability"))
-                if selected_availability:
-                    record["availability"] = selected_availability
+        or []
+    )
+    if flat_variants:
+        for variant in flat_variants:
+            variant["_validated"] = True
+        record["variants"] = flat_variants
+        record["variant_count"] = len(flat_variants)
+    if active_variant and record.get("availability") in (None, "", [], {}):
+        selected_availability = text_or_none(active_variant.get("availability"))
+        if selected_availability:
+            record["availability"] = selected_availability
+    return record
+
+
+def _selected_dom_option_values(
+    axis_names: list[str],
+    axis_option_metadata: dict[str, dict[str, dict[str, object]]],
+) -> dict[str, str]:
+    selected: dict[str, str] = {}
+    for axis_name in axis_names:
+        option_value = next(
+            (
+                value
+                for value, metadata in axis_option_metadata.get(axis_name, {}).items()
+                if metadata.get("selected")
+            ),
+            None,
+        )
+        if option_value:
+            selected[axis_name] = option_value
+    return selected
+
+
+def extract_variants_from_dom(
+    soup: BeautifulSoup,
+    *,
+    page_url: str,
+    js_state_objects: dict[str, Any] | None = None,
+) -> dict[str, object]:
+    cache_key = (str(page_url or ""), id(js_state_objects), id(soup))
+    cached = _cached_dom_variant_record(soup, cache_key)
+    if cached is not None:
+        return cached
+    title_hint = clean_text(soup.h1.get_text(" ", strip=True) if soup.h1 else "")
+    candidate_groups = [
+        *_collect_select_candidate_groups(soup, page_url=page_url),
+        *_collect_choice_candidate_groups(
+            soup,
+            page_url=page_url,
+            title_hint=title_hint,
+        ),
+    ]
+    groups = _validated_dom_option_groups(candidate_groups, page_url=page_url)
+    if not groups:
+        return _cache_dom_variant_record(soup, cache_key, {})
+    state_axis_targets, state_combo_targets = _state_variant_targets(
+        js_state_objects,
+        page_url=page_url,
+    )
+    axis_values, axis_metadata, axis_order = _build_dom_variant_axes(
+        groups,
+        state_axis_targets=state_axis_targets,
+    )
+    if not axis_values:
+        return _cache_dom_variant_record(soup, cache_key, {})
+    variants = _assemble_dom_variant_rows(
+        axis_order,
+        axis_metadata,
+        state_combo_targets=state_combo_targets,
+    )
+    record = _materialize_dom_variant_record(
+        axis_values,
+        axis_metadata,
+        axis_order,
+        variants,
+        page_url=page_url,
+    )
     return _cache_dom_variant_record(soup, cache_key, record)
 
 

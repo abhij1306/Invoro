@@ -32,7 +32,6 @@ import { getApiWebSocketBaseUrl } from '../../lib/api/client';
 import type { CrawlLog, CrawlRecord, ResultSummaryQualityLevel } from '../../lib/api/types';
 import { CRAWL_DEFAULTS } from '../../lib/constants/crawl-defaults';
 import { ACTIVE_STATUSES } from '../../lib/constants/crawl-statuses';
-import { STORAGE_KEYS } from '../../lib/constants/storage-keys';
 import { POLLING_INTERVALS, RETRY_LIMITS } from '../../lib/constants/timing';
 import { getDomain } from '../../lib/format/domain';
 import { telemetryErrorPayload, trackEvent } from '../../lib/telemetry/events';
@@ -41,20 +40,12 @@ import { ActionButton, LogTerminal, RecordsTable } from './shared-components';
 import {
   cleanRecordForDisplay,
   copyJson,
-  extractRecordUrl,
-  extractionVerdict,
-  formatDuration,
-  formatDurationMs,
-  estimateDataQuality,
   humanizeVerdict,
   humanizeQuality,
-  inferDomainFromSurface,
-  isListingRun,
   mergeLogs,
   type OutputTabKey,
   scrollViewportToBottom,
   selectorWinnerLabel,
-  uniqueStrings,
 } from './shared';
 import { AlertBuilderDrawer } from './alert-builder-drawer';
 import { useCrawlRunStore } from './crawl-run-store';
@@ -65,7 +56,6 @@ import {
   isMarkdownOutputRun,
 } from './markdown-output-utils';
 import { MarkdownOutputPanel } from './markdown-output';
-import { storeDataEnrichmentPrefill, storeProductIntelligencePrefill } from './crawl-run-prefill';
 import { buildInitialCrawlRunLocalState, crawlRunLocalReducer } from './crawl-run-state';
 import { useLiveClock, useTerminalRecordSync, useTerminalSync } from './use-run-polling';
 import { useRunWorkspace } from './use-run-workspace';
@@ -458,7 +448,6 @@ export function CrawlRunScreen({ runId }: Readonly<CrawlRunScreenProps>) {
   const {
     visibleColumns,
     visibleSelectedIds,
-    selectedRecords,
     batchSourceRecords,
     llmSummary,
     listingRun,

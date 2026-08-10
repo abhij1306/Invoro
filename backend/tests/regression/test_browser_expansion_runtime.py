@@ -24,19 +24,31 @@ from app.services.acquisition import (
 from app.services.acquisition.browser_capture import BrowserNetworkCapture
 from app.services.acquisition import (
     browser_page_flow,
+    browser_page_helpers,
     browser_pool,
     browser_readiness,
+    browser_result_builder,
     browser_runtime,
 )
 from app.services.acquisition.browser_fetch_support import build_browser_fetch_result
 from app.services.acquisition.traversal import TraversalResult
+from app.services.acquisition.runtime import BlockPageClassification
 from app.services.config.runtime_settings import crawler_runtime_settings
 from app.services.config.selectors import CARD_SELECTORS
 from app.services.pipeline.extract_records import extract_records
 
 
 @pytest.fixture(autouse=True)
-def _reset_origin_warmup_state():
+def _reset_origin_warmup_state(monkeypatch: pytest.MonkeyPatch):
+    async def _no_saved_domain_state(*_args, **_kwargs):
+        await _async_checkpoint()
+        return None
+
+    monkeypatch.setattr(
+        cookie_store,
+        "load_storage_state_for_domain",
+        _no_saved_domain_state,
+    )
     browser_runtime._ORIGIN_WARMUP_IN_FLIGHT.clear()
     browser_runtime._ORIGIN_WARMUP_RECENT.clear()
     yield
@@ -74,7 +86,7 @@ async def _emit_browser_event_noop(*_args, **_kwargs):
 
 async def _classify_browser_page_ok(_html: str, _status_code: int):
     await _async_checkpoint()
-    return browser_page_flow.BlockPageClassification(
+    return BlockPageClassification(
         blocked=False,
         evidence=[],
         outcome="ok",
@@ -82,7 +94,7 @@ async def _classify_browser_page_ok(_html: str, _status_code: int):
 
 
 @pytest.fixture
-def browser_finalize_support(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
+def browser_finalize_support() -> SimpleNamespace:
     visual_calls: list[str | None] = []
 
     async def _capture_fragments(*_args, **_kwargs):
@@ -94,18 +106,7 @@ def browser_finalize_support(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace
         visual_calls.append(_kwargs.get("surface"))
         return []
 
-    monkeypatch.setattr(
-        browser_page_flow,
-        "capture_rendered_listing_fragments",
-        _capture_fragments,
-    )
-    monkeypatch.setattr(
-        browser_page_flow,
-        "_capture_listing_visual_elements",
-        _capture_visuals,
-    )
-
-    def _make_payload(**overrides: Any) -> browser_page_flow.BrowserFinalizeInput:
+    def _make_payload(**overrides: Any) -> browser_result_builder.BrowserFinalizeInput:
         html = str(
             overrides.get(
                 "html",
@@ -134,12 +135,14 @@ def browser_finalize_support(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace
             "phase_timings_ms": {},
             "started_at": 0.0,
         }
-        return browser_page_flow.BrowserFinalizeInput(**{**defaults, **overrides})
+        return browser_result_builder.BrowserFinalizeInput(**{**defaults, **overrides})
 
     return SimpleNamespace(
         make_payload=_make_payload,
         classify_blocked_page_async=_classify_browser_page_ok,
         emit_browser_event=_emit_browser_event_noop,
+        capture_fragments=_capture_fragments,
+        capture_visuals=_capture_visuals,
         visual_calls=visual_calls,
     )
 
@@ -173,7 +176,7 @@ def test_select_primary_browser_html_prefers_full_rendered_when_traversal_fragme
         stop_reason="target_records_reached",
     )
 
-    html = browser_page_flow._select_primary_browser_html(
+    html = browser_page_helpers.select_primary_browser_html(
         surface="ecommerce_listing",
         traversal_result=traversal_result,
         traversal_html="<html><body><a href='/products/a'>A</a></body></html>",
@@ -198,7 +201,7 @@ def test_select_primary_browser_html_uses_surface_specific_detail_hints() -> Non
         stop_reason="target_records_reached",
     )
 
-    html = browser_page_flow._select_primary_browser_html(
+    html = browser_page_helpers.select_primary_browser_html(
         surface="job_listing",
         traversal_result=traversal_result,
         traversal_html=(
@@ -221,9 +224,9 @@ def test_location_interstitial_diagnostics_marks_location_required() -> None:
       <div role="dialog" class="location-modal"><h2>Choose your location</h2><button>Continue</button></div>
     </body></html>
     """
-    assert browser_page_flow.location_interstitial_detected(html) is True
+    assert browser_page_helpers.location_interstitial_detected(html) is True
 
-    diagnostics = browser_page_flow.build_browser_diagnostics(
+    diagnostics = browser_result_builder.build_browser_diagnostics(
         browser_reason="http-escalation",
         browser_outcome="location_required",
         navigation_strategy="domcontentloaded",
@@ -274,7 +277,7 @@ async def test_finalize_browser_fetch_marks_location_interstitial_blocked(
     )
     payload = browser_finalize_support.make_payload(html=html)
 
-    result = await browser_page_flow.finalize_browser_fetch(
+    result = await browser_result_builder.finalize_browser_fetch(
         payload,
         blocked_html_checker=lambda *_args, **_kwargs: False,
         classify_blocked_page_async=browser_finalize_support.classify_blocked_page_async,
@@ -283,6 +286,8 @@ async def test_finalize_browser_fetch_marks_location_interstitial_blocked(
         capture_browser_screenshot=lambda _page: "",
         emit_browser_event=browser_finalize_support.emit_browser_event,
         elapsed_ms=lambda _started_at: 0,
+        capture_rendered_listing_fragments_impl=browser_finalize_support.capture_fragments,
+        capture_listing_visual_elements_impl=browser_finalize_support.capture_visuals,
     )
 
     assert result["blocked"] is True
@@ -319,7 +324,7 @@ async def test_finalize_browser_fetch_keeps_usable_detail_without_ready_probe(
         ],
     )
 
-    result = await browser_page_flow.finalize_browser_fetch(
+    result = await browser_result_builder.finalize_browser_fetch(
         payload,
         blocked_html_checker=lambda *_args, **_kwargs: False,
         classify_blocked_page_async=browser_finalize_support.classify_blocked_page_async,
@@ -328,6 +333,8 @@ async def test_finalize_browser_fetch_keeps_usable_detail_without_ready_probe(
         capture_browser_screenshot=lambda _page: "",
         emit_browser_event=browser_finalize_support.emit_browser_event,
         elapsed_ms=lambda _started_at: 0,
+        capture_rendered_listing_fragments_impl=browser_finalize_support.capture_fragments,
+        capture_listing_visual_elements_impl=browser_finalize_support.capture_visuals,
     )
 
     assert result["blocked"] is False
@@ -346,7 +353,7 @@ def test_location_interstitial_detects_text_only_fallback() -> None:
     </body></html>
     """
 
-    assert browser_page_flow.location_interstitial_detected(html) is True
+    assert browser_page_helpers.location_interstitial_detected(html) is True
 
 
 @pytest.mark.asyncio
@@ -456,7 +463,7 @@ async def test_browser_fetch_closes_payload_capture_after_policy_resolution_erro
 @pytest.mark.regression
 def test_ready_probe_supports_fast_finalize_for_strong_detail_page() -> None:
     assert (
-        browser_page_flow._ready_probe_supports_fast_finalize(
+        browser_result_builder.ready_probe_supports_fast_finalize(
             [
                 {
                     "is_ready": True,
@@ -475,7 +482,7 @@ def test_ready_probe_supports_fast_finalize_for_strong_detail_page() -> None:
 @pytest.mark.regression
 def test_ready_probe_fast_finalize_rejects_for_forced_block_status() -> None:
     assert (
-        browser_page_flow._ready_probe_supports_fast_finalize(
+        browser_result_builder.ready_probe_supports_fast_finalize(
             [
                 {
                     "is_ready": True,
@@ -494,7 +501,7 @@ def test_ready_probe_fast_finalize_rejects_for_forced_block_status() -> None:
 @pytest.mark.regression
 def test_fast_finalize_accepts_verified_extractability_without_probe_payload() -> None:
     assert (
-        browser_page_flow._ready_probe_supports_fast_finalize(
+        browser_result_builder.ready_probe_supports_fast_finalize(
             [],
             surface="ecommerce_detail",
             status_code=200,
@@ -530,7 +537,7 @@ async def test_fast_finalize_keeps_location_clear_when_precheck_found_no_signal(
         },
     )
 
-    result = await browser_page_flow.finalize_browser_fetch(
+    result = await browser_result_builder.finalize_browser_fetch(
         payload,
         blocked_html_checker=lambda *_args, **_kwargs: False,
         classify_blocked_page_async=browser_finalize_support.classify_blocked_page_async,
@@ -539,6 +546,8 @@ async def test_fast_finalize_keeps_location_clear_when_precheck_found_no_signal(
         capture_browser_screenshot=lambda _page: "",
         emit_browser_event=browser_finalize_support.emit_browser_event,
         elapsed_ms=lambda _started_at: 0,
+        capture_rendered_listing_fragments_impl=browser_finalize_support.capture_fragments,
+        capture_listing_visual_elements_impl=browser_finalize_support.capture_visuals,
     )
 
     assert result["blocked"] is False
@@ -585,7 +594,7 @@ async def test_location_interstitial_dismisses_by_safe_text_token() -> None:
 
     page = _Page()
 
-    result = await browser_page_flow.dismiss_safe_location_interstitial(page)
+    result = await browser_page_helpers.dismiss_safe_location_interstitial(page)
 
     assert result == {"status": "dismissed", "selector": "text:continue"}
     assert page.waited is True
@@ -639,7 +648,7 @@ async def test_location_interstitial_dismissal_counts_before_first_locator() -> 
             await _async_checkpoint()
             self.waited = True
 
-    result = await browser_page_flow.dismiss_safe_location_interstitial(_Page())
+    result = await browser_page_helpers.dismiss_safe_location_interstitial(_Page())
 
     assert result["status"] == "dismissed"
 
@@ -679,7 +688,7 @@ async def test_location_interstitial_dismissal_requires_modal_to_clear() -> None
             await _async_checkpoint()
             return True
 
-    result = await browser_page_flow.dismiss_safe_location_interstitial(_Page())
+    result = await browser_page_helpers.dismiss_safe_location_interstitial(_Page())
 
     assert result["status"] == "still_present"
     assert "selector" in result
@@ -716,7 +725,7 @@ async def test_location_interstitial_dismissal_skips_when_no_signal_present() ->
             await _async_checkpoint()
             raise AssertionError("content should be skipped when no signal exists")
 
-    result = await browser_page_flow.dismiss_safe_location_interstitial(_Page())
+    result = await browser_page_helpers.dismiss_safe_location_interstitial(_Page())
 
     assert result == {"status": "not_found", "reason": "no_location_signal"}
 
@@ -771,25 +780,24 @@ async def test_serialize_browser_page_content_reuses_prefetched_html_without_pag
 async def test_settle_browser_page_skips_platform_selector_when_probe_is_ready() -> (
     None
 ):
-    calls = {"probe": 0, "wait": 0}
+    probe_analyses: list[object] = []
+    current_html = "<html><body>Searching...</body></html>"
 
     async def get_page_html_impl(_page):
         await _async_checkpoint()
-        return "<html><body>Searching...</body></html>"
+        return current_html
 
-    async def probe_browser_readiness(*_args, **_kwargs):
+    async def probe_browser_readiness(*_args, **kwargs):
         await _async_checkpoint()
-        calls["probe"] += 1
+        probe_analyses.append(kwargs.get("analysis"))
         return {
             "is_ready": True,
-            "matched_listing_selectors": 0 if calls["probe"] == 1 else 1,
+            "matched_listing_selectors": len(probe_analyses) - 1,
             "structured_data_present": False,
         }
 
     async def wait_for_listing_readiness(*_args, **_kwargs):
-        await _async_checkpoint()
-        calls["wait"] += 1
-        return {"status": "ok"}
+        raise AssertionError("ready probes must skip platform selector waiting")
 
     result = await browser_page_flow.settle_browser_page_impl(
         SimpleNamespace(),
@@ -815,16 +823,15 @@ async def test_settle_browser_page_skips_platform_selector_when_probe_is_ready()
 
     _current_probe, readiness_probes, *_rest = result
 
-    assert calls["wait"] == 0
-    assert [probe["stage"] for probe in readiness_probes] == [
-        "after_navigation",
-    ]
+    assert [
+        (analysis.html, analysis.lowered_html, analysis.normalized_text)
+        for analysis in probe_analyses
+    ] == [(current_html, current_html.lower(), "Searching...")]
+    assert [probe["stage"] for probe in readiness_probes] == ["after_navigation"]
 
 
 @pytest.mark.regression
-def test_detail_expansion_extractability_reuses_supplied_soup_without_reparse(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_detail_expansion_extractability_reuses_supplied_soup_without_reparse() -> None:
     soup = BeautifulSoup(
         "<html><body><section><h2>Materials</h2><p>Leather upper.</p></section></body></html>",
         "html.parser",
@@ -833,21 +840,19 @@ def test_detail_expansion_extractability_reuses_supplied_soup_without_reparse(
     def _unexpected_bs4(*_args, **_kwargs):
         raise AssertionError("BeautifulSoup should not be called when soup is supplied")
 
-    monkeypatch.setattr(browser_page_flow, "BeautifulSoup", _unexpected_bs4)
-    extractability = browser_page_flow._detail_expansion_extractability(
+    extractability = browser_page_helpers.detail_expansion_extractability(
         html="",
         soup=soup,
         surface="ecommerce_detail",
         requested_fields=["materials"],
+        beautiful_soup_factory=_unexpected_bs4,
     )
 
     assert extractability["matched_requested_fields"] == ["materials"]
 
 
 @pytest.mark.regression
-def test_detail_expansion_extractability_limits_probe_fields_to_requested(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_detail_expansion_extractability_limits_probe_fields_to_requested() -> None:
     seen_probe_fields: set[str] | None = None
 
     def _fake_extractability(*_args, **kwargs):
@@ -861,25 +866,20 @@ def test_detail_expansion_extractability_limits_probe_fields_to_requested(
             "section_fields": ["materials"],
         }
 
-    monkeypatch.setattr(
-        browser_page_flow,
-        "requested_content_extractability",
-        _fake_extractability,
-    )
-
-    browser_page_flow._detail_expansion_extractability(
+    browser_page_helpers.detail_expansion_extractability(
         html="<html></html>",
         surface="ecommerce_detail",
         requested_fields=["materials"],
+        requested_content_extractability_impl=_fake_extractability,
     )
 
     assert seen_probe_fields == {"materials"}
 
 
 @pytest.mark.regression
-def test_detail_expansion_extractability_uses_default_dom_probe_fields_without_requests(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_detail_expansion_extractability_uses_default_dom_probe_fields_without_requests() -> (
+    None
+):
     seen_probe_fields: set[str] | None = None
 
     def _fake_extractability(*_args, **kwargs):
@@ -893,16 +893,11 @@ def test_detail_expansion_extractability_uses_default_dom_probe_fields_without_r
             "section_fields": [],
         }
 
-    monkeypatch.setattr(
-        browser_page_flow,
-        "requested_content_extractability",
-        _fake_extractability,
-    )
-
-    browser_page_flow._detail_expansion_extractability(
+    browser_page_helpers.detail_expansion_extractability(
         html="<html></html>",
         surface="ecommerce_detail",
         requested_fields=None,
+        requested_content_extractability_impl=_fake_extractability,
     )
 
     assert seen_probe_fields is not None
@@ -915,6 +910,7 @@ class _FakeHandle:
     label: str
     page: "_FakeExpansionPage"
     attributes: dict[str, str]
+    element_identity: str = "node-1"
     tag_name: str = "button"
     actionable: bool = True
     inside_main: bool = False
@@ -929,6 +925,7 @@ class _FakeHandle:
             return self.label
         if "insideMain" in script:
             return {
+                "elementIdentity": self.element_identity,
                 "insideMain": self.inside_main,
                 "insideHeader": self.inside_header,
                 "insideNav": self.inside_nav,
@@ -975,7 +972,7 @@ class _FakeLocator:
     async def element_handles(self) -> list[_FakeHandle]:
         await _async_checkpoint()
         handles: list[_FakeHandle] = []
-        for row in self._page.labels:
+        for index, row in enumerate(self._page.labels):
             attributes = {
                 str(key): str(value)
                 for key, value in dict(row.get("attributes", {})).items()
@@ -988,6 +985,9 @@ class _FakeLocator:
                     row["label"],
                     self._page,
                     attributes=attributes,
+                    element_identity=str(
+                        row.get("element_identity") or f"node-{index + 1}"
+                    ),
                     tag_name=tag_name,
                     actionable=bool(row.get("actionable", True)),
                     inside_main=bool(row.get("inside_main", False)),
@@ -1369,6 +1369,47 @@ class _FakeRuntime:
 
 @pytest.mark.asyncio
 @pytest.mark.regression
+async def test_browser_fetch_deadline_includes_page_acquisition(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    page = _FakeExpansionPage(
+        base_html="<html><body><h1>Widget Prime</h1></body></html>"
+    )
+    captured_deadlines: list[float] = []
+    perf_counter_calls = 0
+
+    async def _fake_runtime(**_kwargs):
+        await _async_checkpoint()
+        return _FakeRuntime(page)
+
+    def _perf_counter() -> float:
+        nonlocal perf_counter_calls
+        perf_counter_calls += 1
+        return 100.0 if perf_counter_calls == 1 else 104.0
+
+    def _remaining_timeout_factory(deadline: float):
+        captured_deadlines.append(deadline)
+        return lambda: 5.0
+
+    monkeypatch.setattr(browser_runtime.time, "perf_counter", _perf_counter)
+    monkeypatch.setattr(
+        browser_runtime,
+        "remaining_timeout_factory",
+        _remaining_timeout_factory,
+    )
+
+    await browser_runtime.browser_fetch(
+        "https://example.com/products/widget",
+        5,
+        surface="ecommerce_detail",
+        runtime_provider=_fake_runtime,
+    )
+
+    assert captured_deadlines == [105.0]
+
+
+@pytest.mark.asyncio
+@pytest.mark.regression
 async def test_browser_fetch_fast_paths_ready_detail_without_extra_waits() -> None:
     page = _FakeExpansionPage(
         base_html="""
@@ -1695,15 +1736,6 @@ async def test_browser_fetch_listing_skips_detail_extractability_probe(
     async def _fake_runtime(**_kwargs):
         await _async_checkpoint()
         return _FakeRuntime(page)
-
-    def _unexpected_extractability(*args, **kwargs):
-        raise AssertionError("listing settle should not probe detail extractability")
-
-    monkeypatch.setattr(
-        browser_page_flow,
-        "requested_content_extractability",
-        _unexpected_extractability,
-    )
 
     result = await browser_runtime.browser_fetch(
         "https://example.com/collections/widgets",
@@ -2533,7 +2565,7 @@ async def test_browser_fetch_ignores_non_string_rendered_listing_fragments(
         return [123, {"html": "<article>bad</article>"}, " <article>good</article> "]
 
     monkeypatch.setattr(
-        browser_page_flow, "capture_rendered_listing_fragments", _bad_fragments
+        browser_recovery, "capture_rendered_listing_fragments", _bad_fragments
     )
 
     result = await browser_runtime.browser_fetch(
@@ -2573,10 +2605,10 @@ async def test_browser_fetch_keeps_empty_successful_listing_artifacts(
         return []
 
     monkeypatch.setattr(
-        browser_page_flow, "capture_rendered_listing_fragments", _empty_fragments
+        browser_recovery, "capture_rendered_listing_fragments", _empty_fragments
     )
     monkeypatch.setattr(
-        browser_page_flow, "_capture_listing_visual_elements", _empty_visuals
+        browser_page_helpers, "capture_listing_visual_elements", _empty_visuals
     )
 
     result = await browser_runtime.browser_fetch(
@@ -3266,18 +3298,7 @@ async def test_finalize_browser_fetch_keeps_blocked_html_checker_fallback(
         await _async_checkpoint()
         return None
 
-    monkeypatch.setattr(
-        browser_page_flow,
-        "capture_rendered_listing_fragments",
-        _fake_capture_fragments,
-    )
-    monkeypatch.setattr(
-        browser_page_flow,
-        "_capture_listing_visual_elements",
-        _fake_capture_visuals,
-    )
-
-    payload = browser_page_flow.BrowserFinalizeInput(
+    payload = browser_result_builder.BrowserFinalizeInput(
         page=SimpleNamespace(url="https://example.com/products/widget"),
         url="https://example.com/products/widget",
         surface="ecommerce_detail",
@@ -3302,7 +3323,7 @@ async def test_finalize_browser_fetch_keeps_blocked_html_checker_fallback(
         started_at=0.0,
     )
 
-    result = await browser_page_flow.finalize_browser_fetch(
+    result = await browser_result_builder.finalize_browser_fetch(
         payload,
         blocked_html_checker=lambda *_args, **_kwargs: True,
         classify_blocked_page_async=_fake_classify_blocked_page_async,
@@ -3313,6 +3334,8 @@ async def test_finalize_browser_fetch_keeps_blocked_html_checker_fallback(
         capture_browser_screenshot=_fake_emit_browser_event,
         emit_browser_event=_fake_emit_browser_event,
         elapsed_ms=lambda _started_at: 0,
+        capture_rendered_listing_fragments_impl=_fake_capture_fragments,
+        capture_listing_visual_elements_impl=_fake_capture_visuals,
     )
 
     assert result["blocked"] is True
@@ -3547,71 +3570,6 @@ async def test_expand_interactive_elements_via_accessibility_times_out_slow_snap
     assert diagnostics["status"] == "snapshot_timeout"
     assert diagnostics["clicked_count"] == 0
     assert diagnostics["attempted"] is True
-
-
-@pytest.mark.regression
-def test_detail_expansion_skip_requires_extractable_ecommerce_content() -> None:
-    can_skip, reason = browser_page_flow._detail_expansion_can_skip(
-        {"verified": False, "matched_requested_fields": []},
-        surface="ecommerce_detail",
-        requested_fields=None,
-        readiness_probe={"is_ready": True},
-    )
-
-    assert can_skip is False
-    assert reason is None
-
-
-@pytest.mark.regression
-def test_detail_expansion_skip_does_not_trust_sparse_structured_data_alone() -> None:
-    readiness_probe = {
-        "is_ready": True,
-        "structured_data_present": True,
-        "visible_text_length": 1,
-        "detail_hint_count": 0,
-        "h1_present": False,
-    }
-
-    can_skip, reason = browser_page_flow._detail_expansion_can_skip(
-        {"verified": False, "matched_requested_fields": []},
-        surface="ecommerce_detail",
-        requested_fields=None,
-        readiness_probe=readiness_probe,
-    )
-
-    assert can_skip is False
-    assert reason is None
-
-    can_skip, reason = browser_page_flow._detail_expansion_can_skip(
-        {"verified": True, "matched_requested_fields": []},
-        surface="ecommerce_detail",
-        requested_fields=None,
-        readiness_probe=readiness_probe,
-    )
-
-    assert can_skip is True
-    assert reason == "canonical_detail_already_ready"
-
-
-@pytest.mark.regression
-def test_detail_expansion_skip_does_not_trust_sparse_detail_hints_alone() -> None:
-    can_skip, reason = browser_page_flow._detail_expansion_can_skip(
-        {"verified": False, "matched_requested_fields": []},
-        surface="ecommerce_detail",
-        requested_fields=None,
-        readiness_probe={
-            "is_ready": True,
-            "structured_data_present": False,
-            "visible_text_length": 1,
-            "detail_hint_count": int(
-                crawler_runtime_settings.detail_field_signal_min_count
-            ),
-            "h1_present": False,
-        },
-    )
-
-    assert can_skip is False
-    assert reason is None
 
 
 @pytest.mark.regression
@@ -4400,16 +4358,16 @@ async def test_browser_fetch_bounds_listing_artifact_capture_time(
         return [{"tag": "a"}]
 
     monkeypatch.setattr(
-        browser_page_flow,
+        browser_recovery,
         "capture_rendered_listing_fragments",
         _slow_rendered_listing_fragments,
     )
     monkeypatch.setattr(
-        browser_page_flow,
-        "_capture_listing_visual_elements",
+        browser_page_helpers,
+        "capture_listing_visual_elements",
         _slow_listing_visual_elements,
     )
-    with caplog.at_level("WARNING", logger=browser_page_flow.logger.name):
+    with caplog.at_level("WARNING", logger=browser_result_builder.logger.name):
         result = await browser_runtime.browser_fetch(
             "https://example.com/collections/widgets",
             5,
@@ -4445,11 +4403,11 @@ async def test_capture_listing_artifact_with_timeout_reports_playwright_error(
         await _async_checkpoint()
         raise PlaywrightError("Target page, context or browser has been closed")
 
-    with caplog.at_level("DEBUG", logger=browser_page_flow.logger.name):
+    with caplog.at_level("DEBUG", logger=browser_result_builder.logger.name):
         (
             artifacts,
             diagnostics,
-        ) = await browser_page_flow._capture_listing_artifact_with_timeout(
+        ) = await browser_result_builder.capture_listing_artifact_with_timeout(
             _boom(),
             stage="listing_visual_capture",
             url="https://example.com/collections/widgets",
@@ -5305,7 +5263,7 @@ async def test_page_might_have_location_interstitial_uses_live_selector_probe() 
             assert "selectors" in payload
             return True
 
-    detected = await browser_page_flow.page_might_have_location_interstitial(_Page())
+    detected = await browser_page_helpers.page_might_have_location_interstitial(_Page())
 
     assert detected is True
 

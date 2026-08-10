@@ -134,6 +134,28 @@ BROWSER_REQUESTED_DETAIL_GENERIC_TOGGLE_LABELS = frozenset(
         "materials and care",
     }
 )
+BROWSER_DETAIL_SIZE_TOGGLE_TOKENS = (
+    "size selector",
+    "size-selector",
+    "open-size-selector",
+)
+BROWSER_DETAIL_CHROME_TOKENS = (
+    "add-to-wishlist",
+    "gallery",
+    "media-zoom",
+    "thumbnail",
+    "wishlist",
+)
+BROWSER_DETAIL_EXPANDABLE_SELECTOR_SET = frozenset(
+    {
+        "summary",
+        "details > summary",
+        "[aria-expanded='false']",
+        "button[aria-controls]",
+        "[role='button'][aria-controls]",
+        "[role='tab'][aria-controls]",
+    }
+)
 
 _EXTRACTION_RULES_RAW = _STATIC_EXPORTS.get("EXTRACTION_RULES", {})
 EXTRACTION_RULES = (
@@ -289,6 +311,9 @@ __all__ = [
     "VARIANT_MATCHING_INPUT_LIMIT",
     "BROWSER_REQUESTED_DETAIL_SELECTOR_PRIORITY",
     "BROWSER_REQUESTED_DETAIL_GENERIC_TOGGLE_LABELS",
+    "BROWSER_DETAIL_SIZE_TOGGLE_TOKENS",
+    "BROWSER_DETAIL_CHROME_TOKENS",
+    "BROWSER_DETAIL_EXPANDABLE_SELECTOR_SET",
     "_EXTRACTION_RULES_RAW",
     "EXTRACTION_RULES",
     "CONTENT_SURFACE_SANITIZE_SELECTORS",

@@ -142,7 +142,7 @@ Flow:
 | `acquisition/browser_diagnostics.py` | Browser engine labels, profile diagnostics, and failed-fetch diagnostic contracts |
 | `acquisition/browser_identity.py` | Browser fingerprint generation |
 | `acquisition/browser_interstitial.py` | Location-interstitial detection and safe dismissal |
-| `acquisition/browser_page_flow.py` | Page navigation, readiness probing, serialization policy |
+| `acquisition/browser_page_flow.py` | Page navigation, cached-analysis readiness orchestration, and serialization policy |
 | `acquisition/browser_result_builder.py` | Browser acquisition diagnostics, artifacts, screenshots, final result shaping |
 | `acquisition/browser_page_helpers.py` | Browser page HTML selection, detail extractability probes, listing visual capture |
 | `acquisition/browser_proxy_config.py` | Browser proxy URL parsing, redaction, and Playwright proxy config |
@@ -156,9 +156,9 @@ Flow:
 | `acquisition/traversal_card_counting.py` | Card-count and progress-snapshot helpers used by traversal loops |
 | `acquisition/pacing.py` | Host-level rate limiting |
 | `acquisition/cookie_store.py` | Temp storage state plus domain cookie memory helpers |
-| `fetch/fetch_context.py` | `fetch_page()` owner: HTTP/browser decision, escalation, block detection |
-| `fetch/browser_policy.py` | Proxy shaping, browser escalation policy, engine attempt selection, and diagnostics merge helpers |
-| `fetch/types.py` | Typed fetch request and runtime context containers |
+| `fetch/fetch_context.py` | `fetch_page()` owner: HTTP/browser attempt orchestration, host memory, escalation events, and result flow |
+| `fetch/browser_policy.py` | Pure proxy, engine-plan, escalation, handoff, and shared-deadline decisions |
+| `fetch/types.py` | Typed fetch request, runtime context, and browser-attempt plan containers |
 | `robots_policy.py` | robots.txt policy |
 | `url_safety.py` | SSRF and public-target validation |
 
@@ -180,6 +180,7 @@ Canonical config owner:
 | `crawl_engine.py` | Extraction facade and routing |
 | `detail_extractor.py` | Detail-page preparation and field candidate arbitration |
 | `listing_extractor.py` | Listing-page extraction |
+| `extraction_context.py` | Per-artifact cleaned/original/pruned Selectolax documents and cached structured/JS-state views |
 | `structured_sources.py` | JSON-LD, microdata, OG, Nuxt, harvested JS state |
 | `extract/field_candidates/*` | Field candidate collection, structured payload traversal, structured variant row assembly, finalization, and scoring |
 | `js_state/state_normalizer/` | JS state facade plus focused ecommerce payload, variant, identity, and product mapping modules |
@@ -216,7 +217,7 @@ Canonical config owner:
 | `extract/detail/assembly/dom_section_targets.py` | Detail DOM context selection and section target field discovery |
 | `extract/detail/assembly/dom_fallbacks.py` | DOM fallback field assembly for detail records |
 | `extract/detail/variants/dom_coercion.py` | DOM variant axis and option-value coercion helpers |
-| `extract/detail/variants/dom_extraction.py` | DOM variant row extraction, expansion, and backfill |
+| `extract/detail/variants/dom_extraction.py` | DOM variant collection, group validation, row assembly, and fallback merge |
 | `extract/detail/identity/structured_pruning.py` | Structured detail payload relevance and variant-leaf pruning |
 | `extract/detail/assembly/dom_completion.py` | DOM completion gates and DOM variant collection decisions |
 | `extract/detail/images/materialize.py` | Detail image candidate materialization before final cleanup |
@@ -228,7 +229,7 @@ Canonical config owner:
 | `extract/detail/identity/core.py` | Detail/listing URL identity, redirect identity, and requested-detail matching |
 | `extract/detail/identity/jsonld_identity.py` | JSON-LD identity helpers and duplicate product heading pruning |
 | `extract/detail/identity/model_codes.py` | Detail model-number/code compatibility and token extraction |
-| `extract/detail/price/core.py` | Detail price, currency reconciliation, visible PDP price backfill, and magnitude repair |
+| `extract/detail/price/core.py` | Detail price evidence, currency reconciliation, selection/application, visible PDP backfill, and magnitude repair |
 | `extract/detail/assembly/final_cleanup.py` | Ecommerce detail final cleanup orchestrator |
 | `extract/detail/assembly/record_sanitization.py` | Detail placeholder, identity scalar, category, materials, and title cleanup |
 | `extract/detail/price/money_repair.py` | Detail price precision, discount, original-price, and variant price repair |

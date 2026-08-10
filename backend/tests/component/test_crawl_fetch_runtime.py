@@ -11,6 +11,8 @@ import pytest
 from patchright.async_api import Error as PlaywrightError
 
 from app.services.fetch import fetch_context as crawl_fetch_runtime
+from app.services.fetch import browser_policy
+from app.services.fetch.types import FetchRuntimeContext
 from app.services.acquisition import (
     browser_capture,
     runtime as acquisition_runtime,
@@ -26,65 +28,12 @@ from app.services.acquisition.runtime import (
     http_fetch,
     should_escalate_to_browser_async,
 )
+from tests.fixtures.fetch_runtime import (
+    as_async as _as_async,
+    default_fetch_context as _default_fetch_context,
+    page_fetch_result as _page_fetch_result,
+)
 from tests.fixtures.http_mocks import FakeBodyResponse
-
-
-def _default_fetch_context(
-    url: str = "https://example.com/products/widget",
-    surface: str = "ecommerce_detail",
-    **overrides,
-):
-    return crawl_fetch_runtime._FetchRuntimeContext(
-        url=url,
-        resolved_timeout=5.0,
-        deadline_monotonic=time.perf_counter() + 5.0,
-        run_id=None,
-        surface=surface,
-        traversal_mode=None,
-        max_pages=1,
-        max_scrolls=1,
-        max_records=None,
-        on_event=None,
-        browser_reason=None,
-        requested_fields=[],
-        listing_recovery_mode=None,
-        proxies=[None],
-        proxy_profile={},
-        traversal_required=False,
-        fetch_mode="browser_only",
-        runtime_policy={},
-        host_memory_ttl_seconds=crawl_fetch_runtime.crawler_runtime_settings.coerce_host_memory_ttl_seconds(
-            None
-        ),
-        **overrides,
-    )
-
-
-def _page_fetch_result(
-    html: str,
-    *,
-    url: str = "https://example.com/products/widget",
-    final_url: str | None = None,
-    method: str = "browser",
-    status_code: int = 200,
-    **overrides,
-) -> PageFetchResult:
-    return PageFetchResult(
-        url=url,
-        final_url=final_url or url,
-        html=html,
-        status_code=status_code,
-        method=method,
-        **overrides,
-    )
-
-
-def _as_async(fn):
-    async def _wrapped(*args, **kwargs):
-        await asyncio.sleep(0)
-        return fn(*args, **kwargs)
-
-    return _wrapped
 
 
 @pytest.mark.asyncio
@@ -530,9 +479,10 @@ async def test_fetch_page_waits_for_host_slot_before_http_attempt(
 def test_browser_engine_attempts_uses_patchright_by_default() -> None:
     context = _default_fetch_context()
 
-    attempts = crawl_fetch_runtime._browser_engine_attempts(
+    attempts = browser_policy.browser_engine_attempts(
         context=context,
         host_policy=HostProtectionPolicy(host="example.com"),
+        real_chrome_available=False,
     )
 
     assert attempts == ["patchright"]
@@ -554,7 +504,7 @@ def test_browser_engine_attempts_uses_real_chrome_after_patchright_when_availabl
     )
     context = _default_fetch_context()
 
-    attempts = crawl_fetch_runtime._browser_engine_attempts(
+    attempts = browser_policy.browser_engine_attempts(
         context=context,
         host_policy=HostProtectionPolicy(
             host="example.com",
@@ -562,6 +512,7 @@ def test_browser_engine_attempts_uses_real_chrome_after_patchright_when_availabl
             prefer_browser=True,
             last_block_vendor="datadome",
         ),
+        real_chrome_available=True,
     )
 
     assert attempts == ["real_chrome", "patchright"]
@@ -586,13 +537,14 @@ def test_browser_engine_attempts_uses_real_chrome_for_blocked_forum_detail_when_
         surface="forum_detail",
     )
 
-    attempts = crawl_fetch_runtime._browser_engine_attempts(
+    attempts = browser_policy.browser_engine_attempts(
         context=context,
         host_policy=HostProtectionPolicy(
             host="reddit.com",
             patchright_blocked=True,
             prefer_browser=True,
         ),
+        real_chrome_available=True,
     )
 
     assert attempts == ["real_chrome", "patchright"]
@@ -604,9 +556,10 @@ def test_browser_engine_attempts_keeps_forced_patchright_explicit_when_unavailab
 ):
     context = _default_fetch_context(forced_browser_engine="patchright")
 
-    attempts = crawl_fetch_runtime._browser_engine_attempts(
+    attempts = browser_policy.browser_engine_attempts(
         context=context,
         host_policy=HostProtectionPolicy(host="example.com"),
+        real_chrome_available=False,
     )
 
     assert attempts == ["patchright"]
@@ -628,13 +581,14 @@ def test_browser_engine_attempts_does_not_escalate_from_patchright_block_memory_
     )
     context = _default_fetch_context()
 
-    attempts = crawl_fetch_runtime._browser_engine_attempts(
+    attempts = browser_policy.browser_engine_attempts(
         context=context,
         host_policy=HostProtectionPolicy(
             host="example.com",
             patchright_blocked=True,
             prefer_browser=False,
         ),
+        real_chrome_available=True,
     )
 
     assert attempts == ["patchright"]
@@ -654,44 +608,51 @@ def test_saved_real_chrome_contract_skips_patchright(
     )
     context = _default_fetch_context(forced_browser_engine="real_chrome")
 
-    attempts = crawl_fetch_runtime._browser_engine_attempts(
+    attempts = browser_policy.browser_engine_attempts(
         context=context,
         host_policy=HostProtectionPolicy(host="example.com"),
+        real_chrome_available=True,
     )
 
     assert attempts == ["real_chrome"]
 
 
+@pytest.mark.parametrize(
+    ("engine_attempts", "vendor", "method", "expected"),
+    [
+        (
+            ["real_chrome", "patchright"],
+            "datadome",
+            "browser:real_chrome",
+            ["patchright"],
+        ),
+        (
+            ["patchright", "real_chrome"],
+            "akamai",
+            "curl_cffi",
+            ["patchright", "real_chrome"],
+        ),
+    ],
+)
 @pytest.mark.component
-def test_durable_vendor_block_limits_browser_engine_attempts() -> None:
-    attempts = crawl_fetch_runtime._durable_vendor_block_engine_attempts(
-        engine_attempts=["real_chrome", "patchright"],
+def test_durable_vendor_block_engine_attempts(
+    engine_attempts: list[str],
+    vendor: str,
+    method: str,
+    expected: list[str],
+) -> None:
+    attempts = browser_policy.durable_vendor_block_engine_attempts(
+        engine_attempts=engine_attempts,
         host_policy=HostProtectionPolicy(
             host="example.com",
             prefer_browser=True,
-            last_block_vendor="datadome",
-            last_block_method="browser:real_chrome",
+            last_block_vendor=vendor,
+            last_block_method=method,
         ),
         forced_engine=None,
     )
 
-    assert attempts == ["patchright"]
-
-
-@pytest.mark.component
-def test_durable_vendor_block_keeps_http_block_engine_attempts() -> None:
-    attempts = crawl_fetch_runtime._durable_vendor_block_engine_attempts(
-        engine_attempts=["patchright", "real_chrome"],
-        host_policy=HostProtectionPolicy(
-            host="example.com",
-            prefer_browser=True,
-            last_block_vendor="akamai",
-            last_block_method="curl_cffi",
-        ),
-        forced_engine=None,
-    )
-
-    assert attempts == ["patchright", "real_chrome"]
+    assert attempts == expected
 
 
 @pytest.mark.asyncio
@@ -1302,7 +1263,7 @@ async def test_fetch_page_preserves_proxy_list_on_browser_first_path(
 
 @pytest.mark.component
 def test_resolve_proxy_attempts_preserves_order_and_deduplicates() -> None:
-    proxies = crawl_fetch_runtime._resolve_proxy_attempts(
+    proxies = browser_policy.resolve_proxy_attempts(
         [
             "socks5://proxy-b",
             "http://proxy-a",
@@ -1322,14 +1283,14 @@ def test_resolve_proxy_attempts_preserves_order_and_deduplicates() -> None:
 def test_attach_proxy_run_session_replaces_existing_session_marker() -> None:
     proxy = "socks5://user-session-oldvalue:pass@rp.scrapegw.com:6060"
 
-    resolved = crawl_fetch_runtime._attach_proxy_run_session(proxy, run_id=42)
+    resolved = browser_policy.attach_proxy_run_session(proxy, run_id=42)
 
     assert resolved == "socks5://user-session-r42:pass@rp.scrapegw.com:6060"
 
 
 @pytest.mark.component
 def test_resolve_proxy_attempts_does_not_rewrite_proxy_session_by_default() -> None:
-    proxies = crawl_fetch_runtime._resolve_proxy_attempts(
+    proxies = browser_policy.resolve_proxy_attempts(
         [
             "socks5://user-session-oldvalue:pass@rp.scrapegw.com:6060",
             "socks5://user-session-other:pass@rp.scrapegw.com:6060",
@@ -1347,7 +1308,7 @@ def test_resolve_proxy_attempts_does_not_rewrite_proxy_session_by_default() -> N
 def test_resolve_proxy_attempts_rewrites_proxy_session_when_explicitly_enabled() -> (
     None
 ):
-    proxies = crawl_fetch_runtime._resolve_proxy_attempts(
+    proxies = browser_policy.resolve_proxy_attempts(
         [
             "socks5://user-session-oldvalue:pass@rp.scrapegw.com:6060",
             "socks5://user-session-other:pass@rp.scrapegw.com:6060",
@@ -1387,7 +1348,7 @@ async def test_fetch_page_browser_only_retries_proxies_in_user_order_and_stamps_
     monkeypatch.setattr(crawl_fetch_runtime, "_browser_fetch", _fake_browser_fetch)
     monkeypatch.setattr(
         crawl_fetch_runtime,
-        "_browser_engine_attempts",
+        "browser_engine_attempts",
         lambda **_kwargs: ["patchright"],
     )
 
@@ -1410,7 +1371,7 @@ async def test_fetch_page_browser_only_retries_proxies_in_user_order_and_stamps_
 async def test_run_browser_attempts_records_driver_closed_exception(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    context = crawl_fetch_runtime._FetchRuntimeContext(
+    context = FetchRuntimeContext(
         url="https://example.com/products/widget",
         resolved_timeout=5.0,
         deadline_monotonic=time.perf_counter() + 5.0,
@@ -1444,7 +1405,7 @@ async def test_run_browser_attempts_records_driver_closed_exception(
     monkeypatch.setattr(crawl_fetch_runtime, "_browser_fetch", _failing_browser_fetch)
     monkeypatch.setattr(
         crawl_fetch_runtime,
-        "_browser_engine_attempts",
+        "browser_engine_attempts",
         lambda **_kwargs: ["patchright"],
     )
     monkeypatch.setattr(crawl_fetch_runtime, "wait_for_host_slot", AsyncMock())
@@ -1595,7 +1556,7 @@ async def test_run_browser_attempts_replans_to_real_chrome_after_same_proxy_patc
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     attempted_engines: list[str] = []
-    context = crawl_fetch_runtime._FetchRuntimeContext(
+    context = FetchRuntimeContext(
         url="https://example.com/products/widget",
         resolved_timeout=5.0,
         deadline_monotonic=time.perf_counter() + 5.0,
@@ -1674,7 +1635,7 @@ async def test_run_browser_attempts_lets_browser_runtime_own_stage_timeouts(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     attempted_engines: list[str] = []
-    context = crawl_fetch_runtime._FetchRuntimeContext(
+    context = FetchRuntimeContext(
         url="https://example.com/products/widget",
         resolved_timeout=0.01,
         deadline_monotonic=time.perf_counter() + 0.01,
@@ -1713,7 +1674,7 @@ async def test_run_browser_attempts_lets_browser_runtime_own_stage_timeouts(
     monkeypatch.setattr(crawl_fetch_runtime, "_browser_fetch", _fake_browser_fetch)
     monkeypatch.setattr(
         crawl_fetch_runtime,
-        "_browser_engine_attempts",
+        "browser_engine_attempts",
         lambda **_kwargs: ["patchright", "real_chrome"],
     )
     monkeypatch.setattr(crawl_fetch_runtime, "wait_for_host_slot", AsyncMock())
@@ -1755,7 +1716,7 @@ async def test_fetch_page_browser_only_stamps_engine_and_lane_diagnostics(
     monkeypatch.setattr(crawl_fetch_runtime, "_browser_fetch", _fake_browser_fetch)
     monkeypatch.setattr(
         crawl_fetch_runtime,
-        "_browser_engine_attempts",
+        "browser_engine_attempts",
         lambda **_kwargs: ["patchright"],
     )
     monkeypatch.setattr(
@@ -1826,7 +1787,7 @@ async def test_run_browser_attempts_treats_none_cooldown_as_zero(
 ) -> None:
     attempted_engines: list[str] = []
     host_policy = HostProtectionPolicy(host="example.com")
-    context = crawl_fetch_runtime._FetchRuntimeContext(
+    context = FetchRuntimeContext(
         url="https://example.com/products/widget",
         resolved_timeout=5.0,
         deadline_monotonic=time.perf_counter() + 5.0,
@@ -1865,7 +1826,7 @@ async def test_run_browser_attempts_treats_none_cooldown_as_zero(
     monkeypatch.setattr(crawl_fetch_runtime, "_browser_fetch", _fake_browser_fetch)
     monkeypatch.setattr(
         crawl_fetch_runtime,
-        "_browser_engine_attempts",
+        "browser_engine_attempts",
         lambda **_kwargs: ["patchright", "real_chrome"],
     )
     monkeypatch.setattr(crawl_fetch_runtime, "wait_for_host_slot", AsyncMock())
@@ -2598,7 +2559,7 @@ async def test_fetch_page_retries_406_detail_shell_with_browser(
     monkeypatch.setattr(crawl_fetch_runtime, "_browser_fetch", _fake_browser)
     monkeypatch.setattr(
         crawl_fetch_runtime,
-        "_browser_engine_attempts",
+        "browser_engine_attempts",
         lambda **_kwargs: ["patchright"],
     )
     monkeypatch.setattr(crawl_fetch_runtime, "wait_for_host_slot", AsyncMock())
@@ -2652,7 +2613,7 @@ async def test_fetch_page_stops_http_waterfall_after_vendor_confirmed_block(
     monkeypatch.setattr(crawl_fetch_runtime, "_browser_fetch", _failing_browser)
     monkeypatch.setattr(
         crawl_fetch_runtime,
-        "_browser_engine_attempts",
+        "browser_engine_attempts",
         lambda **_kwargs: ["patchright"],
     )
 
@@ -3256,7 +3217,7 @@ async def test_fetch_page_uses_remaining_timeout_budget_across_http_and_browser_
     monkeypatch.setattr(crawl_fetch_runtime, "wait_for_host_slot", AsyncMock())
     monkeypatch.setattr(
         crawl_fetch_runtime,
-        "_browser_engine_attempts",
+        "browser_engine_attempts",
         lambda **_kwargs: ["patchright", "real_chrome"],
     )
     monkeypatch.setattr(
@@ -3278,13 +3239,37 @@ async def test_fetch_page_uses_remaining_timeout_budget_across_http_and_browser_
 
 @pytest.mark.asyncio
 @pytest.mark.component
+async def test_run_browser_attempts_skips_engine_when_shared_deadline_expired(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    context = _default_fetch_context()
+    context.deadline_monotonic = time.perf_counter() - 1.0
+    browser_fetch = AsyncMock()
+    host_slot = AsyncMock()
+
+    monkeypatch.setattr(crawl_fetch_runtime, "_browser_fetch", browser_fetch)
+    monkeypatch.setattr(crawl_fetch_runtime, "wait_for_host_slot", host_slot)
+
+    with pytest.raises(TimeoutError, match="budget exhausted before patchright"):
+        await crawl_fetch_runtime.run_browser_attempts(
+            context,
+            reason="test shared deadline",
+            host_policy=HostProtectionPolicy(host="example.com"),
+        )
+
+    host_slot.assert_not_awaited()
+    browser_fetch.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.component
 async def test_run_browser_attempts_caps_patchright_probe_timeout_for_vendor_block(
     monkeypatch: pytest.MonkeyPatch,
     patch_settings,
 ) -> None:
     patch_settings(browser_vendor_block_probe_timeout_seconds=12.0)
     browser_calls: list[tuple[str, float]] = []
-    context = crawl_fetch_runtime._FetchRuntimeContext(
+    context = FetchRuntimeContext(
         url="https://example.com/products/widget",
         resolved_timeout=30.0,
         deadline_monotonic=time.perf_counter() + 30.0,
@@ -3328,7 +3313,7 @@ async def test_run_browser_attempts_caps_patchright_probe_timeout_for_vendor_blo
     monkeypatch.setattr(crawl_fetch_runtime, "_browser_fetch", _fake_browser_fetch)
     monkeypatch.setattr(
         crawl_fetch_runtime,
-        "_browser_engine_attempts",
+        "browser_engine_attempts",
         lambda **_kwargs: ["patchright", "real_chrome"],
     )
     monkeypatch.setattr(crawl_fetch_runtime, "wait_for_host_slot", AsyncMock())
@@ -3382,7 +3367,7 @@ async def test_run_browser_attempts_caps_patchright_probe_when_real_chrome_is_qu
     """
     patch_settings(browser_vendor_block_probe_timeout_seconds=12.0)
     browser_calls: list[tuple[str, float]] = []
-    context = crawl_fetch_runtime._FetchRuntimeContext(
+    context = FetchRuntimeContext(
         url="https://example.com/products/widget",
         resolved_timeout=30.0,
         deadline_monotonic=time.perf_counter() + 30.0,
@@ -3424,7 +3409,7 @@ async def test_run_browser_attempts_caps_patchright_probe_when_real_chrome_is_qu
     monkeypatch.setattr(crawl_fetch_runtime, "_browser_fetch", _fake_browser_fetch)
     monkeypatch.setattr(
         crawl_fetch_runtime,
-        "_browser_engine_attempts",
+        "browser_engine_attempts",
         lambda **_kwargs: ["patchright", "real_chrome"],
     )
     monkeypatch.setattr(crawl_fetch_runtime, "wait_for_host_slot", AsyncMock())
@@ -3461,11 +3446,10 @@ def test_browser_attempt_timeout_skips_patchright_probe_cap_without_vendor(
     patch_settings(browser_vendor_block_probe_timeout_seconds=1.0)
     context = _default_fetch_context()
 
-    timeout_seconds = crawl_fetch_runtime._browser_attempt_timeout_seconds(
+    timeout_seconds = browser_policy.browser_attempt_timeout_seconds(
         context=context,
         reason="vendor-block:",
         browser_engine="patchright",
-        engine_index=0,
         engine_attempts=["patchright", "real_chrome"],
         host_policy=HostProtectionPolicy(
             host="example.com",
@@ -3485,11 +3469,10 @@ def test_browser_attempt_timeout_caps_patchright_when_real_chrome_is_queued(
     patch_settings(browser_vendor_block_probe_timeout_seconds=1.0)
     context = _default_fetch_context()
 
-    timeout_seconds = crawl_fetch_runtime._browser_attempt_timeout_seconds(
+    timeout_seconds = browser_policy.browser_attempt_timeout_seconds(
         context=context,
         reason="vendor-block:akamai",
         browser_engine="patchright",
-        engine_index=1,
         engine_attempts=["patchright", "real_chrome"],
         host_policy=HostProtectionPolicy(host="example.com"),
     )
@@ -3543,7 +3526,7 @@ async def test_fetch_page_skips_cookie_handoff_when_proxy_identity_would_drift(
     monkeypatch.setattr(crawl_fetch_runtime, "_browser_fetch", _browser_ok)
     monkeypatch.setattr(
         crawl_fetch_runtime,
-        "_browser_engine_attempts",
+        "browser_engine_attempts",
         lambda **_kwargs: ["real_chrome"],
     )
     try:
@@ -3618,7 +3601,7 @@ async def test_fetch_page_prefers_browser_after_hard_blocked_fetch(
     monkeypatch.setattr(crawl_fetch_runtime, "_browser_fetch", _browser_blocked)
     monkeypatch.setattr(
         crawl_fetch_runtime,
-        "_browser_engine_attempts",
+        "browser_engine_attempts",
         lambda **_kwargs: ["patchright"],
     )
     monkeypatch.setattr(

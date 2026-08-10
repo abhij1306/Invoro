@@ -480,19 +480,11 @@ export default function AdminLlmPage() {
                 <Table className="table-auto">
                   <TableHeader>
                     <TableRow className="border-divider/50">
-                      <TableHead className="w-[118px] text-[10px] tracking-[0.08em]">
-                        Usage
-                      </TableHead>
-                      <TableHead className="w-[170px] text-[10px] tracking-[0.08em]">
-                        Task
-                      </TableHead>
-                      <TableHead className="w-[160px] text-[10px] tracking-[0.08em]">
-                        Target
-                      </TableHead>
-                      <TableHead className="text-[10px] tracking-[0.08em]">Provider</TableHead>
-                      <TableHead className="w-[110px] text-right text-[10px] tracking-[0.08em]">
-                        Time
-                      </TableHead>
+                      <TableHead className="w-[118px]">Usage</TableHead>
+                      <TableHead className="w-[170px]">Task</TableHead>
+                      <TableHead className="w-[160px]">Target</TableHead>
+                      <TableHead>Provider</TableHead>
+                      <TableHead className="w-[110px] text-right">Time</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

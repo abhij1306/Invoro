@@ -38,14 +38,16 @@ from app.services.acquisition.browser_storage_state import (
 )
 from app.services.acquisition.browser_page_flow import (
     append_readiness_probe,
-    finalize_browser_fetch,
     navigate_browser_page_impl,
     remaining_timeout_factory,
     resolve_browser_fetch_policy as resolve_browser_fetch_policy_impl,
     serialize_browser_page_content_impl,
     settle_browser_page_impl,
 )
-from app.services.acquisition.browser_result_builder import BrowserFinalizeInput
+from app.services.acquisition.browser_result_builder import (
+    BrowserFinalizeInput,
+    finalize_browser_fetch,
+)
 from app.services.acquisition.browser_proxy_config import (
     display_proxy as _display_proxy,
 )
@@ -337,11 +339,12 @@ async def browser_fetch(
     payload_capture = None
     popup_guard_registrations: list[tuple[Any, str, Any]] = []
     try:
+        started_at = time.perf_counter()
+        deadline = started_at + float(timeout_seconds)
         # Time the launch/reuse window (runtime resolve + browser launch + semaphore
-        # acquire + context open + storage-state load). This window precedes
-        # `started_at` below, so without this probe it is invisible in
-        # phase_timings_ms — which is exactly where a slow 2nd-acquisition launch hides.
-        page_acquire_started_at = time.perf_counter()
+        # acquire + context open + storage-state load). It consumes the same bounded
+        # attempt budget as navigation and settling so engine rotation cannot starve.
+        page_acquire_started_at = started_at
         runtime, page_context = await _resolve_browser_fetch_page_context(
             proxy=proxy,
             proxied_page_factory=proxied_page_factory,
@@ -370,8 +373,7 @@ async def browser_fetch(
                 on_event=on_event,
             )
             runtime_bridge_used = runtime_bridge_used or launch_bridge_used
-            started_at = time.perf_counter()
-            _remaining = remaining_timeout_factory(started_at + float(timeout_seconds))
+            _remaining = remaining_timeout_factory(deadline)
             normalized_surface = _normalize_surface(surface)
             try:
                 payload_capture = _build_payload_capture(surface=normalized_surface)

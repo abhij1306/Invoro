@@ -25,11 +25,6 @@ from app.services.script_text_extractor import (
     iter_script_text_nodes,
 )
 
-try:
-    from w3lib.html import get_base_url
-except ImportError:  # pragma: no cover - dependency may be absent in local test envs
-    get_base_url = None  # type: ignore[assignment]
-
 _NON_STATE_ASSIGNMENT_REGEXES = compile_regex_patterns(
     NON_STATE_ASSIGNMENT_PATTERNS,
     flags=re.S,
@@ -493,7 +488,7 @@ def _append_property_value(row: dict[str, Any], key: str, value: object) -> None
 def _has_itemscope_ancestor(node: Any) -> bool:
     parent = getattr(node, "parent", None)
     while parent is not None:
-        if getattr(parent, "attrs", {}).get("itemscope") is not None:
+        if callable(getattr(parent, "has_attr", None)) and parent.has_attr("itemscope"):
             return True
         parent = getattr(parent, "parent", None)
     return False
@@ -502,7 +497,7 @@ def _has_itemscope_ancestor(node: Any) -> bool:
 def _belongs_to_nested_itemscope(candidate: Any, root: Any) -> bool:
     parent = getattr(candidate, "parent", None)
     while parent is not None and parent != root:
-        if getattr(parent, "attrs", {}).get("itemscope") is not None:
+        if callable(getattr(parent, "has_attr", None)) and parent.has_attr("itemscope"):
             return True
         parent = getattr(parent, "parent", None)
     return False

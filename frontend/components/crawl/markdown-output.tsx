@@ -187,7 +187,7 @@ function MarkdownPreview({ markdown }: Readonly<{ markdown: string }>) {
         >
           <div className="border-border bg-panel flex items-center justify-between border-b px-4 py-2">
             <div className="type-label text-secondary">Design Tokens</div>
-            <div className="text-secondary text-2xs font-mono">YAML</div>
+            <div className="text-secondary font-mono text-xs">YAML</div>
           </div>
           <pre className="px-4 py-3 text-xs leading-relaxed whitespace-pre-wrap">
             <code className="font-mono">{frontmatter.join('\n')}</code>
@@ -219,7 +219,7 @@ function MarkdownPreview({ markdown }: Readonly<{ markdown: string }>) {
       blocks.push(
         <div key={nextKey('code')} className="my-4 overflow-hidden rounded-md border">
           {lang && (
-            <div className="bg-background-alt text-secondary border-b px-4 py-1.5 font-mono text-[0.75em]">
+            <div className="bg-background-alt text-secondary border-b px-4 py-1.5 font-mono text-xs">
               {lang}
             </div>
           )}
@@ -250,7 +250,7 @@ function MarkdownPreview({ markdown }: Readonly<{ markdown: string }>) {
                 {headers.map((header) => (
                   <th
                     key={header}
-                    className="border-border text-2xs border-b px-3 py-2 text-left font-mono font-semibold tracking-wide uppercase"
+                    className="border-border border-b px-3 py-2 text-left font-mono text-xs font-semibold tracking-wide uppercase"
                   >
                     <InlineMarkdown text={header} />
                   </th>
@@ -471,7 +471,7 @@ export function MarkdownOutput({ markdown }: Readonly<{ markdown: string }>) {
           >
             Source
           </button>
-          <span className="text-secondary text-2xs font-mono">{lineCount} lines</span>
+          <span className="text-secondary font-mono text-xs">{lineCount} lines</span>
         </div>
         <Button variant="quiet" type="button" onClick={copyMarkdown}>
           <Copy className="size-3.5" />

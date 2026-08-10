@@ -98,7 +98,7 @@ export function TableHead({
     <th
       {...props}
       className={cn(
-        'border-border bg-background text-muted sticky top-0 z-10 h-[var(--table-header-height)] px-3 text-left align-middle text-[length:var(--table-header-font-size)] font-semibold tracking-[0.07em] uppercase tabular-nums shadow-[inset_0_-1px_0_var(--border)]',
+        'border-border bg-background text-muted sticky top-0 z-10 h-[var(--table-header-height)] px-3 text-left align-middle text-[length:var(--table-header-font-size)] font-semibold tracking-wide uppercase tabular-nums shadow-[inset_0_-1px_0_var(--border)]',
         className,
       )}
     >

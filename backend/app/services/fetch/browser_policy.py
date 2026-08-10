@@ -4,17 +4,24 @@ from __future__ import annotations
 
 import logging
 import re
+import time
 from typing import Any
 from urllib.parse import quote, unquote, urlparse, urlunparse
 
 from app.services.acquisition.host_protection_memory import HostProtectionPolicy
 from app.services.acquisition.runtime import classify_block_from_headers
-from app.services.config.runtime_settings import crawler_runtime_settings
+from app.services.config.runtime_settings import (
+    PATCHRIGHT_BROWSER_ENGINE,
+    PATCHRIGHT_HTTP2_PROTOCOL_ERROR_TOKEN,
+    REAL_CHROME_BROWSER_ENGINE,
+    SUPPORTED_FORCED_BROWSER_ENGINES,
+    crawler_runtime_settings,
+)
+from app.services.fetch.types import BrowserAttemptPlan, FetchRuntimeContext
 
 logger = logging.getLogger(__name__)
 
 _VENDOR_BLOCK_REASON_PREFIX = "vendor-block:"
-_SUPPORTED_FORCED_ENGINES = {"patchright", "real_chrome"}
 
 
 def resolve_proxy_attempts(
@@ -249,14 +256,14 @@ def browser_engine_attempts(
 ) -> list[str]:
     forced_engine = str(context.forced_browser_engine or "").strip().lower()
     if forced_engine:
-        if forced_engine in _SUPPORTED_FORCED_ENGINES:
+        if forced_engine in SUPPORTED_FORCED_BROWSER_ENGINES:
             return [forced_engine]
         logger.warning(
             "Unsupported forced_browser_engine=%r for %s; ignoring and using default engine selection",
             forced_engine,
             context.url,
         )
-    engines = ["patchright"]
+    engines = [PATCHRIGHT_BROWSER_ENGINE]
     if (
         not bool(crawler_runtime_settings.browser_real_chrome_enabled)
         or not real_chrome_available
@@ -264,18 +271,20 @@ def browser_engine_attempts(
         return engines
     if host_policy.patchright_blocked and host_policy.prefer_browser:
         return _prefer_engine_first(
-            _append_engine_once(engines, "real_chrome"), "real_chrome"
+            _append_engine_once(engines, REAL_CHROME_BROWSER_ENGINE),
+            REAL_CHROME_BROWSER_ENGINE,
         )
     if host_policy.real_chrome_success and host_policy.prefer_browser:
         return _prefer_engine_first(
-            _append_engine_once(engines, "real_chrome"), "real_chrome"
+            _append_engine_once(engines, REAL_CHROME_BROWSER_ENGINE),
+            REAL_CHROME_BROWSER_ENGINE,
         )
     if (
         host_policy.request_blocked
         or host_policy.prefer_browser
         or host_policy.last_block_vendor
     ):
-        return _append_engine_once(engines, "real_chrome")
+        return _append_engine_once(engines, REAL_CHROME_BROWSER_ENGINE)
     return engines
 
 
@@ -286,8 +295,9 @@ def extend_browser_engine_attempts_after_block(
     context: Any,
     host_policy: HostProtectionPolicy,
     real_chrome_available: bool,
+    engine_selector=browser_engine_attempts,
 ) -> list[str]:
-    refreshed_attempts = browser_engine_attempts(
+    refreshed_attempts = engine_selector(
         context=context,
         host_policy=host_policy,
         real_chrome_available=real_chrome_available,
@@ -339,6 +349,154 @@ def browser_escalation_proxies(
         return attempts
     remaining = [candidate for candidate in attempts if candidate != current_proxy]
     return remaining or attempts
+
+
+def build_browser_attempt_plan(
+    *,
+    context: FetchRuntimeContext,
+    host_policy: HostProtectionPolicy,
+    proxy: str | None,
+    proxy_attempt_index: int,
+    reason: str,
+    real_chrome_available: bool,
+    engine_selector=browser_engine_attempts,
+) -> BrowserAttemptPlan:
+    engines = engine_selector(
+        context=context,
+        host_policy=host_policy,
+        real_chrome_available=real_chrome_available,
+    )
+    engines = durable_vendor_block_engine_attempts(
+        engine_attempts=engines,
+        host_policy=host_policy,
+        forced_engine=context.forced_browser_engine,
+    )
+    return BrowserAttemptPlan(
+        proxy=proxy,
+        proxy_attempt_index=proxy_attempt_index,
+        engine_attempts=tuple(engines),
+        escalation_lane=browser_escalation_lane(
+            context=context,
+            reason=reason,
+            host_policy=host_policy,
+            proxy=proxy,
+        ),
+    )
+
+
+def remaining_timeout_seconds(
+    context: FetchRuntimeContext,
+    *,
+    now_monotonic: float | None = None,
+) -> float:
+    now = time.perf_counter() if now_monotonic is None else now_monotonic
+    return context.deadline_monotonic - now
+
+
+def browser_attempt_timeout_seconds(
+    context: FetchRuntimeContext,
+    *,
+    reason: str,
+    browser_engine: str,
+    engine_attempts: list[str],
+    host_policy: HostProtectionPolicy | None = None,
+) -> float:
+    remaining_timeout = remaining_timeout_seconds(context)
+    if (
+        browser_engine == PATCHRIGHT_BROWSER_ENGINE
+        and not str(context.forced_browser_engine or "").strip()
+        and patchright_probe_cap_applies(
+            host_policy=host_policy,
+            reason=reason,
+            engine_attempts=engine_attempts,
+        )
+    ):
+        return min(
+            remaining_timeout,
+            float(crawler_runtime_settings.browser_vendor_block_probe_timeout_seconds),
+        )
+    return remaining_timeout
+
+
+def patchright_probe_cap_applies(
+    *,
+    host_policy: HostProtectionPolicy | None,
+    reason: str,
+    engine_attempts: list[str],
+) -> bool:
+    expected_vendor = extract_vendor_from_reason(reason) or ""
+    if REAL_CHROME_BROWSER_ENGINE in engine_attempts:
+        return bool(expected_vendor) or bool(
+            host_policy is not None
+            and host_policy.request_blocked
+            and host_policy.prefer_browser
+        )
+    if not expected_vendor:
+        return False
+    if host_policy is None:
+        return False
+    if not bool(host_policy.patchright_blocked) or not bool(host_policy.prefer_browser):
+        return False
+    last_vendor = str(host_policy.last_block_vendor or "").strip().lower()
+    return expected_vendor == last_vendor
+
+
+def should_retry_patchright_with_real_chrome(
+    *,
+    context: FetchRuntimeContext,
+    exc: Exception,
+    browser_engine: str,
+    engine_attempts: list[str],
+    real_chrome_available: bool,
+) -> bool:
+    return bool(
+        not str(context.forced_browser_engine or "").strip()
+        and browser_engine == PATCHRIGHT_BROWSER_ENGINE
+        and REAL_CHROME_BROWSER_ENGINE not in engine_attempts
+        and crawler_runtime_settings.browser_real_chrome_enabled
+        and real_chrome_available
+        and PATCHRIGHT_HTTP2_PROTOCOL_ERROR_TOKEN in str(exc or "").upper()
+    )
+
+
+def handoff_cookie_engines(*, preferred_engine: str | None = None) -> tuple[str, ...]:
+    configured = tuple(
+        str(engine or "").strip().lower()
+        for engine in tuple(
+            crawler_runtime_settings.browser_http_handoff_cookie_engines or ()
+        )
+        if str(engine or "").strip()
+    )
+    preferred: list[str] = []
+    normalized_preferred = str(preferred_engine or "").strip().lower()
+    if normalized_preferred in SUPPORTED_FORCED_BROWSER_ENGINES:
+        preferred.append(normalized_preferred)
+    for engine in configured:
+        if engine in SUPPORTED_FORCED_BROWSER_ENGINES and engine not in preferred:
+            preferred.append(engine)
+    return tuple(preferred)
+
+
+def resolve_http_timeout(context: FetchRuntimeContext) -> float:
+    remaining_timeout = remaining_timeout_seconds(context)
+    raw_timeout = crawler_runtime_settings.http_timeout_seconds
+    if raw_timeout is None:
+        return remaining_timeout
+    try:
+        configured_timeout = float(raw_timeout)
+    except (TypeError, ValueError):
+        logger.warning(
+            "Invalid http_timeout_seconds=%r; using remaining timeout",
+            raw_timeout,
+        )
+        return remaining_timeout
+    if configured_timeout <= 0:
+        logger.warning(
+            "Invalid http_timeout_seconds=%r; using remaining timeout",
+            raw_timeout,
+        )
+        return remaining_timeout
+    return min(configured_timeout, remaining_timeout)
 
 
 def _append_engine_once(engine_attempts: list[str], engine: str) -> list[str]:

@@ -157,7 +157,7 @@ VARIANT_OPTION_VALUE_NOISE_FULLMATCH_PATTERNS_EXTRA = (
 VARIANT_STRONG_OPTION_SELECTOR = (
     "[role='radio'], [role='option'], input[type='radio'], input[type='checkbox'], "
     "[data-option-value], [data-value], [data-variant-id], [data-selected], "
-    "[aria-pressed][aria-pressed!=''], button[data-option], button[data-value], "
+    "[aria-pressed], button[data-option], button[data-value], "
     "button[data-variant], a[class*='swatch' i][title], "
     "a[class*='swatch' i][aria-label], [data-testid='swatch' i], "
     "[data-testid*='swatch-option' i]"

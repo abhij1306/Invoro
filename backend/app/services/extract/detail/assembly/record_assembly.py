@@ -13,6 +13,7 @@ from app.services.dom.html_parser import BeautifulSoup
 
 from app.services.confidence import score_record_confidence
 from app.services.extraction_context import (
+    ExtractionContext,
     collect_structured_source_payloads,
     prepare_extraction_context,
 )
@@ -128,7 +129,7 @@ def _finalize_detail_record(
     requested_page_url: str | None,
     soup: BeautifulSoup,
     js_state_objects: dict[str, Any],
-    raw_soup: BeautifulSoup | None,
+    raw_soup: BeautifulSoup,
     early_exit: str | None,
 ) -> dict[str, Any]:
     _attach_detail_tables(record, soup)
@@ -142,11 +143,7 @@ def _finalize_detail_record(
             soup=soup,
             js_state_objects=js_state_objects,
         )
-        if (
-            record.get("variants") in (None, "", [], {})
-            and raw_soup is not None
-            and raw_soup is not soup
-        ):
+        if record.get("variants") in (None, "", [], {}) and raw_soup is not soup:
             repair_ecommerce_detail_record_quality(
                 record,
                 html=html,
@@ -183,16 +180,23 @@ def _prepare_detail_extraction(
     *,
     requested_page_url: str | None,
     extraction_runtime_snapshot: dict[str, object] | None,
+    context: ExtractionContext | None = None,
 ) -> PreparedDetailExtraction:
-    context = prepare_extraction_context(html)
+    context = context or prepare_extraction_context(html)
     dom_parser, soup = primary_dom_context(context, page_url=page_url)
+    # Noise removal intentionally drops navigation and breadcrumb containers.
+    # Keep the original DOM as the established loss-recovery source only.
     raw_soup = context.original_soup
     if str(surface or "").strip().lower() == "ecommerce_detail":
-        soup = BeautifulSoup(str(soup), "html.parser")
+        resolved_requested_page_url = text_or_none(requested_page_url) or page_url
+        dom_parser, soup = context.pruned_dom_context(
+            soup,
+            requested_page_url=resolved_requested_page_url,
+        )
         prune_irrelevant_detail_dom_nodes(
             soup,
             page_url=page_url,
-            requested_page_url=text_or_none(requested_page_url) or page_url,
+            requested_page_url=resolved_requested_page_url,
         )
     candidates: dict[str, list[object]] = {}
     candidate_sources: dict[str, list[str]] = {}
@@ -293,6 +297,7 @@ def build_detail_record(
     network_payloads: list[dict[str, object]] | None = None,
     selector_rules: list[dict[str, object]] | None = None,
     extraction_runtime_snapshot: dict[str, object] | None = None,
+    context: ExtractionContext | None = None,
 ) -> dict[str, Any]:
     prepared = _prepare_detail_extraction(
         html,
@@ -301,6 +306,7 @@ def build_detail_record(
         requested_fields,
         requested_page_url=requested_page_url,
         extraction_runtime_snapshot=extraction_runtime_snapshot,
+        context=context,
     )
     alias_lookup = surface_alias_lookup(surface, requested_fields)
     tier_executor = DetailTierExecutor(
@@ -376,6 +382,7 @@ def infer_detail_failure_reason(
     network_payloads: list[dict[str, object]] | None = None,
     selector_rules: list[dict[str, object]] | None = None,
     extraction_runtime_snapshot: dict[str, object] | None = None,
+    context: ExtractionContext | None = None,
 ) -> str | None:
     if "detail" not in str(surface or "").strip().lower():
         return None
@@ -391,6 +398,7 @@ def infer_detail_failure_reason(
         network_payloads=network_payloads,
         selector_rules=selector_rules,
         extraction_runtime_snapshot=extraction_runtime_snapshot,
+        context=context,
     )
     return detail_record_rejection_reason(
         record,
@@ -418,6 +426,7 @@ def extract_detail_records(
     network_payloads: list[dict[str, object]] | None = None,
     selector_rules: list[dict[str, object]] | None = None,
     extraction_runtime_snapshot: dict[str, object] | None = None,
+    context: ExtractionContext | None = None,
 ) -> list[dict[str, Any]]:
     record = build_detail_record(
         html,
@@ -429,6 +438,7 @@ def extract_detail_records(
         network_payloads=network_payloads,
         selector_rules=selector_rules,
         extraction_runtime_snapshot=extraction_runtime_snapshot,
+        context=context,
     )
     if surface == "ecommerce_detail" and _looks_like_site_shell_record(
         record,

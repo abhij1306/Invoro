@@ -3,6 +3,7 @@ from __future__ import annotations
 ACCESS_DENIED_MARKER = "access denied"
 ACCESS_FORBIDDEN_MARKER = "access forbidden"
 SHAPE_SECURITY_MARKER = "shape security"
+CAPTCHA_MARKER = "captcha"
 
 BLOCK_SIGNATURES = {
     "phrases": [
@@ -77,7 +78,7 @@ BLOCK_SIGNATURES = {
         "arkose",
     ],
     "browser_challenge_strong_markers": {
-        "captcha": "captcha",
+        CAPTCHA_MARKER: CAPTCHA_MARKER,
         "you're not a robot": "robot_gate",
         "verify you are human": "verification_text",
         "human verification": "human_verification",
@@ -93,7 +94,7 @@ BLOCK_SIGNATURES = {
         "unusual traffic from your computer network": "google_unusual_traffic",
     },
     "content_tolerant_strong_markers": [
-        "captcha",
+        CAPTCHA_MARKER,
     ],
     "browser_challenge_weak_markers": {
         "one more step": "generic_interstitial",

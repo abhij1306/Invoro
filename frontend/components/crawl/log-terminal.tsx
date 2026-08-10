@@ -706,11 +706,11 @@ export const LogTerminal = memo(function LogTerminal({
                       </a>
                     )}
                     {isParallelCrawl && group.url && (
-                      <span className="text-muted border-border shrink-0 rounded border px-1 py-px text-[9px] font-semibold tracking-widest uppercase">
+                      <span className="text-muted border-border shrink-0 rounded border px-1 py-px text-xs font-semibold tracking-widest uppercase">
                         Parallel
                       </span>
                     )}
-                    <span className="text-muted shrink-0 font-mono text-[10px] opacity-50">
+                    <span className="text-muted shrink-0 font-mono text-xs opacity-50">
                       {group.logs.length} logs
                     </span>
                   </div>
