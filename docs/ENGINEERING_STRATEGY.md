@@ -231,7 +231,7 @@ These are mandatory controls, not suggestions.
 - Do not create parallel systems because an existing module is awkward; refactor the owner instead.
 - Avoid turning docs into changelogs. Capture stable knowledge, not every edit.
 - When an audit or plan doc conflicts with code, trust code first, then update the docs.
-- After any major implementation: run `pytest tests -q`, update the plan slice, update the relevant doc.
+- After any major implementation: run `pytest tests -q -m "unit or component or regression"`, update the plan slice, update the relevant doc.
 
 ---
 

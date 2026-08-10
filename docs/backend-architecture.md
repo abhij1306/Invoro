@@ -594,7 +594,7 @@ Useful local commands:
 ```powershell
 cd backend
 $env:PYTHONPATH='.'
-.\.venv\Scripts\python.exe -m pytest tests -q
+.\.venv\Scripts\python.exe -m pytest tests -q -m "unit or component or regression"
 .\.venv\Scripts\python.exe run_acquire_smoke.py commerce
 .\.venv\Scripts\python.exe run_extraction_smoke.py
 .\.venv\Scripts\python.exe run_test_sites_acceptance.py

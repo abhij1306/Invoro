@@ -28,65 +28,12 @@ from app.services.acquisition.runtime import (
     http_fetch,
     should_escalate_to_browser_async,
 )
+from tests.fixtures.fetch_runtime import (
+    as_async as _as_async,
+    default_fetch_context as _default_fetch_context,
+    page_fetch_result as _page_fetch_result,
+)
 from tests.fixtures.http_mocks import FakeBodyResponse
-
-
-def _default_fetch_context(
-    url: str = "https://example.com/products/widget",
-    surface: str = "ecommerce_detail",
-    **overrides,
-):
-    return FetchRuntimeContext(
-        url=url,
-        resolved_timeout=5.0,
-        deadline_monotonic=time.perf_counter() + 5.0,
-        run_id=None,
-        surface=surface,
-        traversal_mode=None,
-        max_pages=1,
-        max_scrolls=1,
-        max_records=None,
-        on_event=None,
-        browser_reason=None,
-        requested_fields=[],
-        listing_recovery_mode=None,
-        proxies=[None],
-        proxy_profile={},
-        traversal_required=False,
-        fetch_mode="browser_only",
-        runtime_policy={},
-        host_memory_ttl_seconds=crawl_fetch_runtime.crawler_runtime_settings.coerce_host_memory_ttl_seconds(
-            None
-        ),
-        **overrides,
-    )
-
-
-def _page_fetch_result(
-    html: str,
-    *,
-    url: str = "https://example.com/products/widget",
-    final_url: str | None = None,
-    method: str = "browser",
-    status_code: int = 200,
-    **overrides,
-) -> PageFetchResult:
-    return PageFetchResult(
-        url=url,
-        final_url=final_url or url,
-        html=html,
-        status_code=status_code,
-        method=method,
-        **overrides,
-    )
-
-
-def _as_async(fn):
-    async def _wrapped(*args, **kwargs):
-        await asyncio.sleep(0)
-        return fn(*args, **kwargs)
-
-    return _wrapped
 
 
 @pytest.mark.asyncio
@@ -670,36 +617,42 @@ def test_saved_real_chrome_contract_skips_patchright(
     assert attempts == ["real_chrome"]
 
 
+@pytest.mark.parametrize(
+    ("engine_attempts", "vendor", "method", "expected"),
+    [
+        (
+            ["real_chrome", "patchright"],
+            "datadome",
+            "browser:real_chrome",
+            ["patchright"],
+        ),
+        (
+            ["patchright", "real_chrome"],
+            "akamai",
+            "curl_cffi",
+            ["patchright", "real_chrome"],
+        ),
+    ],
+)
 @pytest.mark.component
-def test_durable_vendor_block_limits_browser_engine_attempts() -> None:
+def test_durable_vendor_block_engine_attempts(
+    engine_attempts: list[str],
+    vendor: str,
+    method: str,
+    expected: list[str],
+) -> None:
     attempts = browser_policy.durable_vendor_block_engine_attempts(
-        engine_attempts=["real_chrome", "patchright"],
+        engine_attempts=engine_attempts,
         host_policy=HostProtectionPolicy(
             host="example.com",
             prefer_browser=True,
-            last_block_vendor="datadome",
-            last_block_method="browser:real_chrome",
+            last_block_vendor=vendor,
+            last_block_method=method,
         ),
         forced_engine=None,
     )
 
-    assert attempts == ["patchright"]
-
-
-@pytest.mark.component
-def test_durable_vendor_block_keeps_http_block_engine_attempts() -> None:
-    attempts = browser_policy.durable_vendor_block_engine_attempts(
-        engine_attempts=["patchright", "real_chrome"],
-        host_policy=HostProtectionPolicy(
-            host="example.com",
-            prefer_browser=True,
-            last_block_vendor="akamai",
-            last_block_method="curl_cffi",
-        ),
-        forced_engine=None,
-    )
-
-    assert attempts == ["patchright", "real_chrome"]
+    assert attempts == expected
 
 
 @pytest.mark.asyncio

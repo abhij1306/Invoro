@@ -81,7 +81,7 @@ Reduce backend acquisition, extraction, and critical-test debt without changing 
 **Verify:** `backfill_detail_price_from_html` and `extract_variants_from_dom` Radon C/20 or lower; focused extraction tests; Vulture/jscpd; one safe full suite.
 
 ### Slice 7: Reduce critical-suite debt
-**Status:** TODO
+**Status:** DONE
 **Files:** pytest config, agent/CI verification docs, touched acquisition/extraction suites, shared test fixtures, `tests/regression/test_structure.py`
 **What:** Include regression in safe defaults; consolidate fakes and repeated cases; split touched giant suites by public behavior; remove private assertions only after public coverage; ratchet LOC/private imports/duplication while preserving isolation.
 **Verify:** Focused tests, structure tests, static scans, one safe full suite.
@@ -148,3 +148,9 @@ Reduce backend acquisition, extraction, and critical-test debt without changing 
   - Focused extraction set: 573 passed, 25 fixture skips, 4 deselected in 43.53s. Additional structured/selectolax/variant contract set: 373 passed, 18 fixture skips, 2 deselected. Both formerly red variant fixtures pass.
   - Radon drops `backfill_detail_price_from_html` from F/93 to B/6 and `extract_variants_from_dom` from F/116 to B/6; extracted helpers top out at C/20. Ruff clean; Vulture found no 80%-confidence dead code; touched average B/7.74; touched jscpd reports one clone / 21 lines.
   - Required safe full suite ran exactly once: 2,417 selected / 17 deselected; 2,390 passed, 25 skipped, and only the two Slice 7 structure ratchets failed in 563.83s. No full rerun was performed.
+- Slice 7 verification (2026-08-10):
+  - Pytest now defaults to `unit or component or regression`; CI and canonical agent/backend verification docs use the same safe marker expression. Live, integration, and e2e tests remain deselected.
+  - Fetch-runtime context/result/async fakes now have one shared fixture owner. Repeated durable-vendor engine cases are parameterized. The critical fetch suite shrank from 3,800 to 3,753 physical lines and has a no-regrowth ratchet.
+  - Two tests moved off private DOM helpers to public `extract_section_content` and `extract_node_value` contracts. The private-test import allowlist did not grow. Structure LOC checks now measure source LOC consistently and grandfather only exact pre-existing overages while preserving their original target budgets.
+  - Five-critical-suite jscpd falls from the reproducible base of 111 clones / 1,924 lines to 108 clones / 1,895 lines. Ruff clean; Vulture found no 80%-confidence dead code in touched tests; touched test Radon has one existing C/16 structure helper and no higher block.
+  - Focused fetch suite: 91 passed. Public DOM plus structure set: 37 passed. Required safe full suite completed once after an initial runner-timeout launch produced no pytest output: 2,418 selected / 17 deselected; 2,393 passed and 25 fixture skips in 770.10s.
