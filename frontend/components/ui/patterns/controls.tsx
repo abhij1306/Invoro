@@ -76,7 +76,7 @@ export function TabBar<T extends string>({
           <button
             key={option.value}
             type="button"
-            aria-current={value === option.value ? 'true' : undefined}
+            aria-pressed={value === option.value}
             onClick={() => onChange(option.value)}
             onKeyDown={(event) => handleTabKeyDown(event, index)}
             className={cn(
@@ -110,7 +110,7 @@ export function TabBar<T extends string>({
         <button
           key={option.value}
           type="button"
-          aria-current={value === option.value ? 'true' : undefined}
+          aria-pressed={value === option.value}
           onClick={() => onChange(option.value)}
           onKeyDown={(event) => handleTabKeyDown(event, index)}
           className={cn(
