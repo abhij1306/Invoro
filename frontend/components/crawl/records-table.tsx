@@ -82,13 +82,13 @@ function stickyBodyStyle(width: number, left: number): CSSProperties {
 function RecordCell({ col, record }: Readonly<{ col: string; record: CrawlRecord }>) {
   const colKey = col.toLowerCase();
   const raw = formatCellDisplay(readRecordValue(record, col));
-  if (!raw || raw === '--') return <span className="text-muted/40 text-xs">--</span>;
+  if (!raw || raw === '--') return <span className="text-muted/40 text-sm">--</span>;
 
   if (TITLE_KEYS.has(colKey)) {
-    return <span className="block max-w-[320px] truncate text-xs font-medium">{raw}</span>;
+    return <span className="block max-w-[320px] truncate text-sm font-medium">{raw}</span>;
   }
   if (PRICE_KEYS.has(colKey)) {
-    return <span className="text-foreground text-xs font-bold tabular-nums">{raw}</span>;
+    return <span className="text-foreground text-sm font-bold tabular-nums">{raw}</span>;
   }
   if (URL_KEYS.has(colKey)) {
     const isSafe = raw.startsWith('http://') || raw.startsWith('https://');
@@ -98,7 +98,7 @@ function RecordCell({ col, record }: Readonly<{ col: string; record: CrawlRecord
           href={raw}
           target="_blank"
           rel="noreferrer"
-          className="link-accent block max-w-[200px] truncate text-xs transition-colors"
+          className="link-accent block max-w-[200px] truncate text-sm transition-colors"
           title={raw}
         >
           {raw}
@@ -106,7 +106,7 @@ function RecordCell({ col, record }: Readonly<{ col: string; record: CrawlRecord
       );
     }
   }
-  return <span className="text-secondary block max-w-[260px] truncate text-xs">{raw}</span>;
+  return <span className="text-secondary block max-w-[260px] truncate text-sm">{raw}</span>;
 }
 
 export const RecordsTable = memo(function RecordsTable({

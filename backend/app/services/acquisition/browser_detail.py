@@ -9,7 +9,10 @@ from typing import Any
 from patchright.async_api import TimeoutError as PlaywrightTimeoutError
 
 from app.services.config.extraction_rules import (
+    BROWSER_DETAIL_CHROME_TOKENS,
+    BROWSER_DETAIL_EXPANDABLE_SELECTOR_SET,
     BROWSER_DETAIL_EXPAND_KEYWORDS,
+    BROWSER_DETAIL_SIZE_TOGGLE_TOKENS,
     DETAIL_AOM_EXPAND_ROLES,
     BROWSER_REQUESTED_DETAIL_GENERIC_TOGGLE_LABELS,
     BROWSER_REQUESTED_DETAIL_SELECTOR_PRIORITY,
@@ -18,6 +21,7 @@ from app.services.config.extraction_rules import (
     DETAIL_EXPANSION_STATUS_EXPANDED,
     DETAIL_EXPANSION_STATUS_INTERACTION_FAILED,
     DETAIL_EXPANSION_STATUS_INTERACTION_LIMIT_REACHED,
+    DETAIL_EXPANSION_STATUS_SELECTOR_LIMIT_REACHED,
     DETAIL_EXPANSION_STATUS_NO_MATCHES,
     DETAIL_EXPANSION_STATUS_SKIPPED,
     DETAIL_EXPANSION_STATUS_TIME_BUDGET_REACHED,
@@ -223,7 +227,7 @@ class _DomExpansionState:
         if self.time_budget_reached():
             return DETAIL_EXPANSION_STATUS_TIME_BUDGET_REACHED
         if selector_clicks is not None and selector_clicks >= self.max_per_selector:
-            return "selector_limit_reached"
+            return DETAIL_EXPANSION_STATUS_SELECTOR_LIMIT_REACHED
         return None
 
 
@@ -429,7 +433,7 @@ def _expansion_candidate_matches(
     ).strip()
     size_toggle = any(
         token in f"{candidate.data_qa_action} {candidate.class_name}"
-        for token in ("size selector", "size-selector", "open-size-selector")
+        for token in BROWSER_DETAIL_SIZE_TOGGLE_TOKENS
     )
     return _ExpansionMatches(
         requested=bool(
@@ -470,14 +474,7 @@ def _expansion_candidate_is_blocked(
         and not size_toggle
     )
     chrome_token = any(
-        token in keyword_probe
-        for token in (
-            "add-to-wishlist",
-            "gallery",
-            "media-zoom",
-            "thumbnail",
-            "wishlist",
-        )
+        token in keyword_probe for token in BROWSER_DETAIL_CHROME_TOKENS
     )
     blocked_token = any(token in keyword_probe for token in DETAIL_BLOCKED_TOKENS)
     return navigational_anchor or chrome_token or (blocked_token and not size_toggle)
@@ -488,16 +485,8 @@ def _expansion_candidate_is_expandable(
     selector: str,
     matches: _ExpansionMatches,
 ) -> bool:
-    expandable_selectors = {
-        "summary",
-        "details > summary",
-        "[aria-expanded='false']",
-        "button[aria-controls]",
-        "[role='button'][aria-controls]",
-        "[role='tab'][aria-controls]",
-    }
     return bool(
-        selector in expandable_selectors
+        selector in BROWSER_DETAIL_EXPANDABLE_SELECTOR_SET
         or candidate.aria_expanded == "false"
         or candidate.aria_controls
         or candidate.tag_name == "summary"
@@ -566,12 +555,14 @@ async def _expand_selector_candidates(
     for handle, prefetched_snapshot in candidate_rows:
         stop_status = state.stop_status(selector_clicks=selector_clicks)
         if stop_status:
-            if stop_status != "selector_limit_reached":
+            if stop_status != DETAIL_EXPANSION_STATUS_SELECTOR_LIMIT_REACHED:
                 state.diagnostics["status"] = stop_status
             break
         try:
-            snapshot = prefetched_snapshot or await interactive_candidate_snapshot(
-                handle
+            snapshot = (
+                prefetched_snapshot
+                if prefetched_snapshot is not None
+                else await interactive_candidate_snapshot(handle)
             )
             should_click, expanded_label = _candidate_action_label(
                 snapshot,

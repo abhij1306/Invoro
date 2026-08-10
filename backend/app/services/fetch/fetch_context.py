@@ -83,6 +83,7 @@ from app.services.shared.url_utils import ensure_scheme
 
 logger = logging.getLogger(__name__)
 
+
 async def _emit_fetch_event(on_event: Any | None, level: str, message: str) -> None:
     if not callable(on_event):
         return
@@ -799,20 +800,21 @@ async def _attempt_http_fetch(
     fetcher,
     proxy: str | None,
 ) -> PageFetchResult | object:
-    http_timeout = resolve_http_timeout(context)
-    await _emit_fetch_event(
-        context.on_event,
-        "info",
-        (
-            f"HTTP fetch via {fetcher.__name__} "
-            f"(timeout={http_timeout:.1f}s, proxy={display_proxy(proxy)})"
-        ),
-    )
     try:
         await wait_for_host_slot(
             context.url,
             ttl_seconds=context.host_memory_ttl_seconds,
         )
+        http_timeout = resolve_http_timeout(context)
+        await _emit_fetch_event(
+            context.on_event,
+            "info",
+            (
+                f"HTTP fetch via {fetcher.__name__} "
+                f"(timeout={http_timeout:.1f}s, proxy={display_proxy(proxy)})"
+            ),
+        )
+        http_timeout = resolve_http_timeout(context)
         if proxy is not None:
             return await fetcher(context.url, http_timeout, proxy=proxy)
         return await fetcher(context.url, http_timeout)

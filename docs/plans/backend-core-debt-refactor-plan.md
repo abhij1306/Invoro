@@ -37,7 +37,7 @@ Reduce backend acquisition, extraction, and critical-test debt without changing 
 
 - `frontend/` — dirty frontend work stays in its original worktree.
 - HTTP APIs, schemas, persistence, publish/export contracts — no contract or downstream compensation change.
-- `docs/INVARIANTS.md` — unchanged unless implementation proves a real contract correction.
+- `docs/INVARIANTS.md` — runtime invariants stay unchanged; verification-command-only corrections are allowed for Slice 7.
 - Live test-site/network acceptance — user runs it at the end.
 - `lxml` sites required by extruct/XML behavior — preserve them.
 - Global `BeautifulSoup` compatibility alias — do not rename it in this branch.
@@ -153,7 +153,7 @@ Reduce backend acquisition, extraction, and critical-test debt without changing 
   - Fetch-runtime context/result/async fakes now have one shared fixture owner. Repeated durable-vendor engine cases are parameterized. The critical fetch suite shrank from 3,800 to 3,753 physical lines and has a no-regrowth ratchet.
   - Two tests moved off private DOM helpers to public `extract_section_content` and `extract_node_value` contracts. The private-test import allowlist did not grow. Structure LOC checks now measure source LOC consistently and grandfather only exact pre-existing overages while preserving their original target budgets.
   - Five-critical-suite jscpd falls from the reproducible base of 111 clones / 1,924 lines to 108 clones / 1,895 lines. Ruff clean; Vulture found no 80%-confidence dead code in touched tests; touched test Radon has one existing C/16 structure helper and no higher block.
-  - Focused fetch suite: 91 passed. Public DOM plus structure set: 37 passed. Required safe full suite completed once after an initial runner-timeout launch produced no pytest output: 2,418 selected / 17 deselected; 2,393 passed and 25 fixture skips in 770.10s.
+  - Focused fetch suite: 91 passed. Public DOM plus structure set: 37 passed. An initial runner-timeout launch failed before pytest began and produced no pytest output, so it did not consume the exact-once suite run. The required safe full suite then completed once: 2,418 selected / 17 deselected; 2,393 passed and 25 fixture skips in 770.10s.
 - Slice 8 closeout (2026-08-10):
   - Final hotspot complexity: expansion B/6 (from F/90), blocker classification B/9 (from F/82), DOM variants B/6 (from F/116), and price backfill B/6 (from F/93). Vulture's sole 100%-confidence `original_value` finding is gone.
   - Parser-count contracts lock one cleaned and one pruned detail document, lazy original-DOM construction only on existing loss fallback, one composed rendered-listing artifact document, and zero price-parser builds when a prepared soup is supplied. Adapter contracts lock global empty/duplicate skips, ordered unique calls, detail all-source behavior, and listing sufficiency short-circuit.

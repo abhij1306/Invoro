@@ -64,7 +64,7 @@ def test_find_all_class_alias_matches_class_tokens() -> None:
 
 def test_css_attribute_string_handles_quotes_backslashes_and_controls() -> None:
     soup = BeautifulSoup(
-        "<button aria-controls=\"details'panel\\main&#10;\">Materials</button>"
+        '<button aria-controls="details\'panel\\main&#10;">Materials</button>'
         '<section id="details\'panel\\main&#10;">Material and care instructions.</section>',
         "html.parser",
     )

@@ -728,7 +728,7 @@ export function UcpContractPanel({ report }: Readonly<{ report: UcpAuditReport |
                           formatUnknownText(record.price, 'unpriced'),
                         ].join(':')}
                       >
-                        <TableCell className="font-mono text-xs">
+                        <TableCell className="font-mono text-sm">
                           <span title={formatUnknownText(record.source_url, '-')}>
                             {compactUrl(formatUnknownText(record.source_url, '-'))}
                           </span>
@@ -1019,7 +1019,7 @@ function SampledUrlList({ urls }: Readonly<{ urls: string[] }>) {
           key={url}
           className="border-border bg-panel flex min-w-0 items-center gap-2 rounded-md border px-3 py-2.5"
         >
-          <span className="bg-background border-border text-muted text-2xs grid size-6 shrink-0 place-items-center rounded border font-mono">
+          <span className="bg-background border-border text-muted grid size-6 shrink-0 place-items-center rounded border font-mono text-xs">
             {index + 1}
           </span>
           <div className="min-w-0 flex-1">

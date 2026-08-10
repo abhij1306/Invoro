@@ -158,12 +158,12 @@ export function PageAuditWorkspace({ jobId }: Readonly<{ jobId: number }>) {
               <table className="w-full table-fixed border-collapse text-left">
                 <thead className="bg-background-alt">
                   <tr>
-                    <th className="w-24 px-3 py-2 text-xs font-semibold">Status</th>
-                    <th className="px-3 py-2 text-xs font-semibold">Check</th>
-                    <th className="hidden w-[34%] px-3 py-2 text-xs font-semibold lg:table-cell">
+                    <th className="w-24 px-3 py-2 text-sm font-semibold">Status</th>
+                    <th className="px-3 py-2 text-sm font-semibold">Check</th>
+                    <th className="hidden w-[34%] px-3 py-2 text-sm font-semibold lg:table-cell">
                       Detected
                     </th>
-                    <th className="hidden w-[28%] px-3 py-2 text-xs font-semibold md:table-cell">
+                    <th className="hidden w-[28%] px-3 py-2 text-sm font-semibold md:table-cell">
                       Fix
                     </th>
                   </tr>

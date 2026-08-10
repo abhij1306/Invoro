@@ -53,11 +53,15 @@ export function RecordThumbnail({ src }: Readonly<{ src: string }>) {
     return <span className="ct-muted">--</span>;
   }
   return (
-    <div className="ct-image-wrap relative">
+    <div
+      data-testid="record-thumbnail-frame"
+      className="border-border bg-subtle-panel relative mx-auto size-16 shrink-0 overflow-hidden rounded-md border"
+    >
       <Image
         src={src}
         alt=""
         fill
+        className="object-contain"
         sizes="64px"
         unoptimized
         referrerPolicy="no-referrer"

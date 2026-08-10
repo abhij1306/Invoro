@@ -421,8 +421,11 @@ def test_service_files_stay_under_loc_budget() -> None:
         line_count = _source_loc(path)
         budget = _loc_budget_for(rel)
         legacy_ratchet = LEGACY_SOURCE_LOC_RATCHETS.get(rel, budget)
-        if line_count > max(budget, legacy_ratchet):
-            oversized.append(f"{rel} has {line_count} LOC (budget {budget})")
+        effective_limit = max(budget, legacy_ratchet)
+        if line_count > effective_limit:
+            oversized.append(
+                f"{rel} has {line_count} LOC (effective limit {effective_limit})"
+            )
     assert oversized == []
 
 

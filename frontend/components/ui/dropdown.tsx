@@ -226,7 +226,7 @@ export function Dropdown<T extends string>({
             onMouseDown={(e) => e.preventDefault()}
             onMouseEnter={() => setHighlightedIndex(index)}
             className={cn(
-              'text-2xs flex w-full items-center py-2 leading-snug transition-colors',
+              'flex w-full items-center py-2 text-xs leading-snug transition-colors',
               align === 'center' ? 'justify-center px-8' : 'justify-start px-3',
               option.value === value
                 ? 'bg-accent-subtle text-accent font-medium'

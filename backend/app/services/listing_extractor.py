@@ -713,6 +713,17 @@ def extract_listing_records(
                 selector_rules=selector_rules,
                 record_dom_observed_selectors=record_dom_observed_selectors,
             )
+            if not rendered_dom_records:
+                rendered_dom_records = _dom_listing_stage(
+                    rendered_context.original_dom_parser,
+                    page_url=page_url,
+                    surface=surface,
+                    is_job_surface=is_job_surface,
+                    max_records=max_records,
+                    fallback_fragment_limit=listing_fallback_fragment_limit,
+                    selector_rules=selector_rules,
+                    record_dom_observed_selectors=record_dom_observed_selectors,
+                )
     listing_visual_elements = (
         artifacts.get("listing_visual_elements")
         if isinstance(artifacts, dict)

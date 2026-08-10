@@ -768,30 +768,22 @@ async def test_serialize_browser_page_content_reuses_prefetched_html_without_pag
 
 @pytest.mark.asyncio
 @pytest.mark.regression
-async def test_settle_browser_page_skips_platform_selector_when_probe_is_ready() -> (
-    None
-):
-    calls = {"probe": 0, "wait": 0}
+async def test_settle_browser_page_skips_platform_selector_when_probe_is_ready() -> None:
     probe_analyses: list[object] = []
-
+    current_html = "<html><body>Searching...</body></html>"
     async def get_page_html_impl(_page):
         await _async_checkpoint()
-        return "<html><body>Searching...</body></html>"
-
+        return current_html
     async def probe_browser_readiness(*_args, **kwargs):
         await _async_checkpoint()
-        calls["probe"] += 1
         probe_analyses.append(kwargs.get("analysis"))
         return {
             "is_ready": True,
-            "matched_listing_selectors": 0 if calls["probe"] == 1 else 1,
+            "matched_listing_selectors": len(probe_analyses) - 1,
             "structured_data_present": False,
         }
-
     async def wait_for_listing_readiness(*_args, **_kwargs):
-        await _async_checkpoint()
-        calls["wait"] += 1
-        return {"status": "ok"}
+        raise AssertionError("ready probes must skip platform selector waiting")
 
     result = await browser_page_flow.settle_browser_page_impl(
         SimpleNamespace(),
@@ -817,11 +809,11 @@ async def test_settle_browser_page_skips_platform_selector_when_probe_is_ready()
 
     _current_probe, readiness_probes, *_rest = result
 
-    assert calls["wait"] == 0
-    assert probe_analyses and all(analysis is not None for analysis in probe_analyses)
-    assert [probe["stage"] for probe in readiness_probes] == [
-        "after_navigation",
-    ]
+    assert [
+        (analysis.html, analysis.lowered_html, analysis.normalized_text)
+        for analysis in probe_analyses
+    ] == [(current_html, current_html.lower(), "Searching...")]
+    assert [probe["stage"] for probe in readiness_probes] == ["after_navigation"]
 
 
 @pytest.mark.regression
@@ -871,7 +863,9 @@ def test_detail_expansion_extractability_limits_probe_fields_to_requested() -> N
 
 
 @pytest.mark.regression
-def test_detail_expansion_extractability_uses_default_dom_probe_fields_without_requests() -> None:
+def test_detail_expansion_extractability_uses_default_dom_probe_fields_without_requests() -> (
+    None
+):
     seen_probe_fields: set[str] | None = None
 
     def _fake_extractability(*_args, **kwargs):
@@ -2510,7 +2504,9 @@ async def test_browser_fetch_ignores_non_string_rendered_listing_fragments(
         del args, kwargs
         return [123, {"html": "<article>bad</article>"}, " <article>good</article> "]
 
-    monkeypatch.setattr(browser_recovery, "capture_rendered_listing_fragments", _bad_fragments)
+    monkeypatch.setattr(
+        browser_recovery, "capture_rendered_listing_fragments", _bad_fragments
+    )
 
     result = await browser_runtime.browser_fetch(
         "https://example.com/collections/widgets",
@@ -2548,8 +2544,12 @@ async def test_browser_fetch_keeps_empty_successful_listing_artifacts(
         del args, kwargs
         return []
 
-    monkeypatch.setattr(browser_recovery, "capture_rendered_listing_fragments", _empty_fragments)
-    monkeypatch.setattr(browser_page_helpers, "capture_listing_visual_elements", _empty_visuals)
+    monkeypatch.setattr(
+        browser_recovery, "capture_rendered_listing_fragments", _empty_fragments
+    )
+    monkeypatch.setattr(
+        browser_page_helpers, "capture_listing_visual_elements", _empty_visuals
+    )
 
     result = await browser_runtime.browser_fetch(
         "https://example.com/collections/widgets",

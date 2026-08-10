@@ -129,8 +129,7 @@ def _finalize_detail_record(
     requested_page_url: str | None,
     soup: BeautifulSoup,
     js_state_objects: dict[str, Any],
-    raw_soup: BeautifulSoup | None,
-    context: ExtractionContext,
+    raw_soup: BeautifulSoup,
     early_exit: str | None,
 ) -> dict[str, Any]:
     _attach_detail_tables(record, soup)
@@ -146,13 +145,6 @@ def _finalize_detail_record(
         )
         if (
             record.get("variants") in (None, "", [], {})
-            and raw_soup is None
-            and context.original_html != context.cleaned_html
-        ):
-            raw_soup = context.original_soup
-        if (
-            record.get("variants") in (None, "", [], {})
-            and raw_soup is not None
             and raw_soup is not soup
         ):
             repair_ecommerce_detail_record_quality(
@@ -199,11 +191,15 @@ def _prepare_detail_extraction(
     # Keep the original DOM as the established loss-recovery source only.
     raw_soup = context.original_soup
     if str(surface or "").strip().lower() == "ecommerce_detail":
-        soup = context.pruned_soup(soup)
+        resolved_requested_page_url = text_or_none(requested_page_url) or page_url
+        soup = context.pruned_soup(
+            soup,
+            requested_page_url=resolved_requested_page_url,
+        )
         prune_irrelevant_detail_dom_nodes(
             soup,
             page_url=page_url,
-            requested_page_url=text_or_none(requested_page_url) or page_url,
+            requested_page_url=resolved_requested_page_url,
         )
     candidates: dict[str, list[object]] = {}
     candidate_sources: dict[str, list[str]] = {}

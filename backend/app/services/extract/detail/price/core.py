@@ -18,6 +18,10 @@ from app.services.config.extraction_rules import (
     DETAIL_PARENT_VARIANT_PRICE_RATIO_MAX_DECIMAL,
     DETAIL_STRICT_PARENT_PRICE_SOURCE_SET,
 )
+from app.services.config.extraction_price_rules import (
+    FIELD_SOURCE_DOM_TEXT,
+    FIELD_SOURCE_JSON_LD,
+)
 from app.services.extract.detail.price.parsing import (
     decimal_is_cent_magnitude_copy,
     detail_currency_from_html,
@@ -48,7 +52,7 @@ from app.services.normalizers import normalize_decimal_price
 class _DetailPriceEvidence:
     soup: BeautifulSoup
     record_price_is_low_signal: bool
-    jsonld_price_bundle: tuple[object, object, str | None]
+    jsonld_price_bundle: tuple[str | None, str | None, str | None]
     html_currency: str | None
     record_url: str
     expected_currency: str | None
@@ -163,7 +167,7 @@ def _reconcile_detail_price_currency(
     )
     if evidence.currency and record.get("currency") in (None, "", [], {}):
         record["currency"] = evidence.currency
-        append_record_field_source(record, "currency", "dom_text")
+        append_record_field_source(record, "currency", FIELD_SOURCE_DOM_TEXT)
     if (
         not evidence.html_currency_conflicts_with_host
         and evidence.currency != evidence.jsonld_price_bundle[2]
@@ -197,7 +201,7 @@ def _apply_visible_price_currency(
     )
     if should_update:
         record["currency"] = visible_currency
-        append_record_field_source(record, "currency", "dom_text")
+        append_record_field_source(record, "currency", FIELD_SOURCE_DOM_TEXT)
 
 
 def _drop_unverified_localized_price_evidence(
@@ -234,7 +238,7 @@ def _select_detail_price(
         visible_price=evidence.visible_price,
     ):
         return _DetailPriceSelection(blocked=True)
-    localized_override = _localized_visible_or_structured_price_override(
+    localized_override, localized_source = _localized_visible_or_structured_price_override(
         record=record,
         visible_price=evidence.visible_price,
         jsonld_price=jsonld_price,
@@ -245,9 +249,7 @@ def _select_detail_price(
     localized_applied = False
     if localized_override:
         price = localized_override
-        source = (
-            "dom_text" if evidence.visible_price == localized_override else "json_ld"
-        )
+        source = localized_source
         localized_applied = True
     if evidence.visible_price and (
         detail_price_is_visible_magnitude_copy(price, evidence.visible_price)
@@ -258,7 +260,7 @@ def _select_detail_price(
         )
     ):
         price = evidence.visible_price
-        source = "dom_text"
+        source = FIELD_SOURCE_DOM_TEXT
     return _DetailPriceSelection(
         price=None if price in (None, "", [], {}) else price,
         source=source,
@@ -274,7 +276,7 @@ def _base_detail_price(
     if evidence.html_currency_conflicts_with_host:
         return (
             evidence.visible_price or text_or_none(record.get("price")),
-            "json_ld" if jsonld_price else "dom_text",
+            FIELD_SOURCE_DOM_TEXT,
         )
     price = jsonld_price or detail_price_from_html(
         evidence.soup,
@@ -283,7 +285,7 @@ def _base_detail_price(
     )
     if price in (None, "", [], {}):
         price = text_or_none(record.get("price"))
-    return price, "json_ld" if jsonld_price else "dom_text"
+    return price, FIELD_SOURCE_JSON_LD if jsonld_price else FIELD_SOURCE_DOM_TEXT
 
 
 def _apply_selected_detail_price(
@@ -298,13 +300,13 @@ def _apply_selected_detail_price(
         return
     jsonld_price, _jsonld_original_price, jsonld_currency = evidence.jsonld_price_bundle
     if (
-        selection.source == "json_ld"
+        selection.source == FIELD_SOURCE_JSON_LD
         and jsonld_currency
         and text_or_none(record.get("currency")) != jsonld_currency
     ):
         record["currency"] = jsonld_currency
         evidence.currency = jsonld_currency
-        append_record_field_source(record, "currency", "json_ld")
+        append_record_field_source(record, "currency", FIELD_SOURCE_JSON_LD)
     _apply_detail_record_price(
         record,
         selection,
@@ -337,7 +339,7 @@ def _apply_detail_record_price(
     record_price_is_low_signal: bool,
 ) -> None:
     if (
-        selection.source == "json_ld"
+        selection.source == FIELD_SOURCE_JSON_LD
         and selection.price == jsonld_price
         and not (
             record_field_sources(record, "price")
@@ -345,7 +347,7 @@ def _apply_detail_record_price(
         )
     ):
         record["price"] = selection.price
-        append_record_field_source(record, "price", "json_ld")
+        append_record_field_source(record, "price", FIELD_SOURCE_JSON_LD)
     if (
         _should_override_record_price_from_dom(
             record=record,
@@ -393,7 +395,7 @@ def _backfill_detail_variant_prices(
         if not isinstance(variant, dict):
             continue
         if (
-            source == "json_ld"
+            source == FIELD_SOURCE_JSON_LD
             and jsonld_currency
             and _detail_price_is_visible_outlier(variant.get("price"), price)
             and not authoritative_variants
@@ -418,7 +420,7 @@ def _apply_detail_original_price(
     original_price = jsonld_original_price or visible_original_price
     if (
         selection.localized_override_applied
-        and selection.source == "dom_text"
+        and selection.source == FIELD_SOURCE_DOM_TEXT
         and (
             visible_original_price in (None, "", [], {})
             or detail_price_decimal(visible_original_price)
@@ -442,16 +444,18 @@ def _apply_detail_original_price(
         [],
         {},
     ):
-        source = "json_ld" if jsonld_original_price else "dom_text"
+        source = (
+            FIELD_SOURCE_JSON_LD if jsonld_original_price else FIELD_SOURCE_DOM_TEXT
+        )
         record["original_price"] = original_price
         append_record_field_source(record, "original_price", source)
         if (
-            source == "json_ld"
+            source == FIELD_SOURCE_JSON_LD
             and jsonld_currency
             and record.get("currency") in (None, "", [], {})
         ):
             record["currency"] = jsonld_currency
-            append_record_field_source(record, "currency", "json_ld")
+            append_record_field_source(record, "currency", FIELD_SOURCE_JSON_LD)
     selected_variant = record.get("selected_variant")
     if (
         isinstance(selected_variant, dict)
@@ -468,23 +472,23 @@ def _localized_visible_or_structured_price_override(
     jsonld_price: object,
     jsonld_currency: str | None,
     expected_currency: str | None,
-) -> str | None:
+) -> tuple[str | None, str]:
     if not expected_currency:
-        return None
+        return None, ""
     current_sources = record_field_sources(record, "price")
     if not (current_sources & {"adapter", "js_state"}):
-        return None
+        return None, ""
     if visible_price and _detail_price_is_visible_outlier(
         record.get("price"), visible_price
     ):
-        return text_or_none(visible_price)
+        return text_or_none(visible_price), FIELD_SOURCE_DOM_TEXT
     if (
         jsonld_price
         and jsonld_currency == expected_currency
         and _detail_price_is_visible_outlier(record.get("price"), jsonld_price)
     ):
-        return text_or_none(jsonld_price)
-    return None
+        return text_or_none(jsonld_price), FIELD_SOURCE_JSON_LD
+    return None, ""
 
 
 def _drop_unverified_variant_money(record: dict[str, Any]) -> None:

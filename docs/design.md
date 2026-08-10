@@ -1,6 +1,6 @@
 ---
-version: "4.0"
-name: "Invoro Design System v4"
+version: "4.1"
+name: "Invoro Design System v4.1"
 description: >
   CrawlerAI v4 refined-minimal operator design system adapted to Invoro's
   Next.js shell, with local Switzer body, Satoshi display, and Geist Mono.
@@ -34,7 +34,7 @@ geometry:
   table-row: "38px"
 ---
 
-# Invoro Design System v4
+# Invoro Design System v4.1
 
 `frontend/app/globals.css` is the canonical token and global-style source. This document records its intended use. CrawlerAI v4 is the visual authority; Invoro keeps its Next.js routing, product workflows, copy, and API contracts.
 
@@ -57,7 +57,19 @@ Do not introduce raw page-level colors, decorative gradients, glass effects, ove
 - Satoshi is the display and heading face. Normal and italic variable files cover weights 300–900.
 - Geist Mono is retained for code, URLs, identifiers, logs, and tabular technical values.
 
-The canonical scale is 10px, 11px, 13px, 14px, 17px, 21px, and 29px. Use display typography for headings, body typography for controls and prose, and mono only when the content is actually technical or numeric.
+Invoro uses a 14px operator baseline, adapted from [SAP Fiori's ERP typography guidance](https://experience.sap.com/fiori-design-web/typography/). Fiori uses 14px medium text for buttons, inputs, tables, and trees; 12px small text is exceptional supporting information. Invoro preserves that density model while keeping its established font families.
+
+| Role       | Size | Use                                             |
+| ---------- | ---: | ----------------------------------------------- |
+| Caption    | 12px | Metadata, timestamps, terse technical labels    |
+| Body       | 14px | Default UI, controls, prose, tables, navigation |
+| Body large | 16px | Emphasized body and dialog titles               |
+| Section    | 18px | Card and section headings                       |
+| Subpage    | 20px | Nested page headings                            |
+| Page       | 24px | Page and authentication headings                |
+| Display    | 32px | KPIs and display values                         |
+
+`frontend/app/globals.css` is the only size source. Its `--type-scale-*` tokens feed semantic role classes, table and activity tokens, chart labels, and Tailwind `text-*` compatibility aliases. Screens must not introduce raw pixel font sizes. Use display typography for headings, body typography for controls and prose, and mono only when content is technical or numeric.
 
 ## Tokens And Themes
 

@@ -43,18 +43,15 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   const nonce = (await headers()).get('x-nonce') ?? undefined;
 
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html
+      lang="en"
+      className={`${primaryFont.variable} ${displayFont.variable} ${monoFont.variable}`}
+      suppressHydrationWarning
+    >
       <head>
         <Script src="/theme-init.js" strategy="beforeInteractive" nonce={nonce} />
       </head>
-      {/*
-        Only apply font variables here, NOT primaryFont.className.
-        primaryFont.className hardcodes a font-family class directly on body,
-        bypassing the CSS variable cascade in globals.css entirely.
-        The variables are picked up by --font-primary-family, --font-display-family,
-        and --font-mono-family.
-      */}
-      <body className={`${primaryFont.variable} ${displayFont.variable} ${monoFont.variable}`}>
+      <body>
         <div className="noise-overlay" aria-hidden="true" />
         <QueryProvider>
           <AppShell>{children}</AppShell>

@@ -46,6 +46,7 @@ __all__ = [
     "page_might_have_location_interstitial",
 ]
 
+
 def _generic_card_selectors_for_surface(surface: str | None) -> list[str]:
     if not isinstance(CARD_SELECTORS, dict):
         return []

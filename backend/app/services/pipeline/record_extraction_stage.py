@@ -114,8 +114,7 @@ async def _populate_adapter_records(
         adapter_runner = getattr(extraction_loop, "run_adapter", run_adapter)
         adapter_kwargs = (
             {"proxy": adapter_proxy}
-            if adapter_proxy
-            and "proxy" in inspect.signature(adapter_runner).parameters
+            if adapter_proxy and "proxy" in inspect.signature(adapter_runner).parameters
             else {}
         )
         adapter_calls = 0
@@ -320,8 +319,6 @@ def _adapter_network_payload_inputs(
         if identity_tokens and not any(
             token in serialized_key for token in identity_tokens
         ):
-            continue
-        if not serialized:
             continue
         inputs.append(serialized)
     return inputs

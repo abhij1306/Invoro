@@ -13,7 +13,7 @@ from app.services.dom.html_parser import BeautifulSoup
 
 from app.services.acquisition.browser_readiness import HtmlAnalysis, analyze_html
 from app.core.config import settings
-from app.services.config.block_signatures import BLOCK_SIGNATURES
+from app.services.config.block_signatures import BLOCK_SIGNATURES, CAPTCHA_MARKER
 from app.services.config.content_types import HTML_CONTENT_TYPE
 from app.services.config.extraction_rules import (
     ACTION_BUY_NOW,
@@ -241,14 +241,7 @@ def _collect_block_page_evidence(
             if marker in visible_text or marker in title_text
         },
         provider_hits={marker for marker in provider_markers if marker in lowered},
-        active_provider_hits={
-            marker
-            for item in _mapping_sequence(
-                BLOCK_SIGNATURES.get("active_provider_markers")
-            )
-            if (marker := str(item.get("marker") or "").strip().lower())
-            and marker in lowered
-        },
+        active_provider_hits=_active_provider_hits(lowered),
         challenge_element_hits=set(_challenge_element_hits(analysis.soup, lowered)),
         hard_strong_hits=strong_hits - content_tolerant_strong_markers,
         has_extractable_content=(
@@ -264,6 +257,15 @@ def _normalized_mapping_keys(signature_name: str) -> list[str]:
         for marker in mapping_or_empty(BLOCK_SIGNATURES.get(signature_name)).keys()
         if (normalized := str(marker or "").strip().lower())
     ]
+
+
+def _active_provider_hits(lowered: str) -> set[str]:
+    return {
+        marker
+        for item in _mapping_sequence(BLOCK_SIGNATURES.get("active_provider_markers"))
+        if (marker := str(item.get("marker") or "").strip().lower())
+        and marker in lowered
+    }
 
 
 def _normalized_signature_strings(signature_name: str) -> list[str]:
@@ -335,7 +337,7 @@ def _combined_block_evidence(evidence: _BlockPageEvidence) -> bool:
         or (evidence.title_matches and evidence.challenge_element_hits)
         or (evidence.hard_strong_hits and evidence.weak_hits and evidence.provider_hits)
         or (
-            "captcha" in evidence.strong_hits
+            CAPTCHA_MARKER in evidence.strong_hits
             and evidence.provider_hits
             and (not evidence.has_extractable_content or bool(evidence.title_matches))
         )
@@ -350,7 +352,7 @@ def _usable_content_overrides_block(
         blocked
         and evidence.has_extractable_content
         and not evidence.title_matches
-        and (not evidence.hard_strong_hits or evidence.hard_strong_hits <= {"captcha"})
+        and not evidence.hard_strong_hits
     )
 
 

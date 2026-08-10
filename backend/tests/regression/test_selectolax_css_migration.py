@@ -67,9 +67,7 @@ def test_detail_extractor_preserves_css_dom_field_output() -> None:
 
 
 @pytest.mark.regression
-def test_detail_extractor_builds_each_working_dom_once(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_detail_extractor_builds_each_working_dom_once(monkeypatch: pytest.MonkeyPatch) -> None:
     parser_builds = 0
     real_parser = extraction_context_module.LexborHTMLParser
 
@@ -96,6 +94,7 @@ def test_detail_extractor_builds_each_working_dom_once(
     )
 
     assert record["variant_count"] == 2
+    # Counts only constructors routed through extraction_context_module.LexborHTMLParser.
     assert parser_builds == 3
 
 
@@ -106,8 +105,10 @@ def test_extraction_context_caches_pruned_dom() -> None:
     )
 
     pruned_soup = context.pruned_soup(context.soup)
-
     assert context.pruned_soup(context.soup) is pruned_soup
+
+    second_html = "<html><body><main><h1>Second Widget</h1></main></body></html>"
+    assert context.pruned_soup(prepare_extraction_context(second_html).soup) is not pruned_soup
 
 
 @pytest.mark.regression
@@ -154,9 +155,7 @@ def test_listing_extractor_preserves_css_card_field_output() -> None:
 
 
 @pytest.mark.regression
-def test_listing_extractor_parses_composed_rendered_artifact_once(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_listing_extractor_builds_three_working_doms_for_rendered_fragments(monkeypatch: pytest.MonkeyPatch) -> None:
     parser_builds = 0
     real_parser = extraction_context_module.LexborHTMLParser
 
@@ -180,6 +179,7 @@ def test_listing_extractor_parses_composed_rendered_artifact_once(
     )
 
     assert len(rows) == 2
+    # Budget: cleaned source, original-source fallback, and one composed fragment DOM.
     assert parser_builds == 3
 
 

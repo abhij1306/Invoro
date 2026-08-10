@@ -152,7 +152,6 @@ class DetailTierExecutor:
                 requested_page_url=prepared.state.requested_page_url,
                 soup=prepared.soup,
                 raw_soup=prepared.raw_soup,
-                context=prepared.context,
                 js_state_objects=prepared.js_state_objects,
                 early_exit="js_state",
             )
@@ -168,7 +167,6 @@ class DetailTierExecutor:
             requested_page_url=prepared.state.requested_page_url,
             soup=prepared.soup,
             raw_soup=prepared.raw_soup,
-            context=prepared.context,
             js_state_objects=prepared.js_state_objects,
             early_exit=None,
         )

@@ -10,13 +10,18 @@ from urllib.parse import quote, unquote, urlparse, urlunparse
 
 from app.services.acquisition.host_protection_memory import HostProtectionPolicy
 from app.services.acquisition.runtime import classify_block_from_headers
-from app.services.config.runtime_settings import crawler_runtime_settings
+from app.services.config.runtime_settings import (
+    PATCHRIGHT_BROWSER_ENGINE,
+    PATCHRIGHT_HTTP2_PROTOCOL_ERROR_TOKEN,
+    REAL_CHROME_BROWSER_ENGINE,
+    SUPPORTED_FORCED_BROWSER_ENGINES,
+    crawler_runtime_settings,
+)
 from app.services.fetch.types import BrowserAttemptPlan, FetchRuntimeContext
 
 logger = logging.getLogger(__name__)
 
 _VENDOR_BLOCK_REASON_PREFIX = "vendor-block:"
-_SUPPORTED_FORCED_ENGINES = {"patchright", "real_chrome"}
 
 
 def resolve_proxy_attempts(
@@ -251,14 +256,14 @@ def browser_engine_attempts(
 ) -> list[str]:
     forced_engine = str(context.forced_browser_engine or "").strip().lower()
     if forced_engine:
-        if forced_engine in _SUPPORTED_FORCED_ENGINES:
+        if forced_engine in SUPPORTED_FORCED_BROWSER_ENGINES:
             return [forced_engine]
         logger.warning(
             "Unsupported forced_browser_engine=%r for %s; ignoring and using default engine selection",
             forced_engine,
             context.url,
         )
-    engines = ["patchright"]
+    engines = [PATCHRIGHT_BROWSER_ENGINE]
     if (
         not bool(crawler_runtime_settings.browser_real_chrome_enabled)
         or not real_chrome_available
@@ -266,18 +271,20 @@ def browser_engine_attempts(
         return engines
     if host_policy.patchright_blocked and host_policy.prefer_browser:
         return _prefer_engine_first(
-            _append_engine_once(engines, "real_chrome"), "real_chrome"
+            _append_engine_once(engines, REAL_CHROME_BROWSER_ENGINE),
+            REAL_CHROME_BROWSER_ENGINE,
         )
     if host_policy.real_chrome_success and host_policy.prefer_browser:
         return _prefer_engine_first(
-            _append_engine_once(engines, "real_chrome"), "real_chrome"
+            _append_engine_once(engines, REAL_CHROME_BROWSER_ENGINE),
+            REAL_CHROME_BROWSER_ENGINE,
         )
     if (
         host_policy.request_blocked
         or host_policy.prefer_browser
         or host_policy.last_block_vendor
     ):
-        return _append_engine_once(engines, "real_chrome")
+        return _append_engine_once(engines, REAL_CHROME_BROWSER_ENGINE)
     return engines
 
 
@@ -396,8 +403,7 @@ def browser_attempt_timeout_seconds(
 ) -> float:
     remaining_timeout = remaining_timeout_seconds(context)
     if (
-        browser_engine == "patchright"
-        and is_vendor_block_reason(reason)
+        browser_engine == PATCHRIGHT_BROWSER_ENGINE
         and not str(context.forced_browser_engine or "").strip()
         and patchright_probe_cap_applies(
             host_policy=host_policy,
@@ -419,10 +425,14 @@ def patchright_probe_cap_applies(
     engine_attempts: list[str],
 ) -> bool:
     expected_vendor = extract_vendor_from_reason(reason) or ""
+    if REAL_CHROME_BROWSER_ENGINE in engine_attempts:
+        return bool(expected_vendor) or bool(
+            host_policy is not None
+            and host_policy.request_blocked
+            and host_policy.prefer_browser
+        )
     if not expected_vendor:
         return False
-    if "real_chrome" in engine_attempts:
-        return True
     if host_policy is None:
         return False
     if not bool(host_policy.patchright_blocked) or not bool(host_policy.prefer_browser):
@@ -441,11 +451,11 @@ def should_retry_patchright_with_real_chrome(
 ) -> bool:
     return bool(
         not str(context.forced_browser_engine or "").strip()
-        and browser_engine == "patchright"
-        and "real_chrome" not in engine_attempts
+        and browser_engine == PATCHRIGHT_BROWSER_ENGINE
+        and REAL_CHROME_BROWSER_ENGINE not in engine_attempts
         and crawler_runtime_settings.browser_real_chrome_enabled
         and real_chrome_available
-        and "ERR_HTTP2_PROTOCOL_ERROR" in str(exc or "").upper()
+        and PATCHRIGHT_HTTP2_PROTOCOL_ERROR_TOKEN in str(exc or "").upper()
     )
 
 
@@ -459,26 +469,27 @@ def handoff_cookie_engines(*, preferred_engine: str | None = None) -> tuple[str,
     )
     preferred: list[str] = []
     normalized_preferred = str(preferred_engine or "").strip().lower()
-    if normalized_preferred in _SUPPORTED_FORCED_ENGINES:
+    if normalized_preferred in SUPPORTED_FORCED_BROWSER_ENGINES:
         preferred.append(normalized_preferred)
     for engine in configured:
-        if engine in _SUPPORTED_FORCED_ENGINES and engine not in preferred:
+        if engine in SUPPORTED_FORCED_BROWSER_ENGINES and engine not in preferred:
             preferred.append(engine)
     return tuple(preferred)
 
 
 def resolve_http_timeout(context: FetchRuntimeContext) -> float:
+    remaining_timeout = remaining_timeout_seconds(context)
     raw_timeout = crawler_runtime_settings.http_timeout_seconds
     if raw_timeout is None:
-        return context.resolved_timeout
+        return remaining_timeout
     try:
-        return min(float(raw_timeout), context.resolved_timeout)
+        return min(float(raw_timeout), remaining_timeout)
     except (TypeError, ValueError):
         logger.warning(
-            "Invalid http_timeout_seconds=%r; using resolved timeout",
+            "Invalid http_timeout_seconds=%r; using remaining timeout",
             raw_timeout,
         )
-        return context.resolved_timeout
+        return remaining_timeout
 
 
 def _append_engine_once(engine_attempts: list[str], engine: str) -> list[str]:
