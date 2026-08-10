@@ -25,11 +25,6 @@ from app.services.script_text_extractor import (
     iter_script_text_nodes,
 )
 
-try:
-    from w3lib.html import get_base_url
-except ImportError:  # pragma: no cover - dependency may be absent in local test envs
-    get_base_url = None  # type: ignore[assignment]
-
 _NON_STATE_ASSIGNMENT_REGEXES = compile_regex_patterns(
     NON_STATE_ASSIGNMENT_PATTERNS,
     flags=re.S,

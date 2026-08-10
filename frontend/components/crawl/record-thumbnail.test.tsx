@@ -8,7 +8,7 @@ describe('RecordThumbnail', () => {
     render(<RecordThumbnail src="https://example.com/product.jpg" />);
 
     const frame = screen.getByTestId('record-thumbnail-frame');
-    expect(frame).toHaveClass('relative', 'size-16');
+    expect(frame).toHaveClass('relative', 'size-16', 'border');
     expect(frame.querySelector('img')).toHaveClass('object-contain');
   });
 });

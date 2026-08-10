@@ -483,13 +483,20 @@ def resolve_http_timeout(context: FetchRuntimeContext) -> float:
     if raw_timeout is None:
         return remaining_timeout
     try:
-        return min(float(raw_timeout), remaining_timeout)
+        configured_timeout = float(raw_timeout)
     except (TypeError, ValueError):
         logger.warning(
             "Invalid http_timeout_seconds=%r; using remaining timeout",
             raw_timeout,
         )
         return remaining_timeout
+    if configured_timeout <= 0:
+        logger.warning(
+            "Invalid http_timeout_seconds=%r; using remaining timeout",
+            raw_timeout,
+        )
+        return remaining_timeout
+    return min(configured_timeout, remaining_timeout)
 
 
 def _append_engine_once(engine_attempts: list[str], engine: str) -> list[str]:

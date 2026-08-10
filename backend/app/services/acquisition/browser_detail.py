@@ -473,9 +473,7 @@ def _expansion_candidate_is_blocked(
         and not candidate.aria_controls
         and not size_toggle
     )
-    chrome_token = any(
-        token in keyword_probe for token in BROWSER_DETAIL_CHROME_TOKENS
-    )
+    chrome_token = any(token in keyword_probe for token in BROWSER_DETAIL_CHROME_TOKENS)
     blocked_token = any(token in keyword_probe for token in DETAIL_BLOCKED_TOKENS)
     return navigational_anchor or chrome_token or (blocked_token and not size_toggle)
 

@@ -67,7 +67,9 @@ def test_detail_extractor_preserves_css_dom_field_output() -> None:
 
 
 @pytest.mark.regression
-def test_detail_extractor_builds_each_working_dom_once(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_detail_extractor_builds_each_working_dom_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     parser_builds = 0
     real_parser = extraction_context_module.LexborHTMLParser
 
@@ -108,7 +110,10 @@ def test_extraction_context_caches_pruned_dom() -> None:
     assert context.pruned_soup(context.soup) is pruned_soup
 
     second_html = "<html><body><main><h1>Second Widget</h1></main></body></html>"
-    assert context.pruned_soup(prepare_extraction_context(second_html).soup) is not pruned_soup
+    assert (
+        context.pruned_soup(prepare_extraction_context(second_html).soup)
+        is not pruned_soup
+    )
 
 
 @pytest.mark.regression
@@ -155,7 +160,9 @@ def test_listing_extractor_preserves_css_card_field_output() -> None:
 
 
 @pytest.mark.regression
-def test_listing_extractor_builds_three_working_doms_for_rendered_fragments(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_listing_extractor_builds_three_working_doms_for_rendered_fragments(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     parser_builds = 0
     real_parser = extraction_context_module.LexborHTMLParser
 

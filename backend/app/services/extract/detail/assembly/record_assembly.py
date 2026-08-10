@@ -143,10 +143,7 @@ def _finalize_detail_record(
             soup=soup,
             js_state_objects=js_state_objects,
         )
-        if (
-            record.get("variants") in (None, "", [], {})
-            and raw_soup is not soup
-        ):
+        if record.get("variants") in (None, "", [], {}) and raw_soup is not soup:
             repair_ecommerce_detail_record_quality(
                 record,
                 html=html,

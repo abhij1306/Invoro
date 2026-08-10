@@ -39,7 +39,16 @@ from app.services.pipeline.extract_records import extract_records
 
 
 @pytest.fixture(autouse=True)
-def _reset_origin_warmup_state():
+def _reset_origin_warmup_state(monkeypatch: pytest.MonkeyPatch):
+    async def _no_saved_domain_state(*_args, **_kwargs):
+        await _async_checkpoint()
+        return None
+
+    monkeypatch.setattr(
+        cookie_store,
+        "load_storage_state_for_domain",
+        _no_saved_domain_state,
+    )
     browser_runtime._ORIGIN_WARMUP_IN_FLIGHT.clear()
     browser_runtime._ORIGIN_WARMUP_RECENT.clear()
     yield
@@ -768,12 +777,16 @@ async def test_serialize_browser_page_content_reuses_prefetched_html_without_pag
 
 @pytest.mark.asyncio
 @pytest.mark.regression
-async def test_settle_browser_page_skips_platform_selector_when_probe_is_ready() -> None:
+async def test_settle_browser_page_skips_platform_selector_when_probe_is_ready() -> (
+    None
+):
     probe_analyses: list[object] = []
     current_html = "<html><body>Searching...</body></html>"
+
     async def get_page_html_impl(_page):
         await _async_checkpoint()
         return current_html
+
     async def probe_browser_readiness(*_args, **kwargs):
         await _async_checkpoint()
         probe_analyses.append(kwargs.get("analysis"))
@@ -782,6 +795,7 @@ async def test_settle_browser_page_skips_platform_selector_when_probe_is_ready()
             "matched_listing_selectors": len(probe_analyses) - 1,
             "structured_data_present": False,
         }
+
     async def wait_for_listing_readiness(*_args, **_kwargs):
         raise AssertionError("ready probes must skip platform selector waiting")
 
@@ -1346,6 +1360,47 @@ class _FakeRuntime:
     async def page(self, **_kwargs):
         await _async_checkpoint()
         yield self._page
+
+
+@pytest.mark.asyncio
+@pytest.mark.regression
+async def test_browser_fetch_deadline_includes_page_acquisition(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    page = _FakeExpansionPage(
+        base_html="<html><body><h1>Widget Prime</h1></body></html>"
+    )
+    captured_deadlines: list[float] = []
+    perf_counter_calls = 0
+
+    async def _fake_runtime(**_kwargs):
+        await _async_checkpoint()
+        return _FakeRuntime(page)
+
+    def _perf_counter() -> float:
+        nonlocal perf_counter_calls
+        perf_counter_calls += 1
+        return 100.0 if perf_counter_calls == 1 else 104.0
+
+    def _remaining_timeout_factory(deadline: float):
+        captured_deadlines.append(deadline)
+        return lambda: 5.0
+
+    monkeypatch.setattr(browser_runtime.time, "perf_counter", _perf_counter)
+    monkeypatch.setattr(
+        browser_runtime,
+        "remaining_timeout_factory",
+        _remaining_timeout_factory,
+    )
+
+    await browser_runtime.browser_fetch(
+        "https://example.com/products/widget",
+        5,
+        surface="ecommerce_detail",
+        runtime_provider=_fake_runtime,
+    )
+
+    assert captured_deadlines == [105.0]
 
 
 @pytest.mark.asyncio

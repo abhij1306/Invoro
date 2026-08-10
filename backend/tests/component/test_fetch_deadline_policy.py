@@ -54,3 +54,14 @@ def test_rate_limited_http_escalation_reserves_budget_for_real_chrome(
     )
 
     assert timeout == pytest.approx(12.0, abs=0.05)
+
+
+@pytest.mark.component
+def test_invalid_nonpositive_http_timeout_uses_remaining_budget(patch_settings) -> None:
+    patch_settings(http_timeout_seconds=0)
+    context = default_fetch_context()
+    context.deadline_monotonic = time.perf_counter() + 5.0
+
+    timeout = browser_policy.resolve_http_timeout(context)
+
+    assert timeout == pytest.approx(5.0, abs=0.05)

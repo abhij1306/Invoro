@@ -238,12 +238,14 @@ def _select_detail_price(
         visible_price=evidence.visible_price,
     ):
         return _DetailPriceSelection(blocked=True)
-    localized_override, localized_source = _localized_visible_or_structured_price_override(
-        record=record,
-        visible_price=evidence.visible_price,
-        jsonld_price=jsonld_price,
-        jsonld_currency=jsonld_currency,
-        expected_currency=evidence.expected_currency,
+    localized_override, localized_source = (
+        _localized_visible_or_structured_price_override(
+            record=record,
+            visible_price=evidence.visible_price,
+            jsonld_price=jsonld_price,
+            jsonld_currency=jsonld_currency,
+            expected_currency=evidence.expected_currency,
+        )
     )
     price, source = _base_detail_price(record, evidence, jsonld_price)
     localized_applied = False

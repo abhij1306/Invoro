@@ -86,7 +86,7 @@ Verify the supplied review findings against current code, fix only still-valid i
 
 ## Notes
 
-- Initial audit found an existing regression contract that intentionally keeps authoritative JSON-LD `original_price` on an out-of-stock record. The supplied request to skip original-price application for all blocked selections appears incompatible and will be rechecked during Slice 3.
+- Initial audit found an existing regression contract that intentionally keeps authoritative JSON-LD `original_price` on an out-of-stock record. The supplied request to skip original-price application for all blocked selections appears incompatible and was rechecked during Slice 4 and was skipped because it would break existing regression contracts.
 - Existing dirty files are preserved; only directly requested overlapping lines will be touched.
 - Slice 1 verification: block detection plus browser expansion selected 187 tests; all passed. Ruff passed on every touched acquisition/config file.
 - Slice 2 root cause: PR #86 applied generated Next font variables to `body`, below the `:root` aliases that consume them. Moving the variables to `html` lets the local Switzer/Satoshi faces resolve. Frontend lint, architecture guards, TypeScript, 7 targeted tests, production build, and user visual verification passed.

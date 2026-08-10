@@ -266,7 +266,9 @@ GENDER_ARTIFACT_PATTERN = r"\b(?:men|mens|women|womens|boys|girls)['’]?\s+{can
 GENDER_KEYWORD_TOKENS = frozenset(GENDER_ARTIFACT_WORDS)
 GENDER_POSSESSIVE_PATTERN = r"\b(?:men|women|boys|girls)['’]?s\b"
 STANDARD_SIZE_VALUES = frozenset({"xs", "s", "m", "l", "xl", "xxl", "xxxl"})
-VARIANT_TITLE_STOPWORDS = frozenset({"and", "for", "the", "with", "size", "color", "colour", "variant"})
+VARIANT_TITLE_STOPWORDS = frozenset(
+    {"and", "for", "the", "with", "size", "color", "colour", "variant"}
+)
 DOM_VARIANT_GROUP_LIMIT = 4
 DOM_VARIANT_CARTESIAN_COMBO_LIMIT = 1000
 DETAIL_EXPANSION_STATUS_ATTEMPTED = "attempted"
