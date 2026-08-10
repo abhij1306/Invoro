@@ -20,6 +20,7 @@ from app.services.config.extraction_rules import (
     DOM_VARIANT_CARTESIAN_COMBO_LIMIT,
     DOM_VARIANT_GROUP_LIMIT,
     VARIANT_CHOICE_OPTION_LIMIT,
+    VARIANT_OPTION_CONTROL_SCAN_LIMIT,
 )
 from app.services.config.variant_migration_rules import (
     VARIANT_STRONG_OPTION_SELECTOR,
@@ -178,7 +179,12 @@ def _collect_variant_choice_entries(
 
     def candidate_rows(selector: str) -> list[tuple[Any, str]]:
         rows: list[tuple[Any, str]] = []
-        for node in container.select(selector):
+        scan_limit = _safe_int_config(
+            VARIANT_OPTION_CONTROL_SCAN_LIMIT,
+            300,
+            "VARIANT_OPTION_CONTROL_SCAN_LIMIT",
+        )
+        for node in container.select(selector)[:scan_limit]:
             if not weak_variant_option_node_allowed(
                 node,
                 container=container,
@@ -217,6 +223,8 @@ def _collect_variant_choice_entries(
             cleaned = _strip_variant_option_value_suffix_noise(cleaned)
             if not variant_option_value_is_noise(cleaned):
                 rows.append((node, cleaned))
+                if len(rows) >= option_limit:
+                    break
         return rows
 
     option_rows = candidate_rows(str(VARIANT_STRONG_OPTION_SELECTOR))
