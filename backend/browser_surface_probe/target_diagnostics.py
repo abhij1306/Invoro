@@ -499,6 +499,7 @@ async def _capture_probe_artifacts(
             await page.screenshot(path=str(screenshot_path), full_page=True)
             created["screenshot"] = screenshot_path.name
         except Exception:
+            # Probe artifacts are best effort; the diagnostic result must survive.
             pass
     try:
         page_html = html if html is not None else await page.content()
@@ -510,6 +511,7 @@ async def _capture_probe_artifacts(
             html_path.write_text(page_html, encoding="utf-8")
             created["html"] = html_path.name
         except Exception:
+            # A filesystem failure must not discard the in-memory probe result.
             pass
     body_path = artifacts.get("body")
     if body_path is not None and page_html is not None:
@@ -517,6 +519,7 @@ async def _capture_probe_artifacts(
             _write_target_body_artifact(body_path, page_html)
             created["body"] = body_path.name
         except Exception:
+            # Keep other artifacts when the bounded body artifact cannot be written.
             pass
     return created
 

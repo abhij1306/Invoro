@@ -52,4 +52,4 @@ _object_list = object_list
 
 _string_list = string_list
 
-__all__ = ['_BASELINE_PROBE_SCRIPT_PATH', '_BUNDLE_DIRNAME', '_COUNTRY_CODE_BY_NAME', '_IP_RE', '_NON_ALNUM_RE', '_WHITESPACE_RE']  # fmt: skip
+__all__ = ['_BASELINE_PROBE_SCRIPT_PATH', '_BUNDLE_DIRNAME', '_COUNTRY_CODE_BY_NAME', '_IP_RE', '_NON_ALNUM_RE', '_WHITESPACE_RE', '_object_dict', '_object_list', '_string_list', 'logger']  # fmt: skip

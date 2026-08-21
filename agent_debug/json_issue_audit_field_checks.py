@@ -57,6 +57,15 @@ def _host_from_url(url: str) -> str:
         return ""
 
 
+def _host_matches_domain(host: str, domain: str) -> bool:
+    normalized_host = _safe_str(host).lower().rstrip(".")
+    normalized_domain = _safe_str(domain).lower().strip(".")
+    return bool(normalized_domain) and (
+        normalized_host == normalized_domain
+        or normalized_host.endswith(f".{normalized_domain}")
+    )
+
+
 def _is_noise_text(text: str) -> bool:
     cleaned = _safe_str(text)
     if not cleaned:
@@ -179,7 +188,7 @@ def _find_incorrect_fields(record: dict[str, Any], issues: list[Issue]) -> None:
                         Issue("logical_errors", "high", key, "negative price", value)
                     )
             except ValueError:
-                pass
+                continue
 
     brand = _safe_str(record.get("brand"))
     if (

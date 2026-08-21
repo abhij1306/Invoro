@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from ._run_json_issue_audit_shared import APPAREL_VARIANT_HINT_RES, BLOCKED_PAGE_TITLE_RES, NON_PRODUCT_IMAGE_PATH_RES, URL_RE, Any, Counter, parse_qsl, re, urlencode, urlparse, urlunparse  # fmt: skip
-from .json_issue_audit_field_checks import Issue, _find_incorrect_fields, _find_missing_fields, _find_pollution, _host_from_url, _is_noise_text, _is_variant_size_value, _looks_price, _safe_list, _safe_str, _variant_signature  # fmt: skip
+from .json_issue_audit_field_checks import Issue, _find_incorrect_fields, _find_missing_fields, _find_pollution, _host_from_url, _host_matches_domain, _is_noise_text, _is_variant_size_value, _looks_price, _safe_list, _safe_str, _variant_signature  # fmt: skip
 
 
 def _normalized_image_key(url: str) -> str:
@@ -90,7 +90,7 @@ def _find_image_issues(record: dict[str, Any], issues: list[Issue]) -> None:
 
 def _looks_like_variant_expected(record: dict[str, Any]) -> bool:
     host = _host_from_url(_safe_str(record.get("url")))
-    if "discogs.com" in host:
+    if _host_matches_domain(host, "discogs.com"):
         return False
     text = " ".join(
         [
@@ -528,7 +528,7 @@ def _find_logical_errors(record: dict[str, Any], issues: list[Issue]) -> None:
 
     host = _host_from_url(_safe_str(record.get("url")))
     tags = [str(item) for item in _safe_list(record.get("tags"))]
-    if "discogs.com" in host:
+    if _host_matches_domain(host, "discogs.com"):
         discogs_noise = [
             token
             for token in tags
