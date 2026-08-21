@@ -7,6 +7,7 @@ from app.services.acquisition import browser_identity
 from app.services.acquisition import browser_pool as acquisition_browser_pool
 from app.services.acquisition import browser_runtime as acquisition_browser_runtime
 import run_browser_surface_probe as probe
+from browser_surface_probe import probe_runner
 
 
 def _report(
@@ -501,7 +502,7 @@ async def test_build_report_ignores_runtime_page_init_script_path(
         ),
     )
     monkeypatch.setattr(
-        probe,
+        probe_runner,
         "BROWSER_SURFACE_PROBE_TARGETS",
         (
             {
@@ -562,7 +563,7 @@ async def test_build_report_keeps_partial_report_when_site_context_fails(
         return FakeRuntime()
 
     monkeypatch.setattr(
-        probe,
+        probe_runner,
         "BROWSER_SURFACE_PROBE_TARGETS",
         (
             {
@@ -572,8 +573,8 @@ async def test_build_report_keeps_partial_report_when_site_context_fails(
             },
         ),
     )
-    monkeypatch.setattr(probe, "BROWSER_SURFACE_PROBE_SITE_MAX_RETRIES", 0)
-    monkeypatch.setattr(probe, "BROWSER_SURFACE_PROBE_REQUEST_DELAY_MS", 0)
+    monkeypatch.setattr(probe_runner, "BROWSER_SURFACE_PROBE_SITE_MAX_RETRIES", 0)
+    monkeypatch.setattr(probe_runner, "BROWSER_SURFACE_PROBE_REQUEST_DELAY_MS", 0)
 
     report = await probe.build_report(
         runtime_source=probe.RuntimeSource(
@@ -624,8 +625,8 @@ async def test_build_report_keeps_invalid_target_urls_as_failed_diagnostics(
             browser_blocked=False, httpx_blocked=False, curl_blocked=False
         )
 
-    monkeypatch.setattr(probe, "BROWSER_SURFACE_PROBE_TARGETS", ())
-    monkeypatch.setattr(probe, "_run_target_diagnostic", _fake_target_diagnostic)
+    monkeypatch.setattr(probe_runner, "BROWSER_SURFACE_PROBE_TARGETS", ())
+    monkeypatch.setattr(probe_runner, "_run_target_diagnostic", _fake_target_diagnostic)
 
     report = await probe.build_report(
         runtime_source=probe.RuntimeSource(
@@ -685,8 +686,8 @@ async def test_build_report_keeps_partial_target_diagnostics_when_one_target_fai
             curl_blocked=False,
         )
 
-    monkeypatch.setattr(probe, "BROWSER_SURFACE_PROBE_TARGETS", ())
-    monkeypatch.setattr(probe, "_run_target_diagnostic", _fake_target_diagnostic)
+    monkeypatch.setattr(probe_runner, "BROWSER_SURFACE_PROBE_TARGETS", ())
+    monkeypatch.setattr(probe_runner, "_run_target_diagnostic", _fake_target_diagnostic)
 
     report = await probe.build_report(
         runtime_source=probe.RuntimeSource(

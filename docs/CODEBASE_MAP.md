@@ -12,9 +12,10 @@ If a file is not listed, assume it is a helper under a listed owner.
 | File | Purpose |
 |---|---|
 | `run_test_sites_acceptance.py` | Acceptance runner for curated test-site batches |
-| `harness_support.py` | Acceptance helpers, `TEST_SITES.md` parsing, explicit-surface handling, audit shaping |
+| `harness_support.py`, `harness/site_sets.py`, `harness/site_harness_runner.py`, `harness/quality_evaluator.py` | Acceptance facade, site selection, execution, and quality evaluation |
 | `test_site_sets/commerce_browser_heavy.json` | Commerce acceptance manifest and quality expectations |
-| `browser_surface_probe/core.py`, `browser_surface_probe/report_rendering.py` | Browser-surface diagnostic harness and report rendering |
+| `browser_surface_probe/core.py`, `browser_surface_probe/probe_runner.py`, `browser_surface_probe/findings.py`, `browser_surface_probe/report_rendering.py` | Browser-surface facade, probe execution, finding construction, and report rendering |
+| `../agent_debug/run_json_issue_audit.py`, `../agent_debug/json_issue_audit_*.py` | Offline crawler JSON audit CLI, record checks, and root-cause triage |
 
 ### `api/` — route handlers only
 
