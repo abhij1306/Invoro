@@ -1,9 +1,9 @@
 # Active Plan
 
-**Current:** Extraction Debt Reduction → `docs/plans/productionization-02-extraction-debt-plan.md`
-**Status:** IN PROGRESS
-**Started:** 2026-08-21
-**Last slice completed:** Productionization 01, Slice 5 — Scoped Gates and Full Verification
+**Current:** None
+**Status:** READY FOR NEXT PLAN
+**Started:** —
+**Last slice completed:** Productionization 02, Slice 5 — Scoped Metrics and Full Verification
 
 ## Queue
 
@@ -15,4 +15,5 @@
 
 ## Previously Completed
 
+- Extraction Debt Reduction → `docs/plans/productionization-02-extraction-debt-plan.md` — completed 2026-08-22 in PR #97
 - Backend Test and Tooling Debt → `docs/plans/productionization-01-test-tooling-debt-plan.md` — completed 2026-08-21 in PR #96

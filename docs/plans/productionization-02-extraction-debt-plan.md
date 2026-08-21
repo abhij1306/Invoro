@@ -2,7 +2,7 @@
 
 **Created:** 2026-08-21
 **Agent:** Codex
-**Status:** IN PROGRESS
+**Status:** COMPLETE
 **PR boundary:** One independent PR. Deterministic extraction and canonical field normalization only.
 **Touches buckets:** Extraction, adapters, DOM/selector extraction, JS state, field coercion
 
@@ -70,7 +70,7 @@ Priority non-oversized hotspots include `extract/field_candidates/structured_pay
 - [x] No new cross-cutting helper layer, parallel config source, private cross-module reach-in, or downstream compensation exists.
 - [x] Confirmed dead code and exact duplicate logic found by scoped Vulture/jscpd/search are deleted after call-site validation.
 - [x] Focused contract tests pass after each slice.
-- [ ] Extraction smoke and backend safe suite pass before PR readiness. Extraction smoke passes; safe suite is delegated to PR CI.
+- [x] Extraction smoke and backend safe suite pass before PR readiness.
 - [x] No dependency, workflow, broad formatting, frontend, persistence, or migration changes are included.
 
 ## Do Not Touch
@@ -113,7 +113,7 @@ Priority non-oversized hotspots include `extract/field_candidates/structured_pay
 
 ### Slice 5: Scoped Metrics and Full Verification
 
-**Status:** IN PROGRESS — implementation gates pass; PR CI pending
+**Status:** COMPLETE
 **Files:** all touched extraction files; owner docs if file ownership moved
 **What:** Re-run exact LOC, numeric Radon CC, Vulture 100%, and jscpd. Validate every deletion. Prove scoped LOC decreased and no file/callable violates the target. Run smoke and safe suite.
 **Verify:** `cd backend; $env:PYTHONPATH='.'; .\.venv\Scripts\python.exe run_extraction_smoke.py`; then `cd backend; $env:PYTHONPATH='.'; .\.venv\Scripts\python.exe -m pytest tests -q -m "unit or component or regression"`
@@ -124,7 +124,7 @@ Priority non-oversized hotspots include `extract/field_candidates/structured_pay
 - [x] `docs/backend-architecture.md` — update extraction module layout only where ownership changed.
 - [x] `docs/INVARIANTS.md` — no product decision; no change required.
 - [x] `docs/ENGINEERING_STRATEGY.md` — no new recurring anti-pattern; no change required.
-- [ ] `docs/plans/ACTIVE.md` — set active at start; clear/advance after all verification passes.
+- [x] `docs/plans/ACTIVE.md` — set active at start; clear/advance after all verification passes.
 
 ## Notes
 
@@ -143,4 +143,4 @@ Priority non-oversized hotspots include `extract/field_candidates/structured_pay
 - Static verification: scoped Ruff, Mypy across 475 source files, and `compileall` pass. Vulture at 100% confidence reports no candidates. Scoped jscpd reports 65 clone leads covering 553 duplicated lines (1.35%); each lead was reviewed as evidence, with no validated exact duplicate suitable for further behavior-preserving deletion.
 - Focused affected contracts before review fixes: 522 passed, 5 skipped, 2 deselected. Post-review structure, adapter, field, listing, text, and variant contracts: 149 passed, 2 deselected.
 - Extraction smoke: 10/10 passed after the final import-ownership changes. An earlier first run passed 7/10 and had three transient Playwright `TargetClosedError` browser closures; no extraction assertion failed on either successful run.
-- Backend safe suite is delegated to PR CI per the shipping workflow. Plan completion and `ACTIVE.md` advancement remain pending green CI.
+- PR #97 backend CI passed dependency scanning, Ruff, Mypy, and the full safe suite: 2,429 passed, 25 skipped, 11 deselected. Plan complete.
