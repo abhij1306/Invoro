@@ -2305,7 +2305,6 @@ async def test_fetch_page_uses_browser_for_js_disabled_placeholder_shell(
 async def test_fetch_page_falls_back_to_httpx_after_curl_transport_errors(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-
     @_as_async
     def _failing_curl(url: str, timeout: float, *, proxy: str | None = None):
         del proxy
@@ -3657,7 +3656,6 @@ async def test_http_fetch_surfaces_dns_failure_without_hidden_ipv4_retry(
 async def test_fetch_page_surfaces_browser_error_when_http_exhausts_and_browser_fails(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-
     curl_error = httpx.ConnectError("getaddrinfo failed")
     httpx_error = httpx.ReadTimeout("httpx fallback timed out")
     browser_error = RuntimeError("browser launch failed")
