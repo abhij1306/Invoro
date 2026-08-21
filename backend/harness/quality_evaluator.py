@@ -1,22 +1,9 @@
 from __future__ import annotations
 
-from ._support_shared import *  # noqa: F403
-from .challenge_classifier import (
-    _looks_like_detail_identity_mismatch,
-    _looks_like_placeholder_or_wrong_content,
-    _looks_like_promo_or_wrong_page,
-    _looks_like_site_shell_success,
-    _looks_like_utility_chrome_success,
-)
-from .record_signals import (
-    _looks_like_real_listing_row,
-    _looks_like_utility_record,
-    _normalized_space,
-    _object_dict,
-    _object_list,
-    _price_number,
-    _safe_int,
-)
+from ._support_shared import _ALLOWED_GENDERS_LOWER, _BARCODE_LENGTHS, _HIGH_DENOMINATION_PRICE_CURRENCIES, _INTERNAL_IDENTITY_TOKENS, _MIN_SANE_PRICE, _PUBLIC_RECORD_LEGACY_VARIANT_FIELDS, _VARIANT_AXIS_FIELDS  # fmt: skip
+import re  # fmt: skip
+from .challenge_classifier import _looks_like_detail_identity_mismatch, _looks_like_placeholder_or_wrong_content, _looks_like_promo_or_wrong_page, _looks_like_site_shell_success, _looks_like_utility_chrome_success  # fmt: skip
+from .record_signals import _looks_like_real_listing_row, _looks_like_utility_record, _normalized_space, _object_dict, _object_list, _price_number, _safe_int  # fmt: skip
 
 
 def evaluate_quality(
@@ -446,7 +433,7 @@ def _quality_repair_diagnostics_ok(
         field_repair.get("reason")
         or field_repair.get("action")
         or self_heal.get("error")
-        or "triggered" in self_heal
+        or bool(self_heal.get("triggered"))
     )
 
 
@@ -587,4 +574,4 @@ def _quality_verdict(
     return "good"
 
 
-__all__ = tuple(name for name in globals() if not name.startswith("__"))
+__all__ = ['_ALLOWED_GENDERS_LOWER', '_BARCODE_LENGTHS', '_HIGH_DENOMINATION_PRICE_CURRENCIES', '_INTERNAL_IDENTITY_TOKENS', '_MIN_SANE_PRICE', '_PUBLIC_RECORD_LEGACY_VARIANT_FIELDS', '_VARIANT_AXIS_FIELDS', '_identity_failure_mode', '_looks_like_detail_identity_mismatch', '_looks_like_placeholder_or_wrong_content', '_looks_like_promo_or_wrong_page', '_looks_like_real_listing_row', '_looks_like_site_shell_success', '_looks_like_utility_chrome_success', '_looks_like_utility_record', '_normalized_space', '_object_dict', '_object_list', '_observed_quality_failure_mode', '_price_number', '_price_requirement_failed', '_quality_category_clean_ok', '_quality_expectations', '_quality_identifier_shapes_ok', '_quality_identity_ok', '_quality_listing_noise_ok', '_quality_long_text_clean_ok', '_quality_price_sane_ok', '_quality_repair_diagnostics_ok', '_quality_system_artifacts_ok', '_quality_title_token_ok', '_quality_variant_artifacts_ok', '_quality_variant_currency_parity_ok', '_quality_variant_labels_ok', '_quality_variant_presence_ok', '_quality_variant_price_ok', '_quality_verdict', '_requirement_failure_mode', '_safe_int', 'annotations', 'evaluate_quality', 're']  # fmt: skip

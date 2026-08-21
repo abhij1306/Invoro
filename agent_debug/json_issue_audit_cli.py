@@ -1,8 +1,13 @@
 from __future__ import annotations
 
-from ._run_json_issue_audit_shared import *  # noqa: F403
+from ._run_json_issue_audit_shared import UTC, Any, Counter, Path, argparse, datetime, json  # fmt: skip
 from .json_issue_audit_core import audit_record
-from .json_issue_audit_triage import ROOT_CAUSE_RULES, _build_host_summary, _build_root_cause_groups, _build_triage_section
+from .json_issue_audit_triage import (
+    ROOT_CAUSE_RULES,
+    _build_host_summary,
+    _build_root_cause_groups,
+    _build_triage_section,
+)
 
 
 def _to_records(payload: Any) -> list[dict[str, Any]]:
@@ -16,8 +21,11 @@ def _to_records(payload: Any) -> list[dict[str, Any]]:
         return [payload]
     return []
 
+
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Audit crawler JSON output and emit agent-ready issue report.")
+    parser = argparse.ArgumentParser(
+        description="Audit crawler JSON output and emit agent-ready issue report."
+    )
     parser.add_argument("--input", required=True, help="Path to JSON file.")
     parser.add_argument(
         "--output-dir",
@@ -81,14 +89,15 @@ def main() -> int:
             "2. For each id, look up reference[id] for code_targets and debug_steps. "
             "3. Skip ids in triage.do_not_fix. "
             "4. If triage.secondary_on_blocked_hosts > 0, fix acquisition first. "
-            "5. Use host_breakdown to see which hosts are affected. "
-            "6. Run with --verbose to get per-record detail if needed."
+            "5. Use host_breakdown to see which hosts are affected."
         ),
         "stats": {
             "total": len(audited),
             "with_issues": records_with_issues,
             "clean": len(audited) - records_with_issues,
-            "severity": dict(sorted(Counter(row["max_severity"] for row in audited).items())),
+            "severity": dict(
+                sorted(Counter(row["max_severity"] for row in audited).items())
+            ),
             "categories": dict(sorted(weighted_category_counts.items())),
         },
         "triage": triage,
@@ -101,9 +110,13 @@ def main() -> int:
 
     # --- Console output ---
     print(f"Input: {input_path}")
-    print(f"Records: {len(audited)} total | {records_with_issues} with issues | {len(audited) - records_with_issues} clean")
+    print(
+        f"Records: {len(audited)} total | {records_with_issues} with issues | {len(audited) - records_with_issues} clean"
+    )
     print()
-    print(f"TRIAGE: {triage['action_required']} actionable | {triage['skip_count']} skip")
+    print(
+        f"TRIAGE: {triage['action_required']} actionable | {triage['skip_count']} skip"
+    )
     if triage["note"]:
         print(f"  NOTE: {triage['note']}")
     print()
@@ -111,7 +124,9 @@ def main() -> int:
         print("FIX ORDER:")
         for item in triage["fix_order"]:
             target = item["file"] or "—"
-            print(f"  #{item['priority']} [{item['fix_layer']:11}] {item['id']:35} x{item['count']:3}  -> {target}")
+            print(
+                f"  #{item['priority']} [{item['fix_layer']:11}] {item['id']:35} x{item['count']:3}  -> {target}"
+            )
     if triage["do_not_fix"]:
         print(f"\nSKIP: {', '.join(triage['do_not_fix'])}")
     print(f"\nReport: {json_path}")
@@ -122,6 +137,5 @@ def main() -> int:
         return 1
     return 0
 
-__all__ = tuple(
-    name for name in globals() if not name.startswith("__")
-)
+
+__all__ = ['ROOT_CAUSE_RULES', 'UTC', 'Any', 'Counter', 'Path', '_build_host_summary', '_build_root_cause_groups', '_build_triage_section', '_to_records', 'annotations', 'argparse', 'audit_record', 'datetime', 'json', 'main']  # fmt: skip

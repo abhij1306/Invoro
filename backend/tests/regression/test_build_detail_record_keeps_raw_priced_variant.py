@@ -1,7 +1,11 @@
 from __future__ import annotations
 
-from .test_detail_extractor_structured_sources import *  # noqa: F403
-
+from .test_detail_extractor_structured_sources import (
+    ShopifyAdapter,
+    build_detail_record,
+    extract_records,
+    pytest,
+)
 
 @pytest.mark.regression
 def test_build_detail_record_keeps_raw_priced_variant_rows_over_dom_backfill_guess() -> (

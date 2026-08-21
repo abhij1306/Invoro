@@ -75,4 +75,4 @@ from app.services.structured_sources import harvest_js_state_objects
 from tests.fixtures.loader import read_optional_artifact_text
 
 
-__all__ = tuple(name for name in globals() if not name.startswith("__"))
+__all__ = ['BeautifulSoup', 'MyntraAdapter', 'ShopifyAdapter', '_structured_variants_from_product_payload', 'annotations', 'backfill_detail_price_from_html', 'build_detail_record', 'detail_currency_hint_is_host_level', 'detail_dom_completion', 'detail_image_matches_primary_family', 'detail_product_type_is_low_signal', 'detail_raw_signals', 'detail_redirect_identity_is_mismatched', 'detail_slug_title_fallback_from_url', 'detail_title_fallback_looks_like_code', 'extract_detail_records', 'extract_records', 'harvest_js_state_objects', 'json', 'normalize_variant_record', 'pytest', 'read_optional_artifact_text', 'reconcile_detail_currency_with_url', 'reconcile_parent_price_against_variant_range', 'reconcile_variant_availability_from_dom', 'repair_ecommerce_detail_record_quality', 'sanitize_detail_placeholder_scalars', 'sanitize_variant_row', 'structured_feature_rows', 'title_needs_promotion', 'variant_option_availability']  # fmt: skip

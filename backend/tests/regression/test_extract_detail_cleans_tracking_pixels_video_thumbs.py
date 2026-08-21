@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from .test_detail_extractor_structured_sources import *  # noqa: F403
-
+from .test_detail_extractor_structured_sources import build_detail_record, extract_records, pytest, repair_ecommerce_detail_record_quality, sanitize_detail_placeholder_scalars  # fmt: skip
 
 @pytest.mark.regression
 def test_extract_detail_cleans_tracking_pixels_and_video_thumbs_from_images() -> None:

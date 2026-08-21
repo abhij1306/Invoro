@@ -1,7 +1,11 @@
 from __future__ import annotations
 
-from .test_crawl_engine import *  # noqa: F403
-
+from .test_crawl_engine import (
+    detail_extractor,
+    extract_records,
+    pytest,
+    read_optional_artifact_text,
+)
 
 @pytest.mark.regression
 def test_infer_detail_failure_reason_labels_wayfair_pdp_shell_as_detail_shell() -> None:

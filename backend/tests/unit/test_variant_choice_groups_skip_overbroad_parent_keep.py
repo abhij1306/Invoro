@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from .test_shared_variant_logic import *  # noqa: F403
-
+from .test_shared_variant_logic import BeautifulSoup, axis_values_are_mislabeled_duplicate, backfill_variants_from_dom_if_missing, extract_variants_from_dom, infer_variant_group_name_from_values, iter_variant_choice_groups, normalized_variant_axis_key, pytest, resolve_variant_group_name, resolve_variants, variant_choice_container_for_input, variant_choice_container_is_overbroad  # fmt: skip
 
 @pytest.mark.unit
 def test_variant_choice_groups_skip_overbroad_parent_and_keep_fieldsets() -> None:

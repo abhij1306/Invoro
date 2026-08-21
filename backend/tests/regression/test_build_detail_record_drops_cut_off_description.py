@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from .test_detail_extractor_structured_sources import *  # noqa: F403
-
+from .test_detail_extractor_structured_sources import build_detail_record, extract_records, json, normalize_variant_record, pytest, read_optional_artifact_text  # fmt: skip
 
 @pytest.mark.regression
 def test_build_detail_record_drops_cut_off_description_without_complete_source() -> (

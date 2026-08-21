@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from .test_browser_expansion_runtime import *  # noqa: F403
-
+from .test_browser_expansion_runtime import SimpleNamespace, _FakeExpansionPage, _FakeHandle, _FakeRuntime, _async_checkpoint, browser_capture, browser_detail, browser_page_helpers, browser_readiness, browser_recovery, browser_runtime, pytest  # fmt: skip
 
 @pytest.mark.asyncio
 @pytest.mark.regression

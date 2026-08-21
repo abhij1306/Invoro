@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from .test_traversal_runtime import *  # noqa: F403
-
+from .test_traversal_runtime import PAGINATION_SELECTORS, _FakePage, _State, execute_listing_traversal, listing_node_html, pytest, traversal_module  # fmt: skip
 
 @pytest.mark.component
 def test_listing_node_html_suppresses_unexpected_parser_errors(caplog) -> None:
@@ -405,7 +404,8 @@ async def test_paginate_traversal_handles_numeric_arrow_button() -> None:
     assert result.progress_events == 1
 
 @pytest.mark.asyncio
-async def testlooks_like_paginate_control_rejects_plain_href_without_pagination_signals() -> (
+@pytest.mark.component
+async def test_looks_like_paginate_control_rejects_plain_href_without_pagination_signals() -> (
     None
 ):
     page = _FakePage(

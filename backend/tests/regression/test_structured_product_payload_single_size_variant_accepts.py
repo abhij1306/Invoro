@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from .test_selectolax_css_migration import *  # noqa: F403
-
+from .test_selectolax_css_migration import ADPAdapter, BullhornAdapter, EbayAdapter, IndeedAdapter, LinkedInAdapter, NikeAdapter, _structured_variants_from_product_payload, extract_detail_records, extract_job_sections, extract_records, pytest  # fmt: skip
 
 @pytest.mark.regression
 def test_structured_product_payload_single_size_variant_accepts_snake_case() -> None:

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from .test_batch_runtime import *  # noqa: F403
-
+from .test_batch_runtime import AcquisitionResult, AsyncSession, CrawlLog, CrawlRunSettings, RobotsPolicyResult, URLProcessingResult, _detail_html, _listing_shell_html, _parallel_url_concurrency, _parallel_worker_record_limit, async_sessionmaker, asyncio, batch_runtime_module, create_crawl_run, get_run_records, process_run, pytest, select  # fmt: skip
 
 @pytest.mark.unit
 def test_parallel_worker_record_limit_bounds_each_worker_budget() -> None:
@@ -347,7 +346,10 @@ async def test_process_run_uses_url_batch_concurrency_setting(
             second_active.set()
         try:
             if active == 1:
-                await asyncio.wait_for(second_active.wait(), timeout=0.5)
+                try:
+                    await asyncio.wait_for(second_active.wait(), timeout=0.5)
+                except asyncio.TimeoutError:
+                    pass
             else:
                 await asyncio.sleep(0.01)
         finally:

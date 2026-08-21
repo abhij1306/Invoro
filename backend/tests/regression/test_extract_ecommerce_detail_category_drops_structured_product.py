@@ -1,7 +1,11 @@
 from __future__ import annotations
 
-from .test_detail_extractor_structured_sources import *  # noqa: F403
-
+from .test_detail_extractor_structured_sources import (
+    build_detail_record,
+    extract_records,
+    pytest,
+    structured_feature_rows,
+)
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_category_drops_structured_product_crumb() -> None:

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from .test_field_value_core import *  # noqa: F403
-
+from .test_field_value_core import clean_text, coerce_field_value, extract_urls, infer_brand_from_product_url, infer_brand_from_title_marker, is_title_noise, merge_variant_rows, public_record_data_for_surface, pytest  # fmt: skip
 
 @pytest.mark.unit
 def test_option_scalars_coerce_dict_like_labels_and_reject_null_tokens() -> None:

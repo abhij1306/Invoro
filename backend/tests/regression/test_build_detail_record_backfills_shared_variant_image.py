@@ -1,7 +1,11 @@
 from __future__ import annotations
 
-from .test_detail_extractor_structured_sources import *  # noqa: F403
-
+from .test_detail_extractor_structured_sources import (
+    build_detail_record,
+    extract_records,
+    pytest,
+    read_optional_artifact_text,
+)
 
 @pytest.mark.regression
 def test_build_detail_record_backfills_shared_variant_image_and_availability() -> None:

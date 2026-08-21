@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from ._core_shared import *  # noqa: F403
+from ._core_shared import _IP_RE, _object_dict, _object_list, _string_list  # fmt: skip
+import re
+from app.services.config.browser_surface_probe import BROWSER_SURFACE_PROBE_CREEPJS_LABELS, BROWSER_SURFACE_PROBE_KEYWORD_GROUPS, BROWSER_SURFACE_PROBE_NEIGHBOR_LINE_WINDOW, BROWSER_SURFACE_PROBE_PIXELSCAN_LABELS, BROWSER_SURFACE_PROBE_RISK_TOKENS, BROWSER_SURFACE_PROBE_SAFE_TOKENS, BROWSER_SURFACE_PROBE_SANNYSOFT_LABELS  # fmt: skip
+from browser_surface_probe.value_coercion import BROWSER_VERSION_RE  # fmt: skip
+from ipaddress import ip_address  # fmt: skip
 from .runtime_source import _int_list, _normalize_key, _normalize_space
 
 
@@ -333,4 +337,4 @@ def _extract_generic_site(snapshot: dict[str, object]) -> dict[str, object]:
     return payload
 
 
-__all__ = tuple(name for name in globals() if not name.startswith("__"))
+__all__ = ['BROWSER_SURFACE_PROBE_CREEPJS_LABELS', 'BROWSER_SURFACE_PROBE_KEYWORD_GROUPS', 'BROWSER_SURFACE_PROBE_NEIGHBOR_LINE_WINDOW', 'BROWSER_SURFACE_PROBE_PIXELSCAN_LABELS', 'BROWSER_SURFACE_PROBE_RISK_TOKENS', 'BROWSER_SURFACE_PROBE_SAFE_TOKENS', 'BROWSER_SURFACE_PROBE_SANNYSOFT_LABELS', 'BROWSER_VERSION_RE', '_IP_RE', '_clean_ip_values', '_dedupe', '_dedupe_snapshot_rows', '_extract_creepjs', '_extract_generic_site', '_extract_ip_values', '_extract_keyword_hits', '_extract_labeled_values', '_extract_pixelscan', '_extract_versions', '_flatten_signal_values', '_generic_line_signals', '_int_list', '_label_alias_set', '_looks_like_networkish_ipv4', '_looks_like_truthy_risk', '_normalize_key', '_normalize_snapshot_row', '_normalize_space', '_object_dict', '_object_list', '_percent_value', '_sannysoft_signal_rows', '_string_list', 'annotations', 'ip_address', 're']  # fmt: skip

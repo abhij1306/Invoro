@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from .test_detail_extractor_structured_sources import *  # noqa: F403
-
+from .test_detail_extractor_structured_sources import backfill_detail_price_from_html, extract_records, normalize_variant_record, pytest, read_optional_artifact_text  # fmt: skip
 
 @pytest.mark.regression
 def test_normalize_variant_record_infers_single_variant_size_from_title_tokens() -> (

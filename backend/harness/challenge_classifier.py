@@ -1,17 +1,11 @@
 from __future__ import annotations
 
-from ._support_shared import *  # noqa: F403
-from .record_signals import (
-    _identity_overlap_count,
-    _identity_path,
-    _identity_tokens,
-    _looks_like_utility_record,
-    _object_dict,
-    _object_list,
-    _primary_identity_tokens,
-    _required_identity_overlap,
-    _safe_int,
-)
+from ._support_shared import _GENERIC_DETAIL_SECTION_TITLES, _PLACEHOLDER_TITLES, _SUCCESS_VERDICTS  # fmt: skip
+import re
+from app.services.platform_policy import platform_config_for_family  # fmt: skip
+from app.services.publish.metrics import diagnostics_indicate_block  # fmt: skip
+from urllib.parse import urlsplit  # fmt: skip
+from .record_signals import _identity_overlap_count, _identity_path, _identity_tokens, _looks_like_utility_record, _object_dict, _object_list, _primary_identity_tokens, _required_identity_overlap, _safe_int  # fmt: skip
 from .site_sets import unavailable_configured_adapters
 
 
@@ -316,4 +310,4 @@ def _looks_like_promo_or_wrong_page(result: dict[str, object]) -> bool:
     )
 
 
-__all__ = tuple(name for name in globals() if not name.startswith("__"))
+__all__ = ['_GENERIC_DETAIL_SECTION_TITLES', '_PLACEHOLDER_TITLES', '_SUCCESS_VERDICTS', '_adapter_failure_mode', '_challenge_summary_from_diagnostics', '_diagnostics_contain_strong_challenge_evidence', '_diagnostics_indicate_challenge', '_identity_overlap_count', '_identity_path', '_identity_tokens', '_looks_like_detail_identity_mismatch', '_looks_like_placeholder_or_wrong_content', '_looks_like_placeholder_title', '_looks_like_promo_or_wrong_page', '_looks_like_site_shell_success', '_looks_like_utility_chrome_success', '_looks_like_utility_record', '_object_dict', '_object_list', '_primary_identity_tokens', '_required_identity_overlap', '_runtime_failure_mode', '_safe_int', '_successful_content_mode', '_verdict_failure_mode', 'annotations', 'classify_failure_mode', 'diagnostics_indicate_block', 'platform_config_for_family', 're', 'unavailable_configured_adapters', 'urlsplit']  # fmt: skip

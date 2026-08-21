@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from .test_crawl_service import *  # noqa: F403
-
+from .test_crawl_service import AsyncSession, CONTROL_REQUEST_KILL, CONTROL_REQUEST_PAUSE, CrawlRecord, UTC, _create_running_run, asyncio, celery_dispatch_module, commit_selected_fields, crawl_service, create_crawl_run, database_module, datetime, delete_run, get_control_request, load_domain_run_profile, local_dispatch_module, logging, pytest, save_domain_run_profile, settings, timedelta, update_run_status  # fmt: skip
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -384,6 +383,7 @@ async def test_local_dispatch_commits_task_id_before_launching_task(
         },
     )
     events: list[str] = []
+    tracked_tasks: list[asyncio.Task[None]] = []
     real_commit = db_session.commit
 
     async def _commit() -> None:
@@ -392,12 +392,15 @@ async def test_local_dispatch_commits_task_id_before_launching_task(
 
     def _fake_track(run_id: int) -> asyncio.Task[None]:
         events.append("track")
-        return asyncio.create_task(asyncio.sleep(0))
+        task = asyncio.create_task(asyncio.sleep(0))
+        tracked_tasks.append(task)
+        return task
 
     monkeypatch.setattr(db_session, "commit", _commit)
     monkeypatch.setattr(local_dispatch_module, "track_local_run_task", _fake_track)
 
     await crawl_service.dispatch_run(db_session, run)
+    await asyncio.gather(*tracked_tasks)
 
     assert events[-2:] == ["commit", "track"]
 

@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from ._core_shared import *  # noqa: F403
+import argparse
+import asyncio
+from app.services.acquisition.browser_runtime import shutdown_browser_runtime  # fmt: skip
+from pathlib import Path  # fmt: skip
 from .probe_runner import build_report
 from .runtime_source import (
     _json_dump,
@@ -57,4 +60,4 @@ def main() -> int:
     return asyncio.run(_run(args))
 
 
-__all__ = tuple(name for name in globals() if not name.startswith("__"))
+__all__ = ['Path', '_build_parser', '_json_dump', '_report_root', '_resolve_runtime_source', '_run', '_utc_stamp', 'annotations', 'argparse', 'async_main', 'asyncio', 'build_report', 'main', 'shutdown_browser_runtime']  # fmt: skip

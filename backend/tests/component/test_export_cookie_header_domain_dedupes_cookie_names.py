@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from .test_browser_context import *  # noqa: F403
+from .test_browser_context import DomainCookieMemory, browser_identity, cookie_store, host_protection_memory, pytest, uuid4  # fmt: skip
 
+pytest_plugins = ["tests.component._cookie_store_test_support"]
 
 @pytest.mark.asyncio
 @pytest.mark.component

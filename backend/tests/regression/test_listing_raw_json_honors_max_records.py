@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from .test_crawl_engine import *  # noqa: F403
-
+from .test_crawl_engine import backfill_detail_price_from_html, detail_url_is_utility, extract_records, pytest, select_variant  # fmt: skip
 
 @pytest.mark.regression
 def test_listing_raw_json_honors_max_records() -> None:

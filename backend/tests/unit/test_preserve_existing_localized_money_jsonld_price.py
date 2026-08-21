@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from .test_normalizers import *  # noqa: F403
-
+from .test_normalizers import BeautifulSoup, backfill, backfill_detail_price_from_html, coerce_field_value, enforce_payload_limits, extract_node_value, hydration, normalize_decimal_price, normalize_value, normalize_variant_record, pytest, repair_ecommerce_detail_record_quality  # fmt: skip
 
 @pytest.mark.unit
 def test_preserve_existing_localized_money_without_jsonld_price() -> None:

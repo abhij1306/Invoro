@@ -1,10 +1,21 @@
 from __future__ import annotations
 
-from ._core_shared import *  # noqa: F403
-from .baseline import _collect_baseline, _collect_behavioral_smoke, _collect_page_snapshot, _consensus_baseline
+from ._core_shared import _object_dict, _object_list, logger  # fmt: skip
+import asyncio
+from app.services.acquisition.browser_runtime import SharedBrowserRuntime, _display_proxy, get_browser_runtime  # fmt: skip
+from app.services.config.browser_surface_probe import BROWSER_SURFACE_PROBE_REQUEST_DELAY_MS, BROWSER_SURFACE_PROBE_RETRY_BACKOFF_MS, BROWSER_SURFACE_PROBE_SITE_MAX_RETRIES, BROWSER_SURFACE_PROBE_TARGETS  # fmt: skip
+from browser_surface_probe.report_rendering import build_agent_summary, render_markdown  # fmt: skip
+from datetime import UTC, datetime  # fmt: skip
+from pathlib import Path  # fmt: skip
+from .baseline import (
+    _collect_baseline,
+    _collect_behavioral_smoke,
+    _collect_page_snapshot,
+    _consensus_baseline,
+)
 from .findings import _target_root_cause, build_findings
-from .runtime_source import RuntimeSource, _json_dump, _masked_proxy_inventory, _normalize_space
-from .target_diagnostics import _capture_probe_artifacts, _failed_target_diagnostic, _navigate_probe_target, _run_target_diagnostic, _site_artifacts, _site_signal_payload, _site_validation_warnings, _validated_target_url
+from .runtime_source import RuntimeSource, _json_dump, _masked_proxy_inventory, _masked_proxy_profile, _normalize_space  # fmt: skip
+from .target_diagnostics import _capture_probe_artifacts, _failed_target_diagnostic, _navigate_probe_target, _run_target_diagnostic, _site_artifacts, _site_signal_payload, _site_validation_warnings, _validated_target_url  # fmt: skip
 
 
 def _failed_site_payload(
@@ -34,6 +45,7 @@ def _failed_site_payload(
         "snapshot_summary": {},
         "extracted": {},
     }
+
 
 async def _probe_site(
     runtime: SharedBrowserRuntime,
@@ -126,6 +138,7 @@ async def _probe_site(
         error=last_error or "unknown probe failure",
     )
 
+
 async def build_report(
     *,
     runtime_source: RuntimeSource,
@@ -194,6 +207,7 @@ async def build_report(
         site_id: str(site_payload.get("site_status") or "unknown")
         for site_id, site_payload in sites.items()
     }
+    sanitized_proxy_profile = _masked_proxy_profile(runtime_source.proxy_profile)
     metadata = {
         "generated_at": datetime.now(UTC).isoformat(),
         "source_kind": runtime_source.source_kind,
@@ -203,7 +217,7 @@ async def build_report(
         "selected_proxy_mask": _display_proxy(runtime_source.selected_proxy),
         "selected_proxy_index": runtime_source.selected_proxy_index,
         "proxy_inventory_masked": _masked_proxy_inventory(runtime_source.proxy_list),
-        "proxy_profile": runtime_source.proxy_profile,
+        "proxy_profile": sanitized_proxy_profile,
         "locality_profile": runtime_source.locality_profile,
         "runtime_snapshot": runtime.snapshot(),
         "site_statuses": site_statuses,
@@ -218,7 +232,7 @@ async def build_report(
             "proxy_inventory_masked": _masked_proxy_inventory(
                 runtime_source.proxy_list
             ),
-            "proxy_profile": runtime_source.proxy_profile,
+            "proxy_profile": sanitized_proxy_profile,
             "locality_profile": runtime_source.locality_profile,
         },
         "baseline": baseline,
@@ -231,6 +245,5 @@ async def build_report(
     (report_dir / "report.md").write_text(render_markdown(report), encoding="utf-8")
     return report
 
-__all__ = tuple(
-    name for name in globals() if not name.startswith("__")
-)
+
+__all__ = ['BROWSER_SURFACE_PROBE_REQUEST_DELAY_MS', 'BROWSER_SURFACE_PROBE_RETRY_BACKOFF_MS', 'BROWSER_SURFACE_PROBE_SITE_MAX_RETRIES', 'BROWSER_SURFACE_PROBE_TARGETS', 'Path', 'RuntimeSource', 'SharedBrowserRuntime', 'UTC', '_capture_probe_artifacts', '_collect_baseline', '_collect_behavioral_smoke', '_collect_page_snapshot', '_consensus_baseline', '_display_proxy', '_failed_site_payload', '_failed_target_diagnostic', '_json_dump', '_masked_proxy_inventory', '_navigate_probe_target', '_normalize_space', '_object_dict', '_object_list', '_probe_site', '_run_target_diagnostic', '_site_artifacts', '_site_signal_payload', '_site_validation_warnings', '_target_root_cause', '_validated_target_url', 'annotations', 'asyncio', 'build_agent_summary', 'build_findings', 'build_report', 'datetime', 'get_browser_runtime', 'logger', 'render_markdown']  # fmt: skip

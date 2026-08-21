@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from .test_normalizers import *  # noqa: F403
-
+from .test_normalizers import (
+    normalize_variant_record,
+    pytest,
+)
 
 @pytest.mark.unit
 def test_normalize_variant_record_does_not_invent_color_size_cross_product() -> None:

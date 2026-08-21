@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from .test_detail_extractor_structured_sources import *  # noqa: F403
-
+from .test_detail_extractor_structured_sources import build_detail_record, detail_currency_hint_is_host_level, detail_image_matches_primary_family, extract_records, pytest, reconcile_detail_currency_with_url, repair_ecommerce_detail_record_quality, sanitize_variant_row  # fmt: skip
 
 @pytest.mark.regression
 def test_detail_currency_hint_host_matching_avoids_partial_word_false_positive() -> (

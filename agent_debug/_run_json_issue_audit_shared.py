@@ -1,19 +1,12 @@
 from __future__ import annotations
 
 import argparse
-
 import json
-
 import re
-
 from collections import Counter
-
 from datetime import UTC, datetime
-
 from pathlib import Path
-
 from typing import Any
-
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 DEFAULT_REQUIRED_FIELDS = (
@@ -61,7 +54,9 @@ BLOCKED_PAGE_TITLE_PATTERNS = (
     r"\bservice\s+unavailable\b",
 )
 
-BLOCKED_PAGE_TITLE_RES = [re.compile(p, re.I) for p in BLOCKED_PAGE_TITLE_PATTERNS]
+BLOCKED_PAGE_TITLE_RES = [
+    re.compile(p, re.IGNORECASE) for p in BLOCKED_PAGE_TITLE_PATTERNS
+]
 
 NON_PRODUCT_IMAGE_PATH_PATTERNS = (
     r"/(category|categories)/",
@@ -71,7 +66,9 @@ NON_PRODUCT_IMAGE_PATH_PATTERNS = (
     r"/(hero|promo|slider|carousel)/",
 )
 
-NON_PRODUCT_IMAGE_PATH_RES = [re.compile(p, re.I) for p in NON_PRODUCT_IMAGE_PATH_PATTERNS]
+NON_PRODUCT_IMAGE_PATH_RES = [
+    re.compile(p, re.IGNORECASE) for p in NON_PRODUCT_IMAGE_PATH_PATTERNS
+]
 
 AVAILABILITY_ALLOWED = {
     "in_stock",
@@ -83,21 +80,20 @@ AVAILABILITY_ALLOWED = {
     "unknown",
 }
 
-SIZE_TOKEN_RE = re.compile(r"^(?:\d{1,2}(?:\.5)?|xxs|xs|s|m|l|xl|xxl|xxxl)$", re.I)
+SIZE_TOKEN_RE = re.compile(
+    r"^(?:\d{1,2}(?:\.5)?|xxs|xs|s|m|l|xl|xxl|xxxl)$", re.IGNORECASE
+)
 
 CURRENCY_RE = re.compile(r"^[A-Z]{3}$")
 
 PRICE_RE = re.compile(r"^\d+(?:\.\d{1,2})?$")
 
-URL_RE = re.compile(r"^https?://", re.I)
+URL_RE = re.compile(r"^https?://", re.IGNORECASE)
 
-NOISE_RES = [re.compile(pattern, re.I) for pattern in NOISE_PATTERNS]
+NOISE_RES = [re.compile(pattern, re.IGNORECASE) for pattern in NOISE_PATTERNS]
 
-APPAREL_VARIANT_HINT_RES = [re.compile(pattern, re.I) for pattern in APPAREL_VARIANT_HINT_PATTERNS]
+APPAREL_VARIANT_HINT_RES = [
+    re.compile(pattern, re.IGNORECASE) for pattern in APPAREL_VARIANT_HINT_PATTERNS
+]
 
-if __name__ == "__main__":
-    raise SystemExit(main())
-
-__all__ = tuple(
-    name for name in globals() if not name.startswith("__")
-)
+__all__ = ['APPAREL_VARIANT_HINT_PATTERNS', 'APPAREL_VARIANT_HINT_RES', 'AVAILABILITY_ALLOWED', 'BLOCKED_PAGE_TITLE_PATTERNS', 'BLOCKED_PAGE_TITLE_RES', 'CURRENCY_RE', 'DEFAULT_REQUIRED_FIELDS', 'NOISE_PATTERNS', 'NOISE_RES', 'NON_PRODUCT_IMAGE_PATH_PATTERNS', 'NON_PRODUCT_IMAGE_PATH_RES', 'OPTIONAL_SUSPECT_FIELDS', 'PRICE_RE', 'SIZE_TOKEN_RE', 'URL_RE', 'UTC', 'Any', 'Counter', 'Path', 'annotations', 'argparse', 'datetime', 'json', 'parse_qsl', 're', 'urlencode', 'urlparse', 'urlunparse']  # fmt: skip

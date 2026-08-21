@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from ._run_json_issue_audit_shared import *  # noqa: F403
-
+from ._run_json_issue_audit_shared import (
+    Any,
+    re,
+)
 
 ROOT_CAUSE_RULES: list[dict[str, Any]] = [
     {
@@ -225,7 +227,7 @@ ROOT_CAUSE_RULES: list[dict[str, Any]] = [
     {
         "id": "image_pollution_non_product",
         "match_category": "polluted_data",
-        "match_message": "non-product assets.*category|banner|navigation",
+        "match_message": "(?:additional_images contain non-product assets \\(category/banner/navigation\\)|some additional_images look like non-product assets)",
         "label": "Additional images are site chrome not product photos",
         "fix_layer": "extraction",
         "is_actionable": True,
@@ -244,7 +246,7 @@ ROOT_CAUSE_RULES: list[dict[str, Any]] = [
     {
         "id": "features_garbage",
         "match_category": "polluted_data",
-        "match_message": "product ID leak",
+        "match_message": "(?:features contains single numeric value.*product ID leak|features list is all numeric IDs)",
         "label": "Features field has product IDs not features",
         "fix_layer": "extraction",
         "is_actionable": True,
@@ -392,7 +394,10 @@ _ROOT_CAUSE_COMPILED = [
     for rule in ROOT_CAUSE_RULES
 ]
 
-_ROOT_CAUSE_MAP: dict[str, dict[str, Any]] = {rule["id"]: rule for rule in ROOT_CAUSE_RULES}
+_ROOT_CAUSE_MAP: dict[str, dict[str, Any]] = {
+    rule["id"]: rule for rule in ROOT_CAUSE_RULES
+}
+
 
 def _classify_root_cause(issue: dict[str, Any]) -> str:
     """Return root_cause_id for an issue, or 'uncategorized'."""
@@ -402,6 +407,7 @@ def _classify_root_cause(issue: dict[str, Any]) -> str:
         if cat == rule_cat and rule_rx.search(msg):
             return rc_id
     return "uncategorized"
+
 
 def _build_root_cause_groups(audited: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Group issues by root cause — compact format for agent consumption."""
@@ -448,12 +454,16 @@ def _build_root_cause_groups(audited: list[dict[str, Any]]) -> list[dict[str, An
     sev_order = {"high": 0, "medium": 1, "low": 2}
     sorted_groups = sorted(
         groups.values(),
-        key=lambda g: (0 if g["is_actionable"] else 1, sev_order.get(g["severity"], 3), -g["count"]),
+        key=lambda g: (
+            0 if g["is_actionable"] else 1,
+            sev_order.get(g["severity"], 3),
+            -g["count"],
+        ),
     )
-    # strip internal tracking fields
-    for g in sorted_groups:
-        g.pop("_all_hosts", None)
+    for group in sorted_groups:
+        group["_all_hosts"] = sorted(group.get("_all_hosts", set()))
     return sorted_groups
+
 
 def _build_host_summary(audited: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Per-host rollup — ONLY hosts with issues. Clean hosts omitted."""
@@ -474,7 +484,9 @@ def _build_host_summary(audited: list[dict[str, Any]]) -> list[dict[str, Any]]:
         hd["records"] += 1
         hd["issues"] += record["issue_count"]
         sev_rank = {"high": 3, "medium": 2, "low": 1, "none": 0}
-        if sev_rank.get(record["max_severity"], 0) > sev_rank.get(hd["max_severity"], 0):
+        if sev_rank.get(record["max_severity"], 0) > sev_rank.get(
+            hd["max_severity"], 0
+        ):
             hd["max_severity"] = record["max_severity"]
         for issue in record["issues"]:
             hd["root_causes"].add(_classify_root_cause(issue))
@@ -487,7 +499,10 @@ def _build_host_summary(audited: list[dict[str, Any]]) -> list[dict[str, Any]]:
     result.sort(key=lambda h: (-h["issues"], h["host"]))
     return result[:15]  # top 15 hosts only — agent doesn't need the long tail
 
-def _build_triage_section(root_cause_groups: list[dict[str, Any]], audited: list[dict[str, Any]]) -> dict[str, Any]:
+
+def _build_triage_section(
+    root_cause_groups: list[dict[str, Any]], audited: list[dict[str, Any]]
+) -> dict[str, Any]:
     """Top-level triage: what to fix, what to skip, what's secondary."""
     actionable = [g for g in root_cause_groups if g["is_actionable"]]
     skippable = [g for g in root_cause_groups if not g["is_actionable"]]
@@ -496,12 +511,14 @@ def _build_triage_section(root_cause_groups: list[dict[str, Any]], audited: list
     blocked_hosts = set()
     for g in root_cause_groups:
         if g["id"] in ("acquisition_blocked", "wrong_product_served"):
-            blocked_hosts.update(g["hosts"])
+            blocked_hosts.update(g.get("_all_hosts", set()))
 
     secondary_count = 0
     for record in audited:
         if record["host"] in blocked_hosts:
-            secondary_count += sum(1 for i in record["issues"] if i["category"] == "missing_fields")
+            secondary_count += sum(
+                1 for i in record["issues"] if i["category"] == "missing_fields"
+            )
 
     return {
         "action_required": len(actionable),
@@ -520,11 +537,11 @@ def _build_triage_section(root_cause_groups: list[dict[str, Any]], audited: list
         "note": (
             f"{secondary_count} missing-field issues are on blocked/redirected hosts. "
             "Fix acquisition_blocked/wrong_product_served FIRST — those resolve automatically."
-            if secondary_count > 3 else ""
+            if secondary_count > 3
+            else ""
         ),
         "do_not_fix": [g["id"] for g in skippable],
     }
 
-__all__ = tuple(
-    name for name in globals() if not name.startswith("__")
-)
+
+__all__ = ['ROOT_CAUSE_RULES', '_ROOT_CAUSE_COMPILED', '_ROOT_CAUSE_MAP', 'Any', '_build_host_summary', '_build_root_cause_groups', '_build_triage_section', '_classify_root_cause', 'annotations', 're']  # fmt: skip

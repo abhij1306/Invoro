@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from .test_browser_context import *  # noqa: F403
+from .test_browser_context import Path, SimpleNamespace, _context_spec, _credential_url, _secret_mapping, acquisition_browser_pool, acquisition_browser_runtime, analyze_html, asyncio, browser_proxy_bridge, cookie_store, crawl_fetch_runtime, crawler_runtime_settings, has_extractable_dom_content_detail_signals, has_extractable_listing_signals, is_special_use_domain, normalize_domain, pytest  # fmt: skip
 
+pytest_plugins = ["tests.component._cookie_store_test_support"]
 
 @pytest.mark.component
 def test_chromium_browser_binary_is_labeled_chromium() -> None:

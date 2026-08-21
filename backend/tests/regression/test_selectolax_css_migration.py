@@ -48,4 +48,4 @@ from app.services.dom.xpath_service import extract_selector_value
 from tests.fixtures.loader import read_optional_artifact_text
 
 
-__all__ = tuple(name for name in globals() if not name.startswith("__"))
+__all__ = ['ADPAdapter', 'AmazonAdapter', 'BelkAdapter', 'BullhornAdapter', 'EbayAdapter', 'IndeedAdapter', 'LexborHTMLParser', 'LinkedInAdapter', 'NikeAdapter', '_structured_variants_from_product_payload', 'amazon', 'annotations', 'build_detail_record', 'collect_structured_candidates', 'crawler_runtime_settings', 'extract_detail_records', 'extract_job_sections', 'extract_listing_records', 'extract_records', 'extract_selector_value', 'pytest', 'read_optional_artifact_text']  # fmt: skip

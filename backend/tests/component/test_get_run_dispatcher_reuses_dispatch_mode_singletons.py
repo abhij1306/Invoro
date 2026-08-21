@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from .test_crawl_service import *  # noqa: F403
-
+from .test_crawl_service import AsyncSession, CrawlerConfigurationError, ProgrammingError, ReviewPromotion, apply_acquisition_contract_to_profile, build_success_acquisition_contract, create_crawl_run, dependencies_module, load_domain_run_profile, normalize_acquisition_contract, normalize_crawl_settings, normalize_domain_run_profile, note_acquisition_contract_failure, pytest, record_acquisition_contract_outcome, resolve_url_acquisition_recipe, save_domain_run_profile, settings  # fmt: skip
 
 @pytest.mark.component
 def test_get_run_dispatcher_reuses_dispatch_mode_singletons(

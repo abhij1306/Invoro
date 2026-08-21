@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from .test_state_mappers import *  # noqa: F403
-
+from .test_state_mappers import js_state_mapper, map_configured_state_payload, map_js_state_to_fields, map_network_payloads_to_fields, pytest  # fmt: skip
 
 @pytest.mark.unit
 def test_job_detail_mappers_keep_shared_html_section_behavior() -> None:

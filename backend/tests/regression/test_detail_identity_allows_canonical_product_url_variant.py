@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from .test_crawl_engine import *  # noqa: F403
-
+from .test_crawl_engine import detail_extractor, detail_identity_codes_from_url, detail_title_from_url, extract_records, pytest, read_optional_artifact_text  # fmt: skip
 
 @pytest.mark.regression
 def test_detail_identity_allows_canonical_product_url_with_variant_sku_suffix() -> None:

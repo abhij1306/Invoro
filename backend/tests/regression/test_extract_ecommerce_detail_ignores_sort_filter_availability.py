@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from .test_detail_extractor_structured_sources import *  # noqa: F403
-
+from .test_detail_extractor_structured_sources import BeautifulSoup, build_detail_record, extract_records, pytest, reconcile_variant_availability_from_dom, variant_option_availability  # fmt: skip
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_ignores_sort_filter_and_availability_controls_as_variants() -> (
@@ -383,6 +382,14 @@ def test_extract_ecommerce_detail_prunes_single_value_marketing_axes_from_final_
     )
 
     assert len(rows) == 1
+    record = rows[0]
+    option_names = {
+        str(name).strip().lower().replace(" ", "_")
+        for variant in record["variants"]
+        for name in variant.get("option_values", variant)
+    }
+    assert "soft_fabric" not in option_names
+    assert "high_waisted" not in option_names
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_does_not_duplicate_parent_price_into_variants_when_uniform() -> (
@@ -477,6 +484,7 @@ def test_extract_ecommerce_detail_ignores_generic_selector_axis_names_without_se
     )
 
     assert len(rows) == 1
+    assert "variation_selector_0" not in rows[0].get("variant_axes", {})
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_infers_unlabeled_select_variants_and_ignores_translate_widget() -> (

@@ -1,6 +1,23 @@
 from __future__ import annotations
 
-from ._support_shared import *  # noqa: F403
+import html
+import json
+import re
+from pathlib import Path
+from urllib.parse import urlsplit
+
+from ._support_shared import HARNESS_MODE_FULL_PIPELINE, _DETAIL_FILE_RE, _DETAIL_HINTS, _DETAIL_SLUG_WITH_ID_RE, _JOB_LISTING_HINTS, _NON_DETAIL_FILE_RE, _PRODUCT_LIKE_TERMINAL_SLUG_RE  # fmt: skip
+from app.services.adapters.registry import registered_adapters  # fmt: skip
+from app.services.platform_policy import configured_adapter_names, detect_platform_family, job_platform_families  # fmt: skip
+
+_MARKDOWN_SURFACE_ALIASES = {
+    "listing": "ecommerce_listing",
+    "ajax_listing": "ecommerce_listing",
+    "infinite_scroll": "ecommerce_listing",
+    "spa_listing": "ecommerce_listing",
+    "detail": "ecommerce_detail",
+    "spa_detail": "ecommerce_detail",
+}
 from .record_signals import _object_dict, _object_list, _safe_int
 
 
@@ -94,18 +111,16 @@ def build_explicit_sites(
     *,
     explicit_surfaces: list[str] | None = None,
 ) -> list[dict[str, str]]:
-    normalized_urls = [
-        str(value or "").strip() for value in (urls or []) if str(value or "").strip()
-    ]
+    normalized_urls = [str(value or "").strip() for value in (urls or [])]
     normalized_surfaces = [
-        str(value or "").strip()
-        for value in (explicit_surfaces or [])
-        if str(value or "").strip()
+        str(value or "").strip() for value in (explicit_surfaces or [])
     ]
     if normalized_surfaces and len(normalized_surfaces) != len(normalized_urls):
         raise ValueError("Explicit URL and surface counts must match")
     rows: list[dict[str, str]] = []
     for index, url in enumerate(normalized_urls):
+        if not url:
+            continue
         explicit_surface = (
             normalized_surfaces[index] if index < len(normalized_surfaces) else ""
         )
@@ -190,58 +205,39 @@ def _site_row(defaults: dict[str, object], item: object) -> dict[str, object] | 
     return row
 
 
+def _markdown_site_row(value: str) -> dict[str, str] | None:
+    if value.startswith(("http://", "https://")):
+        return {"name": value, "url": value, "surface": infer_surface(value)}
+    if not value.startswith("|") or "http" not in value:
+        return None
+    url = ""
+    explicit_surface = ""
+    for index, cell in enumerate(value.strip("|").split("|")):
+        match = re.search(r"https?://[^`\s|>]+", cell)
+        if match is not None and not url:
+            url = match.group(0).strip().rstrip("`")
+        if not explicit_surface and index > 0:
+            normalized = re.sub(r"[^a-z0-9]+", "_", cell.strip().lower()).strip("_")
+            explicit_surface = _MARKDOWN_SURFACE_ALIASES.get(normalized, "")
+        if url and explicit_surface:
+            break
+    if not url:
+        return None
+    return {
+        "name": url,
+        "url": url,
+        "surface": infer_surface(url, explicit_surface=explicit_surface),
+    }
+
+
 def parse_test_sites_markdown(path: Path, *, start_line: int) -> list[dict[str, str]]:
     if not isinstance(start_line, int) or start_line < 1:
         raise ValueError("parse_test_sites_markdown start_line must be an integer >= 1")
-    rows: list[dict[str, str]] = []
-    for line in path.read_text(encoding="utf-8").splitlines()[start_line - 1 :]:
-        value = html.unescape(str(line or "").strip())
-        if not value:
-            continue
-        if value.startswith(("http://", "https://")):
-            rows.append({"name": value, "url": value, "surface": infer_surface(value)})
-            continue
-        if not value.startswith("|") or "http" not in value:
-            continue
-        cells = [cell.strip() for cell in value.strip("|").split("|")]
-        url = ""
-        explicit_surface = ""
-        name = ""
-        for index, cell in enumerate(cells):
-            match = re.search(r"https?://[^`\s|>]+", cell)
-            if match is not None and not url:
-                url = match.group(0).strip().rstrip("`")
-                name = url
-            if not explicit_surface and index > 0:
-                normalized = re.sub(
-                    r"[^a-z0-9]+", "_", str(cell or "").strip().lower()
-                ).strip("_")
-                if normalized in {
-                    "listing",
-                    "ajax_listing",
-                    "infinite_scroll",
-                    "spa_listing",
-                    "detail",
-                    "spa_detail",
-                }:
-                    explicit_surface = {
-                        "listing": "ecommerce_listing",
-                        "ajax_listing": "ecommerce_listing",
-                        "infinite_scroll": "ecommerce_listing",
-                        "spa_listing": "ecommerce_listing",
-                        "detail": "ecommerce_detail",
-                        "spa_detail": "ecommerce_detail",
-                    }[normalized]
-                    break
-        if url:
-            rows.append(
-                {
-                    "name": name or url,
-                    "url": url,
-                    "surface": infer_surface(url, explicit_surface=explicit_surface),
-                }
-            )
-    return rows
+    values = (
+        html.unescape(str(line or "").strip())
+        for line in path.read_text(encoding="utf-8").splitlines()[start_line - 1 :]
+    )
+    return [row for value in values if value if (row := _markdown_site_row(value))]
 
 
 def unavailable_configured_adapters() -> set[str]:
@@ -256,4 +252,4 @@ def timeout_owner_for_mode(mode: str) -> str:
     )
 
 
-__all__ = tuple(name for name in globals() if not name.startswith("__"))
+__all__ = ['HARNESS_MODE_FULL_PIPELINE', 'Path', '_DETAIL_FILE_RE', '_DETAIL_HINTS', '_DETAIL_SLUG_WITH_ID_RE', '_JOB_LISTING_HINTS', '_NON_DETAIL_FILE_RE', '_PRODUCT_LIKE_TERMINAL_SLUG_RE', '_inferred_job_surface', '_looks_like_ecommerce_detail', '_object_dict', '_object_list', '_safe_int', '_site_manifest', '_site_row', 'annotations', 'build_explicit_sites', 'configured_adapter_names', 'detect_platform_family', 'html', 'infer_surface', 'job_platform_families', 'json', 'load_site_set', 'parse_test_sites_markdown', 're', 'registered_adapters', 'timeout_owner_for_mode', 'unavailable_configured_adapters', 'urlsplit']  # fmt: skip

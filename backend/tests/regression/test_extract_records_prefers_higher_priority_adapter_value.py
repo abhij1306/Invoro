@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from .test_detail_extractor_priority_and_selector_self_heal import *  # noqa: F403
-
+from .test_detail_extractor_priority_and_selector_self_heal import BeautifulSoup, ExtractionContext, LexborHTMLParser, collect_structured_source_payloads, detail_dom_completion, extract_records, materialize_image_fields, prepare_extraction_context, prune_irrelevant_detail_structured_payload, pytest, reduce_html_for_selector_synthesis, requires_dom_completion, selector_self_heal_targets  # fmt: skip
 
 @pytest.mark.regression
 def test_extract_records_prefers_higher_priority_adapter_value_even_when_dom_value_exists() -> (

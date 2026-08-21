@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from .test_selectolax_css_migration import *  # noqa: F403
-
+from .test_selectolax_css_migration import AmazonAdapter, BelkAdapter, LexborHTMLParser, amazon, build_detail_record, collect_structured_candidates, pytest  # fmt: skip
 
 @pytest.mark.asyncio
 @pytest.mark.regression

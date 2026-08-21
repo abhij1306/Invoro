@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from .test_crawl_engine import *  # noqa: F403
-
+from .test_crawl_engine import dom_variants_add_missing_existing_axis, extract_records, map_js_state_to_fields, normalize_variant_record, pytest, sanitize_variant_row  # fmt: skip
 
 @pytest.mark.regression
 def test_extract_records_limits_xml_sitemap_listing_records() -> None:

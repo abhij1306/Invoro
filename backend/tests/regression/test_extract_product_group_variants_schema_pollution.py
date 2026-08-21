@@ -1,7 +1,11 @@
 from __future__ import annotations
 
-from .test_crawl_engine import *  # noqa: F403
-
+from .test_crawl_engine import (
+    extract_records,
+    extraction_runtime,
+    listing_detail_like_path,
+    pytest,
+)
 
 @pytest.mark.regression
 def test_extract_product_group_variants_without_schema_pollution() -> None:

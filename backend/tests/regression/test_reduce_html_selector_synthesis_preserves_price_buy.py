@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from .test_detail_extractor_priority_and_selector_self_heal import *  # noqa: F403
-
+from .test_detail_extractor_priority_and_selector_self_heal import Path, extract_records, load_export_data, pytest, reduce_html_for_selector_synthesis, selector_heal_improved_record, validated_xpath_rules  # fmt: skip
 
 @pytest.mark.regression
 def test_reduce_html_for_selector_synthesis_preserves_price_and_buy_box_controls() -> (

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from .test_crawl_fetch_runtime import *  # noqa: F403
-
+from .test_crawl_fetch_runtime import AsyncMock, FakeBodyResponse, FetchRuntimeContext, HostProtectionPolicy, PageFetchResult, SimpleNamespace, _as_async, asyncio, browser_capture, crawl_fetch_runtime, http_fetch, pytest, read_network_payload_body, should_escalate_to_browser_async, time  # fmt: skip
 
 @pytest.mark.asyncio
 @pytest.mark.component

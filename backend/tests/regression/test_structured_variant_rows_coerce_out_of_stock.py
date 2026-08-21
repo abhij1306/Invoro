@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from .test_detail_extractor_structured_sources import *  # noqa: F403
-
+from .test_detail_extractor_structured_sources import _structured_variants_from_product_payload, detail_dom_completion, extract_records, json, pytest  # fmt: skip
 
 @pytest.mark.regression
 def test_structured_variant_rows_coerce_is_out_of_stock_flags_strictly() -> None:

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from .test_product_intelligence import *  # noqa: F403
-
+from .test_product_intelligence import AsyncSession, PRODUCT_INTELLIGENCE_CANDIDATE_STATUS_CRAWL_QUEUED, PRODUCT_INTELLIGENCE_CANDIDATE_STATUS_CRAWL_TIMEOUT, ProductIntelligenceCandidate, ProductIntelligenceJob, ProductIntelligenceSourceProduct, SOURCE_TYPE_BRAND_DTC, SearchResult, build_search_queries, discover_product_intelligence_candidates, extract_product_snapshot, extract_search_result_snapshot, poll_candidate_and_score, product_intelligence_settings, pytest, score_candidate  # fmt: skip
 
 @pytest.mark.asyncio
 @pytest.mark.component

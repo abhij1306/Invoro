@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from .test_selectolax_css_migration import *  # noqa: F403
-
+from .test_selectolax_css_migration import AmazonAdapter, amazon, build_detail_record, crawler_runtime_settings, extract_listing_records, extract_selector_value, pytest  # fmt: skip
 
 @pytest.mark.regression
 def test_detail_extractor_normalizes_category_objects_from_network_payloads() -> None:

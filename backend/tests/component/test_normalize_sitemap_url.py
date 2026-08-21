@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from .test_sitemap_resolver import *  # noqa: F403
-
+from .test_sitemap_resolver import SITEMAP_NS, SecurityError, SimpleNamespace, ValidatedTarget, _FakeClient, _SequencedFakeClient, _normalize_sitemap_url, _valid_target, _xml_response, httpx, pytest, resolve_category_urls_from_sitemap, resolve_category_urls_from_sitemap_result, sitemap_resolver  # fmt: skip
 
 @pytest.mark.parametrize(
     ("raw", "expected"),

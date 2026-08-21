@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from .test_detail_extractor_structured_sources import *  # noqa: F403
-
+from .test_detail_extractor_structured_sources import BeautifulSoup, detail_raw_signals, extract_records, harvest_js_state_objects, pytest, reconcile_parent_price_against_variant_range  # fmt: skip
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_keeps_page_url_when_opengraph_url_is_site_root() -> (

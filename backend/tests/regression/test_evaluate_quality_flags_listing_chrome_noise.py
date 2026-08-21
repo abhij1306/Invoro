@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from .test_harness_support import *  # noqa: F403
-
+from .test_harness_support import AcquisitionPlan, SimpleNamespace, classify_failure_mode, evaluate_quality, harness_support, hash_password, pytest, run_test_sites_acceptance, select, site_harness_runner, verify_password  # fmt: skip
+from app.models.user import User
 
 @pytest.mark.regression
 def test_evaluate_quality_flags_listing_chrome_noise() -> None:
@@ -301,7 +301,9 @@ async def test_run_site_harness_supports_acquisition_only_mode(
         _fake_ensure_harness_user_id,
     )
     monkeypatch.setattr(site_harness_runner, "create_crawl_run", _fake_create_crawl_run)
-    monkeypatch.setattr(site_harness_runner, "process_single_url", _fake_process_single_url)
+    monkeypatch.setattr(
+        site_harness_runner, "process_single_url", _fake_process_single_url
+    )
 
     result = await harness_support.run_site_harness(
         url="https://example.com/catalog",
@@ -372,7 +374,9 @@ async def test_run_site_harness_surfaces_challenge_summary_in_acquisition_only_m
         _fake_ensure_harness_user_id,
     )
     monkeypatch.setattr(site_harness_runner, "create_crawl_run", _fake_create_crawl_run)
-    monkeypatch.setattr(site_harness_runner, "process_single_url", _fake_process_single_url)
+    monkeypatch.setattr(
+        site_harness_runner, "process_single_url", _fake_process_single_url
+    )
 
     result = await harness_support.run_site_harness(
         url="https://example.com/catalog",
@@ -407,8 +411,8 @@ async def test_ensure_harness_user_id_reuses_user_by_configured_email(
     second_user_id = await harness_support._ensure_harness_user_id(db_session)
     user = (
         await db_session.execute(
-            select(harness_support.User).where(
-                harness_support.User.email == "harness@example.invalid"
+            select(User).where(
+                User.email == "harness@example.invalid"
             )
         )
     ).scalar_one()
@@ -430,8 +434,8 @@ async def test_ensure_harness_user_id_uses_local_default_credentials_without_env
     user_id = await harness_support._ensure_harness_user_id(db_session)
     user = (
         await db_session.execute(
-            select(harness_support.User).where(
-                harness_support.User.email == harness_support.DEFAULT_HARNESS_EMAIL
+            select(User).where(
+                User.email == harness_support.DEFAULT_HARNESS_EMAIL
             )
         )
     ).scalar_one()
@@ -466,7 +470,7 @@ async def test_ensure_harness_user_id_rejects_password_sync_without_flag(
     monkeypatch.setenv("HARNESS_PASSWORD", "NewHarnessSecret123!")
     monkeypatch.delenv("ENABLE_HARNESS_PASSWORD_SYNC", raising=False)
 
-    user = harness_support.User(
+    user = User(
         email="harness@example.invalid",
         hashed_password=hash_password("OldHarnessSecret123!"),
         role="harness",
@@ -480,8 +484,8 @@ async def test_ensure_harness_user_id_rejects_password_sync_without_flag(
 
     persisted = (
         await db_session.execute(
-            select(harness_support.User).where(
-                harness_support.User.email == "harness@example.invalid"
+            select(User).where(
+                User.email == "harness@example.invalid"
             )
         )
     ).scalar_one()
@@ -499,7 +503,7 @@ async def test_ensure_harness_user_id_allows_password_sync_with_flag(
     monkeypatch.setenv("HARNESS_PASSWORD", "NewHarnessSecret123!")
     monkeypatch.setenv("ENABLE_HARNESS_PASSWORD_SYNC", "true")
 
-    user = harness_support.User(
+    user = User(
         email="harness@example.invalid",
         hashed_password=hash_password("OldHarnessSecret123!"),
         role="harness",
@@ -511,8 +515,8 @@ async def test_ensure_harness_user_id_allows_password_sync_with_flag(
     user_id = await harness_support._ensure_harness_user_id(db_session)
     persisted = (
         await db_session.execute(
-            select(harness_support.User).where(
-                harness_support.User.email == "harness@example.invalid"
+            select(User).where(
+                User.email == "harness@example.invalid"
             )
         )
     ).scalar_one()

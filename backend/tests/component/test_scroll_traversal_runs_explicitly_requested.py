@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from .test_traversal_runtime import *  # noqa: F403
-
+from .test_traversal_runtime import Any, TraversalResult, _FakePage, _OverlayTestLocator, _OverlayTestPage, _State, count_listing_cards, dismiss_overlays_if_needed, execute_listing_traversal, listing_selector_is_weak, pytest, traversal_helpers, traversal_module, wait_for_load_more_card_gain  # fmt: skip
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -433,8 +432,8 @@ async def test_paginate_traversal_detects_cycle_on_redirect_loop() -> None:
     assert result.stop_reason == "paginate_cycle_detected"
     assert result.pages_advanced == 0
 
-@pytest.mark.asyncio
-async def testis_same_origin_blocks_cross_tenant_paths() -> None:
+@pytest.mark.component
+def test_is_same_origin_blocks_cross_tenant_paths() -> None:
     """Pagination must not bleed across path-based multi-tenant boundaries."""
     is_same_origin = traversal_module.is_same_origin
 
@@ -447,8 +446,8 @@ async def testis_same_origin_blocks_cross_tenant_paths() -> None:
         "https://myworkdayjobs.com/TenantB/jobs?page=1",
     )
 
-@pytest.mark.asyncio
-async def testis_same_origin_blocks_cross_tenant_paths_for_workday_subdomains() -> None:
+@pytest.mark.component
+def test_is_same_origin_blocks_cross_tenant_paths_for_workday_subdomains() -> None:
     is_same_origin = traversal_module.is_same_origin
 
     assert is_same_origin(
@@ -460,8 +459,8 @@ async def testis_same_origin_blocks_cross_tenant_paths_for_workday_subdomains() 
         "https://smithnephew.wd5.myworkdayjobs.com/TenantB/jobs?page=1",
     )
 
-@pytest.mark.asyncio
-async def testis_same_origin_allows_same_tenant_different_pages() -> None:
+@pytest.mark.component
+def test_is_same_origin_allows_same_tenant_different_pages() -> None:
     is_same_origin = traversal_module.is_same_origin
 
     assert is_same_origin(
@@ -473,10 +472,8 @@ async def testis_same_origin_allows_same_tenant_different_pages() -> None:
         "https://other.com/listing?page=2",
     )
 
-@pytest.mark.asyncio
-async def testis_same_origin_allows_same_host_path_changes_outside_tenant_hosts() -> (
-    None
-):
+@pytest.mark.component
+def test_is_same_origin_allows_same_host_path_changes_outside_tenant_hosts() -> None:
     is_same_origin = traversal_module.is_same_origin
 
     assert is_same_origin(

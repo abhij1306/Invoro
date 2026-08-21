@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from .test_browser_expansion_runtime import *  # noqa: F403
-
+from .test_browser_expansion_runtime import CARD_SELECTORS, PlaywrightError, PlaywrightTimeoutError, TraversalResult, _FakeExpansionPage, _FakeRuntime, _async_checkpoint, asynccontextmanager, asyncio, browser_pool, browser_runtime, cookie_store, pytest  # fmt: skip
 
 @pytest.mark.asyncio
 @pytest.mark.regression

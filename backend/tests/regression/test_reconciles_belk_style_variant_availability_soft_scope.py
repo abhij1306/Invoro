@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from .test_detail_extractor_structured_sources import *  # noqa: F403
-
+from .test_detail_extractor_structured_sources import build_detail_record, extract_detail_records, extract_records, pytest, read_optional_artifact_text  # fmt: skip
 
 @pytest.mark.regression
 def test_reconciles_belk_style_variant_availability_from_soft_scope() -> None:

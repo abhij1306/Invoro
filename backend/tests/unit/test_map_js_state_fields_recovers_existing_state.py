@@ -1,7 +1,10 @@
 from __future__ import annotations
 
-from .test_state_mappers import *  # noqa: F403
-
+from .test_state_mappers import (
+    map_js_state_to_fields,
+    map_network_payloads_to_fields,
+    pytest,
+)
 
 @pytest.mark.unit
 def test_map_js_state_to_fields_recovers_existing_state_product_fields() -> None:

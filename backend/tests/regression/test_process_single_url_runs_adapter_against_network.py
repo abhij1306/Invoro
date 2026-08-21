@@ -1,7 +1,15 @@
 from __future__ import annotations
 
-from .test_pipeline_core import *  # noqa: F403
-
+from ._pipeline_core_support import _as_async, _detail_html, _fake_acquire_result, _listing_html, _no_adapter  # fmt: skip
+import json
+import pytest
+from app.services.acquisition.acquirer import AcquisitionRequest, AcquisitionResult, acquire  # fmt: skip
+from app.services.acquisition_plan import AcquisitionPlan  # fmt: skip
+from app.services.adapters.base import AdapterResult  # fmt: skip
+from app.services.crawl.crud import create_crawl_run, get_run_records  # fmt: skip
+from app.services.pipeline.extraction_loop import process_single_url, resolved_url_processing_config  # fmt: skip
+from app.services.pipeline.types import URLProcessingConfig  # fmt: skip
+from sqlalchemy.ext.asyncio import AsyncSession  # fmt: skip
 
 @pytest.mark.asyncio
 @pytest.mark.regression

@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from ._support_shared import *  # noqa: F403
+from ._support_shared import DEFAULT_HARNESS_EMAIL, DEFAULT_HARNESS_PASSWORD, logger  # fmt: skip
+import os
+from app.core.security import hash_password, verify_password  # fmt: skip
+from app.models.user import User  # fmt: skip
+from sqlalchemy import select  # fmt: skip
 
 
 async def _ensure_harness_user_id(session) -> int:
@@ -53,14 +57,8 @@ async def _ensure_harness_user_id(session) -> int:
 
 
 def _is_production_environment() -> bool:
-    env_name = (
-        os.getenv("APP_ENV")
-        or os.getenv("FLASK_ENV")
-        or os.getenv("ENV")
-        or "development"
-    )
-    return str(env_name).strip().lower() not in {
-        "",
+    env_name = os.getenv("APP_ENV") or os.getenv("FLASK_ENV") or os.getenv("ENV")
+    return str(env_name or "").strip().lower() not in {
         "development",
         "dev",
         "local",
@@ -69,4 +67,4 @@ def _is_production_environment() -> bool:
     }
 
 
-__all__ = ["DEFAULT_HARNESS_EMAIL"]
+__all__ = ['DEFAULT_HARNESS_EMAIL']  # fmt: skip

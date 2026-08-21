@@ -1,6 +1,15 @@
 from __future__ import annotations
 
-from ._core_shared import *  # noqa: F403
+from ._core_shared import _NON_ALNUM_RE, _WHITESPACE_RE, _object_dict, _object_list  # fmt: skip
+import json
+import re
+from app.services.acquisition.browser_runtime import SharedBrowserRuntime  # fmt: skip
+from app.services.acquisition.runtime import classify_block_from_headers, classify_blocked_page, copy_headers, curl_fetch, http_fetch  # fmt: skip
+from app.services.config.browser_surface_probe import BROWSER_SURFACE_PROBE_POST_NAVIGATION_WAIT_MS, BROWSER_SURFACE_PROBE_TARGET_BODY_ARTIFACT_LIMIT, BROWSER_SURFACE_PROBE_TARGET_CHALLENGE_COOKIE_TOKENS, BROWSER_SURFACE_PROBE_TARGET_COOKIE_NAME_LIMIT, BROWSER_SURFACE_PROBE_TARGET_GEO_ENDPOINTS, BROWSER_SURFACE_PROBE_TARGET_HTTP_TIMEOUT_SECONDS, BROWSER_SURFACE_PROBE_TARGET_NAVIGATION_TIMEOUT_MS, BROWSER_SURFACE_PROBE_TARGET_RESPONSE_HEADER_ALLOWLIST, BROWSER_SURFACE_PROBE_TARGET_VISIBLE_TEXT_SNIPPET_LIMIT  # fmt: skip
+from ipaddress import ip_address  # fmt: skip
+from pathlib import Path  # fmt: skip
+from typing import Any  # fmt: skip
+from urllib.parse import urlparse  # fmt: skip
 from .baseline import (
     _coalesce,
     _collect_baseline,
@@ -8,13 +17,7 @@ from .baseline import (
     _collect_page_snapshot,
 )
 from .runtime_source import RuntimeSource, _dict_rows, _normalize_space
-from .signal_extractor import (
-    _dedupe,
-    _extract_creepjs,
-    _extract_generic_site,
-    _extract_pixelscan,
-    _sannysoft_signal_rows,
-)
+from .signal_extractor import _dedupe, _extract_creepjs, _extract_generic_site, _extract_pixelscan, _sannysoft_signal_rows  # fmt: skip
 
 
 def _site_artifacts(base_dir: Path, site_id: str) -> dict[str, Path]:
@@ -366,9 +369,7 @@ async def _target_browser_payload(
         snapshot = await _collect_page_snapshot(page)
         behavioral_smoke = await _collect_behavioral_smoke(page)
         baseline = await _collect_baseline(page, behavioral_smoke=behavioral_smoke)
-        await page.screenshot(path=str(artifacts["screenshot"]), full_page=True)
-        artifacts["html"].write_text(html, encoding="utf-8")
-        _write_target_body_artifact(artifacts["body"], html)
+        created_artifacts = await _capture_probe_artifacts(page, artifacts, html=html)
         final_url = _normalize_space(page.url)
         response_headers = await _response_headers_dict(response)
         status_code = 0
@@ -411,11 +412,7 @@ async def _target_browser_payload(
             ),
             "cookie_names": cookie_names,
             "challenge_cookie_names": _challenge_cookie_names(cookie_names),
-            "artifacts": {
-                "body": artifacts["body"].name,
-                "html": artifacts["html"].name,
-                "screenshot": artifacts["screenshot"].name,
-            },
+            "artifacts": created_artifacts,
         }
 
 
@@ -489,17 +486,39 @@ async def _navigate_probe_target(page, url: str) -> None:
     await page.wait_for_timeout(int(BROWSER_SURFACE_PROBE_POST_NAVIGATION_WAIT_MS))
 
 
-async def _capture_probe_artifacts(page, artifacts: dict[str, Path]) -> None:
+async def _capture_probe_artifacts(
+    page,
+    artifacts: dict[str, Path],
+    *,
+    html: str | None = None,
+) -> dict[str, str]:
+    created: dict[str, str] = {}
+    screenshot_path = artifacts.get("screenshot")
+    if screenshot_path is not None:
+        try:
+            await page.screenshot(path=str(screenshot_path), full_page=True)
+            created["screenshot"] = screenshot_path.name
+        except Exception:
+            pass
     try:
-        await page.screenshot(path=str(artifacts["screenshot"]), full_page=True)
+        page_html = html if html is not None else await page.content()
     except Exception:
-        # Screenshot artifact is diagnostic-only; ignore capture failures.
-        pass
-    try:
-        artifacts["html"].write_text(await page.content(), encoding="utf-8")
-    except Exception:
-        # HTML artifact is diagnostic-only; ignore capture failures.
-        pass
+        page_html = None
+    html_path = artifacts.get("html")
+    if html_path is not None and page_html is not None:
+        try:
+            html_path.write_text(page_html, encoding="utf-8")
+            created["html"] = html_path.name
+        except Exception:
+            pass
+    body_path = artifacts.get("body")
+    if body_path is not None and page_html is not None:
+        try:
+            _write_target_body_artifact(body_path, page_html)
+            created["body"] = body_path.name
+        except Exception:
+            pass
+    return created
 
 
 def _site_validation_warnings(site_id: str, snapshot: dict[str, object]) -> list[str]:
@@ -515,4 +534,4 @@ def _site_validation_warnings(site_id: str, snapshot: dict[str, object]) -> list
     return warnings
 
 
-__all__ = tuple(name for name in globals() if not name.startswith("__"))
+__all__ = ['Any', 'BROWSER_SURFACE_PROBE_POST_NAVIGATION_WAIT_MS', 'BROWSER_SURFACE_PROBE_TARGET_BODY_ARTIFACT_LIMIT', 'BROWSER_SURFACE_PROBE_TARGET_CHALLENGE_COOKIE_TOKENS', 'BROWSER_SURFACE_PROBE_TARGET_COOKIE_NAME_LIMIT', 'BROWSER_SURFACE_PROBE_TARGET_GEO_ENDPOINTS', 'BROWSER_SURFACE_PROBE_TARGET_HTTP_TIMEOUT_SECONDS', 'BROWSER_SURFACE_PROBE_TARGET_NAVIGATION_TIMEOUT_MS', 'BROWSER_SURFACE_PROBE_TARGET_RESPONSE_HEADER_ALLOWLIST', 'BROWSER_SURFACE_PROBE_TARGET_VISIBLE_TEXT_SNIPPET_LIMIT', 'Path', 'RuntimeSource', 'SharedBrowserRuntime', '_NON_ALNUM_RE', '_WHITESPACE_RE', '_browser_cookie_names', '_capture_probe_artifacts', '_challenge_cookie_names', '_classification_payload', '_coalesce', '_collect_baseline', '_collect_behavioral_smoke', '_collect_page_snapshot', '_dedupe', '_dict_rows', '_extract_creepjs', '_extract_generic_site', '_extract_pixelscan', '_failed_target_diagnostic', '_geo_consensus', '_geo_payload_from_text', '_navigate_probe_target', '_normalize_space', '_object_dict', '_object_list', '_response_headers_dict', '_run_geo_endpoint_checks', '_run_target_diagnostic', '_sannysoft_signal_rows', '_selected_headers', '_site_artifacts', '_site_signal_payload', '_site_validation_warnings', '_slugify', '_target_artifacts', '_target_browser_payload', '_target_transport_payload', '_text_snippet_from_html', '_truncate_text', '_validated_target_url', '_write_target_body_artifact', 'annotations', 'classify_block_from_headers', 'classify_blocked_page', 'copy_headers', 'curl_fetch', 'http_fetch', 'ip_address', 'json', 're', 'urlparse']  # fmt: skip

@@ -17,52 +17,21 @@ from app.models.crawl_run import CrawlRecord
 
 from app.schemas.product_intelligence import ProductIntelligenceDiscoveryRequest
 
-from app.services.config.product_intelligence import (
-    GOOGLE_NATIVE_HOME_URL,
-    PRODUCT_INTELLIGENCE_CANDIDATE_STATUS_CRAWL_QUEUED,
-    PRODUCT_INTELLIGENCE_CANDIDATE_STATUS_CRAWL_TIMEOUT,
-    SOURCE_TYPE_BRAND_DTC,
-    ProductIntelligenceSettings,
-    product_intelligence_settings,
-)
+from app.services.config.product_intelligence import GOOGLE_NATIVE_HOME_URL, PRODUCT_INTELLIGENCE_CANDIDATE_STATUS_CRAWL_QUEUED, PRODUCT_INTELLIGENCE_CANDIDATE_STATUS_CRAWL_TIMEOUT, SOURCE_TYPE_BRAND_DTC, ProductIntelligenceSettings, product_intelligence_settings  # fmt: skip
 
 from app.services.llm.config_service import get_prompt_task
 
-from app.services.product_intelligence.discovery import (
-    SearchResult,
-    google_native_blocked,
-    google_native_session,
-    parse_google_native_results,
-    parse_serpapi_immersive_results,
-    parse_serpapi_shopping_results,
-    build_search_queries,
-    classify_source_type,
-    discover_candidates,
-)
+from app.services.product_intelligence.discovery import SearchResult, google_native_blocked, google_native_session, parse_google_native_results, parse_serpapi_immersive_results, parse_serpapi_shopping_results, build_search_queries, classify_source_type, discover_candidates  # fmt: skip
 
 from app.services.product_intelligence import discovery as discovery_module
 
-from app.services.product_intelligence.matching import (
-    build_search_result_intelligence,
-    extract_product_snapshot,
-    extract_search_result_snapshot,
-    is_private_label,
-    normalize_brand,
-    score_candidate,
-)
+from app.services.product_intelligence.matching import build_search_result_intelligence, extract_product_snapshot, extract_search_result_snapshot, is_private_label, normalize_brand, score_candidate  # fmt: skip
 
 from app.services.llm.circuit_breaker import LLMErrorCategory
 
 from app.services.llm.types import LLMTaskResult
 
-from app.services.product_intelligence.service import (
-    backfill_candidate_brand,
-    poll_candidate_and_score,
-    resolve_source_snapshot,
-    create_product_intelligence_job,
-    discover_product_intelligence_candidates,
-)
-
+from app.services.product_intelligence.service import backfill_candidate_brand, poll_candidate_and_score, resolve_source_snapshot, create_product_intelligence_job, discover_product_intelligence_candidates  # fmt: skip
 
 def _build_candidate_intelligence(
     *, brand: str = "", title: str = "Wundermost Bodysuit"
@@ -84,4 +53,4 @@ def _build_candidate_intelligence(
     }
 
 
-__all__ = tuple(name for name in globals() if not name.startswith("__"))
+__all__ = ['AsyncSession', 'CrawlRecord', 'GOOGLE_NATIVE_HOME_URL', 'LLMErrorCategory', 'LLMTaskResult', 'PRODUCT_INTELLIGENCE_CANDIDATE_STATUS_CRAWL_QUEUED', 'PRODUCT_INTELLIGENCE_CANDIDATE_STATUS_CRAWL_TIMEOUT', 'ProductIntelligenceCandidate', 'ProductIntelligenceDiscoveryRequest', 'ProductIntelligenceJob', 'ProductIntelligenceMatch', 'ProductIntelligenceSettings', 'ProductIntelligenceSourceProduct', 'SOURCE_TYPE_BRAND_DTC', 'SearchResult', '_build_candidate_intelligence', 'annotations', 'backfill_candidate_brand', 'build_search_queries', 'build_search_result_intelligence', 'classify_source_type', 'create_product_intelligence_job', 'discover_candidates', 'discover_product_intelligence_candidates', 'discovery_module', 'extract_product_snapshot', 'extract_search_result_snapshot', 'get_prompt_task', 'google_native_blocked', 'google_native_session', 'is_private_label', 'normalize_brand', 'parse_google_native_results', 'parse_serpapi_immersive_results', 'parse_serpapi_shopping_results', 'poll_candidate_and_score', 'product_intelligence_settings', 'pytest', 'resolve_source_snapshot', 'score_candidate', 'select']  # fmt: skip

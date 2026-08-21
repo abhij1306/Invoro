@@ -1,21 +1,20 @@
 from __future__ import annotations
 
-from ._support_shared import *  # noqa: F403
+from ._support_shared import HARNESS_MODE_FULL_PIPELINE, _PUBLIC_RECORD_LEGACY_VARIANT_FIELDS  # fmt: skip
+from app.core.database import SessionLocal  # fmt: skip
+from app.models.crawl_run import CrawlRun  # fmt: skip
+from app.services.crawl.batch_runtime import process_run  # fmt: skip
+from app.services.crawl.crud import create_crawl_run, get_run_records  # fmt: skip
+from app.services.pipeline.extraction_loop import process_single_url  # fmt: skip
+from app.services.pipeline.types import URLProcessingConfig  # fmt: skip
+from collections.abc import Sequence  # fmt: skip
+from sqlalchemy import select  # fmt: skip
 from .challenge_classifier import (
     _challenge_summary_from_diagnostics,
     classify_failure_mode,
 )
 from .harness_user import _ensure_harness_user_id
-from .record_signals import (
-    _identity_path,
-    _looks_like_utility_record,
-    _looks_numeric_price,
-    _object_dict,
-    _object_list,
-    _safe_int,
-    _summary_value,
-    _variant_row_has_axis,
-)
+from .record_signals import _identity_path, _looks_like_utility_record, _looks_numeric_price, _object_dict, _object_list, _safe_int, _summary_value, _variant_row_has_axis  # fmt: skip
 
 
 def status_for_result(result: dict[str, object]) -> str:
@@ -66,6 +65,7 @@ async def run_site_harness(*, url: str, surface: str, mode: str) -> dict[str, ob
             "run_id": run.id,
             "status": run.status,
             "requested_url": url,
+            "surface": surface,
             "verdict": str(url_result.verdict or ""),
             "method": str(metrics.get("method") or "").strip() or None,
             "platform_family": str(metrics.get("platform_family") or "").strip()
@@ -179,6 +179,7 @@ def _persisted_run_result(
         "run_id": run.id,
         "status": run.status,
         "requested_url": requested_url,
+        "surface": str(run.surface or "").strip(),
         "verdict": str(summary.get("extraction_verdict") or ""),
         "method": _summary_value(summary, "methods"),
         "platform_family": _summary_value(summary, "platform_families"),
@@ -252,4 +253,4 @@ def _listing_contract(rows: Sequence[object]) -> dict[str, object]:
     }
 
 
-__all__ = tuple(name for name in globals() if not name.startswith("__"))
+__all__ = ['CrawlRun', 'HARNESS_MODE_FULL_PIPELINE', 'Sequence', 'SessionLocal', 'URLProcessingConfig', '_PUBLIC_RECORD_LEGACY_VARIANT_FIELDS', '_challenge_summary_from_diagnostics', '_ensure_harness_user_id', '_identity_path', '_listing_contract', '_looks_like_utility_record', '_looks_numeric_price', '_object_dict', '_object_list', '_persisted_run_result', '_populated_field_count', '_safe_int', '_sample_record_audit', '_sample_records', '_sample_semantics', '_summary_value', '_variant_row_has_axis', 'annotations', 'classify_failure_mode', 'create_crawl_run', 'get_run_records', 'process_run', 'process_single_url', 'review_saved_run', 'run_site_harness', 'select', 'status_for_result']  # fmt: skip

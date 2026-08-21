@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from .test_shared_variant_logic import *  # noqa: F403
-
+from .test_shared_variant_logic import BeautifulSoup, SimpleNamespace, _next_f_script, build_detail_record, iter_variant_choice_groups, iter_variant_select_groups, json, normalized_variant_axis_key, pytest, record_assembly, resolve_variant_group_name, resolve_variants, variant_axis_name_is_semantic, variant_option_value_is_noise  # fmt: skip
 
 @pytest.mark.unit
 def test_prepared_dom_variants_keeps_first_pass_signals_without_fallback_variants(

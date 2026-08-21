@@ -1,7 +1,11 @@
 from __future__ import annotations
 
-from .test_detail_extractor_structured_sources import *  # noqa: F403
-
+from .test_detail_extractor_structured_sources import (
+    MyntraAdapter,
+    extract_records,
+    json,
+    pytest,
+)
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_rejects_collection_url_with_visible_tile_prices() -> (

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from .test_crawl_engine import *  # noqa: F403
-
+from .test_crawl_engine import BelkAdapter, _rendered_listing_fragment, extract_listing_records, extract_records, extraction_runtime, pytest  # fmt: skip
 
 @pytest.mark.regression
 def test_extract_records_prefers_rendered_listing_fragments_over_thin_structured_records() -> (

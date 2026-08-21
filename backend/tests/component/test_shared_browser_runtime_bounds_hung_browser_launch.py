@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from .test_browser_context import *  # noqa: F403
+from .test_browser_context import AsyncSession, SimpleNamespace, _context_spec, acquisition_browser_pool, acquisition_browser_runtime, async_sessionmaker, asyncio, cookie_store, crawl_fetch_runtime, crawler_runtime_settings, pytest, uuid4  # fmt: skip
 
+pytest_plugins = ["tests.component._cookie_store_test_support"]
 
 @pytest.mark.asyncio
 @pytest.mark.component

@@ -1,6 +1,11 @@
 from __future__ import annotations
 
-from ._core_shared import *  # noqa: F403
+from ._core_shared import _BASELINE_PROBE_SCRIPT_PATH, _COUNTRY_CODE_BY_NAME, _object_dict  # fmt: skip
+import json
+import pytz
+import re
+from app.services.config.browser_surface_probe import BROWSER_SURFACE_PROBE_FONT_TEST_STRINGS, BROWSER_SURFACE_PROBE_HIGH_ENTROPY_HINTS, BROWSER_SURFACE_PROBE_TABLE_ROW_LIMIT, BROWSER_SURFACE_PROBE_TIMEZONE_ALIASES, BROWSER_SURFACE_PROBE_VISIBLE_TEXT_LIMIT, BROWSER_SURFACE_PROBE_WEBRTC_GATHER_TIMEOUT_MS  # fmt: skip
+from typing import Sequence  # fmt: skip
 from .runtime_source import _normalize_key, _normalize_space
 from .signal_extractor import _dedupe, _dedupe_snapshot_rows
 
@@ -177,9 +182,12 @@ def _country_code_from_value(value: str | None) -> str | None:
         return normalized.upper()
     if normalized in _COUNTRY_CODE_BY_NAME:
         return _COUNTRY_CODE_BY_NAME[normalized]
-    for country_name, country_code in _COUNTRY_CODE_BY_NAME.items():
-        if country_name and country_name in normalized:
-            return country_code
+    aliases = sorted(_COUNTRY_CODE_BY_NAME, key=len, reverse=True)
+    for country_name in aliases:
+        if country_name and re.search(
+            rf"(?<![a-z0-9]){re.escape(country_name)}(?![a-z0-9])", normalized
+        ):
+            return _COUNTRY_CODE_BY_NAME[country_name]
     return None
 
 
@@ -277,4 +285,4 @@ def _consensus_baseline(per_site: dict[str, dict[str, object]]) -> dict[str, obj
     }
 
 
-__all__ = tuple(name for name in globals() if not name.startswith("__"))
+__all__ = ['BROWSER_SURFACE_PROBE_FONT_TEST_STRINGS', 'BROWSER_SURFACE_PROBE_HIGH_ENTROPY_HINTS', 'BROWSER_SURFACE_PROBE_TABLE_ROW_LIMIT', 'BROWSER_SURFACE_PROBE_TIMEZONE_ALIASES', 'BROWSER_SURFACE_PROBE_VISIBLE_TEXT_LIMIT', 'BROWSER_SURFACE_PROBE_WEBRTC_GATHER_TIMEOUT_MS', 'Sequence', '_BASELINE_PROBE_SCRIPT_PATH', '_COUNTRY_CODE_BY_NAME', '_coalesce', '_collect_baseline', '_collect_behavioral_smoke', '_collect_page_snapshot', '_consensus_baseline', '_country_code_from_value', '_dedupe', '_dedupe_snapshot_rows', '_locale_region', '_normalize_key', '_normalize_space', '_object_dict', '_timezone_matches_country', 'annotations', 'json', 'load_baseline_probe_script', 'pytz']  # fmt: skip

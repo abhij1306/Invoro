@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from .test_harness_support import *  # noqa: F403
-
+from .test_harness_support import Path, build_explicit_sites, classify_failure_mode, evaluate_quality, harness_support, infer_surface, load_site_set, parse_test_sites_markdown, pytest, run_test_sites_acceptance  # fmt: skip
 
 @pytest.mark.regression
 def test_infer_surface_prefers_explicit_surface() -> None:

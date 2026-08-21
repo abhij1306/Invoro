@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from .test_crawl_engine import *  # noqa: F403
-
+from .test_crawl_engine import HostProtectionPolicy, _js_shell_html, crawl_fetch_runtime, detail_extractor, extract_records, pytest  # fmt: skip
 
 @pytest.mark.regression
 def test_extract_records_does_not_leak_standalone_product_payloads_when_itemlist_exists() -> (

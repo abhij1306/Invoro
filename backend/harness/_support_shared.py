@@ -1,57 +1,23 @@
 from __future__ import annotations
 
-import html
-
-import json
 
 import logging
 
-import os
 
 import re
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable
 
 from pathlib import Path
 
-from urllib.parse import unquote, urlsplit
-
-from app.core.database import SessionLocal
-
-from app.core.security import hash_password, verify_password
-
-from app.models.crawl_run import CrawlRun
-
-from app.models.user import User
-
-from app.services.adapters.registry import registered_adapters
-
-from app.services.crawl.batch_runtime import process_run
-
-from app.services.crawl.crud import create_crawl_run, get_run_records
-
-from app.services.pipeline.extraction_loop import process_single_url
-
-from app.services.pipeline.types import URLProcessingConfig
-
-from app.services.platform_policy import (
-    configured_adapter_names,
-    detect_platform_family,
-    job_platform_families,
-    platform_config_for_family,
-)
 
 from app.services.publish import VERDICT_PARTIAL, VERDICT_SUCCESS
 
-from app.services.publish.metrics import diagnostics_indicate_block
-
-from app.services.extract.listing_candidate_ranking import looks_like_utility_record
 
 from app.services.config.public_record_policy import PUBLIC_RECORD_LEGACY_VARIANT_FIELDS
 
 from app.services.config.variant_policy import PUBLIC_VARIANT_AXIS_FIELDS
 
-from sqlalchemy import select
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +41,7 @@ _VARIANT_AXIS_FIELDS = tuple(
     )
 )
 
+
 def _field_name_tuple(value: object, config_name: str) -> tuple[str, ...]:
     if isinstance(value, str) or not isinstance(value, Iterable):
         raise TypeError(f"{config_name} must be an iterable of field names")
@@ -82,6 +49,7 @@ def _field_name_tuple(value: object, config_name: str) -> tuple[str, ...]:
     if not fields:
         raise TypeError(f"{config_name} must contain at least one field name")
     return fields
+
 
 _PUBLIC_RECORD_LEGACY_VARIANT_FIELDS = _field_name_tuple(
     PUBLIC_RECORD_LEGACY_VARIANT_FIELDS,
@@ -211,6 +179,4 @@ _INTERNAL_IDENTITY_TOKENS = {
     "reviews",
 }
 
-__all__ = tuple(
-    name for name in globals() if not name.startswith("__")
-)
+__all__ = ['DEFAULT_HARNESS_EMAIL', 'DEFAULT_HARNESS_PASSWORD', 'DEFAULT_SITE_SET_PATH', 'HARNESS_MODE_ACQUISITION_ONLY', 'HARNESS_MODE_FULL_PIPELINE', '_ALLOWED_GENDERS', '_ALLOWED_GENDERS_LOWER', '_BARCODE_LENGTHS', '_DETAIL_FILE_RE', '_DETAIL_HINTS', '_DETAIL_SLUG_WITH_ID_RE', '_GENERIC_DETAIL_SECTION_TITLES', '_HIGH_DENOMINATION_PRICE_CURRENCIES', '_IDENTITY_SEGMENT_SKIP', '_IDENTITY_TOKEN_SKIP', '_INTERNAL_IDENTITY_TOKENS', '_JOB_LISTING_HINTS', '_LISTING_HINTS', '_MIN_SANE_PRICE', '_NON_DETAIL_FILE_RE', '_PLACEHOLDER_TITLES', '_PRODUCT_LIKE_TERMINAL_SLUG_RE', '_PUBLIC_RECORD_LEGACY_VARIANT_FIELDS', '_SUCCESS_VERDICTS', '_VARIANT_AXIS_FIELDS', '_field_name_tuple']  # fmt: skip

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from .test_browser_expansion_runtime import *  # noqa: F403
-
+from .test_browser_expansion_runtime import BeautifulSoup, SimpleNamespace, _FakeExpansionPage, _async_checkpoint, _network_capture_summary, asynccontextmanager, browser_page_flow, browser_page_helpers, browser_readiness, browser_result_builder, browser_runtime, crawler_runtime_settings, pytest  # fmt: skip
 
 @pytest.mark.regression
 def test_generic_card_selectors_use_ecommerce_group_for_unknown_listing_surface(

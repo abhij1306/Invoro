@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from .test_detail_extractor_structured_sources import *  # noqa: F403
-
+from .test_detail_extractor_structured_sources import detail_product_type_is_low_signal, detail_redirect_identity_is_mismatched, detail_slug_title_fallback_from_url, detail_title_fallback_looks_like_code, extract_records, pytest, read_optional_artifact_text, reconcile_detail_currency_with_url, repair_ecommerce_detail_record_quality, title_needs_promotion  # fmt: skip
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_maps_anchor_hash_product_description_upstream() -> (

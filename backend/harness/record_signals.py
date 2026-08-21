@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from ._support_shared import *  # noqa: F403
+import re
+from urllib.parse import unquote, urlsplit
+
+from ._support_shared import _IDENTITY_SEGMENT_SKIP, _IDENTITY_TOKEN_SKIP, _VARIANT_AXIS_FIELDS  # fmt: skip
+from app.services.extract.listing_candidate_ranking import looks_like_utility_record  # fmt: skip
 
 
 def _looks_like_utility_record(*, title: object, url: object) -> bool:
@@ -20,6 +24,7 @@ def _summary_value(summary: dict[str, object], key: str) -> str | None:
     values = _object_dict(summary.get("acquisition_summary")).get(key)
     return str(next(iter(values))) if isinstance(values, dict) and values else None
 
+
 def _primary_identity_tokens(value: str) -> set[str]:
     raw_value = str(value or "").strip()
     if not raw_value:
@@ -36,6 +41,7 @@ def _primary_identity_tokens(value: str) -> set[str]:
         return set()
     return _identity_tokens(unquote(raw_value.lower()))
 
+
 def _identity_tokens(value: str) -> set[str]:
     return {
         token
@@ -43,10 +49,12 @@ def _identity_tokens(value: str) -> set[str]:
         if len(token) >= 2 and not token.isdigit() and token not in _IDENTITY_TOKEN_SKIP
     }
 
+
 def _identity_overlap_count(left: set[str], right: set[str]) -> int:
     if not left or not right:
         return 0
     return len(left & right)
+
 
 def _required_identity_overlap(token_count: int) -> int:
     if token_count <= 2:
@@ -54,6 +62,7 @@ def _required_identity_overlap(token_count: int) -> int:
     if token_count == 3:
         return 2
     return max(2, (token_count * 3 + 4) // 5)
+
 
 def _looks_like_real_listing_row(row: object) -> bool:
     if not isinstance(row, dict):
@@ -68,17 +77,21 @@ def _looks_like_real_listing_row(row: object) -> bool:
         and not _looks_like_utility_record(title=title, url=url)
     )
 
+
 def _safe_int(value: object) -> int:
     try:
         return 0 if value in (None, "") else int(str(value))
     except (TypeError, ValueError):
         return 0
 
+
 def _object_list(value: object) -> list[object]:
     return list(value) if isinstance(value, list) else []
 
+
 def _object_dict(value: object) -> dict[str, object]:
     return dict(value) if isinstance(value, dict) else {}
+
 
 def _looks_numeric_price(value: object) -> bool:
     text = str(value or "").strip()
@@ -95,6 +108,7 @@ def _looks_numeric_price(value: object) -> bool:
     elif "." in text and re.fullmatch(r"^\d{1,3}(?:\.\d{3})+$", text):
         normalized = text.replace(".", "")
     return bool(re.fullmatch(r"^\d+(?:\.\d+)?$", normalized))
+
 
 def _price_number(value: object) -> float | None:
     text = str(value or "").strip()
@@ -117,15 +131,16 @@ def _price_number(value: object) -> float | None:
     except ValueError:
         return None
 
+
 def _variant_row_has_axis(row: dict[str, object]) -> bool:
     axis_values = [
         str(row.get(field_name) or "").strip() for field_name in _VARIANT_AXIS_FIELDS
     ]
     return any(axis_values)
 
+
 def _normalized_space(value: object) -> str:
     return " ".join(str(value or "").strip().split())
 
-__all__ = tuple(
-    name for name in globals() if not name.startswith("__")
-)
+
+__all__ = ['_IDENTITY_SEGMENT_SKIP', '_IDENTITY_TOKEN_SKIP', '_VARIANT_AXIS_FIELDS', '_identity_overlap_count', '_identity_path', '_identity_tokens', '_looks_like_real_listing_row', '_looks_like_utility_record', '_looks_numeric_price', '_normalized_space', '_object_dict', '_object_list', '_price_number', '_primary_identity_tokens', '_required_identity_overlap', '_safe_int', '_summary_value', '_variant_row_has_axis', 'annotations', 'looks_like_utility_record', 're', 'unquote', 'urlsplit']  # fmt: skip

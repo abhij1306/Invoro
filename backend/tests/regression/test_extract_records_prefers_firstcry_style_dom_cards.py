@@ -1,7 +1,10 @@
 from __future__ import annotations
 
-from .test_crawl_engine import *  # noqa: F403
-
+from .test_crawl_engine import (
+    _rendered_listing_fragment,
+    extract_records,
+    pytest,
+)
 
 @pytest.mark.regression
 def test_extract_records_prefers_firstcry_style_dom_cards_over_menu_chrome() -> None:

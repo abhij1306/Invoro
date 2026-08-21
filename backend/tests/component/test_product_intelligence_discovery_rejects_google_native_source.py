@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from .test_product_intelligence import *  # noqa: F403
-
+from .test_product_intelligence import AsyncSession, CrawlRecord, LLMTaskResult, ProductIntelligenceMatch, ProductIntelligenceSourceProduct, SearchResult, create_product_intelligence_job, discover_candidates, discover_product_intelligence_candidates, product_intelligence_settings, pytest, select  # fmt: skip
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -444,8 +443,8 @@ async def test_product_intelligence_discovery_uses_product_url_from_listing_reco
         run_id=run.id,
         source_url="https://www.belk.com/men/mens-clothing/jeans/",
         data={
-            "brand": "Wrangler�",
-            "title": "Wrangler� Relaxed Bootcut Jeans",
+            "brand": "Wrangler\u00ae",
+            "title": "Wrangler\u00ae Relaxed Bootcut Jeans",
             "url": "https://www.belk.com/p/wrangler--relaxed-bootcut-jeans-/3200040112342570.html",
             "price": "39.95",
         },

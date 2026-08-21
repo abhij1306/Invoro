@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from .test_field_value_core import *  # noqa: F403
-
+from .test_field_value_core import Decimal, absolute_url, coerce_field_value, decimal_for_shared_price, direct_record_to_surface_fields, extract_currency_code, is_title_noise, public_record_data_for_surface, pytest, registrable_host, same_site, strip_tracking_query_params, surface_alias_lookup, validate_record_for_surface  # fmt: skip
 
 @pytest.mark.unit
 def test_absolute_url_promotes_bare_host_candidates_to_https() -> None:
@@ -113,7 +112,8 @@ def test_direct_record_to_surface_fields_rejects_unknown_requested_fields() -> N
 
     assert shaped == {"title": "Widget Prime"}
 
-def testdecimal_for_shared_price_supports_european_decimal_format() -> None:
+@pytest.mark.unit
+def test_decimal_for_shared_price_supports_european_decimal_format() -> None:
     assert decimal_for_shared_price("1.234,56") == Decimal("1234.56")
     assert decimal_for_shared_price("234,56") == Decimal("234.56")
     assert decimal_for_shared_price("1.234.567,89") == Decimal("1234567.89")

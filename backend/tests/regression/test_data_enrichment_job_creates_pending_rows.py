@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from .test_data_enrichment import *  # noqa: F403
-
+from .test_data_enrichment import AsyncSession, CrawlRecord, DATA_ENRICHMENT_COLOR_FAMILY_ALIASES, DATA_ENRICHMENT_STATUS_ENRICHED, DATA_ENRICHMENT_STATUS_PENDING, DATA_ENRICHMENT_STATUS_RUNNING, DATA_ENRICHMENT_TAXONOMY_CONTEXT_ONLY_TOKENS, DATA_ENRICHMENT_TAXONOMY_VERSION, DataEnrichmentJobDetailResponse, EnrichedProduct, accessory_path_conflict, async_sessionmaker, asyncio, build_data_enrichment_job_payload, build_deterministic_enrichment, category_match_values, category_url_context, create_data_enrichment_job, get_data_enrichment_job, list_data_enrichment_jobs, normalize_price, normalize_taxonomy_token, percentage_material_parse, plausible_size_value, pytest, run_job, select, shopify_catalog, special_token_conflict, sport_specific_conflict, taxonomy_candidate_conflicts, toys_vs_sports_conflict  # fmt: skip
 
 @pytest.mark.asyncio
 @pytest.mark.regression

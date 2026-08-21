@@ -1,6 +1,15 @@
 from __future__ import annotations
 
-from ._core_shared import *  # noqa: F403
+from ._core_shared import _BUNDLE_DIRNAME, _NON_ALNUM_RE, _WHITESPACE_RE, _object_dict, _object_list  # fmt: skip
+import argparse
+import json
+import time
+from app.core.database import SessionLocal  # fmt: skip
+from app.services.acquisition.browser_runtime import _display_proxy  # fmt: skip
+from app.services.crawl.crud import get_run  # fmt: skip
+from dataclasses import dataclass  # fmt: skip
+from datetime import UTC, datetime  # fmt: skip
+from pathlib import Path  # fmt: skip
 
 
 @dataclass(slots=True)
@@ -15,28 +24,36 @@ class RuntimeSource:
     selected_proxy_index: int | None
     browser_engine: str
 
+
 def _normalize_space(value: object) -> str:
     return _WHITESPACE_RE.sub(" ", str(value or "")).strip()
+
 
 def _normalize_key(value: object) -> str:
     return _NON_ALNUM_RE.sub(" ", _normalize_space(value).lower()).strip()
 
+
 def _json_dump(value: object) -> str:
     return json.dumps(value, ensure_ascii=True, indent=2, sort_keys=True, default=str)
+
 
 def _utc_stamp() -> str:
     return datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
 
+
 def _coerce_proxy_profile(value: object) -> dict[str, object]:
     return dict(value) if isinstance(value, dict) else {}
 
+
 def _int_list(value: object) -> list[int]:
     return [item for item in _object_list(value) if isinstance(item, int)]
+
 
 def _dict_rows(value: object) -> list[dict[str, object]]:
     return [
         _object_dict(item) for item in _object_list(value) if isinstance(item, dict)
     ]
+
 
 def _coerce_locality_profile(
     *,
@@ -54,6 +71,7 @@ def _coerce_locality_profile(
         "language_hint": normalized_language,
         "currency_hint": normalized_currency,
     }
+
 
 async def _load_run_runtime_source(
     run_id: int, *, browser_engine: str
@@ -81,6 +99,7 @@ async def _load_run_runtime_source(
         browser_engine=browser_engine,
     )
 
+
 def _load_explicit_runtime_source(
     *,
     proxies: list[str],
@@ -92,14 +111,21 @@ def _load_explicit_runtime_source(
     if proxy_profile_path:
         raw = json.loads(Path(proxy_profile_path).read_text(encoding="utf-8"))
         proxy_profile = _coerce_proxy_profile(raw)
-    proxy_list = [
+    explicit_proxy_list = [
         _normalize_space(value) for value in proxies if _normalize_space(value)
+    ]
+    if explicit_proxy_list:
+        proxy_profile = dict(proxy_profile)
+        proxy_profile["proxy_list"] = explicit_proxy_list
+    proxy_list = [
+        _normalize_space(value)
+        for value in _object_list(proxy_profile.get("proxy_list"))
+        if _normalize_space(value)
     ]
     enabled = bool(proxy_list) or bool(proxy_profile.get("enabled"))
     if enabled:
         proxy_profile = dict(proxy_profile)
         proxy_profile["enabled"] = True
-        proxy_profile["proxy_list"] = proxy_list
     selected_proxy = proxy_list[0] if proxy_list else None
     selected_proxy_index = 0 if selected_proxy is not None else None
     identity_run_id = time.time_ns()
@@ -114,6 +140,7 @@ def _load_explicit_runtime_source(
         selected_proxy_index=selected_proxy_index,
         browser_engine=browser_engine,
     )
+
 
 async def _resolve_runtime_source(args: argparse.Namespace) -> RuntimeSource:
     explicit_proxies = list(args.proxy or [])
@@ -134,8 +161,23 @@ async def _resolve_runtime_source(args: argparse.Namespace) -> RuntimeSource:
         browser_engine=args.browser_engine,
     )
 
+
 def _masked_proxy_inventory(proxy_list: list[str]) -> list[str]:
     return [_display_proxy(value) for value in proxy_list]
+
+
+def _masked_proxy_profile(profile: dict[str, object]) -> dict[str, object]:
+    sanitized = dict(profile)
+    if "proxy_list" in sanitized:
+        sanitized["proxy_list"] = _masked_proxy_inventory(
+            [
+                _normalize_space(value)
+                for value in _object_list(sanitized.get("proxy_list"))
+                if _normalize_space(value)
+            ]
+        )
+    return sanitized
+
 
 def _report_root(base_dir: str | None) -> Path:
     base = (
@@ -145,6 +187,5 @@ def _report_root(base_dir: str | None) -> Path:
     )
     return base
 
-__all__ = tuple(
-    name for name in globals() if not name.startswith("__")
-)
+
+__all__ = ['Path', 'RuntimeSource', 'SessionLocal', 'UTC', '_BUNDLE_DIRNAME', '_NON_ALNUM_RE', '_WHITESPACE_RE', '_coerce_locality_profile', '_coerce_proxy_profile', '_dict_rows', '_display_proxy', '_int_list', '_json_dump', '_load_explicit_runtime_source', '_load_run_runtime_source', '_masked_proxy_inventory', '_normalize_key', '_normalize_space', '_object_dict', '_object_list', '_report_root', '_resolve_runtime_source', '_utc_stamp', 'annotations', 'argparse', 'dataclass', 'datetime', 'get_run', 'json', 'time']  # fmt: skip

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from .test_crawl_engine import *  # noqa: F403
-
+from .test_crawl_engine import (
+    extract_records,
+    pytest,
+)
 
 @pytest.mark.regression
 def test_extract_detail_infers_chewy_style_offer_variant_sizes() -> None:
@@ -292,6 +294,7 @@ def test_extract_detail_strips_variant_availability_suffix_from_option_values() 
     )
 
     assert len(rows) == 1
+    assert [variant["size"] for variant in rows[0]["variants"]] == ["36", "37"]
 
 @pytest.mark.regression
 def test_extract_detail_dom_images_excludes_related_product_cards() -> None:

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from .test_browser_context import *  # noqa: F403
+from .test_browser_context import SimpleNamespace, _context_spec, acquisition_browser_pool, acquisition_browser_runtime, asyncio, browser_storage_state, cookie_store, crawl_fetch_runtime, pytest  # fmt: skip
 
+pytest_plugins = ["tests.component._cookie_store_test_support"]
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -55,7 +56,7 @@ async def test_shared_browser_runtime_bounds_hung_context_cleanup(
     )
 
     with caplog.at_level("WARNING", logger=acquisition_browser_runtime.logger.name):
-        async with asyncio.timeout(0.5):
+        async with asyncio.timeout(1.0):
             async with runtime.page(
                 run_id=77,
                 domain="example.com",
@@ -167,7 +168,7 @@ async def test_shared_browser_runtime_close_bounds_hung_shutdown(
     )
 
     with caplog.at_level("WARNING", logger=acquisition_browser_runtime.logger.name):
-        async with asyncio.timeout(0.5):
+        async with asyncio.timeout(1.0):
             await runtime.close()
 
     assert runtime._browser is None

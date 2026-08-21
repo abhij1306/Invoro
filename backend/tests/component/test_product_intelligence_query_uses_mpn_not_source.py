@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from .test_product_intelligence import *  # noqa: F403
-
+from .test_product_intelligence import ProductIntelligenceDiscoveryRequest, ProductIntelligenceSettings, SOURCE_TYPE_BRAND_DTC, build_search_queries, build_search_result_intelligence, classify_source_type, extract_product_snapshot, extract_search_result_snapshot, google_native_blocked, is_private_label, normalize_brand, parse_google_native_results, pytest, score_candidate  # fmt: skip
 
 @pytest.mark.component
 def test_product_intelligence_query_uses_mpn_not_source_domain_or_sku() -> None:
@@ -59,8 +58,8 @@ def test_product_intelligence_query_strips_repeated_brand_and_targets_brand_doma
 ):
     queries = build_search_queries(
         {
-            "brand": "Wrangler�",
-            "title": "Wrangler� Relaxed Bootcut Jeans",
+            "brand": "Wrangler\u00ae",
+            "title": "Wrangler\u00ae Relaxed Bootcut Jeans",
             "url": "https://www.belk.com/p/wrangler--relaxed-bootcut-jeans-/3200040112342570.html",
         },
         source_domain_value="belk.com",
@@ -379,7 +378,7 @@ def test_product_intelligence_uses_source_brand_when_candidate_title_mentions_it
     intelligence = build_search_result_intelligence(
         source={
             "title": "Wrangler Relaxed Bootcut Jeans",
-            "brand": "Wrangler�",
+            "brand": "Wrangler\u00ae",
             "price": 50.0,
         },
         candidate_payload={

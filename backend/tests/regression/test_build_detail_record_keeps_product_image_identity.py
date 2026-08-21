@@ -1,7 +1,11 @@
 from __future__ import annotations
 
-from .test_detail_extractor_structured_sources import *  # noqa: F403
-
+from .test_detail_extractor_structured_sources import (
+    build_detail_record,
+    extract_detail_records,
+    extract_records,
+    pytest,
+)
 
 @pytest.mark.regression
 def test_build_detail_record_keeps_product_image_when_identity_code_is_in_url() -> None:

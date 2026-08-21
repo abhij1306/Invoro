@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from .test_product_intelligence import *  # noqa: F403
-
+from .test_product_intelligence import SearchResult, discover_candidates, discovery_module, parse_serpapi_immersive_results, product_intelligence_settings, pytest  # fmt: skip
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -594,8 +593,8 @@ async def test_product_intelligence_discovery_rejects_editorial_brand_pages() ->
 
     candidates = await discover_candidates(
         {
-            "brand": "Wrangler�",
-            "title": "Wrangler� Relaxed Bootcut Jeans",
+            "brand": "Wrangler\u00ae",
+            "title": "Wrangler\u00ae Relaxed Bootcut Jeans",
             "url": "https://www.belk.com/p/wrangler--relaxed-bootcut-jeans-/3200040112342570.html",
         },
         source_domain_value="belk.com",

@@ -24,24 +24,11 @@ from patchright.async_api import Error as PlaywrightError
 
 from patchright.async_api import TimeoutError as PlaywrightTimeoutError
 
-from app.services.acquisition import (
-    browser_capture,
-    browser_detail,
-    browser_recovery,
-    cookie_store,
-    dom_runtime,
-)
+from app.services.acquisition import browser_capture, browser_detail, browser_recovery, cookie_store, dom_runtime  # fmt: skip
 
 from app.services.acquisition.browser_capture import BrowserNetworkCapture
 
-from app.services.acquisition import (
-    browser_page_flow,
-    browser_page_helpers,
-    browser_pool,
-    browser_readiness,
-    browser_result_builder,
-    browser_runtime,
-)
+from app.services.acquisition import browser_page_flow, browser_page_helpers, browser_pool, browser_readiness, browser_result_builder, browser_runtime  # fmt: skip
 
 from app.services.acquisition.browser_fetch_support import build_browser_fetch_result
 
@@ -54,7 +41,6 @@ from app.services.config.runtime_settings import crawler_runtime_settings
 from app.services.config.selectors import CARD_SELECTORS
 
 from app.services.pipeline.extract_records import extract_records
-
 
 @pytest.fixture(autouse=True)
 def _reset_origin_warmup_state(monkeypatch: pytest.MonkeyPatch):
@@ -73,10 +59,8 @@ def _reset_origin_warmup_state(monkeypatch: pytest.MonkeyPatch):
     browser_runtime._ORIGIN_WARMUP_IN_FLIGHT.clear()
     browser_runtime._ORIGIN_WARMUP_RECENT.clear()
 
-
 async def _async_checkpoint() -> None:
     await asyncio.sleep(0)
-
 
 def _network_capture_summary() -> SimpleNamespace:
     return SimpleNamespace(
@@ -90,17 +74,14 @@ def _network_capture_summary() -> SimpleNamespace:
         payloads=[],
     )
 
-
 class _StaticPayloadCapture:
     async def close(self, _page):
         await _async_checkpoint()
         return _network_capture_summary()
 
-
 async def _emit_browser_event_noop(*_args, **_kwargs):
     await _async_checkpoint()
     return None
-
 
 async def _classify_browser_page_ok(_html: str, _status_code: int):
     await _async_checkpoint()
@@ -109,7 +90,6 @@ async def _classify_browser_page_ok(_html: str, _status_code: int):
         evidence=[],
         outcome="ok",
     )
-
 
 @pytest.fixture
 def browser_finalize_support() -> SimpleNamespace:
@@ -164,7 +144,6 @@ def browser_finalize_support() -> SimpleNamespace:
         visual_calls=visual_calls,
     )
 
-
 @dataclass
 class _FakeHandle:
     label: str
@@ -218,7 +197,6 @@ class _FakeHandle:
     async def click(self, **_kwargs) -> None:
         await _async_checkpoint()
         self.page.expanded = True
-
 
 class _FakeLocator:
     def __init__(self, page: "_FakeExpansionPage", selector: str) -> None:
@@ -313,7 +291,6 @@ class _FakeLocator:
         await _async_checkpoint()
         self._page.expanded = True
 
-
 class _FakeRoleLocator:
     def __init__(self, page: "_FakeExpansionPage", role: str, name: object) -> None:
         self._page = page
@@ -353,11 +330,9 @@ class _FakeRoleLocator:
             return bool(self._name_pattern.search(name))
         return name == self._name
 
-
 class _NoTimeoutRoleLocator(_FakeRoleLocator):
     async def is_visible(self, **_kwargs) -> bool:
         return await self.count() > 0
-
 
 class _WaitingRoleLocator(_FakeRoleLocator):
     def __init__(self, page: "_FakeExpansionPage", role: str, name: str) -> None:
@@ -373,7 +348,6 @@ class _WaitingRoleLocator(_FakeRoleLocator):
         self.wait_for_calls.append((state, kwargs.get("timeout")))
         if await self.count() == 0:
             raise PlaywrightTimeoutError("not visible")
-
 
 class _FakePageContext:
     def __init__(self, page: "_FakeExpansionPage") -> None:
@@ -402,7 +376,6 @@ class _FakePageContext:
         self._page.listeners[key] = [
             listener for listener in listeners if listener is not callback
         ]
-
 
 class _FakeExpansionPage:
     def __init__(
@@ -616,7 +589,6 @@ class _FakeExpansionPage:
             Path(path).write_bytes(payload)
         return payload
 
-
 class _FakeRuntime:
     def __init__(self, page: _FakeExpansionPage) -> None:
         self._page = page
@@ -627,4 +599,4 @@ class _FakeRuntime:
         yield self._page
 
 
-__all__ = tuple(name for name in globals() if not name.startswith("__"))
+__all__ = ['Any', 'BeautifulSoup', 'BlockPageClassification', 'BrowserNetworkCapture', 'CARD_SELECTORS', 'Path', 'PlaywrightError', 'PlaywrightTimeoutError', 'SimpleNamespace', 'TraversalResult', '_FakeExpansionPage', '_FakeHandle', '_FakeLocator', '_FakePageContext', '_FakeRoleLocator', '_FakeRuntime', '_NoTimeoutRoleLocator', '_StaticPayloadCapture', '_WaitingRoleLocator', '_async_checkpoint', '_classify_browser_page_ok', '_emit_browser_event_noop', '_network_capture_summary', '_reset_origin_warmup_state', 'annotations', 'asynccontextmanager', 'asyncio', 'browser_capture', 'browser_detail', 'browser_finalize_support', 'browser_page_flow', 'browser_page_helpers', 'browser_pool', 'browser_readiness', 'browser_recovery', 'browser_result_builder', 'browser_runtime', 'build_browser_fetch_result', 'cookie_store', 'crawler_runtime_settings', 'dataclass', 'dom_runtime', 'extract_records', 'httpx', 'pytest', 'time']  # fmt: skip

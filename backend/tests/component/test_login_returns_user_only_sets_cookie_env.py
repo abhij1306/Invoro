@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from .test_public_api import *  # noqa: F403
+from .test_public_api import ASGITransport, ApiKey, AsyncClient, CrawlerAppState, FastAPI, HTTPException, OrderedDict, PUBLIC_API_ERROR_API_KEY_REQUIRED, PUBLIC_API_ERROR_AUTH_UNAVAILABLE, RATE_LIMIT_BUCKETS, Request, SQLAlchemyError, User, _crawler_app_state, _password_field_name, _public_auth_session, _retry_after, _trim, app, auth_rate_limit_buckets_snapshot, auth_security, authenticate_public_api_key, clear_auth_rate_limit_buckets_for_testing, clear_public_rate_limit_buckets_for_testing, clear_rate_limit_buckets_for_testing, client_rate_limit_key, crawler_runtime_settings, create_user, deque, get_current_user, get_db, hash_api_key, logging, metrics_module, pbkdf2_sha256, public_rate_limit_buckets_snapshot, pytest, rate_limit_buckets_snapshot, restore_auth_rate_limit_buckets_for_testing, restore_public_rate_limit_buckets_for_testing, restore_rate_limit_buckets_for_testing, select, settings  # fmt: skip
 
+pytest_plugins = ["tests.component.test_public_api"]
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -467,12 +468,14 @@ async def test_api_key_crud_returns_plaintext_once(db_session, test_user) -> Non
 
     app.dependency_overrides[get_db] = _override_db
     app.dependency_overrides[get_current_user] = _override_user
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://testserver"
-    ) as client:
-        created = await client.post("/api/api-keys", json={"name": "Railway"})
-        listed = await client.get("/api/api-keys")
-    app.dependency_overrides.clear()
+    try:
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://testserver"
+        ) as client:
+            created = await client.post("/api/api-keys", json={"name": "Railway"})
+            listed = await client.get("/api/api-keys")
+    finally:
+        app.dependency_overrides.clear()
 
     assert created.status_code == 201
     payload = created.json()
@@ -640,15 +643,17 @@ async def test_public_rate_limit_is_keyed_by_api_key(
         yield db_session
 
     app.dependency_overrides[get_db] = _override_db
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://testserver"
-    ) as client:
-        headers = {"Authorization": f"Bearer {raw_key}"}
-        first = await client.get("/api/v1/capabilities", headers=headers)
-        second = await client.get("/api/v1/capabilities", headers=headers)
-        third = await client.get("/api/v1/capabilities", headers=headers)
-    app.dependency_overrides.clear()
-    restore_public_rate_limit_buckets_for_testing(previous_public_buckets)
+    try:
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://testserver"
+        ) as client:
+            headers = {"Authorization": f"Bearer {raw_key}"}
+            first = await client.get("/api/v1/capabilities", headers=headers)
+            second = await client.get("/api/v1/capabilities", headers=headers)
+            third = await client.get("/api/v1/capabilities", headers=headers)
+    finally:
+        app.dependency_overrides.clear()
+        restore_public_rate_limit_buckets_for_testing(previous_public_buckets)
 
     assert first.status_code == 200
     assert second.status_code == 200
@@ -686,15 +691,17 @@ async def test_public_batch_extract_is_deferred(db_session, test_user) -> None:
         yield db_session
 
     app.dependency_overrides[get_db] = _override_db
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://testserver"
-    ) as client:
-        response = await client.post(
-            "/api/v1/extract/batch",
-            headers={"Authorization": f"Bearer {raw_key}"},
-            json={"urls": ["https://example.com/p/1"], "surface": "ecommerce"},
-        )
-    app.dependency_overrides.clear()
+    try:
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://testserver"
+        ) as client:
+            response = await client.post(
+                "/api/v1/extract/batch",
+                headers={"Authorization": f"Bearer {raw_key}"},
+                json={"urls": ["https://example.com/p/1"], "surface": "ecommerce"},
+            )
+    finally:
+        app.dependency_overrides.clear()
 
     assert response.status_code == 501
     assert response.json()["error"]["code"] == "WORKER_REQUIRED"

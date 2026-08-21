@@ -1,7 +1,11 @@
 from __future__ import annotations
 
-from .test_selectolax_css_migration import *  # noqa: F403
-
+from .test_selectolax_css_migration import (
+    build_detail_record,
+    extract_listing_records,
+    pytest,
+    read_optional_artifact_text,
+)
 
 @pytest.mark.regression
 def test_detail_extractor_preserves_css_dom_field_output() -> None:
