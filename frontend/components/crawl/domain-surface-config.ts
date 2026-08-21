@@ -29,8 +29,7 @@ export const DOMAIN_TABS: Record<CrawlDomain, Array<{ value: DomainCrawlTab; lab
 };
 
 type SurfaceDispatchKey =
-  | `${Exclude<CrawlDomain, 'forum_thread'>}:${DomainCrawlTab}`
-  | 'forum_thread:pdp';
+  `${Exclude<CrawlDomain, 'forum_thread'>}:${DomainCrawlTab}` | 'forum_thread:pdp';
 
 export const SURFACE_DISPATCH: Record<SurfaceDispatchKey, CrawlSurface> = {
   'auto:category': 'auto',
