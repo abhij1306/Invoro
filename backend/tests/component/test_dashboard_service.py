@@ -4,6 +4,12 @@ import logging
 from pathlib import Path
 
 import pytest
+from tests.fixtures.assertions import (
+    assert_equal,
+    assert_greater_than,
+    assert_is_not,
+    assert_not_equal,
+)
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.exc import OperationalError
 
@@ -244,21 +250,29 @@ async def test_split_reset_crawl_data_and_domain_memory_preserve_the_other_scope
 
     result = await reset_crawl_data(db_session)
 
-    assert result["crawl_runs_deleted"] == 1
-    assert result["crawl_records_deleted"] == 1
-    assert result["crawl_logs_deleted"] == 1
-    assert result["review_promotions_deleted"] == 1
-    assert result["llm_cost_logs_deleted"] == 1
-    assert list(artifacts_dir.iterdir()) == []
-    assert list(cookies_dir.iterdir()) == []
+    assert_equal(result["crawl_runs_deleted"], 1)
+    assert_equal(result["crawl_records_deleted"], 1)
+    assert_equal(result["crawl_logs_deleted"], 1)
+    assert_equal(result["review_promotions_deleted"], 1)
+    assert_equal(result["llm_cost_logs_deleted"], 1)
+    assert_equal(list(artifacts_dir.iterdir()), [])
+    assert_equal(list(cookies_dir.iterdir()), [])
 
     for model in (CrawlRecord, CrawlLog, ReviewPromotion, LLMCostLog):
         remaining = (await db_session.execute(select(model))).scalars().all()
-        assert remaining == []
-    assert (await db_session.execute(select(DomainMemory))).scalars().all() != []
-    assert (await db_session.execute(select(DomainRunProfile))).scalars().all() != []
-    assert (await db_session.execute(select(DomainCookieMemory))).scalars().all() != []
-    assert (await db_session.execute(select(DomainFieldFeedback))).scalars().all() != []
+        assert_equal(remaining, [])
+    assert_not_equal(
+        (await db_session.execute(select(DomainMemory))).scalars().all(), []
+    )
+    assert_not_equal(
+        (await db_session.execute(select(DomainRunProfile))).scalars().all(), []
+    )
+    assert_not_equal(
+        (await db_session.execute(select(DomainCookieMemory))).scalars().all(), []
+    )
+    assert_not_equal(
+        (await db_session.execute(select(DomainFieldFeedback))).scalars().all(), []
+    )
 
     db_session.expunge_all()
 
@@ -273,17 +287,17 @@ async def test_split_reset_crawl_data_and_domain_memory_preserve_the_other_scope
     )
     (cookies_dir / "memory-reset.json").write_text("cookie", encoding="utf-8")
 
-    assert next_run.id is not None
-    assert next_run.id > 0
+    assert_is_not(next_run.id, None)
+    assert_greater_than(next_run.id, 0)
 
     memory_reset = await reset_domain_memory(db_session)
 
-    assert memory_reset["domain_memory_deleted"] == 1
-    assert memory_reset["domain_run_profiles_deleted"] == 1
-    assert memory_reset["domain_cookie_memory_deleted"] == 1
-    assert memory_reset["domain_field_feedback_deleted"] == 1
-    assert memory_reset["host_protection_memory_deleted"] == 1
-    assert memory_reset["cookies_removed"] == 1
+    assert_equal(memory_reset["domain_memory_deleted"], 1)
+    assert_equal(memory_reset["domain_run_profiles_deleted"], 1)
+    assert_equal(memory_reset["domain_cookie_memory_deleted"], 1)
+    assert_equal(memory_reset["domain_field_feedback_deleted"], 1)
+    assert_equal(memory_reset["host_protection_memory_deleted"], 1)
+    assert_equal(memory_reset["cookies_removed"], 1)
     for model in (
         DomainMemory,
         DomainRunProfile,
@@ -291,8 +305,8 @@ async def test_split_reset_crawl_data_and_domain_memory_preserve_the_other_scope
         DomainFieldFeedback,
         HostProtectionMemory,
     ):
-        assert (await db_session.execute(select(model))).scalars().all() == []
-    assert list(cookies_dir.iterdir()) == []
+        assert_equal((await db_session.execute(select(model))).scalars().all(), [])
+    assert_equal(list(cookies_dir.iterdir()), [])
 
 
 @pytest.mark.component

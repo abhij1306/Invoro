@@ -1,6 +1,13 @@
 from __future__ import annotations
 
 import pytest
+from tests.fixtures.assertions import (
+    assert_equal,
+    assert_is,
+    assert_is_not,
+    assert_not_in,
+    assert_true,
+)
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select
 
@@ -92,12 +99,15 @@ async def test_crawls_domain_recipe_routes_round_trip(
             "surface": "ecommerce_detail",
         },
     )
-    assert lookup_before_run.status_code == 200
-    assert lookup_before_run.json() == {
-        "domain": "domain-recipe.example.invalid",
-        "surface": "ecommerce_detail",
-        "saved_run_profile": None,
-    }
+    assert_equal(lookup_before_run.status_code, 200)
+    assert_equal(
+        lookup_before_run.json(),
+        {
+            "domain": "domain-recipe.example.invalid",
+            "surface": "ecommerce_detail",
+            "saved_run_profile": None,
+        },
+    )
 
     await save_domain_memory(
         db_session,
@@ -162,23 +172,29 @@ async def test_crawls_domain_recipe_routes_round_trip(
     await process_run(db_session, run.id)
 
     recipe_response = await crawls_api_client.get(f"/api/crawls/{run.id}/domain-recipe")
-    assert recipe_response.status_code == 200
+    assert_equal(recipe_response.status_code, 200)
     recipe = recipe_response.json()
-    assert recipe["requested_field_coverage"] == {
-        "requested": ["brand"],
-        "found": ["brand"],
-        "missing": [],
-    }
-    assert recipe["affordance_candidates"]["browser_required"] is True
-    assert {row["field_name"] for row in recipe["selector_candidates"]} == {
-        "brand",
-        "price",
-        "title",
-    }
-    assert recipe["acquisition_evidence"]["actual_fetch_method"] == "browser"
-    assert recipe["acquisition_evidence"]["browser_reason"] == "http-escalation"
+    assert_equal(
+        recipe["requested_field_coverage"],
+        {
+            "requested": ["brand"],
+            "found": ["brand"],
+            "missing": [],
+        },
+    )
+    assert_is(recipe["affordance_candidates"]["browser_required"], True)
+    assert_equal(
+        {row["field_name"] for row in recipe["selector_candidates"]},
+        {
+            "brand",
+            "price",
+            "title",
+        },
+    )
+    assert_equal(recipe["acquisition_evidence"]["actual_fetch_method"], "browser")
+    assert_equal(recipe["acquisition_evidence"]["browser_reason"], "http-escalation")
     if recipe["saved_run_profile"] is not None:
-        assert "proxy_profile" not in recipe["saved_run_profile"]
+        assert_not_in("proxy_profile", recipe["saved_run_profile"])
 
     save_profile_response = await crawls_api_client.post(
         f"/api/crawls/{run.id}/domain-recipe/save-run-profile",
@@ -227,17 +243,16 @@ async def test_crawls_domain_recipe_routes_round_trip(
             }
         },
     )
-    assert save_profile_response.status_code == 200
+    assert_equal(save_profile_response.status_code, 200)
     saved_profile = save_profile_response.json()
-    assert saved_profile["fetch_profile"]["fetch_mode"] == "http_then_browser"
-    assert (
-        saved_profile["acquisition_contract"]["preferred_browser_engine"]
-        == "real_chrome"
+    assert_equal(saved_profile["fetch_profile"]["fetch_mode"], "http_then_browser")
+    assert_equal(
+        saved_profile["acquisition_contract"]["preferred_browser_engine"], "real_chrome"
     )
-    assert saved_profile["acquisition_contract"]["handoff_eligible"] is True
-    assert saved_profile["locality_profile"]["geo_country"] == "IN"
-    assert saved_profile["source_run_id"] == run.id
-    assert "proxy_profile" not in saved_profile
+    assert_is(saved_profile["acquisition_contract"]["handoff_eligible"], True)
+    assert_equal(saved_profile["locality_profile"]["geo_country"], "IN")
+    assert_equal(saved_profile["source_run_id"], run.id)
+    assert_not_in("proxy_profile", saved_profile)
 
     lookup_after_save = await crawls_api_client.get(
         "/api/crawls/domain-run-profile",
@@ -246,23 +261,25 @@ async def test_crawls_domain_recipe_routes_round_trip(
             "surface": "ecommerce_detail",
         },
     )
-    assert lookup_after_save.status_code == 200
-    assert (
-        lookup_after_save.json()["saved_run_profile"]["fetch_profile"]["fetch_mode"]
-        == "http_then_browser"
+    assert_equal(lookup_after_save.status_code, 200)
+    assert_equal(
+        lookup_after_save.json()["saved_run_profile"]["fetch_profile"]["fetch_mode"],
+        "http_then_browser",
     )
-    assert "proxy_profile" not in lookup_after_save.json()["saved_run_profile"]
+    assert_not_in("proxy_profile", lookup_after_save.json()["saved_run_profile"])
 
     list_profiles_response = await crawls_api_client.get(
         "/api/crawls/domain-memory/run-profiles",
         params={"domain": "domain-recipe.example.invalid"},
     )
-    assert list_profiles_response.status_code == 200
-    assert list_profiles_response.json()[0]["domain"] == "domain-recipe.example.invalid"
-    assert list_profiles_response.json()[0]["surface"] == "ecommerce_detail"
-    assert (
-        list_profiles_response.json()[0]["profile"]["fetch_profile"]["fetch_mode"]
-        == "http_then_browser"
+    assert_equal(list_profiles_response.status_code, 200)
+    assert_equal(
+        list_profiles_response.json()[0]["domain"], "domain-recipe.example.invalid"
+    )
+    assert_equal(list_profiles_response.json()[0]["surface"], "ecommerce_detail")
+    assert_equal(
+        list_profiles_response.json()[0]["profile"]["fetch_profile"]["fetch_mode"],
+        "http_then_browser",
     )
 
     normalized_profiles_response = await crawls_api_client.get(
@@ -272,8 +289,8 @@ async def test_crawls_domain_recipe_routes_round_trip(
             "surface": " ECOMMERCE_DETAIL ",
         },
     )
-    assert normalized_profiles_response.status_code == 200
-    assert len(normalized_profiles_response.json()) == 1
+    assert_equal(normalized_profiles_response.status_code, 200)
+    assert_equal(len(normalized_profiles_response.json()), 1)
 
     promote_response = await crawls_api_client.post(
         f"/api/crawls/{run.id}/domain-recipe/promote-selectors",
@@ -289,32 +306,34 @@ async def test_crawls_domain_recipe_routes_round_trip(
             ]
         },
     )
-    assert promote_response.status_code == 200
+    assert_equal(promote_response.status_code, 200)
     promoted = promote_response.json()
-    assert len(promoted) == 1
-    assert promoted[0]["field_name"] == "price"
-    assert promoted[0]["source"] == "domain_recipe"
-    assert promoted[0]["source_run_id"] == run.id
+    assert_equal(len(promoted), 1)
+    assert_equal(promoted[0]["field_name"], "price")
+    assert_equal(promoted[0]["source"], "domain_recipe")
+    assert_equal(promoted[0]["source_run_id"], run.id)
 
     recipe_after_save = await crawls_api_client.get(
         f"/api/crawls/{run.id}/domain-recipe"
     )
-    assert recipe_after_save.status_code == 200
+    assert_equal(recipe_after_save.status_code, 200)
     saved_recipe = recipe_after_save.json()
-    assert (
-        saved_recipe["saved_run_profile"]["fetch_profile"]["fetch_mode"]
-        == "http_then_browser"
+    assert_equal(
+        saved_recipe["saved_run_profile"]["fetch_profile"]["fetch_mode"],
+        "http_then_browser",
     )
-    assert "proxy_profile" not in saved_recipe["saved_run_profile"]
-    assert any(row["field_name"] == "price" for row in saved_recipe["saved_selectors"])
+    assert_not_in("proxy_profile", saved_recipe["saved_run_profile"])
+    assert_true(
+        any(row["field_name"] == "price" for row in saved_recipe["saved_selectors"])
+    )
     promoted_candidate = None
     for row in saved_recipe["selector_candidates"]:
         if row["field_name"] == "price":
             promoted_candidate = row
             break
-    assert promoted_candidate is not None
-    assert promoted_candidate["already_saved"] is True
-    assert promoted_candidate["saved_selector_id"] == promoted[0]["id"]
+    assert_is_not(promoted_candidate, None)
+    assert_is(promoted_candidate["already_saved"], True)
+    assert_equal(promoted_candidate["saved_selector_id"], promoted[0]["id"])
 
     field_action_response = await crawls_api_client.post(
         f"/api/crawls/{run.id}/domain-recipe/field-action",
@@ -326,12 +345,12 @@ async def test_crawls_domain_recipe_routes_round_trip(
             "source_record_ids": [1],
         },
     )
-    assert field_action_response.status_code == 200
-    assert field_action_response.json()["action"] == "reject"
+    assert_equal(field_action_response.status_code, 200)
+    assert_equal(field_action_response.json()["action"], "reject")
     feedback_rows = list(
         (await db_session.execute(select(DomainFieldFeedback))).scalars().all()
     )
-    assert len(feedback_rows) == 1
+    assert_equal(len(feedback_rows), 1)
 
     await persist_storage_state_for_domain(
         "domain-recipe.example.invalid",
@@ -352,9 +371,9 @@ async def test_crawls_domain_recipe_routes_round_trip(
         "/api/crawls/domain-memory/cookies",
         params={"domain": "domain-recipe.example.invalid"},
     )
-    assert cookies_response.status_code == 200
-    assert cookies_response.json()[0]["domain"] == "domain-recipe.example.invalid"
-    assert cookies_response.json()[0]["cookie_count"] == 1
+    assert_equal(cookies_response.status_code, 200)
+    assert_equal(cookies_response.json()[0]["domain"], "domain-recipe.example.invalid")
+    assert_equal(cookies_response.json()[0]["cookie_count"], 1)
 
     feedback_response = await crawls_api_client.get(
         "/api/crawls/domain-memory/field-feedback",
@@ -363,23 +382,26 @@ async def test_crawls_domain_recipe_routes_round_trip(
             "surface": "ecommerce_detail",
         },
     )
-    assert feedback_response.status_code == 200
+    assert_equal(feedback_response.status_code, 200)
     feedback_payload = feedback_response.json()
-    assert len(feedback_payload) == 1
-    assert feedback_payload[0] == {
-        **feedback_payload[0],
-        "id": feedback_rows[0].id,
-        "domain": "domain-recipe.example.invalid",
-        "surface": "ecommerce_detail",
-        "field_name": "price",
-        "action": "reject",
-        "source_kind": "selector",
-        "source_value": ".run-price",
-        "source_run_id": run.id,
-        "selector_kind": "css_selector",
-        "selector_value": ".run-price",
-        "source_record_ids": [1],
-    }
+    assert_equal(len(feedback_payload), 1)
+    assert_equal(
+        feedback_payload[0],
+        {
+            **feedback_payload[0],
+            "id": feedback_rows[0].id,
+            "domain": "domain-recipe.example.invalid",
+            "surface": "ecommerce_detail",
+            "field_name": "price",
+            "action": "reject",
+            "source_kind": "selector",
+            "source_value": ".run-price",
+            "source_run_id": run.id,
+            "selector_kind": "css_selector",
+            "selector_value": ".run-price",
+            "source_record_ids": [1],
+        },
+    )
 
 
 @pytest.mark.asyncio

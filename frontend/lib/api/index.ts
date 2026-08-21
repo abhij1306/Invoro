@@ -79,8 +79,7 @@ export type PlaygroundPipelineApiResponse = {
   launched: Record<string, unknown>;
 };
 export type PlaygroundSelectCategoryPayload =
-  | { url: string; urls?: string[] }
-  | { url?: string; urls: string[] };
+  { url: string; urls?: string[] } | { url?: string; urls: string[] };
 export type CategoryDiscoveryPayload = {
   url?: string;
   urls?: string[];

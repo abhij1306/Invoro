@@ -210,8 +210,7 @@ export default function PlaygroundPage() {
               }
               runId={
                 (session.step_data?.discover as Record<string, unknown>)?.run_id as
-                  | number
-                  | undefined
+                  number | undefined
               }
               startedAt={session.created_at}
               phase="discover"
@@ -314,8 +313,7 @@ export default function PlaygroundPage() {
               }
               runId={
                 (session.step_data?.extract as Record<string, unknown>)?.run_id as
-                  | number
-                  | undefined
+                  number | undefined
               }
               startedAt={session.updated_at}
               phase="extract"

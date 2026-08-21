@@ -103,7 +103,6 @@ ALLOWED_PRIVATE_TEST_IMPORTS: set[str] = {
     "tests/unit/test_content_article_forum_surfaces.py -> app.services.pipeline.retry.stage:_apply_detail_rejection_guard",
     "tests/unit/test_detail_image_cleanup.py -> app.services.extract.detail.images.cleanup:_detail_image_candidate_is_usable",
     "tests/unit/test_materials_sanitizer.py -> app.services.extract.detail.text.sanitizer:_clean_materials_pollution",
-    "tests/unit/test_normalizers.py -> app.services.extract.variant_choice_traversal:_variant_choice_container_is_overbroad",
     "tests/component/test_public_api.py -> app.main:_crawler_app_state",
     "tests/services/observability/test_extraction_trace_projection.py -> app.services.pipeline.extraction_loop:_record_extraction_trace",
     "tests/regression/test_batch_runtime.py -> app.services.crawl.batch_runtime:_parallel_url_concurrency",
