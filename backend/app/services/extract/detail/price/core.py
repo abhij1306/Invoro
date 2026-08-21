@@ -9,7 +9,6 @@ __all__ = (
 )
 
 from decimal import Decimal
-from dataclasses import dataclass
 import re
 from typing import Any
 
@@ -55,26 +54,7 @@ from app.services.shared.currency_hints import (
 )
 from app.services.normalizers import normalize_decimal_price
 
-@dataclass(slots=True)
-class _DetailPriceEvidence:
-    soup: BeautifulSoup
-    record_price_is_low_signal: bool
-    jsonld_price_bundle: tuple[str | None, str | None, str | None]
-    html_currency: str | None
-    record_url: str
-    expected_currency: str | None
-    visible_price: object
-    visible_price_currency: str | None
-    currency: str | None = None
-    html_currency_conflicts_with_host: bool = False
-    visible_currency_conflicts_with_html: bool = False
-
-@dataclass(frozen=True, slots=True)
-class _DetailPriceSelection:
-    price: object = None
-    source: str = ""
-    localized_override_applied: bool = False
-    blocked: bool = False
+from .reconciliation import DetailPriceEvidence as _DetailPriceEvidence, DetailPriceSelection as _DetailPriceSelection
 
 def backfill_detail_price_from_html(
     record: dict[str, Any],

@@ -5,7 +5,7 @@ from typing import Any
 
 from app.services.dom.html_parser import BeautifulSoup
 
-from . import dom_extraction as core
+from . import dom_variant_support as core
 
 __all__ = ("extract_variants_from_dom", "backfill_variants_from_dom_if_missing")
 

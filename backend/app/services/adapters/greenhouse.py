@@ -189,9 +189,7 @@ class GreenhouseAdapter(BaseAdapter):
         ) or anchor
         if not title_el and not anchor:
             return None
-        if anchor is None:
-            if title_el is None:
-                return None
+        if anchor is None and title_el is not None:
             anchor = title_el if title_el.name == "a" else title_el.find_parent("a")
         href = _opening_href(anchor, page_url=page_url)
         if not href:

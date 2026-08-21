@@ -1,22 +1,16 @@
-# ruff: noqa: F401
 # Shopify platform adapter.
 from __future__ import annotations
 
 import json
 import re
 import math
-from urllib.parse import ParseResult, parse_qsl, urljoin, urlparse, urlsplit
+from urllib.parse import ParseResult, urljoin, urlparse
 
 from app.services.dom.html_parser import BeautifulSoup, Tag
 
 from app.services.adapters.base import AdapterResult, BaseAdapter
 from app.services.config.adapter_runtime_settings import adapter_runtime_settings
 from app.services.extract.variant_axis import normalized_variant_axis_key
-from app.services.extract.variant_identity_merge import split_variant_axes
-from app.services.extract.variant_normalization.contract import (
-    flatten_variants_for_public_output,
-)
-from app.services.normalizers import normalize_decimal_price
 from app.services.shared.field_coerce import clean_text, text_or_none
 
 _FETCH_ERRORS = (OSError, RuntimeError, ValueError, TypeError, json.JSONDecodeError)

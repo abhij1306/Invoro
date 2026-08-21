@@ -91,18 +91,8 @@ from app.services.extract.detail.identity.model_codes import (
 )
 
 logger = logging.getLogger(__name__)
-_DETAIL_IDENTITY_QUERY_KEYS = frozenset(str(value).strip().lower() for value in tuple(PUBLIC_RECORD_DETAIL_CANONICAL_QUERY_KEYS or ()) if str(value).strip())
-_DETAIL_IDENTITY_QUERY_PREFIXES = tuple(str(value).strip().lower() for value in tuple(PUBLIC_RECORD_DETAIL_CANONICAL_QUERY_PREFIXES or ()) if str(value).strip())
-_DETAIL_URL_PLACEHOLDER_SEGMENTS = frozenset({str(value).strip().lower() for value in tuple(CANDIDATE_PLACEHOLDER_VALUES or ()) if str(value).strip()})
 _LISTING_CATEGORY_PATH_SEGMENTS = frozenset({str(value).strip().lower() for value in tuple(LISTING_CATEGORY_PATH_SEGMENTS or ()) if str(value).strip()})
 _LISTING_LOCALE_PATH_SEGMENT_RE = re.compile(str(LISTING_LOCALE_PATH_SEGMENT_PATTERN or ""), re.IGNORECASE)
-_LOWER_NON_ALNUM_RE = re.compile(r"[^a-z0-9]+")
-_MIXED_NON_ALNUM_RE = re.compile(r"[^A-Za-z0-9]+")
-_HTML_SUFFIX_RE = re.compile(r"\.htm(?:l)?$", re.IGNORECASE)
-_SLUG_SEPARATOR_RE = re.compile(r"[-_]+")
-
-def _path_segment_tokens(value: str) -> set[str]:
-    return {token for token in re.split(r"[\-\.]+", str(value or "").strip().lower()) if token}
 
 def _listing_url_has_product_detail_identity(url: str) -> bool:
     return LISTING_PRODUCT_DETAIL_ID_RE.search(str(url or "")) is not None
@@ -116,12 +106,12 @@ def _jsonld_item_matches_requested_identity(
     raw_url = item.get("url") or item.get("@id")
     if raw_url:
         abs_url = absolute_url(page_url, raw_url)
-        if _split_owner._detail_url_matches_requested_identity(
+        if detail_url_matches_requested_identity(
             abs_url,
             requested_page_url=requested_page_url,
         ):
             return True
-    return _split_owner._record_matches_requested_detail_identity(
+    return record_matches_requested_detail_identity(
         jsonld_item_candidate_record(item),
         requested_page_url=requested_page_url,
     )
@@ -420,18 +410,9 @@ def _job_detail_query_has_identity(query: str) -> bool:
     lowered = str(query or "").lower()
     return any(token in lowered for token in ("showjob=", "jobid=", "job_id=", "gh_jid="))
 
-def _detail_url_path_segments(url: str) -> list[str]:
-    parsed = urlparse(str(url or ""))
-    segments = [segment for segment in str(parsed.path or "").strip("/").split("/") if segment]
-    fragment = str(parsed.fragment or "").strip()
-    if fragment:
-        fragment_path = fragment.split("?", 1)[0].split("&", 1)[0].strip()
-        if "/" in fragment_path:
-            segments.extend(segment for segment in fragment_path.strip("!/").split("/") if segment)
-    return segments
-
-from . import record_identity as _split_owner  # noqa: E402
 from .record_identity import (  # noqa: E402
+    _DETAIL_IDENTITY_QUERY_KEYS, _DETAIL_IDENTITY_QUERY_PREFIXES, _DETAIL_URL_PLACEHOLDER_SEGMENTS, _HTML_SUFFIX_RE,
+    _LOWER_NON_ALNUM_RE, _MIXED_NON_ALNUM_RE, _SLUG_SEPARATOR_RE, _detail_url_path_segments, _path_segment_tokens,
     detail_identity_codes_match, detail_identity_codes_from_record_fields, detail_identity_codes_from_url, detail_query_identity_codes_from_url,
     detail_identity_tokens, detail_redirect_identity_is_mismatched, detail_slug_title_fallback_from_url, detail_title_from_url,
     detail_title_fallback_looks_like_code, detail_url_candidate_is_low_signal, detail_url_is_collection_like, detail_url_is_utility,

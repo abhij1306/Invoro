@@ -1,46 +1,26 @@
-# ruff: noqa: F401
 from __future__ import annotations
 
 import json
-import re
 from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlparse
 
-from selectolax.lexbor import LexborHTMLParser
 
 from app.services.adapters.base import AdapterResult, BaseAdapter
 from app.services.config.adapter_runtime_settings import adapter_runtime_settings
 from app.services.config.extraction_rules import (
-    BELK_BRAND_SELECTORS,
-    BELK_CARD_TITLE_ATTRS,
     BELK_COLOR_MAP_KEY,
     BELK_COLOR_NAME_KEYS,
-    BELK_IMAGE_SELECTORS,
     BELK_PRODUCT_BARCODE_KEYS,
-    BELK_PRICE_SELECTORS,
     BELK_PRODUCT_BRAND_KEYS,
-    BELK_PRODUCT_CARD_SELECTORS,
     BELK_PRODUCT_ID_KEYS,
     BELK_PRODUCT_IMAGE_KEYS,
     BELK_PRODUCT_ORIGINAL_PRICE_KEYS,
     BELK_PRODUCT_PRICE_KEYS,
     BELK_PRODUCT_TITLE_KEYS,
     BELK_PRODUCT_URL_KEYS,
-    BELK_SKU_ARRAY_ID_KEY,
-    BELK_SKU_ARRAY_IMAGE_KEY,
-    BELK_SKU_ARRAY_INVENTORY_KEY,
-    BELK_SKU_ARRAY_ORIGINAL_PRICE_KEY,
-    BELK_SKU_ARRAY_OUT_OF_STOCK_KEY,
-    BELK_SKU_ARRAY_PRICE_KEY,
-    BELK_SKU_ARRAY_UPC_KEY,
-    BELK_TITLE_MAX_CHARS,
-    BELK_TITLE_MIN_CHARS,
-    BELK_TITLE_SELECTORS,
     BELK_VARIANT_ID_KEYS,
-    LISTING_BRAND_MAX_WORDS,
 )
-from app.services.extract.listing_candidate_ranking import looks_like_utility_title
 from app.services.extract.variant_axis import normalized_variant_axis_key
 from app.services.extract.variant_normalization.contract import (
     flatten_variants_for_public_output,
@@ -49,10 +29,6 @@ from app.services.shared.field_coerce import (
     absolute_url,
     clean_text,
     coerce_field_value,
-    extract_price_text,
-    finalize_record,
-    infer_brand_from_product_url,
-    infer_brand_from_title_marker,
 )
 from app.services.js_state.helpers import compact_dict, normalize_price
 from app.services.structured_sources import harvest_js_state_objects

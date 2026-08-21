@@ -226,9 +226,10 @@ Canonical config owner:
 | `extract/detail/assembly/dom_section_targets.py` | Detail DOM context selection and section target field discovery |
 | `extract/detail/assembly/dom_fallbacks.py` | DOM fallback field assembly for detail records |
 | `extract/detail/variants/dom_coercion.py` | DOM variant axis and option-value coercion helpers |
-| `extract/detail/variants/dom_extraction.py` | DOM variant option discovery and public extraction facade |
+| `extract/detail/variants/dom_extraction.py` | Stable DOM variant extraction facade and compatibility hooks |
 | `extract/detail/variants/dom_group_assembly.py` | Compatibility exports for the DOM variant extraction facade |
 | `extract/detail/variants/dom_group_pipeline.py` | DOM group validation, axis/row assembly, caching, and fallback merge |
+| `extract/detail/variants/dom_variant_support.py` | DOM variant option discovery, target selection, and option metadata helpers |
 | `extract/detail/identity/structured_pruning.py` | Structured detail payload relevance and variant-leaf pruning |
 | `extract/detail/assembly/dom_completion.py` | DOM completion gates and DOM variant collection decisions |
 | `extract/detail/images/materialize.py` | Detail image candidate materialization before final cleanup |
