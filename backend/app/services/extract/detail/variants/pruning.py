@@ -150,8 +150,7 @@ def _sanitize_variant_scalar_axes(
         raw_value = variant.get(field_name)
         value = _clean_variant_axis_label(clean_text(raw_value))
         if not value:
-            if raw_value in (None, "", [], {}):
-                variant.pop(field_name, None)
+            variant.pop(field_name, None)
             continue
         noisy = (
             _variant_option_value_is_noise(value)

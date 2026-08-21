@@ -462,12 +462,14 @@ def _text_block_markdown(
 ) -> tuple[bool, list[str]]:
     if name in {"style", "noscript", "template"}:
         return True, []
-    text = _inline_markdown(child, page_url)
     if name in {"h1", "h2", "h3", "h4", "h5", "h6"}:
+        text = _inline_markdown(child, page_url)
         return True, [f"{'#' * int(name[1])} {text}"] if text else []
     if name in {"p", "summary"}:
+        text = _inline_markdown(child, page_url)
         return True, [text] if text else []
     if name == "a":
+        text = _inline_markdown(child, page_url)
         href = absolute_url(page_url, child.get("href"))
         return True, [
             f"[{clean_text(text)}]({href})" if href else clean_text(text)

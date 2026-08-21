@@ -217,5 +217,5 @@ async def try_blocked_adapter_recovery(
 def _adapter_recovery_kwargs(adapter: BaseAdapter, proxy: str | None) -> dict[str, str]:
     if proxy is None:
         return {}
-    parameters = inspect.signature(adapter.try_public_endpoint).parameters
+    parameters = inspect.signature(getattr(adapter, "try_public_endpoint")).parameters
     return {"proxy": proxy} if "proxy" in parameters else {}

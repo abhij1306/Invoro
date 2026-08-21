@@ -113,13 +113,13 @@ def variant_scope_roots(soup: Any) -> list[Any]:
 def _hard_variant_scope_roots(soup: Any, *, max_roots: int | None) -> list[Any]:
     roots: list[Any] = []
     for node in soup.select(_variant_scope_selector):
+        if max_roots is not None and len(roots) >= max_roots:
+            break
         if node in roots or variant_node_in_noise_context(node):
             continue
         if not _node_has_hard_variant_signal(node):
             continue
         roots.append(node)
-        if max_roots is not None and len(roots) >= max_roots:
-            break
     return roots
 
 

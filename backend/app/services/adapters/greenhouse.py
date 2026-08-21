@@ -16,10 +16,17 @@ from app.services.config.adapter_runtime_settings import adapter_runtime_setting
 from app.services.domain_utils import normalize_domain
 from app.services.extraction_html_helpers import extract_job_sections, html_to_text
 from app.services.shared.field_coerce import clean_text
-from app.services.dom.html_parser import BeautifulSoup
+from app.services.dom.html_parser import BeautifulSoup, Tag
 
 _HTML_PARSER = "html.parser"
 _GREENHOUSE_API_HOST = normalize_domain("https://boards-api.greenhouse.io")
+
+
+def _opening_href(anchor: Tag | None, *, page_url: str) -> str:
+    if anchor is None:
+        return ""
+    href = str(anchor.get("href", "") or "")
+    return urljoin(page_url, href) if href and not href.startswith("http") else href
 
 
 class GreenhouseAdapter(BaseAdapter):
@@ -175,7 +182,7 @@ class GreenhouseAdapter(BaseAdapter):
         return records
 
     @staticmethod
-    def _html_opening_record(opening: object, *, page_url: str) -> dict | None:
+    def _html_opening_record(opening: Tag, *, page_url: str) -> dict | None:
         anchor = opening.select_one("a[href]")
         title_el = opening.select_one(
             ".opening-title, td.cell-title a, a .body--medium, a [class*='title'], a p"
@@ -183,10 +190,12 @@ class GreenhouseAdapter(BaseAdapter):
         if not title_el and not anchor:
             return None
         if anchor is None:
+            if title_el is None:
+                return None
             anchor = title_el if title_el.name == "a" else title_el.find_parent("a")
-        href = str(anchor.get("href", "") or "") if anchor else ""
-        if href and not href.startswith("http"):
-            href = urljoin(page_url, href)
+        href = _opening_href(anchor, page_url=page_url)
+        if not href:
+            return None
         title = clean_text(title_el.get_text(" ", strip=True) if title_el else "")
         title = title or clean_text(anchor.get_text(" ", strip=True) if anchor else "")
         if not title:

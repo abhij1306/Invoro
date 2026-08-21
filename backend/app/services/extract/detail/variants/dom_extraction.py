@@ -1,4 +1,4 @@
-# ruff: noqa: E402, F401, F821, F822
+# ruff: noqa: F401
 from __future__ import annotations
 
 __all__ = (
@@ -462,9 +462,25 @@ def _stock_quantity_from_selected_options(
         return quantities[0]
     return None
 
-from . import dom_group_assembly as _split_owner
-globals().update({
-    name: value
-    for name, value in vars(_split_owner).items()
-    if not name.startswith("__") and name != "_owner"
-})
+
+def extract_variants_from_dom(
+    soup: BeautifulSoup,
+    *,
+    page_url: str,
+    js_state_objects: dict[str, Any] | None = None,
+) -> dict[str, object]:
+    from .dom_group_pipeline import extract_variants_from_dom as extract_impl
+
+    return extract_impl(soup, page_url=page_url, js_state_objects=js_state_objects)
+
+
+def backfill_variants_from_dom_if_missing(
+    record: dict[str, Any],
+    *,
+    soup: BeautifulSoup,
+    page_url: str,
+    js_state_objects: dict[str, Any] | None = None,
+) -> None:
+    from .dom_group_pipeline import backfill_variants_from_dom_if_missing as backfill_impl
+
+    backfill_impl(record, soup=soup, page_url=page_url, js_state_objects=js_state_objects)

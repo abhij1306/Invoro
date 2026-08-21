@@ -1,9 +1,24 @@
-# ruff: noqa: F401, F821
 from __future__ import annotations
 
-from . import listing_extractor as _owner
+import logging
+from typing import Any
 
-globals().update({name: value for name, value in vars(_owner).items() if not name.startswith("__")})
+from selectolax.lexbor import LexborHTMLParser
+
+from app.services.config.runtime_settings import crawler_runtime_settings
+from app.services.extraction_context import ExtractionContext, collect_structured_source_payloads, prepare_extraction_context
+from app.services.extract.content_listing_handler import has_table_row_intent, table_row_records
+from app.services.extract.detail.identity.core import listing_detail_like_path, listing_url_is_structural
+from app.services.extract.listing_candidate_ranking import best_listing_candidate_set, listing_record_supported
+from app.services.extract.listing_card_fragments import listing_card_html_fragments
+from app.services.extract.listing_integrity_gate import IntegrityDecision, evaluate_listing_integrity
+from app.services.extract.listing_signals import select_primary_anchor
+from app.services.extract.listing_visual import visual_listing_records
+from app.services.extract.structured_listing_handler import allow_embedded_json_listing_payloads, extract_structured_listing
+from app.services.listing_card_extraction import listing_record_from_card
+from app.services.shared.field_coerce import is_title_noise
+
+logger = logging.getLogger(__name__)
 
 def _detail_anchor_count(
     parser: LexborHTMLParser,
@@ -135,7 +150,7 @@ def _dom_listing_stage(
         fallback_fragment_limit=fallback_fragment_limit,
         limit=max_records,
     ):
-        record = _listing_record_from_card(
+        record = listing_record_from_card(
             card,
             page_url,
             surface,

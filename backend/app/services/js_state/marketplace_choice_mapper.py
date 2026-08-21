@@ -145,12 +145,10 @@ def _marketplace_edge_variants(
         node = edge.get("node") if isinstance(edge, dict) else None
         if not isinstance(node, dict):
             continue
-        choice = node.get("choice") if isinstance(node.get("choice"), dict) else {}
-        selectable = (
-            node.get("selectableVariant")
-            if isinstance(node.get("selectableVariant"), dict)
-            else {}
-        )
+        raw_choice = node.get("choice")
+        choice: dict[str, Any] = raw_choice if isinstance(raw_choice, dict) else {}
+        raw_selectable = node.get("selectableVariant")
+        selectable: dict[str, Any] = raw_selectable if isinstance(raw_selectable, dict) else {}
         row = _marketplace_choice_variant_row(
             axis_name=axis_name,
             choice_name=choice.get("name"),

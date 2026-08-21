@@ -1,13 +1,13 @@
-# ruff: noqa: E402, F401, F821, F822
+# ruff: noqa: F401
 # Shopify platform adapter.
 from __future__ import annotations
 
 import json
 import re
 import math
-from urllib.parse import parse_qsl, urljoin, urlparse, urlsplit
+from urllib.parse import ParseResult, parse_qsl, urljoin, urlparse, urlsplit
 
-from app.services.dom.html_parser import BeautifulSoup
+from app.services.dom.html_parser import BeautifulSoup, Tag
 
 from app.services.adapters.base import AdapterResult, BaseAdapter
 from app.services.config.adapter_runtime_settings import adapter_runtime_settings
@@ -20,20 +20,11 @@ from app.services.normalizers import normalize_decimal_price
 from app.services.shared.field_coerce import clean_text, text_or_none
 
 _FETCH_ERRORS = (OSError, RuntimeError, ValueError, TypeError, json.JSONDecodeError)
-_SHOPIFY_META_ASSIGNMENT_RE = re.compile(
-    r"(?:var\s+meta|(?:window\s*\.\s*)?ShopifyAnalytics\s*\.\s*meta)\s*=\s*",
-    re.DOTALL,
-)
 _SHOPIFY_CDN_URL_RE = re.compile(r"https?://cdn\.shopify\.com(?:[/:?#]|$)", re.I)
 
-from . import shopify_products as _split_owner
-globals().update({
-    name: value
-    for name, value in vars(_split_owner).items()
-    if not name.startswith("__") and name != "_owner"
-})
+from . import shopify_products as _split_owner  # noqa: E402
 
-class ShopifyAdapter(ShopifyProductMixin, BaseAdapter):
+class ShopifyAdapter(_split_owner.ShopifyProductMixin, BaseAdapter):
     name = "shopify"
     domains: list[str] = []  # any domain can be Shopify; detected by signals
 
@@ -99,7 +90,7 @@ class ShopifyAdapter(ShopifyProductMixin, BaseAdapter):
             if isinstance(product, dict)
         ]
 
-    async def _fetch_detail_products(self, url: str, *, html: str, parsed: object, surface: str, proxy: str | None) -> list[dict]:
+    async def _fetch_detail_products(self, url: str, *, html: str, parsed: ParseResult, surface: str, proxy: str | None) -> list[dict]:
         handle = self._extract_product_handle(parsed.path)
         if not handle:
             return []
@@ -125,7 +116,7 @@ class ShopifyAdapter(ShopifyProductMixin, BaseAdapter):
             records.append(record)
         return self._merge_linked_product_records(records)
 
-    async def _fetch_listing_products(self, parsed: object, *, proxy: str | None) -> list[dict]:
+    async def _fetch_listing_products(self, parsed: ParseResult, *, proxy: str | None) -> list[dict]:
         collection = self._extract_collection_handle(parsed.path)
         api_path = f"/collections/{collection}/products.json" if collection else "/products.json"
         max_pages = max(1, math.ceil(adapter_runtime_settings.shopify_max_products / adapter_runtime_settings.shopify_catalog_limit))
@@ -192,7 +183,7 @@ class ShopifyAdapter(ShopifyProductMixin, BaseAdapter):
     def _append_linked_group_handles(
         self,
         rows: list[tuple[str, str, str]],
-        group: object,
+        group: Tag,
         *,
         page_url: str,
         current_host: str,

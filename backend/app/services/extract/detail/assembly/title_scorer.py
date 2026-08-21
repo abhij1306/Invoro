@@ -70,7 +70,7 @@ def promote_detail_title(
         (
             (candidate, source)
             for rank, _, candidate, source in ranked_candidates
-            if _title_candidate_can_replace(
+            if candidate is not None and _title_candidate_can_replace(
                 candidate, title, rank, current_rank, force_semantic_replacement
             )
         ),

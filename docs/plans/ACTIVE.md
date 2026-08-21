@@ -11,7 +11,7 @@
 2. Backend Application Services Debt Reduction → `docs/plans/productionization-04-backend-application-services-debt-plan.md` — queued; independent PR
 3. Frontend Debt Reduction → `docs/plans/productionization-05-frontend-debt-plan.md` — queued; independent PR
 4. Dependency and Reproducibility Hardening → `docs/plans/productionization-06-dependencies-reproducibility-plan.md` — queued; independent PR
-5. Absolute Quality Gates → `docs/plans/productionization-07-quality-gates-plan.md` — queued; execute after Plans 01–05 are green
+5. Absolute Quality Gates → `docs/plans/productionization-07-quality-gates-plan.md` — queued; execute after Plans 01–06 are green
 
 ## Previously Completed
 

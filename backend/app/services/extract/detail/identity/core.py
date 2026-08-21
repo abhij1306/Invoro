@@ -1,4 +1,4 @@
-# ruff: noqa: E402, F401, F821, F822
+# ruff: noqa: F401
 from __future__ import annotations
 
 __all__ = (
@@ -116,12 +116,12 @@ def _jsonld_item_matches_requested_identity(
     raw_url = item.get("url") or item.get("@id")
     if raw_url:
         abs_url = absolute_url(page_url, raw_url)
-        if _detail_url_matches_requested_identity(
+        if _split_owner._detail_url_matches_requested_identity(
             abs_url,
             requested_page_url=requested_page_url,
         ):
             return True
-    return _record_matches_requested_detail_identity(
+    return _split_owner._record_matches_requested_detail_identity(
         jsonld_item_candidate_record(item),
         requested_page_url=requested_page_url,
     )
@@ -430,9 +430,11 @@ def _detail_url_path_segments(url: str) -> list[str]:
             segments.extend(segment for segment in fragment_path.strip("!/").split("/") if segment)
     return segments
 
-from . import record_identity as _split_owner
-globals().update({
-    name: value
-    for name, value in vars(_split_owner).items()
-    if not name.startswith("__") and name != "_owner"
-})
+from . import record_identity as _split_owner  # noqa: E402
+from .record_identity import (  # noqa: E402
+    detail_identity_codes_match, detail_identity_codes_from_record_fields, detail_identity_codes_from_url, detail_query_identity_codes_from_url,
+    detail_identity_tokens, detail_redirect_identity_is_mismatched, detail_slug_title_fallback_from_url, detail_title_from_url,
+    detail_title_fallback_looks_like_code, detail_url_candidate_is_low_signal, detail_url_is_collection_like, detail_url_is_utility,
+    detail_url_looks_like_product, detail_url_matches_requested_identity, preferred_detail_identity_url, record_matches_requested_detail_identity,
+    semantic_detail_identity_tokens,
+)

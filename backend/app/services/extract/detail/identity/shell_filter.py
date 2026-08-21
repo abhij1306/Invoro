@@ -108,7 +108,10 @@ def _shell_evidence(record: dict[str, Any], page_url: str) -> _ShellEvidence:
         if isinstance(confidence_payload, dict)
         else None
     )
-    confidence = float(score) if isinstance(score, (int, float, str)) else 0.0
+    try:
+        confidence = float(score) if isinstance(score, (int, float, str)) else 0.0
+    except ValueError:
+        confidence = 0.0
     description = clean_text(record.get("description"))
     rich_pdp = (
         all(

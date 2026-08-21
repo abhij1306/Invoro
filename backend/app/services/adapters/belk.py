@@ -1,4 +1,4 @@
-# ruff: noqa: E402, F401, F821, F822
+# ruff: noqa: F401
 from __future__ import annotations
 
 import json
@@ -88,8 +88,8 @@ def _extract_listing_records(page_url: str, html: str) -> list[dict[str, Any]]:
     state_index = _state_product_index(page_url, html)
     records: list[dict[str, Any]] = []
     seen_urls: set[str] = set()
-    state_by_identity = {identity: record for record in state_index.values() if (identity := _belk_record_identity(record))}
-    for record in _dom_listing_records(page_url, html):
+    state_by_identity = {identity: record for record in state_index.values() if (identity := _split_owner._belk_record_identity(record))}
+    for record in _split_owner._dom_listing_records(page_url, html):
         merged = _merge_belk_state_record(record, state_index, state_by_identity)
         _append_belk_listing_record(records, merged, seen_urls=seen_urls)
         if len(records) >= product_limit:
@@ -109,7 +109,7 @@ def _merge_belk_state_record(
 ) -> dict[str, Any]:
     url = str(record.get("url") or "")
     state_record = state_index.get(url)
-    if state_record is None and (identity := _belk_record_identity(record)):
+    if state_record is None and (identity := _split_owner._belk_record_identity(record)):
         state_record = state_by_identity.get(identity)
     if not state_record:
         return record
@@ -122,7 +122,7 @@ def _append_belk_listing_record(records: list[dict[str, Any]], record: dict[str,
     url = str(record.get("url") or "")
     if not url or url in seen_urls:
         return
-    finalized = _finalize_adapter_record(record, surface="ecommerce_listing")
+    finalized = _split_owner._finalize_adapter_record(record, surface="ecommerce_listing")
     final_url = str(finalized.get("url") or "")
     if not final_url or final_url in seen_urls:
         return
@@ -134,10 +134,10 @@ def _extract_detail_record(page_url: str, html: str) -> dict[str, Any] | None:
     for record in _state_product_records(page_url, html, target_path=page_path):
         record_url = str(record.get("url") or "")
         if (urlparse(record_url).path or "").rstrip("/").lower() == page_path:
-            return _finalize_adapter_record(record, surface="ecommerce_detail")
-    dom_records = _dom_listing_records(page_url, html)
+            return _split_owner._finalize_adapter_record(record, surface="ecommerce_detail")
+    dom_records = _split_owner._dom_listing_records(page_url, html)
     if len(dom_records) == 1:
-        return _finalize_adapter_record(dom_records[0], surface="ecommerce_detail")
+        return _split_owner._finalize_adapter_record(dom_records[0], surface="ecommerce_detail")
     return None
 
 def _state_product_index(page_url: str, html: str) -> dict[str, dict[str, Any]]:
@@ -159,7 +159,7 @@ def _state_product_records(
     records: list[dict[str, Any]] = []
     for root in _belk_state_roots(html):
         parts = _collect_state_payload_parts(root)
-        variant_objects_by_id = _variant_objects_by_id(parts.variant_objects)
+        variant_objects_by_id = _split_owner._variant_objects_by_id(parts.variant_objects)
         for product in parts.products:
             record = _record_from_payload(
                 product,
@@ -251,12 +251,12 @@ def _looks_like_product_payload(payload: dict[str, Any]) -> bool:
     if not (keys & _BELK_PRODUCT_TITLE_KEY_SET and keys & _BELK_PRODUCT_URL_KEY_SET and keys & _BELK_PRODUCT_SIGNAL_KEY_SET):
         return False
     return bool(
-        _first_payload_field(payload, field_name="title", page_url="", keys=BELK_PRODUCT_TITLE_KEYS)
-        and _first_payload_field(payload, field_name="url", page_url="", keys=BELK_PRODUCT_URL_KEYS)
+        _split_owner._first_payload_field(payload, field_name="title", page_url="", keys=BELK_PRODUCT_TITLE_KEYS)
+        and _split_owner._first_payload_field(payload, field_name="url", page_url="", keys=BELK_PRODUCT_URL_KEYS)
         and (
-            _first_payload_field(payload, field_name="brand", page_url="", keys=BELK_PRODUCT_BRAND_KEYS)
-            or _first_payload_field(payload, field_name="price", page_url="", keys=BELK_PRODUCT_PRICE_KEYS)
-            or _first_payload_field(
+            _split_owner._first_payload_field(payload, field_name="brand", page_url="", keys=BELK_PRODUCT_BRAND_KEYS)
+            or _split_owner._first_payload_field(payload, field_name="price", page_url="", keys=BELK_PRODUCT_PRICE_KEYS)
+            or _split_owner._first_payload_field(
                 payload,
                 field_name="image_url",
                 page_url="",
@@ -273,21 +273,21 @@ def _record_from_payload(
     variant_objects_by_id: dict[str, dict[str, Any]] | None = None,
     color_name_by_code: dict[str, str] | None = None,
 ) -> dict[str, Any]:
-    title = _first_payload_field(product, field_name="title", page_url=page_url, keys=BELK_PRODUCT_TITLE_KEYS)
-    brand = _first_payload_field(product, field_name="brand", page_url=page_url, keys=BELK_PRODUCT_BRAND_KEYS)
-    price_value = _first_payload_field(product, field_name="price", page_url=page_url, keys=BELK_PRODUCT_PRICE_KEYS)
-    original_price_value = _first_payload_field(
+    title = _split_owner._first_payload_field(product, field_name="title", page_url=page_url, keys=BELK_PRODUCT_TITLE_KEYS)
+    brand = _split_owner._first_payload_field(product, field_name="brand", page_url=page_url, keys=BELK_PRODUCT_BRAND_KEYS)
+    price_value = _split_owner._first_payload_field(product, field_name="price", page_url=page_url, keys=BELK_PRODUCT_PRICE_KEYS)
+    original_price_value = _split_owner._first_payload_field(
         product,
         field_name="original_price",
         page_url=page_url,
         keys=BELK_PRODUCT_ORIGINAL_PRICE_KEYS,
     )
-    image = _first_payload_field(product, field_name="image_url", page_url=page_url, keys=BELK_PRODUCT_IMAGE_KEYS)
-    url = _first_payload_field(product, field_name="url", page_url=page_url, keys=BELK_PRODUCT_URL_KEYS)
+    image = _split_owner._first_payload_field(product, field_name="image_url", page_url=page_url, keys=BELK_PRODUCT_IMAGE_KEYS)
+    url = _split_owner._first_payload_field(product, field_name="url", page_url=page_url, keys=BELK_PRODUCT_URL_KEYS)
     # Belk's React PDP `utag_data` exposes per-SKU parallel arrays (sku_id[i] <-> sku_upc[i] <-> ...).
     # Build variant rows from those arrays joined to the variant objects, and take the
     # product-level barcode from the selected/first in-stock variant UPC.
-    sku_variants = _variants_from_sku_arrays(
+    sku_variants = _split_owner._variants_from_sku_arrays(
         product,
         page_url=page_url,
         variant_objects=variant_objects or [],
@@ -295,16 +295,16 @@ def _record_from_payload(
         color_name_by_code=color_name_by_code or {},
     )
     if sku_variants:
-        barcode = _primary_variant_barcode(sku_variants)
+        barcode = _split_owner._primary_variant_barcode(sku_variants)
     else:
-        barcode = _first_nested_payload_field(
+        barcode = _split_owner._first_nested_payload_field(
             product,
             field_name="barcode",
             page_url=page_url,
             keys=BELK_PRODUCT_BARCODE_KEYS,
         )
     if brand in (None, "", [], {}):
-        brand = _infer_belk_brand_from_url(url=str(url or ""), title=title)
+        brand = _split_owner._infer_belk_brand_from_url(url=str(url or ""), title=title)
     currency = coerce_field_value("currency", product, page_url)
     if currency in (None, "", [], {}):
         for key in (*BELK_PRODUCT_PRICE_KEYS, *BELK_PRODUCT_ORIGINAL_PRICE_KEYS):
@@ -330,7 +330,7 @@ def _record_from_payload(
             "image_url": image,
             "sku_upc": barcode,
             "barcode": barcode,
-            "product_id": _first_payload_field(
+            "product_id": _split_owner._first_payload_field(
                 product,
                 field_name="product_id",
                 page_url=page_url,
@@ -492,9 +492,4 @@ def _variant_image_url(variant: dict[str, Any], *, page_url: str) -> str | None:
     cleaned = clean_text(image)
     return absolute_url(page_url, cleaned) if cleaned else None
 
-from . import belk_dom as _split_owner
-globals().update({
-    name: value
-    for name, value in vars(_split_owner).items()
-    if not name.startswith("__") and name != "_owner"
-})
+from . import belk_dom as _split_owner  # noqa: E402

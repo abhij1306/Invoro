@@ -130,7 +130,8 @@ def _decode_firestore_number(raw: object) -> object:
     if raw is None:
         return None
     try:
-        return float(raw) if "." in str(raw) else int(str(raw))
+        text = str(raw)
+        return float(text) if "." in text else int(text)
     except (TypeError, ValueError):
         return raw
 

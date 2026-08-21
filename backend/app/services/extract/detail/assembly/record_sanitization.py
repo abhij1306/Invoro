@@ -579,7 +579,8 @@ def _clean_category_parts(parts: list[str], *, page_url: str) -> list[str]:
     return cleaned_parts
 
 def _normalized_config_tokens(values: object) -> set[str]:
-    return {cleaned.casefold() for value in tuple(values or ()) if (cleaned := clean_text(value))}
+    rows = values if isinstance(values, (list, tuple, set, frozenset)) else ()
+    return {cleaned.casefold() for value in rows if (cleaned := clean_text(value))}
 
 def _category_literal_scalar(value: object) -> object:
     if not isinstance(value, str):

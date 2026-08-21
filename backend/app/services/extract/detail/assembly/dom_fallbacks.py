@@ -159,7 +159,7 @@ class _DomFallback:
             self.add("additional_images", images[1:], source="dom_images")
 
     def add_inline_scalars(self, alias_lookup: dict[str, str]) -> None:
-        targets = {
+        targets: set[str] = {
             field
             for field in ("color", "size")
             if field in self.fields and not self.candidates.get(field)

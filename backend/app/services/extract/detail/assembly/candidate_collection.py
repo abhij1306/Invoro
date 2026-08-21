@@ -492,7 +492,7 @@ def _materialize_candidate_fields(
 
 
 def _winning_field_values(
-    field_name: str, grouped: list[tuple[str, list[object]]]
+    field_name: str, grouped: list[tuple[str | None, list[object]]]
 ) -> tuple[str | None, list[object]]:
     source = grouped[0][0] if grouped else None
     values = grouped[0][1] if grouped else []

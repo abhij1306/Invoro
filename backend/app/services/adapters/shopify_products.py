@@ -1,9 +1,20 @@
-# ruff: noqa: F401, F821
 from __future__ import annotations
 
-from . import shopify as _owner
+import json
+import re
+from urllib.parse import parse_qsl, urljoin, urlparse, urlsplit
 
-globals().update({name: value for name, value in vars(_owner).items() if not name.startswith("__")})
+from app.services.config.adapter_runtime_settings import adapter_runtime_settings
+from app.services.extract.variant_axis import normalized_variant_axis_key
+from app.services.extract.variant_identity_merge import split_variant_axes
+from app.services.extract.variant_normalization.contract import flatten_variants_for_public_output
+from app.services.normalizers import normalize_decimal_price
+
+_SHOPIFY_META_ASSIGNMENT_RE = re.compile(
+    r"(?:var\s+meta|(?:window\s*\.\s*)?ShopifyAnalytics\s*\.\s*meta)\s*=\s*",
+    re.DOTALL,
+)
+
 
 class ShopifyProductMixin:
     def _extract_embedded_product(self, html: str, url: str) -> list[dict]:

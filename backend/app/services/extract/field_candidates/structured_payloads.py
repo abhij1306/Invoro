@@ -274,7 +274,8 @@ def _collect_field_envelope_candidate(
         or payload.get("fieldName")
         or payload.get("field_name")
     )
-    label = normalize_requested_field(raw_name) or normalize_field_key(raw_name)
+    label_text = str(raw_name or "")
+    label = normalize_requested_field(label_text) or normalize_field_key(label_text)
     canonical = alias_lookup.get(label)
     if not canonical:
         return
