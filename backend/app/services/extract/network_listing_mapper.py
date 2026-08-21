@@ -53,31 +53,28 @@ def backfill_listing_rows_from_network(
             for field_name in LISTING_NETWORK_BACKFILL_FIELDS
         ):
             continue
-        candidate = None
-        row_url = str(row.get("url") or "").strip()
-        row_id = listing_identity_from_url(row_url)
-        if row_id:
-            candidate = fields_by_id.get(row_id)
-        if candidate is None:
-            row_title = clean_text(row.get("title"))
-            if row_title:
-                candidate = fields_by_title.get(row_title.lower())
+        candidate = _network_backfill_candidate(row, fields_by_id, fields_by_title)
         if not isinstance(candidate, dict):
             continue
-        price = candidate.get("price")
-        currency = candidate.get("currency")
-        brand = candidate.get("brand")
-        if price not in (None, "", [], {}) and row.get("price") in (None, "", [], {}):
-            row["price"] = price
-        if currency not in (None, "", [], {}) and row.get("currency") in (
-            None,
-            "",
-            [],
-            {},
-        ):
-            row["currency"] = currency
-        if brand not in (None, "", [], {}) and row.get("brand") in (None, "", [], {}):
-            row["brand"] = brand
+        for field_name in LISTING_NETWORK_BACKFILL_FIELDS:
+            value = candidate.get(field_name)
+            if value not in (None, "", [], {}) and row.get(field_name) in (
+                None,
+                "",
+                [],
+                {},
+            ):
+                row[field_name] = value
+
+
+def _network_backfill_candidate(
+    row: dict, fields_by_id: dict[str, dict], fields_by_title: dict[str, dict]
+) -> dict | None:
+    row_id = listing_identity_from_url(str(row.get("url") or "").strip())
+    if row_id and (candidate := fields_by_id.get(row_id)) is not None:
+        return candidate
+    title = clean_text(row.get("title"))
+    return fields_by_title.get(title.lower()) if title else None
 
 
 def extract_listing_rows_from_network(
@@ -299,61 +296,72 @@ def _listing_candidate_raw_price(candidate: dict[str, Any]) -> object | None:
     offers = candidate.get("offers")
     if isinstance(offers, list):
         offers = next((item for item in offers if isinstance(item, dict)), None)
-    for key in LISTING_NETWORK_DIRECT_PRICE_KEYS:
-        if candidate.get(key) not in (None, "", [], {}):
-            return candidate.get(key)
+    if (
+        value := _first_listing_price_value(
+            candidate, LISTING_NETWORK_DIRECT_PRICE_KEYS
+        )
+    ) is not None:
+        return value
     if isinstance(prices, dict):
         for bucket_name in LISTING_NETWORK_PRICE_BUCKETS:
             bucket = prices.get(bucket_name)
             if not isinstance(bucket, dict):
                 continue
-            for key in ("value", *LISTING_NETWORK_PRIMARY_PRICE_KEYS):
-                if bucket.get(key) not in (None, "", [], {}):
-                    return bucket.get(key)
-            for key in LISTING_NETWORK_FALLBACK_PRICE_KEYS:
-                if bucket.get(key) not in (None, "", [], {}):
-                    return bucket.get(key)
-        for key in LISTING_NETWORK_PRIMARY_PRICE_KEYS:
-            if prices.get(key) not in (None, "", [], {}):
-                return prices.get(key)
-        for key in LISTING_NETWORK_FALLBACK_PRICE_KEYS:
-            if prices.get(key) not in (None, "", [], {}):
-                return prices.get(key)
+            if (
+                value := _first_listing_price_value(
+                    bucket,
+                    (
+                        "value",
+                        *LISTING_NETWORK_PRIMARY_PRICE_KEYS,
+                        *LISTING_NETWORK_FALLBACK_PRICE_KEYS,
+                    ),
+                )
+            ) is not None:
+                return value
+        if (
+            value := _first_listing_price_value(
+                prices,
+                (
+                    *LISTING_NETWORK_PRIMARY_PRICE_KEYS,
+                    *LISTING_NETWORK_FALLBACK_PRICE_KEYS,
+                ),
+            )
+        ) is not None:
+            return value
     if isinstance(price_range, dict):
-        for key in LISTING_NETWORK_PRIMARY_PRICE_KEYS:
-            if price_range.get(key) not in (None, "", [], {}):
-                return price_range.get(key)
-        for key in LISTING_NETWORK_FALLBACK_PRICE_KEYS:
-            if price_range.get(key) not in (None, "", [], {}):
-                return price_range.get(key)
+        if (
+            value := _first_listing_price_value(
+                price_range,
+                (
+                    *LISTING_NETWORK_PRIMARY_PRICE_KEYS,
+                    *LISTING_NETWORK_FALLBACK_PRICE_KEYS,
+                ),
+            )
+        ) is not None:
+            return value
     if isinstance(offers, dict):
-        for key in LISTING_NETWORK_PRIMARY_PRICE_KEYS:
-            if offers.get(key) not in (None, "", [], {}):
-                return offers.get(key)
-        for key in LISTING_NETWORK_FALLBACK_PRICE_KEYS:
-            if offers.get(key) not in (None, "", [], {}):
-                return offers.get(key)
+        return _first_listing_price_value(
+            offers,
+            (*LISTING_NETWORK_PRIMARY_PRICE_KEYS, *LISTING_NETWORK_FALLBACK_PRICE_KEYS),
+        )
     return None
+
+
+def _first_listing_price_value(
+    payload: dict[str, Any], keys: tuple[str, ...]
+) -> object | None:
+    return next(
+        (payload[key] for key in keys if payload.get(key) not in (None, "", [], {})),
+        None,
+    )
 
 
 def _listing_candidate_currency(candidate: dict[str, Any]) -> str | None:
     prices = candidate.get("prices")
     price_range = candidate.get("priceRange")
     if isinstance(prices, dict):
-        for bucket_name in LISTING_NETWORK_PRICE_BUCKETS:
-            bucket = prices.get(bucket_name)
-            if not isinstance(bucket, dict):
-                continue
-            code = _listing_currency_code(bucket.get("currency"))
-            if code:
-                return code
-        code = _listing_currency_code(prices.get("currency"))
-        if code:
+        if code := _listing_currency_from_prices(prices):
             return code
-        for key in ("currencyCode", "priceCurrency"):
-            code = clean_text(prices.get(key))
-            if code:
-                return code
     if isinstance(price_range, dict):
         for key in ("currency", "currencyCode", "priceCurrency"):
             code = _listing_currency_code(price_range.get(key))
@@ -368,6 +376,25 @@ def _listing_candidate_currency(candidate: dict[str, Any]) -> str | None:
             return code
     return (
         clean_text(candidate.get("currency") or candidate.get("currencyCode")) or None
+    )
+
+
+def _listing_currency_from_prices(prices: dict[str, Any]) -> str | None:
+    for bucket_name in LISTING_NETWORK_PRICE_BUCKETS:
+        bucket = prices.get(bucket_name)
+        if isinstance(bucket, dict) and (
+            code := _listing_currency_code(bucket.get("currency"))
+        ):
+            return code
+    if code := _listing_currency_code(prices.get("currency")):
+        return code
+    return next(
+        (
+            code
+            for key in ("currencyCode", "priceCurrency")
+            if (code := clean_text(prices.get(key)))
+        ),
+        None,
     )
 
 

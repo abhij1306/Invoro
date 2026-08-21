@@ -201,34 +201,40 @@ def _record_url_suffix_after_title(record: dict[str, Any]) -> str:
     suffix_tokens = terminal_parts[len(title_parts) :]
     if not suffix_tokens or len(suffix_tokens) > 4:
         return ""
-    # Drop digit-only and structural tokens (e.g. "html", numeric product IDs).
-    cleaned_tokens = clean_color_tokens(suffix_tokens)
+    cleaned_tokens = _clean_url_suffix_tokens(suffix_tokens)
     if not cleaned_tokens:
         return ""
-    while cleaned_tokens and _token_looks_like_code(cleaned_tokens[-1]):
-        cleaned_tokens = cleaned_tokens[:-1]
-    while cleaned_tokens and cleaned_tokens[-1].isdigit():
-        cleaned_tokens = cleaned_tokens[:-1]
-    if not cleaned_tokens:
-        return ""
-    while (
-        len(cleaned_tokens) > 1
-        and len(cleaned_tokens[0]) <= variant_url_suffix_code_prefix_max_len
-        and cleaned_tokens[0].isalpha()
-        and cleaned_tokens[0].casefold()
-        not in size_color_extraction.variant_color_hint_words
-        and any(
-            token.casefold() in size_color_extraction.variant_color_hint_words
-            for token in cleaned_tokens[1:]
-        )
-    ):
-        cleaned_tokens = cleaned_tokens[1:]
+    cleaned_tokens = _drop_url_suffix_code_prefixes(cleaned_tokens)
     # SKU/style codes mix letters and digits inside a single token
     # (e.g. ``cl28517s``, ``vn000e9tbpg``). Real color slugs are
     # alphabetic words such as ``tuke-river`` or ``natural-black``.
     if any(_token_looks_like_code(token) for token in cleaned_tokens):
         return ""
     return title_preserving_acronyms(" ".join(cleaned_tokens))
+
+
+def _clean_url_suffix_tokens(tokens: list[str]) -> list[str]:
+    cleaned = clean_color_tokens(tokens)
+    while cleaned and (_token_looks_like_code(cleaned[-1]) or cleaned[-1].isdigit()):
+        cleaned.pop()
+    return cleaned
+
+
+def _drop_url_suffix_code_prefixes(tokens: list[str]) -> list[str]:
+    while len(tokens) > 1 and _is_url_suffix_code_prefix(tokens):
+        tokens = tokens[1:]
+    return tokens
+
+
+def _is_url_suffix_code_prefix(tokens: list[str]) -> bool:
+    first = tokens[0]
+    hints = size_color_extraction.variant_color_hint_words
+    return (
+        len(first) <= variant_url_suffix_code_prefix_max_len
+        and first.isalpha()
+        and first.casefold() not in hints
+        and any(token.casefold() in hints for token in tokens[1:])
+    )
 
 
 def _token_looks_like_code(token: str) -> bool:

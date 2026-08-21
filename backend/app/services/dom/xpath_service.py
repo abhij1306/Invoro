@@ -29,41 +29,47 @@ def extract_selector_value(
     xpath: str | None = None,
     regex: str | None = None,
 ) -> tuple[str | None, int, str | None]:
-    resolved_xpath: str | None = None
-    if xpath:
-        resolved_xpath, _ = validate_or_convert_xpath(xpath)
-    if resolved_xpath:
-        tree = _build_xpath_tree(html_text)
-        if tree is not None:
-            try:
-                matches = tree.xpath(resolved_xpath)
-            except etree.XPathError:
-                matches = []
-            values = _coerce_xpath_matches(matches[:12])
-            if values:
-                filtered_values = _apply_regex_filter(regex, values)
-                if filtered_values:
-                    return filtered_values[0], len(filtered_values), resolved_xpath
-                if not regex:
-                    return values[0], len(values), resolved_xpath
-    if css_selector:
-        soup = BeautifulSoup(html_text, "html.parser")
-        normalized = _normalize_css_selector(css_selector)
-        matches = soup.select(normalized) if normalized else []
-        if matches:
-            values = [
-                value for value in (_node_value(node) for node in matches[:12]) if value
-            ]
-            filtered_values = _apply_regex_filter(regex, values)
-            if filtered_values:
-                return filtered_values[0], len(filtered_values), css_selector
-            if not regex:
-                return values[0], len(values), css_selector
+    if xpath_result := _extract_xpath_value(html_text, xpath=xpath, regex=regex):
+        return xpath_result
+    if css_result := _extract_css_value(html_text, css_selector=css_selector, regex=regex):
+        return css_result
     if regex and not xpath and not css_selector:
         filtered_values = _apply_regex_filter(regex, [html_text])
         if filtered_values:
             return filtered_values[0], len(filtered_values), regex
     return None, 0, None
+
+
+def _extract_xpath_value(
+    html_text: str, *, xpath: str | None, regex: str | None
+) -> tuple[str, int, str] | None:
+    resolved_xpath = validate_or_convert_xpath(xpath)[0] if xpath else None
+    tree = _build_xpath_tree(html_text) if resolved_xpath else None
+    if tree is None or resolved_xpath is None:
+        return None
+    try:
+        matches = tree.xpath(resolved_xpath)
+    except etree.XPathError:
+        return None
+    values = _coerce_xpath_matches(matches[:12])
+    filtered = _apply_regex_filter(regex, values)
+    if filtered:
+        return filtered[0], len(filtered), resolved_xpath
+    return (values[0], len(values), resolved_xpath) if values and not regex else None
+
+
+def _extract_css_value(
+    html_text: str, *, css_selector: str | None, regex: str | None
+) -> tuple[str, int, str] | None:
+    if not css_selector:
+        return None
+    normalized = _normalize_css_selector(css_selector)
+    matches = BeautifulSoup(html_text, "html.parser").select(normalized) if normalized else []
+    values = [value for node in matches[:12] if (value := _node_value(node))]
+    filtered = _apply_regex_filter(regex, values)
+    if filtered:
+        return filtered[0], len(filtered), css_selector
+    return (values[0], len(values), css_selector) if values and not regex else None
 
 
 def validate_or_convert_xpath(candidate: str) -> tuple[str | None, str | None]:
@@ -314,17 +320,17 @@ def _looks_like_css_selector(candidate: str) -> bool:
         return False
     if _xpath_function_names(normalized):
         return False
-    if "#" in normalized:
-        return True
-    if _contains_css_class_selector(normalized):
-        return True
-    if any(token in normalized for token in (">", "+", "~", ",")):
-        return True
-    if " " in normalized and "/" not in normalized:
-        return True
-    if "[" in normalized and "]" in normalized and "=" in normalized:
-        return True
-    return False
+    return _has_css_selector_syntax(normalized)
+
+
+def _has_css_selector_syntax(value: str) -> bool:
+    return bool(
+        "#" in value
+        or _contains_css_class_selector(value)
+        or any(token in value for token in (">", "+", "~", ","))
+        or (" " in value and "/" not in value)
+        or ("[" in value and "]" in value and "=" in value)
+    )
 
 
 def _contains_css_class_selector(candidate: str) -> bool:

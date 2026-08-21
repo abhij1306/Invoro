@@ -146,6 +146,32 @@ def _option_flag_availability(node: Any, label_node: Any | None) -> str | None:
 def variant_option_availability(
     *, node: Any, label_node: Any | None
 ) -> tuple[str | None, int | None]:
+    attr_probe, text_probe = _variant_option_availability_probes(node, label_node)
+    flag_availability = _option_flag_availability(node, label_node)
+    if flag_availability == "out_of_stock":
+        return "out_of_stock", 0
+    if any(token in attr_probe for token in VARIANT_OPTION_OUT_OF_STOCK_CLASS_TOKENS):
+        return "out_of_stock", 0
+    stock_match = VARIANT_OPTION_STOCK_LEFT_PATTERN.search(text_probe)
+    if stock_match:
+        quantity = int(stock_match.group(1))
+        return ("in_stock" if quantity > 0 else "out_of_stock"), quantity
+    if any(phrase in text_probe for phrase in VARIANT_OPTION_OUT_OF_STOCK_TEXT_PHRASES):
+        return "out_of_stock", 0
+    if _option_node_is_disabled(node, label_node) and not _option_node_is_selected(
+        node, label_node
+    ):
+        return "out_of_stock", 0
+    if flag_availability == "in_stock":
+        return "in_stock", None
+    if any(phrase in text_probe for phrase in VARIANT_OPTION_IN_STOCK_TEXT_PHRASES):
+        return "in_stock", None
+    return None, None
+
+
+def _variant_option_availability_probes(
+    node: Any, label_node: Any | None
+) -> tuple[str, str]:
     attr_probe_parts: list[str] = []
     text_probe_parts: list[str] = []
     for candidate in (
@@ -169,32 +195,7 @@ def variant_option_availability(
             text_probe_parts.append(candidate.get_text(" ", strip=True))
     attr_probe = clean_text(" ".join(attr_probe_parts)).lower()
     text_probe = clean_text(" ".join(text_probe_parts)).lower()
-
-    # Explicit machine-readable data-* availability flags win first; they are
-    # unconditional and not affected by selected state.
-    flag_availability = _option_flag_availability(node, label_node)
-    if flag_availability == "out_of_stock":
-        return "out_of_stock", 0
-    if any(token in attr_probe for token in VARIANT_OPTION_OUT_OF_STOCK_CLASS_TOKENS):
-        return "out_of_stock", 0
-    stock_match = VARIANT_OPTION_STOCK_LEFT_PATTERN.search(text_probe)
-    if stock_match:
-        quantity = int(stock_match.group(1))
-        return ("in_stock" if quantity > 0 else "out_of_stock"), quantity
-    if any(phrase in text_probe for phrase in VARIANT_OPTION_OUT_OF_STOCK_TEXT_PHRASES):
-        return "out_of_stock", 0
-    # A disabled/aria-disabled control (or disabled class) marks the option out
-    # of stock unless it is the currently selected option, which is commonly
-    # disabled to lock the active choice in place.
-    if _option_node_is_disabled(node, label_node) and not _option_node_is_selected(
-        node, label_node
-    ):
-        return "out_of_stock", 0
-    if flag_availability == "in_stock":
-        return "in_stock", None
-    if any(phrase in text_probe for phrase in VARIANT_OPTION_IN_STOCK_TEXT_PHRASES):
-        return "in_stock", None
-    return None, None
+    return attr_probe, text_probe
 
 
 def variant_option_url(
@@ -213,6 +214,19 @@ def variant_option_url(
         "data-link",
         "data-variant-url",
     )
+    candidates = _variant_option_url_candidates(node, label_node)
+    for candidate in candidates:
+        if candidate is None or not hasattr(candidate, "get"):
+            continue
+        for attr_name in attr_names:
+            raw = candidate.get(attr_name)
+            url = text_or_none(raw)
+            if url:
+                return absolute_url(page_url, url)
+    return None
+
+
+def _variant_option_url_candidates(node: Any, label_node: Any | None) -> list[Any]:
     candidates: list[Any] = [node, label_node]
     if hasattr(node, "find_parent"):
         parent_anchor = node.find_parent("a", href=True)
@@ -230,15 +244,7 @@ def variant_option_url(
         anchor = label_node.find("a", href=True)
         if anchor is not None:
             candidates.append(anchor)
-    for candidate in candidates:
-        if candidate is None or not hasattr(candidate, "get"):
-            continue
-        for attr_name in attr_names:
-            raw = candidate.get(attr_name)
-            url = text_or_none(raw)
-            if url:
-                return absolute_url(page_url, url)
-    return None
+    return candidates
 
 
 def merge_variant_option_state(

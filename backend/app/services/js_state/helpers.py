@@ -26,72 +26,86 @@ def select_variant(
         if str(key).strip() and str(value).strip()
     ]
     requested_variant_id = next(
-        (value for key, value in query_pairs if key == "variant"),
-        "",
+        (value for key, value in query_pairs if key == "variant"), ""
     )
-    if requested_variant_id:
-        matched = next(
-            (
-                variant
-                for variant in variants
-                if text_or_none(variant.get("variant_id")) == requested_variant_id
-            ),
-            None,
-        )
-        if matched is not None:
-            return matched
+    matched = _variant_with_id(variants, requested_variant_id)
+    if matched is not None:
+        return matched
     requested_axes = {
         axis_key: value
         for key, value in query_pairs
         if (axis_key := normalized_variant_axis_key(key))
     }
     if requested_axes:
-        matches = [
-            variant
-            for variant in variants
-            if _variant_matches_requested_axes(variant, requested_axes)
-        ]
-        if matches:
-            return next(
-                (
-                    variant
-                    for variant in matches
-                    if variant.get("availability") == "in_stock"
-                ),
-                matches[0],
-            )
-        partial_matches = [
-            variant
-            for variant in variants
-            if any(
-                _variant_axis_matches(
-                    variant,
-                    axis_key=axis_key,
-                    requested_value=requested_value,
-                )
-                for axis_key, requested_value in requested_axes.items()
-            )
-        ]
-        if partial_matches:
-            ranked_matches = sorted(
-                partial_matches,
-                key=lambda variant: (
-                    -sum(
-                        1
-                        for axis_key, requested_value in requested_axes.items()
-                        if _variant_axis_matches(
-                            variant,
-                            axis_key=axis_key,
-                            requested_value=requested_value,
-                        )
-                    ),
-                    0 if availability_value(variant) == "in_stock" else 1,
-                ),
-            )
-            return ranked_matches[0]
+        matched = _variant_with_axes(variants, requested_axes)
+        if matched is not None:
+            return matched
     if len(variants) == 1:
         return variants[0]
     return None
+
+
+def _variant_with_id(
+    variants: list[dict[str, Any]], requested_variant_id: str
+) -> dict[str, Any] | None:
+    if not requested_variant_id:
+        return None
+    return next(
+        (
+            variant
+            for variant in variants
+            if text_or_none(variant.get("variant_id")) == requested_variant_id
+        ),
+        None,
+    )
+
+
+def _variant_with_axes(
+    variants: list[dict[str, Any]], requested_axes: dict[str, str]
+) -> dict[str, Any] | None:
+    matches = [
+        variant
+        for variant in variants
+        if _variant_matches_requested_axes(variant, requested_axes)
+    ]
+    if matches:
+        return next(
+            (
+                variant
+                for variant in matches
+                if variant.get("availability") == "in_stock"
+            ),
+            matches[0],
+        )
+    partial_matches = [
+        variant
+        for variant in variants
+        if _variant_matches_any_requested_axis(variant, requested_axes)
+    ]
+    return min(
+        partial_matches,
+        key=lambda variant: _partial_variant_rank(variant, requested_axes),
+        default=None,
+    )
+
+
+def _variant_matches_any_requested_axis(
+    variant: dict[str, Any], requested_axes: dict[str, str]
+) -> bool:
+    return any(
+        _variant_axis_matches(variant, axis_key=key, requested_value=value)
+        for key, value in requested_axes.items()
+    )
+
+
+def _partial_variant_rank(
+    variant: dict[str, Any], requested_axes: dict[str, str]
+) -> tuple[int, int]:
+    match_count = sum(
+        _variant_axis_matches(variant, axis_key=key, requested_value=value)
+        for key, value in requested_axes.items()
+    )
+    return -match_count, 0 if availability_value(variant) == "in_stock" else 1
 
 
 def _variant_matches_requested_axes(
@@ -203,17 +217,9 @@ def availability_value(value: dict[str, Any] | None) -> str | None:
     )
     cleaned = text_or_none(raw)
     if cleaned:
-        coerced = coerce_availability_value(cleaned)
-        if coerced:
-            return coerced
-        lowered = cleaned.lower()
-        if lowered in in_stock_aliases:
-            return "in_stock"
-        if lowered in out_of_stock_aliases:
-            return "out_of_stock"
-        if lowered in {"limited stock", "low stock"}:
-            return "limited_stock"
-        return cleaned
+        return _normalized_availability_text(
+            cleaned, in_stock_aliases, out_of_stock_aliases
+        )
     for key in JS_STATE_VARIANT_AVAILABILITY_BOOL_KEYS:
         available = value.get(key)
         if isinstance(available, bool):
@@ -229,6 +235,21 @@ def availability_value(value: dict[str, Any] | None) -> str | None:
     if qty is None:
         return None
     return "in_stock" if qty > 0 else "out_of_stock"
+
+
+def _normalized_availability_text(
+    cleaned: str, in_stock_aliases: set[str], out_of_stock_aliases: set[str]
+) -> str:
+    if coerced := coerce_availability_value(cleaned):
+        return coerced
+    lowered = cleaned.lower()
+    if lowered in in_stock_aliases:
+        return "in_stock"
+    if lowered in out_of_stock_aliases:
+        return "out_of_stock"
+    if lowered in {"limited stock", "low stock"}:
+        return "limited_stock"
+    return cleaned
 
 
 def stock_quantity(value: dict[str, Any] | None) -> int | None:

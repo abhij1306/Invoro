@@ -325,8 +325,12 @@ def _collapse_tokenized_code_block(body: str) -> str:
     if avg_len > 20 or single_token / len(non_empty) < 0.6:
         return body
 
-    BREAK_AFTER = re.compile(r"[;{},]$")
-    BREAK_BEFORE = re.compile(r"^(def |class |if |for |while |return |#|import |from )")
+    return _collapse_token_lines(lines)
+
+
+def _collapse_token_lines(lines: list[str]) -> str:
+    break_after = re.compile(r"[;{},]$")
+    break_before = re.compile(r"^(def |class |if |for |while |return |#|import |from )")
     result: list[str] = []
     current: list[str] = []
     for raw in lines:
@@ -338,11 +342,11 @@ def _collapse_tokenized_code_block(body: str) -> str:
                 current = []
             result.append("")
             continue
-        if current and BREAK_BEFORE.match(stripped):
+        if current and break_before.match(stripped):
             result.append(" ".join(current))
             current = []
         current.append(stripped)
-        if BREAK_AFTER.search(stripped) or stripped.startswith("#"):
+        if break_after.search(stripped) or stripped.startswith("#"):
             result.append(" ".join(current))
             current = []
     if current:
@@ -442,141 +446,105 @@ def _container_markdown(container: Tag, page_url: str) -> str:
     return _collapse_tokenized_code_blocks(raw)
 
 
+def _script_markdown(child: Tag, name: str, page_url: str) -> tuple[bool, list[str]]:
+    del page_url
+    if name != "script":
+        return False, []
+    script_type = _attribute_text(child.get("type")).lower()
+    latex = clean_text(child.get_text()) if "math/tex" in script_type else ""
+    if not latex:
+        return True, []
+    return True, [f"\\[{latex}\\]" if "display" in script_type else f"\\({latex}\\)"]
+
+
+def _text_block_markdown(
+    child: Tag, name: str, page_url: str
+) -> tuple[bool, list[str]]:
+    if name in {"style", "noscript", "template"}:
+        return True, []
+    if name in {"h1", "h2", "h3", "h4", "h5", "h6"}:
+        text = _inline_markdown(child, page_url)
+        return True, [f"{'#' * int(name[1])} {text}"] if text else []
+    if name in {"p", "summary"}:
+        text = _inline_markdown(child, page_url)
+        return True, [text] if text else []
+    if name == "a":
+        text = _inline_markdown(child, page_url)
+        href = absolute_url(page_url, child.get("href"))
+        return True, [
+            f"[{clean_text(text)}]({href})" if href else clean_text(text)
+        ] if text else []
+    if name == "img":
+        src = absolute_url(page_url, child.get("src") or child.get("data-src"))
+        alt = clean_text(child.get("alt") or "")
+        return True, [f"![{alt}]({src})"] if src else []
+    return False, []
+
+
+def _list_markdown(child: Tag, name: str, page_url: str) -> tuple[bool, list[str]]:
+    if name not in {"ul", "ol", "li"}:
+        return False, []
+    if name == "li":
+        text = _inline_markdown(child, page_url)
+        return True, [f"- {text}"] if text else []
+    rows: list[str] = []
+    for index, item in enumerate(child.find_all("li", recursive=False), start=1):
+        if text := _inline_markdown(item, page_url):
+            prefix = "- " if name == "ul" else f"{index}. "
+            rows.append(f"{prefix}{text}")
+    return True, rows
+
+
+def _pre_markdown(child: Tag, name: str, page_url: str) -> tuple[bool, list[str]]:
+    del page_url
+    if name != "pre":
+        return False, []
+    lang = _code_language(child)
+    code_node = child.find("code")
+    raw = (code_node if isinstance(code_node, Tag) else child).get_text("", strip=False)
+    text = "\n".join(line.rstrip() for line in raw.splitlines()).strip()
+    return True, [f"```{lang}\n{text}\n```"] if text else []
+
+
+def _blockquote_markdown(
+    child: Tag, name: str, page_url: str
+) -> tuple[bool, list[str]]:
+    if name != "blockquote":
+        return False, []
+    rows = [
+        "\n".join(f"> {part}" for part in inner.splitlines()) if inner.strip() else ">"
+        for inner in _markdown_lines(child, page_url)
+    ]
+    return True, rows
+
+
+def _tag_markdown_lines(child: Tag, page_url: str) -> list[str]:
+    name = str(child.name or "").lower()
+    handlers = (
+        _script_markdown,
+        _text_block_markdown,
+        _list_markdown,
+        _pre_markdown,
+        _blockquote_markdown,
+    )
+    for handler in handlers:
+        handled, rows = handler(child, name, page_url)
+        if handled:
+            return rows
+    if not _has_markdown_block_child(child):
+        text = _inline_markdown(child, page_url)
+        return [text] if text else []
+    return _markdown_lines(child, page_url)
+
+
 def _markdown_lines(node: Tag, page_url: str) -> list[str]:
     lines: list[str] = []
     for child in node.children:
         if isinstance(child, NavigableString):
-            if isinstance(child, Comment):
-                continue
-            text = clean_text(str(child))
-            if text:
+            if not isinstance(child, Comment) and (text := clean_text(str(child))):
                 lines.append(text)
-            continue
-        if not isinstance(child, Tag):
-            continue
-        name = str(child.name or "").lower()
-
-        # ------------------------------------------------------------------ #
-        # Script — only care about MathJax embedded LaTeX                     #
-        # ------------------------------------------------------------------ #
-        if name == "script":
-            script_type = _attribute_text(child.get("type")).lower()
-            if "math/tex" in script_type:
-                latex = clean_text(child.get_text())
-                if latex:
-                    if "display" in script_type:
-                        lines.append(f"\\[{latex}\\]")
-                    else:
-                        lines.append(f"\\({latex}\\)")
-            continue
-
-        if name in {"style", "noscript", "template"}:
-            continue
-
-        # ------------------------------------------------------------------ #
-        # Headings                                                             #
-        # ------------------------------------------------------------------ #
-        if name in {"h1", "h2", "h3", "h4", "h5", "h6"}:
-            level = int(name[1])
-            text = _inline_markdown(child, page_url)
-            if text:
-                lines.append(f"{'#' * level} {text}")
-            continue
-
-        # ------------------------------------------------------------------ #
-        # Paragraphs / summary                                                 #
-        # ------------------------------------------------------------------ #
-        if name in {"p", "summary"}:
-            text = _inline_markdown(child, page_url)
-            if text:
-                lines.append(text)
-            continue
-
-        # ------------------------------------------------------------------ #
-        # Standalone anchor                                                    #
-        # ------------------------------------------------------------------ #
-        if name == "a":
-            text = _inline_markdown(child, page_url)
-            href = absolute_url(page_url, child.get("href"))
-            if text:
-                lines.append(
-                    f"[{clean_text(text)}]({href})" if href else clean_text(text)
-                )
-            continue
-
-        # ------------------------------------------------------------------ #
-        # Images                                                               #
-        # ------------------------------------------------------------------ #
-        if name == "img":
-            src = absolute_url(page_url, child.get("src") or child.get("data-src"))
-            alt = clean_text(child.get("alt") or "")
-            if src:
-                lines.append(f"![{alt}]({src})")
-            continue
-
-        # ------------------------------------------------------------------ #
-        # Lists — handle ol/ul explicitly to preserve numbering and avoid     #
-        # double-nesting when li items contain block children.                #
-        # ------------------------------------------------------------------ #
-        if name == "ul":
-            for item in child.find_all("li", recursive=False):
-                text = _inline_markdown(item, page_url)
-                if text:
-                    lines.append(f"- {text}")
-            continue
-
-        if name == "ol":
-            for idx, item in enumerate(child.find_all("li", recursive=False), start=1):
-                text = _inline_markdown(item, page_url)
-                if text:
-                    lines.append(f"{idx}. {text}")
-            continue
-
-        # Bare <li> outside a list container (malformed HTML) — treat as bullet
-        if name == "li":
-            text = _inline_markdown(child, page_url)
-            if text:
-                lines.append(f"- {text}")
-            continue
-
-        # ------------------------------------------------------------------ #
-        # Preformatted / code blocks                                           #
-        # ------------------------------------------------------------------ #
-        if name == "pre":
-            lang = _code_language(child)
-            # Use inner <code> text when present so we strip the wrapper tag.
-            code_node = child.find("code")
-            raw_text = (code_node if isinstance(code_node, Tag) else child).get_text(
-                "", strip=False
-            )
-            # Normalise trailing whitespace per line but keep empty lines.
-            text = "\n".join(ln.rstrip() for ln in raw_text.splitlines()).strip()
-            if text:
-                lines.append(f"```{lang}\n{text}\n```")
-            continue
-
-        # ------------------------------------------------------------------ #
-        # Blockquote                                                           #
-        # ------------------------------------------------------------------ #
-        if name == "blockquote":
-            inner_lines = _markdown_lines(child, page_url)
-            for inner in inner_lines:
-                if inner.strip():
-                    lines.append("\n".join(f"> {part}" for part in inner.splitlines()))
-                else:
-                    lines.append(">")
-            continue
-
-        # ------------------------------------------------------------------ #
-        # Generic container — recurse if it has block children                #
-        # ------------------------------------------------------------------ #
-        if not _has_markdown_block_child(child):
-            text = _inline_markdown(child, page_url)
-            if text:
-                lines.append(text)
-            continue
-
-        lines.extend(_markdown_lines(child, page_url))
+        elif isinstance(child, Tag):
+            lines.extend(_tag_markdown_lines(child, page_url))
     return lines
 
 
@@ -625,48 +593,52 @@ def _inline_markdown(node: Tag, page_url: str) -> str:
             continue
         if not isinstance(child, Tag):
             continue
-        name = str(child.name or "").lower()
-
-        if name == "br":
-            parts.append("\n")
-            continue
-
-        if name == "script":
-            script_type = _attribute_text(child.get("type")).lower()
-            if "math/tex" in script_type:
-                latex = clean_text(child.get_text())
-                if latex:
-                    if "display" in script_type:
-                        parts.append(f"\\[{latex}\\]")
-                    else:
-                        parts.append(f"\\({latex}\\)")
-            continue
-
-        if name in {"style", "noscript", "template"}:
-            continue
-
-        text = _inline_markdown(child, page_url) or child.get_text(" ", strip=True)
-        if not text:
-            continue
-
-        if name == "a":
-            href = absolute_url(page_url, child.get("href"))
-            parts.append(f"[{clean_text(text)}]({href})" if href else text)
-        elif name == "img":
-            src = absolute_url(page_url, child.get("src") or child.get("data-src"))
-            alt = clean_text(child.get("alt") or "")
-            if src:
-                parts.append(f"![{alt}]({src})")
-        elif name == "code":
-            parts.append(f"`{clean_text(text)}`")
-        elif name in {"strong", "b"}:
-            parts.append(f"**{clean_text(text)}**")
-        elif name in {"em", "i"}:
-            parts.append(f"*{clean_text(text)}*")
-        else:
-            parts.append(text)
+        value = _inline_tag_markdown(child, page_url)
+        if value:
+            parts.append(value)
 
     return _clean_markdown_inline("".join(parts))
+
+
+def _inline_tag_markdown(child: Tag, page_url: str) -> str:
+    name = str(child.name or "").lower()
+    if name == "br":
+        return "\n"
+    if name == "script":
+        return _inline_script_markdown(child)
+    if name in {"style", "noscript", "template"}:
+        return ""
+    text = _inline_markdown(child, page_url) or child.get_text(" ", strip=True)
+    if not text:
+        return ""
+    if name == "a":
+        return _inline_link_markdown(child, text, page_url)
+    if name == "img":
+        src = absolute_url(page_url, child.get("src") or child.get("data-src"))
+        alt = clean_text(child.get("alt") or "")
+        return f"![{alt}]({src})" if src else ""
+    wrappers = {
+        "code": ("`", "`"),
+        "strong": ("**", "**"),
+        "b": ("**", "**"),
+        "em": ("*", "*"),
+        "i": ("*", "*"),
+    }
+    prefix, suffix = wrappers.get(name, ("", ""))
+    return f"{prefix}{clean_text(text)}{suffix}" if prefix else text
+
+
+def _inline_script_markdown(child: Tag) -> str:
+    script_type = _attribute_text(child.get("type")).lower()
+    latex = clean_text(child.get_text()) if "math/tex" in script_type else ""
+    if not latex:
+        return ""
+    return f"\\[{latex}\\]" if "display" in script_type else f"\\({latex}\\)"
+
+
+def _inline_link_markdown(child: Tag, text: str, page_url: str) -> str:
+    href = absolute_url(page_url, child.get("href"))
+    return f"[{clean_text(text)}]({href})" if href else text
 
 
 def _clean_markdown_inline(value: str) -> str:

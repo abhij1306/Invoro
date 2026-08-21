@@ -45,19 +45,7 @@ def _structured_listing_record(
         finalized = finalize_candidate_value(field_name, candidates.get(field_name, []))
         if finalized not in (None, "", [], {}):
             record[field_name] = finalized
-    preferred_title = coerce_text(payload.get("name") or payload.get("title"))
-    if preferred_title:
-        record["title"] = preferred_title
-    if not record.get("url"):
-        fallback_url = _structured_listing_url(payload, page_url)
-        if fallback_url:
-            record["url"] = fallback_url
-    if not record.get("image_url"):
-        raw_image = payload.get("image")
-        if raw_image:
-            image_urls = extract_urls(raw_image, page_url)
-            if image_urls:
-                record["image_url"] = image_urls[0]
+    _apply_preferred_structured_fields(record, payload, page_url=page_url)
     url = str(record.get("url") or "")
     if not url:
         return {}
@@ -71,6 +59,21 @@ def _structured_listing_record(
     if listing_url_is_structural(url, page_url):
         return {}
     return finalize_listing_price_fields(finalize_record(record, surface=surface))
+
+
+def _apply_preferred_structured_fields(
+    record: dict[str, Any], payload: dict[str, Any], *, page_url: str
+) -> None:
+    if preferred_title := coerce_text(payload.get("name") or payload.get("title")):
+        record["title"] = preferred_title
+    if not record.get("url") and (
+        fallback_url := _structured_listing_url(payload, page_url)
+    ):
+        record["url"] = fallback_url
+    if record.get("image_url") or not payload.get("image"):
+        return
+    if image_urls := extract_urls(payload["image"], page_url):
+        record["image_url"] = image_urls[0]
 
 
 def _structured_listing_url(payload: dict[str, Any], page_url: str) -> str | None:
@@ -126,29 +129,11 @@ def _structured_listing_items(
     for candidate in _listing_payload_candidates(payload):
         if not isinstance(candidate, dict):
             continue
-        raw_type = candidate.get("@type")
-        normalized_type = (
-            " ".join(raw_type) if isinstance(raw_type, list) else str(raw_type or "")
-        ).lower()
+        normalized_type = _normalized_payload_type(candidate)
         if "itemlist" in normalized_type:
-            item_list = candidate.get("itemListElement")
-            for item in item_list or []:
-                entry = item.get("item") if isinstance(item, dict) else None
-                if isinstance(entry, dict):
-                    items.append(entry)
-                elif isinstance(item, dict):
-                    items.append(item)
+            items.extend(_item_list_entries(candidate.get("itemListElement")))
             continue
-        is_typed_listing_node = any(
-            token in normalized_type
-            for token in (
-                "product",
-                "jobposting",
-                "article",
-                "newsarticle",
-                "blogposting",
-            )
-        )
+        is_typed_listing_node = _is_typed_listing_node(normalized_type)
         if allow_standalone_typed and is_typed_listing_node:
             items.append(candidate)
             continue
@@ -157,6 +142,23 @@ def _structured_listing_items(
         if _looks_like_untyped_listing_payload(candidate):
             items.append(candidate)
     return items
+
+
+def _item_list_entries(value: object) -> list[dict[str, Any]]:
+    entries: list[dict[str, Any]] = []
+    for item in value if isinstance(value, list) else []:
+        if not isinstance(item, dict):
+            continue
+        nested = item.get("item")
+        entries.append(nested if isinstance(nested, dict) else item)
+    return entries
+
+
+def _is_typed_listing_node(normalized_type: str) -> bool:
+    return any(
+        token in normalized_type
+        for token in ("product", "jobposting", "article", "newsarticle", "blogposting")
+    )
 
 
 def _listing_payload_candidates(payload: dict[str, Any]) -> list[dict[str, Any]]:

@@ -47,6 +47,29 @@ class SaaSHRAdapter(PublicEndpointAdapter):
         if not ein_id or not career_portal_id:
             return []
         base_url = f"{parsed.scheme}://{parsed.netloc}"
+        return await self._collect_board_records(
+            board_url=board_url,
+            base_url=base_url,
+            company_code=company_code,
+            ein_id=ein_id,
+            career_portal_id=career_portal_id,
+            lang=lang,
+            target_job_id=target_job_id,
+            proxy=proxy,
+        )
+
+    async def _collect_board_records(
+        self,
+        *,
+        board_url: str,
+        base_url: str,
+        company_code: str,
+        ein_id: str,
+        career_portal_id: str,
+        lang: str,
+        target_job_id: str,
+        proxy: str | None,
+    ) -> list[dict]:
         records: list[dict] = []
         seen_ids: set[str] = set()
         size = int(adapter_runtime_settings.saashr_pagination_size)
@@ -65,15 +88,8 @@ class SaaSHRAdapter(PublicEndpointAdapter):
                 }
             )
             endpoint = f"{base_url}/ta/rest/ui/recruitment/companies/%7C{company_code}/job-requisitions?{query}"
-            try:
-                payload = await self._request_json(
-                    endpoint,
-                    proxy=proxy,
-                    timeout_seconds=adapter_runtime_settings.ats_request_timeout_seconds,
-                )
-                if not isinstance(payload, dict):
-                    break
-            except (OSError, RuntimeError, ValueError, TypeError):
+            payload = await self._request_page(endpoint, proxy=proxy)
+            if payload is None:
                 break
             if company_name is None:
                 company_name = await self._fetch_company_name(
@@ -87,27 +103,59 @@ class SaaSHRAdapter(PublicEndpointAdapter):
             rows = payload.get("job_requisitions", [])
             if not isinstance(rows, list) or not rows:
                 break
-            for row in rows:
-                normalized = self._normalize_row(
-                    row,
-                    board_url=board_url,
-                    company_name=company_name,
-                )
-                if not normalized:
-                    continue
-                job_id = str(normalized.get("job_id") or "").strip()
-                if target_job_id and job_id != target_job_id:
-                    continue
-                if job_id in seen_ids:
-                    continue
-                seen_ids.add(job_id)
-                records.append(normalized)
-                if target_job_id and records:
-                    return records
+            if self._append_rows(
+                records,
+                rows,
+                board_url=board_url,
+                company_name=company_name,
+                target_job_id=target_job_id,
+                seen_ids=seen_ids,
+            ):
+                return records
             if len(rows) < size:
                 break
             offset += size
         return records
+
+    async def _request_page(
+        self, endpoint: str, *, proxy: str | None
+    ) -> dict | None:
+        try:
+            payload = await self._request_json(
+                endpoint,
+                proxy=proxy,
+                timeout_seconds=adapter_runtime_settings.ats_request_timeout_seconds,
+            )
+        except (OSError, RuntimeError, ValueError, TypeError):
+            return None
+        return payload if isinstance(payload, dict) else None
+
+    def _append_rows(
+        self,
+        records: list[dict],
+        rows: list[object],
+        *,
+        board_url: str,
+        company_name: str | None,
+        target_job_id: str,
+        seen_ids: set[str],
+    ) -> bool:
+        for row in rows:
+            normalized = self._normalize_row(
+                row, board_url=board_url, company_name=company_name
+            )
+            if not normalized:
+                continue
+            job_id = str(normalized.get("job_id") or "").strip()
+            if target_job_id and job_id != target_job_id:
+                continue
+            if job_id in seen_ids:
+                continue
+            seen_ids.add(job_id)
+            records.append(normalized)
+            if target_job_id:
+                return True
+        return False
 
     async def _fetch_company_name(
         self,

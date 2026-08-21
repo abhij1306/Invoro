@@ -102,141 +102,159 @@ def _sanitize_detail_variant_payload(
     _drop_variant_derived_parent_axis_scalars(record)
 
 
-def sanitize_variant_row(
-    variant: dict[str, Any],
-    *,
-    identity_url: str,
-    title_hint: str = "",
+def _sanitize_variant_option_values(
+    variant: dict[str, Any], *, identity_url: str
 ) -> bool:
-    axis_value_rejected = False
     option_values = variant.get("option_values")
-    if isinstance(option_values, dict):
-        cleaned_options: dict[str, str] = {}
-        for axis_name, axis_value in option_values.items():
-            axis_key = normalized_variant_axis_key(axis_name)
-            cleaned_value = clean_text(axis_value)
-            if not axis_key or not cleaned_value:
-                continue
-            if (
-                axis_key.startswith("toggle")
-                or _variant_option_value_is_noise(cleaned_value)
-                or _amazon_variant_axis_value_is_noise(
-                    cleaned_value,
-                    axis_key=axis_key,
-                    identity_url=identity_url,
-                )
-            ):
-                axis_value_rejected = True
-                continue
-            if not variant_axis_name_is_semantic(axis_name):
-                continue
-            cleaned_options[axis_key] = cleaned_value
-            if axis_key in {"size", "color"} and variant.get(axis_key) not in (
-                None,
-                "",
-                [],
-                {},
-            ):
-                variant[axis_key] = cleaned_value
-        if cleaned_options:
-            variant["option_values"] = cleaned_options
-        else:
-            variant.pop("option_values", None)
+    if not isinstance(option_values, dict):
+        return False
+    cleaned: dict[str, str] = {}
+    rejected = False
+    for axis_name, axis_value in option_values.items():
+        axis_key = normalized_variant_axis_key(axis_name)
+        value = clean_text(axis_value)
+        if not axis_key or not value:
+            continue
+        noisy = (
+            axis_key.startswith("toggle")
+            or _variant_option_value_is_noise(value)
+            or _amazon_variant_axis_value_is_noise(
+                value, axis_key=axis_key, identity_url=identity_url
+            )
+        )
+        if noisy:
+            rejected = True
+            continue
+        if not variant_axis_name_is_semantic(axis_name):
+            continue
+        cleaned[axis_key] = value
+        if axis_key in {"size", "color"} and variant.get(axis_key) not in (
+            None,
+            "",
+            [],
+            {},
+        ):
+            variant[axis_key] = value
+    if cleaned:
+        variant["option_values"] = cleaned
+    else:
+        variant.pop("option_values", None)
+    return rejected
+
+
+def _sanitize_variant_scalar_axes(
+    variant: dict[str, Any], *, identity_url: str, title_hint: str
+) -> bool:
+    rejected = False
     for field_name in ("size", "color"):
         raw_value = variant.get(field_name)
-        cleaned_value = clean_text(raw_value)
-        cleaned_value = _clean_variant_axis_label(cleaned_value)
-        if not cleaned_value:
-            if raw_value in (None, "", [], {}):
-                variant.pop(field_name, None)
-            continue
-        if _variant_option_value_is_noise(cleaned_value):
+        value = _clean_variant_axis_label(clean_text(raw_value))
+        if not value:
             variant.pop(field_name, None)
-            axis_value_rejected = True
             continue
-        if _amazon_variant_axis_value_is_noise(
-            cleaned_value,
-            axis_key=field_name,
-            identity_url=identity_url,
-        ):
+        noisy = (
+            _variant_option_value_is_noise(value)
+            or _amazon_variant_axis_value_is_noise(
+                value, axis_key=field_name, identity_url=identity_url
+            )
+            or _option_value_repeats_product_title(value, title_hint=title_hint)
+        )
+        if noisy:
             variant.pop(field_name, None)
-            axis_value_rejected = True
-            continue
-        if _option_value_repeats_product_title(cleaned_value, title_hint=title_hint):
-            variant.pop(field_name, None)
-            axis_value_rejected = True
-            continue
-        variant[field_name] = cleaned_value
+            rejected = True
+        else:
+            variant[field_name] = value
+    return rejected
+
+
+def _variant_url_is_allowed(
+    variant: dict[str, Any], *, identity_url: str, title_hint: str
+) -> bool:
     variant_url = text_or_none(variant.get("url"))
-    if variant_url and _variant_url_is_child_product_for_adult_parent(
-        variant_url,
+    if not variant_url:
+        return True
+    if _variant_url_is_child_product_for_adult_parent(
+        variant_url, identity_url=identity_url, title_hint=title_hint, variant=variant
+    ):
+        return False
+    if not same_site(identity_url, variant_url) or not _detail_url_looks_like_product(
+        variant_url
+    ):
+        return True
+    if _variant_url_matches_requested_base(variant_url, identity_url=identity_url):
+        return True
+    if _variant_url_shares_requested_identity(variant_url, identity_url=identity_url):
+        return True
+    return _cross_asin_variant_url_can_be_option(
+        variant,
+        variant_url=variant_url,
         identity_url=identity_url,
         title_hint=title_hint,
-        variant=variant,
-    ):
-        return False
-    if (
-        variant_url
-        and same_site(identity_url, variant_url)
-        and _detail_url_looks_like_product(variant_url)
-        and not _variant_url_matches_requested_base(
-            variant_url, identity_url=identity_url
-        )
-        and not _variant_url_shares_requested_identity(
-            variant_url, identity_url=identity_url
-        )
-        and not _cross_asin_variant_url_can_be_option(
-            variant,
-            variant_url=variant_url,
-            identity_url=identity_url,
-            title_hint=title_hint,
-        )
-        and not _cross_product_variant_url_can_be_option(
-            variant,
-            variant_url=variant_url,
-            title_hint=title_hint,
-        )
-    ):
-        return False
-    title = clean_text(variant.get("title"))
-    if (
-        title
-        and not _variant_url_matches_requested_base(
-            variant.get("url"), identity_url=identity_url
-        )
-        and _variant_title_looks_like_other_product(title, identity_url=identity_url)
-        and not _variant_title_can_be_option_label(variant, title=title)
-    ):
-        return False
-    image_url = text_or_none(variant.get("image_url"))
-    if image_url:
-        normalized_image = upgrade_low_resolution_image_url(image_url)
-        if normalized_image.lower().startswith("http://"):
-            normalized_image = "https://" + normalized_image[7:]
-        parsed_image = urlparse(normalized_image)
-        if _BROKEN_FETCH_IMAGE_PATH_RE.fullmatch(parsed_image.path or "") or (
-            _LOW_RES_SWATCH_IMAGE_PATH_RE.search(normalized_image)
-            and query_dimension_is_tiny(parsed_image.query)
-        ):
-            variant.pop("image_url", None)
-        else:
-            variant["image_url"] = normalized_image
-    if axis_value_rejected and not _variant_has_public_axis_or_identity_signal(variant):
-        return False
-    return any(
-        variant.get(field_name) not in (None, "", [], {})
-        for field_name in (
-            "sku",
-            "variant_id",
-            "barcode",
-            "image_url",
-            "availability",
-            "option_values",
-            "size",
-            "color",
-            *variant_axis_allowed_single_tokens,
-        )
+    ) or _cross_product_variant_url_can_be_option(
+        variant, variant_url=variant_url, title_hint=title_hint
     )
+
+
+def _variant_title_is_allowed(variant: dict[str, Any], *, identity_url: str) -> bool:
+    title = clean_text(variant.get("title"))
+    if not title or _variant_url_matches_requested_base(
+        variant.get("url"), identity_url=identity_url
+    ):
+        return True
+    return not _variant_title_looks_like_other_product(
+        title, identity_url=identity_url
+    ) or _variant_title_can_be_option_label(variant, title=title)
+
+
+def _sanitize_variant_image(variant: dict[str, Any]) -> None:
+    image_url = text_or_none(variant.get("image_url"))
+    if not image_url:
+        return
+    normalized = upgrade_low_resolution_image_url(image_url)
+    if normalized.lower().startswith("http://"):
+        normalized = "https://" + normalized[7:]
+    parsed = urlparse(normalized)
+    broken = _BROKEN_FETCH_IMAGE_PATH_RE.fullmatch(parsed.path or "")
+    tiny_swatch = _LOW_RES_SWATCH_IMAGE_PATH_RE.search(
+        normalized
+    ) and query_dimension_is_tiny(parsed.query)
+    if broken or tiny_swatch:
+        variant.pop("image_url", None)
+    else:
+        variant["image_url"] = normalized
+
+
+def sanitize_variant_row(
+    variant: dict[str, Any], *, identity_url: str, title_hint: str = ""
+) -> bool:
+    rejected = _sanitize_variant_option_values(variant, identity_url=identity_url)
+    rejected = (
+        _sanitize_variant_scalar_axes(
+            variant, identity_url=identity_url, title_hint=title_hint
+        )
+        or rejected
+    )
+    if not _variant_url_is_allowed(
+        variant, identity_url=identity_url, title_hint=title_hint
+    ):
+        return False
+    if not _variant_title_is_allowed(variant, identity_url=identity_url):
+        return False
+    _sanitize_variant_image(variant)
+    if rejected and not _variant_has_public_axis_or_identity_signal(variant):
+        return False
+    fields = (
+        "sku",
+        "variant_id",
+        "barcode",
+        "image_url",
+        "availability",
+        "option_values",
+        "size",
+        "color",
+        *variant_axis_allowed_single_tokens,
+    )
+    return any(variant.get(field) not in (None, "", [], {}) for field in fields)
 
 
 def _amazon_variant_axis_value_is_noise(
@@ -701,38 +719,37 @@ def _drop_variant_derived_parent_axis_scalars(record: dict[str, Any]) -> None:
     field_sources = record.get("_field_sources")
     sources = field_sources if isinstance(field_sources, dict) else {}
     for field_name in ("size", "color"):
-        parent_value = clean_text(record.get(field_name))
-        if not parent_value:
-            continue
-        variant_values = {
-            clean_text(row.get(field_name)).casefold()
-            for row in variants
-            if clean_text(row.get(field_name))
-        }
-        if (
-            field_name == "size"
-            and len(variant_values) >= DETAIL_VARIANT_SIZE_MIN_FOR_NUMERIC_PARENT_DROP
-            and re.fullmatch(r"\d+(?:\.\d+)?", parent_value)
-            and not _numeric_size_value_in_variants(parent_value, variant_values)
-            and parent_value.casefold() not in variant_values
+        if _should_drop_variant_derived_parent_axis(
+            record, variants, field_name=field_name, has_sources=bool(sources.get(field_name))
         ):
             record.pop(field_name, None)
-            continue
-        # Drop parent axis strings that are just a dump of child variant values.
-        if field_name in (
-            "color",
-            "size",
-        ) and _parent_axis_value_looks_like_variant_dump(
-            parent_value,
-            variant_values,
-        ):
-            record.pop(field_name, None)
-            continue
-        if sources.get(field_name):
-            continue
-        if variant_values == {parent_value.casefold()}:
-            record.pop(field_name, None)
-            continue
+
+
+def _should_drop_variant_derived_parent_axis(
+    record: dict[str, Any],
+    variants: list[dict[str, Any]],
+    *,
+    field_name: str,
+    has_sources: bool,
+) -> bool:
+    parent_value = clean_text(record.get(field_name))
+    if not parent_value:
+        return False
+    variant_values = {
+        value.casefold() for row in variants if (value := clean_text(row.get(field_name)))
+    }
+    numeric_size_mismatch = (
+        field_name == "size"
+        and len(variant_values) >= DETAIL_VARIANT_SIZE_MIN_FOR_NUMERIC_PARENT_DROP
+        and re.fullmatch(r"\d+(?:\.\d+)?", parent_value) is not None
+        and not _numeric_size_value_in_variants(parent_value, variant_values)
+        and parent_value.casefold() not in variant_values
+    )
+    if numeric_size_mismatch or _parent_axis_value_looks_like_variant_dump(
+        parent_value, variant_values
+    ):
+        return True
+    return not has_sources and variant_values == {parent_value.casefold()}
 
 
 def _parent_axis_value_looks_like_variant_dump(

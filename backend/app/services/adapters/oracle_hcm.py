@@ -53,6 +53,27 @@ class OracleHCMAdapter(PublicEndpointAdapter):
             if "listing" in str(surface or "").lower()
             else adapter_runtime_settings.oracle_hcm_detail_page_size
         )
+        return await self._collect_requisitions(
+            base_url=base_url,
+            site_number=site_number,
+            site_lang=site_lang,
+            company=company,
+            target_job_id=target_job_id,
+            page_size=page_size,
+            proxy=proxy,
+        )
+
+    async def _collect_requisitions(
+        self,
+        *,
+        base_url: str,
+        site_number: str,
+        site_lang: str,
+        company: str,
+        target_job_id: str,
+        page_size: int,
+        proxy: str | None,
+    ) -> list[dict]:
         offset = 0
         records: list[dict] = []
         seen_job_ids: set[str] = set()
@@ -64,53 +85,92 @@ class OracleHCMAdapter(PublicEndpointAdapter):
                 limit=page_size,
                 offset=offset,
             )
-            try:
-                payload = await self._request_json(
-                    endpoint,
-                    proxy=proxy,
-                    timeout_seconds=adapter_runtime_settings.ats_request_timeout_seconds,
-                )
-                if not isinstance(payload, (dict, list)):
-                    break
-            except (OSError, TimeoutError):
-                break
-
-            items = payload.get("items") if isinstance(payload, dict) else payload
+            items = await self._request_requisition_page(endpoint, proxy=proxy)
             if not isinstance(items, list) or not items:
                 break
-
             response_item_count = len(items)
-            for item in items:
-                requisitions = (
-                    item.get("requisitionList") if isinstance(item, dict) else None
-                )
-                if not isinstance(requisitions, list):
-                    requisitions = [item] if isinstance(item, dict) else []
-                for requisition in requisitions:
-                    normalized = self._normalize_requisition(
-                        requisition,
-                        base_url=base_url,
-                        site_lang=site_lang,
-                        site_number=site_number,
-                        company=company,
-                    )
-                    if not normalized:
-                        continue
-                    job_id = str(normalized.get("job_id") or "").strip()
-                    if target_job_id and job_id != target_job_id:
-                        continue
-                    if job_id and not target_job_id and job_id in seen_job_ids:
-                        continue
-                    if job_id and not target_job_id:
-                        seen_job_ids.add(job_id)
-                    records.append(normalized)
-                    if target_job_id:
-                        return records
+            page_records = self._normalize_requisition_page(
+                items,
+                base_url=base_url,
+                site_lang=site_lang,
+                site_number=site_number,
+                company=company,
+            )
+            if self._append_requisition_records(
+                records,
+                page_records,
+                target_job_id=target_job_id,
+                seen_job_ids=seen_job_ids,
+            ):
+                return records
 
             if response_item_count < page_size:
                 break
             offset += page_size
 
+        return records
+
+    @staticmethod
+    def _append_requisition_records(
+        records: list[dict],
+        page_records: list[dict],
+        *,
+        target_job_id: str,
+        seen_job_ids: set[str],
+    ) -> bool:
+        for normalized in page_records:
+            job_id = str(normalized.get("job_id") or "").strip()
+            if target_job_id and job_id != target_job_id:
+                continue
+            if job_id and not target_job_id and job_id in seen_job_ids:
+                continue
+            if job_id and not target_job_id:
+                seen_job_ids.add(job_id)
+            records.append(normalized)
+            if target_job_id:
+                return True
+        return False
+
+    async def _request_requisition_page(
+        self, endpoint: str, *, proxy: str | None
+    ) -> list[object] | None:
+        try:
+            payload = await self._request_json(
+                endpoint,
+                proxy=proxy,
+                timeout_seconds=adapter_runtime_settings.ats_request_timeout_seconds,
+            )
+        except (OSError, TimeoutError):
+            return None
+        if isinstance(payload, dict):
+            items = payload.get("items")
+            return items if isinstance(items, list) else None
+        return payload if isinstance(payload, list) else None
+
+    def _normalize_requisition_page(
+        self,
+        items: list[object],
+        *,
+        base_url: str,
+        site_lang: str,
+        site_number: str,
+        company: str,
+    ) -> list[dict]:
+        records: list[dict] = []
+        for item in items:
+            requisitions = item.get("requisitionList") if isinstance(item, dict) else None
+            if not isinstance(requisitions, list):
+                requisitions = [item] if isinstance(item, dict) else []
+            for requisition in requisitions:
+                normalized = self._normalize_requisition(
+                    requisition,
+                    base_url=base_url,
+                    site_lang=site_lang,
+                    site_number=site_number,
+                    company=company,
+                )
+                if normalized:
+                    records.append(normalized)
         return records
 
     def _build_endpoint(
@@ -141,25 +201,19 @@ class OracleHCMAdapter(PublicEndpointAdapter):
         if not title or not job_id:
             return None
 
-        description_parts = [
-            html_to_text(str(requisition.get("ShortDescriptionStr") or "")),
-            html_to_text(str(requisition.get("ExternalResponsibilitiesStr") or "")),
-            html_to_text(str(requisition.get("ExternalQualificationsStr") or "")),
-        ]
-        description = "\n\n".join(part for part in description_parts if part)
+        description = self._requisition_description(requisition)
         location = self._join_locations(requisition)
         department = clean_text(requisition.get("Department"))
-        category = clean_text(
-            requisition.get("Organization")
-            or requisition.get("JobFunction")
-            or requisition.get("JobFamily")
+        category = self._first_requisition_text(
+            requisition, "Organization", "JobFunction", "JobFamily"
         )
-        job_type = clean_text(
-            requisition.get("JobType")
-            or requisition.get("WorkerType")
-            or requisition.get("ContractType")
-            or requisition.get("JobSchedule")
-            or requisition.get("WorkplaceType")
+        job_type = self._first_requisition_text(
+            requisition,
+            "JobType",
+            "WorkerType",
+            "ContractType",
+            "JobSchedule",
+            "WorkplaceType",
         )
         record = {
             "title": title,
@@ -179,6 +233,22 @@ class OracleHCMAdapter(PublicEndpointAdapter):
             for key, value in record.items()
             if value not in (None, "", [], {})
         }
+
+    @staticmethod
+    def _requisition_description(requisition: dict) -> str:
+        parts = [
+            html_to_text(str(requisition.get(key) or ""))
+            for key in (
+                "ShortDescriptionStr",
+                "ExternalResponsibilitiesStr",
+                "ExternalQualificationsStr",
+            )
+        ]
+        return "\n\n".join(part for part in parts if part)
+
+    @staticmethod
+    def _first_requisition_text(requisition: dict, *keys: str) -> str:
+        return clean_text(next((requisition.get(key) for key in keys if requisition.get(key)), ""))
 
     def _extract_site_number(self, url: str, html: Optional[str]) -> str:
         path_match = ORACLE_HCM_SITE_PATH_RE.search(urlparse(str(url or "")).path)

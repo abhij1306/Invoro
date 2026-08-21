@@ -188,40 +188,41 @@ def _extract_size_value(value: object) -> str:
     text = clean_text(value)
     if not text:
         return ""
-    lowered_text = text.lower()
-
-    def _size_candidate_is_gender_artifact(candidate: str) -> bool:
-        if len(candidate) != 1 or not gender_artifact_pattern:
-            return False
-        lowered_candidate = candidate.lower()
-        pattern = _gender_artifact_patterns.get(lowered_candidate)
-        if pattern is None:
-            pattern = re.compile(
-                gender_artifact_pattern.format(candidate=re.escape(lowered_candidate))
-            )
-            _gender_artifact_patterns[lowered_candidate] = pattern
-        return pattern.search(lowered_text) is not None
-
     for pattern in variant_size_value_extract_patterns:
         match = pattern.search(text)
         if match is not None:
             candidate = clean_text(match.group(0))
             if len(candidate) == 1 and (
                 (match.start() > 0 and text[match.start() - 1] in {"'", "’"})
-                or _size_candidate_is_gender_artifact(candidate)
+                or _size_candidate_is_gender_artifact(candidate, text)
             ):
                 continue
             # Numeric values <4 are usually counts like 2-pack, not child sizes.
             if candidate.isdigit() and int(candidate) < 4:
                 continue
             return candidate
+    return _size_value_from_token_windows(text)
+
+
+def _size_candidate_is_gender_artifact(candidate: str, source_text: str) -> bool:
+    if len(candidate) != 1 or not gender_artifact_pattern:
+        return False
+    lowered = candidate.lower()
+    pattern = _gender_artifact_patterns.get(lowered)
+    if pattern is None:
+        pattern = re.compile(gender_artifact_pattern.format(candidate=re.escape(lowered)))
+        _gender_artifact_patterns[lowered] = pattern
+    return pattern.search(source_text.lower()) is not None
+
+
+def _size_value_from_token_windows(text: str) -> str:
     tokens = [token for token in re.split(r"[^a-z0-9.]+", text, flags=re.I) if token]
     for width in range(min(3, len(tokens)), 0, -1):
         for index in range(0, len(tokens) - width + 1):
             candidate = clean_text(" ".join(tokens[index : index + width]))
             if not candidate:
                 continue
-            if _size_candidate_is_gender_artifact(candidate):
+            if _size_candidate_is_gender_artifact(candidate, text):
                 continue
             # Numeric values <4 are usually counts like 2-pack, not child sizes.
             if candidate.isdigit() and int(candidate) < 4:
@@ -335,23 +336,25 @@ def _extract_trailing_color_phrase(value: str) -> str:
     ]
     if not color_indexes:
         return ""
-    start = color_indexes[-1]
-    while start > 0 and tokens[start - 1].lower() in variant_color_hint_words:
-        start -= 1
-    if start > 0:
-        previous = tokens[start - 1].lower()
-        if (
-            previous not in standard_size_values
-            and previous not in gender_keyword_tokens
-        ):
-            start -= 1
-    end = color_indexes[-1] + 1
-    while end < len(tokens) and tokens[end].lower() in variant_color_hint_words:
-        end += 1
+    start, end = _color_phrase_bounds(tokens, color_indexes[-1])
     phrase = clean_text(" ".join(tokens[start:end]))
     if not phrase or len(phrase.split()) > 4:
         return ""
     return _title_preserving_acronyms(phrase)
+
+
+def _color_phrase_bounds(tokens: list[str], color_index: int) -> tuple[int, int]:
+    start = color_index
+    while start > 0 and tokens[start - 1].lower() in variant_color_hint_words:
+        start -= 1
+    if start > 0 and tokens[start - 1].lower() not in (
+        standard_size_values | gender_keyword_tokens
+    ):
+        start -= 1
+    end = color_index + 1
+    while end < len(tokens) and tokens[end].lower() in variant_color_hint_words:
+        end += 1
+    return start, end
 
 
 def _title_preserving_acronyms(phrase: str) -> str:

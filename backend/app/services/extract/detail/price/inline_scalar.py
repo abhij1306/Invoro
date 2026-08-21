@@ -46,27 +46,37 @@ def collect_inline_scalar_rows(
     seen: set[tuple[str, str]] = set()
     root = soup.select_one(DETAIL_PRIMARY_DOM_CONTEXT_SELECTOR) or soup
     for node in root.find_all(["li", "p", "div", "span"]):
-        fragments = _direct_text_fragments(node)
-        if len(fragments) != 2:
+        row = _inline_scalar_row(node, alias_lookup, normalized_allowed_fields)
+        if row is None:
             continue
-        label, value = fragments
-        if len(label) > int(INLINE_SCALAR_LABEL_MAX_LEN) or len(value) > int(
-            INLINE_SCALAR_VALUE_MAX_LEN
-        ):
-            continue
-        normalized = alias_lookup.get(label.lower()) or alias_lookup.get(
-            re.sub(r"[^a-z0-9]+", "_", label.lower()).strip("_")
-        )
-        if normalized is None or normalized not in INLINE_SCALAR_ALLOWED_FIELDS:
-            continue
-        if normalized_allowed_fields and normalized not in normalized_allowed_fields:
-            continue
+        normalized, value = row
         key = (normalized, value.casefold())
         if key in seen:
             continue
         seen.add(key)
         rows.append((normalized, value))
     return rows
+
+
+def _inline_scalar_row(
+    node: Tag, alias_lookup: dict[str, str], allowed_fields: set[str]
+) -> tuple[str, str] | None:
+    fragments = _direct_text_fragments(node)
+    if len(fragments) != 2:
+        return None
+    label, value = fragments
+    if len(label) > int(INLINE_SCALAR_LABEL_MAX_LEN) or len(value) > int(
+        INLINE_SCALAR_VALUE_MAX_LEN
+    ):
+        return None
+    normalized = alias_lookup.get(label.lower()) or alias_lookup.get(
+        re.sub(r"[^a-z0-9]+", "_", label.lower()).strip("_")
+    )
+    if normalized is None or normalized not in INLINE_SCALAR_ALLOWED_FIELDS:
+        return None
+    if allowed_fields and normalized not in allowed_fields:
+        return None
+    return normalized, value
 
 
 def _direct_text_fragments(node: Tag) -> list[str]:

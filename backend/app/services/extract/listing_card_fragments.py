@@ -251,29 +251,14 @@ def base_listing_fragment_score(node) -> int:
         and not has_positive_signature
     ):
         return -10
-    score = 0
-    if has_positive_signature:
-        score += 6
+    score = 6 if has_positive_signature else 0
     links = _node_listing_links(node)
     link_count = len(links)
     if link_count == 0:
         return -100
-    if link_count == 1:
-        score += 4
-    elif link_count <= 6:
-        score += 2
-    elif link_count <= 12:
-        score -= 1
-    else:
-        score -= 6
+    score += _listing_link_count_score(link_count)
     text = listing_node_text(node)
-    text_len = len(text)
-    if text_len < 12:
-        score -= 3
-    elif text_len <= 2000:
-        score += 3
-    else:
-        score -= 3
+    score += _listing_text_length_score(len(text))
     has_price = bool(PRICE_RE.search(text))
     if has_price:
         score += 3
@@ -286,6 +271,20 @@ def base_listing_fragment_score(node) -> int:
     if has_price and _node_has_listing_media(node):
         score += 4
     return score
+
+
+def _listing_link_count_score(link_count: int) -> int:
+    if link_count == 1:
+        return 4
+    if link_count <= 6:
+        return 2
+    if link_count <= 12:
+        return -1
+    return -6
+
+
+def _listing_text_length_score(text_length: int) -> int:
+    return 3 if 12 <= text_length <= 2000 else -3
 
 
 def _node_listing_links(node) -> list[object]:

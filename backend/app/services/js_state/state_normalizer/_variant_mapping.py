@@ -34,77 +34,17 @@ def _normalize_variant(
     interpret_integral_as_cents: bool,
 ) -> dict[str, Any] | None:
     row: dict[str, Any] = {}
-    variant_id = text_or_none(
-        variant.get("id")
-        or variant.get("variantId")
-        or variant.get("variant_id")
-        or variant.get("simple_id")
-        or variant.get("simpleId")
-        or variant.get("npin")
-    )
-    explicit_url: str | None = None
+    variant_id = _variant_id(variant)
     if variant_id:
         row["variant_id"] = variant_id
-    try:
-        base = glom(variant, JS_STATE_VARIANT_FIELD_SPEC, default=None)
-    except (GlomError, RuntimeError, TypeError):
-        logger.debug("Failed to glom JS-state variant payload", exc_info=True)
-        base = {}
-    if not isinstance(base, dict):
-        base = {}
+    base = _variant_base_fields(variant)
     explicit_url = text_or_none(base.get("url"))
     if explicit_url:
         row["url"] = explicit_url
     elif variant_id:
         row["url"] = _variant_url(page_url, variant_id)
-    sku = text_or_none(base.get("sku"))
-    if sku:
-        row["sku"] = sku
-    barcode = text_or_none(base.get("barcode"))
-    if barcode:
-        row["barcode"] = barcode
-    raw_price = _nested_variant_price(variant, "sellingRetail")
-    if raw_price in (None, "", [], {}):
-        raw_price = base.get("price")
-    price = normalize_price(
-        raw_price,
-        interpret_integral_as_cents=interpret_integral_as_cents,
-    )
-    if price is not None:
-        row["price"] = price
-    raw_original_price = _nested_variant_price(variant, "baseRetail")
-    if raw_original_price in (None, "", [], {}):
-        raw_original_price = base.get("original_price")
-    original_price = normalize_price(
-        raw_original_price,
-        interpret_integral_as_cents=interpret_integral_as_cents,
-    )
-    if original_price is not None:
-        row["original_price"] = original_price
-    currency = text_or_none(base.get("currency"))
-    if currency:
-        row["currency"] = currency
-    availability = _nested_variant_availability(variant) or availability_value(variant)
-    if availability:
-        row["availability"] = availability
-    variant_stock = stock_quantity(variant)
-    if variant_stock is None:
-        variant_stock = _nested_variant_stock_quantity(variant)
-    if variant_stock is not None:
-        row["stock_quantity"] = variant_stock
-    image_url = next(
-        iter(
-            extract_urls(
-                variant.get("featured_image")
-                or variant.get("featuredImage")
-                or variant.get("image"),
-                page_url,
-            )
-        ),
-        None,
-    )
-    if image_url:
-        row["image_url"] = image_url
+    _add_variant_scalar_fields(row, variant, base, interpret_integral_as_cents)
+    _add_variant_image(row, variant, page_url)
     selection_values = variant_selection_values(
         variant,
         option_names=option_names,
@@ -132,6 +72,71 @@ def _normalize_variant(
         if value and field_name not in row:
             row["title" if field_name == "name" else field_name] = value
     return row or None
+
+
+def _variant_id(variant: dict[str, Any]) -> str | None:
+    return text_or_none(
+        variant.get("id")
+        or variant.get("variantId")
+        or variant.get("variant_id")
+        or variant.get("simple_id")
+        or variant.get("simpleId")
+        or variant.get("npin")
+    )
+
+
+def _variant_base_fields(variant: dict[str, Any]) -> dict[str, Any]:
+    try:
+        base = glom(variant, JS_STATE_VARIANT_FIELD_SPEC, default=None)
+    except (GlomError, RuntimeError, TypeError):
+        logger.debug("Failed to glom JS-state variant payload", exc_info=True)
+        return {}
+    return base if isinstance(base, dict) else {}
+
+
+def _add_variant_scalar_fields(
+    row: dict[str, Any],
+    variant: dict[str, Any],
+    base: dict[str, Any],
+    interpret_integral_as_cents: bool,
+) -> None:
+    for field_name in ("sku", "barcode", "currency"):
+        if value := text_or_none(base.get(field_name)):
+            row[field_name] = value
+    for field_name, nested_key in (
+        ("price", "sellingRetail"),
+        ("original_price", "baseRetail"),
+    ):
+        raw_value = _nested_variant_price(variant, nested_key)
+        if raw_value in (None, "", [], {}):
+            raw_value = base.get(field_name)
+        value = normalize_price(
+            raw_value, interpret_integral_as_cents=interpret_integral_as_cents
+        )
+        if value is not None:
+            row[field_name] = value
+    if availability := _nested_variant_availability(variant) or availability_value(
+        variant
+    ):
+        row["availability"] = availability
+    variant_stock = stock_quantity(variant)
+    if variant_stock is None:
+        variant_stock = _nested_variant_stock_quantity(variant)
+    if variant_stock is not None:
+        row["stock_quantity"] = variant_stock
+
+
+def _add_variant_image(
+    row: dict[str, Any], variant: dict[str, Any], page_url: str
+) -> None:
+    raw_image = (
+        variant.get("featured_image")
+        or variant.get("featuredImage")
+        or variant.get("image")
+    )
+    image_url = next(iter(extract_urls(raw_image, page_url)), None)
+    if image_url:
+        row["image_url"] = image_url
 
 
 def _variant_axis_raw_value(variant: dict[str, Any], field_name: str) -> Any:

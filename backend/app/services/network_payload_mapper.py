@@ -119,61 +119,14 @@ def _availability_payload_detail_result(
     requested_codes = (
         identity_codes if identity_codes is not None else _page_identity_codes(page_url)
     )
-    normalized_product_id = _normalized_identity_code(product_id)
-    if requested_codes and (
-        normalized_product_id is None or normalized_product_id not in requested_codes
-    ):
+    if not _availability_product_identity_matches(product_id, requested_codes):
         return None
-    variants: list[dict[str, Any]] = []
-    for item in variation_list:
-        if not isinstance(item, dict):
-            continue
-        size = text_or_none(coerce_field_value("size", item.get("size"), page_url))
-        color = text_or_none(
-            coerce_field_value(
-                "color",
-                item.get("color") or item.get("colour"),
-                page_url,
-            )
-        )
-        if not size and not color:
-            continue
-        row: dict[str, Any] = {}
-        option_values: dict[str, str] = {}
-        if size:
-            row["size"] = size
-            option_values["size"] = size
-        if color:
-            row["color"] = color
-            option_values["color"] = color
-        if option_values:
-            row["option_values"] = option_values
-        sku = text_or_none(_first_present(item, SKU_KEYS))
-        if sku:
-            row["sku"] = sku
-        row["product_id"] = product_id
-        status_candidate = item.get("availability_status") or body.get(
-            "availability_status"
-        )
-        availability = coerce_field_value(
-            "availability",
-            status_candidate,
-            page_url,
-        )
-        if availability not in (None, "", [], {}):
-            row["availability"] = availability
-        raw_quantity = item.get("availability")
-        try:
-            stock_quantity = int(str(raw_quantity).strip())
-        except (TypeError, ValueError):
-            stock_quantity = None
-        if stock_quantity is not None:
-            row["stock_quantity"] = stock_quantity
-            if row.get("availability") in (None, "", [], {}):
-                row["availability"] = (
-                    "in_stock" if stock_quantity > 0 else "out_of_stock"
-                )
-        variants.append(row)
+    variants = [
+        row
+        for item in variation_list
+        if isinstance(item, dict)
+        if (row := _availability_variant_row(item, body, product_id, page_url))
+    ]
     if not variants:
         return None
     record: dict[str, Any] = {
@@ -189,6 +142,53 @@ def _availability_payload_detail_result(
     if parent_availability not in (None, "", [], {}):
         record["availability"] = parent_availability
     return record
+
+
+def _availability_product_identity_matches(
+    product_id: str, requested_codes: set[str]
+) -> bool:
+    if not requested_codes:
+        return True
+    normalized = _normalized_identity_code(product_id)
+    return normalized is not None and normalized in requested_codes
+
+
+def _availability_variant_row(
+    item: dict[str, Any], body: dict[str, Any], product_id: str, page_url: str
+) -> dict[str, Any] | None:
+    size = text_or_none(coerce_field_value("size", item.get("size"), page_url))
+    color = text_or_none(
+        coerce_field_value("color", item.get("color") or item.get("colour"), page_url)
+    )
+    if not size and not color:
+        return None
+    options = {key: value for key, value in (("size", size), ("color", color)) if value}
+    row: dict[str, Any] = {
+        **options,
+        "option_values": options,
+        "product_id": product_id,
+    }
+    if sku := text_or_none(_first_present(item, SKU_KEYS)):
+        row["sku"] = sku
+    availability = coerce_field_value(
+        "availability",
+        item.get("availability_status") or body.get("availability_status"),
+        page_url,
+    )
+    if availability not in (None, "", [], {}):
+        row["availability"] = availability
+    _add_availability_quantity(row, item.get("availability"))
+    return row
+
+
+def _add_availability_quantity(row: dict[str, Any], raw_quantity: object) -> None:
+    try:
+        quantity = int(str(raw_quantity).strip())
+    except (TypeError, ValueError):
+        return
+    row["stock_quantity"] = quantity
+    if row.get("availability") in (None, "", [], {}):
+        row["availability"] = "in_stock" if quantity > 0 else "out_of_stock"
 
 
 def _page_identity_codes(page_url: str) -> set[str]:
@@ -562,23 +562,7 @@ def _has_detail_anchor(
     title = finalize_candidate_value("title", candidates.get("title", []))
     url = finalize_candidate_value("url", candidates.get("url", []))
     if inferred_surface == "ecommerce_detail":
-        price = finalize_candidate_value("price", candidates.get("price", []))
-        sku = finalize_candidate_value("sku", candidates.get("sku", []))
-        brand = finalize_candidate_value("brand", candidates.get("brand", []))
-        url_matches_page = _detail_url_matches_page(url, page_url)
-        if url not in (None, "", [], {}) and not url_matches_page:
-            return False
-        informative_fields = (
-            field_name
-            for field_name, values in candidates.items()
-            if field_name not in {"brand", "sku", "title", "url", "vendor"}
-            and finalize_candidate_value(field_name, values) not in (None, "", [], {})
-        )
-        return bool(
-            title
-            and (sku or brand or url_matches_page)
-            and (price or any(True for _ in informative_fields))
-        )
+        return _has_ecommerce_detail_anchor(candidates, title, url, page_url)
     if inferred_surface == "job_detail":
         company = finalize_candidate_value("company", candidates.get("company", []))
         location = finalize_candidate_value("location", candidates.get("location", []))
@@ -592,6 +576,23 @@ def _has_detail_anchor(
             title and (company or location) and (apply_url or url or description)
         )
     return bool(title and url)
+
+
+def _has_ecommerce_detail_anchor(
+    candidates: dict[str, list[object]], title: object, url: object, page_url: str
+) -> bool:
+    price = finalize_candidate_value("price", candidates.get("price", []))
+    sku = finalize_candidate_value("sku", candidates.get("sku", []))
+    brand = finalize_candidate_value("brand", candidates.get("brand", []))
+    url_matches_page = _detail_url_matches_page(url, page_url)
+    if url not in (None, "", [], {}) and not url_matches_page:
+        return False
+    informative = any(
+        finalize_candidate_value(field_name, values) not in (None, "", [], {})
+        for field_name, values in candidates.items()
+        if field_name not in {"brand", "sku", "title", "url", "vendor"}
+    )
+    return bool(title and (sku or brand or url_matches_page) and (price or informative))
 
 
 def _finalize_detail_result(result: dict[str, Any]) -> dict[str, Any]:
@@ -623,38 +624,51 @@ def _detail_url_matches_page(candidate_url: object, page_url: str) -> bool:
     candidate = str(candidate_url or "").strip()
     if not candidate:
         return False
-    candidate_parts = urlparse(candidate)
-    page_parts = urlparse(page_url)
-    candidate_host = str(candidate_parts.hostname or "").strip().lower()
-    page_host = str(page_parts.hostname or "").strip().lower()
-    if candidate_host and page_host and candidate_host != page_host:
+    paths = _matching_detail_url_paths(candidate, page_url)
+    if paths is None:
         return False
-    candidate_path = str(candidate_parts.path or "").rstrip("/").lower()
-    page_path = str(page_parts.path or "").rstrip("/").lower()
-    if not candidate_path or not page_path:
-        return False
+    candidate_path, page_path = paths
     if candidate_path == page_path:
         return True
-    candidate_tokens = {
-        token
-        for token in re.split(r"[^a-z0-9]+", candidate_path)
-        if len(token) >= 2 and token not in DETAIL_URL_IGNORE_TOKENS
-    }
-    page_tokens = {
-        token
-        for token in re.split(r"[^a-z0-9]+", page_path)
-        if len(token) >= 2 and token not in DETAIL_URL_IGNORE_TOKENS
-    }
+    candidate_tokens = _detail_url_identity_tokens(candidate_path)
+    page_tokens = _detail_url_identity_tokens(page_path)
     if not candidate_tokens or not page_tokens:
         return False
     overlap = candidate_tokens & page_tokens
     if not overlap:
         return False
-    if not any(
-        len(token) >= 4 or any(char.isdigit() for char in token) for token in overlap
-    ):
+    if not _detail_url_overlap_is_distinctive(overlap):
         return False
     return len(overlap) >= min(2, len(candidate_tokens))
+
+
+def _matching_detail_url_paths(
+    candidate_url: str, page_url: str
+) -> tuple[str, str] | None:
+    candidate_parts = urlparse(candidate_url)
+    page_parts = urlparse(page_url)
+    candidate_host = str(candidate_parts.hostname or "").strip().lower()
+    page_host = str(page_parts.hostname or "").strip().lower()
+    if candidate_host and page_host and candidate_host != page_host:
+        return None
+    candidate_path = str(candidate_parts.path or "").rstrip("/").lower()
+    page_path = str(page_parts.path or "").rstrip("/").lower()
+    return (candidate_path, page_path) if candidate_path and page_path else None
+
+
+def _detail_url_identity_tokens(path: str) -> set[str]:
+    return {
+        token
+        for token in re.split(r"[^a-z0-9]+", path)
+        if len(token) >= 2 and token not in DETAIL_URL_IGNORE_TOKENS
+    }
+
+
+def _detail_url_overlap_is_distinctive(tokens: set[str]) -> bool:
+    return any(
+        len(token) >= 4 or any(character.isdigit() for character in token)
+        for token in tokens
+    )
 
 
 looks_like_product_api = _looks_like_product_api

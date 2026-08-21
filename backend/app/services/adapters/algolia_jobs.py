@@ -84,19 +84,11 @@ class AlgoliaJobsAdapter(PublicEndpointAdapter):
         if not isinstance(hit, dict):
             return None
         title = clean_text(hit.get("title"))
-        url = clean_text(
-            hit.get("url_external")
-            or hit.get("apply_url")
-            or hit.get("url")
-            or hit.get("permalink")
-        )
+        url = _first_hit_text(hit, "url_external", "apply_url", "url", "permalink")
         if not title or not url:
             return None
-        job_id = clean_text(
-            hit.get("objectID")
-            or hit.get("post_pk")
-            or hit.get("id_external_80_000_hours")
-            or hit.get("id")
+        job_id = _first_hit_text(
+            hit, "objectID", "post_pk", "id_external_80_000_hours", "id"
         )
         company = clean_text(
             hit.get("company_name") or _nested_text(hit.get("company"), "name")
@@ -129,6 +121,10 @@ class AlgoliaJobsAdapter(PublicEndpointAdapter):
             for key, value in record.items()
             if value not in (None, "", [], {})
         }
+
+
+def _first_hit_text(hit: dict, *keys: str) -> str:
+    return next((value for key in keys if (value := clean_text(hit.get(key)))), "")
 
 
 def _first_match(pattern: re.Pattern[str], text: str) -> str:

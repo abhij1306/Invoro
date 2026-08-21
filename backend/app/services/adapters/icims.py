@@ -86,6 +86,9 @@ class ICIMSAdapter(BaseAdapter):
         if endpoint_parsed.scheme and endpoint_parsed.netloc:
             base_url = f"{endpoint_parsed.scheme}://{endpoint_parsed.netloc}"
 
+        return await self._fetch_listing_pages(endpoint, base_url=base_url)
+
+    async def _fetch_listing_pages(self, endpoint: str, *, base_url: str) -> list[dict]:
         records: list[dict] = []
         seen_urls: set[str] = set()
         for offset in range(
@@ -242,36 +245,25 @@ class ICIMSAdapter(BaseAdapter):
                 base_url=base_url,
             ),
         }
-        description = row.select_one(
-            ".description, .iCIMS_JobContent, [class*='description'], [class*='Description']"
-        )
-        location = row.select_one(
-            "[class*='location'], [class*='Location'], .iCIMS_JobLocation"
-        )
-        department = row.select_one(
-            "[class*='category'], [class*='Category'], [class*='department'], [class*='Department'], .iCIMS_JobCategory"
-        )
-        posted = row.select_one(
-            "[class*='date'], [class*='Date'], [class*='posted'], .iCIMS_JobDate"
-        )
-        if location is not None:
-            value = clean_text(location.get_text(" ", strip=True))
-            if value and value != title:
-                record["location"] = value
-        if department is not None:
-            value = clean_text(department.get_text(" ", strip=True))
-            if value and value != title:
-                record["department"] = value
-        if posted is not None:
-            value = clean_text(posted.get_text(" ", strip=True))
-            if value:
-                record["posted_date"] = value
-        if description is not None:
-            value = clean_text(description.get_text(" ", strip=True))
-            if value:
-                record["description"] = value
+        self._apply_row_optional_fields(record, row, title=title)
         self._apply_metadata_fields(record, metadata)
         return record
+
+    @staticmethod
+    def _apply_row_optional_fields(
+        record: dict[str, str], row: Tag, *, title: str
+    ) -> None:
+        selectors = {
+            "location": "[class*='location'], [class*='Location'], .iCIMS_JobLocation",
+            "department": "[class*='category'], [class*='Category'], [class*='department'], [class*='Department'], .iCIMS_JobCategory",
+            "posted_date": "[class*='date'], [class*='Date'], [class*='posted'], .iCIMS_JobDate",
+            "description": ".description, .iCIMS_JobContent, [class*='description'], [class*='Description']",
+        }
+        for field_name, selector in selectors.items():
+            node = row.select_one(selector)
+            value = clean_text(node.get_text(" ", strip=True) if node else "")
+            if value and (field_name not in {"location", "department"} or value != title):
+                record[field_name] = value
 
     def _extract_row_from_html(self, row_html: str, base_url: str) -> dict | None:
         link_match = re.search(
