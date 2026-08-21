@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from typing import Any
 
 from selectolax.lexbor import LexborHTMLParser
@@ -105,9 +106,10 @@ def _structured_listing_stage(
     surface: str,
     max_records: int,
     listing_min_items: int,
+    payload_collector: Callable[..., Any],
 ) -> list[dict[str, Any]]:
     payloads: list[dict[str, Any]] = []
-    for source_name, source_payloads in collect_structured_source_payloads(
+    for source_name, source_payloads in payload_collector(
         context,
         page_url=page_url,
         surface=surface,
@@ -186,6 +188,7 @@ def extract_listing_records(
     network_payloads: list[dict[str, object]] | None = None,
     record_dom_observed_selectors: bool = False,
     context: ExtractionContext | None = None,
+    structured_payload_collector: Callable[..., Any] = collect_structured_source_payloads,
 ) -> list[dict[str, Any]]:
     del network_payloads
     if surface == "content_listing":
@@ -216,6 +219,7 @@ def extract_listing_records(
         surface=surface,
         max_records=max_records,
         listing_min_items=listing_min_items,
+        payload_collector=structured_payload_collector,
     )
     dom_records = _dom_listing_stage(
         dom_parser,

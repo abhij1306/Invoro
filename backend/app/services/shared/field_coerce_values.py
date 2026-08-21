@@ -253,7 +253,7 @@ def _coerce_option_value(field_name: str, value: object) -> str | None:
     return _sanitize_option_scalar(field_name, scalar)
 
 def _coerce_predefined_field(field_name: str, value: object) -> tuple[bool, object | None]:
-    for handler in (_coerce_structured_container, _coerce_named_field):
+    for handler in (_coerce_named_field, _coerce_structured_container):
         handled, coerced = handler(field_name, value)
         if handled:
             return True, coerced

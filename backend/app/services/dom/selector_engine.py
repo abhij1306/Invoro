@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from .selector_values import (apply_selector_fallbacks, candidate_image_urls_from_node, canonical_image_url, dedupe_image_urls, extract_feature_rows,
+from .selector_values import (EXTRACTION_RULES, apply_selector_fallbacks, candidate_image_urls_from_node, canonical_image_url, dedupe_image_urls, extract_feature_rows,
     extract_heading_sections, extract_label_value_pairs, extract_node_value, extract_page_images, extract_regex_values, extract_selector_values,
     extract_xpath_values, filter_values_by_regex, image_candidate_score, is_garbage_image_candidate, requested_content_extractability,
     upgrade_low_resolution_image_url,)
 
-__all__ = ("apply_selector_fallbacks", "candidate_image_urls_from_node", "canonical_image_url", "dedupe_image_urls", "extract_feature_rows",
+__all__ = ("EXTRACTION_RULES", "apply_selector_fallbacks", "candidate_image_urls_from_node", "canonical_image_url", "dedupe_image_urls", "extract_feature_rows",
     "extract_heading_sections", "extract_label_value_pairs", "extract_node_value", "extract_page_images", "extract_regex_values",
     "extract_selector_values", "extract_xpath_values", "filter_values_by_regex", "image_candidate_score", "is_garbage_image_candidate",
     "requested_content_extractability", "upgrade_low_resolution_image_url",)

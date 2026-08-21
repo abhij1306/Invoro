@@ -484,3 +484,12 @@ def backfill_variants_from_dom_if_missing(
     from .dom_group_pipeline import backfill_variants_from_dom_if_missing as backfill_impl
 
     backfill_impl(record, soup=soup, page_url=page_url, js_state_objects=js_state_objects)
+
+
+def _merge_state_axis_metadata(
+    axis_metadata: dict[str, dict[str, object]],
+    state_targets: dict[str, dict[str, object]],
+) -> None:
+    from . import dom_group_pipeline
+
+    dom_group_pipeline._merge_state_axis_metadata(axis_metadata, state_targets)
