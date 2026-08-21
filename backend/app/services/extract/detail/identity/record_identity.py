@@ -23,20 +23,20 @@ __all__ = (
     "preferred_detail_identity_url", "record_matches_requested_detail_identity", "semantic_detail_identity_tokens",
 )
 
-_DETAIL_IDENTITY_QUERY_KEYS = frozenset(str(value).strip().lower() for value in tuple(PUBLIC_RECORD_DETAIL_CANONICAL_QUERY_KEYS or ()) if str(value).strip())
-_DETAIL_IDENTITY_QUERY_PREFIXES = tuple(str(value).strip().lower() for value in tuple(PUBLIC_RECORD_DETAIL_CANONICAL_QUERY_PREFIXES or ()) if str(value).strip())
-_DETAIL_URL_PLACEHOLDER_SEGMENTS = frozenset({str(value).strip().lower() for value in tuple(CANDIDATE_PLACEHOLDER_VALUES or ()) if str(value).strip()})
-_LOWER_NON_ALNUM_RE = re.compile(r"[^a-z0-9]+")
-_MIXED_NON_ALNUM_RE = re.compile(r"[^A-Za-z0-9]+")
-_HTML_SUFFIX_RE = re.compile(r"\.htm(?:l)?$", re.IGNORECASE)
-_SLUG_SEPARATOR_RE = re.compile(r"[-_]+")
+DETAIL_IDENTITY_QUERY_KEYS = frozenset(str(value).strip().lower() for value in tuple(PUBLIC_RECORD_DETAIL_CANONICAL_QUERY_KEYS or ()) if str(value).strip())
+DETAIL_IDENTITY_QUERY_PREFIXES = tuple(str(value).strip().lower() for value in tuple(PUBLIC_RECORD_DETAIL_CANONICAL_QUERY_PREFIXES or ()) if str(value).strip())
+DETAIL_URL_PLACEHOLDER_SEGMENTS = frozenset({str(value).strip().lower() for value in tuple(CANDIDATE_PLACEHOLDER_VALUES or ()) if str(value).strip()})
+LOWER_NON_ALNUM_RE = re.compile(r"[^a-z0-9]+")
+MIXED_NON_ALNUM_RE = re.compile(r"[^A-Za-z0-9]+")
+HTML_SUFFIX_RE = re.compile(r"\.htm(?:l)?$", re.IGNORECASE)
+SLUG_SEPARATOR_RE = re.compile(r"[-_]+")
 
 
-def _path_segment_tokens(value: str) -> set[str]:
+def path_segment_tokens(value: str) -> set[str]:
     return {token for token in re.split(r"[\-\.]+", str(value or "").strip().lower()) if token}
 
 
-def _detail_url_path_segments(url: str) -> list[str]:
+def detail_url_path_segments(url: str) -> list[str]:
     parsed = urlparse(str(url or ""))
     segments = [segment for segment in str(parsed.path or "").strip("/").split("/") if segment]
     fragment = str(parsed.fragment or "").strip()
@@ -48,13 +48,13 @@ def _detail_url_path_segments(url: str) -> list[str]:
 
 
 def _detail_title_from_url(page_url: str) -> str | None:
-    path_segments = _detail_url_path_segments(page_url)
+    path_segments = detail_url_path_segments(page_url)
     if not path_segments:
         return None
     generic_terminal_tokens = set(DETAIL_GENERIC_TERMINAL_TOKENS)
     for index in range(len(path_segments) - 1, -1, -1):
         segment = path_segments[index]
-        terminal = _HTML_SUFFIX_RE.sub("", segment)
+        terminal = HTML_SUFFIX_RE.sub("", segment)
         if _detail_segment_is_shop_merchant_namespace(path_segments, index):
             continue
         if _detail_terminal_is_ignored(
@@ -66,7 +66,7 @@ def _detail_title_from_url(page_url: str) -> str | None:
             if _detail_terminal_parent_is_collection(path_segments, index):
                 return None
             continue
-        title = clean_text(_SLUG_SEPARATOR_RE.sub(" ", terminal))
+        title = clean_text(SLUG_SEPARATOR_RE.sub(" ", terminal))
         if title and not is_title_noise(title):
             return title
     return None
@@ -80,14 +80,14 @@ def _detail_terminal_embedded_codes_are_generic(
     if not embedded_codes:
         return False
     alpha_chunks = [chunk.lower() for chunk in re.findall(r"[A-Za-z]+", terminal)]
-    return not alpha_chunks or all(set(_path_segment_tokens(chunk)) <= generic_terminal_tokens for chunk in alpha_chunks)
+    return not alpha_chunks or all(set(path_segment_tokens(chunk)) <= generic_terminal_tokens for chunk in alpha_chunks)
 
 def _detail_terminal_is_generic(
     terminal: str,
     *,
     generic_terminal_tokens: set[str],
 ) -> bool:
-    terminal_tokens = _path_segment_tokens(terminal)
+    terminal_tokens = path_segment_tokens(terminal)
     return terminal in generic_terminal_tokens or bool(terminal_tokens and terminal_tokens <= generic_terminal_tokens)
 
 def _detail_terminal_is_ignored(
@@ -141,7 +141,7 @@ def _detail_url_candidate_is_low_signal(candidate_url: object, *, page_url: str)
     if any(candidate_path.lower().endswith(ext) for ext in DETAIL_NON_PAGE_FILE_EXTENSIONS):
         return True
     candidate_segments = {segment.strip().lower() for segment in candidate_path.split("/") if segment.strip()}
-    if candidate_segments & _DETAIL_URL_PLACEHOLDER_SEGMENTS:
+    if candidate_segments & DETAIL_URL_PLACEHOLDER_SEGMENTS:
         return True
     if same_site(page_url, candidate) and _detail_url_is_utility(candidate):
         return True
@@ -168,7 +168,7 @@ def _preferred_detail_identity_url(
     return requested
 
 def _detail_url_looks_like_product(url: str) -> bool:
-    path_segments = _detail_url_path_segments(url)
+    path_segments = detail_url_path_segments(url)
     path = f"/{'/'.join(path_segments)}".lower() if path_segments else ""
     if any(hint in path for hint in PRODUCT_URL_HINTS):
         return True
@@ -216,7 +216,7 @@ def _detail_url_is_collection_like(url: str) -> bool:
     return any(token in path_tokens for token in DETAIL_COLLECTION_PATH_TOKENS)
 
 def _detail_url_path_tokens(url: str) -> set[str]:
-    return {token for token in _LOWER_NON_ALNUM_RE.split("/".join(_detail_url_path_segments(url)).lower()) if token}
+    return {token for token in LOWER_NON_ALNUM_RE.split("/".join(detail_url_path_segments(url)).lower()) if token}
 
 def _record_matches_requested_detail_identity(
     record: dict[str, object],
@@ -281,18 +281,18 @@ def _detail_requested_identity_text(page_url: object) -> str:
     if title:
         return title
     generic_terminal_tokens = set(DETAIL_GENERIC_TERMINAL_TOKENS)
-    path_segments = _detail_url_path_segments(raw_url)
+    path_segments = detail_url_path_segments(raw_url)
     for index in range(len(path_segments) - 1, -1, -1):
         if _detail_segment_is_shop_merchant_namespace(path_segments, index):
             continue
         segment = path_segments[index]
-        terminal = _HTML_SUFFIX_RE.sub("", segment)
+        terminal = HTML_SUFFIX_RE.sub("", segment)
         if not terminal or terminal.isdigit():
             continue
-        terminal_tokens = _path_segment_tokens(terminal)
+        terminal_tokens = path_segment_tokens(terminal)
         if terminal_tokens and terminal_tokens <= generic_terminal_tokens:
             continue
-        title = clean_text(_SLUG_SEPARATOR_RE.sub(" ", terminal))
+        title = clean_text(SLUG_SEPARATOR_RE.sub(" ", terminal))
         semantic_tokens = _semantic_detail_identity_tokens(title)
         if _detail_segment_looks_like_identity_code(terminal) and len(semantic_tokens) < 2:
             continue
@@ -374,19 +374,19 @@ def _record_has_detail_product_evidence(record: dict[str, object]) -> bool:
 
 def _detail_slug_title_fallback_from_url(identity_url: str) -> str | None:
     generic_terminal_tokens = set(DETAIL_GENERIC_TERMINAL_TOKENS)
-    path_segments = _detail_url_path_segments(identity_url)
+    path_segments = detail_url_path_segments(identity_url)
     for index in range(len(path_segments) - 1, -1, -1):
         if _detail_segment_is_shop_merchant_namespace(path_segments, index):
             continue
         segment = path_segments[index]
-        terminal = _HTML_SUFFIX_RE.sub("", segment)
+        terminal = HTML_SUFFIX_RE.sub("", segment)
         if not terminal:
             continue
-        title = clean_text(_SLUG_SEPARATOR_RE.sub(" ", terminal))
+        title = clean_text(SLUG_SEPARATOR_RE.sub(" ", terminal))
         semantic_tokens = _semantic_detail_identity_tokens(title)
         if _detail_title_fallback_looks_like_code(terminal) and (len(semantic_tokens) < int(DETAIL_TITLE_FALLBACK_MIN_SEMANTIC_TOKENS)):
             continue
-        terminal_tokens = _path_segment_tokens(terminal)
+        terminal_tokens = path_segment_tokens(terminal)
         if terminal_tokens and terminal_tokens <= generic_terminal_tokens:
             continue
         if len(semantic_tokens) >= int(DETAIL_TITLE_FALLBACK_MIN_SEMANTIC_TOKENS):
@@ -397,12 +397,12 @@ def _detail_title_fallback_looks_like_code(value: object) -> bool:
     terminal = str(value or "").strip()
     if not terminal:
         return False
-    if _MIXED_NON_ALNUM_RE.search(terminal):
+    if MIXED_NON_ALNUM_RE.search(terminal):
         return False
     text = clean_text(value)
     if not text:
         return False
-    compact = _MIXED_NON_ALNUM_RE.sub("", text)
+    compact = MIXED_NON_ALNUM_RE.sub("", text)
     pattern = str(DETAIL_TITLE_FALLBACK_CODE_PATTERN or "").strip()
     return bool(compact and re.search(r"\d", compact) and re.fullmatch(pattern, compact))
 
@@ -439,7 +439,7 @@ def _detail_url_matches_requested_identity(
 
 def _detail_identity_tokens(value: object) -> set[str]:
     cleaned = clean_text(value).lower()
-    return {token for token in _LOWER_NON_ALNUM_RE.split(cleaned) if len(token) >= 3 and token not in DETAIL_IDENTITY_STOPWORDS}
+    return {token for token in LOWER_NON_ALNUM_RE.split(cleaned) if len(token) >= 3 and token not in DETAIL_IDENTITY_STOPWORDS}
 
 def _semantic_detail_identity_tokens(value: object) -> set[str]:
     return {token for token in _detail_identity_tokens(value) if re.search(r"[a-z]", token) and not re.search(r"\d", token)}
@@ -450,8 +450,8 @@ def _detail_identity_codes_from_url(url: object) -> set[str]:
         return set()
     parsed = urlparse(text)
     codes: set[str] = set()
-    for segment in _detail_url_path_segments(text):
-        terminal = _HTML_SUFFIX_RE.sub("", segment)
+    for segment in detail_url_path_segments(text):
+        terminal = HTML_SUFFIX_RE.sub("", segment)
         code_like_terminal = _detail_segment_code(terminal)
         if code_like_terminal:
             codes.add(code_like_terminal)
@@ -483,7 +483,7 @@ def _detail_query_identity_codes_from_url(url: object) -> set[str]:
         normalized_key = str(key or "").strip().lower()
         if not normalized_key:
             continue
-        if normalized_key in _DETAIL_IDENTITY_QUERY_KEYS or any(normalized_key.startswith(prefix) for prefix in _DETAIL_IDENTITY_QUERY_PREFIXES):
+        if normalized_key in DETAIL_IDENTITY_QUERY_KEYS or any(normalized_key.startswith(prefix) for prefix in DETAIL_IDENTITY_QUERY_PREFIXES):
             normalized_value = _detail_segment_code(value)
             if normalized_value:
                 codes.add(normalized_value)
@@ -512,7 +512,7 @@ def _detail_segment_code(value: object) -> str | None:
     return _normalized_detail_identity_code(text)
 
 def _normalized_detail_identity_code(value: object) -> str | None:
-    text = _MIXED_NON_ALNUM_RE.sub("", str(value or "")).upper()
+    text = MIXED_NON_ALNUM_RE.sub("", str(value or "")).upper()
     if len(text) < DETAIL_IDENTITY_CODE_MIN_LENGTH:
         return None
     if not re.search(r"\d", text):

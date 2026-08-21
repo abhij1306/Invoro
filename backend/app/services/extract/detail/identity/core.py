@@ -174,9 +174,9 @@ def prune_irrelevant_detail_dom_nodes(
 def _listing_url_has_category_path_segment(path: str) -> bool:
     segments = [segment.strip().lower() for segment in str(path or "").split("/") if segment.strip()]
     for segment in segments:
-        # Broader split is intentional here, unlike _path_segment_tokens:
+        # Broader split is intentional here, unlike path_segment_tokens:
         # _LISTING_CATEGORY_PATH_SEGMENTS may be embedded behind "_" or mixed punctuation.
-        segment_tokens = {token for token in _LOWER_NON_ALNUM_RE.split(segment) if token}
+        segment_tokens = {token for token in LOWER_NON_ALNUM_RE.split(segment) if token}
         if segment in _LISTING_CATEGORY_PATH_SEGMENTS:
             return True
         if _LISTING_CATEGORY_PATH_SEGMENTS.intersection(segment_tokens):
@@ -315,7 +315,7 @@ def listing_url_is_structural(url: str, page_url: str) -> bool:
 
 def _listing_path_tail_is_structural(path: str, query: str) -> bool:
     raw_segments = [segment.strip().lower() for segment in path.split("/") if segment.strip()]
-    tokenized = [_path_segment_tokens(segment) for segment in raw_segments]
+    tokenized = [path_segment_tokens(segment) for segment in raw_segments]
     terminal_tokens = tokenized[-1] if tokenized else set()
     terminal_raw = raw_segments[-1] if raw_segments else ""
     non_listing = set(LISTING_NON_LISTING_PATH_TOKENS)
@@ -411,8 +411,8 @@ def _job_detail_query_has_identity(query: str) -> bool:
     return any(token in lowered for token in ("showjob=", "jobid=", "job_id=", "gh_jid="))
 
 from .record_identity import (  # noqa: E402
-    _DETAIL_IDENTITY_QUERY_KEYS, _DETAIL_IDENTITY_QUERY_PREFIXES, _DETAIL_URL_PLACEHOLDER_SEGMENTS, _HTML_SUFFIX_RE,
-    _LOWER_NON_ALNUM_RE, _MIXED_NON_ALNUM_RE, _SLUG_SEPARATOR_RE, _detail_url_path_segments, _path_segment_tokens,
+    DETAIL_IDENTITY_QUERY_KEYS, DETAIL_IDENTITY_QUERY_PREFIXES, DETAIL_URL_PLACEHOLDER_SEGMENTS, HTML_SUFFIX_RE,
+    LOWER_NON_ALNUM_RE, MIXED_NON_ALNUM_RE, SLUG_SEPARATOR_RE, detail_url_path_segments, path_segment_tokens,
     detail_identity_codes_match, detail_identity_codes_from_record_fields, detail_identity_codes_from_url, detail_query_identity_codes_from_url,
     detail_identity_tokens, detail_redirect_identity_is_mismatched, detail_slug_title_fallback_from_url, detail_title_from_url,
     detail_title_fallback_looks_like_code, detail_url_candidate_is_low_signal, detail_url_is_collection_like, detail_url_is_utility,
