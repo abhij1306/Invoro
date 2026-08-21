@@ -2,7 +2,7 @@
 
 **Created:** 2026-08-21
 **Agent:** Codex
-**Status:** IN PROGRESS
+**Status:** DONE
 **PR boundary:** One independent PR. Test and diagnostic-tooling structure only.
 **Touches buckets:** Backend tests, browser-surface probe, acceptance harness, JSON audit tooling
 
@@ -51,7 +51,7 @@ The two JSON audit scripts appear duplicative. Grep both call sites and imports.
 - [x] Existing pytest markers, fixture discovery, CLI arguments, output contracts, and exit codes remain stable.
 - [x] No production file under `backend/app` changes.
 - [x] Focused verification passes after each slice.
-- [ ] Backend safe suite exits 0 before the PR is ready.
+- [x] Backend safe suite exits 0 before the PR is ready.
 
 ## Do Not Touch
 
@@ -93,17 +93,17 @@ The two JSON audit scripts appear duplicative. Grep both call sites and imports.
 
 ### Slice 5: Scoped Gates and Full Verification
 
-**Status:** IN PROGRESS
+**Status:** DONE
 **Files:** all touched test/tooling files; plan Notes
 **What:** Re-run physical LOC and Radon using the same baseline method. Prove scoped LOC decreased. Run collection comparison, structure regression, and safe suite. Do not add permanent CI gates here.
 **Verify:** `cd backend; $env:PYTHONPATH='.'; .\.venv\Scripts\python.exe -m pytest tests/regression/test_structure.py -q -m regression`; then `cd backend; $env:PYTHONPATH='.'; .\.venv\Scripts\python.exe -m pytest tests -q -m "unit or component or regression"`
 
 ## Doc Updates Required
 
-- [ ] `docs/CODEBASE_MAP.md` — only if a first-party diagnostic-tool owner moves; test-only moves need no map entry.
-- [ ] `docs/ENGINEERING_STRATEGY.md` — only if a new recurring test anti-pattern is confirmed.
-- [ ] `docs/INVARIANTS.md` — no change expected; this plan cannot change runtime contracts.
-- [ ] `docs/plans/ACTIVE.md` — set this plan active at start and clear/advance it only after verification.
+- [x] `docs/CODEBASE_MAP.md` — diagnostic-tool ownership updated.
+- [x] `docs/ENGINEERING_STRATEGY.md` — no change required; no new recurring anti-pattern.
+- [x] `docs/INVARIANTS.md` — no change required; runtime contracts unchanged.
+- [x] `docs/plans/ACTIVE.md` — cleared after verification.
 
 ## Notes
 
@@ -118,6 +118,6 @@ The two JSON audit scripts appear duplicative. Grep both call sites and imports.
 - Slice 2 focused extraction/unit verification: 1,104 passed, 19 artifact-dependent skips, 7 deselected. One private-helper test was deleted; equivalent public DOM variant behavior remains covered.
 - Slice 3 focused acquisition/crawl/pipeline/workflow verification: 711 passed, 13 deselected. High-CC API scenarios also passed in the focused tooling run.
 - Slice 4 focused browser/harness verification: 66 passed. Browser probe, acceptance harness, and JSON audit `--help` commands passed; JSON audit also completed against a minimal offline record with exit 0.
-- Final local gates: structure regression 30 passed; collection 2,459 items, 11 deselected, 2,448 selected; scoped LOC 89,553 across 277 files (down 1,080 from baseline); zero files over 800; zero Radon callables over 15; targeted Ruff and compile checks passed. The 14 additional selected tests are six repaired test names/markers and eight new tooling regressions.
+- Final local gates: structure regression 30 passed; collection 2,459 items, 11 deselected, 2,448 selected; scoped LOC 89,599 across 277 files (down 1,034 from baseline); zero files over 800; zero Radon callables over 15; Ruff passed across the backend; mypy passed across 461 application source files; 315 changed-module tests passed. The 14 additional selected tests are six repaired test names/markers and eight new tooling regressions.
 - Follow-up review findings were verified. Two assertion-only requests were not applied: current extraction does not retain adapter `variant_axes`/`selected_variant` in the named deep-merge scenarios, so those assertions would require an out-of-scope `backend/app` behavior fix. All other still-valid findings were fixed in test/tooling scope.
-- The backend safe suite remains for required CI per the `ship-main` workflow.
+- Backend CI run `32507436113` passed dependency scanning, Ruff, mypy, and the full pytest suite on PR #96.
