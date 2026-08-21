@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from .test_batch_runtime import AsyncSession, URLProcessingResult, create_crawl_run, process_run, pytest  # fmt: skip
 
+pytest_plugins = ["tests.regression.test_batch_runtime"]
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_process_run_continues_when_failure_log_persistence_raises_non_sql_exception(

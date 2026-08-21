@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from .test_browser_expansion_runtime import SimpleNamespace, _FakeExpansionPage, _FakeHandle, _FakeRuntime, _async_checkpoint, browser_capture, browser_detail, browser_page_helpers, browser_readiness, browser_recovery, browser_runtime, pytest  # fmt: skip
 
+pytest_plugins = ["tests.regression.test_browser_expansion_runtime"]
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_probe_browser_readiness_accepts_detail_title_matching_url() -> None:

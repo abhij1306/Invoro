@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from .test_public_api import ASGITransport, ApiKey, AsyncClient, CrawlRecord, DomainMemory, DomainRunProfile, PUBLIC_API_INTERNAL_ECOMMERCE_SURFACE, UTC, app, datetime, get_db, hash_api_key, pytest  # fmt: skip
 
+pytest_plugins = ["tests.component.test_public_api"]
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_public_domain_info_reads_domain_memory(db_session, test_user) -> None:

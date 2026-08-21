@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from .test_crawl_fetch_runtime import AsyncMock, HostProtectionPolicy, PageFetchResult, SimpleNamespace, _as_async, _default_fetch_context, _page_fetch_result, acquisition_runtime, browser_policy, classify_network_endpoint, crawl_fetch_runtime, httpx, pytest, should_capture_network_payload, sys  # fmt: skip
 
+pytest_plugins = ["tests.component.test_crawl_fetch_runtime"]
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_real_chrome_success_updates_host_memory(

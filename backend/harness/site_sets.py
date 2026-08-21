@@ -7,6 +7,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from ._support_shared import HARNESS_MODE_FULL_PIPELINE, _DETAIL_FILE_RE, _DETAIL_HINTS, _DETAIL_SLUG_WITH_ID_RE, _JOB_LISTING_HINTS, _NON_DETAIL_FILE_RE, _PRODUCT_LIKE_TERMINAL_SLUG_RE  # fmt: skip
+from .record_signals import _object_dict, _object_list, _safe_int
 from app.services.adapters.registry import registered_adapters  # fmt: skip
 from app.services.platform_policy import configured_adapter_names, detect_platform_family, job_platform_families  # fmt: skip
 
@@ -18,7 +19,6 @@ _MARKDOWN_SURFACE_ALIASES = {
     "detail": "ecommerce_detail",
     "spa_detail": "ecommerce_detail",
 }
-from .record_signals import _object_dict, _object_list, _safe_int
 
 
 def infer_surface(url: str, explicit_surface: object | None = None) -> str:

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from .test_crawl_fetch_runtime import AsyncMock, FakeBodyResponse, FetchRuntimeContext, HostProtectionPolicy, PageFetchResult, SimpleNamespace, _as_async, asyncio, browser_capture, crawl_fetch_runtime, http_fetch, pytest, read_network_payload_body, should_escalate_to_browser_async, time  # fmt: skip
 
+pytest_plugins = ["tests.component.test_crawl_fetch_runtime"]
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_fetch_page_browser_only_escalates_to_real_chrome_for_forum_detail(

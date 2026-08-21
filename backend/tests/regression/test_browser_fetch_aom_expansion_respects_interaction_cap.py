@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from .test_browser_expansion_runtime import Any, BrowserNetworkCapture, PlaywrightTimeoutError, SimpleNamespace, TraversalResult, _FakeExpansionPage, _FakeRuntime, _NoTimeoutRoleLocator, _WaitingRoleLocator, _async_checkpoint, asyncio, browser_detail, browser_readiness, browser_runtime, pytest  # fmt: skip
 
+pytest_plugins = ["tests.regression.test_browser_expansion_runtime"]
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_browser_fetch_aom_expansion_respects_interaction_cap(

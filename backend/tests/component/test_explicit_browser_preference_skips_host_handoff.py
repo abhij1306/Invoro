@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from .test_crawl_fetch_runtime import AsyncMock, FetchRuntimeContext, HostProtectionPolicy, PageFetchResult, PlaywrightError, _as_async, _default_fetch_context, asyncio, browser_policy, crawl_fetch_runtime, httpx, pytest, time  # fmt: skip
 
+pytest_plugins = ["tests.component.test_crawl_fetch_runtime"]
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_explicit_browser_preference_skips_host_handoff(

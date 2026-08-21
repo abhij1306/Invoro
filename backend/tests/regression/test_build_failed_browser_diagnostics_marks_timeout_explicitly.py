@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from .test_browser_expansion_runtime import Any, PlaywrightError, SimpleNamespace, _FakeExpansionPage, _FakeRuntime, _async_checkpoint, asyncio, browser_page_flow, browser_page_helpers, browser_recovery, browser_result_builder, browser_runtime, crawler_runtime_settings, pytest  # fmt: skip
 
+pytest_plugins = ["tests.regression.test_browser_expansion_runtime"]
+
 @pytest.mark.regression
 def test_build_failed_browser_diagnostics_marks_timeout_explicitly() -> None:
     diagnostics = browser_runtime.build_failed_browser_diagnostics(

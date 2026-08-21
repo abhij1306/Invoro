@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from .test_batch_runtime import AcquisitionResult, AsyncSession, CrawlLog, CrawlRunSettings, RobotsPolicyResult, URLProcessingResult, _detail_html, _listing_shell_html, _parallel_url_concurrency, _parallel_worker_record_limit, async_sessionmaker, asyncio, batch_runtime_module, create_crawl_run, get_run_records, process_run, pytest, select  # fmt: skip
 
+pytest_plugins = ["tests.regression.test_batch_runtime"]
+
 @pytest.mark.unit
 def test_parallel_worker_record_limit_bounds_each_worker_budget() -> None:
     assert _parallel_worker_record_limit(5, 2) == 3

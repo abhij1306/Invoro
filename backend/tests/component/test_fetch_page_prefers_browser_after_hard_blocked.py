@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from .test_crawl_fetch_runtime import HostProtectionPolicy, PageFetchResult, _as_async, crawl_fetch_runtime, httpx, pytest  # fmt: skip
 
+pytest_plugins = ["tests.component.test_crawl_fetch_runtime"]
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_fetch_page_prefers_browser_after_hard_blocked_fetch(

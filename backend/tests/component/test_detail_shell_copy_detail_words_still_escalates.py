@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from .test_crawl_fetch_runtime import AsyncMock, HostProtectionPolicy, PageFetchResult, _as_async, crawl_fetch_runtime, httpx, pytest, should_escalate_to_browser_async  # fmt: skip
 
+pytest_plugins = ["tests.component.test_crawl_fetch_runtime"]
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_detail_shell_copy_with_detail_words_still_escalates_to_browser() -> None:

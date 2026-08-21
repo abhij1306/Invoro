@@ -7,6 +7,8 @@ from .test_playground_service import (
     start_discover,
 )
 
+pytest_plugins = ["tests.component.test_playground_service"]
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_start_discover_lists_categories_for_multiple_input_urls(

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from .test_browser_expansion_runtime import Any, PlaywrightError, PlaywrightTimeoutError, SimpleNamespace, _FakeExpansionPage, _FakeRuntime, _async_checkpoint, asyncio, browser_page_flow, browser_page_helpers, browser_readiness, browser_recovery, browser_runtime, build_browser_fetch_result, crawler_runtime_settings, dom_runtime, pytest, time  # fmt: skip
 
+pytest_plugins = ["tests.regression.test_browser_expansion_runtime"]
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_recover_browser_challenge_runs_for_real_chrome() -> None:

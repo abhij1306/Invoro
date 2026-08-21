@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from .test_batch_runtime import AcquisitionResult, AsyncSession, CrawlLog, CrawlRecord, PendingRollbackError, ROBOTS_ALLOWED, ROBOTS_FETCH_FAILURE, ROBOTS_MISSING, RobotsPolicyResult, SITEMAP_DEFAULT_MAX_URLS, URLProcessingResult, _detail_html, asyncio, create_crawl_run, get_run_records, process_run, pytest, select  # fmt: skip
 
+pytest_plugins = ["tests.regression.test_batch_runtime"]
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_process_run_ignores_robots_when_disabled_in_settings(

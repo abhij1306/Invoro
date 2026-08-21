@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from .test_browser_expansion_runtime import SimpleNamespace, _FakeExpansionPage, _FakeHandle, _FakeRuntime, _async_checkpoint, browser_detail, browser_page_flow, browser_result_builder, browser_runtime, extract_records, httpx, pytest  # fmt: skip
 
+pytest_plugins = ["tests.regression.test_browser_expansion_runtime"]
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_expand_all_interactive_elements_prioritizes_requested_measurements_over_media_zoom() -> (

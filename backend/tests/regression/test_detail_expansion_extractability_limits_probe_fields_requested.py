@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from .test_browser_expansion_runtime import Any, BeautifulSoup, CARD_SELECTORS, SimpleNamespace, _FakeExpansionPage, _FakeRuntime, _async_checkpoint, asyncio, browser_page_flow, browser_page_helpers, browser_readiness, browser_runtime, crawler_runtime_settings, pytest  # fmt: skip
 
+pytest_plugins = ["tests.regression.test_browser_expansion_runtime"]
+
 @pytest.mark.regression
 def test_detail_expansion_extractability_limits_probe_fields_to_requested() -> None:
     seen_probe_fields: set[str] | None = None

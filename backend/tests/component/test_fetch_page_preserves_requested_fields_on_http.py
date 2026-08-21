@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from .test_crawl_fetch_runtime import AsyncMock, FetchRuntimeContext, HostProtectionPolicy, PageFetchResult, _as_async, _default_fetch_context, browser_policy, crawl_fetch_runtime, pytest, time  # fmt: skip
 
+pytest_plugins = ["tests.component.test_crawl_fetch_runtime"]
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_fetch_page_preserves_requested_fields_on_http_to_browser_escalation(
