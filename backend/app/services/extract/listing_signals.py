@@ -125,24 +125,11 @@ def _extract_price_signal_from_card(card) -> str | None:
             )
             if not price_text:
                 continue
-            score = 0
             attrs = listing_node_signature(node)
-            if "price" in attrs:
-                score += 5
             lowered_raw_text = raw_text.lower()
-            if any(
-                token in attrs or token in lowered_raw_text for token in ("sale", "now")
-            ):
-                score += 4
-            if any(
-                token in attrs or token in lowered_raw_text
-                for token in ("regular", "original", "mrp", "list")
-            ):
-                score -= 6
-            if len(raw_text) <= 40:
-                score += 2
-            if extract_currency_code(price_text):
-                score += 2
+            score = _listing_price_candidate_score(
+                attrs, lowered_raw_text, raw_text, price_text
+            )
             candidates.append((score, order, price_text))
     if candidates:
         candidates.sort(key=lambda row: (-row[0], row[1]))
@@ -151,14 +138,35 @@ def _extract_price_signal_from_card(card) -> str | None:
     fallback_price = extract_price_text(card_text, prefer_last=True)
     if not fallback_price:
         return None
-    lowered_card_text = card_text.lower()
-    if any(symbol in card_text for symbol in ("$", "£", "€", "₹")):
-        return fallback_price
-    if re.search(r"\b(?:usd|eur|gbp|inr|cad|aud|jpy|zar|aed)\b", lowered_card_text):
-        return fallback_price
-    if re.search(r"\b(?:price|sale|from|now|only|msrp|mrp)\b", lowered_card_text):
-        return fallback_price
-    return None
+    return fallback_price if _card_text_supports_price(card_text) else None
+
+
+def _listing_price_candidate_score(
+    attrs: str, lowered_text: str, raw_text: str, price_text: str
+) -> int:
+    score = 5 if "price" in attrs else 0
+    if any(token in attrs or token in lowered_text for token in ("sale", "now")):
+        score += 4
+    if any(
+        token in attrs or token in lowered_text
+        for token in ("regular", "original", "mrp", "list")
+    ):
+        score -= 6
+    if len(raw_text) <= 40:
+        score += 2
+    if extract_currency_code(price_text):
+        score += 2
+    return score
+
+
+def _card_text_supports_price(text: str) -> bool:
+    if any(symbol in text for symbol in ("$", "£", "€", "₹")):
+        return True
+    lowered = text.lower()
+    return bool(
+        re.search(r"\b(?:usd|eur|gbp|inr|cad|aud|jpy|zar|aed)\b", lowered)
+        or re.search(r"\b(?:price|sale|from|now|only|msrp|mrp)\b", lowered)
+    )
 
 
 def _card_title_node(card) -> object | None:
@@ -212,22 +220,40 @@ def _card_title_score(
     attrs = str(attrs or "")
     tag_name = str(tag_name or "")
     href_present = bool(href_present)
-    score = 0
-    if any(
-        token in attrs
-        for token in (
-            "title",
-            "name",
-            "product",
-            "item",
-            "listing",
-            "result",
-            "job",
-            "record",
-            "release",
+    score = _card_title_attribute_score(attrs)
+    if tag_name in {"h1", "h2", "h3", "h4", "h5", "a", "strong", "b"}:
+        score += 2
+    if text.isdigit():
+        score -= 20
+    if re.search(r"[a-z]", text, flags=re.I):
+        score += 2
+    score += _card_title_length_score(len(text))
+    if is_title_noise(text):
+        score -= 4
+    if href_present:
+        score += 2
+    return score
+
+
+def _card_title_attribute_score(attrs: str) -> int:
+    score = (
+        6
+        if any(
+            token in attrs
+            for token in (
+                "title",
+                "name",
+                "product",
+                "item",
+                "listing",
+                "result",
+                "job",
+                "record",
+                "release",
+            )
         )
-    ):
-        score += 6
+        else 0
+    )
     if any(
         token in attrs
         for token in (
@@ -241,24 +267,15 @@ def _card_title_score(
         )
     ):
         score -= 6
-    if tag_name in {"h1", "h2", "h3", "h4", "h5", "a", "strong", "b"}:
-        score += 2
-    if text.isdigit():
-        score -= 20
-    if re.search(r"[a-z]", text, flags=re.I):
-        score += 2
-    text_len = len(text)
-    if 8 <= text_len <= 180:
-        score += 3
-    elif text_len < 4:
-        score -= 6
-    elif text_len > 220:
-        score -= 2
-    if is_title_noise(text):
-        score -= 4
-    if href_present:
-        score += 2
     return score
+
+
+def _card_title_length_score(length: int) -> int:
+    if 8 <= length <= 180:
+        return 3
+    if length < 4:
+        return -6
+    return -2 if length > 220 else 0
 
 
 def _fallback_card_title_candidates(card) -> list[object]:
@@ -312,47 +329,57 @@ def _select_primary_anchor(
     anchors.extend(listing_node_css(card, "a[href]"))
     for anchor in anchors:
         url = absolute_url(page_url, listing_node_attr(anchor, "href"))
-        if not url or (not same_host(page_url, url) and not same_site(page_url, url)):
-            continue
-        lowered_url = url.lower()
-        if not is_article and listing_url_is_structural(url, page_url):
-            continue
-        if any(
-            token in lowered_url
-            for token in ("sort=", "filter=", "facet=", "#review", "#details")
-        ):
+        if _listing_anchor_url_is_rejected(url, page_url, is_article):
             continue
         text = clean_text(
             listing_node_attr(anchor, "title")
             or listing_node_attr(anchor, "aria-label")
             or listing_node_text(anchor)
         )
-        score = _card_title_score(
-            text=text,
-            attrs=listing_node_signature(anchor),
-            tag_name=listing_node_tag(anchor),
-            href_present=True,
-        )
-        if listing_detail_like_path(url, is_job=is_job):
-            score += 6
-        if any(
-            token in lowered_url
-            for token in ("/seller/", "/profile/", "/brand/", "/help/", "/search")
-        ):
-            score -= 5
-        if title_index >= 0 and card_html:
-            anchor_html = listing_node_html(anchor)
-            anchor_index = card_html.find(anchor_html) if anchor_html else -1
-            if 0 <= anchor_index < title_index:
-                score += 3
-            elif anchor_index > title_index:
-                score -= 3
+        score = _listing_anchor_score(anchor, url, text, is_job, card_html, title_index)
         if best is None or score > best[0]:
             best = (score, anchor, url, text)
     if best is None:
         return None
     score, anchor, url, text = best
     return anchor, url, text, score
+
+
+def _listing_anchor_url_is_rejected(url: str, page_url: str, is_article: bool) -> bool:
+    if not url or (not same_host(page_url, url) and not same_site(page_url, url)):
+        return True
+    if not is_article and listing_url_is_structural(url, page_url):
+        return True
+    return any(
+        token in url.lower()
+        for token in ("sort=", "filter=", "facet=", "#review", "#details")
+    )
+
+
+def _listing_anchor_score(
+    anchor: object, url: str, text: str, is_job: bool, card_html: str, title_index: int
+) -> int:
+    score = _card_title_score(
+        text=text,
+        attrs=listing_node_signature(anchor),
+        tag_name=listing_node_tag(anchor),
+        href_present=True,
+    )
+    if listing_detail_like_path(url, is_job=is_job):
+        score += 6
+    if any(
+        token in url.lower()
+        for token in ("/seller/", "/profile/", "/brand/", "/help/", "/search")
+    ):
+        score -= 5
+    if title_index >= 0 and card_html:
+        anchor_html = listing_node_html(anchor)
+        anchor_index = card_html.find(anchor_html) if anchor_html else -1
+        if 0 <= anchor_index < title_index:
+            score += 3
+        elif anchor_index > title_index:
+            score -= 3
+    return score
 
 
 def _select_primary_card_url(

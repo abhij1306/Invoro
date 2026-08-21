@@ -79,6 +79,13 @@ def _enforce_variant_currency_context(record: dict[str, Any]) -> None:
         if only_variant_currency != parent_currency:
             record["currency"] = only_variant_currency
             parent_currency = only_variant_currency
+    kept, mismatched = _partition_variants_by_currency(variants, parent_currency)
+    _store_currency_partition(record, kept=kept, mismatched=mismatched)
+
+
+def _partition_variants_by_currency(
+    variants: list[object], parent_currency: str
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     kept: list[dict[str, Any]] = []
     mismatched: list[dict[str, Any]] = []
     for variant in variants:
@@ -86,47 +93,36 @@ def _enforce_variant_currency_context(record: dict[str, Any]) -> None:
             continue
         variant_currency = _currency_code(variant.get("currency"))
         if variant_currency and variant_currency != parent_currency:
-            logger.warning(
-                "Dropping variant with mismatched currency",
-                extra={
-                    "variant_id": variant.get("id") or variant.get("sku"),
-                    "variant_currency": variant_currency,
-                    "parent_currency": parent_currency,
-                },
-            )
-            mismatch = dict(variant)
-            mismatch["currency_mismatch"] = True
-            mismatch["parent_currency"] = parent_currency
-            mismatch["variant_currency"] = variant_currency
-            mismatched.append(mismatch)
+            logger.warning("Dropping variant with mismatched currency")
+            mismatched.append({
+                **variant,
+                "currency_mismatch": True,
+                "parent_currency": parent_currency,
+                "variant_currency": variant_currency,
+            })
             continue
         variant["currency"] = parent_currency
         kept.append(variant)
+    return kept, mismatched
+
+
+def _store_currency_partition(
+    record: dict[str, Any], *, kept: list[dict[str, Any]], mismatched: list[dict[str, Any]]
+) -> None:
     if mismatched:
         record["variants_currency_mismatch"] = mismatched
-    if kept:
-        record["variants"] = kept
-        record["variant_count"] = len(kept)
-        return
-    if mismatched:
-        restored_variants = [
-            {
-                key: value
-                for key, value in variant.items()
-                if key
-                not in {
-                    "currency_mismatch",
-                    "parent_currency",
-                    "variant_currency",
-                }
-            }
-            for variant in mismatched
-        ]
-        record["variants"] = restored_variants
-        record["variant_count"] = len(restored_variants)
-        return
-    record.pop("variants", None)
-    record.pop("variant_count", None)
+    output = kept or [_strip_currency_mismatch(row) for row in mismatched]
+    if output:
+        record["variants"] = output
+        record["variant_count"] = len(output)
+    else:
+        record.pop("variants", None)
+        record.pop("variant_count", None)
+
+
+def _strip_currency_mismatch(variant: dict[str, Any]) -> dict[str, Any]:
+    metadata = {"currency_mismatch", "parent_currency", "variant_currency"}
+    return {key: value for key, value in variant.items() if key not in metadata}
 
 
 def _currency_code(value: object) -> str:
@@ -213,38 +209,31 @@ def _backfill_variant_shared_fields_from_record(record: dict[str, Any]) -> None:
     for variant in variants:
         if not isinstance(variant, dict):
             continue
-        variant_color = clean_text(variant.get("color"))
-        # Drop pre-existing variant images that match the parent image but
-        # represent a different colorway. Source upstreams (Shopify swatch
-        # blocks, network listings) sometimes paint the current PDP image
-        # onto every sibling colorway, leaving misleading data.
-        existing_variant_image = variant.get("image_url")
-        if (
-            existing_variant_image
-            and fallback_image_key
-            and _image_url_normalize_key(existing_variant_image) == fallback_image_key
-            and record_color
-            and variant_color
-            and variant_color.casefold() != record_color.casefold()
-        ):
-            variant.pop("image_url", None)
-            existing_variant_image = None
-        if fallback_image not in (None, "", [], {}) and existing_variant_image in (
-            None,
-            "",
-            [],
-            {},
-        ):
-            # Do not paint the parent image onto a variant that represents a
-            # different colorway. Otherwise consumers see (e.g.) the Yellow
-            # PDP image attached to Black/Brown variants on FashionNova.
-            if (
-                record_color
-                and variant_color
-                and variant_color.casefold() != record_color.casefold()
-            ):
-                continue
-            variant["image_url"] = fallback_image
+        _backfill_variant_image(
+            variant,
+            fallback_image=fallback_image,
+            fallback_image_key=fallback_image_key,
+            record_color=record_color,
+        )
+
+
+def _backfill_variant_image(
+    variant: dict[str, Any],
+    *,
+    fallback_image: object,
+    fallback_image_key: str,
+    record_color: str,
+) -> None:
+    variant_color = clean_text(variant.get("color"))
+    different_color = bool(
+        record_color and variant_color and variant_color.casefold() != record_color.casefold()
+    )
+    existing = variant.get("image_url")
+    if existing and fallback_image_key and _image_url_normalize_key(existing) == fallback_image_key and different_color:
+        variant.pop("image_url", None)
+        existing = None
+    if fallback_image not in (None, "", [], {}) and existing in (None, "", [], {}) and not different_color:
+        variant["image_url"] = fallback_image
 
 
 def _image_url_normalize_key(url: object) -> str:

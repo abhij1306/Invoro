@@ -118,30 +118,33 @@ def _decode_firestore_value(value: object) -> Any:
         return value.get("booleanValue")
     for number_key in ("integerValue", "doubleValue"):
         if number_key in value:
-            raw = value.get(number_key)
-            if raw is None:
-                return None
-            try:
-                return float(raw) if "." in str(raw) else int(str(raw))
-            except (TypeError, ValueError):
-                return raw
+            return _decode_firestore_number(value.get(number_key))
     if "mapValue" in value:
-        map_value = value.get("mapValue")
-        if not isinstance(map_value, dict):
-            return {}
-        fields = map_value.get("fields")
-        if not isinstance(fields, dict):
-            return {}
-        return {key: _decode_firestore_value(item) for key, item in fields.items()}
+        return _decode_firestore_map(value.get("mapValue"))
     if "arrayValue" in value:
-        array_value = value.get("arrayValue")
-        if not isinstance(array_value, dict):
-            return []
-        values = array_value.get("values")
-        if not isinstance(values, list):
-            return []
-        return [_decode_firestore_value(item) for item in values]
+        return _decode_firestore_array(value.get("arrayValue"))
     return None
+
+
+def _decode_firestore_number(raw: object) -> object:
+    if raw is None:
+        return None
+    try:
+        return float(raw) if "." in str(raw) else int(str(raw))
+    except (TypeError, ValueError):
+        return raw
+
+
+def _decode_firestore_map(value: object) -> dict[str, Any]:
+    if not isinstance(value, dict) or not isinstance(value.get("fields"), dict):
+        return {}
+    return {key: _decode_firestore_value(item) for key, item in value["fields"].items()}
+
+
+def _decode_firestore_array(value: object) -> list[Any]:
+    if not isinstance(value, dict) or not isinstance(value.get("values"), list):
+        return []
+    return [_decode_firestore_value(item) for item in value["values"]]
 
 
 def _job_url(*, page_url: str, company_slug: str, job_slug: str) -> str:

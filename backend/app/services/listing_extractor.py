@@ -1,3 +1,4 @@
+# ruff: noqa: E402, F401, F821, F822
 from __future__ import annotations
 import re
 import logging
@@ -86,10 +87,8 @@ from app.services.dom.selector_engine import apply_selector_fallbacks
 logger = logging.getLogger(__name__)
 _alnum_word_pattern = re.compile(r"[a-z0-9]+", re.I)
 
-
 def _alnum_token_count(text: str) -> int:
     return len(_alnum_word_pattern.findall(text))
-
 
 def _resolve_selector_trace(
     field_name: str,
@@ -101,16 +100,11 @@ def _resolve_selector_trace(
         if not isinstance(trace, dict):
             continue
         if trace.get("_candidate_value") == finalized_value:
-            return {
-                key: value
-                for key, value in trace.items()
-                if not str(key).startswith("_")
-            }
+            return {key: value for key, value in trace.items() if not str(key).startswith("_")}
     trace = next((row for row in traces if isinstance(row, dict)), {})
     if not isinstance(trace, dict):
         return None
     return {key: value for key, value in trace.items() if not str(key).startswith("_")}
-
 
 def _is_title_only_candidate_allowed(
     *,
@@ -131,9 +125,7 @@ def _is_title_only_candidate_allowed(
             title=cleaned_title,
             url=cleaned_url,
         )
-        and not re.match(
-            r"^(?:article|flyer|guide|manual|resource)\s*:", cleaned_title, flags=re.I
-        )
+        and not re.match(r"^(?:article|flyer|guide|manual|resource)\s*:", cleaned_title, flags=re.I)
         and not re.search(r"\.(?:pdf|docx?|pptx?)(?:$|[?#])", cleaned_url, flags=re.I)
         and not any(
             token in cleaned_url.lower()
@@ -149,15 +141,10 @@ def _is_title_only_candidate_allowed(
         and title_token_overlap(cleaned_title, title_from_url(cleaned_url) or "") >= 2
     )
 
-
 def _surface_has_dom_fallback_patterns(surface: str) -> bool:
     dom_patterns_raw = EXTRACTION_RULES.get("dom_patterns")
     dom_patterns = dict(dom_patterns_raw) if isinstance(dom_patterns_raw, dict) else {}
-    return any(
-        str(dom_patterns.get(field_name) or "").strip()
-        for field_name in surface_fields(surface, None)
-    )
-
+    return any(str(dom_patterns.get(field_name) or "").strip() for field_name in surface_fields(surface, None))
 
 def _build_card_candidates(
     card,
@@ -178,11 +165,7 @@ def _build_card_candidates(
     candidates: dict[str, list[object]] = {"title": [title], "url": [url]}
     selector_trace_candidates: dict[str, list[dict[str, object]]] = {}
     card_soup: BeautifulSoup | None = None
-    needs_card_soup = (
-        bool(selector_rules)
-        or surface in {"article_listing", "content_listing"}
-        or _surface_has_dom_fallback_patterns(surface)
-    )
+    needs_card_soup = bool(selector_rules) or surface in {"article_listing", "content_listing"} or _surface_has_dom_fallback_patterns(surface)
     if needs_card_soup:
         card_soup = BeautifulSoup(str(getattr(card, "html", "") or ""), "html.parser")
     if card_soup is not None:
@@ -196,10 +179,22 @@ def _build_card_candidates(
             selector_trace_candidates=selector_trace_candidates,
             record_dom_observed_selectors=record_dom_observed_selectors,
         )
+    _add_card_content_fields(candidates, surface, card_soup, title)
+    _add_card_identity_fields(candidates, card, title, is_job, image_urls)
+    _add_card_description(candidates, title, best_same_url_text, same_url_texts)
+    _add_card_label_values(candidates, card, alias_lookup, page_url)
+    _add_card_commerce_fields(candidates, card, page_url, is_job)
+    _add_card_text_metrics(candidates, card_text, is_job)
+    return candidates, selector_trace_candidates
+
+def _add_card_content_fields(
+    candidates: dict[str, list[object]],
+    surface: str,
+    card_soup: BeautifulSoup | None,
+    title: str,
+) -> None:
     if surface == "article_listing" and card_soup is not None:
-        author = article_card_text(
-            card_soup, [".author", ".byline", "[rel='author']", "[itemprop='author']"]
-        )
+        author = article_card_text(card_soup, [".author", ".byline", "[rel='author']", "[itemprop='author']"])
         if author:
             add_candidate(candidates, "author", author)
         publication_date = article_card_date(card_soup)
@@ -212,12 +207,27 @@ def _build_card_candidates(
         summary = article_card_summary(card_soup, title)
         if summary:
             add_candidate(candidates, "summary", summary)
+
+def _add_card_identity_fields(
+    candidates: dict[str, list[object]],
+    card,
+    title: str,
+    is_job: bool,
+    image_urls: list[str],
+) -> None:
     if not is_job and not candidates.get("brand"):
         brand_text = extract_brand_signal_from_card(card, title)
         if brand_text:
             add_candidate(candidates, "brand", brand_text)
     if image_urls and not candidates.get("image_url"):
         add_candidate(candidates, "image_url", image_urls[0])
+
+def _add_card_description(
+    candidates: dict[str, list[object]],
+    title: str,
+    best_same_url_text: str | None,
+    same_url_texts: list[str],
+) -> None:
     if best_same_url_text and not candidates.get("description"):
         description_text = next(
             (
@@ -228,15 +238,19 @@ def _build_card_candidates(
                 and _alnum_token_count(text) >= 3
                 and not PRICE_RE.search(text)
                 and not is_title_noise(text)
-                and (
-                    title_token_overlap(text, title) >= 2
-                    or _alnum_token_count(text) >= 5
-                )
+                and (title_token_overlap(text, title) >= 2 or _alnum_token_count(text) >= 5)
             ),
             None,
         )
         if description_text:
             add_candidate(candidates, "description", description_text)
+
+def _add_card_label_values(
+    candidates: dict[str, list[object]],
+    card,
+    alias_lookup: dict[str, str],
+    page_url: str,
+) -> None:
     for label, value in extract_label_value_pairs_from_node(card):
         normalized_label = normalize_requested_field(label)
         if not normalized_label:
@@ -248,6 +262,8 @@ def _build_card_candidates(
                 canonical,
                 coerce_field_value(canonical, value, page_url),
             )
+
+def _add_card_commerce_fields(candidates: dict[str, list[object]], card, page_url: str, is_job: bool) -> None:
     if not is_job and not candidates.get("price"):
         price_text = extract_price_signal_from_card(card)
         if price_text:
@@ -262,6 +278,8 @@ def _build_card_candidates(
             inferred_currency = currency_hint_from_page_url(page_url)
             if inferred_currency and candidates.get("price"):
                 add_candidate(candidates, "currency", inferred_currency)
+
+def _add_card_text_metrics(candidates: dict[str, list[object]], card_text: str, is_job: bool) -> None:
     if is_job and not candidates.get("salary"):
         salary_match = PRICE_RE.search(card_text)
         if salary_match:
@@ -274,8 +292,6 @@ def _build_card_candidates(
         review_match = REVIEW_COUNT_RE.search(card_text)
         if review_match:
             add_candidate(candidates, "review_count", review_match.group(1))
-    return candidates, selector_trace_candidates
-
 
 def _listing_record_from_card(
     card,
@@ -287,77 +303,29 @@ def _listing_record_from_card(
 ) -> dict[str, Any] | None:
     is_job = surface.startswith("job_")
     title_node = card_title_node(card)
-    primary_anchor = select_primary_anchor(
-        card,
-        page_url,
-        surface=surface,
-        title_node=title_node,
-    )
+    primary_anchor = _resolve_card_anchor(card, page_url, surface, title_node)
     if primary_anchor is None:
-        fallback_url = select_primary_card_url(card, page_url)
-        if not fallback_url or title_node is None:
-            return None
-        primary_anchor = (
-            title_node,
-            fallback_url,
-            clean_text(listing_node_text(title_node)),
-            max(10, card_title_score(title_node) + 4),
-        )
+        return None
     anchor_node, url, anchor_text, anchor_score = primary_anchor
     title_node = title_node or anchor_node
     title_score = card_title_score(title_node)
-    image_title_hint = extract_image_title_hint(card, page_url=page_url)
-    title = clean_text(
-        listing_node_attr(title_node, "title")
-        or listing_node_attr(title_node, "alt")
-        or listing_node_text(title_node)
-        or anchor_text
-    )
     same_url_texts = same_url_anchor_text_candidates(card, url)
-    best_same_url_text = next(
-        (
-            text
-            for text in sorted(same_url_texts, key=len, reverse=True)
-            if _alnum_token_count(text) >= 3
-            and not PRICE_RE.search(text)
-            and not is_title_noise(text)
-        ),
-        None,
-    )
-    if best_same_url_text and (_alnum_token_count(title) < 3 or is_title_noise(title)):
-        title = best_same_url_text
-    if should_replace_title_with_image_hint(title, image_title_hint):
-        title = clean_text(image_title_hint)
-    title = normalize_listing_title(title)
+    title, best_same_url_text = _resolve_card_title(card, title_node, anchor_text, same_url_texts, page_url)
     if len(title) < 4 or is_title_noise(title):
         return None
     if anchor_score < 4 and title_score < 8:
         return None
     card_text = listing_node_text(card)
     image_urls = extract_page_images_from_node(card, page_url)
-    has_supporting_listing_signals = bool(
-        PRICE_RE.search(card_text)
-        or RATING_RE.search(card_text)
-        or REVIEW_COUNT_RE.search(card_text)
-        or image_urls
-    )
-    if not listing_detail_like_path(url, is_job=is_job):
-        if (
-            is_job
-            and anchor_score < 8
-            and not any(
-                token in card_text.lower()
-                for token in ("salary", "remote", "location", "apply")
-            )
-        ):
-            return None
-        if (
-            not is_job
-            and anchor_score < 8
-            and not has_supporting_listing_signals
-            and title_score < 8
-        ):
-            return None
+    if not _card_path_is_supported(
+        url=url,
+        is_job=is_job,
+        anchor_score=anchor_score,
+        title_score=title_score,
+        card_text=card_text,
+        image_urls=image_urls,
+    ):
+        return None
     candidates, selector_trace_candidates = _build_card_candidates(
         card,
         page_url=page_url,
@@ -372,10 +340,100 @@ def _listing_record_from_card(
         card_text=card_text,
         record_dom_observed_selectors=record_dom_observed_selectors,
     )
-    record: dict[str, Any] = {
-        "source_url": page_url,
-        "_source": "dom_listing",
-    }
+    cleaned = _materialize_card_record(
+        candidates,
+        selector_trace_candidates,
+        surface=surface,
+        page_url=page_url,
+    )
+    if cleaned is None:
+        return None
+    cleaned_title = clean_text(cleaned.get("title"))
+    cleaned_url = str(cleaned.get("url") or "").strip()
+    allow_title_only_dom_candidate = _is_title_only_candidate_allowed(
+        is_job=is_job,
+        anchor_score=anchor_score,
+        title_score=title_score,
+        cleaned_title=cleaned_title,
+        cleaned_url=cleaned_url,
+        page_url=page_url,
+    )
+    supported = listing_record_supported(
+        cleaned,
+        page_url=page_url,
+        surface=surface,
+        title_is_noise=is_title_noise,
+        url_is_structural=listing_url_is_structural,
+        detail_like_url=lambda value: listing_detail_like_path(value, is_job=is_job),
+    )
+    if not supported and not allow_title_only_dom_candidate:
+        return None
+    cleaned["_structural_signature"] = listing_fragment_structural_signature(card, url=cleaned_url)
+    return cleaned
+
+def _resolve_card_anchor(card, page_url: str, surface: str, title_node):
+    primary = select_primary_anchor(card, page_url, surface=surface, title_node=title_node)
+    if primary is not None:
+        return primary
+    fallback_url = select_primary_card_url(card, page_url)
+    if not fallback_url or title_node is None:
+        return None
+    return (
+        title_node,
+        fallback_url,
+        clean_text(listing_node_text(title_node)),
+        max(10, card_title_score(title_node) + 4),
+    )
+
+def _resolve_card_title(card, title_node, anchor_text: str, same_url_texts: list[str], page_url: str) -> tuple[str, str | None]:
+    title = clean_text(listing_node_attr(title_node, "title") or listing_node_attr(title_node, "alt") or listing_node_text(title_node) or anchor_text)
+    best_same_url_text = next(
+        (
+            text
+            for text in sorted(same_url_texts, key=len, reverse=True)
+            if _alnum_token_count(text) >= 3 and not PRICE_RE.search(text) and not is_title_noise(text)
+        ),
+        None,
+    )
+    if best_same_url_text and (_alnum_token_count(title) < 3 or is_title_noise(title)):
+        title = best_same_url_text
+    image_hint = extract_image_title_hint(card, page_url=page_url)
+    if should_replace_title_with_image_hint(title, image_hint):
+        title = clean_text(image_hint)
+    return normalize_listing_title(title), best_same_url_text
+
+def _card_path_is_supported(
+    *,
+    url: str,
+    is_job: bool,
+    anchor_score: int,
+    title_score: int,
+    card_text: str,
+    image_urls: list[str],
+) -> bool:
+    if listing_detail_like_path(url, is_job=is_job):
+        return True
+    if is_job:
+        job_signal = any(token in card_text.lower() for token in ("salary", "remote", "location", "apply"))
+        return anchor_score >= 8 or job_signal
+    supporting = any(
+        (
+            PRICE_RE.search(card_text),
+            RATING_RE.search(card_text),
+            REVIEW_COUNT_RE.search(card_text),
+            image_urls,
+        )
+    )
+    return anchor_score >= 8 or supporting or title_score >= 8
+
+def _materialize_card_record(
+    candidates: dict[str, list[object]],
+    selector_trace_candidates: dict[str, list[dict[str, object]]],
+    *,
+    surface: str,
+    page_url: str,
+) -> dict[str, Any] | None:
+    record: dict[str, Any] = {"source_url": page_url, "_source": "dom_listing"}
     selected_selector_traces: dict[str, dict[str, object]] = {}
     for field_name in surface_fields(surface, None):
         finalized = finalize_candidate_value(field_name, candidates.get(field_name, []))
@@ -393,428 +451,11 @@ def _listing_record_from_card(
     cleaned = finalize_record(record, surface=surface)
     if not cleaned.get("url") or not cleaned.get("title"):
         return None
-    cleaned_title = clean_text(cleaned.get("title"))
-    cleaned_url = str(cleaned.get("url") or "").strip()
-    allow_title_only_dom_candidate = _is_title_only_candidate_allowed(
-        is_job=is_job,
-        anchor_score=anchor_score,
-        title_score=title_score,
-        cleaned_title=cleaned_title,
-        cleaned_url=cleaned_url,
-        page_url=page_url,
-    )
-    if (
-        not listing_record_supported(
-            cleaned,
-            page_url=page_url,
-            surface=surface,
-            title_is_noise=is_title_noise,
-            url_is_structural=listing_url_is_structural,
-            detail_like_url=(
-                lambda url: listing_detail_like_path(
-                    url,
-                    is_job=surface.startswith("job_"),
-                )
-            ),
-        )
-        and not allow_title_only_dom_candidate
-    ):
-        return None
-    cleaned["_structural_signature"] = listing_fragment_structural_signature(
-        card,
-        url=cleaned_url,
-    )
     return cleaned
 
-
-def _detail_anchor_count(
-    parser: LexborHTMLParser,
-    *,
-    page_url: str,
-    surface: str,
-    fallback_fragment_limit: int,
-) -> int:
-    is_job = surface.startswith("job_")
-    seen_urls: set[str] = set()
-    count = 0
-    for card in listing_card_html_fragments(
-        parser,
-        is_job=is_job,
-        fallback_fragment_limit=fallback_fragment_limit,
-    ):
-        primary_anchor = select_primary_anchor(card, page_url, surface=surface)
-        if primary_anchor is None:
-            continue
-        url = str(primary_anchor[1] or "").strip()
-        if not url or url in seen_urls:
-            continue
-        seen_urls.add(url)
-        if listing_detail_like_path(url, is_job=is_job):
-            count += 1
-    return count
-
-
-def _attach_gate_decision_to_artifacts(
-    artifacts: dict[str, object] | None,
-    decision: IntegrityDecision | None,
-) -> None:
-    """Attach the integrity gate decision to the artifacts dict under key ``listing_integrity``."""
-    if artifacts is None:
-        return
-    if decision is None or not isinstance(decision, IntegrityDecision):
-        artifacts["listing_integrity"] = {
-            "outcome": "unknown",
-            "reason": "invalid_decision",
-            "metrics": {},
-        }
-        return
-    artifacts["listing_integrity"] = {
-        "outcome": decision.outcome,
-        "reason": decision.reason,
-        "metrics": decision.metrics,
-    }
-
-
-def apply_listing_integrity_gate(
-    records: list[dict[str, Any]],
-    *,
-    page_url: str,
-    surface: str,
-    artifacts: dict[str, object] | None = None,
-) -> list[dict[str, Any]]:
-    if not records:
-        _attach_gate_decision_to_artifacts(artifacts, None)
-        return []
-    try:
-        decision = evaluate_listing_integrity(
-            records, page_url=page_url, surface=surface
-        )
-    except (KeyError, RuntimeError, TypeError, ValueError):
-        logger.exception(
-            "evaluate_listing_integrity failed for page_url=%s surface=%s records=%d",
-            page_url,
-            surface,
-            len(records),
-        )
-        decision = None
-    _attach_gate_decision_to_artifacts(artifacts, decision)
-    if decision is not None and decision.outcome == "promo_only_cluster":
-        return []
-    return [_strip_listing_integrity_internals(record) for record in records]
-
-
-def _strip_listing_integrity_internals(record: dict[str, Any]) -> dict[str, Any]:
-    if "_structural_signature" not in record:
-        return record
-    cleaned = dict(record)
-    cleaned.pop("_structural_signature", None)
-    return cleaned
-
-
-def _structured_listing_stage(
-    context: Any,
-    *,
-    page_url: str,
-    surface: str,
-    max_records: int,
-    listing_min_items: int,
-) -> list[dict[str, Any]]:
-    payloads: list[dict[str, Any]] = []
-    for source_name, source_payloads in collect_structured_source_payloads(
-        context,
-        page_url=page_url,
-        surface=surface,
-    ):
-        if source_name == "js_state":
-            continue
-        payload_list = [
-            payload for payload in source_payloads if isinstance(payload, dict)
-        ]
-        if source_name == "embedded_json" and not allow_embedded_json_listing_payloads(
-            payload_list,
-            listing_min_items=listing_min_items,
-        ):
-            continue
-        payloads.extend(payload_list)
-    return extract_structured_listing(
-        payloads,
-        page_url,
-        surface,
-        max_records=max_records,
-        listing_min_items=listing_min_items,
-    )
-
-
-def _dom_listing_stage(
-    parser: LexborHTMLParser,
-    *,
-    page_url: str,
-    surface: str,
-    is_job_surface: bool,
-    max_records: int,
-    fallback_fragment_limit: int,
-    selector_rules: list[dict[str, object]] | None,
-    record_dom_observed_selectors: bool,
-    seed_urls: set[str] | None = None,
-) -> list[dict[str, Any]]:
-    records: list[dict[str, Any]] = []
-    skipped_urls: set[str] = set(seed_urls or ())
-    records_by_url: dict[str, dict[str, Any]] = {}
-    for card in listing_card_html_fragments(
-        parser,
-        is_job=is_job_surface,
-        fallback_fragment_limit=fallback_fragment_limit,
-        limit=max_records,
-    ):
-        record = _listing_record_from_card(
-            card,
-            page_url,
-            surface,
-            selector_rules=selector_rules,
-            record_dom_observed_selectors=record_dom_observed_selectors,
-        )
-        if record is None:
-            continue
-        url = str(record.get("url") or "")
-        if not url:
-            continue
-        existing = records_by_url.get(url)
-        if existing is not None:
-            for key, value in record.items():
-                if key not in existing or existing.get(key) in (None, "", [], {}):
-                    existing[key] = value
-            continue
-        if url in skipped_urls:
-            continue
-        skipped_urls.add(url)
-        records_by_url[url] = record
-        records.append(record)
-    return records
-
-
-def extract_listing_records(
-    html: str,
-    page_url: str,
-    surface: str,
-    *,
-    max_records: int,
-    artifacts: dict[str, object] | None = None,
-    selector_rules: list[dict[str, object]] | None = None,
-    network_payloads: list[dict[str, object]] | None = None,
-    record_dom_observed_selectors: bool = False,
-    context: ExtractionContext | None = None,
-) -> list[dict[str, Any]]:
-    del network_payloads
-    if surface == "content_listing":
-        table_records = table_row_records(html, page_url, max_records=max_records)
-        if table_records:
-            return table_records
-        # Table intent prevents falling back to unrelated DOM cards when table parsing finds no records.
-        table_row_intent = has_table_row_intent(html)
-    else:
-        table_row_intent = False
-    context = context or prepare_extraction_context(html)
-    dom_parser = context.dom_parser
-    is_job_surface = surface.startswith("job_")
-    listing_fallback_fragment_limit = int(
-        crawler_runtime_settings.listing_fallback_fragment_limit
-    )
-    listing_min_items = int(crawler_runtime_settings.listing_min_items)
-    if not listing_card_html_fragments(
-        dom_parser,
-        is_job=is_job_surface,
-        fallback_fragment_limit=listing_fallback_fragment_limit,
-        limit=max_records,
-    ):
-        original_parser = context.original_dom_parser
-        if listing_card_html_fragments(
-            original_parser,
-            is_job=is_job_surface,
-            fallback_fragment_limit=listing_fallback_fragment_limit,
-            limit=max_records,
-        ):
-            logger.debug(
-                "Using original listing DOM after cleaned DOM lost card fragments for %s",
-                page_url,
-            )
-            dom_parser = original_parser
-
-    structured_records = _structured_listing_stage(
-        context,
-        page_url=page_url,
-        surface=surface,
-        max_records=max_records,
-        listing_min_items=listing_min_items,
-    )
-    dom_records = _dom_listing_stage(
-        dom_parser,
-        page_url=page_url,
-        surface=surface,
-        is_job_surface=is_job_surface,
-        max_records=max_records,
-        fallback_fragment_limit=listing_fallback_fragment_limit,
-        selector_rules=selector_rules,
-        record_dom_observed_selectors=record_dom_observed_selectors,
-    )
-    original_dom_records: list[dict[str, Any]] = []
-    if context.original_html and context.original_html != context.cleaned_html:
-        original_parser = context.original_dom_parser
-        cleaned_detail_anchor_count = _detail_anchor_count(
-            dom_parser,
-            page_url=page_url,
-            surface=surface,
-            fallback_fragment_limit=listing_fallback_fragment_limit,
-        )
-        original_detail_anchor_count = _detail_anchor_count(
-            original_parser,
-            page_url=page_url,
-            surface=surface,
-            fallback_fragment_limit=listing_fallback_fragment_limit,
-        )
-        if original_detail_anchor_count >= max(3, cleaned_detail_anchor_count + 2):
-            original_dom_records = _dom_listing_stage(
-                original_parser,
-                page_url=page_url,
-                surface=surface,
-                is_job_surface=is_job_surface,
-                max_records=max_records,
-                fallback_fragment_limit=listing_fallback_fragment_limit,
-                selector_rules=selector_rules,
-                record_dom_observed_selectors=record_dom_observed_selectors,
-            )
-            logger.debug(
-                "Using original listing DOM after cleaned DOM lost detail-link evidence for %s",
-                page_url,
-            )
-    rendered_fragments = (
-        artifacts.get("rendered_listing_fragments")
-        if isinstance(artifacts, dict)
-        else None
-    )
-    rendered_dom_records: list[dict[str, Any]] = []
-    rendered_original_dom_records: list[dict[str, Any]] = []
-    if isinstance(rendered_fragments, list):
-        rendered_fragment_html = "\n".join(
-            fragment
-            for fragment in (str(item or "").strip() for item in rendered_fragments)
-            if fragment
-        )
-        if rendered_fragment_html:
-            rendered_context = prepare_extraction_context(
-                f"<html><body>{rendered_fragment_html}</body></html>"
-            )
-            rendered_parser = rendered_context.dom_parser
-            rendered_dom_records = _dom_listing_stage(
-                rendered_parser,
-                page_url=page_url,
-                surface=surface,
-                is_job_surface=is_job_surface,
-                max_records=max_records,
-                fallback_fragment_limit=listing_fallback_fragment_limit,
-                selector_rules=selector_rules,
-                record_dom_observed_selectors=record_dom_observed_selectors,
-            )
-            if rendered_context.noise_removed:
-                rendered_original_parser = rendered_context.original_dom_parser
-                cleaned_detail_anchor_count = _detail_anchor_count(
-                    rendered_parser,
-                    page_url=page_url,
-                    surface=surface,
-                    fallback_fragment_limit=listing_fallback_fragment_limit,
-                )
-                original_detail_anchor_count = _detail_anchor_count(
-                    rendered_original_parser,
-                    page_url=page_url,
-                    surface=surface,
-                    fallback_fragment_limit=listing_fallback_fragment_limit,
-                )
-                original_materially_stronger = original_detail_anchor_count >= max(
-                    3,
-                    cleaned_detail_anchor_count + 2,
-                )
-                if not rendered_dom_records or original_materially_stronger:
-                    rendered_original_dom_records = _dom_listing_stage(
-                        rendered_original_parser,
-                        page_url=page_url,
-                        surface=surface,
-                        is_job_surface=is_job_surface,
-                        max_records=max_records,
-                        fallback_fragment_limit=listing_fallback_fragment_limit,
-                        selector_rules=selector_rules,
-                        record_dom_observed_selectors=record_dom_observed_selectors,
-                    )
-            elif not rendered_dom_records:
-                rendered_original_dom_records = _dom_listing_stage(
-                    rendered_context.original_dom_parser,
-                    page_url=page_url,
-                    surface=surface,
-                    is_job_surface=is_job_surface,
-                    max_records=max_records,
-                    fallback_fragment_limit=listing_fallback_fragment_limit,
-                    selector_rules=selector_rules,
-                    record_dom_observed_selectors=record_dom_observed_selectors,
-                )
-    listing_visual_elements = (
-        artifacts.get("listing_visual_elements")
-        if isinstance(artifacts, dict)
-        else None
-    )
-    visual_records = visual_listing_records(
-        listing_visual_elements if isinstance(listing_visual_elements, list) else None,
-        page_url=page_url,
-        surface=surface,
-        max_records=max_records,
-        title_is_noise=is_title_noise,
-        url_is_structural=listing_url_is_structural,
-    )
-    visual_records = [
-        record
-        for record in visual_records
-        if listing_record_supported(
-            record,
-            page_url=page_url,
-            surface=surface,
-            title_is_noise=is_title_noise,
-            url_is_structural=listing_url_is_structural,
-            detail_like_url=(
-                lambda url: listing_detail_like_path(
-                    url,
-                    is_job=surface.startswith("job_"),
-                )
-            ),
-        )
-    ]
-    candidate_sets: list[tuple[str, list[dict[str, Any]]]] = [
-        ("structured", structured_records),
-        ("dom", dom_records),
-        ("structured_plus_dom", [*dom_records, *structured_records]),
-    ]
-    if original_dom_records:
-        candidate_sets.append(("original_dom", original_dom_records))
-    if rendered_dom_records:
-        candidate_sets.append(("rendered_dom", rendered_dom_records))
-    if rendered_original_dom_records:
-        candidate_sets.append(("rendered_original_dom", rendered_original_dom_records))
-    if visual_records:
-        candidate_sets.append(("visual", visual_records))
-    best_records = best_listing_candidate_set(
-        candidate_sets,
-        page_url=page_url,
-        surface=surface,
-        max_records=max_records,
-        title_is_noise=is_title_noise,
-        url_is_structural=listing_url_is_structural,
-        detail_like_url=lambda candidate_url: listing_detail_like_path(
-            candidate_url,
-            is_job=is_job_surface,
-        ),
-    )
-    if table_row_intent and not best_records:
-        # Preserve empty table-listing results instead of substituting non-table card records.
-        return []
-    return apply_listing_integrity_gate(
-        best_records,
-        page_url=page_url,
-        surface=surface,
-        artifacts=artifacts,
-    )
+from . import listing_stages as _split_owner
+globals().update({
+    name: value
+    for name, value in vars(_split_owner).items()
+    if not name.startswith("__") and name != "_owner"
+})

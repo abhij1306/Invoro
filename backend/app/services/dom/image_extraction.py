@@ -174,44 +174,13 @@ def canonical_image_url(url: str) -> str:
 def image_candidate_score(url: str) -> tuple[int, int, int, int]:
     normalized_url = _normalize_image_url_text(url)
     parsed = urlparse(normalized_url)
-    numeric_params = {
-        str(key or "").strip().lower(): str(value or "").strip()
-        for key, value in parse_qsl(parsed.query, keep_blank_values=True)
-    }
-    numeric_params.update(
-        {
-            str(key or "").strip().lower(): str(value or "").strip()
-            for key, value in parse_qsl(
-                str(parsed.params or "").replace(";", "&"),
-                keep_blank_values=True,
-            )
-        }
+    numeric_params = _image_numeric_params(parsed.query, parsed.params)
+    width = _first_int_param(
+        numeric_params,
+        "width", "w", "wid", "sw", "imwidth", "odnwidth", "maxwidth",
     )
-
-    def _int_param(*names: str) -> int:
-        for name in names:
-            raw_value = numeric_params.get(name)
-            if not raw_value:
-                continue
-            try:
-                return int(raw_value)
-            except ValueError:
-                continue
-        return 0
-
-    width = _int_param(
-        *(
-            p
-            for p in ("width", "w", "wid", "sw", "imwidth", "odnwidth", "maxwidth")
-            if p in _CDN_IMAGE_QUERY_PARAMS
-        )
-    )
-    height = _int_param(
-        *(
-            p
-            for p in ("height", "h", "hei", "sh", "odnheight", "maxheight")
-            if p in _CDN_IMAGE_QUERY_PARAMS
-        )
+    height = _first_int_param(
+        numeric_params, "height", "h", "hei", "sh", "odnheight", "maxheight"
     )
     if not width or not height:
         for match in _IMAGE_PATH_DIMENSION_RE.finditer(normalized_url):
@@ -223,6 +192,29 @@ def image_candidate_score(url: str) -> tuple[int, int, int, int]:
                 height = max(height, second or first)
     area = width * height if width and height else max(width, height)
     return (0 if _is_proxy_image_url(url) else 1, area, width, height)
+
+
+def _image_numeric_params(query: str, params: str) -> dict[str, str]:
+    pairs = parse_qsl(query, keep_blank_values=True)
+    pairs += parse_qsl(str(params or "").replace(";", "&"), keep_blank_values=True)
+    return {
+        str(key or "").strip().lower(): str(value or "").strip()
+        for key, value in pairs
+    }
+
+
+def _first_int_param(numeric_params: dict[str, str], *names: str) -> int:
+    for name in names:
+        if name not in _CDN_IMAGE_QUERY_PARAMS:
+            continue
+        raw_value = numeric_params.get(name)
+        if not raw_value:
+            continue
+        try:
+            return int(raw_value)
+        except ValueError:
+            continue
+    return 0
 
 
 def dedupe_image_urls(urls: list[str]) -> list[str]:
@@ -410,21 +402,8 @@ def is_garbage_image_candidate(node: Tag, candidate_url: str) -> bool:
 
 def gallery_image_score(node: Tag, candidate_url: str) -> int:
     context = image_node_context(node)
-    score = 0
-    if any(hint in context for hint in PRODUCT_GALLERY_CONTEXT_HINTS):
-        score += 4
-    elif node.find_parent(["main"]) is not None and looks_like_image_asset_url(
-        candidate_url
-    ):
-        score += 2
-    width = str(node.get("width") or "").strip()
-    height = str(node.get("height") or "").strip()
-    try:
-        if int(width or "0") >= 120 or int(height or "0") >= 120:
-            score += 1
-    except ValueError:
-        # Non-numeric width/height attributes contribute no size bonus.
-        pass
+    score = _gallery_context_score(node, candidate_url, context)
+    score += _image_dimension_score(node)
     if "srcset" in node.attrs or "data-srcset" in node.attrs:
         score += 1
     if looks_like_image_asset_url(candidate_url):
@@ -432,6 +411,23 @@ def gallery_image_score(node: Tag, candidate_url: str) -> int:
     if node.find_parent("picture") is not None:
         score += 1
     return score
+
+
+def _gallery_context_score(node: Tag, candidate_url: str, context: str) -> int:
+    if any(hint in context for hint in PRODUCT_GALLERY_CONTEXT_HINTS):
+        return 4
+    if node.find_parent(["main"]) is not None and looks_like_image_asset_url(candidate_url):
+        return 2
+    return 0
+
+
+def _image_dimension_score(node: Tag) -> int:
+    try:
+        width = int(str(node.get("width") or "0").strip())
+        height = int(str(node.get("height") or "0").strip())
+    except ValueError:
+        return 0
+    return int(width >= 120 or height >= 120)
 
 
 def image_node_context(node: Tag) -> str:

@@ -114,19 +114,35 @@ def _next_data_product(html: str) -> dict[str, Any] | None:
     product = page_props.get("selectedProduct")
     if not isinstance(product, dict) or not product.get("id"):
         return None
-    product_info = product.get("productInfo")
-    if not isinstance(product_info, dict):
-        product_info = {}
-    prices = product.get("prices")
-    if not isinstance(prices, dict):
-        prices = {}
+    product_info = _dict_value(product.get("productInfo"))
+    prices = _dict_value(product.get("prices"))
     images = _next_data_images(page_props, product)
     color = text_or_none(product.get("colorDescription"))
-    raw_sizes = product.get("sizes")
-    sizes = raw_sizes if isinstance(raw_sizes, list) else []
+    sizes = product.get("sizes") if isinstance(product.get("sizes"), list) else []
     current_price = prices.get("currentPrice")
     initial_price = prices.get("initialPrice")
-    size_options = [
+    size_options = _next_data_size_options(sizes, current_price, initial_price)
+    is_out_of_stock = _next_data_product_is_out_of_stock(product, sizes)
+    return _next_data_product_record(
+        product,
+        product_info,
+        images,
+        color,
+        current_price,
+        initial_price,
+        size_options,
+        is_out_of_stock,
+    )
+
+
+def _dict_value(value: object) -> dict[str, Any]:
+    return value if isinstance(value, dict) else {}
+
+
+def _next_data_size_options(
+    sizes: list[object], current_price: object, initial_price: object
+) -> list[dict[str, Any]]:
+    return [
         compact_dict(
             {
                 "id": option.get("merchSkuId"),
@@ -144,21 +160,33 @@ def _next_data_product(html: str) -> dict[str, Any] | None:
         if isinstance(option, dict)
         and text_or_none(option.get("label") or option.get("localizedLabel"))
     ]
-    explicit_out_of_stock = product.get("isOutOfStock")
-    derived_out_of_stock = (
-        not any(
-            _next_data_size_is_in_stock(option)
-            for option in sizes
-            if isinstance(option, dict)
-        )
-        if sizes
-        else None
+
+
+def _next_data_product_is_out_of_stock(
+    product: dict[str, Any], sizes: list[object]
+) -> bool | None:
+    explicit = product.get("isOutOfStock")
+    if explicit is not None:
+        return bool(explicit)
+    if not sizes:
+        return None
+    return not any(
+        _next_data_size_is_in_stock(option)
+        for option in sizes
+        if isinstance(option, dict)
     )
-    is_out_of_stock = (
-        bool(explicit_out_of_stock)
-        if explicit_out_of_stock is not None
-        else derived_out_of_stock
-    )
+
+
+def _next_data_product_record(
+    product: dict[str, Any],
+    product_info: dict[str, Any],
+    images: list[str],
+    color: str | None,
+    current_price: object,
+    initial_price: object,
+    size_options: list[dict[str, Any]],
+    is_out_of_stock: bool | None,
+) -> dict[str, Any]:
     return compact_dict(
         {
             "id": product.get("id")

@@ -20,70 +20,77 @@ def finalize_candidate_value(field_name: str, values: list[object]) -> object | 
     if not values:
         return None
     if field_name in STRUCTURED_OBJECT_FIELDS:
-        merged: dict[str, object] = {}
-        for value in values:
-            if not isinstance(value, dict):
-                continue
-            merged = _deep_merge_structured_dict(merged, value)
-        return merged or None
+        return _merge_structured_objects(values)
     if field_name in STRUCTURED_OBJECT_LIST_FIELDS:
-        merged_rows: list[dict[str, object]] = []
-        seen_rows: set[str] = set()
-        for value in values:
-            if not isinstance(value, list):
-                continue
-            for row in value:
-                if not isinstance(row, dict):
-                    continue
-                fingerprint = candidate_fingerprint(row)
-                if fingerprint in seen_rows:
-                    continue
-                seen_rows.add(fingerprint)
-                merged_rows.append(row)
-        if field_name == "variants":
-            merged_rows = merge_variant_rows(merged_rows)
-        return merged_rows or None
+        return _merge_structured_rows(field_name, values)
     if field_name in STRUCTURED_MULTI_FIELDS:
-        rows: list[str] = []
-        seen_values: set[str] = set()
-        for value in values:
-            items = value if isinstance(value, list) else [value]
-            for item in items:
-                text = text_or_none(item)
-                if not text:
-                    continue
-                lowered = text.lower()
-                if lowered in seen_values:
-                    continue
-                seen_values.add(lowered)
-                rows.append(text)
+        rows = _unique_text_rows(values)
         if field_name in {"additional_images", "features", "tags"}:
             return rows or None
         return "\n".join(rows) if rows else None
     if field_name in LONG_TEXT_FIELDS:
-        text_rows: list[str] = []
-        lowered_rows: list[str] = []
-        text_seen: set[str] = set()
-        for value in values:
-            text = coerce_text(value)
-            if not text:
-                continue
-            lowered = text.lower()
-            if lowered in text_seen:
-                continue
-            # Dedupe descriptions that are identical except for a short
-            # trailing variant/color suffix. Do not collapse unrelated long
-            # text just because it shares an opening boilerplate paragraph.
-            if any(
-                _long_text_differs_only_by_short_suffix(lowered, kept_lowered)
-                for kept_lowered in lowered_rows
-            ):
-                continue
-            text_seen.add(lowered)
-            lowered_rows.append(lowered)
-            text_rows.append(text)
+        text_rows = _unique_long_text_rows(values)
         return "\n\n".join(text_rows) if text_rows else None
     return values[0]
+
+
+def _merge_structured_objects(values: list[object]) -> dict[str, object] | None:
+    merged: dict[str, object] = {}
+    for value in values:
+        if isinstance(value, dict):
+            merged = _deep_merge_structured_dict(merged, value)
+    return merged or None
+
+
+def _merge_structured_rows(
+    field_name: str, values: list[object]
+) -> list[dict[str, object]] | None:
+    merged_rows: list[dict[str, object]] = []
+    seen_rows: set[str] = set()
+    for row in (
+        row
+        for value in values
+        if isinstance(value, list)
+        for row in value
+        if isinstance(row, dict)
+    ):
+        fingerprint = candidate_fingerprint(row)
+        if fingerprint not in seen_rows:
+            seen_rows.add(fingerprint)
+            merged_rows.append(row)
+    if field_name == "variants":
+        merged_rows = merge_variant_rows(merged_rows)
+    return merged_rows or None
+
+
+def _unique_text_rows(values: list[object]) -> list[str]:
+    rows: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        for item in value if isinstance(value, list) else [value]:
+            text = text_or_none(item)
+            if text and text.lower() not in seen:
+                seen.add(text.lower())
+                rows.append(text)
+    return rows
+
+
+def _unique_long_text_rows(values: list[object]) -> list[str]:
+    rows: list[str] = []
+    lowered_rows: list[str] = []
+    for value in values:
+        text = coerce_text(value)
+        lowered = text.lower() if text else ""
+        if not text or lowered in lowered_rows:
+            continue
+        if any(
+            _long_text_differs_only_by_short_suffix(lowered, kept)
+            for kept in lowered_rows
+        ):
+            continue
+        lowered_rows.append(lowered)
+        rows.append(text)
+    return rows
 
 
 def finalize_candidate_fields(
@@ -132,27 +139,12 @@ def _deep_merge_structured_dict(
 ) -> dict[str, object]:
     merged = dict(base)
     incoming_option_values = incoming.get("option_values")
-    incoming_option_keys = (
-        {str(key) for key in incoming_option_values.keys()}
-        if isinstance(incoming_option_values, dict)
-        else set()
-    )
+    incoming_option_keys = _option_value_keys(incoming_option_values)
     for key, value in incoming.items():
         normalized_key = str(key)
         existing = merged.get(normalized_key)
-        if (
-            normalized_key == "option_values"
-            and isinstance(existing, dict)
-            and existing
-            and isinstance(value, dict)
-        ):
-            continue
-        if (
-            incoming_option_keys
-            and isinstance(merged.get("option_values"), dict)
-            and merged["option_values"]
-            and normalized_key in incoming_option_keys
-            and is_blank(existing)
+        if _preserve_existing_option_value(
+            normalized_key, existing, value, merged, incoming_option_keys
         ):
             continue
         if isinstance(existing, dict) and isinstance(value, dict):
@@ -175,3 +167,28 @@ def _deep_merge_structured_dict(
         if normalized_key not in merged:
             merged[normalized_key] = value
     return merged
+
+
+def _option_value_keys(value: object) -> set[str]:
+    return {str(key) for key in value} if isinstance(value, dict) else set()
+
+
+def _preserve_existing_option_value(
+    key: str,
+    existing: object,
+    incoming: object,
+    merged: dict[str, object],
+    incoming_option_keys: set[str],
+) -> bool:
+    if key == "option_values":
+        return bool(
+            isinstance(existing, dict) and existing and isinstance(incoming, dict)
+        )
+    option_values = merged.get("option_values")
+    return bool(
+        incoming_option_keys
+        and isinstance(option_values, dict)
+        and option_values
+        and key in incoming_option_keys
+        and is_blank(existing)
+    )

@@ -67,37 +67,47 @@ def _map_ecommerce_detail_state(
                 ),
             )
             if mapped:
-                if not base_record:
-                    base_record = mapped
-                elif (
-                    _mapped_product_family_matches(base_record, mapped)
-                    and _mapped_record_matches_page_url(mapped, page_url)
-                    and not _mapped_record_matches_page_url(base_record, page_url)
-                ):
-                    base_record = _merge_same_product_record(
-                        mapped,
-                        base_record,
-                        page_url=page_url,
-                    )
-                    if mapped.get("variants"):
-                        for field_name in VARIANT_AXIS_KEYS:
-                            if mapped.get(field_name) in (None, "", [], {}):
-                                base_record.pop(field_name, None)
-                elif _mapped_product_identity_matches(
-                    base_record, mapped, page_url=page_url
-                ):
-                    base_record = _merge_same_product_record(
-                        base_record,
-                        mapped,
-                        page_url=page_url,
-                    )
-                elif (
-                    not base_record.get("variants")
-                    and mapped.get("variants")
-                    and _mapped_record_matches_page_url(mapped, page_url)
-                ):
-                    base_record = _merge_variant_fields(base_record, mapped)
+                base_record = _merge_mapped_product(base_record, mapped, page_url)
     return base_record
+
+
+def _merge_mapped_product(
+    base: dict[str, Any], mapped: dict[str, Any], page_url: str
+) -> dict[str, Any]:
+    if not base:
+        return mapped
+    if _mapped_product_should_lead(base, mapped, page_url):
+        merged = _merge_same_product_record(mapped, base, page_url=page_url)
+        if mapped.get("variants"):
+            for field_name in VARIANT_AXIS_KEYS:
+                if mapped.get(field_name) in (None, "", [], {}):
+                    merged.pop(field_name, None)
+        return merged
+    if _mapped_product_identity_matches(base, mapped, page_url=page_url):
+        return _merge_same_product_record(base, mapped, page_url=page_url)
+    if _mapped_variants_can_backfill(base, mapped, page_url):
+        return _merge_variant_fields(base, mapped)
+    return base
+
+
+def _mapped_product_should_lead(
+    base: dict[str, Any], mapped: dict[str, Any], page_url: str
+) -> bool:
+    return bool(
+        _mapped_product_family_matches(base, mapped)
+        and _mapped_record_matches_page_url(mapped, page_url)
+        and not _mapped_record_matches_page_url(base, page_url)
+    )
+
+
+def _mapped_variants_can_backfill(
+    base: dict[str, Any], mapped: dict[str, Any], page_url: str
+) -> bool:
+    return bool(
+        not base.get("variants")
+        and mapped.get("variants")
+        and _mapped_record_matches_page_url(mapped, page_url)
+    )
 
 
 def _extract_product_payloads_from_normalized(

@@ -183,13 +183,7 @@ async def try_blocked_adapter_recovery(
     for proxy in proxy_attempts:
         for adapter in recovery_adapters:
             try:
-                recovery_kwargs = (
-                    {"proxy": proxy}
-                    if proxy is not None
-                    and "proxy"
-                    in inspect.signature(adapter.try_public_endpoint).parameters
-                    else {}
-                )
+                recovery_kwargs = _adapter_recovery_kwargs(adapter, proxy)
                 records = await adapter.try_public_endpoint(
                     url,
                     html="",
@@ -218,3 +212,10 @@ async def try_blocked_adapter_recovery(
                 source_type=f"{adapter.name}_adapter_recovery",
             )
     return None
+
+
+def _adapter_recovery_kwargs(adapter: BaseAdapter, proxy: str | None) -> dict[str, str]:
+    if proxy is None:
+        return {}
+    parameters = inspect.signature(adapter.try_public_endpoint).parameters
+    return {"proxy": proxy} if "proxy" in parameters else {}

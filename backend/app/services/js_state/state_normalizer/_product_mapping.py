@@ -37,97 +37,34 @@ def _map_product_payload(
     description_fields = _extract_ecommerce_description_fields(base.get("description"))
     shopify_like = _looks_like_shopify_product(product)
     option_names = _option_names(product.get("options"))
-    option_value_labels_by_axis = option_value_labels(product)
-    raw_variants = _product_variant_rows(product)
-    normalized_variants = [
-        normalized
-        for variant in raw_variants
-        if isinstance(variant, dict)
-        if (
-            normalized := _normalize_variant(
-                variant,
-                option_names=option_names,
-                option_value_labels=option_value_labels_by_axis,
-                page_url=page_url,
-                interpret_integral_as_cents=shopify_like,
-            )
-        )
-    ]
-    normalized_variants = _drop_geographic_state_variant_rows(normalized_variants)
+    normalized_variants = _normalized_product_variants(
+        product, option_names, page_url, shopify_like
+    )
     axes = variant_axes(normalized_variants)
     variants = (
         resolve_variants(axes, normalized_variants) if axes else normalized_variants
     )
     active_variant = select_variant(variants, page_url=page_url)
-    price = variant_attribute(active_variant, "price")
-    if price in (None, "", [], {}):
-        raw_current_price = _raw_current_price_value(
-            product,
-            interpret_integral_as_cents=shopify_like,
-        )
-        if raw_current_price is not None:
-            price = raw_current_price
-        else:
-            price = normalize_price(
-                base.get("price"),
-                interpret_integral_as_cents=shopify_like,
-            )
-    if price in (None, "", [], {}):
-        price = _discounted_percentage_price(product)
-    original_price = variant_attribute(
-        active_variant,
-        "original_price",
+    price = _product_price(product, base, active_variant, shopify_like)
+    original_price = _product_original_price(
+        product, base, active_variant, shopify_like
     )
-    if original_price in (None, "", [], {}):
-        raw_original_price = _raw_original_price_value(
-            product,
-            interpret_integral_as_cents=shopify_like,
-        )
-        original_price = (
-            raw_original_price
-            if raw_original_price is not None
-            else normalize_price(
-                base.get("original_price"),
-                interpret_integral_as_cents=shopify_like,
-            )
-        )
     currency = variant_attribute(active_variant, "currency") or text_or_none(
         base.get("currency")
     )
     availability = availability_value(active_variant) or availability_value(product)
-    product_stock = stock_quantity(active_variant)
-    if product_stock is None:
-        product_stock = stock_quantity(product)
-    color = variant_attribute(active_variant, "color")
-    if color in (None, "", [], {}):
-        color = variant_axis_value(
-            "color",
-            product.get("color") or product.get("colour"),
-            page_url=page_url,
-        )
-    size = variant_attribute(active_variant, "size")
-    if size in (None, "", [], {}):
-        raw_product_size = product.get("size") or product.get("sz")
-        if _product_scalar_size_is_public(
-            raw_product_size,
-            option_names=option_names,
-            normalized_variants=normalized_variants,
-        ):
-            size = variant_axis_value(
-                "size",
-                raw_product_size,
-                page_url=page_url,
-            )
-
-    brand_raw = base.get("brand")
-    vendor_raw = base.get("vendor")
-    brand = _name_or_value(brand_raw) if isinstance(brand_raw, dict) else brand_raw
-    vendor = _name_or_value(vendor_raw) if isinstance(vendor_raw, dict) else vendor_raw
-
-    category = base.get("category")
-    if not category and category_fallback_from_type:
-        category = base.get("product_type")
-
+    product_stock = _product_stock_quantity(active_variant, product)
+    color, size = _product_variant_axes(
+        product, active_variant, option_names, normalized_variants, page_url
+    )
+    brand = _product_party_value(base.get("brand"))
+    vendor = _product_party_value(base.get("vendor"))
+    category = base.get("category") or (
+        base.get("product_type") if category_fallback_from_type else None
+    )
+    primary_image = variant_attribute(active_variant, "image_url")
+    if not primary_image and images:
+        primary_image = images[0]
     record = compact_dict(
         {
             "title": base.get("title"),
@@ -149,10 +86,7 @@ def _map_product_payload(
             or base.get("barcode"),
             "color": color,
             "size": size,
-            "image_url": (
-                variant_attribute(active_variant, "image_url")
-                or (images[0] if images else None)
-            ),
+            "image_url": primary_image,
             "additional_images": images[1:] if len(images) > 1 else None,
             "image_count": len(images) or None,
             "features": description_fields.get("features"),
@@ -165,6 +99,102 @@ def _map_product_payload(
         }
     )
     return record
+
+
+def _normalized_product_variants(
+    product: dict[str, Any],
+    option_names: list[str],
+    page_url: str,
+    shopify_like: bool,
+) -> list[dict[str, Any]]:
+    labels = option_value_labels(product)
+    variants = [
+        normalized
+        for variant in _product_variant_rows(product)
+        if isinstance(variant, dict)
+        if (
+            normalized := _normalize_variant(
+                variant,
+                option_names=option_names,
+                option_value_labels=labels,
+                page_url=page_url,
+                interpret_integral_as_cents=shopify_like,
+            )
+        )
+    ]
+    return _drop_geographic_state_variant_rows(variants)
+
+
+def _product_stock_quantity(
+    active_variant: dict[str, Any] | None, product: dict[str, Any]
+) -> int | None:
+    quantity = stock_quantity(active_variant)
+    return quantity if quantity is not None else stock_quantity(product)
+
+
+def _product_price(
+    product: dict[str, Any],
+    base: dict[str, Any],
+    active_variant: dict[str, Any] | None,
+    shopify_like: bool,
+) -> object:
+    price = variant_attribute(active_variant, "price")
+    if price not in (None, "", [], {}):
+        return price
+    price = _raw_current_price_value(product, interpret_integral_as_cents=shopify_like)
+    if price is None:
+        price = normalize_price(
+            base.get("price"), interpret_integral_as_cents=shopify_like
+        )
+    return (
+        price
+        if price not in (None, "", [], {})
+        else _discounted_percentage_price(product)
+    )
+
+
+def _product_original_price(
+    product: dict[str, Any],
+    base: dict[str, Any],
+    active_variant: dict[str, Any] | None,
+    shopify_like: bool,
+) -> object:
+    price = variant_attribute(active_variant, "original_price")
+    if price not in (None, "", [], {}):
+        return price
+    price = _raw_original_price_value(product, interpret_integral_as_cents=shopify_like)
+    if price is not None:
+        return price
+    return normalize_price(
+        base.get("original_price"), interpret_integral_as_cents=shopify_like
+    )
+
+
+def _product_variant_axes(
+    product: dict[str, Any],
+    active_variant: dict[str, Any] | None,
+    option_names: list[str],
+    normalized_variants: list[dict[str, Any]],
+    page_url: str,
+) -> tuple[object, object]:
+    color = variant_attribute(active_variant, "color")
+    if color in (None, "", [], {}):
+        color = variant_axis_value(
+            "color", product.get("color") or product.get("colour"), page_url=page_url
+        )
+    size = variant_attribute(active_variant, "size")
+    raw_size = product.get("size") or product.get("sz")
+    if size in (None, "", [], {}) and _product_scalar_size_is_public(
+        raw_size,
+        option_names=option_names,
+        normalized_variants=normalized_variants,
+    ):
+        size = variant_axis_value("size", raw_size, page_url=page_url)
+    return color, size
+
+
+def _product_party_value(value: object) -> object:
+    return _name_or_value(value) if isinstance(value, dict) else value
 
 
 def _drop_geographic_state_variant_rows(
@@ -217,6 +247,10 @@ def _extract_ecommerce_description_fields(value: object) -> dict[str, object]:
         text = text_or_none(description_html)
         return {"description": text} if text else {}
 
+    return _description_fields_from_html(description_html)
+
+
+def _description_fields_from_html(description_html: str) -> dict[str, object]:
     soup = BeautifulSoup(description_html, "html.parser")
     for node in soup.select("script, style, iframe, svg, img, picture, source, video"):
         node.decompose()
@@ -232,9 +266,20 @@ def _extract_ecommerce_description_fields(value: object) -> dict[str, object]:
         if text:
             blocks.append((str(node.name).lower(), text))
 
+    lead_parts = _lead_description_parts(blocks, alias_lookup)
+    lead_description = clean_text(" ".join(lead_parts))
+    description = text_or_none(lead_description) or text_or_none(
+        html_to_text(description_html)
+    )
+    return compact_dict({"description": description, "features": features})
+
+
+def _lead_description_parts(
+    blocks: list[tuple[str, str]], alias_lookup: dict[str, str]
+) -> list[str]:
     lead_parts: list[str] = []
     seen: set[str] = set()
-    for tag_name, text in blocks:
+    for _tag_name, text in blocks:
         normalized_text = normalize_field_key(text)
         canonical = alias_lookup.get(normalized_text)
         if lead_parts and canonical and canonical != "description":
@@ -244,17 +289,7 @@ def _extract_ecommerce_description_fields(value: object) -> dict[str, object]:
             continue
         seen.add(lowered)
         lead_parts.append(text)
-
-    lead_description = clean_text(" ".join(lead_parts))
-    description = text_or_none(lead_description) or text_or_none(
-        html_to_text(description_html)
-    )
-    result: dict[str, object] = {}
-    if description:
-        result["description"] = description
-    if features:
-        result["features"] = features
-    return result
+    return lead_parts
 
 
 def _raw_current_price_value(

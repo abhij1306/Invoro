@@ -411,35 +411,8 @@ class AmazonAdapter(BaseAdapter):
         )
         if not dim_order:
             return {}
-        axis_entries: dict[str, list[dict[str, object]]] = {}
-        selected_values: dict[str, str] = {}
+        axis_entries, selected_values = self._twister_axis_entries(raw_dims, dim_order)
         record: dict[str, object] = {}
-        for raw_dim in dim_order:
-            raw_entries = raw_dims.get(raw_dim)
-            if not isinstance(raw_entries, list):
-                continue
-            axis_name = _axis_key(raw_dim)
-            entries: list[dict[str, object]] = []
-            values: list[str] = []
-            for entry in raw_entries:
-                if not isinstance(entry, Mapping):
-                    continue
-                value = str(entry.get("dimensionValueDisplayText") or "").strip()
-                if not value:
-                    continue
-                entry_map = dict(entry)
-                entry_map["value"] = value
-                entries.append(entry_map)
-                if value not in values:
-                    values.append(value)
-                if (
-                    str(entry.get("dimensionValueState") or "").strip().upper()
-                    == "SELECTED"
-                ):
-                    selected_values[axis_name] = value
-            if not values:
-                continue
-            axis_entries[axis_name] = entries
         if not axis_entries:
             return {}
         variants = self._twister_variants(
@@ -462,6 +435,37 @@ class AmazonAdapter(BaseAdapter):
         for axis_name, value in selected_values.items():
             record[axis_name] = value
         return record
+
+    def _twister_axis_entries(
+        self, raw_dims: Mapping[object, object], dim_order: list[str]
+    ) -> tuple[dict[str, list[dict[str, object]]], dict[str, str]]:
+        axes: dict[str, list[dict[str, object]]] = {}
+        selected: dict[str, str] = {}
+        for raw_dim in dim_order:
+            raw_entries = raw_dims.get(raw_dim)
+            if not isinstance(raw_entries, list):
+                continue
+            axis_name = _axis_key(raw_dim)
+            entries = self._twister_axis_values(raw_entries, axis_name=axis_name, selected=selected)
+            if entries:
+                axes[axis_name] = entries
+        return axes, selected
+
+    @staticmethod
+    def _twister_axis_values(
+        raw_entries: list[object], *, axis_name: str, selected: dict[str, str]
+    ) -> list[dict[str, object]]:
+        entries: list[dict[str, object]] = []
+        for entry in raw_entries:
+            if not isinstance(entry, Mapping):
+                continue
+            value = str(entry.get("dimensionValueDisplayText") or "").strip()
+            if not value:
+                continue
+            entries.append({**entry, "value": value})
+            if str(entry.get("dimensionValueState") or "").strip().upper() == "SELECTED":
+                selected[axis_name] = value
+        return entries
 
     def _twister_dimension_order(
         self,

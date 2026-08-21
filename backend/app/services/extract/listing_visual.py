@@ -116,37 +116,13 @@ def _cluster_visual_elements(
     clusters_by_href: dict[str, tuple[int, tuple[int, int], list[dict[str, Any]]]] = {}
     for anchor in anchors:
         anchor_href = str(anchor.get("href") or "")
-        anchor_y = int(anchor.get("y") or 0)
-        cluster = [anchor]
-        left = int(anchor.get("x") or 0) - 80
-        right = left + int(anchor.get("width") or 0) + 160
-        top = int(anchor.get("y") or 0) - 80
-        bottom = top + int(anchor.get("height") or 0) + 260
-        for item in elements:
-            if item is anchor:
-                continue
-            item_href = str(item.get("href") or "")
-            if item_href and item_href != anchor_href:
-                continue
-            x = int(item.get("x") or 0)
-            y = int(item.get("y") or 0)
-            width = int(item.get("width") or 0)
-            height = int(item.get("height") or 0)
-            if not item_href and y + height < anchor_y:
-                continue
-            if x + width < left or x > right or y + height < top or y > bottom:
-                continue
-            cluster.append(item)
+        cluster = _visual_elements_near_anchor(elements, anchor, anchor_href)
         score = _visual_cluster_score(cluster, title_is_noise=title_is_noise)
         if score <= 0:
             continue
         origin = _visual_cluster_origin(cluster)
         current = clusters_by_href.get(anchor_href)
-        if (
-            current is None
-            or score > current[0]
-            or (score == current[0] and origin < current[1])
-        ):
+        if _visual_cluster_wins(current, score, origin):
             clusters_by_href[anchor_href] = (score, origin, cluster)
     clusters = [entry[2] for entry in clusters_by_href.values()]
     clusters.sort(
@@ -157,6 +133,61 @@ def _cluster_visual_elements(
         )
     )
     return clusters
+
+
+def _visual_elements_near_anchor(
+    elements: list[dict[str, Any]],
+    anchor: dict[str, Any],
+    anchor_href: str,
+) -> list[dict[str, Any]]:
+    anchor_y = int(anchor.get("y") or 0)
+    left = int(anchor.get("x") or 0) - 80
+    right = left + int(anchor.get("width") or 0) + 160
+    top = anchor_y - 80
+    bottom = top + int(anchor.get("height") or 0) + 260
+    cluster = [anchor]
+    for item in elements:
+        if item is anchor or _visual_item_has_other_href(item, anchor_href):
+            continue
+        if not _visual_item_in_anchor_bounds(
+            item, anchor_y=anchor_y, left=left, right=right, top=top, bottom=bottom
+        ):
+            continue
+        cluster.append(item)
+    return cluster
+
+
+def _visual_item_has_other_href(item: dict[str, Any], href: str) -> bool:
+    item_href = str(item.get("href") or "")
+    return bool(item_href and item_href != href)
+
+
+def _visual_item_in_anchor_bounds(
+    item: dict[str, Any],
+    *,
+    anchor_y: int,
+    left: int,
+    right: int,
+    top: int,
+    bottom: int,
+) -> bool:
+    x, y = int(item.get("x") or 0), int(item.get("y") or 0)
+    width, height = int(item.get("width") or 0), int(item.get("height") or 0)
+    if not item.get("href") and y + height < anchor_y:
+        return False
+    return not (x + width < left or x > right or y + height < top or y > bottom)
+
+
+def _visual_cluster_wins(
+    current: tuple[int, tuple[int, int], list[dict[str, Any]]] | None,
+    score: int,
+    origin: tuple[int, int],
+) -> bool:
+    return (
+        current is None
+        or score > current[0]
+        or (score == current[0] and origin < current[1])
+    )
 
 
 def _visual_cluster_score(
@@ -170,18 +201,28 @@ def _visual_cluster_score(
     if len(hrefs) != 1:
         return -50
     score = 10
-    if any(
-        _visual_element_is_title(item, title_is_noise=title_is_noise)
-        for item in cluster
-    ):
-        score += 8
+    score += _visual_cluster_content_score(cluster, title_is_noise)
+    score += max(int(item.get("score") or 0) for item in cluster)
+    if len(cluster) > 12:
+        score -= (len(cluster) - 12) // 2
+    return score
+
+
+def _visual_cluster_content_score(
+    cluster: list[dict[str, Any]], title_is_noise: Callable[[str], bool]
+) -> int:
+    score = (
+        8
+        if any(
+            _visual_element_is_title(item, title_is_noise=title_is_noise)
+            for item in cluster
+        )
+        else 0
+    )
     if any(re.search(r"[$€£₹]\s?\d", str(item.get("text") or "")) for item in cluster):
         score += 4
     if any(str(item.get("tag") or "") == "img" and item.get("src") for item in cluster):
         score += 3
-    score += max(int(item.get("score") or 0) for item in cluster)
-    if len(cluster) > 12:
-        score -= (len(cluster) - 12) // 2
     return score
 
 
@@ -223,9 +264,7 @@ def _visual_cluster_to_record(
         href=href,
         title_is_noise=title_is_noise,
     )
-    if not title:
-        return None
-    if _visual_title_is_utility(title):
+    if not title or _visual_title_is_utility(title):
         return None
     brand = _visual_cluster_brand(
         cluster,
@@ -234,11 +273,26 @@ def _visual_cluster_to_record(
         anchor_item=_visual_primary_anchor_item(cluster, href=href),
         title_item=title_item,
     )
-    image_url = next(
-        (str(item.get("src") or "") for item in cluster if item.get("src")),
-        "",
+    image_url = _first_visual_image(cluster)
+    price_text = _first_visual_price_text(cluster)
+    extracted_price = extract_price_text(
+        price_text, prefer_last=False, allow_unmarked=True
     )
-    price_text = next(
+    if not _visual_record_identity_supported(
+        surface, title_item, title, href, extracted_price
+    ):
+        return None
+    return _materialize_visual_record(
+        page_url, surface, title, href, brand, image_url, extracted_price
+    )
+
+
+def _first_visual_image(cluster: list[dict[str, Any]]) -> str:
+    return next((str(item.get("src") or "") for item in cluster if item.get("src")), "")
+
+
+def _first_visual_price_text(cluster: list[dict[str, Any]]) -> str:
+    return next(
         (
             str(item.get("text") or "")
             for item in cluster
@@ -246,21 +300,31 @@ def _visual_cluster_to_record(
         ),
         "",
     )
-    extracted_price = extract_price_text(
-        price_text, prefer_last=False, allow_unmarked=True
-    )
-    is_job = surface.startswith("job_")
-    if is_job and not (
-        _visual_title_bound_to_href(title_item, href)
-        or _visual_title_matches_url(title, href)
-    ):
-        return None
-    if (
-        not is_job
-        and not extracted_price
-        and not _visual_title_matches_url(title, href)
-    ):
-        return None
+
+
+def _visual_record_identity_supported(
+    surface: str,
+    title_item: dict[str, Any] | None,
+    title: str,
+    href: str,
+    extracted_price: str | None,
+) -> bool:
+    if surface.startswith("job_"):
+        return _visual_title_bound_to_href(
+            title_item, href
+        ) or _visual_title_matches_url(title, href)
+    return bool(extracted_price or _visual_title_matches_url(title, href))
+
+
+def _materialize_visual_record(
+    page_url: str,
+    surface: str,
+    title: str,
+    href: str,
+    brand: str,
+    image_url: str,
+    extracted_price: str | None,
+) -> dict[str, Any]:
     record = {
         "source_url": page_url,
         "_source": "visual_listing",
@@ -377,13 +441,19 @@ def _visual_cluster_brand(
         value = clean_text(
             item.get("raw_text") or item.get("raw_alt") or item.get("text") or ""
         )
-        if not value or value.casefold() == title_text or extract_price_text(value):
+        if _visual_brand_value_is_invalid(value, title_text):
             continue
         return value
     return (
         infer_brand_from_title_marker(title)
         or infer_brand_from_product_url(url=href, title=title)
         or ""
+    )
+
+
+def _visual_brand_value_is_invalid(value: str, title_text: str) -> bool:
+    return (
+        not value or value.casefold() == title_text or bool(extract_price_text(value))
     )
 
 

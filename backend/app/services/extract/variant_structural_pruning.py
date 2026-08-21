@@ -163,37 +163,41 @@ def drop_parent_shared_variant_axes(record: dict[str, Any]) -> None:
     variant_rows = [variant for variant in variants if isinstance(variant, dict)]
     if len(variant_rows) < 2:
         return
-    varying_axes = {
+    varying_axes = _varying_variant_axes(variant_rows)
+    if not varying_axes:
+        return
+    for axis in _PUBLIC_VARIANT_AXIS_FIELDS:
+        if varying_axes == {axis} or not _axis_is_shared_with_parent(
+            record, variant_rows, axis
+        ):
+            continue
+        for variant in variant_rows:
+            variant.pop(axis, None)
+
+
+def _varying_variant_axes(rows: list[dict[str, Any]]) -> set[str]:
+    return {
         axis
         for axis in _PUBLIC_VARIANT_AXIS_FIELDS
         if len(
             {
-                clean_text(variant.get(axis)).casefold()
-                for variant in variant_rows
-                if clean_text(variant.get(axis))
+                value.casefold()
+                for row in rows
+                if (value := clean_text(row.get(axis)))
             }
         )
         >= 2
     }
-    if not varying_axes:
-        return
-    for axis in _PUBLIC_VARIANT_AXIS_FIELDS:
-        parent_value = clean_text(record.get(axis))
-        if not parent_value:
-            continue
-        variant_values = [
-            clean_text(variant.get(axis))
-            for variant in variant_rows
-            if clean_text(variant.get(axis))
-        ]
-        if len(variant_values) != len(variant_rows):
-            continue
-        if any(value.casefold() != parent_value.casefold() for value in variant_values):
-            continue
-        if varying_axes == {axis}:
-            continue
-        for variant in variant_rows:
-            variant.pop(axis, None)
+
+
+def _axis_is_shared_with_parent(
+    record: dict[str, Any], rows: list[dict[str, Any]], axis: str
+) -> bool:
+    parent_value = clean_text(record.get(axis)).casefold()
+    if not parent_value:
+        return False
+    values = [clean_text(row.get(axis)).casefold() for row in rows]
+    return all(value == parent_value for value in values)
 
 
 def prune_axisless_rows_when_axisful_rows_exist(record: dict[str, Any]) -> None:
@@ -230,29 +234,39 @@ def drop_color_only_rows_when_size_rows_exist(record: dict[str, Any]) -> None:
     rows = [variant for variant in variants if isinstance(variant, dict)]
     if len(rows) < 2:
         return
-    if [
-        variant
-        for variant in rows
-        if clean_text(variant.get("size")) and clean_text(variant.get("color"))
-    ]:
-        return
-    size_rows = [variant for variant in rows if clean_text(variant.get("size"))]
-    color_only_rows = [
-        variant
-        for variant in rows
-        if clean_text(variant.get("color")) and not clean_text(variant.get("size"))
-    ]
-    if len(size_rows) < 2 or not color_only_rows:
-        return
-    parent_color = clean_text(record.get("color")).casefold()
-    if not parent_color or any(
-        clean_text(row.get("color")).casefold() != parent_color
-        for row in color_only_rows
-    ):
+    color_only_rows = _redundant_color_only_rows(record, rows)
+    if not color_only_rows:
         return
     _replace_or_drop_variants(
         record, [variant for variant in rows if variant not in color_only_rows]
     )
+
+
+def _variant_has_size_and_color(row: dict[str, Any]) -> bool:
+    return bool(clean_text(row.get("size")) and clean_text(row.get("color")))
+
+
+def _variant_is_color_only(row: dict[str, Any]) -> bool:
+    return bool(clean_text(row.get("color")) and not clean_text(row.get("size")))
+
+
+def _redundant_color_only_rows(
+    record: dict[str, Any], rows: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    if any(_variant_has_size_and_color(row) for row in rows):
+        return []
+    if sum(bool(clean_text(row.get("size"))) for row in rows) < 2:
+        return []
+    color_only_rows = [row for row in rows if _variant_is_color_only(row)]
+    parent_color = clean_text(record.get("color")).casefold()
+    if not parent_color or not color_only_rows:
+        return []
+    if any(
+        clean_text(row.get("color")).casefold() != parent_color
+        for row in color_only_rows
+    ):
+        return []
+    return color_only_rows
 
 
 def drop_subset_variants_when_richer_alternative_exists(record: dict[str, Any]) -> None:
@@ -290,21 +304,10 @@ def drop_parent_sku_alias_variant_rows(record: dict[str, Any]) -> None:
             children_by_terminal_size.setdefault(terminal, []).append((index, variant))
     dropped_indexes: set[int] = set()
     for index, variant in enumerate(variant_rows):
-        sku = clean_text(variant.get("sku"))
-        size = clean_text(variant.get("size"))
-        size_token = re.sub(r"[^a-z0-9]+", "", size.casefold())
-        if not sku or not size_token:
-            continue
-        for other_index, other in children_by_terminal_size.get(size_token, []):
-            if (
-                index != other_index
-                and _variant_sku_is_size_specific_child(
-                    parent_sku=sku, child_sku=clean_text(other.get("sku")), size=size
-                )
-                and variant_row_richness(other) >= variant_row_richness(variant)
-            ):
-                dropped_indexes.add(index)
-                break
+        if _variant_has_richer_sku_child(
+            index, variant, children_by_terminal_size
+        ):
+            dropped_indexes.add(index)
     if dropped_indexes:
         _replace_or_drop_variants(
             record,
@@ -314,6 +317,26 @@ def drop_parent_sku_alias_variant_rows(record: dict[str, Any]) -> None:
                 if index not in dropped_indexes
             ],
         )
+
+
+def _variant_has_richer_sku_child(
+    index: int,
+    variant: dict[str, Any],
+    children_by_terminal_size: dict[str, list[tuple[int, dict[str, Any]]]],
+) -> bool:
+    sku = clean_text(variant.get("sku"))
+    size = clean_text(variant.get("size"))
+    size_token = re.sub(r"[^a-z0-9]+", "", size.casefold())
+    if not sku or not size_token:
+        return False
+    for other_index, other in children_by_terminal_size.get(size_token, []):
+        if index == other_index:
+            continue
+        if _variant_sku_is_size_specific_child(
+            parent_sku=sku, child_sku=clean_text(other.get("sku")), size=size
+        ) and variant_row_richness(other) >= variant_row_richness(variant):
+            return True
+    return False
 
 
 def prune_low_signal_numeric_only_variants(record: dict[str, Any]) -> None:

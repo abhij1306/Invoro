@@ -1,3 +1,4 @@
+# ruff: noqa: E402, F401, F821, F822
 from __future__ import annotations
 
 __all__ = (
@@ -98,91 +99,31 @@ from app.services.config.detail_extraction_constants import MAX_STRUCTURED_TEXT_
 from app.services.shared.field_coerce import LONG_TEXT_FIELDS, clean_text, text_or_none
 from app.services.shared.regex_patterns import compile_regex_patterns
 
-document_link_label_patterns = compile_regex_patterns(
-    DETAIL_DOCUMENT_LINK_LABEL_PATTERNS or ()
-)
+document_link_label_patterns = compile_regex_patterns(DETAIL_DOCUMENT_LINK_LABEL_PATTERNS or ())
 fulfillment_only_long_text_phrases = frozenset(
-    clean_text(phrase).lower()
-    for phrase in tuple(DETAIL_FULFILLMENT_ONLY_LONG_TEXT_PHRASES or ())
-    if clean_text(phrase)
+    clean_text(phrase).lower() for phrase in tuple(DETAIL_FULFILLMENT_ONLY_LONG_TEXT_PHRASES or ()) if clean_text(phrase)
 )
-fulfillment_long_text_patterns = compile_regex_patterns(
-    DETAIL_FULFILLMENT_LONG_TEXT_PATTERNS or ()
-)
-guide_glossary_text_patterns = compile_regex_patterns(
-    DETAIL_GUIDE_GLOSSARY_TEXT_PATTERNS or ()
-)
-guide_glossary_heading_tokens = frozenset(
-    clean_text(value).lower()
-    for value in tuple(DETAIL_GUIDE_GLOSSARY_HEADING_TOKENS or ())
-    if clean_text(value)
-)
-long_text_disclaimer_patterns = compile_regex_patterns(
-    DETAIL_LONG_TEXT_DISCLAIMER_PATTERNS or ()
-)
-long_text_substring_remove_patterns = compile_regex_patterns(
-    DETAIL_LONG_TEXT_SUBSTRING_REMOVE_PATTERNS or ()
-)
-long_text_repeated_prompts = tuple(
-    clean_text(prompt)
-    for prompt in tuple(DETAIL_LONG_TEXT_REPEATED_PROMPTS or ())
-    if clean_text(prompt)
-)
-low_signal_title_values = frozenset(
-    clean_text(value).lower()
-    for value in tuple(DETAIL_LOW_SIGNAL_TITLE_VALUES or ())
-    if clean_text(value)
-)
-low_signal_long_text_values = frozenset(
-    clean_text(value).lower()
-    for value in tuple(DETAIL_LOW_SIGNAL_LONG_TEXT_VALUES or ())
-    if clean_text(value)
-)
-materials_pollution_tokens = frozenset(
-    clean_text(token).casefold()
-    for token in tuple(DETAIL_MATERIALS_POLLUTION_TOKENS or ())
-    if clean_text(token)
-)
-_MATERIALS_ZERO_PERCENT_PATTERN = re.compile(
-    str(DETAIL_MATERIALS_ZERO_PERCENT_PATTERN), re.I
-)
-low_signal_product_type_values = frozenset(
-    clean_text(value).lower()
-    for value in tuple(DETAIL_LOW_SIGNAL_PRODUCT_TYPE_VALUES or ())
-    if clean_text(value)
-)
-detail_artifact_product_type_patterns = compile_regex_patterns(
-    DETAIL_ARTIFACT_PRODUCT_TYPE_PATTERNS or ()
-)
-cross_product_text_type_tokens = frozenset(
-    clean_text(value).lower()
-    for value in tuple(DETAIL_CROSS_PRODUCT_TEXT_TYPE_TOKENS or ())
-    if clean_text(value)
-)
-cross_product_text_generic_tokens = frozenset(
-    clean_text(value).lower()
-    for value in tuple(DETAIL_CROSS_PRODUCT_TEXT_GENERIC_TOKENS or ())
-    if clean_text(value)
-)
+fulfillment_long_text_patterns = compile_regex_patterns(DETAIL_FULFILLMENT_LONG_TEXT_PATTERNS or ())
+guide_glossary_text_patterns = compile_regex_patterns(DETAIL_GUIDE_GLOSSARY_TEXT_PATTERNS or ())
+guide_glossary_heading_tokens = frozenset(clean_text(value).lower() for value in tuple(DETAIL_GUIDE_GLOSSARY_HEADING_TOKENS or ()) if clean_text(value))
+long_text_disclaimer_patterns = compile_regex_patterns(DETAIL_LONG_TEXT_DISCLAIMER_PATTERNS or ())
+long_text_substring_remove_patterns = compile_regex_patterns(DETAIL_LONG_TEXT_SUBSTRING_REMOVE_PATTERNS or ())
+long_text_repeated_prompts = tuple(clean_text(prompt) for prompt in tuple(DETAIL_LONG_TEXT_REPEATED_PROMPTS or ()) if clean_text(prompt))
+low_signal_title_values = frozenset(clean_text(value).lower() for value in tuple(DETAIL_LOW_SIGNAL_TITLE_VALUES or ()) if clean_text(value))
+low_signal_long_text_values = frozenset(clean_text(value).lower() for value in tuple(DETAIL_LOW_SIGNAL_LONG_TEXT_VALUES or ()) if clean_text(value))
+materials_pollution_tokens = frozenset(clean_text(token).casefold() for token in tuple(DETAIL_MATERIALS_POLLUTION_TOKENS or ()) if clean_text(token))
+_MATERIALS_ZERO_PERCENT_PATTERN = re.compile(str(DETAIL_MATERIALS_ZERO_PERCENT_PATTERN), re.I)
+low_signal_product_type_values = frozenset(clean_text(value).lower() for value in tuple(DETAIL_LOW_SIGNAL_PRODUCT_TYPE_VALUES or ()) if clean_text(value))
+detail_artifact_product_type_patterns = compile_regex_patterns(DETAIL_ARTIFACT_PRODUCT_TYPE_PATTERNS or ())
+cross_product_text_type_tokens = frozenset(clean_text(value).lower() for value in tuple(DETAIL_CROSS_PRODUCT_TEXT_TYPE_TOKENS or ()) if clean_text(value))
+cross_product_text_generic_tokens = frozenset(clean_text(value).lower() for value in tuple(DETAIL_CROSS_PRODUCT_TEXT_GENERIC_TOKENS or ()) if clean_text(value))
 title_dimension_size_re = re.compile(str(DETAIL_TITLE_DIMENSION_SIZE_PATTERN), re.I)
 tracking_token_re = re.compile(str(DETAIL_TRACKING_TOKEN_PATTERN), re.I)
-cookie_disclosure_text_patterns = compile_regex_patterns(
-    DETAIL_COOKIE_DISCLOSURE_TEXT_PATTERNS or ()
-)
+cookie_disclosure_text_patterns = compile_regex_patterns(DETAIL_COOKIE_DISCLOSURE_TEXT_PATTERNS or ())
 low_signal_numeric_size_max = int(DETAIL_LOW_SIGNAL_NUMERIC_SIZE_MAX)
-_detail_noise_prefixes = tuple(
-    clean_text(prefix).lower()
-    for prefix in tuple(DETAIL_NOISE_PREFIXES or ())
-    if clean_text(prefix)
-)
-_DESCRIPTION_REPAIRED_FROM_PRODUCT_DETAILS = (
-    "_description_repaired_from_product_details"
-)
-_long_text_ui_tail_phrases = tuple(
-    clean_text(phrase).lower()
-    for phrase in tuple(DETAIL_LONG_TEXT_UI_TAIL_PHRASES or ())
-    if clean_text(phrase)
-)
+_detail_noise_prefixes = tuple(clean_text(prefix).lower() for prefix in tuple(DETAIL_NOISE_PREFIXES or ()) if clean_text(prefix))
+_DESCRIPTION_REPAIRED_FROM_PRODUCT_DETAILS = "_description_repaired_from_product_details"
+_long_text_ui_tail_phrases = tuple(clean_text(phrase).lower() for phrase in tuple(DETAIL_LONG_TEXT_UI_TAIL_PHRASES or ()) if clean_text(phrase))
 _long_text_ui_tail_min_product_words = int(DETAIL_LONG_TEXT_UI_TAIL_MIN_PRODUCT_WORDS)
 _guide_glossary_heading_min_hits = int(DETAIL_GUIDE_GLOSSARY_HEADING_MIN_HITS)
 _bracket_prose_min_words = int(DETAIL_BRACKET_PROSE_MIN_WORDS)
@@ -190,22 +131,11 @@ _long_text_min_words = int(LONG_TEXT_MIN_WORDS)
 _long_text_max_words = int(LONG_TEXT_MAX_WORDS)
 _token_min_len_distinctive = int(TOKEN_MIN_LEN_DISTINCTIVE)
 _token_min_len_chunk = int(TOKEN_MIN_LEN_CHUNK)
-_long_text_prefixes = tuple(
-    clean_text(prefix).lower()
-    for prefix in tuple(LONG_TEXT_PREFIXES or ())
-    if clean_text(prefix)
-)
+_long_text_prefixes = tuple(clean_text(prefix).lower() for prefix in tuple(LONG_TEXT_PREFIXES or ()) if clean_text(prefix))
 _legal_tail_patterns = DETAIL_LEGAL_TAIL_PATTERNS or {}
-_legal_tail_contains = tuple(
-    str(value) for value in _legal_tail_patterns.get("contains", ())
-)
-_legal_tail_digit_contains = tuple(
-    str(value) for value in _legal_tail_patterns.get("digit_contains", ())
-)
-_legal_tail_exact = frozenset(
-    str(value) for value in _legal_tail_patterns.get("exact", ())
-)
-
+_legal_tail_contains = tuple(str(value) for value in _legal_tail_patterns.get("contains", ()))
+_legal_tail_digit_contains = tuple(str(value) for value in _legal_tail_patterns.get("digit_contains", ()))
+_legal_tail_exact = frozenset(str(value) for value in _legal_tail_patterns.get("exact", ()))
 
 def _normalize_legal_tail_all_contains(value: object) -> tuple[tuple[str, ...], ...]:
     if isinstance(value, str):
@@ -220,9 +150,7 @@ def _normalize_legal_tail_all_contains(value: object) -> tuple[tuple[str, ...], 
             try:
                 items = tuple(group)
             except TypeError as exc:
-                raise ValueError(
-                    "DETAIL_LEGAL_TAIL_PATTERNS all_contains must be strings"
-                ) from exc
+                raise ValueError("DETAIL_LEGAL_TAIL_PATTERNS all_contains must be strings") from exc
         else:
             raise ValueError("DETAIL_LEGAL_TAIL_PATTERNS all_contains must be strings")
         if not all(isinstance(item, str) for item in items):
@@ -230,22 +158,13 @@ def _normalize_legal_tail_all_contains(value: object) -> tuple[tuple[str, ...], 
         groups.append(items)
     return tuple(groups)
 
-
-_legal_tail_all_contains = _normalize_legal_tail_all_contains(
-    _legal_tail_patterns.get("all_contains", ())
-)
-artifact_price_values = frozenset(
-    clean_text(v).lower()
-    for v in tuple(DETAIL_ARTIFACT_PRICE_VALUES or ())
-    if clean_text(v)
-)
+_legal_tail_all_contains = _normalize_legal_tail_all_contains(_legal_tail_patterns.get("all_contains", ()))
+artifact_price_values = frozenset(clean_text(v).lower() for v in tuple(DETAIL_ARTIFACT_PRICE_VALUES or ()) if clean_text(v))
 feature_row_noise_patterns = compile_regex_patterns(FEATURE_ROW_NOISE_PATTERNS or ())
-
 
 def detail_title_value_is_low_signal(value: object) -> bool:
     text = clean_text(value)
     return bool(text and text.lower() in low_signal_title_values)
-
 
 def detail_product_type_is_low_signal(value: object) -> bool:
     text = clean_text(value)
@@ -255,13 +174,9 @@ def detail_product_type_is_low_signal(value: object) -> bool:
         and (
             lowered in low_signal_product_type_values
             or lowered in DETAIL_ARTIFACT_PRODUCT_TYPE_VALUES
-            or any(
-                pattern.fullmatch(lowered)
-                for pattern in detail_artifact_product_type_patterns
-            )
+            or any(pattern.fullmatch(lowered) for pattern in detail_artifact_product_type_patterns)
         )
     )
-
 
 def detail_scalar_size_is_low_signal(value: str, *, title: object) -> bool:
     if not value or not value.isdigit():
@@ -270,10 +185,7 @@ def detail_scalar_size_is_low_signal(value: str, *, title: object) -> bool:
         numeric_value = int(value)
     except ValueError:
         return False
-    return numeric_value <= low_signal_numeric_size_max and bool(
-        title_dimension_size_re.search(clean_text(title))
-    )
-
+    return numeric_value <= low_signal_numeric_size_max and bool(title_dimension_size_re.search(clean_text(title)))
 
 def detail_candidate_is_valid(
     field_name: str,
@@ -292,12 +204,8 @@ def detail_candidate_is_valid(
         or _variant_candidate_is_artifact(field_name, value)
     )
 
-
 def _title_candidate_is_artifact(field_name: str, value: object) -> bool:
-    return field_name == "title" and bool(
-        tracking_token_re.fullmatch(clean_text(value))
-    )
-
+    return field_name == "title" and bool(tracking_token_re.fullmatch(clean_text(value)))
 
 def _category_candidate_is_noise(field_name: str, value: object) -> bool:
     if field_name != "category":
@@ -305,11 +213,7 @@ def _category_candidate_is_noise(field_name: str, value: object) -> bool:
     cleaned = clean_text(value)
     if not cleaned:
         return True
-    parts = [
-        clean_text(part).lower()
-        for part in re.split(r">\s*|/+", cleaned)
-        if clean_text(part)
-    ]
+    parts = [clean_text(part).lower() for part in re.split(r">\s*|/+", cleaned) if clean_text(part)]
     if not parts or any(part in DETAIL_CATEGORY_UI_TOKENS for part in parts):
         return True
     lowered = f" {cleaned.lower()} "
@@ -319,16 +223,11 @@ def _category_candidate_is_noise(field_name: str, value: object) -> bool:
         if token != "..."  # nosec B105
     )
 
-
 def _sku_candidate_is_artifact(field_name: str, value: object) -> bool:
     if field_name not in {"sku", "part_number", "product_id"}:
         return False
     cleaned = clean_text(value).lower()
-    return bool(
-        cleaned
-        and any(cleaned.startswith(prefix) for prefix in DETAIL_ARTIFACT_SKU_PREFIXES)
-    )
-
+    return bool(cleaned and any(cleaned.startswith(prefix) for prefix in DETAIL_ARTIFACT_SKU_PREFIXES))
 
 def _identifier_candidate_is_artifact(field_name: str, value: object) -> bool:
     if field_name not in {"product_id", "part_number"}:
@@ -336,22 +235,13 @@ def _identifier_candidate_is_artifact(field_name: str, value: object) -> bool:
     cleaned = clean_text(value).lower()
     return bool(cleaned and cleaned in DETAIL_ARTIFACT_IDENTIFIER_VALUES)
 
-
 def _product_type_candidate_is_artifact(field_name: str, value: object) -> bool:
     if field_name != "product_type":
         return False
     cleaned = clean_text(value).lower()
     return bool(
-        cleaned
-        and (
-            cleaned in DETAIL_ARTIFACT_PRODUCT_TYPE_VALUES
-            or any(
-                pattern.fullmatch(cleaned)
-                for pattern in detail_artifact_product_type_patterns
-            )
-        )
+        cleaned and (cleaned in DETAIL_ARTIFACT_PRODUCT_TYPE_VALUES or any(pattern.fullmatch(cleaned) for pattern in detail_artifact_product_type_patterns))
     )
-
 
 def _price_candidate_is_artifact(field_name: str, value: object) -> bool:
     if field_name not in {"price", "sale_price", "original_price"}:
@@ -369,14 +259,10 @@ def _price_candidate_is_artifact(field_name: str, value: object) -> bool:
     except ValueError:
         return True
 
-
 def _variant_candidate_is_artifact(field_name: str, value: object) -> bool:
     if field_name not in {"variants", "selected_variant", "variant_axes"}:
         return False
-    return any(
-        _variant_artifact_token_seen(item) for item in _walk_variant_values(value)
-    )
-
+    return any(_variant_artifact_token_seen(item) for item in _walk_variant_values(value))
 
 def _walk_variant_values(value: object) -> list[object]:
     if isinstance(value, dict):
@@ -388,17 +274,9 @@ def _walk_variant_values(value: object) -> list[object]:
         return [nested for item in value for nested in _walk_variant_values(item)]
     return [value]
 
-
 def _variant_artifact_token_seen(value: object) -> bool:
     text = clean_text(value).lower()
-    return bool(
-        text
-        and (
-            text in DETAIL_VARIANT_ARTIFACT_VALUE_TOKENS
-            or re.fullmatch(r"\d+\s*%", text)
-        )
-    )
-
+    return bool(text and (text in DETAIL_VARIANT_ARTIFACT_VALUE_TOKENS or re.fullmatch(r"\d+\s*%", text)))
 
 def _long_text_candidate_is_noise(
     field_name: str,
@@ -412,9 +290,7 @@ def _long_text_candidate_is_noise(
     lowered = cleaned.lower()
     if not lowered or lowered in low_signal_long_text_values:
         return True
-    if field_name in {"description", "specifications"} and lowered.startswith(
-        _detail_noise_prefixes
-    ):
+    if field_name in {"description", "specifications"} and lowered.startswith(_detail_noise_prefixes):
         return True
     tail_stripped = _strip_long_text_ui_tail(cleaned)
     if tail_stripped != cleaned:
@@ -432,24 +308,15 @@ def _long_text_candidate_is_noise(
         return True
     return len(cleaned.split()) < 2
 
-
 def sanitize_detail_long_text_fields(
     record: dict[str, Any],
     *,
     title_hint: str | None = None,
 ) -> None:
-    record_title = clean_text(
-        " ".join(
-            value
-            for value in (clean_text(record.get("title")), clean_text(title_hint))
-            if value
-        )
-    )
+    record_title = clean_text(" ".join(value for value in (clean_text(record.get("title")), clean_text(title_hint)) if value))
     title_tokens = set(detail_product_text_tokens(clean_text(record.get("title"))))
     protected_identity_tokens = {
-        token
-        for token in detail_product_text_tokens(clean_text(title_hint))
-        if len(token) >= _token_min_len_chunk and token not in title_tokens
+        token for token in detail_product_text_tokens(clean_text(title_hint)) if len(token) >= _token_min_len_chunk and token not in title_tokens
     }
     for field_name in LONG_TEXT_FIELDS:
         text = text_or_none(record.get(field_name))
@@ -486,13 +353,10 @@ def sanitize_detail_long_text_fields(
     _drop_redundant_product_details(record)
     _promote_product_details_description(record)
 
-
 def _repair_description_feature_duplicate(record: dict[str, Any]) -> None:
     description = clean_text(record.get("description"))
     raw_features_value = record.get("features")
-    raw_features: list[Any] = (
-        raw_features_value if isinstance(raw_features_value, list) else []
-    )
+    raw_features: list[Any] = raw_features_value if isinstance(raw_features_value, list) else []
     features = []
     for row in raw_features:
         cleaned = clean_text(row)
@@ -513,7 +377,6 @@ def _repair_description_feature_duplicate(record: dict[str, Any]) -> None:
         return
     record.pop("description", None)
 
-
 def _trim_description_to_identity_hint(
     record: dict[str, Any],
     *,
@@ -522,11 +385,7 @@ def _trim_description_to_identity_hint(
     description = clean_text(record.get("description"))
     if not description or not protected_identity_tokens:
         return
-    chunks = [
-        clean_text(chunk)
-        for chunk in re.split(r"(?<=[.!?])\s+|\s+:\s+|\n+", description)
-        if clean_text(chunk)
-    ]
+    chunks = [clean_text(chunk) for chunk in re.split(r"(?<=[.!?])\s+|\s+:\s+|\n+", description) if clean_text(chunk)]
     if not chunks:
         return
     kept: list[str] = []
@@ -540,24 +399,16 @@ def _trim_description_to_identity_hint(
             continue
         if not seen_identity:
             continue
-        if detail_long_text_chunk_has_product_name_shape(
-            chunk
-        ) and _chunk_has_named_product_signal(chunk):
+        if detail_long_text_chunk_has_product_name_shape(chunk) and _chunk_has_named_product_signal(chunk):
             break
         kept.append(chunk)
     if kept and len(kept) < len(chunks):
         record["description"] = " ".join(kept)
 
-
 def _chunk_has_named_product_signal(chunk: str) -> bool:
     words = re.findall(r"[A-Za-z][A-Za-z'’-]*", str(chunk or ""))
-    capitalized = [
-        word
-        for word in words[1:]
-        if len(word) > 1 and word[:1].isupper() and word.casefold() not in {"this"}
-    ]
+    capitalized = [word for word in words[1:] if len(word) > 1 and word[:1].isupper() and word.casefold() not in {"this"}]
     return len(capitalized) >= 2
-
 
 def _promote_product_details_description(record: dict[str, Any]) -> None:
     description = clean_text(record.get("description"))
@@ -580,7 +431,6 @@ def _promote_product_details_description(record: dict[str, Any]) -> None:
         return
     record["description"] = product_details
 
-
 def _drop_redundant_product_details(record: dict[str, Any]) -> None:
     description = clean_text(record.get("description"))
     product_details = sanitize_detail_long_text(
@@ -598,526 +448,11 @@ def _drop_redundant_product_details(record: dict[str, Any]) -> None:
     if isinstance(field_sources, dict):
         field_sources.pop("product_details", None)
 
-
 # skipcq: PY-R1000
-def sanitize_detail_long_text(
-    text: str,
-    *,
-    title: str,
-    protected_identity_tokens: set[str] | None = None,
-) -> str:
-    cleaned_text = _strip_long_text_ui_tail(
-        _strip_leading_attribute_blob(_strip_bracket_artifact_noise(clean_text(text)))
-    )
-    cleaned_text = _strip_long_text_substring_noise(cleaned_text)
-    cleaned_text = _trim_repeated_title_lead(cleaned_text, title=title)
-    if _text_is_structured_object_repr(cleaned_text) or _text_is_structured_json_array(
-        cleaned_text
-    ):
-        return ""
-    if cleaned_text.lower() in low_signal_long_text_values:
-        return ""
-    if detail_long_text_is_numeric_sequence(cleaned_text):
-        return ""
-    if detail_long_text_is_fulfillment_only(cleaned_text):
-        return ""
-    if detail_long_text_is_guide_or_glossary_dump(cleaned_text):
-        return ""
-    if detail_long_text_is_cookie_disclosure_dump(cleaned_text):
-        return ""
-    if detail_long_text_is_document_label_cluster(text):
-        return ""
-    chunks = [
-        clean_text(chunk)
-        for chunk in re.split(r"(?<=[.!?])\s+|\s+:\s+|\n+", cleaned_text)
-        if clean_text(chunk)
-    ]
-    seen: set[str] = set()
-    kept: list[str] = []
-    protected_tokens = protected_identity_tokens or set()
-    for chunk in chunks:
-        chunk = _strip_repeated_prompt_text(chunk)
-        lowered = chunk.lower()
-        if not chunk:
-            continue
-        if lowered in seen:
-            continue
-        if detail_long_text_chunk_is_legal_tail(chunk):
-            continue
-        if any(pattern.search(chunk) for pattern in long_text_disclaimer_patterns):
-            continue
-        chunk_tokens = detail_product_text_tokens(chunk)
-        protected_chunk = bool(protected_tokens & chunk_tokens)
-        if not protected_chunk:
-            if detail_long_text_chunk_is_variant_title(chunk, title=title):
-                continue
-            if detail_long_text_chunk_is_other_product(chunk, title=title):
-                continue
-        if detail_long_text_chunk_is_variant_size_sequence(chunk):
-            continue
-        if detail_long_text_chunk_looks_truncated(chunk):
-            continue
-        seen.add(lowered)
-        kept.append(chunk)
-    if kept and all(detail_long_text_chunk_is_document_label(chunk) for chunk in kept):
-        return ""
-    return " ".join(kept).strip()
 
-
-def _strip_long_text_substring_noise(text: str) -> str:
-    cleaned = clean_text(text)
-    if not cleaned:
-        return ""
-    for pattern in long_text_substring_remove_patterns:
-        cleaned = clean_text(pattern.sub("", cleaned))
-    return cleaned
-
-
-def _strip_repeated_prompt_text(text: str) -> str:
-    cleaned = clean_text(text)
-    for prompt in long_text_repeated_prompts:
-        if cleaned.count(prompt) >= 2:
-            first_end = cleaned.find(prompt) + len(prompt)
-            cleaned = clean_text(
-                cleaned[:first_end] + cleaned[first_end:].replace(prompt, "")
-            )
-    return cleaned
-
-
-def _trim_repeated_title_lead(text: str, *, title: str) -> str:
-    cleaned = clean_text(text)
-    title_lead = clean_text(str(title or "").split("|", 1)[0])
-    if len(title_lead.split()) < 3:
-        return cleaned
-    lowered = cleaned.casefold()
-    needle = title_lead.casefold()
-    first = lowered.find(needle)
-    if first != 0:
-        return cleaned
-    second = lowered.find(needle, first + len(needle))
-    if second <= first:
-        return cleaned
-    if re.search(r"[.!?]", cleaned[len(title_lead) : second]):
-        return cleaned
-    return clean_text(cleaned[:second])
-
-
-def sanitize_detail_features(value: object, *, title: str) -> list[str]:
-    rows = value if isinstance(value, list) else [value]
-    seen: set[str] = set()
-    cleaned_rows: list[str] = []
-    for row in rows:
-        text = text_or_none(row)
-        if not text:
-            continue
-        cleaned = sanitize_detail_long_text(text, title=title)
-        lowered = cleaned.lower()
-        if not cleaned or any(
-            pattern.search(cleaned) for pattern in long_text_disclaimer_patterns
-        ):
-            continue
-        if any(pattern.fullmatch(cleaned) for pattern in feature_row_noise_patterns):
-            continue
-        if lowered in seen:
-            continue
-        seen.add(lowered)
-        cleaned_rows.append(cleaned)
-    return cleaned_rows
-
-
-def detail_long_text_chunk_looks_truncated(text: str) -> bool:
-    cleaned = clean_text(text).rstrip()
-    if not cleaned:
-        return False
-    if cleaned.endswith(("...", "…")):
-        return True
-    if cleaned[-1] in ".!?":
-        return False
-    tokens = re.findall(r"[A-Za-z0-9']+", cleaned.casefold())
-    return bool(tokens) and tokens[-1] in DETAIL_LONG_TEXT_TRUNCATED_TAIL_TOKENS
-
-
-def detail_long_text_chunk_is_variant_size_sequence(text: str) -> bool:
-    tokens = clean_text(text).split()
-    if len(tokens) < DETAIL_VARIANT_SIZE_SEQUENCE_MIN_COUNT:
-        return False
-    values: list[float] = []
-    for token in tokens:
-        if not re.fullmatch(r"\d+(?:\.5)?", token):
-            return False
-        values.append(float(token))
-    return (
-        values == sorted(values)
-        and len(set(values)) >= DETAIL_VARIANT_SIZE_SEQUENCE_MIN_COUNT
-    )
-
-
-_BRACKET_RUN_RE = re.compile(r"(?:\[\s*){2,}|(?:\]\s*){2,}")
-_BRACKETS_RE = re.compile(r"[\[\]]+")
-_LEADING_ATTRIBUTE_BLOB_RE = re.compile(
-    str(DETAIL_LONG_TEXT_LEADING_ATTRIBUTE_BLOB_PATTERN), re.I
-)
-
-
-def _text_is_structured_object_repr(text: str) -> bool:
-    if len(text) > MAX_STRUCTURED_TEXT_LENGTH:
-        return False
-    cleaned = text.strip()
-    if not (cleaned.startswith("{") and cleaned.endswith("}")):
-        return False
-    try:
-        parsed = ast.literal_eval(cleaned)
-    except (ValueError, SyntaxError):
-        try:
-            parsed = json.loads(cleaned)
-        except (TypeError, ValueError):
-            return False
-    return isinstance(parsed, dict)
-
-
-def _strip_bracket_artifact_noise(text: str) -> str:
-    """Recover prose from Vans/Brinkhaus-style `[[[Style]] [[SKU]] [prose]` artifacts."""
-    if not text or not _BRACKET_RUN_RE.search(text):
-        return text
-    # Recursive strip for extreme nesting like [ [ [ ... ] ] ]
-    current = text
-    while _BRACKET_RUN_RE.search(current):
-        stripped = _BRACKETS_RE.sub(" ", current)
-        if stripped == current:
-            break
-        current = stripped
-    candidates: list[tuple[int, int, str]] = []
-    for source in (text, current):
-        for index, part in enumerate(_BRACKETS_RE.split(source)):
-            cleaned = clean_text(part)
-            if not cleaned:
-                continue
-            word_count = len(cleaned.split())
-            if word_count >= _bracket_prose_min_words:
-                candidates.append((word_count, index, cleaned))
-        if candidates:
-            break
-    if candidates:
-        candidates.sort(key=lambda item: (-item[0], item[1]))
-        return candidates[0][2]
-    return clean_text(current)
-
-
-def _strip_leading_attribute_blob(text: str) -> str:
-    cleaned = clean_text(text)
-    if not cleaned:
-        return ""
-    stripped = clean_text(_LEADING_ATTRIBUTE_BLOB_RE.sub("", cleaned, count=1))
-    return stripped or cleaned
-
-
-def _strip_long_text_ui_tail(text: str) -> str:
-    cleaned = clean_text(text)
-    lowered = cleaned.lower()
-    for phrase in _long_text_ui_tail_phrases:
-        if lowered == phrase:
-            return ""
-        suffix = f" {phrase}"
-        if lowered.endswith(suffix):
-            return clean_text(cleaned[: -len(suffix)])
-    return cleaned
-
-
-def _clean_materials_pollution(value: object) -> str:
-    text = clean_text(value)
-    if not text:
-        return ""
-    stripped = text.lstrip()
-    if stripped.startswith("{") or _text_is_structured_json_array(stripped):
-        return ""
-    if detail_long_text_is_fulfillment_only(text) or any(
-        pattern.search(text) for pattern in long_text_disclaimer_patterns
-    ):
-        return ""
-    # Editorial / glossary blocks (e.g. Todd Snyder seersucker page) sneak
-    # into materials when the DOM selector pulls a description accordion.
-    # Real fabric composition leads with a percent token within the first
-    # ~200 characters. When the head of a long string lacks a composition
-    # pattern but the tail contains one, keep only the trailing composition.
-    composition_repaired = _materials_extract_trailing_composition(text)
-    if composition_repaired is not None:
-        text = composition_repaired
-    text = _materials_trim_to_first_specifics(text)
-    chunks = [
-        clean_text(chunk)
-        for chunk in re.split(r"(?<=[.!?])\s+|\s+:\s+|\n+", text)
-        if clean_text(chunk)
-    ]
-    kept = [
-        chunk
-        for chunk in chunks
-        if clean_text(chunk).casefold() not in materials_pollution_tokens
-        # DQ-10 / 2026-05-04 gemini audit: "0% Silk" / "0% Lyocell" segments
-        # are spec-table placeholder rows; drop them so only non-zero
-        # composition entries survive.
-        and not _MATERIALS_ZERO_PERCENT_PATTERN.search(chunk)
-    ]
-    cleaned = _dedupe_adjacent_material_chunks(" ".join(kept).strip())
-    while True:
-        parts = cleaned.split(maxsplit=1)
-        if (
-            not parts
-            or parts[0].casefold().strip(":") not in materials_pollution_tokens
-        ):
-            return _dedupe_adjacent_material_chunks(cleaned)
-        cleaned = parts[1] if len(parts) > 1 else ""
-
-
-_MATERIALS_COMPOSITION_PATTERN = re.compile(
-    str(DETAIL_MATERIALS_COMPOSITION_PATTERN),
-    re.I,
-)
-_materials_editorial_head_len = int(DETAIL_MATERIALS_EDITORIAL_HEAD_THRESHOLD)
-_materials_editorial_min_len = int(DETAIL_MATERIALS_EDITORIAL_LENGTH_THRESHOLD)
-
-
-def _materials_extract_trailing_composition(text: str) -> str | None:
-    """Salvage trailing fabric composition from an editorial-prefixed block.
-
-    Real composition starts with a percent token (``97% Cotton, 3% Elastane``).
-    When the first ~200 chars lack any composition pattern but the full
-    string is long and ends with one or more composition entries, replace
-    the value with just the trailing composition slice.
-
-    Returns the trimmed composition text, ``""`` when an editorial block
-    should be discarded, or ``None`` when no salvage is needed because the
-    head already has composition.
-    """
-    if len(text) <= _materials_editorial_min_len:
-        return None
-    head = text[:_materials_editorial_head_len]
-    if _MATERIALS_COMPOSITION_PATTERN.search(head):
-        return None
-    matches = list(_MATERIALS_COMPOSITION_PATTERN.finditer(text))
-    if not matches:
-        # Empty string means discard this editorial block; None means keep original.
-        return ""
-    first = matches[0]
-    return text[first.start() :].strip() or ""
-
-
-_MATERIALS_HEAD_TRIM_TERMINATORS_RE = re.compile(
-    r"\b(?:Made\s+in|Garment\s+Made\s+in|Fabric\s+(?:From|Made\s+in)|"
-    r"Dry\s+Clean(?:\s+Only)?|Machine\s+Wash|Hand\s+Wash|Wash\s+Cold|"
-    r"Tumble\s+Dry|Do\s+Not\s+Bleach)\b[^.]{0,80}\.",
-    re.I,
-)
-
-
-def _materials_trim_to_first_specifics(text: str) -> str:
-    """When a long materials field starts with composition + care/origin
-    info but trails into a glossary of unrelated fabrics, keep only the
-    first composition+origin sentences.
-
-    Heuristic: locate the FIRST occurrence of a care/origin terminator
-    (``Made in X.``, ``Dry Clean Only.``, ``Machine Wash.`` etc.); cut
-    just after that period. If none is found within the first 400 chars,
-    fall back to the original text.
-    """
-    if len(text) <= 200:
-        return text
-    if not _MATERIALS_COMPOSITION_PATTERN.match(text):
-        return text
-    match = _MATERIALS_HEAD_TRIM_TERMINATORS_RE.search(text[:400])
-    if match is None:
-        return text
-    if any(
-        item.start() > match.end()
-        for item in _MATERIALS_COMPOSITION_PATTERN.finditer(text)
-    ):
-        return text
-    cut = text[: match.end()].strip()
-    return cut or text
-
-
-def _dedupe_adjacent_material_chunks(text: str) -> str:
-    cleaned = clean_text(text)
-    if not cleaned:
-        return ""
-    chunks = [
-        clean_text(chunk)
-        for chunk in re.split(r"(?<=[.;!?])\s+", cleaned)
-        if clean_text(chunk)
-    ]
-    if len(chunks) < 2:
-        return cleaned
-    deduped: list[str] = []
-    for chunk in chunks:
-        if deduped and chunk.casefold() == deduped[-1].casefold():
-            continue
-        deduped.append(chunk)
-    return " ".join(deduped)
-
-
-def detail_long_text_is_numeric_sequence(text: str) -> bool:
-    tokens = text.split()
-    if len(tokens) < 5 or any(not token.isdigit() for token in tokens):
-        return False
-    numbers = [int(token) for token in tokens]
-    return numbers == list(range(numbers[0], numbers[0] + len(numbers)))
-
-
-def detail_long_text_is_fulfillment_only(text: str) -> bool:
-    lowered = clean_text(text).lower().strip(" .;:")
-    if lowered in fulfillment_only_long_text_phrases:
-        return True
-    return any(pattern.search(lowered) for pattern in fulfillment_long_text_patterns)
-
-
-def detail_long_text_is_guide_or_glossary_dump(text: str) -> bool:
-    cleaned = clean_text(text)
-    if not cleaned:
-        return False
-    if any(pattern.search(cleaned) for pattern in guide_glossary_text_patterns):
-        return True
-    lowered = cleaned.lower()
-    words = set(re.findall(r"\w+", lowered))
-    heading_hits = sum(1 for token in guide_glossary_heading_tokens if token in words)
-    return heading_hits >= _guide_glossary_heading_min_hits
-
-
-def _text_is_structured_json_array(text: str) -> bool:
-    if not text.startswith("["):
-        return False
-    try:
-        parsed = json.loads(text)
-    except (TypeError, ValueError):
-        return False
-    return isinstance(parsed, list)
-
-
-def detail_long_text_is_cookie_disclosure_dump(text: str) -> bool:
-    cleaned = clean_text(text)
-    return bool(
-        cleaned
-        and any(pattern.search(cleaned) for pattern in cookie_disclosure_text_patterns)
-    )
-
-
-def detail_long_text_chunk_is_legal_tail(chunk: str) -> bool:
-    lowered = chunk.lower()
-    return (
-        any(pattern in lowered for pattern in _legal_tail_contains)
-        or (
-            any(pattern in lowered for pattern in _legal_tail_digit_contains)
-            and any(char.isdigit() for char in chunk)
-        )
-        or any(
-            all(pattern in lowered for pattern in group)
-            for group in _legal_tail_all_contains
-        )
-        or lowered in _legal_tail_exact
-    )
-
-
-def detail_long_text_chunk_is_document_label(chunk: str) -> bool:
-    normalized = clean_text(chunk)
-    if not normalized:
-        return False
-    return any(
-        pattern.fullmatch(normalized) for pattern in document_link_label_patterns
-    )
-
-
-def detail_long_text_is_document_label_cluster(text: str) -> bool:
-    normalized = clean_text(text)
-    if not normalized:
-        return False
-    normalized = re.sub(r"\b(guide|label|manual)\b\s+", r"\1\n", normalized, flags=re.I)
-    parts = [clean_text(part) for part in normalized.splitlines() if clean_text(part)]
-    return len(parts) >= 2 and all(
-        detail_long_text_chunk_is_document_label(part) for part in parts
-    )
-
-
-def detail_long_text_chunk_is_variant_title(chunk: str, *, title: str) -> bool:
-    if not title:
-        return False
-    normalized_chunk = clean_text(chunk)
-    if len(normalized_chunk.split()) > 16:
-        return False
-    if " - " not in normalized_chunk:
-        return False
-    title_tokens = detail_product_text_tokens(title)
-    chunk_tokens = detail_product_text_tokens(normalized_chunk)
-    return bool(title_tokens) and len(title_tokens & chunk_tokens) >= max(
-        1,
-        min(2, len(title_tokens)),
-    )
-
-
-def detail_long_text_chunk_is_other_product(chunk: str, *, title: str) -> bool:
-    if not title:
-        return False
-    normalized_chunk = clean_text(chunk)
-    words = normalized_chunk.split()
-    if len(words) < _long_text_min_words or len(words) > _long_text_max_words:
-        return False
-    if not detail_long_text_chunk_has_product_name_shape(chunk):
-        return False
-    chunk_tokens = detail_product_text_tokens(normalized_chunk)
-    if not (chunk_tokens & cross_product_text_type_tokens):
-        return False
-    title_tokens = detail_product_text_tokens(title)
-    distinctive_title_tokens = {
-        token
-        for token in title_tokens
-        if len(token) >= _token_min_len_distinctive
-        and token not in cross_product_text_generic_tokens
-    }
-    lowered_chunk = normalized_chunk.lower()
-    if chunk_tokens & distinctive_title_tokens and lowered_chunk.startswith(
-        _long_text_prefixes
-    ):
-        return False
-    if not distinctive_title_tokens or chunk_tokens & distinctive_title_tokens:
-        distinctive_chunk_tokens = {
-            token
-            for token in chunk_tokens
-            if len(token) >= _token_min_len_chunk
-            and token not in cross_product_text_generic_tokens
-        }
-        return bool(
-            distinctive_chunk_tokens - title_tokens
-            and not distinctive_title_tokens <= chunk_tokens
-        )
-    distinctive_chunk_tokens = {
-        token
-        for token in chunk_tokens
-        if len(token) >= _token_min_len_chunk
-        and token not in cross_product_text_generic_tokens
-    }
-    return bool(distinctive_chunk_tokens - title_tokens)
-
-
-def detail_product_text_tokens(value: str) -> set[str]:
-    tokens = {
-        token
-        for token in re.split(r"[^a-z0-9]+", clean_text(value).lower())
-        if token and not token.isdigit()
-    }
-    tokens.update(
-        token[:-1] for token in list(tokens) if len(token) > 4 and token.endswith("s")
-    )
-    return tokens
-
-
-def detail_long_text_chunk_has_product_name_shape(chunk: str) -> bool:
-    words = re.findall(r"[A-Za-z][A-Za-z'’-]*", str(chunk or ""))
-    if not words:
-        return False
-    capitalized = [word for word in words if word[:1].isupper()]
-    non_initial_capitalized = [word for word in words[1:] if word[:1].isupper()]
-    if len(capitalized) >= 2 or non_initial_capitalized:
-        return True
-    return bool(
-        words
-        and words[0].lower() == "the"
-        and len(words) > 1
-        and words[1][:1].isupper()
-    )
+from . import long_text_sanitization as _split_owner
+globals().update({
+    name: value
+    for name, value in vars(_split_owner).items()
+    if not name.startswith("__") and name != "_owner"
+})

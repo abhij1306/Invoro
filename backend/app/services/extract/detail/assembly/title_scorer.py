@@ -70,13 +70,8 @@ def promote_detail_title(
         (
             (candidate, source)
             for rank, _, candidate, source in ranked_candidates
-            if candidate
-            and candidate != title
-            and not is_title_noise(candidate)
-            and (
-                rank < current_rank
-                or (rank == current_rank and len(candidate) > len(title))
-                or (force_semantic_replacement and len(candidate) > len(title))
+            if _title_candidate_can_replace(
+                candidate, title, rank, current_rank, force_semantic_replacement
             )
         ),
         None,
@@ -85,6 +80,23 @@ def promote_detail_title(
         record["title"] = replacement[0]
         return replacement
     return None
+
+
+def _title_candidate_can_replace(
+    candidate: str | None,
+    title: str,
+    rank: int,
+    current_rank: int,
+    force_semantic_replacement: bool,
+) -> bool:
+    if not candidate or candidate == title or is_title_noise(candidate):
+        return False
+    longer = len(candidate) > len(title)
+    return (
+        rank < current_rank
+        or (rank == current_rank and longer)
+        or (force_semantic_replacement and longer)
+    )
 
 
 def title_needs_promotion(title: str, *, page_url: str) -> bool:

@@ -108,31 +108,12 @@ def table_rows(table: Tag, headers: list[str]) -> list[dict[str, str]]:
 
 
 def meaningful_table(table: Tag) -> bool:
-    if table.find(["input", "select", "textarea"]):
-        return False
-    if not table.find_all("th"):
+    if not _has_meaningful_table_shape(table):
         return False
     rows = table.find_all("tr")
-    if len(rows) < 3:
-        return False
     first_cells = rows[0].find_all(["th", "td"], recursive=False)
-    if len(first_cells) < 2:
-        return False
     all_cells = table.find_all(["td", "th"])
-    if not all_cells:
-        return False
-    link_only = 0
-    for cell in all_cells:
-        text = clean_text(cell.get_text(" ", strip=True))
-        link_text = clean_text(
-            " ".join(
-                node.get_text(" ", strip=True)
-                for node in cell.find_all(["a", "button"])
-            )
-        )
-        if text and link_text and text == link_text:
-            link_only += 1
-    if link_only / max(1, len(all_cells)) > 0.5:
+    if len(first_cells) < 2 or _mostly_link_only_cells(all_cells):
         return False
     text_blob = clean_text(table.get_text(" ", strip=True)).lower()
     if re.search(r"\b(?:sun|mon|tue|wed|thu|fri|sat)\b", text_blob) and re.search(
@@ -147,6 +128,30 @@ def meaningful_table(table: Tag) -> bool:
         token in f"{table_class} {table_id}"
         for token in ("nav", "menu", "calendar", "layout")
     )
+
+
+def _has_meaningful_table_shape(table: Tag) -> bool:
+    return bool(
+        not table.find(["input", "select", "textarea"])
+        and table.find_all("th")
+        and len(table.find_all("tr")) >= 3
+        and table.find_all(["td", "th"])
+    )
+
+
+def _mostly_link_only_cells(cells: list[Tag]) -> bool:
+    link_only = 0
+    for cell in cells:
+        text = clean_text(cell.get_text(" ", strip=True))
+        link_text = clean_text(
+            " ".join(
+                node.get_text(" ", strip=True)
+                for node in cell.find_all(["a", "button"])
+            )
+        )
+        if text and link_text and text == link_text:
+            link_only += 1
+    return link_only / max(1, len(cells)) > 0.5
 
 
 def meaningful_listing_table(table: Tag) -> bool:

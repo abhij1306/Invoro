@@ -180,7 +180,8 @@ Canonical config owner:
 |---|---|
 | `crawl_engine.py` | Extraction facade and routing |
 | `detail_extractor.py` | Detail-page preparation and field candidate arbitration |
-| `listing_extractor.py` | Listing-page extraction |
+| `listing_extractor.py` | Listing card parsing facade and public listing extraction boundary |
+| `listing_stages.py` | Listing integrity, structured/DOM/rendered stage orchestration, and parser selection |
 | `extraction_context.py` | Per-artifact cleaned/original/pruned Selectolax documents and cached structured/JS-state views |
 | `structured_sources.py` | JSON-LD, microdata, OG, Nuxt, harvested JS state |
 | `extract/field_candidates/*` | Field candidate collection, structured payload traversal, structured variant row assembly, finalization, and scoring |
@@ -190,13 +191,15 @@ Canonical config owner:
 | `js_state/variant_options.py` | JS-state variant axis, option-value, and display-label normalization |
 | `network_payload_mapper.py` | Network payload to field mapping |
 | `shared/field_coerce.py` | Canonical field coercion dispatch and public-record shaping |
+| `shared/field_coerce_values.py` | Canonical option, availability, attributes, scalar values, and final record cleanup |
 | `shared/field_coerce_price.py` | Price, currency, and shared-price comparison coercion |
 | `shared/field_coerce_text.py` | Brand, identity, SKU, barcode, gender, and category text coercion |
 | `shared/field_coerce_url.py` | URL/image URL coercion and tracking cleanup exports |
 | `field_url_normalization.py` | Tracking URL cleanup and query stripping |
 | `dom/content_extractability.py` | Visible text/link/image extractability checks used by selector extraction |
 | `dom/query.py` | Safe BeautifulSoup selector/find/text/traversal primitives shared by DOM extraction modules |
-| `dom/selector_engine.py` | DOM selector extraction, image URL ranking, and selector result assembly |
+| `dom/selector_engine.py` | DOM visibility, product text scope, and selector extraction facade |
+| `dom/selector_values.py` | CSS/XPath/regex value extraction and selector fallback orchestration |
 | `dom/xpath_service.py` | XPath syntax validation, conversion, absolute XPath building, and selector value extraction |
 | `dom/image_extraction.py` | DOM image URL scoring, dedupe, low-resolution upgrade, and page image extraction |
 | `dom/section_extraction.py` | DOM label/value pairs, semantic heading sections, materials sections, and feature rows |
@@ -204,9 +207,12 @@ Canonical config owner:
 | `field_value_*.py` | Per-field normalization helpers |
 | `field_policy.py` | Field eligibility by surface |
 | `adapters/registry.py` | Adapter resolution |
-| `adapters/[platform].py` | Platform-specific extraction |
+| `adapters/[platform].py` | Platform-specific extraction facades and endpoint mapping |
+| `adapters/belk_dom.py` | Belk DOM cards, payload scalar lookup, brand identity, and SKU-array variants |
+| `adapters/shopify_products.py` | Shopify embedded/product record mapping, variants, and linked-product merging |
 | `extract/listing_card_fragments.py` | Canonical listing-fragment discovery, scoring, and listing-card heuristics shared by traversal, browser artifact capture, and listing extraction |
-| `extract/listing_candidate_ranking.py` | Listing candidate admission, support signals, utility rejection, dedupe, and set ranking |
+| `extract/listing_candidate_ranking.py` | Listing candidate preparation, dedupe, quality metrics, and set ranking |
+| `extract/listing_admission.py` | Listing admission, support signals, utility rejection, and detail-path hints |
 | `extract/structured_listing_handler.py` | Structured JSON-LD listing record extraction and typed/untyped listing payload gating |
 | `extract/article_card_parser.py` | Article/content listing card author, date, and summary parsing |
 | `extract/network_listing_mapper.py` | Network listing rows and network-to-listing price/brand/currency backfill |
@@ -218,7 +224,8 @@ Canonical config owner:
 | `extract/detail/assembly/dom_section_targets.py` | Detail DOM context selection and section target field discovery |
 | `extract/detail/assembly/dom_fallbacks.py` | DOM fallback field assembly for detail records |
 | `extract/detail/variants/dom_coercion.py` | DOM variant axis and option-value coercion helpers |
-| `extract/detail/variants/dom_extraction.py` | DOM variant collection, group validation, row assembly, and fallback merge |
+| `extract/detail/variants/dom_extraction.py` | DOM variant option discovery and public extraction facade |
+| `extract/detail/variants/dom_group_assembly.py` | DOM group validation, axis/row assembly, caching, and fallback merge |
 | `extract/detail/identity/structured_pruning.py` | Structured detail payload relevance and variant-leaf pruning |
 | `extract/detail/assembly/dom_completion.py` | DOM completion gates and DOM variant collection decisions |
 | `extract/detail/images/materialize.py` | Detail image candidate materialization before final cleanup |
@@ -227,10 +234,12 @@ Canonical config owner:
 | `extract/detail/images/dedupe.py` | Primary/additional detail image merge and dedupe helper |
 | `extract/detail/variants/numbered_options.py` | DOM-axis hydration for raw numbered option variant rows |
 | `extract/detail/assembly/raw_signals.py` | Raw detail breadcrumb category and deterministic gender signal helpers |
-| `extract/detail/identity/core.py` | Detail/listing URL identity, redirect identity, and requested-detail matching |
+| `extract/detail/identity/core.py` | Listing/detail URL classification and stable identity facade |
+| `extract/detail/identity/record_identity.py` | Requested-detail record matching, codes, redirects, and URL title fallbacks |
 | `extract/detail/identity/jsonld_identity.py` | JSON-LD identity helpers and duplicate product heading pruning |
 | `extract/detail/identity/model_codes.py` | Detail model-number/code compatibility and token extraction |
-| `extract/detail/price/core.py` | Detail price evidence, currency reconciliation, selection/application, visible PDP backfill, and magnitude repair |
+| `extract/detail/price/core.py` | Detail price evidence, selection/application, and stable price facade |
+| `extract/detail/price/reconciliation.py` | Original-price, currency, zero-price, and parent/variant magnitude reconciliation |
 | `extract/detail/assembly/final_cleanup.py` | Ecommerce detail final cleanup orchestrator |
 | `extract/detail/assembly/record_sanitization.py` | Detail placeholder, identity scalar, category, materials, and title cleanup |
 | `extract/detail/price/money_repair.py` | Detail price precision, discount, original-price, and variant price repair |
@@ -238,11 +247,13 @@ Canonical config owner:
 | `extract/detail/images/cleanup.py` | Final detail image cleanup, family matching, and parent image backfill |
 | `extract/detail/identity/shell_filter.py` | Site-shell and utility-page detail rejection helpers |
 | `extract/detail/variants/state_targets.py` | JS-state target maps for DOM variant URL/id enrichment |
-| `extract/detail/text/sanitizer.py` | Detail long-text pollution filters, fulfillment copy cleanup, and low-signal scalar checks |
+| `extract/detail/text/sanitizer.py` | Detail candidate guards, record long-text orchestration, and stable text facade |
+| `extract/detail/text/long_text_sanitization.py` | Long-text, features, materials, legal-tail, and product-name cleanup |
 | `extract/detail/assembly/title_scorer.py` | Detail title promotion and shell-title scoring |
 | `extract/variant_axis.py` | Variant axis key/display normalization and semantic axis-label gates |
 | `extract/variant_option_value.py` | Variant option-value noise, UI-noise, color, and quantity-run gates |
-| `extract/variant_choice_traversal.py` | Variant DOM choice traversal, group-name inference, and per-Soup cue-result caching |
+| `extract/variant_choice_traversal.py` | Variant cue detection, group-name inference, and stable traversal facade |
+| `extract/variant_choice_groups.py` | Choice-group discovery, swatch/input container selection, and per-Soup traversal |
 | `extract/variant_identity_merge.py` | Variant axis splitting, identity, row richness, row merge, and size alias collapse |
 | `extract/variant_dom_cues.py` | Variant DOM cue, scoped node-selection, sibling-signal helpers, and per-Soup selector caches |
 | `extract/variant_dom_provenance.py` | DOM variant provenance capture for validator input |

@@ -80,64 +80,7 @@ def _marketplace_choice_product(value: dict[str, Any]) -> dict[str, Any]:
     categories = value.get("choiceCategories")
     if not isinstance(categories, list) or not categories:
         return {}
-    variants: list[dict[str, Any]] = []
-    for category in categories:
-        if not isinstance(category, dict):
-            continue
-        axis_name = text_or_none(category.get("name"))
-        if not axis_name:
-            continue
-        connection = category.get("variantChoices")
-        edges = connection.get("edges") if isinstance(connection, dict) else None
-        if isinstance(edges, list) and edges:
-            for edge in edges:
-                edge_node = edge.get("node") if isinstance(edge, dict) else None
-                if not isinstance(edge_node, dict):
-                    continue
-                raw_choice = edge_node.get("choice")
-                edge_choice: dict[str, Any] = (
-                    raw_choice if isinstance(raw_choice, dict) else {}
-                )
-                raw_selectable = edge_node.get("selectableVariant")
-                selectable: dict[str, Any] = (
-                    raw_selectable if isinstance(raw_selectable, dict) else {}
-                )
-                row = _marketplace_choice_variant_row(
-                    axis_name=axis_name,
-                    choice_name=edge_choice.get("name"),
-                    choice_id=edge_choice.get("displayId")
-                    or edge_choice.get("choiceId"),
-                    listing_url=selectable.get("listingUrl"),
-                    stock_status=_marketplace_stock_status(selectable),
-                    price_amount=_marketplace_price_amount(selectable),
-                    currency_code=_marketplace_currency_code(selectable),
-                )
-                if row:
-                    variants.append(row)
-            continue
-        selected_variant_choice = category.get("selectedVariantChoice")
-        selected = (
-            selected_variant_choice
-            if isinstance(selected_variant_choice, dict)
-            else None
-        )
-        raw_selected_choice = (
-            selected.get("choice") if isinstance(selected, dict) else None
-        )
-        choice: dict[str, Any] = (
-            raw_selected_choice if isinstance(raw_selected_choice, dict) else {}
-        )
-        row = _marketplace_choice_variant_row(
-            axis_name=axis_name,
-            choice_name=choice.get("name"),
-            choice_id=choice.get("displayId") or choice.get("choiceId"),
-            listing_url=value.get("listingUrl"),
-            stock_status=_marketplace_stock_status(value),
-            price_amount=_marketplace_price_amount(value),
-            currency_code=_marketplace_currency_code(value),
-        )
-        if row:
-            variants.append(row)
+    variants = _marketplace_category_variants(categories, value)
     if not variants:
         return {}
     url = next(
@@ -163,6 +106,79 @@ def _marketplace_choice_product(value: dict[str, Any]) -> dict[str, Any]:
             "variants": variants,
             "variant_count": len(variants),
         }
+    )
+
+
+def _marketplace_category_variants(
+    categories: list[object], product: dict[str, Any]
+) -> list[dict[str, Any]]:
+    variants: list[dict[str, Any]] = []
+    for category in categories:
+        if not isinstance(category, dict):
+            continue
+        axis_name = text_or_none(category.get("name"))
+        if not axis_name:
+            continue
+        rows = _marketplace_edge_variants(category, axis_name)
+        if not _marketplace_category_has_edges(category):
+            selected = _marketplace_selected_variant(category, product, axis_name)
+            rows = [selected] if selected else []
+        variants.extend(rows)
+    return variants
+
+
+def _marketplace_category_has_edges(category: dict[str, Any]) -> bool:
+    connection = category.get("variantChoices")
+    edges = connection.get("edges") if isinstance(connection, dict) else None
+    return isinstance(edges, list) and bool(edges)
+
+
+def _marketplace_edge_variants(
+    category: dict[str, Any], axis_name: str
+) -> list[dict[str, Any]]:
+    connection = category.get("variantChoices")
+    edges = connection.get("edges") if isinstance(connection, dict) else None
+    if not isinstance(edges, list) or not edges:
+        return []
+    rows: list[dict[str, Any]] = []
+    for edge in edges:
+        node = edge.get("node") if isinstance(edge, dict) else None
+        if not isinstance(node, dict):
+            continue
+        choice = node.get("choice") if isinstance(node.get("choice"), dict) else {}
+        selectable = (
+            node.get("selectableVariant")
+            if isinstance(node.get("selectableVariant"), dict)
+            else {}
+        )
+        row = _marketplace_choice_variant_row(
+            axis_name=axis_name,
+            choice_name=choice.get("name"),
+            choice_id=choice.get("displayId") or choice.get("choiceId"),
+            listing_url=selectable.get("listingUrl"),
+            stock_status=_marketplace_stock_status(selectable),
+            price_amount=_marketplace_price_amount(selectable),
+            currency_code=_marketplace_currency_code(selectable),
+        )
+        if row:
+            rows.append(row)
+    return rows
+
+
+def _marketplace_selected_variant(
+    category: dict[str, Any], product: dict[str, Any], axis_name: str
+) -> dict[str, Any]:
+    selected = category.get("selectedVariantChoice")
+    choice = selected.get("choice") if isinstance(selected, dict) else None
+    choice = choice if isinstance(choice, dict) else {}
+    return _marketplace_choice_variant_row(
+        axis_name=axis_name,
+        choice_name=choice.get("name"),
+        choice_id=choice.get("displayId") or choice.get("choiceId"),
+        listing_url=product.get("listingUrl"),
+        stock_status=_marketplace_stock_status(product),
+        price_amount=_marketplace_price_amount(product),
+        currency_code=_marketplace_currency_code(product),
     )
 
 

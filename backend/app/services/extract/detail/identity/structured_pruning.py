@@ -9,6 +9,7 @@ __all__ = (
 )
 
 from collections.abc import Callable
+from functools import partial
 from urllib.parse import urlparse
 
 from app.services.config.extraction_rules import (
@@ -63,29 +64,33 @@ def _prune_irrelevant_detail_structured_payload(
     detail_identity_codes_from_url = (
         detail_identity_codes_from_url or _detail_identity_codes_from_url
     )
-    if depth == 0:
-        requested_title = requested_title or detail_title_from_url(requested_page_url)
-        requested_tokens = requested_tokens or detail_identity_tokens(requested_title)
-        requested_codes = requested_codes or detail_identity_codes_from_url(
-            requested_page_url
-        )
+    requested_title, requested_tokens, requested_codes = _requested_identity_context(
+        depth,
+        requested_page_url,
+        requested_title,
+        requested_tokens,
+        requested_codes,
+        detail_title_from_url,
+        detail_identity_tokens,
+        detail_identity_codes_from_url,
+    )
     if depth >= DETAIL_PAYLOAD_MAX_DEPTH_INT:
         return None
+    recurse = partial(
+        _prune_irrelevant_detail_structured_payload,
+        page_url=page_url,
+        requested_page_url=requested_page_url,
+        depth=depth + 1,
+        requested_title=requested_title,
+        requested_tokens=requested_tokens,
+        requested_codes=requested_codes,
+        detail_title_from_url=detail_title_from_url,
+        detail_identity_tokens=detail_identity_tokens,
+        detail_identity_codes_from_url=detail_identity_codes_from_url,
+    )
     if isinstance(payload, list):
         cleaned_items = [
-            _prune_irrelevant_detail_structured_payload(
-                item,
-                page_url=page_url,
-                requested_page_url=requested_page_url,
-                depth=depth + 1,
-                requested_title=requested_title,
-                requested_tokens=requested_tokens,
-                requested_codes=requested_codes,
-                detail_title_from_url=detail_title_from_url,
-                detail_identity_tokens=detail_identity_tokens,
-                detail_identity_codes_from_url=detail_identity_codes_from_url,
-            )
-            for item in payload[: int(DETAIL_PAYLOAD_LIST_LIMIT or 50)]
+            recurse(item) for item in payload[: int(DETAIL_PAYLOAD_LIST_LIMIT or 50)]
         ]
         return [item for item in cleaned_items if item not in (None, "", [], {})]
     if not isinstance(payload, dict):
@@ -102,22 +107,29 @@ def _prune_irrelevant_detail_structured_payload(
         return None
     cleaned: dict[str, object] = {}
     for key, value in payload.items():
-        cleaned_value = _prune_irrelevant_detail_structured_payload(
-            value,
-            page_url=page_url,
-            requested_page_url=requested_page_url,
-            depth=depth + 1,
-            requested_title=requested_title,
-            requested_tokens=requested_tokens,
-            requested_codes=requested_codes,
-            detail_title_from_url=detail_title_from_url,
-            detail_identity_tokens=detail_identity_tokens,
-            detail_identity_codes_from_url=detail_identity_codes_from_url,
-        )
+        cleaned_value = recurse(value)
         if cleaned_value in (None, "", [], {}):
             continue
         cleaned[str(key)] = cleaned_value
     return cleaned or None
+
+
+def _requested_identity_context(
+    depth: int,
+    page_url: str,
+    title: str | None,
+    tokens: set[str] | None,
+    codes: set[str] | None,
+    title_from_url: Callable[[str], str | None],
+    identity_tokens: Callable[[object], set[str]],
+    identity_codes: Callable[[str], set[str]],
+) -> tuple[str | None, set[str] | None, set[str] | None]:
+    if depth != 0:
+        return title, tokens, codes
+    resolved_title = title or title_from_url(page_url)
+    resolved_tokens = tokens or identity_tokens(resolved_title)
+    resolved_codes = codes or identity_codes(page_url)
+    return resolved_title, resolved_tokens, resolved_codes
 
 
 def _detail_structured_payload_is_irrelevant_product(
@@ -131,24 +143,7 @@ def _detail_structured_payload_is_irrelevant_product(
     detail_identity_tokens: Callable[[object], set[str]] | None = None,
 ) -> bool:
     detail_identity_tokens = detail_identity_tokens or _detail_identity_tokens
-    raw_type = payload.get("@type")
-    normalized_type = (
-        " ".join(raw_type) if isinstance(raw_type, list) else str(raw_type or "")
-    )
-    lowered_type = normalized_type.lower()
-    payload_keys = {str(key).lower() for key in payload}
-    looks_product_like = (
-        "product" in lowered_type
-        or bool(
-            {"sku", "mpn", "productid", "offers", "price", "image", "url"}
-            & payload_keys
-        )
-        or (
-            {"name", "description"} <= payload_keys
-            and bool({"offers", "price", "image", "url"} & payload_keys)
-        )
-    )
-    if not looks_product_like:
+    if not _structured_payload_looks_product_like(payload):
         return False
     raw_candidate_url = payload.get("url") or payload.get("@id")
     candidate_urls = extract_urls(raw_candidate_url, page_url)
@@ -156,15 +151,7 @@ def _detail_structured_payload_is_irrelevant_product(
         candidate_urls,
         requested_page_url=requested_page_url,
     )
-    candidate_record = {
-        "title": payload.get("name") or payload.get("title"),
-        "description": payload.get("description"),
-        "url": candidate_url,
-        "sku": payload.get("sku")
-        or payload.get("productId")
-        or payload.get("productID"),
-        "part_number": payload.get("mpn"),
-    }
+    candidate_record = _structured_candidate_record(payload, candidate_url)
     if _structured_variant_leaf_conflicts_with_base_request(
         candidate_urls=candidate_urls,
         candidate_record=candidate_record,
@@ -172,29 +159,11 @@ def _detail_structured_payload_is_irrelevant_product(
         requested_codes=requested_codes,
     ):
         return True
-    if candidate_url:
-        if _detail_url_matches_requested_identity(
-            candidate_url,
-            requested_page_url=requested_page_url,
-        ):
-            return False
-        if _record_matches_requested_detail_identity(
-            candidate_record,
-            requested_page_url=requested_page_url,
-        ):
-            return False
-        if same_site(candidate_url, requested_page_url):
-            candidate_path = urlparse(candidate_url).path.rstrip("/")
-            requested_path = urlparse(requested_page_url).path.rstrip("/")
-            return bool(
-                candidate_path and requested_path and candidate_path != requested_path
-            )
-    else:
-        if _record_matches_requested_detail_identity(
-            candidate_record,
-            requested_page_url=requested_page_url,
-        ):
-            return False
+    url_decision = _structured_candidate_url_irrelevance(
+        candidate_url, candidate_record, requested_page_url
+    )
+    if url_decision is not None:
+        return url_decision
     if not text_or_none(raw_candidate_url):
         candidate_title = clean_text(candidate_record.get("title"))
         if not candidate_title:
@@ -216,6 +185,59 @@ def _detail_structured_payload_is_irrelevant_product(
     ):
         return True
     return False
+
+
+def _structured_payload_looks_product_like(payload: dict[str, object]) -> bool:
+    raw_type = payload.get("@type")
+    normalized_type = (
+        " ".join(raw_type) if isinstance(raw_type, list) else str(raw_type or "")
+    )
+    keys = {str(key).lower() for key in payload}
+    strong_keys = {"sku", "mpn", "productid", "offers", "price", "image", "url"}
+    descriptive_product = {"name", "description"} <= keys and bool(
+        {"offers", "price", "image", "url"} & keys
+    )
+    return (
+        "product" in normalized_type.lower()
+        or bool(strong_keys & keys)
+        or descriptive_product
+    )
+
+
+def _structured_candidate_record(
+    payload: dict[str, object], candidate_url: str
+) -> dict[str, object]:
+    return {
+        "title": payload.get("name") or payload.get("title"),
+        "description": payload.get("description"),
+        "url": candidate_url,
+        "sku": payload.get("sku")
+        or payload.get("productId")
+        or payload.get("productID"),
+        "part_number": payload.get("mpn"),
+    }
+
+
+def _structured_candidate_url_irrelevance(
+    candidate_url: str,
+    candidate_record: dict[str, object],
+    requested_page_url: str,
+) -> bool | None:
+    if _record_matches_requested_detail_identity(
+        candidate_record, requested_page_url=requested_page_url
+    ):
+        return False
+    if not candidate_url:
+        return None
+    if _detail_url_matches_requested_identity(
+        candidate_url, requested_page_url=requested_page_url
+    ):
+        return False
+    if not same_site(candidate_url, requested_page_url):
+        return None
+    candidate_path = urlparse(candidate_url).path.rstrip("/")
+    requested_path = urlparse(requested_page_url).path.rstrip("/")
+    return bool(candidate_path and requested_path and candidate_path != requested_path)
 
 
 def _preferred_structured_payload_url(

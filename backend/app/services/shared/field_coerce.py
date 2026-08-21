@@ -1,3 +1,4 @@
+# ruff: noqa: E402, F401, F821, F822
 """Shared field coercion, normalization, and public-record shaping helpers."""
 
 from __future__ import annotations
@@ -5,7 +6,7 @@ from __future__ import annotations
 import ast
 import json
 import re
-from typing import Any, cast
+from typing import Any
 from app.services.extraction_html_helpers import html_to_text
 from app.services.config.extraction_rules import (
     AVAILABILITY_URL_MAP,
@@ -129,64 +130,30 @@ __all__ = (
 PRODUCT_URL_HINTS = detail_path_hints("ecommerce_detail")
 JOB_URL_HINTS = detail_path_hints("job_detail")
 _FIELD_ALIASES = FIELD_ALIASES
-_OPTION_VALUE_SUFFIX_NOISE_RE = compile_regex_patterns(
-    VARIANT_OPTION_VALUE_SUFFIX_NOISE_PATTERNS or ()
-)
-_OPTION_VALUE_NOISE_WORD_PATTERN = "|".join(
-    re.escape(str(word))
-    for word in tuple(OPTION_VALUE_NOISE_WORDS or ())
-    if str(word).strip()
-)
-ALL_CANONICAL_FIELDS = sorted(
-    {
-        field_name
-        for fields in CANONICAL_SCHEMAS.values()
-        for field_name in fields or []
-        if field_name
-    }
-)
+_OPTION_VALUE_SUFFIX_NOISE_RE = compile_regex_patterns(VARIANT_OPTION_VALUE_SUFFIX_NOISE_PATTERNS or ())
+_OPTION_VALUE_NOISE_WORD_PATTERN = "|".join(re.escape(str(word)) for word in tuple(OPTION_VALUE_NOISE_WORDS or ()) if str(word).strip())
+ALL_CANONICAL_FIELDS = sorted({field_name for fields in CANONICAL_SCHEMAS.values() for field_name in fields or [] if field_name})
 _PRICE_FIELD_NAMES = PRICE_VALUE_FIELDS
 _INTEGER_FIELD_NAMES = INTEGER_VALUE_FIELDS
-_NOISY_PRODUCT_ATTRIBUTE_KEYS = frozenset(
-    normalize_field_key(str(key or ""))
-    for key in tuple(NOISY_PRODUCT_ATTRIBUTE_KEYS or ())
-    if str(key or "").strip()
-)
+_NOISY_PRODUCT_ATTRIBUTE_KEYS = frozenset(normalize_field_key(str(key or "")) for key in tuple(NOISY_PRODUCT_ATTRIBUTE_KEYS or ()) if str(key or "").strip())
 _SMALL_NUMERIC_RE = re.compile(str(SMALL_NUMERIC_PATTERN), re.I)
 _TRACKING_PIXEL_RE = re.compile(str(TRACKING_PIXEL_PATTERN), re.I)
 _COLOR_KEYWORD_RE = re.compile(str(COLOR_KEYWORD_PATTERN), re.I)
-_variant_color_codelike_token_re = re.compile(
-    str(VARIANT_COLOR_CODELIKE_TOKEN_PATTERN), re.I
-)
-_SIZE_REJECT_TOKENS_NORMALIZED: frozenset[str] = frozenset(
-    str(token).strip().lower()
-    for token in tuple(SIZE_REJECT_TOKENS or ())
-    if str(token).strip()
-)
-
+_variant_color_codelike_token_re = re.compile(str(VARIANT_COLOR_CODELIKE_TOKEN_PATTERN), re.I)
+_SIZE_REJECT_TOKENS_NORMALIZED: frozenset[str] = frozenset(str(token).strip().lower() for token in tuple(SIZE_REJECT_TOKENS or ()) if str(token).strip())
 
 object_list = _object_list
 object_dict = _object_dict
 safe_int = _safe_int
 coerce_int = _coerce_int
 
-
-LISTING_UTILITY_TITLE_REGEXES = tuple(
-    re.compile(pattern, re.I) for pattern in LISTING_UTILITY_TITLE_PATTERNS
-)
-_AVAILABILITY_CANONICAL_ENUM = frozenset(
-    str(v) for v in dict(AVAILABILITY_URL_MAP or {}).values() if v
-)
+LISTING_UTILITY_TITLE_REGEXES = tuple(re.compile(pattern, re.I) for pattern in LISTING_UTILITY_TITLE_PATTERNS)
+_AVAILABILITY_CANONICAL_ENUM = frozenset(str(v) for v in dict(AVAILABILITY_URL_MAP or {}).values() if v)
 _HTML_ENTITY_RE = re.compile(r"&(?:#\d+|#x[0-9a-fA-F]+|[A-Za-z][A-Za-z0-9]+);")
-_product_type_noise_tokens = frozenset(
-    str(token).casefold()
-    for token in tuple(PUBLIC_RECORD_PRODUCT_TYPE_NOISE_TOKENS or ())
-)
-
+_product_type_noise_tokens = frozenset(str(token).casefold() for token in tuple(PUBLIC_RECORD_PRODUCT_TYPE_NOISE_TOKENS or ()))
 
 def clean_record(record: dict[str, Any]) -> dict[str, Any]:
     return {str(key): value for key, value in record.items() if not is_blank(value)}
-
 
 def _surface_field_type_error(
     *,
@@ -195,9 +162,7 @@ def _surface_field_type_error(
     value: object,
     scalar_list_fields: set[str],
 ) -> str | None:
-    if normalized_field in STRUCTURED_OBJECT_LIST_FIELDS and not isinstance(
-        value, list
-    ):
+    if normalized_field in STRUCTURED_OBJECT_LIST_FIELDS and not isinstance(value, list):
         return f"{field_name} expected list"
     if normalized_field in STRUCTURED_OBJECT_FIELDS and not isinstance(value, dict):
         return f"{field_name} expected object"
@@ -210,7 +175,6 @@ def _surface_field_type_error(
         return f"{field_name} expected scalar"
     return None
 
-
 def validate_record_for_surface(
     record: dict[str, Any],
     surface: str,
@@ -220,19 +184,8 @@ def validate_record_for_surface(
 ) -> tuple[dict[str, Any], list[str]]:
     if str(surface or "").strip().lower() == DESIGN_SYSTEM_SURFACE:
         allowed = set(DESIGN_SYSTEM_PUBLIC_FIELDS)
-        return {
-            key: value
-            for key, value in dict(record or {}).items()
-            if str(key).startswith("_") or (key in allowed and not is_blank(value))
-        }, []
-    logical_fields = {
-        key: value
-        for key, value in dict(record).items()
-        if not str(key).startswith("_")
-    }
-    internal_fields = {
-        key: value for key, value in dict(record).items() if str(key).startswith("_")
-    }
+        return {key: value for key, value in dict(record or {}).items() if str(key).startswith("_") or (key in allowed and not is_blank(value))}, []
+    logical_fields, internal_fields = _partition_record_fields(record)
     allowed_fields = {
         normalize_field_key(field_name)
         for field_name in surface_fields(
@@ -241,24 +194,7 @@ def validate_record_for_surface(
             allow_noncanonical_requested=False,
         )
     }
-    validation_errors: list[str] = []
-    validated_fields: dict[str, Any] = {}
-    scalar_list_fields = set(STRUCTURED_MULTI_FIELDS) | {ADDITIONAL_IMAGES_FIELD}
-    for field_name, value in logical_fields.items():
-        normalized_field = normalize_field_key(field_name)
-        if normalized_field not in allowed_fields:
-            continue
-        if strict_types:
-            type_error = _surface_field_type_error(
-                field_name=field_name,
-                normalized_field=normalized_field,
-                value=value,
-                scalar_list_fields=scalar_list_fields,
-            )
-            if type_error:
-                validation_errors.append(type_error)
-                continue
-        validated_fields[field_name] = value
+    validated_fields, validation_errors = _validated_surface_fields(logical_fields, allowed_fields=allowed_fields, strict_types=strict_types)
     if str(surface or "").strip().lower().startswith("ecommerce_"):
         for field_name in (
             *tuple(PUBLIC_RECORD_ECOMMERCE_DROPPED_FIELDS or ()),
@@ -270,6 +206,43 @@ def validate_record_for_surface(
         **internal_fields,
     }, validation_errors
 
+def _partition_record_fields(
+    record: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    logical: dict[str, Any] = {}
+    internal: dict[str, Any] = {}
+    for key, value in dict(record).items():
+        (internal if str(key).startswith("_") else logical)[key] = value
+    return logical, internal
+
+def _validated_surface_fields(
+    logical_fields: dict[str, Any],
+    *,
+    allowed_fields: set[str],
+    strict_types: bool,
+) -> tuple[dict[str, Any], list[str]]:
+    errors: list[str] = []
+    validated: dict[str, Any] = {}
+    scalar_list_fields = set(STRUCTURED_MULTI_FIELDS) | {ADDITIONAL_IMAGES_FIELD}
+    for field_name, value in logical_fields.items():
+        normalized = normalize_field_key(field_name)
+        if normalized not in allowed_fields:
+            continue
+        type_error = (
+            _surface_field_type_error(
+                field_name=field_name,
+                normalized_field=normalized,
+                value=value,
+                scalar_list_fields=scalar_list_fields,
+            )
+            if strict_types
+            else None
+        )
+        if type_error:
+            errors.append(type_error)
+        else:
+            validated[field_name] = value
+    return validated, errors
 
 def surface_fields(
     surface: str,
@@ -284,21 +257,12 @@ def surface_fields(
         fields.append(URL_FIELD)
     for field_name in requested_fields or []:
         exact_field = exact_requested_field_key(field_name)
-        if (
-            exact_field
-            and (allow_noncanonical_requested or exact_field in allowed_fields)
-            and exact_field not in fields
-        ):
+        if exact_field and (allow_noncanonical_requested or exact_field in allowed_fields) and exact_field not in fields:
             fields.append(exact_field)
     for field_name in expand_requested_fields(requested_fields or []):
-        if (
-            field_name
-            and (allow_noncanonical_requested or field_name in allowed_fields)
-            and field_name not in fields
-        ):
+        if field_name and (allow_noncanonical_requested or field_name in allowed_fields) and field_name not in fields:
             fields.append(field_name)
     return fields
-
 
 def surface_alias_lookup(
     surface: str,
@@ -330,7 +294,6 @@ def surface_alias_lookup(
                 lookup.setdefault(normalized_alias, canonical)
     return lookup
 
-
 def direct_record_to_surface_fields(
     record: dict[str, Any],
     *,
@@ -346,22 +309,14 @@ def direct_record_to_surface_fields(
         allow_noncanonical_requested=False,
     )
     for field_name in source_fields:
-        value = coerce_field_value(
-            field_name, dict(record or {}).get(field_name), page_url
-        )
+        value = coerce_field_value(field_name, dict(record or {}).get(field_name), page_url)
         if value not in (None, "", [], {}):
             shaped[field_name] = value
     return finalize_record(shaped, surface=surface)
 
-
 def _split_multivalue_text_rows(value: str) -> list[str]:
-    rows = [
-        clean_text(part)
-        for part in re.split(r"(?:\r?\n|[•]+)", str(value or ""))
-        if clean_text(part)
-    ]
+    rows = [clean_text(part) for part in re.split(r"(?:\r?\n|[•]+)", str(value or "")) if clean_text(part)]
     return rows
-
 
 def _iter_structured_multi_values(value: object) -> list[object]:
     if isinstance(value, dict):
@@ -369,7 +324,6 @@ def _iter_structured_multi_values(value: object) -> list[object]:
     if isinstance(value, (list, tuple, set)):
         return list(value)
     return []
-
 
 def _coerce_structured_multi_rows(field_name: str, value: object) -> list[str]:
     if value in (None, "", [], {}):
@@ -386,17 +340,12 @@ def _coerce_structured_multi_rows(field_name: str, value: object) -> list[str]:
         literal_rows = coerce_literal_text_list(value)
         if literal_rows:
             return literal_rows
-        text = (
-            html_to_text(value, preserve_block_breaks=True)
-            if ("<" in value or _HTML_ENTITY_RE.search(value))
-            else str(value)
-        )
+        text = html_to_text(value, preserve_block_breaks=True) if ("<" in value or _HTML_ENTITY_RE.search(value)) else str(value)
         rows = _split_multivalue_text_rows(text)
         if rows:
             return rows
     coerced_text = coerce_text(value)
     return [coerced_text] if coerced_text is not None else []
-
 
 def coerce_structured_scalar(
     value: object,
@@ -436,7 +385,6 @@ def coerce_structured_scalar(
         return None
     return coerce_text(value)
 
-
 def _coerce_simple_string_dict_scalar(
     value: str,
     *,
@@ -460,7 +408,6 @@ def _coerce_simple_string_dict_scalar(
             return candidate
     return None
 
-
 def _unquote_simple_string_dict_token(value: str) -> str | None:
     if len(value) < 2 or value[0] != value[-1] or value[0] not in {"'", '"'}:
         return None
@@ -469,11 +416,9 @@ def _unquote_simple_string_dict_token(value: str) -> str | None:
         return None
     return inner
 
-
 def _join_text_parts(parts: list[str | None], *, separator: str) -> str | None:
     cleaned_parts = [part for part in parts if part]
     return separator.join(cleaned_parts) if cleaned_parts else None
-
 
 def _color_value_is_opaque_code(value: str) -> bool:
     """Reject internal swatch/style codes that masquerade as colors.
@@ -499,46 +444,27 @@ def _color_value_is_opaque_code(value: str) -> bool:
         return False
     return True
 
-
 def _strip_color_value_code_pollution(value: str) -> str:
     if not value or not any(char.isdigit() for char in value):
         return value
     tokens = re.findall(r"[A-Za-z0-9]+", value)
     if len(tokens) < 2:
         return value
-    color_indexes = [
-        index
-        for index, token in enumerate(tokens)
-        if _COLOR_KEYWORD_RE.fullmatch(token)
-    ]
+    color_indexes = [index for index, token in enumerate(tokens) if _COLOR_KEYWORD_RE.fullmatch(token)]
     if not color_indexes:
         return value
     tail = tokens[color_indexes[-1] + 1 :]
     if not tail:
         return value
-    if not all(
-        token.isdigit() or _variant_color_codelike_token_re.fullmatch(token)
-        for token in tail
-    ):
+    if not all(token.isdigit() or _variant_color_codelike_token_re.fullmatch(token) for token in tail):
         return value
-    color_prefix = [
-        token
-        for token in tokens[: color_indexes[0]]
-        if not _color_prefix_token_is_code_like(token)
-    ]
+    color_prefix = [token for token in tokens[: color_indexes[0]] if not _color_prefix_token_is_code_like(token)]
     color_tokens = tokens[color_indexes[0] : color_indexes[-1] + 1]
     return clean_text(" ".join([*color_prefix, *color_tokens]))
 
-
 def _color_prefix_token_is_code_like(token: str) -> bool:
     text = token.strip()
-    return (
-        1 < len(text) <= 3
-        and not text.islower()
-        and text.casefold() not in _SHORT_COLOR_ALLOWLIST
-        and _COLOR_KEYWORD_RE.fullmatch(text) is None
-    )
-
+    return 1 < len(text) <= 3 and not text.islower() and text.casefold() not in _SHORT_COLOR_ALLOWLIST and _COLOR_KEYWORD_RE.fullmatch(text) is None
 
 _SHORT_COLOR_ALLOWLIST = frozenset(
     {
@@ -583,470 +509,24 @@ _SHORT_COLOR_ALLOWLIST = frozenset(
     }
 )
 
-
-def _sanitize_option_scalar(field_name: str, value: object) -> str | None:
-    text = coerce_text(value)
-    if not text:
-        return None
-    if text.lstrip().startswith(("{", "[")):
-        return None
-    cleaned = text
-    if field_name in OPTION_SCALAR_FIELDS:
-        for pattern in _OPTION_VALUE_SUFFIX_NOISE_RE:
-            cleaned = clean_text(pattern.sub("", cleaned))
+def _strip_option_suffix_noise(value: str) -> str:
+    cleaned = value
+    for pattern in _OPTION_VALUE_SUFFIX_NOISE_RE:
+        cleaned = clean_text(pattern.sub("", cleaned))
+    cleaned = re.sub(rf"\s+(?:{CURRENCY_SYMBOL_PATTERN})\s*\d[\d.,]*.*$", "", cleaned)
+    cleaned = re.sub(rf"\s+\d[\d.,]*\s*(?:{CURRENCY_CODE_PATTERN})\b.*$", "", cleaned, flags=re.I)
+    if _OPTION_VALUE_NOISE_WORD_PATTERN:
         cleaned = re.sub(
-            rf"\s+(?:{CURRENCY_SYMBOL_PATTERN})\s*\d[\d.,]*.*$", "", cleaned
-        )
-        cleaned = re.sub(
-            rf"\s+\d[\d.,]*\s*(?:{CURRENCY_CODE_PATTERN})\b.*$",
+            rf"\s+\b(?:{_OPTION_VALUE_NOISE_WORD_PATTERN})\b.*$",
             "",
             cleaned,
             flags=re.I,
         )
-        if _OPTION_VALUE_NOISE_WORD_PATTERN:
-            cleaned = re.sub(
-                rf"\s+\b(?:{_OPTION_VALUE_NOISE_WORD_PATTERN})\b.*$",
-                "",
-                cleaned,
-                flags=re.I,
-            )
-        cleaned = clean_text(cleaned)
-    if field_name == "color":
-        if _SMALL_NUMERIC_RE.fullmatch(cleaned):
-            return None
-        if _TRACKING_PIXEL_RE.fullmatch(cleaned):
-            return None
-        if _color_value_is_opaque_code(cleaned):
-            return None
-        match = re.fullmatch(r"select\s+(.+?)\s+color", cleaned, flags=re.I)
-        if match is not None:
-            cleaned = clean_text(match.group(1))
-        cleaned = re.split(r"\bstyle\s*:", cleaned, maxsplit=1, flags=re.I)[0]
-        if ":" in cleaned:
-            _prefix, suffix = cleaned.rsplit(":", 1)
-            if len(clean_text(suffix).split()) <= 4 and _COLOR_KEYWORD_RE.search(
-                suffix
-            ):
-                cleaned = suffix
-        cleaned = re.sub(r"^color\s*:\s*", "", cleaned, flags=re.I)
-        cleaned = re.sub(r"\bcolor\s+details\b.*$", "", cleaned, flags=re.I).strip()
-        cleaned = re.split(r"\bview as list\b", cleaned, maxsplit=1, flags=re.I)[0]
-        cleaned = re.split(
-            r"\bsize(?:\s*\([^)]*\))?\b", cleaned, maxsplit=1, flags=re.I
-        )[0]
-        cleaned = _strip_color_value_code_pollution(cleaned)
-        cleaned = clean_text(cleaned)
-        if not cleaned or re.search(r"\d+\s*x\s*\d+", cleaned):
-            return None
-    elif field_name == "size":
-        cleaned = re.sub(r"^size\s*:\s*", "", cleaned, flags=re.I)
-        cleaned = re.split(r"\bview as list\b", cleaned, maxsplit=1, flags=re.I)[0]
-        cleaned = re.sub(r"\s*\(size[\s_-]*chart\)", "", cleaned, flags=re.I)
-        cleaned = clean_text(cleaned)
-        if re.search(r"\b(?:please\s+)?select(?:\s+size)?\b", cleaned, flags=re.I):
-            return None
-        if cleaned.strip().lower() in _SIZE_REJECT_TOKENS_NORMALIZED:
-            return None
-    elif field_name == WEIGHT_FIELD and re.fullmatch(r"\d+(?:\.\d+)?", cleaned):
-        return None
-    if is_null_text(cleaned):
-        return None
-    return cleaned or None
+    return clean_text(cleaned)
 
-
-def coerce_location(value: object) -> str | None:
-    if isinstance(value, dict):
-        address = value.get("address")
-        if isinstance(address, str):
-            address_text = text_or_none(address)
-            if address_text:
-                return address_text
-        if isinstance(address, dict):
-            joined_address = _join_text_parts(
-                [
-                    text_or_none(address.get("streetAddress")),
-                    text_or_none(address.get("addressLocality")),
-                    text_or_none(address.get("addressRegion")),
-                    text_or_none(address.get("postalCode")),
-                    text_or_none(address.get("addressCountry")),
-                ],
-                separator=", ",
-            )
-            if joined_address:
-                return joined_address
-        return _join_text_parts(
-            [
-                text_or_none(value.get("name")),
-                text_or_none(value.get("addressLocality")),
-                text_or_none(value.get("addressRegion")),
-                text_or_none(value.get("addressCountry")),
-            ],
-            separator=", ",
-        )
-    if isinstance(value, list):
-        return _join_text_parts(
-            [coerce_location(item) for item in value],
-            separator=" | ",
-        )
-    return coerce_text(value)
-
-
-def _salary_from_nested_value(
-    nested: dict[str, object],
-    *,
-    currency: str | None,
-) -> str | None:
-    minimum = text_or_none(nested.get("minValue"))
-    maximum = text_or_none(nested.get("maxValue"))
-    amount = text_or_none(nested.get("value"))
-    unit = text_or_none(nested.get("unitText"))
-    numbers = " - ".join(part for part in (minimum, maximum) if part)
-    if not numbers:
-        numbers = amount or ""
-    if not numbers:
-        return None
-    return " ".join(piece for piece in (currency, numbers, unit) if piece)
-
-
-def salary_from_json(value: object) -> str | None:
-    if isinstance(value, dict):
-        currency = text_or_none(
-            value.get("currency")
-            or value.get("salaryCurrency")
-            or value.get("currencyCode")
-        )
-        nested = value.get("value")
-        if isinstance(nested, dict):
-            nested_salary = _salary_from_nested_value(nested, currency=currency)
-            if nested_salary:
-                return nested_salary
-        text = coerce_text(value.get("value"))
-        if text:
-            return f"{currency} {text}".strip() if currency else text
-    return coerce_text(value)
-
-
-def coerce_product_attributes(value: object) -> dict[str, object] | None:
-    if not isinstance(value, dict):
-        return None
-    cleaned = _clean_product_attribute_dict(value)
-    return cleaned or None
-
-
-def _product_attribute_key_is_noise(value: object) -> bool:
-    normalized = normalize_field_key(str(value or ""))
-    return bool(normalized and normalized in _NOISY_PRODUCT_ATTRIBUTE_KEYS)
-
-
-def _product_attribute_row_is_noise(value: dict[str, object]) -> bool:
-    row_id = (
-        value.get("Id") or value.get("id") or value.get("name") or value.get("label")
-    )
-    return _product_attribute_key_is_noise(row_id)
-
-
-def _clean_product_attribute_value(value: object) -> object | None:
-    if value in (None, "", [], {}):
-        return None
-    if isinstance(value, dict):
-        if _product_attribute_row_is_noise(value):
-            return None
-        return _clean_product_attribute_dict(value)
-    if isinstance(value, list):
-        rows = [
-            cleaned
-            for item in value
-            if (cleaned := _clean_product_attribute_value(item))
-            not in (None, "", [], {})
-        ]
-        return rows or None
-    return value
-
-
-def _clean_product_attribute_dict(value: dict[str, object]) -> dict[str, object]:
-    cleaned: dict[str, object] = {}
-    for key, item in value.items():
-        if _product_attribute_key_is_noise(key):
-            continue
-        cleaned_value = _clean_product_attribute_value(item)
-        if cleaned_value not in (None, "", [], {}):
-            cleaned[str(key)] = cleaned_value
-    return cleaned
-
-
-def coerce_availability_dict(value: object) -> str | None:
-    if not isinstance(value, dict):
-        return None
-    explicit_keys = ("availability", "availabilityStatus", "status")
-    for key in explicit_keys:
-        candidate = value.get(key)
-        if candidate not in (None, "", [], {}):
-            return coerce_availability_value(candidate)
-    if len(value) == 1:
-        for key in ("name", "value"):
-            candidate = value.get(key)
-            if candidate not in (None, "", [], {}):
-                return coerce_availability_value(candidate)
-    return None
-
-
-def coerce_availability_value(value: object) -> str | None:
-    if isinstance(value, bool):
-        return "in_stock" if value else "out_of_stock"
-    text = coerce_text(value)
-    if text:
-        for phrase in tuple(CANDIDATE_AVAILABILITY_NOISE_PHRASES or ()):
-            if phrase.lower() in text.lower():
-                text = re.sub(re.escape(phrase), "", text, flags=re.I).strip()
-                if not text:
-                    return None
-    if not text:
-        return None
-    lowered = text.strip().lower().rstrip("/")
-    mapped = dict(AVAILABILITY_URL_MAP or {}).get(lowered)
-    if mapped:
-        return str(mapped)
-    # Drop non-canonical residual text so noisy values cannot leak through.
-    normalized_enum = lowered.replace("-", "_").replace(" ", "_")
-    if normalized_enum in _AVAILABILITY_CANONICAL_ENUM:
-        return normalized_enum
-    return None
-
-
-def coerce_rating_value(value: object) -> float | None:
-    text = coerce_text(value)
-    if not text:
-        return None
-    match = RATING_RE.search(text)
-    candidate = match.group(0) if match else text
-    try:
-        return float(candidate)
-    except (TypeError, ValueError):
-        return None
-
-
-def coerce_field_value(field_name: str, value: object, page_url: str) -> object | None:
-    if value in (None, "", [], {}):
-        return None
-    if field_name == "product_attributes":
-        return coerce_product_attributes(value)
-    if field_name in STRUCTURED_OBJECT_FIELDS and isinstance(value, dict):
-        return value
-    if field_name in STRUCTURED_OBJECT_LIST_FIELDS and isinstance(value, list):
-        dict_rows = [item for item in value if isinstance(item, dict)]
-        return dict_rows or None
-    if field_name == "location":
-        return coerce_location(value)
-    if field_name == "salary":
-        return salary_from_json(value)
-    if field_name in {"currency", "salary_currency"} and isinstance(value, str):
-        currency_code = extract_currency_code(value)
-        if currency_code:
-            return currency_code
-        text = coerce_text(value)
-        if text and re.fullmatch(r"[A-Za-z]{3}", text):
-            return text.upper()
-        return text
-    if field_name in BRAND_LIKE_FIELDS and isinstance(
-        value,
-        dict,
-    ):
-        explicit_value = value.get("name") or value.get("title") or value.get("value")
-        if explicit_value in (None, "", [], {}) and set(value.keys()) <= {
-            str(index) for index in range(len(value))
-        }:
-            explicit_value = list(value.values())[0] if value else None
-        return coerce_brand_text(explicit_value)
-    if field_name in BRAND_LIKE_FIELDS:
-        return coerce_brand_text(value)
-    if field_name == "category":
-        if isinstance(value, dict):
-            value = (
-                value.get("name")
-                or value.get("title")
-                or value.get("slug")
-                or value.get("value")
-                or value.get("en")
-            )
-        elif isinstance(value, str) and value.strip().startswith(("{", "[")):
-            value = coerce_structured_scalar(
-                value,
-                keys=("name", "title", "label", "value", "text", "en"),
-            )
-        category_text = coerce_text(value)
-        if category_text and category_value_is_url_path(category_text):
-            return None
-        return category_text
-    if field_name == "product_type":
-        return _coerce_product_type_clean(value)
-    if field_name == "product_id":
-        return coerce_identity_token_or_none(value)
-    if field_name == TITLE_FIELD:
-        return _coerce_title_text(value)
-    if field_name == "barcode":
-        return coerce_barcode(value)
-    if field_name == "sku":
-        return coerce_sku(value)
-    if field_name == "gender":
-        return coerce_gender(value)
-    if field_name in OPTION_SCALAR_FIELDS:
-        scalar_input: object = value
-        if field_name == "color" and isinstance(value, list):
-            # Filter out opaque internal swatch codes before picking the first
-            # candidate. Real human-readable colors elsewhere in the list
-            # should win over codes like "SMDB"/"OLGG".
-            filtered = [
-                item
-                for item in value
-                if not (isinstance(item, str) and _color_value_is_opaque_code(item))
-            ]
-            if filtered:
-                scalar_input = filtered
-        return _sanitize_option_scalar(
-            field_name,
-            coerce_structured_scalar(
-                scalar_input,
-                keys=(field_name, "name", "title", "label", "value", "text"),
-            ),
-        )
-    if field_name in _PRICE_FIELD_NAMES and isinstance(value, str):
-        text = coerce_text(value)
-        if text and not re.search(r"\d", text):
-            return None
-        if price_text_is_negative(text):
-            return None
-        return text or None
-    if (
-        field_name in _INTEGER_FIELD_NAMES
-        and isinstance(value, (int, float))
-        and not isinstance(value, bool)
-    ):
-        return int(value)
-    if field_name in _INTEGER_FIELD_NAMES and isinstance(value, str):
-        text = coerce_text(value)
-        if not text:
-            return None
-        normalized = text.replace(",", "").strip()
-        if not re.fullmatch(r"[-+]?\d+", normalized):
-            return None
-        try:
-            return int(normalized)
-        except (TypeError, ValueError):
-            return None
-    if field_name in {
-        "price",
-        "sale_price",
-        "original_price",
-        "discount_amount",
-    } and isinstance(value, dict):
-        return coerce_price_from_dict(value)
-    if field_name in {"currency", "salary_currency"} and isinstance(value, dict):
-        for key in ("currency", "currencyCode", "priceCurrency", "salaryCurrency"):
-            if value.get(key) not in (None, "", [], {}):
-                return coerce_text(value.get(key))
-        return None
-    if field_name == "rating" and isinstance(value, dict):
-        for key in ("ratingValue", "value", "rating", "score"):
-            if value.get(key) not in (None, "", [], {}):
-                return coerce_rating_value(value.get(key))
-        return None
-    if field_name == "review_count" and isinstance(value, dict):
-        for key in (
-            "reviewCount",
-            "ratingCount",
-            "count",
-            "totalCount",
-            "numberOfReviews",
-        ):
-            if value.get(key) not in (None, "", [], {}):
-                return coerce_text(value.get(key))
-        return None
-    if field_name == "availability" and isinstance(value, bool):
-        return "in_stock" if value else "out_of_stock"
-    if field_name == "availability" and isinstance(value, dict):
-        return coerce_availability_dict(value)
-    if field_name == "availability":
-        return coerce_availability_value(value)
-    if is_url_field(field_name):
-        return coerce_url_field_value(field_name, value, page_url)
-    if field_name in STRUCTURED_MULTI_FIELDS:
-        rows = _coerce_structured_multi_rows(field_name, value)
-        deduped: list[str] = []
-        seen: set[str] = set()
-        for row in rows:
-            lowered = row.lower()
-            if lowered in seen:
-                continue
-            seen.add(lowered)
-            deduped.append(row)
-        return deduped or None
-    if isinstance(value, list):
-        normalized_rows: list[object] = []
-        for item in value:
-            normalized_value = cast(
-                object, coerce_field_value(field_name, item, page_url)
-            )
-            if normalized_value in (None, "", [], {}):
-                continue
-            if isinstance(normalized_value, list):
-                normalized_rows.extend(normalized_value)
-            else:
-                normalized_rows.append(normalized_value)
-        return normalized_rows or None
-    if isinstance(value, (dict, set, frozenset)):
-        return None
-    if field_name in LONG_TEXT_FIELDS:
-        return coerce_long_text(value)
-    if field_name == "rating":
-        return coerce_rating_value(value)
-    return coerce_text(value)
-
-
-def _coerce_title_text(value: object) -> str | None:
-    is_structured_input = isinstance(value, dict) or (
-        isinstance(value, str)
-        and value.strip().startswith("{")
-        and value.strip().endswith("}")
-    )
-    if is_structured_input:
-        structured = coerce_structured_scalar(
-            value,
-            keys=TITLE_STRUCTURED_VALUE_KEYS,
-        )
-        if structured:
-            value = structured
-        else:
-            return None
-    return coerce_identity_token_or_none(value)
-
-
-def _coerce_product_type_clean(value: object) -> str | None:
-    if isinstance(value, dict):
-        value = coerce_structured_scalar(
-            value, keys=("name", "title", "label", "value", "text", "type")
-        )
-    text = coerce_text(value)
-    if not text:
-        return None
-    if text.lstrip().startswith(("{", "[")):
-        return None
-    folded = text.strip().lower()
-    if folded in identity_internal_tokens():
-        return None
-    if any(token in folded for token in _product_type_noise_tokens):
-        return None
-    return text
-
-
-def finalize_record(
-    record: dict[str, Any],
-    *,
-    normalize_fields: bool = True,
-    surface: str | None = None,
-) -> dict[str, Any]:
-    cleaned = clean_record(record)
-    cleaned = strip_record_tracking_params(cleaned, surface=surface)
-    return normalize_record_fields(cleaned) if normalize_fields else cleaned
-
-
-decimal_for_shared_price = _decimal_for_shared_price
+from . import field_coerce_values as _split_owner
+globals().update({
+    name: value
+    for name, value in vars(_split_owner).items()
+    if not name.startswith("__") and name != "_owner"
+})
