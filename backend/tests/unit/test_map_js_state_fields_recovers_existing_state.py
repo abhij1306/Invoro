@@ -21,6 +21,21 @@ def test_variant_option_values_reads_attribute_mapping() -> None:
 
 
 @pytest.mark.unit
+def test_variant_option_values_merges_partial_sources_and_ignores_private_axes() -> (
+    None
+):
+    assert variant_option_values(
+        {
+            "variation_values": {"size": "M"},
+            "attributes": {"brand": "Nike"},
+            "option1": "Blue",
+            "size": "L",
+        },
+        option_names=["Color"],
+    ) == {"size": "M", "color": "Blue"}
+
+
+@pytest.mark.unit
 def test_map_js_state_to_fields_recovers_existing_state_product_fields() -> None:
     js_state_objects = {
         "__INITIAL_STATE__": {

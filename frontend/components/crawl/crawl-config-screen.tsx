@@ -159,10 +159,6 @@ export function CrawlConfigScreen({
       ? `${normalizedTargetDomain}|${effectiveSurface}`
       : '';
   const diagnosticsPreset = diagnosticsPresetForProfile(runProfile);
-  const setLifecycleTargetUrl = useCallback(
-    (value: string) => setValue('targetUrl', value),
-    [setValue],
-  );
   const setLifecycleBulkUrls = useCallback(
     (value: string) => setValue('bulkUrls', value),
     [setValue],
@@ -176,7 +172,6 @@ export function CrawlConfigScreen({
     bulkPrefillRouteSyncGuardRef,
     dispatchRoute,
     localDispatch,
-    setTargetUrl: setLifecycleTargetUrl,
     setBulkUrls: setLifecycleBulkUrls,
     setFieldRows,
   });

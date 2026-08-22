@@ -71,10 +71,12 @@ def normalize_brand(value: object) -> str:
     normalized = re.sub(r"[^a-z0-9]+", " ", text).strip()
     return BRAND_ALIAS_MAP.get(normalized, normalized)
 
+
 def is_private_label(brand: object) -> bool:
     return normalize_brand(brand) in PRIVATE_LABEL_BRANDS or is_belk_exclusive_brand(
         brand
     )
+
 
 def source_domain(url: object) -> str:
     try:
@@ -82,6 +84,7 @@ def source_domain(url: object) -> str:
     except ValueError:
         return ""
     return host.removeprefix("www.").lower()
+
 
 def extract_product_snapshot(record: object) -> dict[str, object]:
     data = dict(record or {}) if isinstance(record, dict) else {}
@@ -120,6 +123,7 @@ def extract_product_snapshot(record: object) -> dict[str, object]:
         "raw": data,
     }
 
+
 def _product_identity_fields(data: dict[str, object]) -> dict[str, str]:
     return {
         "sku": str(_first_present(data, SOURCE_SKU_FIELDS) or "").strip(),
@@ -127,6 +131,7 @@ def _product_identity_fields(data: dict[str, object]) -> dict[str, str]:
         "gtin": str(_first_present(data, SOURCE_GTIN_FIELDS) or "").strip(),
         "mpn": str(_first_present(data, SOURCE_MPN_FIELDS) or "").strip(),
     }
+
 
 def score_candidate(
     *,
@@ -193,6 +198,7 @@ def score_candidate(
         "reasons": reasons,
     }
 
+
 def _resolved_candidate_brand(
     source: dict[str, object],
     candidate: dict[str, object],
@@ -206,6 +212,7 @@ def _resolved_candidate_brand(
         and _candidate_mentions_source_brand(source, candidate)
     )
     return (source_brand if from_evidence else candidate_brand), from_evidence
+
 
 def _authority_bonus(source_type: str) -> float:
     bonus = float(SOURCE_TYPE_AUTHORITY_BONUS.get(str(source_type or ""), 0.0))

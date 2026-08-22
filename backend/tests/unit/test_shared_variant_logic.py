@@ -42,6 +42,9 @@ from app.services.extract.detail.variants.dom_extraction import (
     backfill_variants_from_dom_if_missing,
     extract_variants_from_dom,
 )
+from app.services.extract.detail.variants.dom_merge import (
+    expand_existing_variants_with_dom_axes,
+)
 
 variant_choice_container_for_input = (
     variant_choice_traversal._variant_choice_container_for_input
@@ -50,6 +53,36 @@ variant_choice_container_for_input = (
 variant_choice_container_is_overbroad = (
     variant_choice_traversal._variant_choice_container_is_overbroad
 )
+
+
+@pytest.mark.unit
+def test_dom_axis_expansion_preserves_identity_only_for_one_to_one_rows() -> None:
+    existing = [
+        {
+            "sku": "sku-m",
+            "variant_id": "variant-m",
+            "barcode": "12345678",
+            "size": "M",
+            "price": "10.00",
+        }
+    ]
+
+    one_to_one = expand_existing_variants_with_dom_axes(
+        existing,
+        [{"color": "Blue"}],
+    )
+    one_to_many = expand_existing_variants_with_dom_axes(
+        existing,
+        [{"color": "Blue"}, {"color": "Red"}],
+    )
+
+    assert one_to_one[0]["sku"] == "sku-m"
+    assert one_to_one[0]["variant_id"] == "variant-m"
+    assert one_to_one[0]["barcode"] == "12345678"
+    assert all("sku" not in row for row in one_to_many)
+    assert all("variant_id" not in row for row in one_to_many)
+    assert all("barcode" not in row for row in one_to_many)
+    assert all(row["price"] == "10.00" for row in one_to_many)
 
 
 def _next_f_script(fragment: str) -> str:

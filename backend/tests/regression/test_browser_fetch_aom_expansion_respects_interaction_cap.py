@@ -88,6 +88,21 @@ def test_listing_override_requires_minimum_matching_cards(patch_settings) -> Non
             listing_card_count=0,
             matched_listing_selectors=3,
         )
+        is False
+    )
+    assert (
+        browser_readiness._readiness_decision(
+            is_detail=False,
+            is_listing=True,
+            visible_text_length=1000,
+            structured_data_present=True,
+            detail_like=False,
+            h1_present=False,
+            detail_hints=0,
+            detail_title_matches_url=False,
+            listing_card_count=3,
+            matched_listing_selectors=0,
+        )
         is True
     )
 

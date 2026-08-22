@@ -280,9 +280,7 @@ def _readiness_decision(
 ) -> bool:
     min_visible_text = int(crawler_runtime_settings.browser_readiness_visible_text_min)
     if is_listing:
-        return max(listing_card_count, matched_listing_selectors) >= int(
-            crawler_runtime_settings.listing_min_items
-        )
+        return listing_card_count >= int(crawler_runtime_settings.listing_min_items)
     if not is_detail:
         return visible_text_length >= min_visible_text
     enough_text = visible_text_length >= min_visible_text

@@ -693,7 +693,7 @@ async def _process_run_with_span(
         await session.commit()
 
         verdicts: list[str] = []
-        record_count = as_int(run.get_summary("record_count", 0))
+        record_count: int
 
         try:
             if (

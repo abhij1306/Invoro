@@ -5,6 +5,7 @@ from typing import Any
 from app.services.config.js_state_field_specs import VARIANT_AXIS_KEYS
 from app.services.extract.variant_axis import (
     normalized_variant_axis_key,
+    public_variant_axis_fields,
     variant_axis_name_is_semantic,
 )
 from app.services.shared.field_coerce import (
@@ -83,15 +84,16 @@ def variant_option_values(
     option_names: list[str],
     option_value_labels: dict[str, dict[str, str]] | None = None,
 ) -> dict[str, str]:
-    named_axis = _name_value_axis(variant, option_value_labels=option_value_labels)
-    if named_axis:
-        return named_axis
-    option_values = _selected_option_values(variant, option_value_labels)
-    if option_values:
-        return option_values
-    variation_values = _variation_option_values(variant, option_value_labels)
-    if variation_values:
-        return variation_values
+    option_values: dict[str, str] = {}
+    value_sources = (
+        _name_value_axis(variant, option_value_labels=option_value_labels),
+        _selected_option_values(variant, option_value_labels),
+        _variation_option_values(variant, option_value_labels),
+    )
+    for values in value_sources:
+        for axis_key, value in values.items():
+            if axis_key in public_variant_axis_fields:
+                option_values.setdefault(axis_key, value)
     for field_name in ("attributes", "traits"):
         values = variant.get(field_name)
         if isinstance(values, dict):
@@ -99,13 +101,18 @@ def variant_option_values(
                 values,
                 option_value_labels=option_value_labels,
             )
-            if mapped_values:
-                return mapped_values
-    option_values = _size_chart_option_values(variant, option_value_labels)
-    if option_values:
-        return option_values
-    option_values = _indexed_option_values(variant, option_names, option_value_labels)
-    return option_values or _direct_axis_option_values(variant, option_value_labels)
+            for axis_key, value in mapped_values.items():
+                if axis_key in public_variant_axis_fields:
+                    option_values.setdefault(axis_key, value)
+    for values in (
+        _size_chart_option_values(variant, option_value_labels),
+        _indexed_option_values(variant, option_names, option_value_labels),
+        _direct_axis_option_values(variant, option_value_labels),
+    ):
+        for axis_key, value in values.items():
+            if axis_key in public_variant_axis_fields:
+                option_values.setdefault(axis_key, value)
+    return option_values
 
 
 def _selected_option_values(

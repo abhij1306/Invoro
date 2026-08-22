@@ -41,7 +41,6 @@ type Options = {
   bulkPrefillRouteSyncGuardRef: { current: boolean };
   dispatchRoute: Dispatch<CrawlRouteAction>;
   localDispatch: LocalDispatch;
-  setTargetUrl: (value: string) => void;
   setBulkUrls: (value: string) => void;
   setFieldRows: Dispatch<SetStateAction<FieldRow[]>>;
 };
@@ -56,7 +55,6 @@ export function useCrawlConfigLifecycle(options: Options) {
     bulkPrefillRouteSyncGuardRef,
     dispatchRoute,
     localDispatch,
-    setTargetUrl,
     setBulkUrls,
     setFieldRows,
   } = options;
