@@ -13,6 +13,10 @@ def test_variant_option_values_reads_attribute_mapping() -> None:
         {"attributes": {"Color": "Blue"}},
         option_names=[],
     ) == {"color": "Blue"}
+    assert variant_option_values(
+        {"attributes": {}, "traits": {"Size": "M"}},
+        option_names=[],
+    ) == {"size": "M"}
 
 @pytest.mark.unit
 def test_map_js_state_to_fields_recovers_existing_state_product_fields() -> None:
