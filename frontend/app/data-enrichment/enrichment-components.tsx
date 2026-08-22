@@ -1,8 +1,6 @@
 'use client';
 
 import { Loader2 } from 'lucide-react';
-import React from 'react';
-
 import { Badge } from '../../components/ui/primitives';
 
 export function EnrichmentStatus({

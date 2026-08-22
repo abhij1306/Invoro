@@ -33,8 +33,8 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("APP_ENV", "app_env"),
     )
     backend_host: str = "127.0.0.1"
-    backend_port: int = 8000
-    frontend_url: str = "http://127.0.0.1:3000"
+    backend_port: int = 9000
+    frontend_url: str = "http://127.0.0.1:4000"
     frontend_origins: str = ""
     jwt_secret_key: str = Field(
         validation_alias=AliasChoices("JWT_SECRET_KEY", "jwt_secret_key"),
@@ -44,7 +44,7 @@ class Settings(BaseSettings):
     encryption_key: str = Field(
         validation_alias=AliasChoices("ENCRYPTION_KEY", "encryption_key"),
     )
-    database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/crawl_db"
+    database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/invoro"
     redis_url: str = "redis://localhost:6379/0"
     redis_state_enabled: bool = False
     celery_dispatch_enabled: bool = True
@@ -82,6 +82,7 @@ class Settings(BaseSettings):
     crawl_log_file_enabled: bool = True
     crawl_log_file_dir: Path = Field(default=BASE_DIR / "artifacts" / "run_logs")
     logfire_enabled: bool = False
+    logfire_base_url: str = "https://logfire-us.pydantic.dev"
     logfire_token: str = Field(
         default="",
         validation_alias=AliasChoices("LOGFIRE_TOKEN", "logfire_token"),

@@ -1,8 +1,9 @@
 # Active Plan
 
-**Current:** None
-**Status:** COMPLETE
-**Last completed:** Productionization 07 — Absolute Quality Gates (2026-08-22)
+**Current:** Crawl Reliability, Logout, and Warmup Removal → `docs/plans/crawl-auth-warmup-reliability-plan.md`
+**Status:** IN PROGRESS
+**Started:** 2026-08-22
+**Last slice completed:** Slice 3 — Remove origin warmup
 
 ## Queue
 

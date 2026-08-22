@@ -1,7 +1,7 @@
 'use client';
 
 import { History, X } from 'lucide-react';
-import React, { useEffect, useEffectEvent } from 'react';
+import { useEffect, useEffectEvent } from 'react';
 
 import { cn } from '../../lib/utils';
 import { Badge } from './badge';

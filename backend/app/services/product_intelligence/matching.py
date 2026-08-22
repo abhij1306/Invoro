@@ -61,9 +61,11 @@ from app.services.config.product_intelligence import (
 from app.services.product_intelligence.brand_registry import (
     infer_belk_brand,
     infer_belk_brand_prefix,
-    is_private_label as is_private_label,
+    is_private_label as _is_private_label,
     normalize_brand,
 )
+
+is_private_label = _is_private_label
 
 
 def source_domain(url: object) -> str:

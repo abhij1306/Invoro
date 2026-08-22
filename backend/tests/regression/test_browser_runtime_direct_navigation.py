@@ -1,326 +1,37 @@
 from __future__ import annotations
 
-from .test_browser_expansion_runtime import CARD_SELECTORS, PlaywrightError, PlaywrightTimeoutError, TraversalResult, _FakeExpansionPage, _FakeRuntime, _async_checkpoint, asynccontextmanager, asyncio, browser_pool, browser_runtime, cookie_store, pytest  # fmt: skip
-from app.services.acquisition import browser_origin_warmup
+from .test_browser_expansion_runtime import CARD_SELECTORS, PlaywrightError, PlaywrightTimeoutError, TraversalResult, _FakeExpansionPage, _FakeRuntime, _async_checkpoint, asynccontextmanager, asyncio, browser_pool, browser_runtime, pytest  # fmt: skip
 
 pytest_plugins = ["tests.regression.test_browser_expansion_runtime"]
 
 
 @pytest.mark.asyncio
 @pytest.mark.regression
-async def test_origin_warmup_skips_recovery_after_budget_is_consumed(
-    monkeypatch: pytest.MonkeyPatch,
+@pytest.mark.parametrize("browser_engine", ["patchright", "real_chrome"])
+async def test_browser_fetch_navigates_directly_to_target(
+    browser_engine: str,
 ) -> None:
-    class _Page:
-        async def goto(self, *args, **kwargs):
-            del args, kwargs
-            return object()
-
-    async def _unexpected_recovery(*args, **kwargs):
-        del args, kwargs
-        raise AssertionError("challenge recovery must not exceed warmup budget")
-
-    monkeypatch.setattr(browser_origin_warmup, "elapsed_ms", lambda _started: 1000)
-    monkeypatch.setattr(
-        browser_origin_warmup, "recover_browser_challenge", _unexpected_recovery
+    target_url = "https://example.com/products/widget"
+    page = _FakeExpansionPage(
+        base_html="<html><body><h1>Widget</h1><p>Product detail content</p></body></html>"
     )
-
-    timings = await browser_origin_warmup._navigate_warmup_page(
-        _Page(),
-        warm_url="https://example.com/",
-        browser_engine="chromium",
-        warm_budget_ms=1000,
-        started_at=0,
-    )
-
-    assert timings == {}
-
-
-@pytest.mark.asyncio
-@pytest.mark.regression
-async def test_origin_warmup_skips_for_rotating_proxy_profile() -> None:
-    page = _FakeExpansionPage(base_html="<html><body><h1>Widget</h1></body></html>")
-
-    await browser_runtime._maybe_warm_origin_before_navigation(
-        page,
-        url="https://example.com/products/widget",
-        surface="ecommerce_detail",
-        browser_reason="http-escalation",
-        host_policy_snapshot=None,
-        proxy_profile={"rotation": "rotating"},
-        timeout_seconds=5,
-        phase_timings_ms={},
-    )
-
-    assert page.goto_calls == []
-    assert not page.spawned_pages
-
-
-@pytest.mark.asyncio
-@pytest.mark.regression
-async def test_origin_warmup_runs_for_real_chrome_without_saved_domain_state() -> None:
-    page = _FakeExpansionPage(base_html="<html><body><h1>Widget</h1></body></html>")
-
-    await browser_runtime._maybe_warm_origin_before_navigation(
-        page,
-        url="https://example.com/products/widget",
-        surface="ecommerce_detail",
-        browser_engine="real_chrome",
-        browser_reason="http-escalation",
-        host_policy_snapshot=None,
-        proxy_profile=None,
-        timeout_seconds=5,
-        phase_timings_ms={},
-    )
-
-    assert page.goto_calls == ["domcontentloaded"]
-    assert not page.spawned_pages
-
-
-@pytest.mark.asyncio
-@pytest.mark.regression
-async def test_origin_warmup_caps_budget_to_preserve_navigation_time(
-    patch_settings,
-) -> None:
-    patch_settings(
-        origin_warmup_max_budget_ratio=0.4,
-        browser_navigation_domcontentloaded_timeout_ms=15000,
-    )
-    page = _FakeExpansionPage(base_html="<html><body><h1>Widget</h1></body></html>")
-
-    await browser_runtime._maybe_warm_origin_before_navigation(
-        page,
-        url="https://example.com/products/widget",
-        surface="ecommerce_detail",
-        browser_engine="real_chrome",
-        browser_reason="vendor-block:akamai",
-        host_policy_snapshot=None,
-        proxy_profile=None,
-        timeout_seconds=20,
-        phase_timings_ms={},
-    )
-
-    assert page.goto_timeout_calls == [8000]
-    assert not page.spawned_pages
-
-
-@pytest.mark.asyncio
-@pytest.mark.regression
-async def test_origin_warmup_keeps_minimum_budget_for_short_url_timeout(
-    patch_settings,
-) -> None:
-    patch_settings(
-        origin_warmup_max_budget_ratio=0.4,
-        browser_navigation_domcontentloaded_timeout_ms=15000,
-    )
-    page = _FakeExpansionPage(base_html="<html><body><h1>Widget</h1></body></html>")
-
-    await browser_runtime._maybe_warm_origin_before_navigation(
-        page,
-        url="https://example.com/products/widget",
-        surface="ecommerce_detail",
-        browser_engine="real_chrome",
-        browser_reason="http-escalation",
-        host_policy_snapshot=None,
-        proxy_profile=None,
-        timeout_seconds=1,
-        phase_timings_ms={},
-    )
-
-    assert page.goto_timeout_calls == [750]
-    assert not page.spawned_pages
-
-
-@pytest.mark.asyncio
-@pytest.mark.regression
-async def test_origin_warmup_zero_ratio_preserves_minimum_budget(
-    patch_settings,
-) -> None:
-    patch_settings(
-        origin_warmup_max_budget_ratio=0,
-        browser_navigation_domcontentloaded_timeout_ms=15000,
-    )
-    page = _FakeExpansionPage(base_html="<html><body><h1>Widget</h1></body></html>")
-
-    await browser_runtime._maybe_warm_origin_before_navigation(
-        page,
-        url="https://example.com/products/widget",
-        surface="ecommerce_detail",
-        browser_engine="real_chrome",
-        browser_reason="http-escalation",
-        host_policy_snapshot=None,
-        proxy_profile=None,
-        timeout_seconds=10,
-        phase_timings_ms={},
-    )
-
-    assert page.goto_timeout_calls == [750]
-    assert not page.spawned_pages
-
-
-@pytest.mark.asyncio
-@pytest.mark.regression
-async def test_origin_warmup_skips_for_real_chrome_with_saved_domain_state() -> None:
-    page = _FakeExpansionPage(base_html="<html><body><h1>Widget</h1></body></html>")
-
-    await browser_runtime._maybe_warm_origin_before_navigation(
-        page,
-        url="https://example.com/products/widget",
-        surface="ecommerce_detail",
-        browser_engine="real_chrome",
-        browser_reason="http-escalation",
-        host_policy_snapshot=None,
-        proxy_profile=None,
-        skip_for_reusable_domain_state=True,
-        timeout_seconds=5,
-        phase_timings_ms={},
-    )
-
-    assert not page.spawned_pages
-
-
-@pytest.mark.asyncio
-@pytest.mark.regression
-async def test_origin_warmup_skips_for_known_vendor_block_memory() -> None:
-    page = _FakeExpansionPage(base_html="<html><body><h1>Widget</h1></body></html>")
-
-    await browser_runtime._maybe_warm_origin_before_navigation(
-        page,
-        url="https://example.com/products/widget",
-        surface="ecommerce_detail",
-        browser_reason="host-preference",
-        host_policy_snapshot={"prefer_browser": True, "last_block_vendor": "datadome"},
-        proxy_profile=None,
-        timeout_seconds=5,
-        phase_timings_ms={},
-    )
-
-    assert page.goto_calls == []
-    assert not page.spawned_pages
-
-
-@pytest.mark.asyncio
-@pytest.mark.regression
-async def test_origin_warmup_runs_for_real_chrome_despite_vendor_block_memory() -> None:
-    page = _FakeExpansionPage(base_html="<html><body><h1>Widget</h1></body></html>")
-
-    await browser_runtime._maybe_warm_origin_before_navigation(
-        page,
-        url="https://example.com/products/widget",
-        surface="ecommerce_detail",
-        browser_engine="real_chrome",
-        browser_reason="vendor-block:datadome",
-        host_policy_snapshot={"prefer_browser": True, "last_block_vendor": "datadome"},
-        proxy_profile=None,
-        timeout_seconds=5,
-        phase_timings_ms={},
-    )
-
-    assert page.goto_calls == ["domcontentloaded"]
-    assert not page.spawned_pages
-
-
-@pytest.mark.asyncio
-@pytest.mark.regression
-async def test_origin_warmup_dedupes_parallel_same_host() -> None:
-    pages = [
-        _FakeExpansionPage(base_html="<html><body><h1>Widget</h1></body></html>")
-        for _index in range(6)
-    ]
-
-    await asyncio.gather(
-        *(
-            browser_runtime._maybe_warm_origin_before_navigation(
-                page,
-                url="https://example.com/products/widget",
-                surface="ecommerce_detail",
-                browser_reason="http-escalation",
-                host_policy_snapshot=None,
-                proxy_profile=None,
-                timeout_seconds=5,
-                phase_timings_ms={},
-            )
-            for page in pages
-        )
-    )
-
-    assert sum(len(page.spawned_pages) for page in pages) == 1
-
-
-@pytest.mark.asyncio
-@pytest.mark.regression
-async def test_origin_warmup_dedupes_recent_same_host_waves_by_default() -> None:
-    pages = [
-        _FakeExpansionPage(base_html="<html><body><h1>Widget</h1></body></html>")
-        for _index in range(3)
-    ]
-
-    for page in pages:
-        await browser_runtime._maybe_warm_origin_before_navigation(
-            page,
-            url="https://example.com/products/widget",
-            surface="ecommerce_detail",
-            browser_reason="http-escalation",
-            host_policy_snapshot=None,
-            proxy_profile=None,
-            timeout_seconds=5,
-            phase_timings_ms={},
-        )
-
-    assert sum(len(page.spawned_pages) for page in pages) == 1
-
-
-@pytest.mark.asyncio
-@pytest.mark.regression
-async def test_browser_fetch_skips_real_chrome_warmup_when_domain_cookies_exist(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    page = _FakeExpansionPage(base_html="<html><body><h1>Widget</h1></body></html>")
-    captured_skip_flags: list[bool] = []
 
     async def _fake_runtime(**_kwargs):
         await _async_checkpoint()
         return _FakeRuntime(page)
 
-    async def _fake_load_storage_state_for_domain(*_args, **_kwargs):
-        await _async_checkpoint()
-        return {
-            "cookies": [
-                {
-                    "name": "session",
-                    "value": "abc",
-                    "domain": ".example.com",
-                    "path": "/",
-                }
-            ],
-            "origins": [],
-        }
-
-    async def _fake_warm_origin(*_args, **kwargs):
-        await _async_checkpoint()
-        captured_skip_flags.append(bool(kwargs.get("skip_for_reusable_domain_state")))
-
-    monkeypatch.setattr(
-        cookie_store,
-        "load_storage_state_for_domain",
-        _fake_load_storage_state_for_domain,
-    )
-    monkeypatch.setattr(
-        browser_runtime,
-        "_maybe_warm_origin_before_navigation",
-        _fake_warm_origin,
-    )
-
-    await browser_runtime.browser_fetch(
-        "https://example.com/products/widget",
+    result = await browser_runtime.browser_fetch(
+        target_url,
         5,
         surface="ecommerce_detail",
-        browser_engine="real_chrome",
+        browser_engine=browser_engine,
         browser_reason="http-escalation",
         runtime_provider=_fake_runtime,
     )
 
-    assert captured_skip_flags == [True]
+    assert result.status_code == 200
+    assert page.goto_url_calls == [target_url]
+    assert not page.spawned_pages
 
 
 @pytest.mark.regression

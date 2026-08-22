@@ -145,7 +145,7 @@ async def _handle_message(
         if method == "initialize":
             result = {
                 "protocolVersion": "2024-11-05",
-                "serverInfo": {"name": "crawlerai", "version": "0.1.0"},
+                "serverInfo": {"name": "invoro", "version": "0.1.0"},
             }
         elif method == "tools/list":
             result = {"tools": server.tools()}

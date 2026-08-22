@@ -32,7 +32,6 @@ from app.services.acquisition.browser_diagnostics import (
 from app.services.acquisition.browser_storage_state import (
     mark_storage_state_persist_policy,
 )
-from app.services.acquisition import browser_origin_warmup as _origin_warmup
 from app.services.acquisition.browser_page_flow import (
     append_readiness_probe,
     navigate_browser_page_impl,
@@ -94,7 +93,7 @@ from app.services.acquisition.traversal import (
 from app.services.acquisition.traversal_recovery import recover_listing_page_content
 from app.services.config.browser_fingerprint_profiles import (
     BEHAVIOR_REALISM_ELIGIBLE_BROWSER_REASONS,
-    WARMUP_VENDOR_BLOCK_PREFIX,
+    VENDOR_BLOCK_REASON_PREFIX,
 )
 from app.services.config.runtime_settings import (
     # Public compatibility exports for callers that still import these via __all__.
@@ -108,11 +107,6 @@ from app.services.config.runtime_settings import (
 from app.services.domain_utils import normalize_domain
 
 logger = logging.getLogger(__name__)
-
-_maybe_warm_origin_before_navigation = (
-    _origin_warmup.maybe_warm_origin_before_navigation
-)
-
 
 get_browser_runtime = _get_browser_runtime_impl
 shutdown_browser_runtime = _shutdown_browser_runtime_impl
@@ -140,7 +134,7 @@ def _should_run_behavior_realism(engine: str, *, browser_reason: str | None) -> 
     if not reason:
         return False
     return reason in BEHAVIOR_REALISM_ELIGIBLE_BROWSER_REASONS or reason.startswith(
-        WARMUP_VENDOR_BLOCK_PREFIX
+        VENDOR_BLOCK_REASON_PREFIX
     )
 
 
@@ -185,11 +179,6 @@ def _proxy_requires_fresh_browser_state(
     proxy_profile: dict[str, object] | None,
 ) -> bool:
     return proxy_rotation_mode(proxy_profile) == "rotating"
-
-
-def _surface_supports_origin_warmup(surface: str) -> bool:
-    normalized_surface = _normalize_surface(surface)
-    return "detail" in normalized_surface
 
 
 def _browser_proxy_mode(
@@ -312,7 +301,6 @@ async def browser_fetch(
         proxied_page_factory=proxied_page_factory,
     )
     runtime_bridge_used = browser_proxy_mode == "page"
-    skip_origin_warmup = False
     runtime: SharedBrowserRuntime | None = None
     payload_capture = None
     popup_guard_registrations: list[tuple[Any, str, Any]] = []
@@ -340,14 +328,10 @@ async def browser_fetch(
                 runtime_engine,
                 runtime_binary,
                 launch_bridge_used,
-                skip_origin_warmup,
             ) = await _prepare_browser_fetch_launch_context(
                 runtime=runtime,
                 normalized_engine=normalized_engine,
-                normalized_domain=normalized_domain,
-                allow_storage_state=allow_storage_state,
                 proxy=proxy,
-                resolved_proxy_rotation_mode=resolved_proxy_rotation_mode,
                 on_event=on_event,
                 emit_browser_event=_emit_browser_event,
             )
@@ -375,19 +359,6 @@ async def browser_fetch(
                 )
                 if pre_nav_pause_ms > 0 and normalized_surface.startswith("ecommerce_"):
                     await page.wait_for_timeout(pre_nav_pause_ms)
-                await _maybe_warm_origin_before_navigation(
-                    page,
-                    url=url,
-                    surface=normalized_surface,
-                    browser_engine=runtime_engine,
-                    browser_reason=browser_reason,
-                    host_policy_snapshot=host_policy_snapshot,
-                    proxy=proxy,
-                    proxy_profile=proxy_profile,
-                    skip_for_reusable_domain_state=skip_origin_warmup,
-                    timeout_seconds=_remaining(),
-                    phase_timings_ms=phase_timings_ms,
-                )
                 popup_guard_registrations = _install_popup_guard(
                     page, on_event=on_event
                 )

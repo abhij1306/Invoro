@@ -459,12 +459,12 @@ async def test_public_alert_list_uses_api_key_envelope(
     db_session,
     test_user,
 ) -> None:
-    raw_key = "crawlerai_test_key"
+    raw_key = "invoro_test_key"
     db_session.add(
         ApiKey(
             user_id=test_user.id,
             name="test",
-            key_prefix="crawlerai",
+            key_prefix="invoro",
             key_hash=hash_api_key(raw_key),
             is_active=True,
         )
@@ -512,12 +512,12 @@ async def test_public_alert_create_uses_public_api_contract(
     test_user,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    raw_key = "crawlerai_create_alert_key"
+    raw_key = "invoro_create_alert_key"
     db_session.add(
         ApiKey(
             user_id=test_user.id,
             name="test",
-            key_prefix="crawlerai",
+            key_prefix="invoro",
             key_hash=hash_api_key(raw_key),
             is_active=True,
         )

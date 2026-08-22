@@ -7,7 +7,6 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   DataRegionEmpty,
   DataRegionLoading,
-  InlineAlert,
   SurfacePanel,
   TableSurface,
 } from '../../components/ui/patterns';

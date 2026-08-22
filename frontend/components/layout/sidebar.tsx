@@ -1,8 +1,9 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Route } from 'next';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import type { ComponentType } from 'react';
 import {
@@ -16,6 +17,7 @@ import {
   FileChartColumn,
   FolderKanban,
   Grid2x2,
+  LogOut,
   Radar,
   SearchCheck,
   Settings2,
@@ -23,10 +25,12 @@ import {
   WandSparkles,
 } from 'lucide-react';
 
-import { monitorsApi } from '../../lib/api';
+import { api, monitorsApi } from '../../lib/api';
+import type { User } from '../../lib/api/types';
 import { STORAGE_KEYS } from '../../lib/constants/storage-keys';
 import { cn } from '../../lib/utils';
 import { ThemeToggle } from '../ui/theme-toggle';
+import { InlineAlert } from '../ui/alert';
 import { LogoMark } from './logo-mark';
 
 const navGroups = [
@@ -89,7 +93,9 @@ function isNavItemActive(pathname: string, item: (typeof navGroups)[number]['ite
   return pathname === item.href || pathname.startsWith(`${item.href}/`);
 }
 
-export function Sidebar({ pathname }: Readonly<{ pathname: string }>) {
+export function Sidebar({ pathname, user }: Readonly<{ pathname: string; user: User }>) {
+  const router = useRouter();
+  const queryClient = useQueryClient();
   const [collapsed, setCollapsed] = useState(false);
   const [sidebarReady, setSidebarReady] = useState(false);
   const [monitorLastVisit, setMonitorLastVisit] = useState('');
@@ -127,6 +133,14 @@ export function Sidebar({ pathname }: Readonly<{ pathname: string }>) {
       return new Date(monitor.updated_at).getTime() > new Date(monitorLastVisit).getTime();
     }),
   );
+  const logoutMutation = useMutation({
+    mutationFn: () => api.logout(),
+    onSuccess: () => {
+      queryClient.clear();
+      router.replace('/login');
+      router.refresh();
+    },
+  });
 
   return (
     <aside className={cn('app-sidebar', collapsed && 'is-collapsed')}>
@@ -182,17 +196,64 @@ export function Sidebar({ pathname }: Readonly<{ pathname: string }>) {
         ))}
       </nav>
 
-      {!collapsed ? (
-        <div className="app-sidebar-footer">
-          <div className="app-sidebar-footer-row">
-            <div>
-              <div className="app-sidebar-footer-title">Display</div>
-              <div className="app-sidebar-footer-subtitle">Theme preference</div>
+      <div className="app-sidebar-footer">
+        {!collapsed ? (
+          <>
+            <div className="app-sidebar-footer-row">
+              <div className="min-w-0">
+                <div className="app-sidebar-footer-title truncate">{user.email}</div>
+                <div className="app-sidebar-footer-subtitle capitalize">{user.role}</div>
+              </div>
+              <button
+                type="button"
+                className="app-icon-button"
+                onClick={() => logoutMutation.mutate()}
+                disabled={logoutMutation.isPending}
+                aria-label="Log out"
+                title="Log out"
+              >
+                <LogOut className="size-3.5" />
+              </button>
             </div>
-            <ThemeToggle compact />
-          </div>
-        </div>
-      ) : null}
+            <div className="app-sidebar-footer-row">
+              <div>
+                <div className="app-sidebar-footer-title">Display</div>
+                <div className="app-sidebar-footer-subtitle">Theme preference</div>
+              </div>
+              <ThemeToggle compact />
+            </div>
+          </>
+        ) : (
+          <button
+            type="button"
+            className="app-icon-button mx-auto"
+            onClick={() => logoutMutation.mutate()}
+            disabled={logoutMutation.isPending}
+            aria-label="Log out"
+            title={`Log out ${user.email}`}
+          >
+            <LogOut className="size-3.5" />
+          </button>
+        )}
+        {logoutMutation.isError ? (
+          <InlineAlert
+            className="mt-2"
+            tone="danger"
+            message={
+              <div className="flex items-center justify-between gap-2">
+                <span>Could not log out.</span>
+                <button
+                  type="button"
+                  className="font-medium underline"
+                  onClick={() => logoutMutation.mutate()}
+                >
+                  Retry
+                </button>
+              </div>
+            }
+          />
+        ) : null}
+      </div>
     </aside>
   );
 }

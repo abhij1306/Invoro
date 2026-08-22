@@ -219,10 +219,6 @@ def _merge_run_acquisition_metrics(
         + as_int(url_metrics.get("browser_decision_ms", 0)),
         "browser_launch_ms_total": as_int(current.get("browser_launch_ms_total", 0))
         + as_int(url_metrics.get("browser_launch_ms", 0)),
-        "browser_origin_warm_ms_total": as_int(
-            current.get("browser_origin_warm_ms_total", 0)
-        )
-        + as_int(url_metrics.get("browser_origin_warm_ms", 0)),
         "browser_navigation_ms_total": as_int(
             current.get("browser_navigation_ms_total", 0)
         )

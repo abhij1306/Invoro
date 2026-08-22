@@ -35,7 +35,7 @@ from app.services.config.monitor_settings import (
 )
 
 celery_app = Celery(
-    "crawlerai",
+    "invoro",
     broker=settings.redis_url,
     backend=settings.redis_url,
     include=["app.tasks"],

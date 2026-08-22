@@ -6,7 +6,7 @@ import { useSyncExternalStore } from 'react';
 import { Button } from './button';
 
 type ThemeMode = 'light' | 'dark';
-const THEME_STORAGE_KEY = 'crawlerai-theme';
+const THEME_STORAGE_KEY = 'invoro-theme';
 const THEME_TRANSITION_ATTR = 'data-theme-transition';
 
 // skipcq: JS-0067

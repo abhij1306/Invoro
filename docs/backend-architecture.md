@@ -206,6 +206,7 @@ Current live behavior:
 - local startup recovery only reclaims stale active runs: fresh `pending` rows without a local task id are left alone, while stale `running` rows are forced into `failed` and stale local-dispatch `pending` rows are forced into `killed` so interrupted work does not stay orphaned forever
 - batch execution now refreshes `last_heartbeat_at` as runs advance so startup recovery can distinguish live external workers from truly stale local work
 - per-URL failures now roll back and reload the active DB session, persist URL-level error metrics/diagnostics, and continue the batch; mixed success/error runs finish `completed` with aggregate verdict `partial`, and persisted records remain exportable
+- serial and parallel URL work uses a fresh owned `AsyncSession` per URL; the coordinator alone owns its run ORM instance, progress, and status, while parallel batches use a fixed worker pool bounded by resolved URL concurrency
 - per-URL pipeline calls return `URLProcessingResult`; tuple result compatibility is removed so batch orchestration depends on the typed public result interface
 - acceptance harness runs now support curated manifest-driven site sets with bucketed expectations, explicit acceptance surfaces remain authoritative instead of being silently re-inferred from URLs, and curated commerce rows can reuse artifact-backed run ids before falling back to live execution
 - acceptance reports now distinguish transport verdicts from output quality through `quality_verdict`, `observed_failure_mode`, and `quality_checks`, so runs that technically succeed but return shell pages, promo pages, chrome-heavy listings, or broken variant semantics no longer look healthy
@@ -234,7 +235,6 @@ Primary files:
 - `acquisition/browser_result_builder.py`
 - `acquisition/browser_page_helpers.py`
 - `acquisition/browser_accessibility_expansion.py`
-- `acquisition/browser_origin_warmup.py`
 - `acquisition/content_signals.py`
 - `acquisition/http_client.py` (thin adapter over `runtime.get_shared_http_client`)
 - `acquisition/browser_identity.py`
@@ -320,9 +320,9 @@ Current live behavior:
 - acquisition identity now repairs malformed browser client-hint headers before Playwright contexts are created, and the shared HTTP default headers advertise the same Chrome client-hint family (`sec-ch-ua*`, `Upgrade-Insecure-Requests`) when the configured UA is Chrome-like instead of sending a partial browser header set
 - tracked detail URLs are normalized upstream before reuse: extracted and user-entered commerce/job targets now drop low-signal click/search context params (`utm_*`, `click_*`, `content_source`, `pf_from`, `sr_prefetch`, `qs`, and similar short replay flags) while preserving functional params such as `variant`, `q`, and `id`
 - hosts with repeated hard blocks can temporarily prefer browser-first acquisition within the pacing TTL, but one successful browser recovery clears that host memory so random PDP challenges do not taint the whole host
-- risky detail browser navigations can spend the configured `origin_warm_pause_ms` budget warming the site origin before the direct PDP navigation, but real Chrome only does that on the first engine/domain run without reusable domain state
-- once sanitized engine-scoped `real_chrome` domain state exists, later real-Chrome fetches skip origin warmup and go straight to the target URL
-- real Chrome is not challenge-exempt: if warmup or the direct PDP nav lands on a challenge shell, acquisition runs the same bounded challenge wait/activity/retry loop before returning a blocked verdict
+- Patchright and real Chrome navigate directly to the requested target URL; there is no preliminary site-root navigation or browser origin warmup
+- sanitized engine-scoped `real_chrome` domain state still loads into the browser context, without changing the direct-target navigation sequence
+- real Chrome is not challenge-exempt: if direct target navigation lands on a challenge shell, acquisition runs the same bounded challenge wait/activity/retry loop before returning a blocked verdict
 - browser contexts accept a per-fetch `proxy` for rotated-proxy traversal; `temporary_browser_page` is a thin wrapper over `SharedBrowserRuntime.page(proxy=...)`
 - `browser_identity` is host-OS-coherent: the de-headlessified UA OS token, the `sec-ch-ua-platform` header, and the engine's native `navigator.platform` all agree, keyed off the host OS the browser runs on (Windows dev box vs Linux Docker in prod). There is no synthetic fingerprint generation and no UA-vs-OS regeneration loop; the engine is genuinely Chrome, so only the headless token is normalized.
 - browser acquisition no longer injects custom init scripts into Patchright contexts; identity shaping is limited to context options, headers, locale/timezone alignment, and engine-native behavior so we do not reintroduce script-surface blockers. Real Chrome (headful, native context) is exempt from de-headlessification because it already reports a clean UA.

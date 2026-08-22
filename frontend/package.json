@@ -1,11 +1,11 @@
 {
-  "name": "crawlerai-frontend",
+  "name": "invoro-frontend",
   "private": true,
   "version": "0.1.0",
   "scripts": {
-    "dev": "next dev --hostname 127.0.0.1 --port 3000",
+    "dev": "next dev --hostname 127.0.0.1 --port 4000",
     "build": "next build",
-    "start": "next start --port 3000",
+    "start": "next start --port 4000",
     "lint": "pnpm run lint:eslint && pnpm run check:quality-gates && pnpm run check:tokens && pnpm run check:crawl-architecture && pnpm run check:frontend-architecture",
     "lint:eslint": "eslint . --max-warnings=0",
     "check:tokens": "node scripts/check-token-escapes.mjs",

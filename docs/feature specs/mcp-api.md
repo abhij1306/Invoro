@@ -247,8 +247,8 @@ The hosted version is deployed as a standalone service. Developers configure the
 ### 5.3 Configuration
 
 On first run, the MCP server requires:
-- `CRAWLERAI_API_KEY` — set via environment variable or config file
-- `CRAWLERAI_API_BASE_URL` — defaults to `https://api.crawlerai.com/api/v1`
+- `INVORO_API_KEY` — set via environment variable or config file
+- `INVORO_API_BASE_URL` — defaults to `https://api.invoro.ai/api/v1`
 
 ### 5.4 MCP Tools
 
@@ -400,10 +400,10 @@ Developer installs the MCP server package and configures it in their MCP client 
 ```json
 {
   "mcpServers": {
-    "crawlerai": {
-      "command": "crawlerai-mcp",
+    "invoro": {
+      "command": "invoro-mcp",
       "env": {
-        "CRAWLERAI_API_KEY": "your_key_here"
+        "INVORO_API_KEY": "your_key_here"
       }
     }
   }

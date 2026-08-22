@@ -8,7 +8,7 @@ function parseConfiguredApiBaseUrl(configured: string) {
     parsed = new URL(configured);
   } catch {
     throw new Error(
-      'NEXT_PUBLIC_API_BASE_URL must be a valid absolute URL (for example, http://127.0.0.1:8000).',
+      'NEXT_PUBLIC_API_BASE_URL must be a valid absolute URL (for example, http://127.0.0.1:9000).',
     );
   }
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
@@ -63,13 +63,13 @@ export function getApiBaseUrl() {
       throw new Error('NEXT_PUBLIC_API_BASE_URL must be set in production.');
     }
     const { protocol, hostname } = window.location;
-    resolvedBaseUrl = `${protocol}//${hostname}:8000`;
+    resolvedBaseUrl = `${protocol}//${hostname}:9000`;
     return resolvedBaseUrl;
   }
   if (process.env.NODE_ENV === 'production') {
     throw new Error('NEXT_PUBLIC_API_BASE_URL must be set in production.');
   }
-  resolvedBaseUrl = 'http://127.0.0.1:8000';
+  resolvedBaseUrl = 'http://127.0.0.1:9000';
   return resolvedBaseUrl;
 }
 

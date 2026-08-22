@@ -71,6 +71,7 @@ Primary files:
 Responsibilities:
 
 - session gating
+- signed-in identity display and per-user logout; logout clears the complete query cache before routing to `/login` so a later account cannot inherit cached workspace data
 - shell layout and nav
 - notification menu presentation in `components/layout/notification-menu.tsx`
 - auth-route vs app-route split

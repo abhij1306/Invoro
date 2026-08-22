@@ -31,34 +31,56 @@ async def get_current_user(
     authorization: str | None = Header(default=None),
     session: AsyncSession = Depends(get_db),  # noqa: B008 - FastAPI dependency injection requires Depends defaults.
 ) -> User:
+    user = await _resolve_current_user(
+        access_token=access_token,
+        authorization=authorization,
+        session=session,
+    )
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated"
+        )
+    return user
+
+
+async def get_current_user_optional(
+    access_token: str | None = Cookie(default=None),
+    authorization: str | None = Header(default=None),
+    session: AsyncSession = Depends(get_db),  # noqa: B008 - FastAPI dependency injection requires Depends defaults.
+) -> User | None:
+    return await _resolve_current_user(
+        access_token=access_token,
+        authorization=authorization,
+        session=session,
+    )
+
+
+async def _resolve_current_user(
+    *,
+    access_token: str | None,
+    authorization: str | None,
+    session: AsyncSession,
+) -> User | None:
     token = access_token
     if not token and authorization:
         scheme, _, credentials = authorization.partition(" ")
         if scheme.lower() == "bearer" and credentials.strip():
             token = credentials.strip()
     if not token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated"
-        )
+        return None
     try:
         payload = decode_access_token(token)
         user_id = int(payload["sub"])
         token_version = int(payload.get("ver", 0))
-    except (TokenDecodeError, KeyError, ValueError) as exc:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
-        ) from exc
+    except (TokenDecodeError, KeyError, ValueError):
+        return None
     result = await session.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if user is None or not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Inactive user"
-        )
+        return None
     user_token_version = user.token_version if user.token_version is not None else 0
     if user_token_version != token_version:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired"
-        )
+        return None
     return user
 
 

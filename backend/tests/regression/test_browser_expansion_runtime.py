@@ -24,11 +24,11 @@ from patchright.async_api import Error as PlaywrightError
 
 from patchright.async_api import TimeoutError as PlaywrightTimeoutError
 
-from app.services.acquisition import browser_capture, browser_detail, browser_recovery, cookie_store, dom_runtime  # fmt: skip
+from app.services.acquisition import browser_capture, browser_detail, browser_recovery, dom_runtime  # fmt: skip
 
 from app.services.acquisition.browser_capture import BrowserNetworkCapture
 
-from app.services.acquisition import browser_origin_warmup, browser_page_flow, browser_page_helpers, browser_pool, browser_readiness, browser_result_builder, browser_runtime  # fmt: skip
+from app.services.acquisition import browser_page_flow, browser_page_helpers, browser_pool, browser_readiness, browser_result_builder, browser_runtime  # fmt: skip
 
 from app.services.acquisition.browser_fetch_support import build_browser_fetch_result
 
@@ -41,24 +41,6 @@ from app.services.config.runtime_settings import crawler_runtime_settings
 from app.services.config.selectors import CARD_SELECTORS
 
 from app.services.pipeline.extract_records import extract_records
-
-
-@pytest.fixture(autouse=True)
-def _reset_origin_warmup_state(monkeypatch: pytest.MonkeyPatch):
-    async def _no_saved_domain_state(*_args, **_kwargs):
-        await _async_checkpoint()
-        return None
-
-    monkeypatch.setattr(
-        cookie_store,
-        "load_storage_state_for_domain",
-        _no_saved_domain_state,
-    )
-    browser_origin_warmup.ORIGIN_WARMUP_IN_FLIGHT.clear()
-    browser_origin_warmup.ORIGIN_WARMUP_RECENT.clear()
-    yield
-    browser_origin_warmup.ORIGIN_WARMUP_IN_FLIGHT.clear()
-    browser_origin_warmup.ORIGIN_WARMUP_RECENT.clear()
 
 
 async def _async_checkpoint() -> None:
@@ -425,6 +407,7 @@ class _FakeExpansionPage:
         self.card_selectors = set()
         self.role_targets = set(role_targets or set())
         self.goto_calls: list[str] = []
+        self.goto_url_calls: list[str] = []
         self.goto_timeout_calls: list[int | None] = []
         self.goto_failures = dict(goto_failures or {})
         self.goto_status = int(options.get("goto_status", 200))
@@ -479,6 +462,7 @@ class _FakeExpansionPage:
     ) -> Any:
         await _async_checkpoint()
         self.url = url
+        self.goto_url_calls.append(url)
         strategy = str(wait_until or "")
         self.goto_calls.append(strategy)
         timeout = kwargs.get("timeout")
@@ -614,4 +598,4 @@ class _FakeRuntime:
         yield self._page
 
 
-__all__ = ['Any', 'BeautifulSoup', 'BlockPageClassification', 'BrowserNetworkCapture', 'CARD_SELECTORS', 'Path', 'PlaywrightError', 'PlaywrightTimeoutError', 'SimpleNamespace', 'TraversalResult', '_FakeExpansionPage', '_FakeHandle', '_FakeLocator', '_FakePageContext', '_FakeRoleLocator', '_FakeRuntime', '_NoTimeoutRoleLocator', '_StaticPayloadCapture', '_WaitingRoleLocator', '_async_checkpoint', '_classify_browser_page_ok', '_emit_browser_event_noop', '_network_capture_summary', '_reset_origin_warmup_state', 'annotations', 'asynccontextmanager', 'asyncio', 'browser_capture', 'browser_detail', 'browser_finalize_support', 'browser_page_flow', 'browser_page_helpers', 'browser_pool', 'browser_readiness', 'browser_recovery', 'browser_result_builder', 'browser_runtime', 'build_browser_fetch_result', 'cookie_store', 'crawler_runtime_settings', 'dataclass', 'dom_runtime', 'extract_records', 'httpx', 'pytest', 'time']  # fmt: skip
+__all__ = ['Any', 'BeautifulSoup', 'BlockPageClassification', 'BrowserNetworkCapture', 'CARD_SELECTORS', 'Path', 'PlaywrightError', 'PlaywrightTimeoutError', 'SimpleNamespace', 'TraversalResult', '_FakeExpansionPage', '_FakeHandle', '_FakeLocator', '_FakePageContext', '_FakeRoleLocator', '_FakeRuntime', '_NoTimeoutRoleLocator', '_StaticPayloadCapture', '_WaitingRoleLocator', '_async_checkpoint', '_classify_browser_page_ok', '_emit_browser_event_noop', '_network_capture_summary', 'annotations', 'asynccontextmanager', 'asyncio', 'browser_capture', 'browser_detail', 'browser_finalize_support', 'browser_page_flow', 'browser_page_helpers', 'browser_pool', 'browser_readiness', 'browser_recovery', 'browser_result_builder', 'browser_runtime', 'build_browser_fetch_result', 'crawler_runtime_settings', 'dataclass', 'dom_runtime', 'extract_records', 'httpx', 'pytest', 'time']  # fmt: skip

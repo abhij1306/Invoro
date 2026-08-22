@@ -1,1 +1,1 @@
-"""Hosted MCP server for CrawlerAI public API."""
+"""Hosted MCP server for Invoro public API."""

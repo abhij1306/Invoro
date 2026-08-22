@@ -11,7 +11,7 @@ from app.core.rate_limit import (
     client_identifier_from_request,
     consume_sliding_window_limit,
 )
-from app.core.dependencies import get_current_user, get_db
+from app.core.dependencies import get_current_user, get_current_user_optional, get_db
 from app.models.user import User
 from app.schemas.user import AuthResponse, UserCreate, UserResponse
 from app.services.config.auth_security import (
@@ -21,7 +21,11 @@ from app.services.config.auth_security import (
     auth_rate_limit_key,
     secure_transport_required,
 )
-from app.services.auth_service import authenticate_user, create_user
+from app.services.auth_service import (
+    authenticate_user,
+    create_user,
+    revoke_user_sessions,
+)
 from app.services.config.runtime_settings import crawler_runtime_settings
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse
@@ -75,6 +79,16 @@ async def _enforce_auth_rate_limit(
         status_code=429,
         headers={"Retry-After": str(retry_after)},
     )
+
+
+async def _enforce_logout_rate_limit(request: Request) -> None:
+    limited = await _enforce_auth_rate_limit(request, "logout")
+    if limited is not None:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Rate limit exceeded",
+            headers={"Retry-After": limited.headers["Retry-After"]},
+        )
 
 
 @router.post("/register", response_model=UserResponse)
@@ -147,3 +161,29 @@ async def login(
 @router.get("/me")
 async def me(user: Annotated[User, Depends(get_current_user)]) -> UserResponse:
     return UserResponse.model_validate(user, from_attributes=True)
+
+
+@router.post(
+    "/logout",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(_enforce_logout_rate_limit)],
+)
+async def logout(
+    response: Response,
+    session: Annotated[AsyncSession, Depends(get_db)],
+    user: Annotated[User | None, Depends(get_current_user_optional)],
+) -> Response:
+    secure_cookie = secure_transport_required(runtime_app_env())
+    response.delete_cookie(
+        "access_token",
+        path="/",
+        httponly=True,
+        samesite="lax",
+        secure=secure_cookie,
+    )
+    response.status_code = status.HTTP_204_NO_CONTENT
+    if user is not None:
+        user_id = int(user.id)
+        await revoke_user_sessions(session, user_id)
+        logger.info("auth.logout_success", extra={"user_id": str(user_id)})
+    return response

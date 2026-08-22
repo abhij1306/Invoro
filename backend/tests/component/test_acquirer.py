@@ -1,11 +1,8 @@
 from __future__ import annotations
 
-import asyncio
-
 import httpx
 import pytest
 
-from app.services.acquisition import browser_origin_warmup
 from app.services.acquisition.acquirer import (
     AcquisitionRequest,
     PageEvidence,
@@ -19,22 +16,6 @@ from app.services.crawl.utils import (
     normalize_target_url,
     parse_csv_urls,
 )
-
-
-@pytest.mark.component
-def test_origin_warmup_state_lock_is_scoped_to_running_loop() -> None:
-    async def _locks() -> tuple[asyncio.Lock, asyncio.Lock]:
-        return (
-            browser_origin_warmup.origin_warmup_state_lock(),
-            browser_origin_warmup.origin_warmup_state_lock(),
-        )
-
-    first_lock, repeated_first_lock = asyncio.run(_locks())
-    second_lock, repeated_second_lock = asyncio.run(_locks())
-
-    assert first_lock is repeated_first_lock
-    assert second_lock is repeated_second_lock
-    assert first_lock is not second_lock
 
 
 @pytest.mark.component

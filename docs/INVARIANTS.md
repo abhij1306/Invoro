@@ -149,7 +149,7 @@ When `llm_enabled=True` and active config allows the relevant LLM workflow, LLM 
 Browser acquisition may use Patchright or real Chrome to produce better observations: rendered HTML, network payloads, visible text, accessibility text, readiness probes, and screenshots when enabled. It may also produce explicit detail-expansion artifacts (HTML/JSON from clicked size/color variant controls, expanded accordion sections, etc.). These are observation artifacts and are allowed inputs to extraction and LLM repair.
 Browser acquisition must not fabricate fields. It must not run hidden page scripts that directly assign `price`, `brand`, `variants`, or other logical fields outside the normal extraction/repair provenance path.
 
-Challenge recovery is part of acquisition, not extraction. Direct browser navigation and origin warmup must both run the bounded challenge wait/activity/retry loop. A provider-marked low-content shell may not be accepted as final just because the blocked-page classifier is not yet `blocked=True`; it must be re-polled until it becomes usable content or the configured challenge budget is exhausted.
+Challenge recovery is part of acquisition, not extraction. Browser acquisition navigates directly to the requested target and then runs the bounded challenge wait/activity/retry loop in place. A provider-marked low-content shell may not be accepted as final just because the blocked-page classifier is not yet `blocked=True`; it must be re-polled until it becomes usable content or the configured challenge budget is exhausted.
 
 Field-aware browser retry is allowed when policy and diagnostics justify it. A non-browser fetch that produces a low-quality ecommerce detail record missing requested/default high-value fields may retry browser. Default ecommerce detail retry targets stay limited to `price`, `title`, and `image_url`; user-requested fields are added explicitly. A Patchright result with usable content may escalate once to real Chrome only when high-value fields remain missing and diagnostics show weak rendered evidence. Every retry must be logged.
 
@@ -157,12 +157,13 @@ Diagnostics controls are user controls. If `diagnostics_profile.capture_screensh
 
 Browser-driver disconnects are URL-local failures. If a shared browser dies during `new_context`, page bootstrap, or content serialization, the runtime may recycle that browser once, but `_batch_runtime.py` must keep the failure scoped to the current URL and continue the batch.
 
+Batch database ownership is strict. The run coordinator owns its `AsyncSession`, run ORM instance, progress, and terminal status. Every URL owns a separate short-lived session in serial and parallel modes. Parallel scheduling creates only the configured fixed worker count; workers receive primitive run ids and plain URL inputs, never coordinator ORM objects or its session.
+
 **Patchright runs headless bundled Chromium; headless leaks must be masked.**
 
 - Engine is `patchright` headless bundled Chromium (`--headless=new`), not Patchright's headful `channel="chrome"` mode. Headless leaks a `HeadlessChrome` UA token with no `sec-ch-ua` hints, which PX/Akamai/DataDome block on sight.
 - `build_playwright_context_spec` MUST rewrite the UA to plain `Chrome` with coherent `sec-ch-ua` headers. UA OS token, `sec-ch-ua-platform`, and native `navigator.platform` MUST agree, keyed off host OS. Real Chrome (headful, native context) is exempt.
 - No `browserforge`, no JS init-script shaping. Patchright's "no fingerprint injection" guidance applies only to headful `channel="chrome"` and never justifies dropping the mask while headless.
-- Origin warmup is non-fatal and budget-capped (`origin_warmup_max_budget_ratio`): a blocked/challenge-shell origin MUST NOT raise or abort; the main navigation owns the blocked verdict.
 - Challenge recovery re-checks for clear immediately after challenge activity (activity is ~2s; providers often clear during it) to avoid a needless engine escalation on an already-usable page.
 - A terminal hard block (title/strong "Access Denied" evidence, no active challenge or challenge-element markers) never clears by waiting; the recovery loop exits early and skips the retry-goto so real-Chrome escalation is not delayed by the full challenge budget.
 - Challenge recovery MUST re-read and re-classify the live DOM on every poll. It may not gate the clear-check on a provider cookie (e.g. Akamai `_abck`): a provider shell (Akamai/DataDome/PerimeterX) clears by swapping in real content, so the re-read HTML is the source of truth. Gating the re-check on a cookie that never appears in-page makes Patchright miss an already-usable page and wastes the whole challenge budget before a needless real-Chrome escalation. A missing provider cookie is at most a hint, never a reason to skip the DOM re-check.
@@ -190,10 +191,13 @@ is a crawler bug, not stricter security detection.
 - A usable detail page retries from Chromium to real Chrome solely because Akamai/DataDome/Cloudflare provider markers are present
 - Host protection memory records a hard block from a usable browser page with provider markers but no title/strong blocked evidence
 - A retry happens that is not logged and visible in diagnostics
-- Direct navigation challenge recovery runs only during origin warmup, or provider-marked low-content shells skip the bounded recovery loop
+- Browser acquisition navigates to a site root or other origin URL before the requested target
+- Provider-marked low-content target pages skip the bounded recovery loop
 - Browser escalation triggers for a URL that returned 200 with complete requested/default high-value fields
 - Browser-side code writes logical extraction fields directly into the record instead of returning observation artifacts
 - Browser acquisition captures a screenshot when `capture_screenshot=False`
+- A URL worker reads an attribute from the coordinator's `CrawlRun` ORM instance, receives the coordinator `AsyncSession`, or shares one URL session with another URL
+- A batch creates one asyncio task per URL instead of a fixed pool bounded by `url_batch_concurrency`
 - A learned real Chrome success causes a later run to launch Patchright first without explicit user override or after the contract has been marked stale (see Rule 9)
 
 ---
@@ -240,8 +244,8 @@ Detail extraction must also reject collection/category URLs that expose product-
 - Run-scoped and domain-scoped browser storage must stay engine-scoped; `chromium`, `patchright`, and `real_chrome` state must not bleed across engines.
 - Browser-to-HTTP handoff may only reuse sanitized engine-scoped session state on the same proxy identity. If proxy affinity cannot be proven, skip handoff and stay browser-first.
 - Host browser-first memory is for repeated hard blocks, not one noisy challenge hit.
-- When launching real-Chrome for detail fetches and no reusable engine-scoped `real_chrome` domain state exists, acquisition may warm the site origin before direct PDP navigation; once reusable `real_chrome` domain state exists, later fetches skip warmup.
-- Real Chrome is not challenge-exempt. If warmup or the direct PDP nav lands on a challenge shell, acquisition must still run the bounded challenge wait/activity/retry loop before declaring the page blocked.
+- Reusable engine-scoped `real_chrome` domain state may be loaded into the browser context, but it never gates a preliminary navigation; every engine navigates directly to the requested target.
+- Real Chrome is not challenge-exempt. If direct target navigation lands on a challenge shell, acquisition must run the bounded challenge wait/activity/retry loop before declaring the page blocked.
 - Learned acquisition contracts live in editable `DomainRunProfile` memory scoped by normalized `(domain, surface)`. They own durable engine choice and handoff eligibility; explicit run settings always override them.
 - Future crawls must reuse the successful acquisition/data-extraction path and learned selectors for the domain/surface without fresh experimentation unless the user explicitly changes settings, enables experimentation, resets learned memory, or the contract becomes stale.
 - Only contracts with `handoff_eligible=true` may trigger curl handoff. Browser success alone is not enough; rendered extraction, traversal, or network-payload dependence must disable handoff.

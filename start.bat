@@ -29,8 +29,8 @@ for /L %%I in (1,1,%INVORO_WORKER_COUNT%) do (
     taskkill /F /T /FI "WINDOWTITLE eq Invoro Worker %%I" >nul 2>&1
 )
 
-call :kill_port 8000
-call :kill_port 3000
+call :kill_port 9000
+call :kill_port 4000
 
 if not exist "%ROOT%backend\artifacts" mkdir "%ROOT%backend\artifacts"
 

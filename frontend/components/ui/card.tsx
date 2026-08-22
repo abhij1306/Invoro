@@ -6,7 +6,7 @@ import { cn } from '../../lib/utils';
 /**
  * Card — bg-panel, border, --radius-lg, --card-padding, shadow-card.
  * Composed from header / title / description / content / footer slots.
- * Supports legacy `animate` prop for backward compatibility in CrawlerAI.
+ * Supports legacy `animate` prop for backward compatibility in Invoro.
  */
 export function Card({
   children,

@@ -32,6 +32,7 @@ PYTHON_SCAN_EXCLUDED_DIRECTORIES = frozenset(
         ".ruff_cache",
         ".venv",
         "__pycache__",
+        "alembic",
         "build",
         "coverage",
         "dist",
@@ -465,7 +466,7 @@ def test_root_binary_assets_are_not_committed_without_context() -> None:
         and path.suffix.lower() in {".png", ".jpg", ".jpeg", ".gif", ".webp"}
     ]
     assert forbidden == []
-    logo_path = REPO_ROOT / "docs" / "assets" / "crawlerai-logo.png"
+    logo_path = REPO_ROOT / "docs" / "assets" / "invoro-logo.png"
     if logo_path.parent.exists():
         assert logo_path.exists()
 

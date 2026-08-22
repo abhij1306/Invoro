@@ -12,6 +12,7 @@ If a file is not listed, assume it is a helper under a listed owner.
 | File | Purpose |
 |---|---|
 | `run_test_sites_acceptance.py` | Acceptance runner for curated test-site batches |
+| `docker_entrypoint.py` | Container startup URL construction and command handoff |
 | `harness_support.py`, `harness/site_sets.py`, `harness/site_harness_runner.py`, `harness/quality_evaluator.py` | Acceptance facade, site selection, execution, and quality evaluation |
 | `test_site_sets/commerce_browser_heavy.json` | Commerce acceptance manifest and quality expectations |
 | `browser_surface_probe/core.py`, `browser_surface_probe/probe_runner.py`, `browser_surface_probe/findings.py`, `browser_surface_probe/report_rendering.py` | Browser-surface facade, probe execution, finding construction, and report rendering |
@@ -145,7 +146,6 @@ Flow:
 | `acquisition/browser_result_builder.py` | Browser acquisition diagnostics, artifacts, screenshots, final result shaping |
 | `acquisition/browser_page_helpers.py` | Browser page HTML selection, detail extractability probes, listing visual capture |
 | `acquisition/browser_accessibility_expansion.py` | Bounded accessibility-assisted detail expansion |
-| `acquisition/browser_origin_warmup.py` | Eligibility and bounded origin-warmup navigation |
 | `acquisition/content_signals.py` | Shared deterministic detail/listing content signals |
 | `acquisition/browser_proxy_config.py` | Browser proxy URL parsing, redaction, and Playwright proxy config |
 | `acquisition/browser_readiness.py` | DOM readiness checks, listing/detail probes, outcome classification |

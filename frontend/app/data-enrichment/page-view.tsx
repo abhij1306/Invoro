@@ -258,22 +258,14 @@ function enrichmentDescription(
 
 function DataEnrichmentView({ model }: { model: DataEnrichmentModel }) {
   const {
-    llmEnabled,
     dispatch,
     sourceRecords,
-    sourceRecordIds,
-    jobsQuery,
     historyItems,
     resolvedJobId,
     detailQuery,
     activeJob,
     isRunning,
     products,
-    resolvedProductId,
-    selectedProduct,
-    completedCount,
-    semanticCount,
-    createMutation,
     descriptionText,
     error,
     historyOpen,

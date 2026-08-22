@@ -17,20 +17,11 @@ from lxml import (
 )  # skipcq: BAN-B410 - lxml.html.fromstring parses sanitized HTML snippets, not arbitrary XML.
 
 from app.services.config.extraction_rules import (
-    DETAIL_CROSS_PRODUCT_CONTAINER_TOKENS,
     DETAIL_IMAGE_URL_ATTRS,
-    DETAIL_TEXT_HIDDEN_STYLE_TOKENS,
-    DETAIL_TEXT_SCOPE_EXCLUDE_TOKENS,
-    DETAIL_TEXT_SCOPE_PRIORITY_TOKENS,
-    DETAIL_TEXT_SCOPE_SELECTORS,
     EXTRACTION_RULES,
     MAX_SELECTOR_MATCHES,
     VARIANT_OPTION_TEXT_CHILD_DROP_PATTERNS,
     VARIANT_OPTION_TEXT_FIELDS,
-    SCOPE_PRODUCT_CONTEXT_TOKENS,
-    SCOPE_SCORE_MAIN_WEIGHT,
-    SCOPE_SCORE_PRIORITY_WEIGHT,
-    SCOPE_SCORE_PRODUCT_CONTEXT_WEIGHT,
 )
 from app.services.dom.image_extraction import (
     candidate_image_urls_from_node,  # noqa: F401 - public compatibility export
@@ -96,24 +87,7 @@ __all__ = [
     "upgrade_low_resolution_image_url",
 ]
 
-_cross_product_container_tokens = tuple(
-    clean_text(token).lower()
-    for token in tuple(DETAIL_CROSS_PRODUCT_CONTAINER_TOKENS or ())
-    if clean_text(token)
-)
-_scope_product_context_tokens = tuple(
-    clean_text(token).lower()
-    for token in tuple(SCOPE_PRODUCT_CONTEXT_TOKENS or ())
-    if clean_text(token)
-)
 _max_selector_matches = _safe_int(MAX_SELECTOR_MATCHES, default=12) or 12
-_scope_score_main_weight = _safe_int(SCOPE_SCORE_MAIN_WEIGHT, default=4000) or 4000
-_scope_score_priority_weight = (
-    _safe_int(SCOPE_SCORE_PRIORITY_WEIGHT, default=2000) or 2000
-)
-_scope_score_product_context_weight = (
-    _safe_int(SCOPE_SCORE_PRODUCT_CONTEXT_WEIGHT, default=1000) or 1000
-)
 
 
 def _compile_variant_option_child_drop_patterns() -> tuple[re.Pattern[str], ...]:
@@ -126,8 +100,6 @@ def _compile_variant_option_child_drop_patterns() -> tuple[re.Pattern[str], ...]
 
 _VARIANT_OPTION_CHILD_DROP_RE = _compile_variant_option_child_drop_patterns()
 
-_PAGE_FILE_EXTENSIONS = (".asp", ".aspx", ".htm", ".html", ".jsp", ".php")
-
 
 def _selector_regex_timeout_seconds() -> float | None:
     try:
@@ -139,28 +111,6 @@ def _selector_regex_timeout_seconds() -> float | None:
         )
         return None
     return timeout if timeout > 0 else None
-
-
-_detail_text_scope_selectors = tuple(
-    selector
-    for selector in tuple(DETAIL_TEXT_SCOPE_SELECTORS or ())
-    if str(selector).strip()
-)
-_detail_text_scope_priority_tokens = tuple(
-    str(token).lower()
-    for token in tuple(DETAIL_TEXT_SCOPE_PRIORITY_TOKENS or ())
-    if str(token).strip()
-)
-_detail_text_scope_exclude_tokens = tuple(
-    str(token).lower()
-    for token in tuple(DETAIL_TEXT_SCOPE_EXCLUDE_TOKENS or ())
-    if str(token).strip()
-)
-_detail_text_hidden_style_tokens = tuple(
-    str(token).lower()
-    for token in tuple(DETAIL_TEXT_HIDDEN_STYLE_TOKENS or ())
-    if str(token).strip()
-)
 
 
 def extract_node_value(node: Tag, field_name: str, page_url: str) -> object | None:

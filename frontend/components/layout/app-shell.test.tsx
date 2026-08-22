@@ -5,16 +5,19 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppShell } from './app-shell';
 
 const routerReplaceMock = vi.fn();
+const routerRefreshMock = vi.fn();
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/dashboard',
   useRouter: () => ({
     replace: routerReplaceMock,
+    refresh: routerRefreshMock,
   }),
 }));
 
 const apiMock = vi.hoisted(() => ({
   me: vi.fn(),
+  logout: vi.fn(),
   resetApplicationData: vi.fn(),
 }));
 
@@ -37,6 +40,7 @@ function renderShell() {
       </AppShell>
     </QueryClientProvider>,
   );
+  return queryClient;
 }
 
 beforeEach(() => {
@@ -173,5 +177,64 @@ describe('AppShell sidebar toggle', () => {
       'aria-expanded',
       'false',
     );
+  });
+});
+
+describe('AppShell logout', () => {
+  it('shows account identity, revokes the session, clears cache, and redirects', async () => {
+    apiMock.me.mockResolvedValue({
+      id: 1,
+      email: 'admin@example.com',
+      role: 'admin',
+      is_active: true,
+      created_at: new Date('2026-05-19T00:00:00Z').toISOString(),
+      updated_at: new Date('2026-05-19T00:00:00Z').toISOString(),
+    });
+    apiMock.logout.mockResolvedValue(undefined);
+    const queryClient = renderShell();
+    const clearSpy = vi.spyOn(queryClient, 'clear');
+
+    expect(await screen.findByText('admin@example.com')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /log out/i }));
+
+    await waitFor(() => {
+      expect(apiMock.logout).toHaveBeenCalledOnce();
+      expect(clearSpy).toHaveBeenCalledOnce();
+      expect(routerReplaceMock).toHaveBeenCalledWith('/login');
+      expect(routerRefreshMock).toHaveBeenCalledOnce();
+    });
+  });
+
+  it('keeps account state and offers retry when the logout request fails', async () => {
+    apiMock.me.mockResolvedValue({
+      id: 2,
+      email: 'user@example.com',
+      role: 'user',
+      is_active: true,
+      created_at: new Date('2026-05-19T00:00:00Z').toISOString(),
+      updated_at: new Date('2026-05-19T00:00:00Z').toISOString(),
+    });
+    apiMock.logout.mockRejectedValue(new Error('network unavailable'));
+    const queryClient = renderShell();
+    const clearSpy = vi.spyOn(queryClient, 'clear');
+
+    fireEvent.click(await screen.findByRole('button', { name: /log out/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent('Could not log out.');
+    });
+    expect(clearSpy).not.toHaveBeenCalled();
+    expect(routerReplaceMock).not.toHaveBeenCalled();
+    expect(routerRefreshMock).not.toHaveBeenCalled();
+
+    apiMock.logout.mockResolvedValue(undefined);
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+
+    await waitFor(() => {
+      expect(apiMock.logout).toHaveBeenCalledTimes(2);
+      expect(clearSpy).toHaveBeenCalledOnce();
+      expect(routerReplaceMock).toHaveBeenCalledWith('/login');
+      expect(routerRefreshMock).toHaveBeenCalledOnce();
+    });
   });
 });

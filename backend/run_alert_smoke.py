@@ -88,7 +88,7 @@ async def _run_one(site: dict[str, Any]) -> dict[str, Any]:
                     url=site["url"],
                     target_fields=list(site["target_fields"]),
                     condition=site.get("condition"),
-                    webhook_url="https://example.invalid/crawlerai-alert-smoke",
+                    webhook_url="https://example.invalid/invoro-alert-smoke",
                     poll_interval_seconds=300,
                 ),
             )

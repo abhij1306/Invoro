@@ -454,6 +454,50 @@ async def test_shared_browser_runtime_reuses_run_storage_state(
 
 @pytest.mark.asyncio
 @pytest.mark.component
+async def test_real_chrome_context_still_loads_engine_scoped_domain_state(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    storage_state = {
+        "cookies": [
+            {
+                "name": "session",
+                "value": "existing-cookie",
+                "domain": ".example.com",
+                "path": "/",
+            }
+        ],
+        "origins": [],
+    }
+
+    async def _no_run_state(*_args, **_kwargs):
+        return None
+
+    async def _domain_state(domain: str | None, *, browser_engine: str):
+        assert domain == "example.com"
+        assert browser_engine == "real_chrome"
+        return storage_state
+
+    monkeypatch.setattr(cookie_store, "load_storage_state_for_run", _no_run_state)
+    monkeypatch.setattr(cookie_store, "load_storage_state_for_domain", _domain_state)
+    runtime = crawl_fetch_runtime.SharedBrowserRuntime(
+        max_contexts=1,
+        browser_engine="real_chrome",
+    )
+
+    options = await runtime._context_options_with_storage(
+        _context_spec(),
+        run_id=None,
+        domain="example.com",
+        allow_storage_state=True,
+        allow_domain_storage_state=True,
+        phase_timings_ms={},
+    )
+
+    assert options["storage_state"] == storage_state
+
+
+@pytest.mark.asyncio
+@pytest.mark.component
 async def test_shared_browser_runtime_skips_storage_state_reuse_when_disallowed(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

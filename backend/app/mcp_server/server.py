@@ -13,7 +13,7 @@ from app.mcp_server.tools import list_capabilities as _list_capabilities
 def build_server():
     from fastmcp import FastMCP
 
-    mcp = FastMCP("crawlerai")
+    mcp = FastMCP("invoro")
     client = PublicApiClient(api_key=api_key(), base_url=api_base_url())
 
     @mcp.tool

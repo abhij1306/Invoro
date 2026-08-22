@@ -21,7 +21,6 @@ import {
 import {
   buildRowFromSelectorRecord,
   buildRowFromSuggestion,
-  createEmptyRow,
   formatSelectorMatchMessage,
   INITIAL_SELECTORS_PAGE_STATE,
   isDuplicateSelectorError,

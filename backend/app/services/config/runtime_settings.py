@@ -24,26 +24,22 @@ PERFORMANCE_PROFILES: dict[str, dict[str, int]] = {
     "ULTRA_FAST": {
         "browser_fallback_visible_text_min": 1000,
         "challenge_wait_max_seconds": 3,
-        "origin_warm_pause_ms": 0,
         "surface_readiness_max_wait_ms": 3000,
     },
     "BALANCED": {
         "browser_fallback_visible_text_min": 500,
         "challenge_wait_max_seconds": 15,
-        "origin_warm_pause_ms": 500,
         "surface_readiness_max_wait_ms": 6000,
     },
     "STEALTH": {
         "browser_fallback_visible_text_min": 200,
         "challenge_wait_max_seconds": 15,
-        "origin_warm_pause_ms": 2000,
         "surface_readiness_max_wait_ms": 15000,
     },
 }
 _PROFILE_CONTROLLED_FIELDS = (
     "browser_fallback_visible_text_min",
     "challenge_wait_max_seconds",
-    "origin_warm_pause_ms",
     "surface_readiness_max_wait_ms",
 )
 _DEFAULT_CHROME_MAJOR_VERSION = 131
@@ -203,11 +199,6 @@ class CrawlerRuntimeSettings(BaseSettings):
     browser_behavior_typing_jitter_ms: int = 95
     surface_readiness_max_wait_ms: int | None = 6000
     surface_readiness_poll_ms: int = 250
-    origin_warm_pause_ms: int | None = 500
-    origin_warmup_max_budget_ratio: float = 0.4
-    origin_warmup_dedupe_ttl_seconds: float = 60.0
-    origin_warmup_min_budget_ms: int = 750
-    origin_warmup_recent_max_entries: int = 512
     browser_error_retry_attempts: int = 1
     browser_error_retry_delay_ms: int = 1000
     browser_post_block_cooldown_ms: int = 500
@@ -403,7 +394,7 @@ class CrawlerRuntimeSettings(BaseSettings):
     listing_integrity_escalation_retry_max_per_run: int = 1
     robots_cache_size: int = 512
     robots_cache_ttl: float = 3600.0
-    robots_fetch_user_agent: str = "CrawlerAI"
+    robots_fetch_user_agent: str = "Invoro"
 
     @model_validator(mode="after")
     def _apply_profile_defaults(self) -> CrawlerRuntimeSettings:
@@ -461,15 +452,12 @@ class CrawlerRuntimeSettings(BaseSettings):
             "adapter_payload_identity_min_token_length",
             "browser_launch_timeout_seconds",
             "browser_context_slot_timeout_seconds",
-            "origin_warmup_min_budget_ms",
-            "origin_warmup_recent_max_entries",
         ):
             _require_positive(field_name, getattr(self, field_name))
         for field_name in (
             "url_process_timeout_buffer_seconds",
             "browser_post_block_cooldown_ms",
             "browser_first_nav_pause_ms",
-            "origin_warmup_dedupe_ttl_seconds",
             "browser_accessibility_snapshot_timeout_seconds",
         ):
             _require_non_negative(field_name, getattr(self, field_name))
@@ -562,10 +550,7 @@ class CrawlerRuntimeSettings(BaseSettings):
             )
         for field_name in ("selector_self_heal_min_confidence",):
             _require_unit_interval(field_name, getattr(self, field_name))
-        for field_name in (
-            "browser_navigation_networkidle_primary_budget_ratio",
-            "origin_warmup_max_budget_ratio",
-        ):
+        for field_name in ("browser_navigation_networkidle_primary_budget_ratio",):
             _require_open_unit_interval(field_name, getattr(self, field_name))
         if not str(self.host_memory_ttl_seconds_key or "").strip():
             raise ValueError("host_memory_ttl_seconds_key must not be blank")

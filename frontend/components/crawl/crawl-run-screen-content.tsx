@@ -1,21 +1,15 @@
 'use client';
 import {
   ArrowRightCircle,
-  Bell,
   Brain,
   ChevronsDown,
   Clock,
-  Copy,
   Download,
   History,
   Plus,
 } from 'lucide-react';
 import { HistoryDrawer } from '../ui/history-drawer';
-import { syntaxHighlightJsonNodes } from '../../lib/ui/syntax';
 import {
-  DataRegionEmpty,
-  DataRegionLoading,
-  DetailRow,
   InlineAlert,
   PageHeader,
   RunSummaryChips,
@@ -25,21 +19,17 @@ import {
 } from '../ui/patterns';
 import { Badge, Button, Card } from '../ui/primitives';
 import type { ResultSummaryQualityLevel } from '../../lib/api/types';
-import { CRAWL_DEFAULTS } from '../../lib/constants/crawl-defaults';
 import { ACTIVE_STATUSES } from '../../lib/constants/crawl-statuses';
 import { getDomain } from '../../lib/format/domain';
-import { ActionButton, LogTerminal, RecordsTable } from './shared-components';
+import { ActionButton, LogTerminal } from './shared-components';
 import {
-  copyJson,
   humanizeVerdict,
   humanizeQuality,
   type OutputTabKey,
   scrollViewportToBottom,
-  selectorWinnerLabel,
 } from './shared';
 import { AlertBuilderDrawer } from './alert-builder-drawer';
 import { downloadMarkdown } from './markdown-output-utils';
-import { MarkdownOutputPanel } from './markdown-output';
 import type { CrawlRunScreenModel } from './use-crawl-run-screen-model';
 import { RunOutputContent } from './crawl-run-output-content';
 
@@ -235,7 +225,6 @@ function LiveRunPanel({ model }: { model: CrawlRunScreenModel }) {
     runControl,
     logs,
     batchSourceRecords,
-    live,
   } = model;
   if (model.showRunLoadingState || model.terminal) return null;
   return (
@@ -296,24 +285,7 @@ function LiveRunPanel({ model }: { model: CrawlRunScreenModel }) {
 }
 
 function TerminalRunPanel({ model }: { model: CrawlRunScreenModel }) {
-  const {
-    run,
-    runActionError,
-    listingRun,
-    batchFromResultsUrls,
-    triggerBatchCrawlFromResults,
-    batchFromResultsLabel,
-    ecommerceDetailRun,
-    downstreamRecords,
-    triggerProductIntelligenceFromResults,
-    productIntelligenceLabel,
-    triggerDataEnrichmentFromResults,
-    dataEnrichmentLabel,
-    markdownOutputRun,
-    markdownDocument,
-    downloadExport,
-    setHistoryOpen,
-  } = model;
+  const { run, runActionError } = model;
   const runErrorMessage =
     typeof run?.result_summary?.error === 'string' ? run.result_summary.error : '';
   if (model.showRunLoadingState || !model.terminal) return null;

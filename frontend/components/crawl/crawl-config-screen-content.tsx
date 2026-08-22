@@ -1,53 +1,24 @@
 'use client';
-import { Globe, Info, Plus, SlidersHorizontal, Sparkles } from 'lucide-react';
-import { cn } from '../../lib/utils';
+import { Globe, Info, SlidersHorizontal, Sparkles } from 'lucide-react';
 import { InlineAlert, TabBar } from '../ui/patterns';
-import { Badge, Button, Dropdown, Card, Input, Textarea, Toggle, Tooltip } from '../ui/primitives';
+import { Badge, Dropdown, Card, Textarea, Toggle, Tooltip } from '../ui/primitives';
 import type { CrawlDomain } from '../../lib/api/types';
-import { CRAWL_DEFAULTS, CRAWL_LIMITS } from '../../lib/constants/crawl-defaults';
 import {
   AdditionalFieldInput,
   CsvFileField,
-  FieldEditorHeader,
-  ManualFieldEditor,
-  SettingSection,
-  SliderRow,
   SitemapConfigFields,
   TargetUrlField,
 } from './shared-components';
 import {
-  clampNumber,
-  normalizeField,
   parseLines,
   parseRequestedCategoryMode,
   parseRequestedCrawlTab,
   parseRequestedPdpMode,
   uniqueRequestedFields,
 } from './shared';
-import {
-  applyDiagnosticsPreset,
-  BROWSER_ENGINE_OPTIONS,
-  CAPTURE_NETWORK_OPTIONS,
-  EXTRACTION_SOURCE_OPTIONS,
-  FETCH_MODE_OPTIONS,
-  JS_MODE_OPTIONS,
-  parseOptionalClampedNumber,
-  surfaceLabel,
-  TRAVERSAL_MODE_OPTIONS,
-  type BrowserEngine,
-  type CaptureNetworkMode,
-  type DiagnosticsPreset,
-  type ExtractionSource,
-  type FetchMode,
-  type JsMode,
-  type TraversalDropdownValue,
-} from './crawl-config-logic';
+import { surfaceLabel } from './crawl-config-logic';
 import { CrawlActionButtons } from './crawl-action-buttons';
 import {
-  ADVANCED_COLUMN_CLASS,
-  ADVANCED_CONTROL_ROW_CLASS,
-  ADVANCED_SECTION_TITLE_CLASS,
-  ADVANCED_SUBSECTION_CLASS,
   RUN_SETUP_CONTROL_CLASS,
   RUN_SETUP_LABEL_CLASS,
   RUN_SETUP_ROW_CLASS,

@@ -103,6 +103,7 @@ export const api = {
     return response;
   },
   me: () => apiClient.get<User>('/api/auth/me'),
+  logout: () => apiClient.post<void>('/api/auth/logout', {}),
   dashboard: () => apiClient.get<Dashboard>('/api/dashboard'),
   resetApplicationData: () =>
     apiClient.post<Record<string, number | boolean>>('/api/dashboard/reset-data', {}),
