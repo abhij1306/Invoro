@@ -208,8 +208,8 @@ Binary assets in the repository root become mystery blobs and make README/docs c
 
 These are mandatory controls, not suggestions.
 
-1. `backend/tests/services/test_structure.py` is the architecture ratchet.
-   It owns LOC budgets, config-placement checks, and the allowlist for private cross-module imports.
+1. `backend/tests/regression/test_structure.py` owns backend architecture gates.
+   Every maintained Python file, including tests and first-party tooling, is limited to 800 physical lines. Every Python callable is limited to numeric McCabe complexity 15. No grandfathered LOC or complexity allowance is permitted.
 
 2. Any new violation pattern found in an audit must become one of:
    - a focused test gate
@@ -221,6 +221,8 @@ These are mandatory controls, not suggestions.
 
 4. Audit work is not complete until the guard exists.
    Deleting wrappers or moving config without adding the enforcement hook means the drift will return.
+
+5. `frontend/eslint.config.mjs` owns the callable complexity limit of 15. `frontend/scripts/check-frontend-architecture.mjs` owns the absolute 800-physical-line gate across maintained JS, JSX, TS, TSX, MJS, and CJS files, including tests and first-party scripts.
 
 ---
 

@@ -614,6 +614,10 @@ Useful local commands:
 cd backend
 $env:PYTHONPATH='.'
 uv sync --frozen --extra dev
+uv run --frozen --extra dev ruff check app tests
+uv run --frozen --extra dev ruff format --check app tests
+uv run --frozen --extra dev mypy app
+uv run --frozen --extra dev pytest tests/regression/test_structure.py -q -m regression
 uv run --frozen --extra dev pytest tests -q -m "unit or component or regression"
 uv run --frozen --extra dev python run_acquire_smoke.py commerce
 uv run --frozen --extra dev python run_extraction_smoke.py

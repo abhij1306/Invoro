@@ -190,6 +190,7 @@ uv run --frozen --extra dev pip-audit --local --vulnerability-service osv
 uv run --frozen --extra dev ruff check app tests
 uv run --frozen --extra dev ruff format --check app tests
 uv run --frozen --extra dev mypy app
+uv run --frozen --extra dev pytest tests/regression/test_structure.py -q -m regression
 uv run --frozen --extra dev pytest tests -q -m "unit or component or regression"
 uv run --frozen --extra dev python run_acquire_smoke.py commerce
 uv run --frozen --extra dev python run_extraction_smoke.py
@@ -204,6 +205,7 @@ corepack prepare pnpm@11.9.0 --activate
 pnpm install --frozen-lockfile
 pnpm audit --audit-level=high
 pnpm format:check
+pnpm check:quality-gates
 pnpm lint
 pnpm typecheck
 pnpm test

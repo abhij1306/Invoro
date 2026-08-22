@@ -1,16 +1,23 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const root = process.cwd();
 const failures = [];
-
-const lineBudgets = new Map([
-  ['components/ui/primitives.tsx', 30],
-  ['components/ui/patterns.tsx', 40],
-  ['components/crawl/shared.ts', 200],
-  ['components/crawl/shared-components.tsx', 120],
-  ['components/layout/app-shell.tsx', 460],
-  ['components/layout/sidebar.tsx', 210],
+const isMain = path.resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url);
+export const MAX_PHYSICAL_LINES = 800;
+export const SOURCE_SCAN_EXCLUDED_DIRECTORIES = new Set([
+  '.git',
+  '.cache',
+  '.next',
+  '.turbo',
+  'build',
+  'coverage',
+  'dist',
+  'htmlcov',
+  'node_modules',
+  'playwright-report',
+  'test-results',
 ]);
 
 function read(relativePath) {
@@ -20,15 +27,6 @@ function read(relativePath) {
     const message = error instanceof Error ? error.message : String(error);
     failures.push(`${relativePath} could not be read: ${message}`);
     return null;
-  }
-}
-
-for (const [relativePath, maxLines] of lineBudgets) {
-  const content = read(relativePath);
-  if (content === null) continue;
-  const lines = content === '' ? 0 : content.replace(/\r?\n$/, '').split(/\r?\n/).length;
-  if (lines > maxLines) {
-    failures.push(`${relativePath} has ${lines} lines; limit is ${maxLines}.`);
   }
 }
 
@@ -48,21 +46,33 @@ const requiredOwners = [
   'components/crawl/shared-components.tsx',
 ];
 
-for (const relativePath of requiredOwners) {
-  if (!fs.existsSync(path.join(root, relativePath))) {
-    failures.push(`${relativePath} is missing. Keep shared concerns in focused owners.`);
+if (isMain) {
+  for (const relativePath of requiredOwners) {
+    if (!fs.existsSync(path.join(root, relativePath))) {
+      failures.push(`${relativePath} is missing. Keep shared concerns in focused owners.`);
+    }
   }
 }
 
-function sourceFiles(directory) {
+export function physicalLineCount(content) {
+  return content === '' ? 0 : content.replace(/\r?\n$/, '').split(/\r?\n/).length;
+}
+
+export function sourceFiles(directory, includeTests = true) {
   if (!fs.existsSync(directory)) return [];
   return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const absolutePath = path.join(directory, entry.name);
-    if (entry.isDirectory()) return sourceFiles(absolutePath);
+    if (entry.isDirectory()) {
+      return SOURCE_SCAN_EXCLUDED_DIRECTORIES.has(entry.name)
+        ? []
+        : sourceFiles(absolutePath, includeTests);
+    }
     if (
       !entry.isFile() ||
-      !/\.(?:ts|tsx)$/.test(entry.name) ||
-      /\.(?:test|spec)\./.test(entry.name)
+      !/\.(?:[cm]?js|jsx|ts|tsx)$/.test(entry.name) ||
+      entry.name === 'next-env.d.ts' ||
+      /\.min\.(?:js|jsx)$/.test(entry.name) ||
+      (!includeTests && /\.(?:test|spec)\./.test(entry.name))
     ) {
       return [];
     }
@@ -70,12 +80,24 @@ function sourceFiles(directory) {
   });
 }
 
-for (const directory of ['app', 'components']) {
-  for (const absolutePath of sourceFiles(path.join(root, directory))) {
+if (isMain) {
+  for (const absolutePath of sourceFiles(root)) {
     const relativePath = path.relative(root, absolutePath).replaceAll('\\', '/');
-    const content = fs.readFileSync(absolutePath, 'utf8');
-    if (/\btransition-all\b/.test(content)) {
-      failures.push(`${relativePath} uses transition-all; name the animated properties.`);
+    const lines = physicalLineCount(fs.readFileSync(absolutePath, 'utf8'));
+    if (lines > MAX_PHYSICAL_LINES) {
+      failures.push(`${relativePath} has ${lines} physical lines; limit is ${MAX_PHYSICAL_LINES}.`);
+    }
+  }
+}
+
+if (isMain) {
+  for (const directory of ['app', 'components']) {
+    for (const absolutePath of sourceFiles(path.join(root, directory), false)) {
+      const relativePath = path.relative(root, absolutePath).replaceAll('\\', '/');
+      const content = fs.readFileSync(absolutePath, 'utf8');
+      if (/\btransition-all\b/.test(content)) {
+        failures.push(`${relativePath} uses transition-all; name the animated properties.`);
+      }
     }
   }
 }
@@ -86,16 +108,18 @@ const fontFiles = [
   'app/fonts/Switzer-Variable.woff2',
   'app/fonts/Switzer-VariableItalic.woff2',
 ];
-for (const relativePath of fontFiles) {
-  if (!fs.existsSync(path.join(root, relativePath))) {
-    failures.push(`${relativePath} is missing from the local typography contract.`);
+if (isMain) {
+  for (const relativePath of fontFiles) {
+    if (!fs.existsSync(path.join(root, relativePath))) {
+      failures.push(`${relativePath} is missing from the local typography contract.`);
+    }
   }
-}
 
-if (failures.length) {
-  console.error('Frontend architecture check failed:');
-  for (const failure of failures) console.error(`- ${failure}`);
-  process.exit(1);
-}
+  if (failures.length) {
+    console.error('Frontend architecture check failed:');
+    for (const failure of failures) console.error(`- ${failure}`);
+    process.exit(1);
+  }
 
-console.log('Frontend architecture check passed.');
+  console.log('Frontend architecture check passed.');
+}

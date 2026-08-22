@@ -105,7 +105,7 @@ max-returns = 8
 max-statements = 50
 max-attributes = 12
 max-public-methods = 24
-max-module-lines = 1000
+max-module-lines = 800
 
 [tool.pylint.similarities]
 min-similarity-lines = 5

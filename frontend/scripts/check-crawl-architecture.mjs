@@ -4,17 +4,6 @@ import ts from 'typescript';
 
 const root = process.cwd();
 
-const checks = [
-  {
-    file: 'components/crawl/crawl-run-screen.tsx',
-    maxLines: 1400,
-  },
-  {
-    file: 'components/crawl/crawl-config-screen.tsx',
-    maxLines: 1500,
-  },
-];
-
 const failures = [];
 const fileCache = new Map();
 
@@ -157,17 +146,6 @@ function stripCommentsAndStrings(content) {
     .replace(/\/\*[\s\S]*?\*\//g, (match) => match.replace(/[^\n]/g, ' '))
     .replace(/\/\/.*$/gm, '')
     .replace(/'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"/g, maskNonNewlines);
-}
-
-for (const check of checks) {
-  const content = read(check.file);
-  if (content === null) {
-    continue;
-  }
-  const lines = content.split(/\r?\n/).length;
-  if (lines > check.maxLines) {
-    failures.push(`${check.file} has ${lines} lines; limit is ${check.maxLines}. Split the owner.`);
-  }
 }
 
 const runScreen = read('components/crawl/crawl-run-screen.tsx');

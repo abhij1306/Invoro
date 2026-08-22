@@ -6,6 +6,12 @@ const config = [
   {
     ignores: ['.next/**', 'next-env.d.ts', 'node_modules/**'],
   },
+  {
+    files: ['**/*.{js,jsx,mjs,cjs,ts,tsx}'],
+    rules: {
+      complexity: ['error', 15],
+    },
+  },
   eslintConfigPrettier,
 ];
 

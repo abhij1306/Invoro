@@ -7,6 +7,8 @@ import importlib
 import tomllib
 from pathlib import Path
 
+from radon.complexity import cc_visit
+
 from app.core.database import Base
 
 importlib.import_module("app.models")
@@ -18,10 +20,27 @@ APP_ROOT = ROOT / "app"
 API_ROOT = APP_ROOT / "api"
 TESTS_ROOT = ROOT / "tests"
 REPO_ROOT = ROOT.parent
-ROOT_SUPPORT_LOC_BUDGETS = {
-    Path("harness_support.py"): 120,
-    Path("run_browser_surface_probe.py"): 120,
-}
+MAX_PHYSICAL_LINES = 800
+MAX_CALLABLE_COMPLEXITY = 15
+PYTHON_SCAN_EXCLUDED_DIRECTORIES = frozenset(
+    {
+        ".git",
+        ".cache",
+        ".mypy_cache",
+        ".pytest_cache",
+        ".pytest-tmp",
+        ".ruff_cache",
+        ".venv",
+        "__pycache__",
+        "build",
+        "coverage",
+        "dist",
+        "htmlcov",
+        "node_modules",
+        "playwright-report",
+        "test-results",
+    }
+)
 EXTRACTION_MODULES = [
     SERVICES_ROOT / "extraction_context.py",
     SERVICES_ROOT / "listing_extractor.py",
@@ -140,45 +159,6 @@ ALLOWED_SERVICE_CONFIG_CONSTANTS = {
     ("platform_policy.py", "_GENERIC_JOB_TOKENS"),
     ("playground_service.py", "SITEMAP_DISPLAY_LIMIT"),
 }
-DEFAULT_LOC_BUDGET = 1000
-# Debt present when regression tests joined the default safe suite. These exact
-# baselines are grandfathered, but may only shrink; the normal budgets remain.
-LEGACY_SOURCE_LOC_RATCHETS = {
-    Path("app/services/acquisition/browser_detail.py"): 1018,
-    Path("app/services/config/extraction_rules/_detail.py"): 664,
-}
-CRITICAL_TEST_LOC_RATCHETS = {
-    Path("tests/component/test_crawl_fetch_runtime.py"): 3753,
-    Path("tests/regression/test_browser_expansion_runtime.py"): 6250,
-    Path("tests/regression/test_crawl_engine.py"): 6753,
-    Path("tests/regression/test_detail_extractor_structured_sources.py"): 9379,
-    Path("tests/regression/test_selectolax_css_migration.py"): 2799,
-}
-PLAN_TARGET_LOC_BUDGETS = {
-    # Verified Architecture Audit Remediation staged targets. These are not
-    # blanket budgets: each matching slice must make the target enforceable.
-    Path("app/services/listing_extractor.py"): 900,  # Slice 2 facade target.
-    Path("app/services/pipeline/extract_records.py"): 700,  # Slice 3 target.
-    Path(
-        "app/services/extract/detail_candidate_collection.py"
-    ): 1000,  # Slice 6 follow-up target.
-    Path(
-        "app/services/extract/detail_final_cleanup.py"
-    ): 1000,  # Slice 7 follow-up target.
-    Path("app/services/extract/detail_price_core.py"): 800,  # Slice 8 follow-up target.
-    Path(
-        "app/services/extract/detail_identity_core.py"
-    ): 800,  # Slice 8 follow-up target.
-    Path("app/services/selectors_runtime.py"): 600,  # Slice 12 target.
-    Path("app/services/pipeline/extraction_loop.py"): 1000,  # Slice 12 target.
-    Path("app/services/dom/selector_engine.py"): 1000,  # Slice 12 target.
-    Path("app/services/acquisition/browser_runtime.py"): 1000,  # Slice 12 target.
-    Path("app/services/acquisition/traversal.py"): 1000,  # Slice 12 target.
-    Path("app/services/acquisition/browser_page_flow.py"): 1000,  # Slice 12 target.
-    Path("app/services/fetch/fetch_context.py"): 1000,  # Slice 12 target.
-    Path("app/services/data_enrichment/service.py"): 725,  # Slice 12 target.
-    Path("app/api/crawls.py"): 500,  # Slice 12 target.
-}
 
 
 @pytest.mark.regression
@@ -203,105 +183,6 @@ def test_variant_normalization_common_keeps_compatibility_reexports() -> None:
     )
 
 
-# Keep explicit budgets for coherent large owners. Budgets are set to roughly the
-# current LOC plus 10% so growth requires a conscious update instead of a blanket
-# threshold increase.
-FILE_LOC_BUDGETS = {
-    # Browser identity owns native Playwright context spec construction.
-    Path("app/services/acquisition/browser_identity.py"): 175,
-    # Browser runtime owns fetch orchestration; pooled lifecycle lives in browser_pool.py.
-    Path("app/services/acquisition/browser_pool.py"): 1100,
-    Path("app/services/acquisition/browser_runtime.py"): 1060,
-    # Page flow owns navigation/readiness; final result shaping lives in browser_result_builder.py.
-    Path("app/services/acquisition/browser_page_flow.py"): 1000,
-    # Traversal owns mode orchestration; helper/recovery mechanics live beside it.
-    Path("app/services/acquisition/traversal.py"): 1000,
-    # Config extraction rules are split by concern behind a stable package facade.
-    Path("app/services/config/extraction_rules/__init__.py"): 80,
-    Path("app/services/config/extraction_rules/_common.py"): 330,
-    Path("app/services/config/extraction_rules/_detail.py"): 630,
-    Path("app/services/config/extraction_rules/_detail_sections.py"): 80,
-    Path("app/services/config/extraction_rules/_extra_exports.py"): 280,
-    Path("app/services/config/extraction_rules/_images.py"): 100,
-    Path("app/services/config/extraction_rules/_jobs.py"): 80,
-    Path("app/services/config/extraction_rules/_listing_structured.py"): 650,
-    Path("app/services/config/extraction_rules/_variants.py"): 340,
-    Path("app/services/pipeline/extract_records.py"): 700,
-    Path("app/services/extract/detail_dom_section_targets.py"): 160,
-    Path("app/services/extract/detail_dom_fallbacks.py"): 360,
-    Path("app/services/extract/detail_dom_variant_coercion.py"): 340,
-    Path("app/services/extract/detail_dom_variant_extraction.py"): 945,
-    Path("app/services/extract/detail_final_cleanup.py"): 205,
-    Path("app/services/extract/detail_record_sanitization.py"): 500,
-    Path("app/services/extract/detail_money_repair.py"): 355,
-    Path("app/services/extract/detail_variant_pruning.py"): 555,
-    Path("app/services/extract/detail_image_cleanup.py"): 505,
-    Path("app/services/extract/detail/price/core.py"): 1085,
-    Path("app/services/extract/detail/identity/core.py"): 1330,
-    Path("app/services/extract/detail/text/sanitizer.py"): 1080,
-    # Extract decomposition plan Slice 2 follow-up: split stage owners must stay
-    # small after variant_record_normalization.py was removed.
-    Path("app/services/extract/variant_normalization/contract.py"): 400,
-    Path("app/services/extract/variant_normalization/hydration.py"): 400,
-    Path("app/services/extract/variant_normalization/sanitization.py"): 400,
-    Path("app/services/extract/variant_normalization/deduplication.py"): 400,
-    Path("app/services/extract/variant_normalization/backfill.py"): 400,
-    Path("app/services/extract/variant_normalization/size_color_extraction.py"): 400,
-    Path("app/services/extract/variant_axis.py"): 295,
-    Path("app/services/extract/variant_option_value.py"): 260,
-    Path("app/services/extract/variant_choice_traversal.py"): 905,
-    Path("app/services/extract/variant_identity_merge.py"): 500,
-    # Listing extraction is the orchestration facade; card/title/image/brand
-    # signal ownership lives in extract/listing_signals.py.
-    Path("app/services/listing_extractor.py"): 900,
-    Path("app/services/extract/listing_signals.py"): 650,
-    # Canonical field coercion remains centralized here instead of scattering value policy.
-    # Shrunk after removing stranded URL helpers and duplicate output schema checks.
-    Path("app/services/dom/selector_engine.py"): 1000,
-    Path("app/services/extract/detail_candidate_collection.py"): 610,
-    Path("app/services/extract/detail_structured_pruning.py"): 300,
-    Path("app/services/extract/detail_dom_completion.py"): 360,
-    Path("app/services/extract/detail_image_materialize.py"): 130,
-    Path("app/services/extract/detail_record_assembly.py"): 495,
-    # Ratcheted for explicit typed fetch_page API compatibility.
-    Path("app/services/fetch/fetch_context.py"): 1150,
-    Path("app/services/js_state/state_normalizer/__init__.py"): 80,
-    Path("app/services/js_state/state_normalizer/_common.py"): 120,
-    Path("app/services/js_state/state_normalizer/_facade.py"): 180,
-    Path("app/services/js_state/state_normalizer/_identity.py"): 240,
-    Path("app/services/js_state/state_normalizer/_payloads.py"): 260,
-    Path("app/services/js_state/state_normalizer/_product_mapping.py"): 460,
-    Path("app/services/js_state/state_normalizer/_variant_mapping.py"): 280,
-    Path("app/services/js_state/state_normalizer/_variant_rows.py"): 445,
-    Path("app/services/product_intelligence/discovery.py"): 1320,
-    Path("app/services/extract/detail/variants/dom_extraction.py"): 1150,
-    # Extraction loop owns stage orchestration; retry and record extraction stages are split out.
-    Path("app/services/pipeline/extraction_loop.py"): 1000,
-    # Run progress owns batch-level summary/merge/quality aggregation, evicted
-    # from the ORM layer so business logic does not live in models/crawl.py.
-    Path("app/services/pipeline/run_progress.py"): 365,
-    Path("app/services/shared/field_coerce.py"): 1100,
-    Path("app/services/selectors_runtime.py"): 610,
-    Path("app/services/playground_service.py"): 1040,
-    Path("app/services/selector_suggestions.py"): 250,
-    # Enrichment service owns job orchestration and delegates deterministic normalization.
-    # Data enrichment quality plan added prompt-context validation and optional semantic tags.
-    Path("app/services/data_enrichment/service.py"): 825,
-    Path("app/services/data_enrichment/deterministic.py"): 890,
-    # LLM task runtime now only orchestrates task execution. Prompt rendering,
-    # payload validation, provider calls, budget/cache, and cost logging have
-    # separate owners.
-    # Ratcheted for config_snapshot-aware LLM task runtime.
-    Path("app/services/llm/tasks.py"): 460,
-    # Product Intelligence service owns job + discovery orchestration with brand and enrichment LLM helpers.
-    Path("app/services/product_intelligence/service.py"): 1105,
-}
-API_FILE_LOC_BUDGETS = {
-    Path("app/api/crawls.py"): 500,
-    Path("app/api/crawl_domain.py"): 250,
-}
-
-
 def _module_imports(path: Path) -> set[str]:
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     imports: set[str] = set()
@@ -312,16 +193,6 @@ def _module_imports(path: Path) -> set[str]:
         if isinstance(node, ast.ImportFrom) and node.module:
             imports.add(node.module)
     return imports
-
-
-def _loc_budget_for(path: Path) -> int:
-    return FILE_LOC_BUDGETS.get(path, DEFAULT_LOC_BUDGET)
-
-
-def _source_loc(path: Path) -> int:
-    return sum(
-        bool(line.strip()) for line in path.read_text(encoding="utf-8").splitlines()
-    )
 
 
 def _service_rel(path: Path) -> str:
@@ -410,56 +281,92 @@ def _private_app_imports(path: Path) -> set[str]:
     return imports
 
 
+def _maintained_python_files(root: Path) -> list[Path]:
+    return sorted(
+        path
+        for path in root.rglob("*.py")
+        if not set(path.relative_to(root).parts) & PYTHON_SCAN_EXCLUDED_DIRECTORIES
+    )
+
+
+def _physical_line_count(path: Path) -> int:
+    return len(path.read_text(encoding="utf-8").splitlines())
+
+
+def _callable_complexities(path: Path) -> list[tuple[str, int, int]]:
+    blocks = cc_visit(path.read_text(encoding="utf-8"))
+    callables: list[tuple[str, int, int]] = []
+    pending = [block for block in blocks if block.letter in {"F", "M"}]
+    while pending:
+        block = pending.pop()
+        callables.append((block.name, block.lineno, block.complexity))
+        pending.extend(block.closures)
+    return callables
+
+
 @pytest.mark.regression
-def test_service_files_stay_under_loc_budget() -> None:
+def test_maintained_python_files_meet_absolute_quality_limits() -> None:
     oversized: list[str] = []
-    for path in SERVICES_ROOT.rglob("*.py"):
-        rel = path.relative_to(ROOT)
-        line_count = _source_loc(path)
-        budget = _loc_budget_for(rel)
-        legacy_ratchet = LEGACY_SOURCE_LOC_RATCHETS.get(rel, budget)
-        effective_limit = max(budget, legacy_ratchet)
-        if line_count > effective_limit:
+    overcomplex: list[str] = []
+    for path in _maintained_python_files(ROOT):
+        relative_path = path.relative_to(ROOT).as_posix()
+        line_count = _physical_line_count(path)
+        if line_count > MAX_PHYSICAL_LINES:
             oversized.append(
-                f"{rel} has {line_count} LOC (effective limit {effective_limit})"
+                f"{relative_path} has {line_count} physical lines; "
+                f"limit is {MAX_PHYSICAL_LINES}"
             )
+        for name, line_number, complexity in _callable_complexities(path):
+            if complexity > MAX_CALLABLE_COMPLEXITY:
+                overcomplex.append(
+                    f"{relative_path}:{line_number}:{name} has CC {complexity}; "
+                    f"limit is {MAX_CALLABLE_COMPLEXITY}"
+                )
     assert oversized == []
+    assert overcomplex == []
 
 
 @pytest.mark.regression
-def test_critical_test_suites_do_not_regrow() -> None:
-    oversized = []
-    for rel, budget in CRITICAL_TEST_LOC_RATCHETS.items():
-        line_count = len((ROOT / rel).read_text(encoding="utf-8").splitlines())
-        if line_count > budget:
-            oversized.append(f"{rel} has {line_count} LOC (ratchet {budget})")
-    assert oversized == []
+def test_absolute_quality_gate_boundaries(tmp_path: Path) -> None:
+    exact_loc = tmp_path / "exact_loc.py"
+    oversized = tmp_path / "oversized.py"
+    exact_loc.write_text("pass\n" * MAX_PHYSICAL_LINES, encoding="utf-8")
+    oversized.write_text("pass\n" * (MAX_PHYSICAL_LINES + 1), encoding="utf-8")
+    assert _physical_line_count(exact_loc) == MAX_PHYSICAL_LINES
+    assert _physical_line_count(oversized) == MAX_PHYSICAL_LINES + 1
+
+    exact_cc = tmp_path / "exact_cc.py"
+    overcomplex_cc = tmp_path / "overcomplex_cc.py"
+    exact_cc.write_text(_synthetic_callable(MAX_CALLABLE_COMPLEXITY), encoding="utf-8")
+    overcomplex_cc.write_text(
+        _synthetic_callable(MAX_CALLABLE_COMPLEXITY + 1), encoding="utf-8"
+    )
+    assert _callable_complexities(exact_cc) == [
+        ("synthetic", 1, MAX_CALLABLE_COMPLEXITY)
+    ]
+    assert _callable_complexities(overcomplex_cc) == [
+        ("synthetic", 1, MAX_CALLABLE_COMPLEXITY + 1)
+    ]
+
+
+def _synthetic_callable(complexity: int) -> str:
+    branches = [
+        f"    if value == {index}:\n        return {index}\n"
+        for index in range(complexity - 1)
+    ]
+    return "def synthetic(value):\n" + "".join(branches) + "    return -1\n"
 
 
 @pytest.mark.regression
-def test_api_files_stay_under_loc_budget() -> None:
-    oversized: list[str] = []
-    for path in API_ROOT.rglob("*.py"):
-        rel = path.relative_to(ROOT)
-        budget = API_FILE_LOC_BUDGETS.get(rel)
-        if budget is None:
-            continue
-        line_count = len(path.read_text(encoding="utf-8").splitlines())
-        if line_count > budget:
-            oversized.append(f"{rel} has {line_count} LOC (budget {budget})")
-    assert oversized == []
-
-
-@pytest.mark.regression
-def test_root_support_facades_stay_thin() -> None:
-    oversized: list[str] = []
-    for rel, budget in ROOT_SUPPORT_LOC_BUDGETS.items():
-        path = ROOT / rel
-        assert path.exists()
-        line_count = len(path.read_text(encoding="utf-8").splitlines())
-        if line_count > budget:
-            oversized.append(f"{rel} has {line_count} LOC (budget {budget})")
-    assert oversized == []
+def test_python_quality_exclusions_are_narrow_and_explicit(tmp_path: Path) -> None:
+    maintained = tmp_path / "app" / "maintained.py"
+    maintained.parent.mkdir()
+    maintained.write_text("pass\n", encoding="utf-8")
+    for directory in PYTHON_SCAN_EXCLUDED_DIRECTORIES:
+        excluded = tmp_path / directory / "ignored.py"
+        excluded.parent.mkdir()
+        excluded.write_text("pass\n" * (MAX_PHYSICAL_LINES + 1), encoding="utf-8")
+    assert _maintained_python_files(tmp_path) == [maintained]
 
 
 @pytest.mark.regression
@@ -484,20 +391,6 @@ def test_removed_architecture_audit_files_do_not_return() -> None:
         SERVICES_ROOT / "pipeline" / "extraction_retry_stage.py",
     ]
     assert [str(path.relative_to(ROOT)) for path in forbidden if path.exists()] == []
-
-
-@pytest.mark.regression
-def test_audit_plan_targets_are_tracked_by_current_budgets() -> None:
-    missing = set(PLAN_TARGET_LOC_BUDGETS) - set(FILE_LOC_BUDGETS)
-    missing = {
-        path
-        for path in missing
-        if (ROOT / path).exists()
-        and len((ROOT / path).read_text(encoding="utf-8").splitlines())
-        > DEFAULT_LOC_BUDGET
-    }
-    missing -= {Path("app/api/crawls.py")}
-    assert missing == set()
 
 
 @pytest.mark.regression
