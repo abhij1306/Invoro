@@ -21,7 +21,6 @@ from app.models.monitor import (
     MonitorWebhookDelivery,
 )
 from app.models.notification import InAppNotification
-from app.models.page_audit import PageAuditJob, PageAuditResult
 from app.models.playground import PlaygroundSession
 from app.models.product_intelligence import (
     ProductIntelligenceCandidate,
@@ -30,7 +29,6 @@ from app.models.product_intelligence import (
     ProductIntelligenceSourceProduct,
 )
 from app.models.review import ReviewPromotion
-from app.models.ucp_audit import UCPAuditJob, UCPAuditPageResult, UCPAuditReport
 
 __all__ = [
     "Base",
@@ -59,11 +57,6 @@ __all__ = [
     "MonitorURLState",
     "MonitorWebhookDelivery",
     "InAppNotification",
-    "PageAuditJob",
-    "PageAuditResult",
     "PlaygroundSession",
     "ReviewPromotion",
-    "UCPAuditJob",
-    "UCPAuditPageResult",
-    "UCPAuditReport",
 ]

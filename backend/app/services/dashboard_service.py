@@ -4,6 +4,7 @@ from __future__ import annotations
 import logging
 import shutil
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 from pathlib import Path
 
 from app.core.config import BASE_DIR, PROJECT_ROOT, settings
@@ -25,9 +26,7 @@ from app.models.product_intelligence import (
     ProductIntelligenceMatch,
     ProductIntelligenceSourceProduct,
 )
-from app.models.page_audit import PageAuditJob, PageAuditResult
 from app.models.review import ReviewPromotion
-from app.models.ucp_audit import UCPAuditJob, UCPAuditPageResult, UCPAuditReport
 from app.models.llm import LLMCostLog
 from app.services.acquisition.cookie_store import clear_cookie_store_cache
 from app.services.acquisition.pacing import reset_pacing_state
@@ -123,16 +122,12 @@ async def reset_application_data(session: AsyncSession) -> dict:
         memory_reset = await _reset_domain_memory_db(session)
         intelligence_reset = await _reset_product_intelligence_db(session)
         enrichment_reset = await _reset_data_enrichment_db(session)
-        ucp_audit_reset = await _reset_ucp_audit_db(session)
-        page_audit_reset = await _reset_page_audit_db(session)
     return {
         **crawl_reset,
         **await _reset_crawl_runtime_state(),
         **memory_reset,
         **intelligence_reset,
         **enrichment_reset,
-        **ucp_audit_reset,
-        **page_audit_reset,
     }
 
 
@@ -217,31 +212,6 @@ async def _reset_data_enrichment_db(session: AsyncSession) -> dict:
         ],
     )
     await _reset_data_enrichment_tables(session)
-    return counts
-
-
-async def _reset_ucp_audit_db(session: AsyncSession) -> dict:
-    counts = await _reset_bucket_db(
-        session,
-        [
-            ("ucp_audit_jobs_deleted", UCPAuditJob),
-            ("ucp_audit_page_results_deleted", UCPAuditPageResult),
-            ("ucp_audit_reports_deleted", UCPAuditReport),
-        ],
-    )
-    await _reset_ucp_audit_tables(session)
-    return counts
-
-
-async def _reset_page_audit_db(session: AsyncSession) -> dict:
-    counts = await _reset_bucket_db(
-        session,
-        [
-            ("page_audit_jobs_deleted", PageAuditJob),
-            ("page_audit_results_deleted", PageAuditResult),
-        ],
-    )
-    await _reset_page_audit_tables(session)
     return counts
 
 
@@ -369,25 +339,6 @@ async def _reset_data_enrichment_tables(session: AsyncSession) -> None:
     )
 
 
-async def _reset_ucp_audit_tables(session: AsyncSession) -> None:
-    await _reset_bucket_tables(
-        session,
-        [UCPAuditReport, UCPAuditPageResult, UCPAuditJob],
-        UCPAuditReport.__tablename__,
-        UCPAuditPageResult.__tablename__,
-        UCPAuditJob.__tablename__,
-    )
-
-
-async def _reset_page_audit_tables(session: AsyncSession) -> None:
-    await _reset_bucket_tables(
-        session,
-        [PageAuditResult, PageAuditJob],
-        PageAuditResult.__tablename__,
-        PageAuditJob.__tablename__,
-    )
-
-
 async def _reset_bucket_tables(
     session: AsyncSession,
     models: list[type],
@@ -475,59 +426,27 @@ async def build_operational_metrics(session: AsyncSession) -> dict:
         .limit(crawler_runtime_settings.max_duration_sample_size)
     )
     durations_seconds: list[float] = []
-    long_running_count = 0
-    active_without_stage_count = 0
-    active_stalled_no_progress_count = 0
     active_status_values = {status.value for status in ACTIVE_STATUSES}
-    from datetime import UTC, datetime
-
     now = datetime.now(UTC)
     for created_at, completed_at in run_duration_rows:
-        created_ts = (
-            created_at.replace(tzinfo=UTC)
-            if getattr(created_at, "tzinfo", None) is None
-            else created_at.astimezone(UTC)
+        durations_seconds.append(
+            _run_duration_seconds(created_at, completed_at, now=now)
         )
-        completed_ts = (
-            completed_at.replace(tzinfo=UTC)
-            if completed_at is not None
-            and getattr(completed_at, "tzinfo", None) is None
-            else completed_at.astimezone(UTC)
-            if completed_at is not None
-            else None
-        )
-        end_time = completed_ts or now
-        duration = max(0.0, (end_time - created_ts).total_seconds())
-        durations_seconds.append(duration)
     active_rows = await session.execute(
         select(CrawlRun.created_at, CrawlRun.updated_at, CrawlRun.result_summary).where(
             CrawlRun.status.in_(list(active_status_values))
         )
     )
-    for created_at, updated_at, result_summary in active_rows:
-        if not created_at:
-            continue
-        summary = result_summary if isinstance(result_summary, dict) else {}
-        current_stage = str(summary.get("current_stage") or "").strip()
-        created_ts = (
-            created_at.replace(tzinfo=UTC)
-            if getattr(created_at, "tzinfo", None) is None
-            else created_at.astimezone(UTC)
-        )
-        active_duration = max(0.0, (now - created_ts).total_seconds())
-        if active_duration >= long_run_threshold_seconds:
-            long_running_count += 1
-        if not current_stage:
-            active_without_stage_count += 1
-            if updated_at is not None:
-                updated_ts = (
-                    updated_at.replace(tzinfo=UTC)
-                    if getattr(updated_at, "tzinfo", None) is None
-                    else updated_at.astimezone(UTC)
-                )
-                seconds_since_update = max(0.0, (now - updated_ts).total_seconds())
-                if seconds_since_update >= stalled_run_threshold_seconds:
-                    active_stalled_no_progress_count += 1
+    (
+        long_running_count,
+        active_without_stage_count,
+        active_stalled_no_progress_count,
+    ) = _active_run_metrics(
+        active_rows,
+        now=now,
+        long_run_threshold_seconds=long_run_threshold_seconds,
+        stalled_run_threshold_seconds=stalled_run_threshold_seconds,
+    )
     avg_duration = (
         round(sum(durations_seconds) / len(durations_seconds), 2)
         if durations_seconds
@@ -553,3 +472,47 @@ async def build_operational_metrics(session: AsyncSession) -> dict:
             "active_stalled_no_progress_count": active_stalled_no_progress_count,
         },
     }
+
+
+def _utc_datetime(value):
+    if value is None:
+        return None
+    if getattr(value, "tzinfo", None) is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
+
+
+def _run_duration_seconds(created_at, completed_at, *, now: datetime) -> float:
+    created = _utc_datetime(created_at)
+    completed = _utc_datetime(completed_at)
+    return max(0.0, ((completed or now) - created).total_seconds())
+
+
+def _active_run_metrics(
+    rows,
+    *,
+    now: datetime,
+    long_run_threshold_seconds: float,
+    stalled_run_threshold_seconds: float,
+) -> tuple[int, int, int]:
+    long_running = 0
+    without_stage = 0
+    stalled = 0
+    for created_at, updated_at, result_summary in rows:
+        if not created_at:
+            continue
+        created = _utc_datetime(created_at)
+        if max(0.0, (now - created).total_seconds()) >= long_run_threshold_seconds:
+            long_running += 1
+        summary = result_summary if isinstance(result_summary, dict) else {}
+        if str(summary.get("current_stage") or "").strip():
+            continue
+        without_stage += 1
+        updated = _utc_datetime(updated_at)
+        if (
+            updated is not None
+            and max(0.0, (now - updated).total_seconds())
+            >= stalled_run_threshold_seconds
+        ):
+            stalled += 1
+    return long_running, without_stage, stalled

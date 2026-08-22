@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
+
 from app.models.review import ReviewPromotion
 from app.services.domain_utils import normalize_domain
 from app.services.field_policy import canonical_requested_fields
@@ -62,15 +64,11 @@ def refresh_record_commit_metadata(
     source_trace = dict(record.source_trace or {})
     field_discovery = dict(source_trace.get("field_discovery") or {})
     existing = field_discovery.get(normalized_field)
-    sources: list[str]
-    if preserve_existing_sources and isinstance(existing, dict):
-        existing_sources = existing.get("sources")
-        if isinstance(existing_sources, list) and existing_sources:
-            sources = [str(item) for item in existing_sources]
-        else:
-            sources = [source_label]
-    else:
-        sources = [source_label]
+    sources = _commit_sources(
+        existing,
+        source_label=source_label,
+        preserve_existing_sources=preserve_existing_sources,
+    )
     next_payload: dict[str, object] = {
         "status": "found",
         "value": _stringify_value(value),
@@ -81,17 +79,10 @@ def refresh_record_commit_metadata(
     field_discovery[normalized_field] = next_payload
     source_trace["field_discovery"] = field_discovery
 
-    requested_fields = canonical_requested_fields(run.requested_fields or [])
-    found_fields = {
-        key
-        for key, payload in field_discovery.items()
-        if isinstance(payload, dict) and payload.get("status") == "found"
-    }
-    missing = [item for item in requested_fields if item and item not in found_fields]
-    if missing:
-        source_trace["field_discovery_missing"] = missing
-    else:
-        source_trace.pop("field_discovery_missing", None)
+    requested_fields, found_fields, missing = _field_coverage(
+        run.requested_fields, field_discovery
+    )
+    _set_missing_fields(source_trace, missing)
     record.source_trace = source_trace
 
     discovered_data = dict(record.discovered_data or {})
@@ -102,6 +93,37 @@ def refresh_record_commit_metadata(
             "missing": missing,
         }
     record.discovered_data = discovered_data
+
+
+def _commit_sources(
+    existing: object, *, source_label: str, preserve_existing_sources: bool
+) -> list[str]:
+    if not preserve_existing_sources or not isinstance(existing, dict):
+        return [source_label]
+    existing_sources = existing.get("sources")
+    if not isinstance(existing_sources, list) or not existing_sources:
+        return [source_label]
+    return [str(item) for item in existing_sources]
+
+
+def _field_coverage(
+    requested: Iterable[str] | None, field_discovery: dict
+) -> tuple[list[str], set[str], list[str]]:
+    requested_fields = canonical_requested_fields(requested)
+    found_fields = {
+        key
+        for key, payload in field_discovery.items()
+        if isinstance(payload, dict) and payload.get("status") == "found"
+    }
+    missing = [item for item in requested_fields if item and item not in found_fields]
+    return requested_fields, found_fields, missing
+
+
+def _set_missing_fields(source_trace: dict, missing: list[str]) -> None:
+    if missing:
+        source_trace["field_discovery_missing"] = missing
+    else:
+        source_trace.pop("field_discovery_missing", None)
 
 
 def _stringify_value(value: object) -> str:

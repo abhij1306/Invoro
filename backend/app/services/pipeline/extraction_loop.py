@@ -9,7 +9,6 @@ from app.services.acquisition.acquirer import acquire as _acquire
 from app.services.acquisition.browser_runtime import real_chrome_browser_available
 from app.services.acquisition.host_protection_memory import note_host_hard_block
 from app.services.acquisition.runtime import is_non_retryable_http_status
-from app.services.config import observability as obs_config
 from app.services.config.pipeline_reasons import NON_RETRYABLE_HTTP_STATUS_REASON
 from app.services.config.runtime_settings import crawler_runtime_settings
 from app.services.db_utils import mapping_or_empty
@@ -54,8 +53,6 @@ from .extraction_retry_decision import (
     annotate_field_repair as _annotate_field_repair,
     empty_extraction_browser_retry_decision as _empty_extraction_browser_retry_decision,
 )
-from .extraction_trace import record_extraction_trace as _record_extraction_trace
-from .acquisition_timeline import record_acquire_timeline as _record_acquire_timeline
 from .retry import (
     apply_detail_rejection_guard as _apply_detail_rejection_guard,
     build_acquisition_request as _build_acquisition_request,
@@ -70,7 +67,6 @@ from .retry import (
 from .persistence import (
     persist_acquisition_artifacts,
     persist_extracted_records,
-    persist_run_trace,
 )
 from .record_extraction_stage import (
     best_adapter_result,
@@ -358,8 +354,6 @@ async def _run_acquisition_stage(
             f"Acquisition detected rate limiting or bot protection for {context.url}",
         )
 
-    _record_acquire_timeline(context, acquisition_result)
-
     return _FetchedURLStage(
         context=context,
         acquisition_result=acquisition_result,
@@ -430,7 +424,6 @@ async def _run_extraction_stage_observed(
     )
     if _is_content_detail_surface(context.surface):
         await _log_extraction_outcome(context, acquisition_result, records)
-        _record_extraction_trace(context, records)
         set_logfire_attributes(span, final_record_count=len(records))
         return _ExtractedURLStage(fetched=fetched, records=records)
     records, selector_rules = await _retry_low_quality_extraction_with_browser(
@@ -487,7 +480,6 @@ async def _run_extraction_stage_observed(
             "warning",
             f"Rejected detail extraction for {context.url}: {rejection_reason}{guidance}",
         )
-    _record_extraction_trace(context, records)
     set_logfire_attributes(
         span,
         final_record_count=len(records),
@@ -506,7 +498,6 @@ async def _run_normalization_stage(
 ) -> _ExtractedURLStage:
     await _enter_stage(context, STAGE_NORMALIZE)
     acquisition_result = extracted.fetched.acquisition_result
-    trace = context.trace
     normalized_records: list[dict[str, object]] = []
     for index, record in enumerate(extracted.records, start=1):
         normalized_record, validation_errors = validate_record_for_surface(
@@ -517,12 +508,6 @@ async def _run_normalization_stage(
         )
         normalized_records.append(normalized_record)
         if validation_errors:
-            for validation_error in validation_errors:
-                if trace is not None:
-                    trace.record_normalize_edit(
-                        field_name=f"record_{index}",
-                        reason=str(validation_error),
-                    )
             await _log_pipeline_event(
                 context,
                 "warning",
@@ -669,9 +654,6 @@ async def _run_persistence_stage(
             f"Persisted {persisted_count} record(s) for {acquisition_result.final_url}",
             commit=False,
         )
-    await _persist_url_trace(
-        context, extracted, acquisition_result=acquisition_result, verdict=verdict
-    )
     await update_acquisition_contract_memory(
         context,
         acquisition_result=acquisition_result,
@@ -715,32 +697,6 @@ def _persistence_verdict(
     ):
         return VERDICT_LISTING_FAILED
     return verdict
-
-
-async def _persist_url_trace(
-    context: _URLProcessingContext,
-    extracted: _ExtractedURLStage,
-    *,
-    acquisition_result,
-    verdict: str,
-) -> None:
-    trace = context.trace
-    if trace is None:
-        return
-    diagnostics = mapping_or_empty(
-        getattr(acquisition_result, "browser_diagnostics", {})
-    )
-    failure_reason = mapping_or_empty(extracted.fetched.url_metrics).get(
-        "failure_reason"
-    ) or diagnostics.get("failure_reason")
-    trace.record_extraction_rejection(str(failure_reason or "").strip() or None)
-    trace.record_verdict(verdict)
-    await persist_run_trace(
-        run_id=context.run.id,
-        source_url=acquisition_result.final_url,
-        trace=trace,
-        flagged=verdict not in obs_config.TRACE_SUCCESS_VERDICTS,
-    )
 
 
 def _result_record(record: dict[str, object]) -> dict[str, object]:

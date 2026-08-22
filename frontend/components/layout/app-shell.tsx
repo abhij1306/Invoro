@@ -28,7 +28,7 @@ const metricSkeletonKeys = ['metric-crawls', 'metric-records', 'metric-domains',
 const resetDialogCopy = {
   title: 'Reset workspace data',
   description:
-    'Delete crawl runs, records, logs, artifacts, runtime cookie files, learned domain memory, saved cookie memory, field feedback, host protection memory, Product Intelligence data, Data Enrichment data, and AI Discoverability reports.',
+    'Delete crawl runs, records, logs, artifacts, runtime cookie files, learned domain memory, saved cookie memory, field feedback, host protection memory, Product Intelligence data, and Data Enrichment data.',
   confirmLabel: 'Reset Workspace Data',
 } as const;
 
@@ -415,16 +415,6 @@ function getFallbackHeader(pathname: string): TopBarState {
     return {
       title: 'Product Intelligence',
       description: 'Find matching product pages and compare prices.',
-    };
-  if (pathname.startsWith('/ucp-audit'))
-    return {
-      title: 'AI Discoverability Score',
-      description: 'Audit catalog signals for AI-readable commerce discovery.',
-    };
-  if (pathname.startsWith('/run-trace'))
-    return {
-      title: 'Run Trace',
-      description: 'Inspect acquire timeline, extraction tiers, and auto-flagged bugs for a run.',
     };
   if (pathname.startsWith('/runs/'))
     return {

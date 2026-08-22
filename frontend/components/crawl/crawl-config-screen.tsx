@@ -61,7 +61,6 @@ import {
   type TraversalDropdownValue,
 } from './crawl-config-logic';
 import { resolveAutoSurface } from './auto-surface';
-import { CrawlAuditMode, CrawlWorkspaceHeader } from './crawl-audit-mode';
 import { CrawlActionButtons } from './crawl-action-buttons';
 import { testCrawlFieldRow } from './crawl-field-test';
 import {
@@ -78,7 +77,6 @@ import {
   type CrawlConfigScreenProps,
   useCrawlRouteState,
 } from './crawl-config-state';
-import { createDesignCrawlRun } from './design-crawl-submit';
 import { DOMAIN_OPTIONS, DOMAIN_TABS } from './domain-surface-config';
 import * as crawlConfigForm from './use-crawl-config';
 import { useCrawlConfigLifecycle } from './use-crawl-config-lifecycle';
@@ -87,8 +85,6 @@ export function CrawlConfigScreen({
   requestedTab,
   requestedCategoryMode,
   requestedPdpMode,
-  requestedWorkspace = 'crawl',
-  requestedUrl = '',
 }: Readonly<CrawlConfigScreenProps>) {
   const router = useRouter();
   const { routeState, dispatchRoute, bulkPrefillRouteSyncGuardRef } = useCrawlRouteState({
@@ -110,7 +106,7 @@ export function CrawlConfigScreen({
   } = crawlConfigForm.useCrawlConfig();
   const [localState, dispatchLocal] = useReducer(
     crawlConfigLocalReducer,
-    requestedWorkspace,
+    undefined,
     buildInitialLocalState,
   );
   const {
@@ -130,13 +126,11 @@ export function CrawlConfigScreen({
     additionalFields,
     generatingSelectors,
     savingDomainMemory,
-    designSubmitting,
     fieldConfigMessage,
     fieldConfigError,
     fieldRowMessages,
     activeFieldTestId,
     configError,
-    workspaceMode,
   } = localState;
   const localDispatch = useMemo(() => bindCrawlConfigLocalDispatch(dispatchLocal), [dispatchLocal]);
 
@@ -174,8 +168,6 @@ export function CrawlConfigScreen({
     [setValue],
   );
   const { loadDomainMemoryForUrl, markProfileDirty } = useCrawlConfigLifecycle({
-    requestedWorkspace,
-    requestedUrl,
     profileLookupKey,
     domainMemoryLookupKey,
     targetUrl,
@@ -190,9 +182,6 @@ export function CrawlConfigScreen({
   });
 
   useEffect(() => {
-    if (workspaceMode === 'audit') {
-      return;
-    }
     const routeMode = crawlTab === 'category' ? requestedCategoryMode : requestedPdpMode;
     if (
       bulkPrefillRouteSyncGuardRef.current ||
@@ -214,7 +203,6 @@ export function CrawlConfigScreen({
     requestedCategoryMode,
     requestedPdpMode,
     requestedTab,
-    workspaceMode,
   ]);
 
   useEffect(() => {
@@ -330,24 +318,6 @@ export function CrawlConfigScreen({
         }),
       );
       localDispatch.setConfigError(message);
-    }
-  }
-
-  async function startDesignCrawl() {
-    localDispatch.setConfigError('');
-    localDispatch.setDesignSubmitting(true);
-    try {
-      const response = await createDesignCrawlRun({ targetUrl, config, runProfile });
-      startTransition(() => {
-        router.replace(`/crawl?run_id=${response.run_id}` as Route);
-        router.refresh();
-      });
-    } catch (error) {
-      localDispatch.setConfigError(
-        error instanceof Error ? error.message : 'Unable to launch design crawl.',
-      );
-    } finally {
-      localDispatch.setDesignSubmitting(false);
     }
   }
 
@@ -505,32 +475,9 @@ export function CrawlConfigScreen({
         ? targetUrl.trim().length > 0
         : bulkUrls.trim().length > 0 || csvFile !== null;
   const canSubmit =
-    hasTarget &&
-    canPreview(config, fieldRows, { runProfile, studioMode }) &&
-    !isSubmitting &&
-    !designSubmitting;
-  const canSubmitDesign = targetUrl.trim().length > 0 && !isSubmitting && !designSubmitting;
-  function selectWorkspace(value: string) {
-    if (value !== 'crawl' && value !== 'audit') return;
-    localDispatch.setWorkspaceMode(value);
-    window.history.replaceState(
-      null,
-      '',
-      value === 'audit' ? '/crawl?tool=audit' : `/crawl?module=${crawlTab}&mode=${activeMode}`,
-    );
-  }
-  if (workspaceMode === 'audit')
-    return (
-      <CrawlAuditMode
-        targetUrl={targetUrl}
-        onTargetUrlChange={(value) => setValue('targetUrl', value)}
-        onWorkspaceChange={selectWorkspace}
-      />
-    );
-
+    hasTarget && canPreview(config, fieldRows, { runProfile, studioMode }) && !isSubmitting;
   return (
     <div className="page-stack gap-4">
-      <CrawlWorkspaceHeader value="crawl" onChange={selectWorkspace} />
       <form
         className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_380px] xl:items-stretch"
         onSubmit={(event) => void handleSubmit(startCrawl)(event)}
@@ -595,13 +542,7 @@ export function CrawlConfigScreen({
                   </div>
                 ) : null}
               </div>
-              <CrawlActionButtons
-                canSubmit={canSubmit}
-                canSubmitDesign={canSubmitDesign}
-                designSubmitting={designSubmitting}
-                isSubmitting={isSubmitting}
-                onDesignCrawl={() => void startDesignCrawl()}
-              />
+              <CrawlActionButtons canSubmit={canSubmit} isSubmitting={isSubmitting} />
             </div>
 
             {(crawlTab === 'category' && categoryMode === 'bulk') ||

@@ -168,9 +168,7 @@ function RunRow({
       {/* Mode */}
       <TableCell>
         <span className="bg-background-elevated text-muted rounded-sm px-1.5 py-0.5 text-sm">
-          {run.surface === 'design_system'
-            ? `${formatRunType(run.run_type)} · Design System`
-            : formatRunType(run.run_type)}
+          {formatRunType(run.run_type)}
         </span>
       </TableCell>
 

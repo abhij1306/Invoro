@@ -46,27 +46,12 @@ _PRICE_RE = re.compile(r"-?\d+(?:\.\d+)?")
 class MonitorChangeDetectionService:
     async def handle_run_complete(self, run_id: int) -> None:
         async with SessionLocal() as session:
-            run = await session.get(CrawlRun, run_id)
-            if run is None:
+            context = await _load_monitor_context(session, run_id)
+            if context is None:
                 return
-            settings = run.settings if isinstance(run.settings, dict) else {}
-            monitor_id = _as_int(settings.get(MONITOR_ID_SETTING_KEY))
-            if monitor_id is None:
-                return
-            monitor = await session.get(MonitorJob, monitor_id)
-            if monitor is None:
-                return
-
+            run, monitor, settings = context
             previous_records = await _latest_snapshot_records(session, monitor.id)
-            current_records = list(
-                (
-                    await session.scalars(
-                        select(CrawlRecord)
-                        .where(CrawlRecord.run_id == run.id)
-                        .order_by(CrawlRecord.id)
-                    )
-                ).all()
-            )
+            current_records = await _current_run_records(session, run.id)
             previous = {record.url_identity_key: record for record in previous_records}
             current = {
                 _record_identity(record): record
@@ -74,73 +59,25 @@ class MonitorChangeDetectionService:
                 if record.data and _record_identity(record)
             }
 
-            events: list[MonitorEvent] = []
             detected_at = utcnow()
             tracked_fields = [str(field) for field in monitor.tracked_fields or []]
             alert_rules = _alert_rules(monitor)
-
-            for key, record in current.items():
-                if key not in previous:
-                    events.append(
-                        _event(
-                            monitor_id=monitor.id,
-                            run_id=run.id,
-                            source_url=record.source_url,
-                            event_type=MONITOR_EVENT_RECORD_NEW,
-                            detected_at=detected_at,
-                            new_value=_tracked_values(
-                                record, tracked_fields, alert_rules
-                            ),
-                        )
-                    )
-                    continue
-                previous_row = previous[key]
-                for field in _tracked_value_names(tracked_fields, alert_rules):
-                    old_raw = dict(previous_row.field_values or {}).get(field)
-                    new_raw = _tracked_values(record, tracked_fields, alert_rules).get(
-                        field
-                    )
-
-                    old_value = _normalized_value(field, old_raw)
-                    new_value = _normalized_value(field, new_raw)
-
-                    if old_value != new_value:
-                        events.append(
-                            _event(
-                                monitor_id=monitor.id,
-                                run_id=run.id,
-                                source_url=record.source_url,
-                                event_type=MONITOR_EVENT_FIELD_CHANGED,
-                                field_name=field,
-                                old_value=old_raw,
-                                new_value=new_raw,
-                                detected_at=detected_at,
-                            )
-                        )
-
-            for key, previous_row in previous.items():
-                if key not in current:
-                    events.append(
-                        _event(
-                            monitor_id=monitor.id,
-                            run_id=run.id,
-                            source_url=previous_row.source_url,
-                            event_type=MONITOR_EVENT_RECORD_REMOVED,
-                            detected_at=detected_at,
-                            old_value=dict(previous_row.field_values or {}),
-                        )
-                    )
-
-            snapshot = MonitorSnapshot(
-                monitor_id=monitor.id,
-                run_id=run.id,
-                snapshot_data={
-                    "tracked_fields": tracked_fields,
-                    "alert_rules": alert_rules,
-                    "run_id": run.id,
-                },
-                record_count=len(current),
-                change_count=len(events),
+            events = _change_events(
+                monitor=monitor,
+                run=run,
+                previous=previous,
+                current=current,
+                tracked_fields=tracked_fields,
+                alert_rules=alert_rules,
+                detected_at=detected_at,
+            )
+            snapshot = _snapshot_for_run(
+                monitor=monitor,
+                run=run,
+                current=current,
+                events=events,
+                tracked_fields=tracked_fields,
+                alert_rules=alert_rules,
             )
             session.add(snapshot)
             await session.flush()
@@ -156,37 +93,16 @@ class MonitorChangeDetectionService:
                         ),
                     )
                 )
-            for event in events:
-                if event.event_type == MONITOR_EVENT_FIELD_CHANGED:
-                    event.condition_met = _condition_met(
-                        monitor, dict(monitor.last_known_values or {}), event
-                    )
-                session.add(event)
-            if current:
-                first_record = next(iter(current.values()))
-                monitor.last_known_values = _tracked_values(
-                    first_record, tracked_fields, alert_rules
-                )
-                monitor.last_checked_at = detected_at
-                monitor.last_crawl_method = _crawl_method(run, first_record)
-                monitor.consecutive_failure_count = 0
-                monitor.last_error = None
-            else:
-                monitor.last_checked_at = detected_at
-                monitor.consecutive_failure_count = (
-                    int(monitor.consecutive_failure_count or 0) + 1
-                )
-                monitor.last_error = "No records extracted for alert poll"
-                if (
-                    monitor.poll_interval_seconds
-                    and monitor.consecutive_failure_count
-                    >= ALERT_CONSECUTIVE_FAILURE_LIMIT
-                ):
-                    monitor.status = MONITOR_STATUS_ERROR
-            if monitor.poll_interval_seconds and any(
-                event.condition_met for event in events
-            ):
-                monitor.status = MONITOR_STATUS_TRIGGERED
+            _add_monitor_events(session, monitor=monitor, events=events)
+            _update_monitor_after_run(
+                monitor,
+                run=run,
+                current=current,
+                tracked_fields=tracked_fields,
+                alert_rules=alert_rules,
+                detected_at=detected_at,
+                events=events,
+            )
             await session.flush()
             await create_monitor_change_notification(
                 session,
@@ -201,6 +117,150 @@ class MonitorChangeDetectionService:
             summary["monitor_change_count"] = len(events)
             run.result_summary = summary
             await session.commit()
+
+
+async def _load_monitor_context(session, run_id: int):
+    run = await session.get(CrawlRun, run_id)
+    if run is None:
+        return None
+    settings = run.settings if isinstance(run.settings, dict) else {}
+    monitor_id = _as_int(settings.get(MONITOR_ID_SETTING_KEY))
+    if monitor_id is None:
+        return None
+    monitor = await session.get(MonitorJob, monitor_id)
+    return (run, monitor, settings) if monitor is not None else None
+
+
+async def _current_run_records(session, run_id: int) -> list[CrawlRecord]:
+    rows = await session.scalars(
+        select(CrawlRecord).where(CrawlRecord.run_id == run_id).order_by(CrawlRecord.id)
+    )
+    return list(rows.all())
+
+
+def _change_events(
+    *, monitor, run, previous, current, tracked_fields, alert_rules, detected_at
+) -> list[MonitorEvent]:
+    events: list[MonitorEvent] = []
+    for key, record in current.items():
+        if key not in previous:
+            events.append(
+                _event(
+                    monitor_id=monitor.id,
+                    run_id=run.id,
+                    source_url=record.source_url,
+                    event_type=MONITOR_EVENT_RECORD_NEW,
+                    detected_at=detected_at,
+                    new_value=_tracked_values(record, tracked_fields, alert_rules),
+                )
+            )
+        else:
+            events.extend(
+                _field_change_events(
+                    monitor=monitor,
+                    run=run,
+                    record=record,
+                    previous_row=previous[key],
+                    tracked_fields=tracked_fields,
+                    alert_rules=alert_rules,
+                    detected_at=detected_at,
+                )
+            )
+    events.extend(
+        _event(
+            monitor_id=monitor.id,
+            run_id=run.id,
+            source_url=row.source_url,
+            event_type=MONITOR_EVENT_RECORD_REMOVED,
+            detected_at=detected_at,
+            old_value=dict(row.field_values or {}),
+        )
+        for key, row in previous.items()
+        if key not in current
+    )
+    return events
+
+
+def _field_change_events(
+    *, monitor, run, record, previous_row, tracked_fields, alert_rules, detected_at
+) -> list[MonitorEvent]:
+    events = []
+    new_values = _tracked_values(record, tracked_fields, alert_rules)
+    old_values = dict(previous_row.field_values or {})
+    for field in _tracked_value_names(tracked_fields, alert_rules):
+        old_raw = old_values.get(field)
+        new_raw = new_values.get(field)
+        if _normalized_value(field, old_raw) != _normalized_value(field, new_raw):
+            events.append(
+                _event(
+                    monitor_id=monitor.id,
+                    run_id=run.id,
+                    source_url=record.source_url,
+                    event_type=MONITOR_EVENT_FIELD_CHANGED,
+                    field_name=field,
+                    old_value=old_raw,
+                    new_value=new_raw,
+                    detected_at=detected_at,
+                )
+            )
+    return events
+
+
+def _snapshot_for_run(
+    *, monitor, run, current, events, tracked_fields, alert_rules
+) -> MonitorSnapshot:
+    return MonitorSnapshot(
+        monitor_id=monitor.id,
+        run_id=run.id,
+        snapshot_data={
+            "tracked_fields": tracked_fields,
+            "alert_rules": alert_rules,
+            "run_id": run.id,
+        },
+        record_count=len(current),
+        change_count=len(events),
+    )
+
+
+def _add_monitor_events(session, *, monitor, events: list[MonitorEvent]) -> None:
+    previous_values = dict(monitor.last_known_values or {})
+    for event in events:
+        if event.event_type == MONITOR_EVENT_FIELD_CHANGED:
+            event.condition_met = _condition_met(monitor, previous_values, event)
+        session.add(event)
+
+
+def _update_monitor_after_run(
+    monitor,
+    *,
+    run,
+    current,
+    tracked_fields,
+    alert_rules,
+    detected_at,
+    events,
+) -> None:
+    monitor.last_checked_at = detected_at
+    if current:
+        first_record = next(iter(current.values()))
+        monitor.last_known_values = _tracked_values(
+            first_record, tracked_fields, alert_rules
+        )
+        monitor.last_crawl_method = _crawl_method(run, first_record)
+        monitor.consecutive_failure_count = 0
+        monitor.last_error = None
+    else:
+        monitor.consecutive_failure_count = (
+            int(monitor.consecutive_failure_count or 0) + 1
+        )
+        monitor.last_error = "No records extracted for alert poll"
+        if (
+            monitor.poll_interval_seconds
+            and monitor.consecutive_failure_count >= ALERT_CONSECUTIVE_FAILURE_LIMIT
+        ):
+            monitor.status = MONITOR_STATUS_ERROR
+    if monitor.poll_interval_seconds and any(event.condition_met for event in events):
+        monitor.status = MONITOR_STATUS_TRIGGERED
 
 
 def ensure_monitor_change_detection_registered() -> None:

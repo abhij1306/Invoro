@@ -50,7 +50,6 @@ class PlaygroundPipelineRequest(BaseModel):
     enrich: bool = False
     compare: bool = False
     monitor: bool = False
-    audit: bool = False
 
 
 class PlaygroundStepResult(BaseModel):

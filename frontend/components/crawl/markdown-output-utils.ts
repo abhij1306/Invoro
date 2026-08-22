@@ -6,7 +6,6 @@ const MARKDOWN_OUTPUT_SURFACES = new Set([
   'content_detail',
   'article_detail',
   'forum_detail',
-  'design_system',
 ]);
 
 export function isMarkdownOutputRun(run: CrawlRun | undefined): boolean {
@@ -22,10 +21,6 @@ export function isMarkdownOutputRun(run: CrawlRun | undefined): boolean {
     MARKDOWN_OUTPUT_SURFACES.has(resolvedSurface) ||
     requestedFields.some((field) => field.toLowerCase() === 'markdown')
   );
-}
-
-export function isDesignSystemRun(run: CrawlRun | undefined): boolean {
-  return String(run?.surface || '').toLowerCase() === 'design_system';
 }
 
 function readRecordString(record: CrawlRecord, field: string): string {
@@ -54,9 +49,6 @@ export function buildMarkdownDocument(records: CrawlRecord[]): string {
 
 // skipcq: JS-0067
 function markdownDownloadName(run: CrawlRun | undefined): string {
-  if (isDesignSystemRun(run)) {
-    return 'design.md';
-  }
   const host = run?.url
     ? getDomain(run.url)
         .replace(/[^a-z0-9.-]+/gi, '-')

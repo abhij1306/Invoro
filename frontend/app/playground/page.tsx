@@ -380,25 +380,6 @@ export default function PlaygroundPage() {
                       </p>
                     </div>
                   </label>
-                  <label className="border-divider hover:bg-background-alt flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition">
-                    <input
-                      type="checkbox"
-                      checked={pipelineOptions.audit}
-                      onChange={(e) =>
-                        setPipelineOptions((prev) => ({ ...prev, audit: e.target.checked }))
-                      }
-                      className="mt-0.5 size-4 rounded"
-                    />
-                    <div>
-                      <p className="m-0 text-sm font-medium">AI Audit</p>
-                      <p className="text-muted m-0 text-xs">
-                        Check AI discoverability score for the source domain.
-                      </p>
-                      <Badge tone="info" className="mt-1">
-                        Independent — runs on input URL
-                      </Badge>
-                    </div>
-                  </label>
                 </div>
                 <div className="border-divider flex justify-end border-t px-4 py-3">
                   <Button
@@ -407,8 +388,7 @@ export default function PlaygroundPage() {
                       runPipeline.isPending ||
                       (!pipelineOptions.enrich &&
                         !pipelineOptions.compare &&
-                        !pipelineOptions.monitor &&
-                        !pipelineOptions.audit)
+                        !pipelineOptions.monitor)
                     }
                   >
                     {runPipeline.isPending ? (
@@ -1110,10 +1090,6 @@ function PipelineResultsPanel({
         <PipelineStepCard
           label="Monitor"
           stepData={session.step_data?.monitor as Record<string, unknown> | undefined}
-        />
-        <PipelineStepCard
-          label="AI Audit"
-          stepData={session.step_data?.audit as Record<string, unknown> | undefined}
         />
       </div>
       {(onReset || extractedRunIds.length > 0) && (

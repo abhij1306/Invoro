@@ -312,40 +312,47 @@ def artifact_table_rows(row: CrawlRecord) -> list[dict]:
     for table in table_list:
         if not isinstance(table, dict):
             continue
-        header_cells = table.get("headers")
-        headers = header_cells if isinstance(header_cells, list) else []
-        header_labels = [
-            str((cell.get("text") if isinstance(cell, dict) else "") or "").strip()
-            or f"column_{index + 1}"
-            for index, cell in enumerate(headers)
-        ]
-        table_rows = _object_list(table.get("rows"))
-        for row_index, table_row in enumerate(table_rows, start=1):
-            if not isinstance(table_row, dict):
-                continue
-            table_cells = table_row.get("cells")
-            cells = table_cells if isinstance(table_cells, list) else []
-            payload: dict[str, object] = {
-                "record_id": row.id,
-                "source_url": row.source_url,
-                "table_index": table.get("table_index"),
-                "table_caption": table.get("caption"),
-                "table_section_title": table.get("section_title"),
-                "table_row_index": table_row.get("row_index") or row_index,
-            }
-            for index, cell in enumerate(cells):
-                if not isinstance(cell, dict):
-                    continue
-                label = (
-                    header_labels[index]
-                    if index < len(header_labels)
-                    else f"column_{index + 1}"
-                )
-                payload[label] = cell.get("text")
-            flattened.append(
-                {k: v for k, v in payload.items() if v not in (None, "", [], {})}
-            )
+        flattened.extend(_flatten_artifact_table(row, table))
     return flattened
+
+
+def _flatten_artifact_table(row: CrawlRecord, table: dict) -> list[dict]:
+    headers = _object_list(table.get("headers"))
+    labels = [
+        str((cell.get("text") if isinstance(cell, dict) else "") or "").strip()
+        or f"column_{index + 1}"
+        for index, cell in enumerate(headers)
+    ]
+    return [
+        payload
+        for row_index, table_row in enumerate(_object_list(table.get("rows")), start=1)
+        if isinstance(table_row, dict)
+        if (payload := _artifact_table_row(row, table, table_row, labels, row_index))
+    ]
+
+
+def _artifact_table_row(
+    record: CrawlRecord,
+    table: dict,
+    table_row: dict,
+    labels: list[str],
+    row_index: int,
+) -> dict:
+    payload: dict[str, object] = {
+        "record_id": record.id,
+        "source_url": record.source_url,
+        "table_index": table.get("table_index"),
+        "table_caption": table.get("caption"),
+        "table_section_title": table.get("section_title"),
+        "table_row_index": table_row.get("row_index") or row_index,
+    }
+    for index, cell in enumerate(_object_list(table_row.get("cells"))):
+        if isinstance(cell, dict):
+            label = labels[index] if index < len(labels) else f"column_{index + 1}"
+            payload[label] = cell.get("text")
+    return {
+        key: value for key, value in payload.items() if value not in (None, "", [], {})
+    }
 
 
 def record_artifact_bundle(row: CrawlRecord) -> dict[str, object]:

@@ -20,7 +20,6 @@ const DEFAULT_PIPELINE_OPTIONS = {
   enrich: false,
   compare: false,
   monitor: false,
-  audit: false,
 };
 
 export function clampCategoryLimit(value: number): number {

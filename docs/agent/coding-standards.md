@@ -45,6 +45,7 @@ def proc(d, f):
     temp = d * f
     return temp
 
+
 # GOOD
 def calculate_discounted_price(base_price: float, discount_factor: float) -> float:
     return base_price * discount_factor
@@ -323,21 +324,25 @@ if (user.age >= SENIOR_AGE_THRESHOLD) applyDiscount(price * SENIOR_DISCOUNT_RATE
 # Dataclass instead of verbose __init__
 from dataclasses import dataclass, field
 
+
 @dataclass
 class Order:
     id: str
     items: list[str] = field(default_factory=list)
     total: float = 0.0
 
+
 # Context manager for resource management
-with open('file.txt') as f:
+with open("file.txt") as f:
     data = f.read()  # file auto-closed, even on exception
+
 
 # Generator for memory-efficient processing
 def process_large_file(path: str):
     with open(path) as f:
-        for line in f:           # reads line-by-line, not all into memory
+        for line in f:  # reads line-by-line, not all into memory
             yield parse(line)
+
 
 # Walrus operator for readability
 if (match := pattern.search(text)) is not None:

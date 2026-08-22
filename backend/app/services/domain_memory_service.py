@@ -191,20 +191,22 @@ def compose_runtime_selector_rules(
         for row in normalized_run_contract
         if str(row.get("field_name") or "").strip()
     }
+    retained_saved = [
+        row
+        for row in normalized_saved
+        if str(row.get("field_name") or "").strip().lower() not in run_override_fields
+    ]
+    return _dedupe_selector_rules([*retained_saved, *normalized_run_contract])
+
+
+def _dedupe_selector_rules(
+    rules: list[dict[str, object]],
+) -> list[dict[str, object]]:
     combined: list[dict[str, object]] = []
     seen: set[tuple[str, str, str, str]] = set()
-    for row in normalized_saved:
-        if str(row.get("field_name") or "").strip().lower() in run_override_fields:
-            continue
+    for row in rules:
         signature = _selector_rule_signature(row)
-        if signature in seen:
-            continue
-        seen.add(signature)
-        combined.append(row)
-    for row in normalized_run_contract:
-        signature = _selector_rule_signature(row)
-        if signature in seen:
-            continue
-        seen.add(signature)
-        combined.append(row)
+        if signature not in seen:
+            seen.add(signature)
+            combined.append(row)
     return combined

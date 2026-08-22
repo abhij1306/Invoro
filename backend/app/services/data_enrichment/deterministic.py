@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import re
-from collections.abc import Collection, Sequence
+from collections.abc import Sequence
 from decimal import Decimal, InvalidOperation
 from functools import lru_cache
 from urllib.parse import urlparse
@@ -30,14 +30,20 @@ from app.services.config.data_enrichment import (
     DATA_ENRICHMENT_SIZE_CANDIDATE_TARGETS,
     data_enrichment_settings,
 )
-from app.services.data_enrichment.shopify_catalog import (
+from app.services.data_enrichment.catalog_metadata import (
     attribute_lookup_keys,
+    repository_terms,
+    term_dict,
+)
+from app.services.data_enrichment.shopify_catalog import (
     category_attribute_handles as shopify_category_attribute_handles,
     load_attribute_repository_data,
     load_taxonomy_index as load_shopify_taxonomy_index,
-    repository_terms,
-    term_dict,
     top_taxonomy_candidates as shopify_top_taxonomy_candidates,
+)
+from app.services.data_enrichment.candidate_values import (
+    candidate_values,
+    targeted_candidate_values,
 )
 from app.services.shared.regex_patterns import compile_regex_patterns
 from app.services.shared.currency_hints import currency_hint_from_page_url
@@ -187,17 +193,7 @@ def normalize_sizes(
     terms: dict[str, object],
     category_match: dict[str, object] | None = None,
 ) -> tuple[list[str] | None, str | None]:
-    size_config = term_dict(terms, "size_systems")
-    aliases_value = size_config.get("aliases")
-    aliases_dict = aliases_value if isinstance(aliases_value, dict) else {}
-    aliases = {str(k).casefold(): str(v) for k, v in aliases_dict.items()}
-    systems_value = size_config.get("systems")
-    systems_dict = systems_value if isinstance(systems_value, dict) else {}
-    systems = {
-        str(system): {str(item).casefold() for item in values or []}
-        for system, values in systems_dict.items()
-        if isinstance(values, list)
-    }
+    aliases, systems = _size_term_maps(terms)
     values = [
         *candidate_values(data, *DATA_ENRICHMENT_SIZE_CANDIDATE_FIELDS),
         *targeted_candidate_values(
@@ -212,6 +208,39 @@ def normalize_sizes(
     size_context = has_size_context(data)
     if not values and not category_supports_size:
         return None, None
+    return _normalize_size_values(
+        values,
+        aliases=aliases,
+        systems=systems,
+        require_strong=not (category_supports_size or size_context),
+    )
+
+
+def _size_term_maps(
+    terms: dict[str, object],
+) -> tuple[dict[str, str], dict[str, set[str]]]:
+    size_config = term_dict(terms, "size_systems")
+    aliases_value = size_config.get("aliases")
+    aliases_dict = aliases_value if isinstance(aliases_value, dict) else {}
+    systems_value = size_config.get("systems")
+    systems_dict = systems_value if isinstance(systems_value, dict) else {}
+    return (
+        {str(key).casefold(): str(value) for key, value in aliases_dict.items()},
+        {
+            str(system): {str(item).casefold() for item in values or []}
+            for system, values in systems_dict.items()
+            if isinstance(values, list)
+        },
+    )
+
+
+def _normalize_size_values(
+    values: list[object],
+    *,
+    aliases: dict[str, str],
+    systems: dict[str, set[str]],
+    require_strong: bool,
+) -> tuple[list[str] | None, str | None]:
     normalized: list[str] = []
     seen: set[str] = set()
     detected_system = None
@@ -223,7 +252,7 @@ def normalize_sizes(
             cleaned,
             aliases=aliases,
             systems=systems,
-            require_strong=not (category_supports_size or size_context),
+            require_strong=require_strong,
         ):
             continue
         canonical = aliases.get(
@@ -664,127 +693,6 @@ def product_attribute_value(data: dict[str, object], attribute: str) -> object |
 
 def category_attribute_handles(category_path: str | None) -> list[str]:
     return shopify_category_attribute_handles(category_path, load_taxonomy_index())
-
-
-def candidate_values(data: dict[str, object], *keys: str) -> list[object]:
-    values: list[object] = []
-    for key in keys:
-        value = data.get(key)
-        if value in (None, "", [], {}):
-            continue
-        if isinstance(value, dict):
-            values.extend(flatten_dict_values(value))
-        elif isinstance(value, list):
-            values.extend(flatten_list_values(value))
-        else:
-            values.append(value)
-    return values
-
-
-def targeted_candidate_values(
-    data: dict[str, object], target_keys: Collection[str], *keys: str
-) -> list[object]:
-    normalized_targets = {str(key).casefold() for key in target_keys}
-    values: list[object] = []
-    for key in keys:
-        value = data.get(key)
-        if value in (None, "", [], {}):
-            continue
-        if isinstance(value, dict):
-            values.extend(flatten_targeted_dict_values(value, normalized_targets))
-        elif isinstance(value, list):
-            values.extend(flatten_targeted_list_values(value, normalized_targets))
-        else:
-            values.append(value)
-    return values
-
-
-def flatten_dict_values(
-    value: dict[str, object], max_depth: int | None = None
-) -> list[object]:
-    if max_depth is None:
-        max_depth = data_enrichment_settings.candidate_flatten_max_depth
-    if max_depth <= 0:
-        return []
-    values: list[object] = []
-    for item in value.values():
-        if isinstance(item, dict):
-            values.extend(flatten_dict_values(item, max_depth - 1))
-        elif isinstance(item, list):
-            values.extend(flatten_list_values(item, max_depth - 1))
-        else:
-            values.append(item)
-    return values
-
-
-def flatten_list_values(
-    value: list[object], max_depth: int | None = None
-) -> list[object]:
-    if max_depth is None:
-        max_depth = data_enrichment_settings.candidate_flatten_max_depth
-    if max_depth <= 0:
-        return []
-    values: list[object] = []
-    for item in value:
-        if isinstance(item, dict):
-            values.extend(flatten_dict_values(item, max_depth - 1))
-        elif isinstance(item, list):
-            values.extend(flatten_list_values(item, max_depth - 1))
-        else:
-            values.append(item)
-    return values
-
-
-def flatten_targeted_dict_values(
-    value: dict[str, object],
-    target_keys: set[str],
-    max_depth: int | None = None,
-) -> list[object]:
-    if max_depth is None:
-        max_depth = data_enrichment_settings.candidate_flatten_max_depth
-    if max_depth <= 0:
-        return []
-    values: list[object] = []
-    for key, item in value.items():
-        if str(key).casefold() in target_keys and item not in (None, "", [], {}):
-            if isinstance(item, dict):
-                values.extend(flatten_dict_values(item, max_depth - 1))
-            elif isinstance(item, list):
-                values.extend(flatten_list_values(item, max_depth - 1))
-            else:
-                values.append(item)
-            continue
-        if isinstance(item, dict):
-            values.extend(
-                flatten_targeted_dict_values(item, target_keys, max_depth - 1)
-            )
-        elif isinstance(item, list):
-            values.extend(
-                flatten_targeted_list_values(item, target_keys, max_depth - 1)
-            )
-    return values
-
-
-def flatten_targeted_list_values(
-    value: list[object],
-    target_keys: set[str],
-    max_depth: int | None = None,
-) -> list[object]:
-    if max_depth is None:
-        max_depth = data_enrichment_settings.candidate_flatten_max_depth
-    if max_depth <= 0:
-        return []
-    values: list[object] = []
-    for item in value:
-        if isinstance(item, dict):
-            values.extend(
-                flatten_targeted_dict_values(item, target_keys, max_depth - 1)
-            )
-        elif isinstance(item, list):
-            values.extend(
-                flatten_targeted_list_values(item, target_keys, max_depth - 1)
-            )
-    return values
 
 
 def split_values(values: list[object]) -> list[str]:

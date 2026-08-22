@@ -51,8 +51,6 @@ App routes under `frontend/app`:
 Important route behavior:
 
 - `/crawl` switches between config mode and run workspace based on `run_id`
-- `/crawl?tool=audit` opens the Crawl Studio page-audit mode; completed runs can prefill its URL
-- `/crawl?audit_job_id={id}` displays page-audit results inside Crawl Studio
 - `/crawl/category`, `/crawl/pdp`, and `/crawl/bulk` are route shims into `/crawl?...`
 - `/runs/[run_id]` routes back into the crawl workspace
 
@@ -201,7 +199,6 @@ Primary files:
 - `components/layout/app-shell.tsx`, `sidebar.tsx`, and `logo-mark.tsx` for separate shell, navigation, and brand ownership
 - `app/product-intelligence/product-intelligence-components.tsx`, `product-intelligence-results.tsx`, and `product-intelligence-candidate-card.tsx` for Product Intelligence local UI pieces, result summaries, source-vs-candidate comparison rows, confidence reason chips, and URL selection actions; crawl result screens can prefill Product Intelligence from both listing and ecommerce detail records
 - `components/monitors/*` for Monitor and Alert Management list/detail/form/event/history/snapshot components
-- `app/ucp-audit/ucp-audit-components.tsx` for UCP audit report UI pieces
 
 Global CSS policy:
 
@@ -227,8 +224,6 @@ The frontend currently uses live backend routes for:
 - selectors: `/api/selectors`, `/api/selectors/suggest`, `/api/selectors/test`, `/api/selectors/preview-html`
 - users: `/api/users`
 - llm: `/api/llm/providers`, `/api/llm/configs`, `/api/llm/test-connection`, `/api/llm/cost-log`
-- ucp audit: `/api/ucp-audit/jobs`, `/api/ucp-audit/jobs/{id}`, `/api/ucp-audit/jobs/{id}/export.json`, `/api/ucp-audit/jobs/{id}/export.md`
-- page audit: `/api/page-audit/jobs`, `/api/page-audit/jobs/{id}`, `/api/page-audit/jobs/{id}/export.json`, `/api/page-audit/jobs/{id}/export.md`
 - jobs: `/api/jobs/active`
 - monitors: `/api/monitors`, `/api/monitors/{id}`, `/api/monitors/{id}/run/now`, `/api/monitors/{id}/events`, `/api/monitors/{id}/history`, `/api/monitors/{id}/snapshot/current`
 - alerts: `/api/alerts`, `/api/alerts/{id}`, `/api/alerts/{id}/test`, `/api/alerts/{id}/history`, `/api/alerts/{id}/deliveries`
@@ -294,15 +289,6 @@ The admin LLM UI is built on:
 - config CRUD
 - connection tests
 - cost log listing
-
-### UCP Audit
-
-The UCP audit UI is built on:
-
-- persisted audit jobs with status, domain, options, and summary
-- one detail payload containing page results and the final report
-- report dimension scores and findings rendered without recomputing compliance client-side
-- direct JSON and Markdown export URLs from the API layer
 
 ## 7. Testing Surface
 

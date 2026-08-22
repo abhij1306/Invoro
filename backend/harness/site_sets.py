@@ -43,7 +43,7 @@ def _inferred_job_surface(
     normalized_url: str,
     host: str,
     host_label: str,
-    family: str,
+    family: str | None,
 ) -> str | None:
     if (
         family in job_platform_families()

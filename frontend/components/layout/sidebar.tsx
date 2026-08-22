@@ -11,13 +11,11 @@ import {
   BriefcaseBusiness,
   ChevronLeft,
   ChevronRight,
-  ClipboardCheck,
   Clock3,
   DatabaseZap,
   FileChartColumn,
   FolderKanban,
   Grid2x2,
-  Network,
   Radar,
   SearchCheck,
   Settings2,
@@ -47,7 +45,6 @@ const navGroups = [
     items: [
       { href: '/monitors', label: 'Monitors', icon: Radar },
       { href: '/alerts', label: 'Product Alerts', icon: Bell },
-      { href: '/run-trace', label: 'Run Trace', icon: Network },
     ],
   },
   {
@@ -55,7 +52,6 @@ const navGroups = [
     items: [
       { href: '/data-enrichment', label: 'Data Enrichment', icon: FileChartColumn },
       { href: '/product-intelligence', label: 'Product Intelligence', icon: BrainCircuit },
-      { href: '/ucp-audit', label: 'AI Discoverability', icon: ClipboardCheck },
     ],
   },
   {

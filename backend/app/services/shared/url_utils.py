@@ -184,15 +184,20 @@ def title_preserving_acronyms(value: str) -> str:
 
 
 def extract_urls(value: object, page_url: str) -> list[str]:
+    results = _raw_url_candidates(value, page_url)
+    return _dedupe_extracted_urls(results)
+
+
+def _raw_url_candidates(value: object, page_url: str) -> list[str]:
     results: list[str] = []
     if isinstance(value, str):
         text = str(value or "").strip()
         if not text:
-            return results
+            return []
         if _looks_like_malformed_relative_url_candidate(text):
-            return results
+            return []
         if is_concatenated_url(text):
-            return results
+            return []
         embedded_urls = re.findall(r"https?://(?:(?!https?://)[^\s,])+", text)
         if len(embedded_urls) >= 2:
             for candidate in embedded_urls:
@@ -211,10 +216,14 @@ def extract_urls(value: object, page_url: str) -> list[str]:
             candidate = value.get(key)
             if candidate in (None, "", [], {}):
                 continue
-            results.extend(extract_urls(candidate, page_url))
+            results.extend(_raw_url_candidates(candidate, page_url))
     elif isinstance(value, list):
         for item in value:
-            results.extend(extract_urls(item, page_url))
+            results.extend(_raw_url_candidates(item, page_url))
+    return results
+
+
+def _dedupe_extracted_urls(results: list[str]) -> list[str]:
     deduped: list[str] = []
     seen: set[str] = set()
     for candidate in results:

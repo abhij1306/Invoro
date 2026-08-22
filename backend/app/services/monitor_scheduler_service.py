@@ -85,23 +85,7 @@ class MonitorSchedulerService:
                 response = await client.head(url)
                 if _head_response_needs_get_fallback(response):
                     content_hash = await _stream_content_hash(client, url)
-                    state.last_checked_at = now
-                    had_prior_hash = bool(state.last_content_hash)
-                    if content_hash is None:
-                        changed = had_prior_hash
-                    else:
-                        changed = (
-                            not had_prior_hash
-                            or state.last_content_hash != content_hash
-                        )
-                        state.last_content_hash = content_hash
-                    if changed:
-                        state.last_changed_at = now
-                        state.consecutive_unchanged_count = 0
-                    else:
-                        state.consecutive_unchanged_count = (
-                            int(state.consecutive_unchanged_count or 0) + 1
-                        )
+                    changed = _update_hash_precheck_state(state, content_hash, now=now)
                     logger.info(
                         "head_precheck_failed_get_succeeded",
                         extra={"url": url, "status_code": response.status_code},
@@ -117,33 +101,14 @@ class MonitorSchedulerService:
             state.last_checked_at = now
             return True
 
-        had_prior_state = bool(
-            state.last_etag or state.last_modified or state.last_content_hash
+        changed = _precheck_values_changed(
+            state, etag=etag, last_modified=last_modified, content_hash=content_hash
         )
-        changed = not had_prior_state
-        if etag:
-            changed = state.last_etag != etag if had_prior_state else True
-        elif last_modified:
-            changed = state.last_modified != last_modified if had_prior_state else True
-        elif content_hash:
-            changed = (
-                state.last_content_hash != content_hash if had_prior_state else True
-            )
-        else:
-            changed = True
-
         state.last_etag = etag
         state.last_modified = last_modified
         if content_hash is not None:
             state.last_content_hash = content_hash
-        state.last_checked_at = now
-        if changed:
-            state.last_changed_at = now
-            state.consecutive_unchanged_count = 0
-        else:
-            state.consecutive_unchanged_count = (
-                int(state.consecutive_unchanged_count or 0) + 1
-            )
+        _record_precheck_result(state, changed=changed, now=now)
         return changed
 
     async def dispatch_monitor_run(
@@ -266,3 +231,52 @@ def _head_response_needs_get_fallback(response: httpx.Response) -> bool:
     return (
         str(response.headers.get("cf-mitigated") or "").strip().lower() == "challenge"
     )
+
+
+def _update_hash_precheck_state(
+    state: MonitorURLState, content_hash: str | None, *, now
+) -> bool:
+    had_prior_hash = bool(state.last_content_hash)
+    changed = (
+        had_prior_hash
+        if content_hash is None
+        else (not had_prior_hash or state.last_content_hash != content_hash)
+    )
+    if content_hash is not None:
+        state.last_content_hash = content_hash
+    _record_precheck_result(state, changed=changed, now=now)
+    return changed
+
+
+def _precheck_values_changed(
+    state: MonitorURLState,
+    *,
+    etag: str | None,
+    last_modified: str | None,
+    content_hash: str | None,
+) -> bool:
+    had_prior = bool(state.last_etag or state.last_modified or state.last_content_hash)
+    current, previous = next(
+        (
+            pair
+            for pair in (
+                (etag, state.last_etag),
+                (last_modified, state.last_modified),
+                (content_hash, state.last_content_hash),
+            )
+            if pair[0]
+        ),
+        (None, None),
+    )
+    return True if not had_prior or current is None else previous != current
+
+
+def _record_precheck_result(state: MonitorURLState, *, changed: bool, now) -> None:
+    state.last_checked_at = now
+    if changed:
+        state.last_changed_at = now
+        state.consecutive_unchanged_count = 0
+    else:
+        state.consecutive_unchanged_count = (
+            int(state.consecutive_unchanged_count or 0) + 1
+        )

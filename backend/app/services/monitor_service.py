@@ -166,6 +166,17 @@ async def update_monitor(
     payload: dict[str, object],
 ) -> MonitorJob:
     monitor = await get_monitor(session, monitor_id)
+    _apply_monitor_schedule_fields(monitor, payload)
+    _apply_monitor_metadata_fields(monitor, payload)
+    _apply_monitor_status(monitor, payload)
+    await session.commit()
+    await session.refresh(monitor)
+    return monitor
+
+
+def _apply_monitor_schedule_fields(
+    monitor: MonitorJob, payload: dict[str, object]
+) -> None:
     if payload.get("name") is not None:
         monitor.name = str(payload["name"]).strip()
     if payload.get("tracked_fields") is not None:
@@ -193,12 +204,20 @@ async def update_monitor(
         monitor.next_run_at = next_alert_run_time(
             utcnow(), monitor.poll_interval_seconds
         )
+
+
+def _apply_monitor_metadata_fields(
+    monitor: MonitorJob, payload: dict[str, object]
+) -> None:
     if payload.get("priority") is not None:
         monitor.priority = _priority(payload.get("priority"))
     if payload.get("retention_days") is not None:
         monitor.retention_days = _retention_days(payload.get("retention_days"))
     if payload.get("settings") is not None:
         monitor.settings = _monitor_settings(payload.get("settings"), monitor.surface)
+
+
+def _apply_monitor_status(monitor: MonitorJob, payload: dict[str, object]) -> None:
     if payload.get("status") is not None:
         monitor.status = _status(payload.get("status"))
         if monitor.status == MONITOR_STATUS_ACTIVE and monitor.next_run_at is None:
@@ -211,9 +230,6 @@ async def update_monitor(
         monitor.condition = _optional_text(payload.get("condition"))
     if "webhook_url" in payload:
         monitor.webhook_url = _optional_text(payload.get("webhook_url"))
-    await session.commit()
-    await session.refresh(monitor)
-    return monitor
 
 
 async def delete_monitor(session: AsyncSession, monitor_id: int) -> None:

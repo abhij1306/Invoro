@@ -10,8 +10,6 @@ export type CrawlConfigScreenProps = {
   requestedTab: CrawlTab | null;
   requestedCategoryMode: CategoryMode | null;
   requestedPdpMode: PdpMode | null;
-  requestedWorkspace?: 'crawl' | 'audit';
-  requestedUrl?: string;
 };
 
 export const RUN_SETUP_ROW_CLASS =
@@ -49,13 +47,11 @@ export type CrawlConfigLocalState = {
   additionalFields: string[];
   generatingSelectors: boolean;
   savingDomainMemory: boolean;
-  designSubmitting: boolean;
   fieldConfigMessage: string;
   fieldConfigError: string;
   fieldRowMessages: Record<string, { tone: FieldRowMessageTone; message: string }>;
   activeFieldTestId: string | null;
   configError: string;
-  workspaceMode: 'crawl' | 'audit';
 };
 
 export type CrawlConfigLocalAction =
@@ -69,9 +65,7 @@ export type CrawlConfigLocalAction =
       ) => Record<string, { tone: FieldRowMessageTone; message: string }>;
     };
 
-export function buildInitialLocalState(
-  workspaceMode: 'crawl' | 'audit' = 'crawl',
-): CrawlConfigLocalState {
+export function buildInitialLocalState(): CrawlConfigLocalState {
   return {
     sitemapDomain: '',
     sitemapFilterKeyword: 'collections',
@@ -89,13 +83,11 @@ export function buildInitialLocalState(
     additionalFields: [],
     generatingSelectors: false,
     savingDomainMemory: false,
-    designSubmitting: false,
     fieldConfigMessage: '',
     fieldConfigError: '',
     fieldRowMessages: {},
     activeFieldTestId: null,
     configError: '',
-    workspaceMode,
   };
 }
 
@@ -167,8 +159,6 @@ export function bindCrawlConfigLocalDispatch(dispatchLocal: Dispatch<CrawlConfig
       dispatchLocal({ type: 'patch', patch: { generatingSelectors } }),
     setSavingDomainMemory: (savingDomainMemory: boolean) =>
       dispatchLocal({ type: 'patch', patch: { savingDomainMemory } }),
-    setDesignSubmitting: (designSubmitting: boolean) =>
-      dispatchLocal({ type: 'patch', patch: { designSubmitting } }),
     setFieldConfigMessage: (fieldConfigMessage: string) =>
       dispatchLocal({ type: 'patch', patch: { fieldConfigMessage } }),
     setFieldConfigError: (fieldConfigError: string) =>
@@ -178,8 +168,6 @@ export function bindCrawlConfigLocalDispatch(dispatchLocal: Dispatch<CrawlConfig
       dispatchLocal({ type: 'patch', patch: { activeFieldTestId } }),
     setConfigError: (configError: string) =>
       dispatchLocal({ type: 'patch', patch: { configError } }),
-    setWorkspaceMode: (workspaceMode: 'crawl' | 'audit') =>
-      dispatchLocal({ type: 'patch', patch: { workspaceMode } }),
   };
 }
 

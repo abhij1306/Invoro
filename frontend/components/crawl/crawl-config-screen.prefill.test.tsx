@@ -11,7 +11,6 @@ const {
   refreshMock,
   createCsvCrawlMock,
   createCrawlMock,
-  createPageAuditJobMock,
   getDomainRunProfileMock,
   listSelectorsMock,
 } = vi.hoisted(() => ({
@@ -19,7 +18,6 @@ const {
   refreshMock: vi.fn(),
   createCsvCrawlMock: vi.fn(),
   createCrawlMock: vi.fn(),
-  createPageAuditJobMock: vi.fn(),
   getDomainRunProfileMock: vi.fn(),
   listSelectorsMock: vi.fn(),
 }));
@@ -36,7 +34,6 @@ vi.mock('../../lib/api', () => ({
   api: {
     createCsvCrawl: createCsvCrawlMock,
     createCrawl: createCrawlMock,
-    createPageAuditJob: createPageAuditJobMock,
     getDomainRunProfile: getDomainRunProfileMock,
     listSelectors: listSelectorsMock,
   },
@@ -83,7 +80,6 @@ describe('CrawlConfigScreen bulk prefill', () => {
     });
     listSelectorsMock.mockResolvedValue([]);
     createCrawlMock.mockResolvedValue({ run_id: 321 });
-    createPageAuditJobMock.mockResolvedValue({ id: 41 });
   });
   it('restores the jobs domain from batch prefill storage', async () => {
     window.sessionStorage.setItem(
@@ -202,50 +198,6 @@ describe('CrawlConfigScreen bulk prefill', () => {
     expect(
       screen.queryByText('Loaded 1 saved selector from domain memory.'),
     ).not.toBeInTheDocument();
-  });
-
-  it('launches design crawls from the target URL', async () => {
-    renderConfigScreen();
-
-    enterTargetUrl('https://example.com/');
-    fireEvent.click(screen.getByRole('button', { name: 'Design Crawl' }));
-
-    await waitFor(() => {
-      expect(createCrawlMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          run_type: 'crawl',
-          url: 'https://example.com/',
-          surface: 'design_system',
-          additional_fields: [],
-          settings: expect.objectContaining({
-            llm_enabled: true,
-            respect_robots_txt: expect.any(Boolean),
-            fetch_profile: expect.objectContaining({
-              fetch_mode: 'browser_only',
-              extraction_source: 'rendered_dom_visual',
-              traversal_mode: null,
-            }),
-          }),
-        }),
-      );
-    });
-    expect(replaceMock).toHaveBeenCalledWith('/crawl?run_id=321');
-  });
-
-  it('runs page audit from the Crawl Studio audit mode', async () => {
-    renderConfigScreen();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Audit' }));
-    enterTargetUrl('https://example.com/about');
-    fireEvent.click(screen.getByRole('button', { name: 'Start Audit' }));
-
-    await waitFor(() => {
-      expect(createPageAuditJobMock).toHaveBeenCalledWith({
-        url: 'https://example.com/about',
-        context: 'auto',
-      });
-    });
-    expect(replaceMock).toHaveBeenCalledWith('/crawl?audit_job_id=41');
   });
 
   it('does not expose sitemap controls while auto surface is selected', async () => {

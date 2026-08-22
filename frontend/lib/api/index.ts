@@ -11,12 +11,6 @@ import type {
   DataEnrichmentJob,
   DataEnrichmentJobCreatePayload,
   DataEnrichmentJobDetail,
-  UcpAuditJob,
-  UcpAuditJobCreatePayload,
-  UcpAuditJobDetail,
-  PageAuditJob,
-  PageAuditJobCreatePayload,
-  PageAuditJobDetail,
   Dashboard,
   DomainRecipe,
   DomainCookieMemoryRecord,
@@ -50,7 +44,6 @@ import type {
   LlmCostLogRecord,
   InAppNotification,
   PlaygroundSessionResponse,
-  RunObservability,
 } from './types';
 
 function withQuery(path: string, query: URLSearchParams) {
@@ -171,8 +164,6 @@ export const api = {
   },
   getRecordProvenance: (recordId: number) =>
     apiClient.get<CrawlRecordProvenance>(`/api/records/${recordId}/provenance`),
-  getRunObservability: (runId: number) =>
-    apiClient.get<RunObservability>(`/api/runs/${runId}/observability`),
   getCrawlLogs: (runId: number, params?: { afterId?: number; limit?: number }) => {
     const query = new URLSearchParams();
     if (params?.afterId !== undefined) query.set('after_id', String(params.afterId));
@@ -204,29 +195,6 @@ export const api = {
   },
   getDataEnrichmentJob: (jobId: number) =>
     apiClient.get<DataEnrichmentJobDetail>(`/api/data-enrichment/jobs/${jobId}`),
-  createUcpAuditJob: (payload: UcpAuditJobCreatePayload) =>
-    apiClient.post<UcpAuditJob>('/api/ucp-audit/jobs', payload),
-  listUcpAuditJobs: (params?: { limit?: number }) => {
-    const query = new URLSearchParams();
-    if (params?.limit !== undefined) query.set('limit', String(params.limit));
-    return apiClient.get<UcpAuditJob[]>(withQuery('/api/ucp-audit/jobs', query));
-  },
-  getUcpAuditJob: (jobId: number) =>
-    apiClient.get<UcpAuditJobDetail>(`/api/ucp-audit/jobs/${jobId}`),
-  cancelUcpAuditJob: (jobId: number) =>
-    apiClient.post<UcpAuditJob>(`/api/ucp-audit/jobs/${jobId}/cancel`, {}),
-  exportUcpAuditJson: (jobId: number) =>
-    `${getApiBaseUrl()}/api/ucp-audit/jobs/${jobId}/export.json`,
-  exportUcpAuditMarkdown: (jobId: number) =>
-    `${getApiBaseUrl()}/api/ucp-audit/jobs/${jobId}/export.md`,
-  createPageAuditJob: (payload: PageAuditJobCreatePayload) =>
-    apiClient.post<PageAuditJob>('/api/page-audit/jobs', payload),
-  getPageAuditJob: (jobId: number) =>
-    apiClient.get<PageAuditJobDetail>(`/api/page-audit/jobs/${jobId}`),
-  exportPageAuditJson: (jobId: number) =>
-    `${getApiBaseUrl()}/api/page-audit/jobs/${jobId}/export.json`,
-  exportPageAuditMarkdown: (jobId: number) =>
-    `${getApiBaseUrl()}/api/page-audit/jobs/${jobId}/export.md`,
   reviewProductIntelligenceMatch: (
     jobId: number,
     matchId: number,
@@ -256,8 +224,6 @@ export const api = {
   downloadJson: (runId: number) => apiClient.getBlob(`/api/crawls/${runId}/export/json`),
   exportCsv: (runId: number) => `${getApiBaseUrl()}/api/crawls/${runId}/export/csv`,
   exportJson: (runId: number) => `${getApiBaseUrl()}/api/crawls/${runId}/export/json`,
-  exportDesignMarkdown: (runId: number) =>
-    `${getApiBaseUrl()}/api/crawls/${runId}/export/design.md`,
   getReview: (runId: number) => apiClient.get<ReviewPayload>(`/api/review/${runId}`),
   reviewHtml: (runId: number) => `${getApiBaseUrl()}/api/review/${runId}/artifact-html`,
   saveReview: (runId: number, payload: { selections: ReviewSelection[]; extra_fields: string[] }) =>
@@ -422,7 +388,7 @@ export const api = {
     ),
   playgroundPipeline: (
     sessionId: number,
-    options: { enrich: boolean; compare: boolean; monitor: boolean; audit: boolean },
+    options: { enrich: boolean; compare: boolean; monitor: boolean },
   ) =>
     apiClient.post<PlaygroundPipelineApiResponse>(
       `/api/playground/sessions/${sessionId}/pipeline`,

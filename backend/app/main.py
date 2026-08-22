@@ -30,8 +30,6 @@ from app.api.jobs import router as jobs_router
 from app.api.llm import router as llm_router
 from app.api.monitors import router as monitors_router
 from app.api.notifications import router as notifications_router
-from app.api.observability import router as observability_router
-from app.api.page_audit import router as page_audit_router
 from app.api.product_intelligence import router as product_intelligence_router
 from app.api.playground import router as playground_router
 from app.api.public_alerts import router as public_alerts_router
@@ -39,7 +37,6 @@ from app.api.records import router as records_router
 from app.api.review import router as review_router
 from app.api.selectors import router as selectors_router
 from app.api.users import router as users_router
-from app.api.ucp_audit import router as ucp_audit_router
 from app.api.alerts import router as alerts_router
 from app.core.config import get_frontend_origins, runtime_app_env, settings
 from app.core.dependencies import get_db, shutdown_run_dispatchers
@@ -98,7 +95,6 @@ from app.services.monitor_async_loop import AsyncSchedulerLoop
 from app.services.monitor_change_detection import (
     ensure_monitor_change_detection_registered,
 )
-from app.services.observability.run_audit import ensure_run_audit_registered
 from app.services.monitor_scheduler_service import MonitorSchedulerService
 
 logger = logging.getLogger("app")
@@ -141,7 +137,6 @@ async def lifespan(fastapi_app: FastAPI):
                 recovered,
             )
     ensure_monitor_change_detection_registered()
-    ensure_run_audit_registered()
     crawler_state = _crawler_app_state(fastapi_app)
     if settings.scheduler_driver == SCHEDULER_DRIVER_DEV:
         scheduler_loop = AsyncSchedulerLoop(
@@ -619,8 +614,5 @@ for router in [
     public_capabilities_router,
     public_alerts_router,
     notifications_router,
-    page_audit_router,
-    ucp_audit_router,
-    observability_router,
 ]:
     app.include_router(router)

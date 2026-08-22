@@ -33,10 +33,6 @@ from app.services.config.field_mappings import (
     FIELD_ALIASES,
     URL_FIELD,
 )
-from app.services.config.design_system import (
-    DESIGN_SYSTEM_PUBLIC_FIELDS,
-    DESIGN_SYSTEM_SURFACE,
-)
 from app.services.config.public_record_policy import (
     PUBLIC_RECORD_ECOMMERCE_DROPPED_FIELDS,
     PUBLIC_RECORD_LEGACY_VARIANT_FIELDS,
@@ -191,13 +187,6 @@ def validate_record_for_surface(
     requested_fields: list[str] | None = None,
     strict_types: bool = False,
 ) -> tuple[dict[str, Any], list[str]]:
-    if str(surface or "").strip().lower() == DESIGN_SYSTEM_SURFACE:
-        allowed = set(DESIGN_SYSTEM_PUBLIC_FIELDS)
-        return {
-            key: value
-            for key, value in dict(record or {}).items()
-            if str(key).startswith("_") or (key in allowed and not is_blank(value))
-        }, []
     logical_fields, internal_fields = _partition_record_fields(record)
     allowed_fields = {
         normalize_field_key(field_name)

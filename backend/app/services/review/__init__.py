@@ -2,16 +2,10 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from pathlib import Path
 
-from app.models.domain_memory import (
-    DomainCookieMemory,
-    DomainFieldFeedback,
-)
+from app.models.domain_memory import DomainFieldFeedback
 from app.models.crawl_run import CrawlRecord, CrawlRun
 from app.models.review import ReviewPromotion
-from app.services.config.browser_fingerprint_profiles import BROWSER_REQUIRED_REASONS
-from app.services.config.extraction_rules import EXTRACTION_RULES, REVIEW_CONTAINER_KEYS
 from app.services.db_utils import mapping_or_empty
 from app.services.crawl.profile import (
     load_domain_run_profile,
@@ -29,12 +23,26 @@ from app.services.publish import (
     refresh_record_commit_metadata,
 )
 from app.services.schema_service import load_resolved_schema
+from app.services.review.record_content import (
+    discovered_review_fields,
+    found_review_fields,
+    normalized_review_fields,
+    render_review_html,
+    review_bucket_rows,
+)
+from app.services.review.acquisition_evidence import derive_acquisition_info
+from app.services.review.feedback import (
+    domain_cookie_memory_exists,
+    latest_field_feedback_index,
+    list_domain_field_feedback as list_domain_field_feedback,
+    serialize_feedback_row,
+)
 from app.services.selectors_runtime import (
     create_selector_record,
     list_selector_records,
     update_selector_record,
 )
-from sqlalchemy import desc, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -53,35 +61,8 @@ async def build_review_payload(session: AsyncSession, run_id: int) -> dict | Non
         domain=domain,
         surface=run.surface,
     )
-    normalized_fields = sorted(
-        {
-            key
-            for record in records
-            for key, val in mapping_or_empty(record.data).items()
-            if val not in (None, "", [], {}) and not str(key).startswith("_")
-        }
-    )
-    discovered_field_names: set[str] = set()
-    for record in records:
-        for row in _review_bucket_rows(record):
-            key = str(row.get("key") or "").strip()
-            if key:
-                discovered_field_names.add(key)
-    if not discovered_field_names:
-        for record in records:
-            for src in (
-                mapping_or_empty(record.discovered_data),
-                mapping_or_empty(record.raw_data),
-                mapping_or_empty(record.data),
-            ):
-                for key, val in src.items():
-                    if (
-                        val not in (None, "", [], {})
-                        and not str(key).startswith("_")
-                        and key not in REVIEW_CONTAINER_KEYS
-                    ):
-                        discovered_field_names.add(str(key))
-    discovered_fields = sorted(discovered_field_names)
+    normalized_fields = normalized_review_fields(records)
+    discovered_fields = discovered_review_fields(records)
     suggested_mapping = {
         field: domain_mapping.get(field, field) for field in discovered_fields
     }
@@ -104,73 +85,16 @@ async def load_review_html(session: AsyncSession, run_id: int) -> str:
         select(CrawlRecord).where(CrawlRecord.run_id == run_id)
     )
     records = list(records_result.scalars().all())
-    return _load_review_html(records)
+    return render_review_html(records)
 
 
 async def save_review(
     session: AsyncSession, run: CrawlRun, selections: list[dict]
 ) -> dict:
-    selected_rows = [
-        row
-        for row in selections
-        if bool(row.get("selected", True))
-        and str(row.get("source_field") or "").strip()
-        and str(row.get("output_field") or "").strip()
-    ]
     domain = normalize_domain(run.url)
-    mapping: dict[str, str] = {}
-    for row in selected_rows:
-        source_field = normalize_field_key(row.get("source_field"))
-        target_field = normalize_review_target(run.surface, row.get("output_field"))
-        if source_field and target_field:
-            mapping[source_field] = target_field
+    mapping = _review_mapping(run.surface, selections)
     resolved_schema = await load_resolved_schema(session, run.surface, domain)
-    next_fields = [
-        *resolved_schema.fields,
-        *list(mapping.values()),
-    ]
-    normalized_baseline_fields = list(
-        dict.fromkeys(
-            normalized_field
-            for field in resolved_schema.baseline_fields
-            if (normalized_field := normalize_review_target(run.surface, field))
-        )
-    )
-    normalized_new_fields = list(
-        dict.fromkeys(
-            normalized_field
-            for field in resolved_schema.new_fields
-            if (normalized_field := normalize_review_target(run.surface, field))
-        )
-    )
-    normalized_baseline_field_set = set(normalized_baseline_fields)
-    updated_schema = resolved_schema.__class__(
-        surface=resolved_schema.surface,
-        domain=resolved_schema.domain,
-        baseline_fields=normalized_baseline_fields,
-        fields=list(dict.fromkeys(field for field in next_fields if field)),
-        new_fields=list(
-            dict.fromkeys(
-                [
-                    *normalized_new_fields,
-                    *[
-                        normalized_value
-                        for value in mapping.values()
-                        if (
-                            normalized_value := normalize_review_target(
-                                run.surface, value
-                            )
-                        )
-                        and normalized_value not in normalized_baseline_field_set
-                    ],
-                ]
-            )
-        ),
-        deprecated_fields=list(resolved_schema.deprecated_fields),
-        source="review",
-        saved_at=None,
-        stale=False,
-    )
+    updated_schema = _updated_review_schema(resolved_schema, run.surface, mapping)
     db_run = await session.get(CrawlRun, run.id)
     if db_run is None:
         raise RuntimeError(f"CrawlRun not found for review save: run_id={run.id}")
@@ -202,33 +126,58 @@ async def save_review(
     }
 
 
-def _load_review_html(records: list[CrawlRecord]) -> str:
-    for record in records:
-        html = _load_record_html(record)
-        if html:
-            return html
-    return ""
+def _review_mapping(surface: str, selections: list[dict]) -> dict[str, str]:
+    mapping: dict[str, str] = {}
+    for row in selections:
+        if not bool(row.get("selected", True)):
+            continue
+        source = normalize_field_key(row.get("source_field"))
+        target = normalize_review_target(surface, row.get("output_field"))
+        if source and target:
+            mapping[source] = target
+    return mapping
 
 
-def _load_record_html(record: CrawlRecord) -> str:
-    raw_path = str(record.raw_html_path or "").strip()
-    if not raw_path:
-        return ""
-    path = Path(raw_path)
-    if not path.exists() or not path.is_file():
-        return ""
-    try:
-        return path.read_text(encoding="utf-8", errors="replace")
-    except OSError:
-        return ""
-
-
-def _review_bucket_rows(record: CrawlRecord) -> list[dict]:
-    discovered_data = mapping_or_empty(record.discovered_data)
-    rows = discovered_data.get("review_bucket")
-    if not isinstance(rows, list):
-        return []
-    return [row for row in rows if isinstance(row, dict)]
+def _updated_review_schema(resolved_schema, surface: str, mapping: dict[str, str]):
+    next_fields = [*resolved_schema.fields, *mapping.values()]
+    normalized_baseline_fields = list(
+        dict.fromkeys(
+            normalized_field
+            for field in resolved_schema.baseline_fields
+            if (normalized_field := normalize_review_target(surface, field))
+        )
+    )
+    normalized_new_fields = list(
+        dict.fromkeys(
+            normalized_field
+            for field in resolved_schema.new_fields
+            if (normalized_field := normalize_review_target(surface, field))
+        )
+    )
+    normalized_baseline_field_set = set(normalized_baseline_fields)
+    return resolved_schema.__class__(
+        surface=resolved_schema.surface,
+        domain=resolved_schema.domain,
+        baseline_fields=normalized_baseline_fields,
+        fields=list(dict.fromkeys(field for field in next_fields if field)),
+        new_fields=list(
+            dict.fromkeys(
+                [
+                    *normalized_new_fields,
+                    *[
+                        normalized_value
+                        for value in mapping.values()
+                        if (normalized_value := normalize_review_target(surface, value))
+                        and normalized_value not in normalized_baseline_field_set
+                    ],
+                ]
+            )
+        ),
+        deprecated_fields=list(resolved_schema.deprecated_fields),
+        source="review",
+        saved_at=None,
+        stale=False,
+    )
 
 
 def _selector_signature(
@@ -264,136 +213,95 @@ def _saved_selector_signature(row: dict[str, object]) -> tuple[str, str, str]:
 async def _promote_review_bucket_fields(
     session: AsyncSession, run: CrawlRun, mapping: dict[str, str]
 ) -> None:
-    if not mapping:
-        return
-    normalized_mapping = {
-        normalized_source_field: normalized_target_field
-        for source_field, target_field in mapping.items()
-        if (normalized_source_field := normalize_field_key(source_field))
-        and (normalized_target_field := normalize_field_key(target_field))
-    }
+    normalized_mapping = _normalized_review_mapping(mapping)
     if not normalized_mapping:
         return
     records_result = await session.execute(
         select(CrawlRecord).where(CrawlRecord.run_id == run.id)
     )
-    records = list(records_result.scalars().all())
-    for record in records:
-        review_bucket = _review_bucket_rows(record)
-        if not review_bucket:
-            continue
-
-        selected_values: dict[str, dict] = {}
-        remaining_rows: list[dict] = []
-        for row in review_bucket:
-            source_field = normalize_field_key(row.get("key"))
-            output_field = normalized_mapping.get(source_field)
-            if not source_field or not output_field:
-                remaining_rows.append(row)
-                continue
-            current_value = mapping_or_empty(record.data).get(output_field)
-            if current_value not in (None, "", [], {}):
-                remaining_rows.append(row)
-                continue
-            existing = selected_values.get(output_field)
-            if existing is None:
-                selected_values[output_field] = row
-
-        if not selected_values and len(remaining_rows) == len(review_bucket):
-            continue
-
-        data = dict(mapping_or_empty(record.data))
-        for output_field, row in selected_values.items():
-            normalized_value = normalize_value(output_field, row.get("value"))
-            data[output_field] = normalized_value
-        record.data = data
-
-        discovered_data = dict(mapping_or_empty(record.discovered_data))
-        mapped_source_fields = {
-            source_field for source_field in normalized_mapping if source_field
-        }
-        discovered_data["review_bucket"] = [
-            row
-            for row in remaining_rows
-            if (key_norm := normalize_field_key(row.get("key")))
-            not in mapped_source_fields
-            or mapping_or_empty(record.data).get(normalized_mapping.get(key_norm, ""))
-            not in (None, "", [], {})
-        ]
-        record.discovered_data = {
-            key: value
-            for key, value in discovered_data.items()
-            if value not in (None, "", [], {})
-        }
-
-        for output_field, _row in selected_values.items():
-            refresh_record_commit_metadata(
-                record,
-                run=run,
-                field_name=output_field,
-                value=data[output_field],
-                source_label="review_promotion",
-            )
+    for record in records_result.scalars().all():
+        _promote_record_bucket(record, run=run, mapping=normalized_mapping)
 
 
-def _derive_acquisition_info(
-    records: list[CrawlRecord],
-    *,
-    run: CrawlRun,
-) -> dict[str, object]:
-    browser_required = False
-    actual_fetch_method: str | None = None
-    browser_reason: str | None = None
-    affordance_candidates: dict[str, object] = {
-        "accordions": [],
-        "tabs": [],
-        "carousels": [],
-        "shadow_hosts": [],
-        "iframe_promotion": None,
-        "browser_required": False,
-    }
-    for record in records:
-        source_trace = mapping_or_empty(record.source_trace)
-        acquisition = mapping_or_empty(source_trace.get("acquisition"))
-        browser_diagnostics = mapping_or_empty(acquisition.get("browser_diagnostics"))
-        if actual_fetch_method is None:
-            method = str(acquisition.get("method") or "").strip()
-            if method:
-                actual_fetch_method = method
-        if browser_reason is None:
-            next_browser_reason = (
-                str(browser_diagnostics.get("browser_reason") or "").strip().lower()
-            )
-            if next_browser_reason:
-                browser_reason = next_browser_reason
-        if (
-            str(acquisition.get("method") or "").strip().lower() == "browser"
-            and str(browser_diagnostics.get("browser_reason") or "").strip().lower()
-            in BROWSER_REQUIRED_REASONS
-        ):
-            browser_required = True
-        _merge_affordance_candidates(
-            affordance_candidates,
-            acquisition=acquisition,
-            browser_diagnostics=browser_diagnostics,
-        )
-    acquisition_summary = mapping_or_empty(
-        mapping_or_empty(run.result_summary).get("acquisition_summary")
+def _normalized_review_mapping(mapping: dict[str, str]) -> dict[str, str]:
+    normalized: dict[str, str] = {}
+    for source_field, target_field in mapping.items():
+        source = normalize_field_key(source_field)
+        target = normalize_field_key(target_field)
+        if source and target:
+            normalized[source] = target
+    return normalized
+
+
+def _promote_record_bucket(
+    record: CrawlRecord, *, run: CrawlRun, mapping: dict[str, str]
+) -> None:
+    review_bucket = review_bucket_rows(record)
+    if not review_bucket:
+        return
+    selected, remaining = _select_review_values(
+        review_bucket,
+        mapping=mapping,
+        record_data=mapping_or_empty(record.data),
     )
-    if actual_fetch_method is None and mapping_or_empty(
-        acquisition_summary.get("methods")
-    ).get("browser"):
-        actual_fetch_method = "browser"
-    if browser_reason is None and actual_fetch_method == "browser":
-        browser_reason = "http-escalation"
-    affordance_candidates["browser_required"] = browser_required
-    return {
-        "actual_fetch_method": actual_fetch_method,
-        "browser_required": browser_required,
-        "browser_reason": browser_reason,
-        "acquisition_summary": acquisition_summary,
-        "affordance_candidates": affordance_candidates,
+    if not selected and len(remaining) == len(review_bucket):
+        return
+    data = dict(mapping_or_empty(record.data))
+    for output_field, row in selected.items():
+        data[output_field] = normalize_value(output_field, row.get("value"))
+    record.data = data
+    discovered = dict(mapping_or_empty(record.discovered_data))
+    discovered["review_bucket"] = _remaining_review_rows(
+        remaining, mapping=mapping, record_data=mapping_or_empty(record.data)
+    )
+    record.discovered_data = {
+        key: value
+        for key, value in discovered.items()
+        if value not in (None, "", [], {})
     }
+    for output_field in selected:
+        refresh_record_commit_metadata(
+            record,
+            run=run,
+            field_name=output_field,
+            value=data[output_field],
+            source_label="review_promotion",
+        )
+
+
+def _select_review_values(
+    review_bucket: list[dict],
+    *,
+    mapping: dict[str, str],
+    record_data: dict[str, object],
+) -> tuple[dict[str, dict], list[dict]]:
+    selected: dict[str, dict] = {}
+    remaining: list[dict] = []
+    for row in review_bucket:
+        source_field = normalize_field_key(row.get("key"))
+        output_field = mapping.get(source_field)
+        if not source_field or not output_field:
+            remaining.append(row)
+        elif record_data.get(output_field) not in (None, "", [], {}):
+            remaining.append(row)
+        elif output_field not in selected:
+            selected[output_field] = row
+    return selected, remaining
+
+
+def _remaining_review_rows(
+    rows: list[dict],
+    *,
+    mapping: dict[str, str],
+    record_data: dict[str, object],
+) -> list[dict]:
+    mapped_sources = set(mapping)
+    return [
+        row
+        for row in rows
+        if (key := normalize_field_key(row.get("key"))) not in mapped_sources
+        or record_data.get(mapping.get(key, "")) not in (None, "", [], {})
+    ]
 
 
 def _collect_selector_candidates(
@@ -403,124 +311,164 @@ def _collect_selector_candidates(
     run: CrawlRun,
     feedback_index: dict[tuple[str, str, str], DomainFieldFeedback],
 ) -> tuple[dict[str, dict[str, object]], dict[tuple[str, str, str], dict[str, object]]]:
-    saved_selector_index = {
-        _saved_selector_signature(row): row for row in saved_selectors
-    }
-    selector_candidates: dict[str, dict[str, object]] = {}
-    field_learning: dict[tuple[str, str, str], dict[str, object]] = {}
+    saved_index = {_saved_selector_signature(row): row for row in saved_selectors}
+    candidates: dict[str, dict[str, object]] = {}
+    learning: dict[tuple[str, str, str], dict[str, object]] = {}
     for record in records:
-        source_trace = mapping_or_empty(record.source_trace)
-        field_discovery = mapping_or_empty(source_trace.get("field_discovery"))
-        for field_name, payload in field_discovery.items():
-            payload_map = payload if isinstance(payload, dict) else {}
-            selector_trace = mapping_or_empty(payload_map.get("selector_trace"))
-            selector_kind = str(selector_trace.get("selector_kind") or "").strip()
-            selector_value = str(selector_trace.get("selector_value") or "").strip()
-            source_labels = [
-                str(value)
-                for value in payload_map.get("sources") or []
-                if str(value or "").strip()
+        discovery = mapping_or_empty(
+            mapping_or_empty(record.source_trace).get("field_discovery")
+        )
+        for field_name, raw_payload in discovery.items():
+            payload = raw_payload if isinstance(raw_payload, dict) else {}
+            trace = mapping_or_empty(payload.get("selector_trace"))
+            kind = str(trace.get("selector_kind") or "").strip()
+            value = str(trace.get("selector_value") or "").strip()
+            labels = [
+                str(item)
+                for item in payload.get("sources") or []
+                if str(item or "").strip()
             ]
-            if (
-                payload_map.get("status") == "found"
-                and payload_map.get("value") not in (None, "", [], {})
-                and selector_kind == "xpath"
-                and selector_value
-            ):
-                learning_key = (
-                    str(field_name or "").strip().lower(),
-                    selector_kind,
-                    selector_value or (source_labels[-1] if source_labels else ""),
-                )
-                feedback_row = feedback_index.get(learning_key)
-                learning_entry = field_learning.setdefault(
-                    learning_key,
-                    {
-                        "field_name": str(field_name or "").strip().lower(),
-                        "value": payload_map.get("value"),
-                        "source_labels": source_labels,
-                        "selector_kind": selector_kind or None,
-                        "selector_value": selector_value or None,
-                        "source_record_ids": [],
-                        "feedback": (
-                            _serialize_feedback_row(feedback_row)
-                            if feedback_row is not None
-                            else None
-                        ),
-                    },
-                )
-                learning_entry["source_record_ids"] = sorted(
-                    {
-                        parsed
-                        for value in [
-                            *_object_list(learning_entry.get("source_record_ids")),
-                            record.id,
-                        ]
-                        if (parsed := _safe_int(value)) is not None
-                    }
-                )
-            if not selector_kind or not selector_value:
-                continue
-            candidate_key = f"{field_name}|{selector_kind}|{selector_value}"
-            saved_selector = saved_selector_index.get(
-                _selector_signature(
-                    field_name=field_name,
-                    selector_kind=selector_kind,
-                    selector_value=selector_value,
-                )
+            _add_field_learning(
+                learning,
+                feedback_index=feedback_index,
+                record=record,
+                field_name=field_name,
+                payload=payload,
+                selector_kind=kind,
+                selector_value=value,
+                source_labels=labels,
             )
-            entry = selector_candidates.setdefault(
-                candidate_key,
-                {
-                    "candidate_key": candidate_key,
-                    "field_name": str(field_name or "").strip().lower(),
-                    "selector_kind": selector_kind,
-                    "selector_value": selector_value,
-                    "selector_source": str(selector_trace.get("selector_source") or ""),
-                    "sample_value": selector_trace.get("sample_value")
-                    or payload_map.get("value"),
-                    "source_record_ids": [],
-                    "source_run_id": selector_trace.get("source_run_id") or run.id,
-                    "saved_selector_id": saved_selector.get("id")
-                    if isinstance(saved_selector, dict)
-                    else None,
-                    "already_saved": isinstance(saved_selector, dict),
-                    "final_field_source": (
-                        _object_list(payload_map.get("sources"))[-1]
-                        if _object_list(payload_map.get("sources"))
-                        else None
-                    ),
-                },
+            _add_selector_candidate(
+                candidates,
+                saved_index=saved_index,
+                record=record,
+                run=run,
+                field_name=field_name,
+                payload=payload,
+                trace=trace,
+                selector_kind=kind,
+                selector_value=value,
             )
-            entry["source_record_ids"] = sorted(
-                {
-                    parsed
-                    for value in [
-                        *_object_list(entry.get("source_record_ids")),
-                        record.id,
-                    ]
-                    if (parsed := _safe_int(value)) is not None
-                }
-            )
-    if selector_candidates:
-        return selector_candidates, field_learning
+    if candidates:
+        return candidates, learning
+    return _fallback_selector_candidates(saved_selectors, run=run), learning
 
-    fallback_rows = [*saved_selectors, *run.settings_view.extraction_contract()]
-    for row in fallback_rows:
+
+def _add_field_learning(
+    learning: dict[tuple[str, str, str], dict[str, object]],
+    *,
+    feedback_index: dict[tuple[str, str, str], DomainFieldFeedback],
+    record: CrawlRecord,
+    field_name: object,
+    payload: dict[str, object],
+    selector_kind: str,
+    selector_value: str,
+    source_labels: list[str],
+) -> None:
+    found_xpath = (
+        payload.get("status") == "found"
+        and payload.get("value") not in (None, "", [], {})
+        and selector_kind == "xpath"
+        and bool(selector_value)
+    )
+    if not found_xpath:
+        return
+    key = (
+        str(field_name or "").strip().lower(),
+        selector_kind,
+        selector_value or (source_labels[-1] if source_labels else ""),
+    )
+    feedback = feedback_index.get(key)
+    entry = learning.setdefault(
+        key,
+        {
+            "field_name": key[0],
+            "value": payload.get("value"),
+            "source_labels": source_labels,
+            "selector_kind": selector_kind or None,
+            "selector_value": selector_value or None,
+            "source_record_ids": [],
+            "feedback": serialize_feedback_row(feedback)
+            if feedback is not None
+            else None,
+        },
+    )
+    entry["source_record_ids"] = _merged_record_ids(entry, record.id)
+
+
+def _add_selector_candidate(
+    candidates: dict[str, dict[str, object]],
+    *,
+    saved_index: dict[tuple[str, str, str], dict[str, object]],
+    record: CrawlRecord,
+    run: CrawlRun,
+    field_name: object,
+    payload: dict[str, object],
+    trace: dict[str, object],
+    selector_kind: str,
+    selector_value: str,
+) -> None:
+    if not selector_kind or not selector_value:
+        return
+    field = str(field_name or "").strip().lower()
+    key = f"{field_name}|{selector_kind}|{selector_value}"
+    saved = saved_index.get(
+        _selector_signature(
+            field_name=field_name,
+            selector_kind=selector_kind,
+            selector_value=selector_value,
+        )
+    )
+    sources = _object_list(payload.get("sources"))
+    entry = candidates.setdefault(
+        key,
+        {
+            "candidate_key": key,
+            "field_name": field,
+            "selector_kind": selector_kind,
+            "selector_value": selector_value,
+            "selector_source": str(trace.get("selector_source") or ""),
+            "sample_value": trace.get("sample_value") or payload.get("value"),
+            "source_record_ids": [],
+            "source_run_id": trace.get("source_run_id") or run.id,
+            "saved_selector_id": saved.get("id") if isinstance(saved, dict) else None,
+            "already_saved": isinstance(saved, dict),
+            "final_field_source": sources[-1] if sources else None,
+        },
+    )
+    entry["source_record_ids"] = _merged_record_ids(entry, record.id)
+
+
+def _merged_record_ids(entry: dict[str, object], record_id: object) -> list[int]:
+    return sorted(
+        {
+            parsed
+            for value in [*_object_list(entry.get("source_record_ids")), record_id]
+            if (parsed := _safe_int(value)) is not None
+        }
+    )
+
+
+def _fallback_selector_candidates(
+    saved_selectors: list[dict[str, object]], *, run: CrawlRun
+) -> dict[str, dict[str, object]]:
+    saved_index = {_saved_selector_signature(row): row for row in saved_selectors}
+    candidates: dict[str, dict[str, object]] = {}
+    for row in [*saved_selectors, *run.settings_view.extraction_contract()]:
         field_name = str(row.get("field_name") or "").strip().lower()
         selector_value = str(row.get("css_selector") or "").strip()
         if not field_name or not selector_value:
             continue
-        candidate_key = f"{field_name}|css_selector|{selector_value}"
-        saved_selector = saved_selector_index.get(
+        key = f"{field_name}|css_selector|{selector_value}"
+        saved = saved_index.get(
             _selector_signature(
                 field_name=field_name,
                 selector_kind="css_selector",
                 selector_value=selector_value,
             )
         )
-        selector_candidates[candidate_key] = {
-            "candidate_key": candidate_key,
+        candidates[key] = {
+            "candidate_key": key,
             "field_name": field_name,
             "selector_kind": "css_selector",
             "selector_value": selector_value,
@@ -528,13 +476,11 @@ def _collect_selector_candidates(
             "sample_value": row.get("sample_value"),
             "source_record_ids": [],
             "source_run_id": row.get("source_run_id") or run.id,
-            "saved_selector_id": saved_selector.get("id")
-            if isinstance(saved_selector, dict)
-            else None,
-            "already_saved": isinstance(saved_selector, dict),
+            "saved_selector_id": saved.get("id") if isinstance(saved, dict) else None,
+            "already_saved": isinstance(saved, dict),
             "final_field_source": None,
         }
-    return selector_candidates, field_learning
+    return candidates
 
 
 async def build_domain_recipe_payload(
@@ -542,48 +488,27 @@ async def build_domain_recipe_payload(
     *,
     run: CrawlRun,
 ) -> dict[str, object]:
-    records_result = await session.execute(
-        select(CrawlRecord)
-        .where(CrawlRecord.run_id == run.id)
-        .order_by(CrawlRecord.id.asc())
+    records = list(
+        (
+            await session.execute(
+                select(CrawlRecord)
+                .where(CrawlRecord.run_id == run.id)
+                .order_by(CrawlRecord.id.asc())
+            )
+        )
+        .scalars()
+        .all()
     )
-    records = list(records_result.scalars().all())
     domain = normalize_domain(run.url)
     saved_selectors = await list_selector_records(
-        session,
-        domain=domain,
-        surface=run.surface,
-    )
-    found_fields = sorted(
-        {
-            str(field_name)
-            for record in records
-            for field_name, value in mapping_or_empty(record.data).items()
-            if value not in (None, "", [], {})
-        }
-        | {
-            str(field_name)
-            for record in records
-            for field_name, payload in mapping_or_empty(
-                mapping_or_empty(record.source_trace).get("field_discovery")
-            ).items()
-            if isinstance(payload, dict) and payload.get("status") == "found"
-        }
+        session, domain=domain, surface=run.surface
     )
     requested_fields = [
         str(value) for value in run.requested_fields or [] if str(value or "").strip()
     ]
-    if not found_fields and requested_fields:
-        dom_patterns = mapping_or_empty(EXTRACTION_RULES.get("dom_patterns"))
-        found_fields = sorted(
-            field_name
-            for field_name in requested_fields
-            if str(dom_patterns.get(field_name) or "").strip()
-        )
-    feedback_index = await _latest_field_feedback_index(
-        session,
-        domain=domain,
-        surface=run.surface,
+    found_fields = found_review_fields(records, requested_fields=requested_fields)
+    feedback_index = await latest_field_feedback_index(
+        session, domain=domain, surface=run.surface
     )
     selector_candidates, field_learning = _collect_selector_candidates(
         records,
@@ -591,59 +516,55 @@ async def build_domain_recipe_payload(
         run=run,
         feedback_index=feedback_index,
     )
-    acquisition_info = _derive_acquisition_info(records, run=run)
-    actual_fetch_method = acquisition_info["actual_fetch_method"]
-    browser_reason = acquisition_info["browser_reason"]
-    acquisition_summary = acquisition_info["acquisition_summary"]
-    affordance_candidates = acquisition_info["affordance_candidates"]
-    saved_profile_record = await load_domain_run_profile(
-        session,
-        domain=domain,
-        surface=run.surface,
+    acquisition = derive_acquisition_info(records, run=run)
+    saved_profile = await load_domain_run_profile(
+        session, domain=domain, surface=run.surface
     )
-    cookie_memory_exists = await _domain_cookie_memory_exists(session, domain=domain)
+    cookie_memory_exists = await domain_cookie_memory_exists(session, domain=domain)
     return {
         "run_id": run.id,
         "domain": domain,
         "surface": run.surface,
-        "requested_field_coverage": {
-            "requested": requested_fields,
-            "found": [field for field in requested_fields if field in found_fields],
-            "missing": [
-                field for field in requested_fields if field not in found_fields
-            ],
-        },
+        "requested_field_coverage": _requested_field_coverage(
+            requested_fields, found_fields=found_fields
+        ),
         "acquisition_evidence": {
-            "actual_fetch_method": actual_fetch_method,
-            "browser_used": actual_fetch_method == "browser",
-            "browser_reason": browser_reason,
-            "acquisition_summary": acquisition_summary,
+            "actual_fetch_method": acquisition["actual_fetch_method"],
+            "browser_used": acquisition["actual_fetch_method"] == "browser",
+            "browser_reason": acquisition["browser_reason"],
+            "acquisition_summary": acquisition["acquisition_summary"],
             "cookie_memory_available": cookie_memory_exists,
         },
-        "field_learning": sorted(
-            field_learning.values(),
-            key=lambda row: (
-                str(row.get("field_name") or ""),
-                str(row.get("selector_kind") or ""),
-                str(row.get("selector_value") or ""),
-            ),
-        ),
-        "selector_candidates": sorted(
-            selector_candidates.values(),
-            key=lambda row: (
-                str(row.get("field_name") or ""),
-                str(row.get("selector_kind") or ""),
-                str(row.get("selector_value") or ""),
-            ),
-        ),
-        "affordance_candidates": affordance_candidates,
+        "field_learning": _sorted_recipe_rows(field_learning.values()),
+        "selector_candidates": _sorted_recipe_rows(selector_candidates.values()),
+        "affordance_candidates": acquisition["affordance_candidates"],
         "saved_selectors": saved_selectors,
-        "saved_run_profile": (
-            dict(saved_profile_record.profile or {})
-            if saved_profile_record is not None
-            else None
-        ),
+        "saved_run_profile": dict(saved_profile.profile or {})
+        if saved_profile
+        else None,
     }
+
+
+def _requested_field_coverage(
+    requested_fields: list[str], *, found_fields: list[str]
+) -> dict[str, list[str]]:
+    found_set = set(found_fields)
+    return {
+        "requested": requested_fields,
+        "found": [field for field in requested_fields if field in found_set],
+        "missing": [field for field in requested_fields if field not in found_set],
+    }
+
+
+def _sorted_recipe_rows(rows) -> list[dict[str, object]]:
+    return sorted(
+        rows,
+        key=lambda row: (
+            str(row.get("field_name") or ""),
+            str(row.get("selector_kind") or ""),
+            str(row.get("selector_value") or ""),
+        ),
+    )
 
 
 async def promote_domain_recipe_selectors(
@@ -662,36 +583,12 @@ async def promote_domain_recipe_selectors(
     by_signature = {_saved_selector_signature(row): row for row in existing}
     saved_rows: list[dict[str, object]] = []
     for row in selectors:
-        selector_kind = str(row.get("selector_kind") or "").strip()
-        selector_value = str(row.get("selector_value") or "").strip()
-        field_name = normalize_field_key(str(row.get("field_name") or ""))
-        if not field_name or not selector_kind or not selector_value:
+        normalized = _normalized_recipe_selector(row, run_id=run.id)
+        if normalized is None:
             continue
-        payload = {
-            "field_name": field_name,
-            "css_selector": selector_value if selector_kind == "css_selector" else None,
-            "xpath": selector_value if selector_kind == "xpath" else None,
-            "regex": selector_value if selector_kind == "regex" else None,
-            "sample_value": row.get("sample_value"),
-            "source": "domain_recipe",
-            "source_run_id": run.id,
-            "status": "validated",
-            "is_active": True,
-        }
-        signature = _selector_signature(
-            field_name=field_name,
-            selector_kind=selector_kind,
-            selector_value=selector_value,
-        )
-        existing_row = by_signature.get(signature)
-        if (
-            isinstance(existing_row, dict)
-            and "id" in existing_row
-            and existing_row["id"] is not None
-        ):
-            selector_id = _safe_int(existing_row.get("id"))
-            if selector_id is None:
-                continue
+        signature, payload = normalized
+        selector_id = _existing_selector_id(by_signature.get(signature))
+        if selector_id is not None:
             updated_row = await update_selector_record(
                 session,
                 selector_id=selector_id,
@@ -711,6 +608,39 @@ async def promote_domain_recipe_selectors(
         if created_row is not None:
             saved_rows.append(created_row)
     return [row for row in saved_rows if isinstance(row, dict)]
+
+
+def _normalized_recipe_selector(
+    row: dict[str, object], *, run_id: int
+) -> tuple[tuple[str, str, str], dict[str, object]] | None:
+    selector_kind = str(row.get("selector_kind") or "").strip()
+    selector_value = str(row.get("selector_value") or "").strip()
+    field_name = normalize_field_key(str(row.get("field_name") or ""))
+    if not all((field_name, selector_kind, selector_value)):
+        return None
+    payload = {
+        "field_name": field_name,
+        "css_selector": selector_value if selector_kind == "css_selector" else None,
+        "xpath": selector_value if selector_kind == "xpath" else None,
+        "regex": selector_value if selector_kind == "regex" else None,
+        "sample_value": row.get("sample_value"),
+        "source": "domain_recipe",
+        "source_run_id": run_id,
+        "status": "validated",
+        "is_active": True,
+    }
+    signature = _selector_signature(
+        field_name=field_name,
+        selector_kind=selector_kind,
+        selector_value=selector_value,
+    )
+    return signature, payload
+
+
+def _existing_selector_id(row: object) -> int | None:
+    if not isinstance(row, dict):
+        return None
+    return _safe_int(row.get("id"))
 
 
 async def save_domain_recipe_run_profile(
@@ -735,218 +665,131 @@ async def apply_domain_recipe_field_action(
     run: CrawlRun,
     action: dict[str, object],
 ) -> dict[str, object]:
-    domain = normalize_domain(run.url)
     field_name = normalize_field_key(str(action.get("field_name") or ""))
     action_name = str(action.get("action") or "").strip().lower()
     selector_kind = str(action.get("selector_kind") or "").strip().lower()
     selector_value = str(action.get("selector_value") or "").strip()
     if not field_name or action_name not in {"keep", "reject"}:
         raise ValueError("Invalid domain recipe field action.")
-
-    source_kind = "selector" if selector_kind and selector_value else "field_source"
-    source_value = selector_value or None
     try:
-        if action_name == "keep" and selector_kind and selector_value:
-            await promote_domain_recipe_selectors(
-                session,
-                run=run,
-                selectors=[
-                    {
-                        "field_name": field_name,
-                        "selector_kind": selector_kind,
-                        "selector_value": selector_value,
-                    }
-                ],
-                commit=False,
-            )
-        if action_name == "reject" and selector_kind and selector_value:
-            existing = await list_selector_records(
-                session,
-                domain=domain,
-                surface=run.surface,
-            )
-            for row in existing:
-                matched_value = (
-                    row.get("css_selector")
-                    if selector_kind == "css_selector"
-                    else row.get("xpath")
-                    if selector_kind == "xpath"
-                    else row.get("regex")
-                )
-                if (
-                    normalize_field_key(str(row.get("field_name") or "")) == field_name
-                    and str(matched_value or "").strip() == selector_value
-                    and row.get("id") is not None
-                ):
-                    selector_id = _safe_int(row.get("id"))
-                    if selector_id is None:
-                        continue
-                    await update_selector_record(
-                        session,
-                        selector_id=selector_id,
-                        payload={"is_active": False},
-                        commit=False,
-                    )
-                    break
-
+        await _apply_selector_feedback_action(
+            session,
+            run=run,
+            action_name=action_name,
+            field_name=field_name,
+            selector_kind=selector_kind,
+            selector_value=selector_value,
+        )
         feedback = DomainFieldFeedback(
-            domain=domain,
+            domain=normalize_domain(run.url),
             surface=run.surface,
             field_name=field_name,
             action=action_name,
-            source_kind=source_kind,
-            source_value=source_value,
+            source_kind="selector"
+            if selector_kind and selector_value
+            else "field_source",
+            source_value=selector_value or None,
             source_run_id=run.id,
             payload={
                 "selector_kind": selector_kind or None,
                 "selector_value": selector_value or None,
-                "source_record_ids": [
-                    parsed
-                    for parsed in (
-                        _safe_int(value)
-                        for value in _object_list(action.get("source_record_ids"))
-                    )
-                    if parsed is not None
-                ],
+                "source_record_ids": _feedback_record_ids(action),
             },
         )
         session.add(feedback)
         await session.commit()
         await session.refresh(feedback)
-        return _serialize_feedback_row(feedback)
+        return serialize_feedback_row(feedback)
     except Exception:
         await session.rollback()
         raise
 
 
-async def list_domain_field_feedback(
+async def _apply_selector_feedback_action(
     session: AsyncSession,
     *,
-    domain: str = "",
-    surface: str = "",
-    limit: int = 50,
-) -> list[dict[str, object]]:
-    statement = select(DomainFieldFeedback).order_by(
-        desc(DomainFieldFeedback.created_at),
-        desc(DomainFieldFeedback.id),
-    )
-    if domain:
-        statement = statement.where(DomainFieldFeedback.domain == domain)
-    if surface:
-        statement = statement.where(DomainFieldFeedback.surface == surface)
-    rows = list((await session.execute(statement.limit(max(1, limit)))).scalars().all())
-    return [_serialize_feedback_record(row) for row in rows]
-
-
-async def _domain_cookie_memory_exists(
-    session: AsyncSession,
-    *,
-    domain: str,
-) -> bool:
-    result = await session.execute(
-        select(DomainCookieMemory.id)
-        .where(DomainCookieMemory.domain == domain)
-        .limit(1)
-    )
-    return result.scalar_one_or_none() is not None
-
-
-async def _latest_field_feedback_index(
-    session: AsyncSession,
-    *,
-    domain: str,
-    surface: str,
-) -> dict[tuple[str, str, str], DomainFieldFeedback]:
-    rows = list(
-        (
-            await session.execute(
-                select(DomainFieldFeedback)
-                .where(
-                    DomainFieldFeedback.domain == domain,
-                    DomainFieldFeedback.surface == surface,
-                )
-                .order_by(
-                    desc(DomainFieldFeedback.created_at), desc(DomainFieldFeedback.id)
-                )
-            )
-        )
-        .scalars()
-        .all()
-    )
-    index: dict[tuple[str, str, str], DomainFieldFeedback] = {}
-    for row in rows:
-        key = (
-            str(row.field_name or "").strip().lower(),
-            str((row.payload or {}).get("selector_kind") or "").strip(),
-            str(row.source_value or "").strip(),
-        )
-        index.setdefault(key, row)
-    return index
-
-
-def _serialize_feedback_row(row: DomainFieldFeedback) -> dict[str, object]:
-    return {
-        "action": row.action,
-        "source_kind": row.source_kind,
-        "source_value": row.source_value,
-        "source_run_id": row.source_run_id,
-        "created_at": row.created_at,
-    }
-
-
-def _serialize_feedback_record(row: DomainFieldFeedback) -> dict[str, object]:
-    payload = row.payload or {}
-    return {
-        "id": row.id,
-        "domain": row.domain,
-        "surface": row.surface,
-        "field_name": row.field_name,
-        "action": row.action,
-        "source_kind": row.source_kind,
-        "source_value": row.source_value,
-        "source_run_id": row.source_run_id,
-        "selector_kind": payload.get("selector_kind"),
-        "selector_value": payload.get("selector_value"),
-        "source_record_ids": [
-            parsed
-            for parsed in (
-                _safe_int(value) for value in payload.get("source_record_ids") or []
-            )
-            if parsed is not None
-        ],
-        "created_at": row.created_at,
-    }
-
-
-def _merge_affordance_candidates(
-    affordance_candidates: dict[str, object],
-    *,
-    acquisition: dict[str, object],
-    browser_diagnostics: dict[str, object],
+    run: CrawlRun,
+    action_name: str,
+    field_name: str,
+    selector_kind: str,
+    selector_value: str,
 ) -> None:
-    accordion_labels = _object_list(affordance_candidates.get("accordions"))
-    tab_labels = _object_list(affordance_candidates.get("tabs"))
-    if not affordance_candidates.get("iframe_promotion"):
-        final_url = str(acquisition.get("final_url") or "").strip()
-        if (
-            final_url
-            and final_url != str(acquisition.get("requested_url") or "").strip()
+    if not selector_kind or not selector_value:
+        return
+    if action_name == "keep":
+        await promote_domain_recipe_selectors(
+            session,
+            run=run,
+            selectors=[
+                {
+                    "field_name": field_name,
+                    "selector_kind": selector_kind,
+                    "selector_value": selector_value,
+                }
+            ],
+            commit=False,
+        )
+        return
+    await _reject_domain_selector(
+        session,
+        run=run,
+        field_name=field_name,
+        selector_kind=selector_kind,
+        selector_value=selector_value,
+    )
+
+
+async def _reject_domain_selector(
+    session: AsyncSession,
+    *,
+    run: CrawlRun,
+    field_name: str,
+    selector_kind: str,
+    selector_value: str,
+) -> None:
+    existing = await list_selector_records(
+        session, domain=normalize_domain(run.url), surface=run.surface
+    )
+    for row in existing:
+        if not _selector_row_matches(
+            row,
+            field_name=field_name,
+            selector_kind=selector_kind,
+            selector_value=selector_value,
         ):
-            affordance_candidates["iframe_promotion"] = final_url
-    detail_expansion = mapping_or_empty(browser_diagnostics.get("detail_expansion"))
-    for label in _string_values(detail_expansion.get("expanded_elements")):
-        if label not in accordion_labels:
-            accordion_labels.append(label)
-    for label in _string_values(
-        mapping_or_empty(detail_expansion.get("aom")).get("expanded_elements")
-    ):
-        if label not in tab_labels:
-            tab_labels.append(label)
-    affordance_candidates["accordions"] = accordion_labels
-    affordance_candidates["tabs"] = tab_labels
+            continue
+        selector_id = _safe_int(row.get("id"))
+        if selector_id is not None:
+            await update_selector_record(
+                session,
+                selector_id=selector_id,
+                payload={"is_active": False},
+                commit=False,
+            )
+        return
 
 
-def _string_values(value: object) -> list[str]:
-    if not isinstance(value, list):
-        return []
-    return [str(item).strip() for item in value if str(item or "").strip()]
+def _selector_row_matches(
+    row: dict[str, object],
+    *,
+    field_name: str,
+    selector_kind: str,
+    selector_value: str,
+) -> bool:
+    field_key = {
+        "css_selector": "css_selector",
+        "xpath": "xpath",
+    }.get(selector_kind, "regex")
+    return (
+        normalize_field_key(str(row.get("field_name") or "")) == field_name
+        and str(row.get(field_key) or "").strip() == selector_value
+        and row.get("id") is not None
+    )
+
+
+def _feedback_record_ids(action: dict[str, object]) -> list[int]:
+    return [
+        parsed
+        for value in _object_list(action.get("source_record_ids"))
+        if (parsed := _safe_int(value)) is not None
+    ]
