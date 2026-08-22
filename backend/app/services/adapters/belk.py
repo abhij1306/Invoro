@@ -231,7 +231,13 @@ def _collect_state_payload_parts(root: object) -> _BelkStatePayloadParts:
 
 
 def _belk_nested_children(node: object) -> list[object]:
-    values = node.values() if isinstance(node, dict) else node if isinstance(node, list) else []
+    values = (
+        node.values()
+        if isinstance(node, dict)
+        else node
+        if isinstance(node, list)
+        else []
+    )
     return [value for value in values if isinstance(value, (dict, list))]
 
 
