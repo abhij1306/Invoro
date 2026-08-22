@@ -11,6 +11,7 @@ from app.models.crawl_run import CrawlRun
 from app.services.config.selectors import (
     SELECTOR_SYNTHESIS_ALLOWED_ATTRS,
     SELECTOR_SELF_HEAL_DEFAULT_MIN_CONFIDENCE,
+    SELECTOR_SELF_HEAL_RECORD_IDENTITY_FIELDS,
     SELECTOR_SELF_HEAL_TARGET_LIMIT,
     SELECTOR_SYNTHESIS_DROP_TAGS,
     SELECTOR_SYNTHESIS_KEEP_ATTRS,
@@ -39,6 +40,8 @@ from app.services.dom.xpath_service import (
     extract_selector_value,
     validate_or_convert_xpath,
 )
+from app.services.dom.selector_scope import best_text_scope
+from app.services.shared.field_coerce import clean_text
 
 
 def reduce_html_for_selector_synthesis(html: str) -> str:
@@ -258,7 +261,7 @@ async def apply_selector_self_heal(
     reduced_html = reduce_html_for_selector_synthesis(html)
 
     persisted_rules = False
-    for record in records:
+    for record_index, record in enumerate(records):
         next_record, current_rules, added_rules, persisted = await _heal_one_record(
             session,
             run=run,
@@ -272,6 +275,8 @@ async def apply_selector_self_heal(
             current_rules=current_rules,
             adapter_records=adapter_records,
             network_payloads=network_payloads,
+            record_count=len(records),
+            record_index=record_index,
         )
         updated_records.append(next_record)
         existing_rule_count += added_rules
@@ -295,6 +300,8 @@ async def _heal_one_record(
     current_rules: list[dict[str, object]],
     adapter_records: list[dict[str, object]] | None,
     network_payloads: list[dict[str, object]] | None,
+    record_count: int,
+    record_index: int,
 ) -> tuple[dict[str, object], list[dict[str, object]], int, bool]:
     next_record = dict(record)
     requested_fields = repair_target_fields_for_surface(
@@ -333,14 +340,16 @@ async def _heal_one_record(
         html,
         page_url,
         run.surface,
-        max_records=1,
+        max_records=max(1, record_count),
         requested_fields=requested_fields,
         adapter_records=adapter_records,
         network_payloads=network_payloads,
         selector_rules=candidate_rules,
         extraction_runtime_snapshot=run.settings_view.extraction_runtime_snapshot(),
     )
-    rerun_record = _first_rerun_record(rerun_records, fallback=next_record)
+    rerun_record = _matching_rerun_record(
+        rerun_records, fallback=next_record, record_index=record_index
+    )
     improved = _selector_heal_improved_record(
         before_record=next_record,
         after_record=rerun_record,
@@ -383,10 +392,23 @@ def _public_record_values(record: dict[str, object]) -> dict[str, object]:
     return {key: value for key, value in record.items() if not str(key).startswith("_")}
 
 
-def _first_rerun_record(
-    records: list[dict[str, object]], *, fallback: dict[str, object]
+def _matching_rerun_record(
+    records: list[dict[str, object]],
+    *,
+    fallback: dict[str, object],
+    record_index: int,
 ) -> dict[str, object]:
-    return dict(records[0]) if records else fallback
+    identity = {
+        field_name: fallback.get(field_name)
+        for field_name in SELECTOR_SELF_HEAL_RECORD_IDENTITY_FIELDS
+        if fallback.get(field_name) not in (None, "", [], {})
+    }
+    for candidate in records:
+        if identity and any(
+            candidate.get(field_name) == value for field_name, value in identity.items()
+        ):
+            return dict(candidate)
+    return dict(records[record_index]) if record_index < len(records) else fallback
 
 
 def _selector_heal_error(error_message: str | None, *, improved: bool) -> str | None:
@@ -478,7 +500,11 @@ def _validated_xpath_rule(
     sample_value, count, selector_used = extract_selector_value(
         html, xpath=validated_xpath
     )
-    if count <= 0 or sample_value in (None, ""):
+    if (
+        count != 1
+        or sample_value in (None, "")
+        or not _sample_within_product_scope(html, sample_value)
+    ):
         return None
     return _selector_rule_payload(
         field_name, xpath=selector_used or validated_xpath, sample_value=sample_value
@@ -491,13 +517,26 @@ def _validated_css_rule(
     sample_value, count, selector_used = extract_selector_value(
         html, css_selector=css_selector
     )
-    if count <= 0 or sample_value in (None, ""):
+    if (
+        count != 1
+        or sample_value in (None, "")
+        or not _sample_within_product_scope(html, sample_value)
+    ):
         return None
     return _selector_rule_payload(
         field_name,
         css_selector=selector_used or css_selector,
         sample_value=sample_value,
     )
+
+
+def _sample_within_product_scope(html: str, sample_value: object) -> bool:
+    root = BeautifulSoup(html, "html.parser")
+    scope = best_text_scope(root)
+    if scope is None:
+        return True
+    needle = clean_text(sample_value).casefold()
+    return bool(needle) and needle in clean_text(str(scope)).casefold()
 
 
 def _selector_rule_payload(

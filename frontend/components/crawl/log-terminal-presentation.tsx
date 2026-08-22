@@ -241,9 +241,7 @@ export function groupStillActive(group: LogSiteGroup) {
     return false;
   }
   const lastMessage = sanitizeLogMessage(group.logs.at(-1)?.message ?? '').toLowerCase();
-  const completedSuccessfully =
-    logIconContext('info', lastMessage, lastMessage).isComplete ||
-    lastMessage.includes('extracted');
+  const completedSuccessfully = logIconContext('info', lastMessage, lastMessage).isComplete;
   return !(
     group.stageLogs.persistence.length > 0 ||
     group.hasError ||

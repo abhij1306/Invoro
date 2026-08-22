@@ -216,7 +216,7 @@ describeCrawlRunScreen(() => {
     expect(screen.getAllByText('0m 10s')).toHaveLength(2);
   });
 
-  it('stops ticking a site duration after successful extraction', () => {
+  it('keeps ticking after extraction until a terminal event arrives', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-04-08T10:00:10Z'));
 
@@ -236,7 +236,7 @@ describeCrawlRunScreen(() => {
       />,
     );
 
-    expect(screen.getByText('0m 5s')).toBeInTheDocument();
+    expect(screen.getByText('0m 10s')).toBeInTheDocument();
   });
 
   it('preserves selected records when switching from table to logs', async () => {

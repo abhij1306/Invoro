@@ -44,9 +44,14 @@ def test_clean_materials_salvages_trailing_composition_from_editorial_block() ->
 
 
 @pytest.mark.unit
-def test_clean_materials_drops_long_editorial_with_no_composition() -> None:
-    long_editorial = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. " * 30
-    assert _clean_materials_pollution(long_editorial) == ""
+def test_clean_materials_preserves_long_text_without_positive_pollution_signal() -> (
+    None
+):
+    long_materials = "Soft brushed wool with specialist dry-clean care guidance. " * 30
+    cleaned = _clean_materials_pollution(long_materials)
+
+    assert cleaned
+    assert cleaned.startswith("Soft brushed wool")
 
 
 @pytest.mark.unit

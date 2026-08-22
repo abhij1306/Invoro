@@ -240,10 +240,10 @@ def _node_scalar_attribute(node: Tag) -> tuple[bool, object | None]:
 def _node_raw_text(node: Tag, field_name: str) -> str:
     if _looks_like_variant_option_node(node, field_name):
         return _variant_option_node_text(node, field_name)
-    visible = cast(Tag, clone_visible_only(node) or node)
     if field_uses_scoped_text(field_name):
+        visible = cast(Tag, clone_visible_only(node) or node)
         return html_to_text(str(visible), preserve_block_breaks=True)
-    return visible.get_text(" ", strip=True)
+    return node.get_text(" ", strip=True)
 
 
 def _looks_like_variant_option_node(node: Tag, field_name: str) -> bool:

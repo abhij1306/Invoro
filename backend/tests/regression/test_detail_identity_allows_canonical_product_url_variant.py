@@ -71,6 +71,13 @@ def test_detail_identity_extracts_numeric_hm_product_codes_from_url() -> None:
 
 
 @pytest.mark.regression
+def test_detail_identity_ignores_mixed_slug_tokens_outside_terminal_code() -> None:
+    url = "https://example.com/widget2025/products/plain-widget"
+
+    assert detail_identity_codes_from_url(url) == set()
+
+
+@pytest.mark.regression
 def test_extract_records_rejects_visual_artifact_cta_and_footer_clusters() -> None:
     rows = extract_records(
         "<html><body></body></html>",

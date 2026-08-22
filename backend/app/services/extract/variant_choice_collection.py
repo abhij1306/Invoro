@@ -203,10 +203,12 @@ def _add_input_choice_groups(soup: Any, groups: list[Any], seen: set[object]) ->
 
 def _add_button_choice_groups(soup: Any, groups: list[Any], seen: set[object]) -> bool:
     selector = "button[data-variant], button.variant-option, button.size-option, button.color-option"
+    cache: dict[object, list[Any]] = {}
     for node in soup.select(selector):
         if variant_node_in_noise_context(node):
             continue
-        if _append_choice_group(groups, seen, node):
+        container = _swatch_container_for_button(node, seen, cache)
+        if container is not None and _append_choice_group(groups, seen, container):
             return True
     return False
 

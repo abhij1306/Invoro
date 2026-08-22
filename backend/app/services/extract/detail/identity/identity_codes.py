@@ -79,17 +79,18 @@ def detail_identity_codes_from_url(url: object) -> set[str]:
         return set()
     parsed = urlparse(text)
     codes: set[str] = set()
-    for segment in detail_url_path_segments(text):
-        terminal = HTML_SUFFIX_RE.sub("", segment)
-        code_like_terminal = detail_segment_code(terminal)
-        if code_like_terminal:
-            codes.add(code_like_terminal)
-        for match in re.findall(
-            rf"[A-Za-z0-9]{{{DETAIL_IDENTITY_CODE_MIN_LENGTH},}}", terminal
-        ):
-            normalized = normalized_detail_identity_code(match)
-            if normalized:
-                codes.add(normalized)
+    segments = detail_url_path_segments(text)
+    terminal = HTML_SUFFIX_RE.sub("", segments[-1]) if segments else ""
+    code_like_terminal = detail_segment_code(terminal)
+    if code_like_terminal:
+        codes.add(code_like_terminal)
+    # Embedded URL identity is authoritative only for numeric product codes in
+    # the terminal segment (for example ``productpage.1317259001.html``).
+    # Mixed slug tokens such as ``widget2025`` are descriptive, not identifiers.
+    for match in re.findall(rf"\d{{{DETAIL_IDENTITY_CODE_MIN_LENGTH},}}", terminal):
+        normalized = normalized_detail_identity_code(match)
+        if normalized:
+            codes.add(normalized)
     for key, _value in parse_qsl(parsed.query, keep_blank_values=True):
         match = re.match(
             r"dwvar_([A-Za-z0-9][A-Za-z0-9_-]{6,}[A-Za-z0-9])_",

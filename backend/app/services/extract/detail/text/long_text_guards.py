@@ -224,8 +224,7 @@ def _materials_extract_trailing_composition(text: str) -> str | None:
         return None
     matches = list(_MATERIALS_COMPOSITION_PATTERN.finditer(text))
     if not matches:
-        # Empty string means discard this editorial block; None means keep original.
-        return ""
+        return None
     first = matches[0]
     return text[first.start() :].strip() or ""
 
