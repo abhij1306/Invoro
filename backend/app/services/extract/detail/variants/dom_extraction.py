@@ -16,7 +16,7 @@ def extract_variants_from_dom(
     page_url: str,
     js_state_objects: dict[str, Any] | None = None,
 ) -> dict[str, object]:
-    dom_variant_support.DOM_VARIANT_CARTESIAN_COMBO_LIMIT = DOM_VARIANT_CARTESIAN_COMBO_LIMIT
+    dom_group_pipeline.DOM_VARIANT_CARTESIAN_COMBO_LIMIT = DOM_VARIANT_CARTESIAN_COMBO_LIMIT
     dom_variant_support.VARIANT_CHOICE_OPTION_LIMIT = VARIANT_CHOICE_OPTION_LIMIT
     return dom_group_pipeline.extract_variants_from_dom(soup, page_url=page_url, js_state_objects=js_state_objects)
 
@@ -28,7 +28,7 @@ def backfill_variants_from_dom_if_missing(
     page_url: str,
     js_state_objects: dict[str, Any] | None = None,
 ) -> None:
-    dom_variant_support.DOM_VARIANT_CARTESIAN_COMBO_LIMIT = DOM_VARIANT_CARTESIAN_COMBO_LIMIT
+    dom_group_pipeline.DOM_VARIANT_CARTESIAN_COMBO_LIMIT = DOM_VARIANT_CARTESIAN_COMBO_LIMIT
     dom_variant_support.VARIANT_CHOICE_OPTION_LIMIT = VARIANT_CHOICE_OPTION_LIMIT
     dom_group_pipeline.backfill_variants_from_dom_if_missing(record, soup=soup, page_url=page_url, js_state_objects=js_state_objects)
 
