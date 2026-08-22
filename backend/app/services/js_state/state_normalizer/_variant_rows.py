@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import Any
 
 from app.services.config.variant_policy import PUBLIC_VARIANT_AXIS_FIELDS
+from app.services.shared.coerce_primitives import safe_int
 
 from ._common import *
 from ._variant_mapping import _option_names, _variant_axis_raw_value
@@ -367,10 +368,9 @@ def _apply_matrix_stock(row: dict[str, Any], stock: object) -> None:
         return
     stock_level = stock.get("stockLevel")
     if stock_level not in (None, "", [], {}):
-        try:
-            row["stock_quantity"] = int(str(stock_level).strip())
-        except (TypeError, ValueError):
-            pass
+        stock_quantity = safe_int(stock_level)
+        if stock_quantity is not None:
+            row["stock_quantity"] = stock_quantity
     status = clean_text(stock.get("stockLevelStatus")).casefold()
     if status in {"instock", "lowstock"}:
         row["availability"] = "in_stock"

@@ -1,4 +1,3 @@
-# ruff: noqa: F401
 from __future__ import annotations
 
 __all__ = (
@@ -8,51 +7,30 @@ __all__ = (
     "append_record_field_source", "normalize_mismatched_host_currency_price",
 )
 
-from decimal import Decimal
-import re
 from typing import Any
 
 from app.services.dom.html_parser import BeautifulSoup
 
 from app.services.config.extraction_rules import (
-    AVAILABILITY_OUT_OF_STOCK,
-    DETAIL_CENT_BASED_PRICE_CURRENCY_SET,
     DETAIL_AUTHORITATIVE_PRICE_SOURCE_SET,
     DETAIL_CURRENT_PRICE_SELECTORS,
-    DETAIL_LOW_SIGNAL_PRICE_VISIBLE_MIN_DELTA,
-    DETAIL_LOW_SIGNAL_PRICE_VISIBLE_RATIO,
-    DETAIL_LOW_SIGNAL_ZERO_PRICE_SOURCE_SET,
-    DETAIL_PARENT_VARIANT_PRICE_RATIO_MAX_DECIMAL,
-    DETAIL_STRICT_PARENT_PRICE_SOURCE_SET,
 )
 from app.services.config.extraction_price_rules import (
     FIELD_SOURCE_DOM_TEXT,
     FIELD_SOURCE_JSON_LD,
 )
 from app.services.extract.detail.price.parsing import (
-    decimal_is_cent_magnitude_copy,
     detail_currency_from_html,
     detail_current_price_currency_from_html,
     detail_jsonld_price_bundle,
-    detail_original_price_from_html,
     detail_price_decimal,
     detail_price_from_html,
     detail_price_from_selector_text,
     detail_price_is_visible_magnitude_copy,
     detail_price_is_cent_magnitude_copy,
-    format_detail_price_decimal,
-    format_price_decimal,
-    single_decimal_value,
 )
-from app.services.shared.field_coerce import (
-    extract_currency_code,
-    text_or_none,
-)
-from app.services.shared.currency_hints import (
-    currency_hint_from_page_url,
-    detail_currency_hint_is_host_level,
-)
-from app.services.normalizers import normalize_decimal_price
+from app.services.shared.field_coerce import text_or_none
+from app.services.shared.currency_hints import currency_hint_from_page_url
 
 from .reconciliation import DetailPriceEvidence as _DetailPriceEvidence, DetailPriceSelection as _DetailPriceSelection
 

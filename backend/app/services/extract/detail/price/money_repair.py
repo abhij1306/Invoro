@@ -24,7 +24,7 @@ from app.services.shared.field_coerce import (
     clean_text,
     text_or_none,
 )
-from app.services.extract.detail.price.core import (
+from app.services.extract.detail.price.parsing import (
     detail_price_decimal,
     format_detail_price_decimal,
 )

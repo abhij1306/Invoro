@@ -31,10 +31,10 @@ from app.services.extract.detail.variants.dom_availability import (
 
 from app.services.extract.detail.price.core import (
     backfill_detail_price_from_html,
-    detail_currency_hint_is_host_level,
     reconcile_parent_price_against_variant_range,
     reconcile_detail_currency_with_url,
 )
+from app.services.shared.currency_hints import detail_currency_hint_is_host_level
 
 from app.services.extract.detail.images.cleanup import (
     detail_image_matches_primary_family,

@@ -1,19 +1,14 @@
-# ruff: noqa: F401
 from __future__ import annotations
 
 __all__ = ("existing_variant_cluster_has_transport_signal", "primary_dom_context", "record_has_rich_existing_variants")
 
 import logging
-from copy import deepcopy
-from itertools import product
 from typing import Any
 from urllib.parse import parse_qsl, urlsplit
 
 from app.services.dom.html_parser import BeautifulSoup
 
 from app.services.config.extraction_rules import (
-    DOM_VARIANT_CARTESIAN_COMBO_LIMIT,
-    DOM_VARIANT_GROUP_LIMIT,
     VARIANT_CHOICE_OPTION_LIMIT,
     VARIANT_OPTION_CONTROL_SCAN_LIMIT,
 )
@@ -21,13 +16,8 @@ from app.services.config.variant_migration_rules import (
     VARIANT_STRONG_OPTION_SELECTOR,
     VARIANT_WEAK_OPTION_SELECTOR,
 )
-from app.services.extract.variant_normalization.contract import (
-    flatten_variants_for_public_output,
-)
 from app.services.shared.field_coerce import (
     clean_text,
-    object_dict as _object_dict,
-    object_list as _object_list,
     text_or_none,
 )
 from app.services.shared.url_utils import (
@@ -36,41 +26,14 @@ from app.services.shared.url_utils import (
     terminal_tokens,
     title_tokens,
 )
-from app.services.extract.detail.variants.state_targets import (
-    state_variant_targets as _state_variant_targets,
-)
 from app.services.extract.detail.variants.dom_options import (
     merge_variant_option_state,
-    node_attr_is_truthy,
-    variant_option_availability,
     variant_option_url,
 )
-from app.services.extract.detail.variants.dom_merge import (
-    dom_variants_add_missing_existing_axis as _dom_variants_add_missing_existing_axis,
-    expand_existing_variants_with_dom_axes as _expand_existing_variants_with_dom_axes,
-)
-from app.services.extract.variant_group_validator import (
-    VariantGroupValidator,
-)
 from app.services.extract.variant_dom_provenance import (
-    build_variant_candidate_group,
-    variant_option_node_types,
     weak_variant_option_node_allowed,
 )
-from app.services.js_state.helpers import select_variant
-from app.services.extract.variant_choice_traversal import (
-    infer_variant_group_name_from_values,
-    iter_variant_choice_groups,
-    iter_variant_select_groups,
-    resolve_variant_group_name,
-    variant_input_label,
-    variant_dom_cues_present,
-)
-from app.services.extract.variant_identity_merge import (
-    merge_variant_pair,
-    resolve_variants,
-    split_variant_axes,
-)
+from app.services.extract.variant_choice_traversal import variant_input_label
 from app.services.extract.variant_axis import (
     normalized_variant_axis_key,
     option_scalar_fields,

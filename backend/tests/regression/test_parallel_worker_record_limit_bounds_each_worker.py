@@ -351,7 +351,7 @@ async def test_process_run_uses_url_batch_concurrency_setting(
                 try:
                     await asyncio.wait_for(second_active.wait(), timeout=0.5)
                 except asyncio.TimeoutError:
-                    pass
+                    assert not second_active.is_set()
             else:
                 await asyncio.sleep(0.01)
         finally:

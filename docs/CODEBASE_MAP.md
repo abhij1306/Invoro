@@ -192,8 +192,8 @@ Canonical config owner:
 | `js_state/variant_options.py` | JS-state variant axis, option-value, and display-label normalization |
 | `network_payload_mapper.py` | Network payload to field mapping |
 | `shared/field_coerce.py` | Stable canonical field-coercion and public-record facade |
-| `shared/field_coerce_core.py` | Shared low-level field-coercion primitives, schemas, and surface shaping |
-| `shared/field_coerce_values.py` | Canonical option, availability, attributes, scalar values, and final record cleanup |
+| `shared/field_coerce_core.py` | Shared low-level field-coercion primitives, schemas, and surface-field selection |
+| `shared/field_coerce_values.py` | Canonical option, availability, attributes, scalar values, direct-record surface shaping, and final record cleanup |
 | `shared/field_coerce_price.py` | Price, currency, and shared-price comparison coercion |
 | `shared/field_coerce_text.py` | Brand, identity, SKU, barcode, gender, and category text coercion |
 | `shared/field_coerce_url.py` | URL/image URL coercion and tracking cleanup exports |

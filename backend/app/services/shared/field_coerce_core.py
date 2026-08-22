@@ -1,4 +1,3 @@
-# ruff: noqa: F401
 """Shared field coercion primitives exported to the coercion owners."""
 
 from __future__ import annotations
@@ -10,16 +9,13 @@ from typing import Any
 from app.services.extraction_html_helpers import html_to_text
 from app.services.config.extraction_rules import (
     AVAILABILITY_URL_MAP,
-    CANDIDATE_AVAILABILITY_NOISE_PHRASES,
     COLOR_KEYWORD_PATTERN,
     IMAGE_FIELDS as IMAGE_FIELDS,
     INTEGER_VALUE_FIELDS,
     LISTING_UTILITY_TITLE_PATTERNS,
-    LONG_TEXT_FIELDS,
     NOISY_PRODUCT_ATTRIBUTE_KEYS,
     OPTION_VALUE_NOISE_WORDS,
     PRICE_VALUE_FIELDS,
-    RATING_RE,
     REVIEW_COUNT_RE as _REVIEW_COUNT_RE,
     SIZE_REJECT_TOKENS,
     SMALL_NUMERIC_PATTERN,
@@ -34,12 +30,8 @@ from app.services.config.extraction_rules import (
 from app.services.config.field_mappings import (
     CANONICAL_SCHEMAS,
     ADDITIONAL_IMAGES_FIELD,
-    BRAND_LIKE_FIELDS,
     FIELD_ALIASES,
-    TITLE_FIELD,
-    TITLE_STRUCTURED_VALUE_KEYS,
     URL_FIELD,
-    WEIGHT_FIELD,
 )
 from app.services.config.design_system import (
     DESIGN_SYSTEM_PUBLIC_FIELDS,
@@ -50,7 +42,6 @@ from app.services.config.public_record_policy import (
     PUBLIC_RECORD_LEGACY_VARIANT_FIELDS,
     PUBLIC_RECORD_PRODUCT_TYPE_NOISE_TOKENS,
 )
-from app.services.config.variant_policy import OPTION_SCALAR_FIELDS
 from app.services.config.surface_hints import detail_path_hints
 from app.services.field_policy import (
     exact_requested_field_key,
@@ -58,7 +49,6 @@ from app.services.field_policy import (
     get_surface_field_aliases,
     normalize_field_key,
 )
-from app.services.normalizers import normalize_record_fields
 from app.services.shared.coerce_primitives import (
     coerce_int as _coerce_int,
     is_blank,
@@ -69,41 +59,25 @@ from app.services.shared.coerce_primitives import (
 from app.services.shared.text_coerce import (
     clean_text,
     coerce_literal_text_list,
-    coerce_long_text,
     coerce_text,
-    is_null_text,
     is_title_noise as is_title_noise,
     strip_html_tags as strip_html_tags,
-    text_or_none,
 )
 from app.services.shared.field_coerce_price import (
     CURRENCY_CODE_PATTERN,
     CURRENCY_SYMBOL_PATTERN,
     PRICE_RE as PRICE_RE,
-    coerce_price_from_dict,
     decimal_for_shared_price,
-    extract_currency_code,
     extract_price_text as extract_price_text,
-    price_text_is_negative,
 )
 from app.services.shared.field_coerce_text import (
-    category_value_is_url_path,
-    coerce_barcode,
-    coerce_brand_text,
-    coerce_gender,
-    coerce_identity_token_or_none,
-    coerce_sku,
-    identity_internal_tokens,
     infer_brand_from_product_url as infer_brand_from_product_url,
     infer_brand_from_title_marker as infer_brand_from_title_marker,
 )
 from app.services.shared.field_coerce_url import (
     absolute_url as absolute_url,
-    coerce_url_field_value,
     extract_urls as extract_urls,
-    is_url_field,
     same_host as same_host,
-    strip_record_tracking_params,
     strip_tracking_query_params as strip_tracking_query_params,
 )
 from app.services.shared.regex_patterns import compile_regex_patterns
@@ -293,28 +267,6 @@ def surface_alias_lookup(
             if normalized_alias:
                 lookup.setdefault(normalized_alias, canonical)
     return lookup
-
-def direct_record_to_surface_fields(
-    record: dict[str, Any],
-    *,
-    surface: str,
-    page_url: str,
-    requested_fields: list[str] | None = None,
-    base_fields: dict[str, Any] | None = None,
-) -> dict[str, Any]:
-    from .field_coerce_values import coerce_field_value, finalize_record
-
-    shaped = dict(base_fields or {})
-    source_fields = surface_fields(
-        surface,
-        requested_fields,
-        allow_noncanonical_requested=False,
-    )
-    for field_name in source_fields:
-        value = coerce_field_value(field_name, dict(record or {}).get(field_name), page_url)
-        if value not in (None, "", [], {}):
-            shaped[field_name] = value
-    return finalize_record(shaped, surface=surface)
 
 def _split_multivalue_text_rows(value: str) -> list[str]:
     rows = [clean_text(part) for part in re.split(r"(?:\r?\n|[•]+)", str(value or "")) if clean_text(part)]

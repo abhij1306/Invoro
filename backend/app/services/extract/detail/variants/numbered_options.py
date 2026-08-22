@@ -6,7 +6,7 @@ import re
 from decimal import Decimal
 from typing import Any
 
-from app.services.extract.detail.price.core import format_detail_price_decimal
+from app.services.extract.detail.price.parsing import format_detail_price_decimal
 from app.services.extract.variant_choice_traversal import (
     iter_variant_choice_groups,
     resolve_variant_group_name,
