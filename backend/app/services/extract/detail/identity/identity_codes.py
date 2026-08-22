@@ -127,7 +127,7 @@ def detail_query_identity_codes_from_url(url: object) -> set[str]:
 
 def detail_identity_codes_from_record_fields(record: dict[str, object]) -> set[str]:
     codes: set[str] = set()
-    for field_name in ("sku", "product_id", "variant_id", "part_number"):
+    for field_name in ("sku", "product_id", "variant_id", "part_number", "barcode"):
         normalized = normalized_detail_identity_code(record.get(field_name))
         if normalized:
             codes.add(normalized)

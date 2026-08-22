@@ -75,7 +75,7 @@ def _looks_like_ecommerce_detail(
     path_segments: list[str],
 ) -> bool:
     return bool(
-        _is_autozone_product(normalized_url, host)
+        _is_autozone_product(path_segments, host)
         or _is_index_product(path_segments)
         or any(token in normalized_url for token in _DETAIL_HINTS)
         or _is_product_file(path_segments)
@@ -83,10 +83,11 @@ def _looks_like_ecommerce_detail(
     )
 
 
-def _is_autozone_product(normalized_url: str, host: str) -> bool:
+def _is_autozone_product(path_segments: list[str], host: str) -> bool:
+    terminal = path_segments[-1] if path_segments else ""
     return (
         host == "autozone.com" or host.endswith(".autozone.com")
-    ) and normalized_url.rstrip("/").rsplit("/", 1)[-1].count("_") >= 2
+    ) and terminal.count("_") >= 2
 
 
 def _is_index_product(path_segments: list[str]) -> bool:

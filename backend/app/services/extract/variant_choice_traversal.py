@@ -2,23 +2,14 @@ from __future__ import annotations
 
 __all__ = (
     "infer_variant_group_name",
-    "variant_dom_cues_present",
     "variant_input_label",
     "resolve_variant_group_name",
     "infer_variant_group_name_from_values",
-    "iter_variant_select_groups",
-    "iter_variant_choice_groups",
 )
 
 import re
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any
-
-if TYPE_CHECKING:
-    from app.services.extract.variant_choice_collection import (
-        iter_variant_choice_groups,
-        iter_variant_select_groups,
-    )
+from typing import Any
 
 from app.services.config.extraction_rules import (
     VARIANT_AXIS_EXCLUDED_SINGLE_TOKENS,
@@ -85,19 +76,6 @@ _variant_anchor_href_markers = tuple(
     )
     if str(marker or "").strip()
 )
-_VARIANT_CHOICE_CACHE_ATTR = "_crawler_variant_choice_cache"
-
-
-def _variant_choice_cache(soup: Any) -> dict[object, object]:
-    cache = getattr(soup, _VARIANT_CHOICE_CACHE_ATTR, None)
-    if isinstance(cache, dict):
-        return cache
-    cache = {}
-    try:
-        setattr(soup, _VARIANT_CHOICE_CACHE_ATTR, cache)
-    except Exception:
-        return {}
-    return cache
 
 
 def infer_variant_group_name(node: Any) -> str:
@@ -132,21 +110,6 @@ def infer_variant_group_name(node: Any) -> str:
         ):
             return token
     return ""
-
-
-def variant_dom_cues_present(soup: Any) -> bool:
-    from app.services.extract.variant_choice_collection import (
-        iter_variant_choice_groups,
-        iter_variant_select_groups,
-    )
-
-    cache = _variant_choice_cache(soup)
-    cache_key = "variant_dom_cues_present"
-    if cache_key in cache:
-        return bool(cache[cache_key])
-    result = bool(iter_variant_select_groups(soup) or iter_variant_choice_groups(soup))
-    cache[cache_key] = result
-    return result
 
 
 def _choice_option_text(node: Any, *, parent: Any | None = None) -> str:
@@ -625,18 +588,3 @@ def _nearby_variant_group_name(node: Any) -> str:
             break
         current = parent
     return ""
-
-
-def __getattr__(name: str) -> Any:
-    if name in {
-        "iter_variant_choice_groups",
-        "iter_variant_select_groups",
-        "_variant_choice_container_for_input",
-    }:
-        from app.services.extract import variant_choice_collection
-
-        target_name = name.removeprefix("_")
-        return getattr(variant_choice_collection, target_name)
-    if name == "_variant_choice_container_is_overbroad":
-        return variant_choice_container_is_overbroad
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

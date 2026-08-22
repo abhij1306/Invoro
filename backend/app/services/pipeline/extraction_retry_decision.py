@@ -24,7 +24,7 @@ from app.services.extract.detail.identity.core import (
     detail_url_is_collection_like,
     detail_url_is_utility,
 )
-from app.services.extract.variant_choice_traversal import variant_dom_cues_present
+from app.services.extract.variant_choice_collection import variant_dom_cues_present
 from app.services.field_policy import (
     browser_retry_target_fields_for_surface,
     repair_target_fields_for_surface,

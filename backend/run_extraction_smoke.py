@@ -238,12 +238,31 @@ async def _acquire_and_extract_site(
     adapter_result = await _smoke_adapter_result(acquisition, url=url, surface=surface)
     result.update(_smoke_acquisition_metadata(acquisition, adapter_result, url=url))
     if acquisition.content_type.startswith("application/json"):
-        result["ok"] = True
-        result["note"] = "JSON response; extraction corpus checks skipped"
+        issue = _json_response_issue(acquisition)
+        result["ok"] = issue is None
+        if issue is None:
+            result["note"] = "JSON response; extraction corpus checks skipped"
+        else:
+            result["issue"] = issue
         return None
     return _extract_smoke_records(
         acquisition, adapter_result, site=site, url=url, surface=surface
     )
+
+
+def _json_response_issue(acquisition) -> str | None:
+    status_code = int(acquisition.status_code)
+    if not 200 <= status_code < 300:
+        return f"JSON acquisition failed with HTTP {status_code}"
+    payload = acquisition.json_data
+    if not isinstance(payload, dict):
+        return None
+    if payload.get("success") is False:
+        return "JSON acquisition reported success=false"
+    for key in ("error", "errors"):
+        if _value_present(payload.get(key)):
+            return f"JSON acquisition returned {key}"
+    return None
 
 
 async def _smoke_adapter_result(acquisition, *, url: str, surface: str):
@@ -354,15 +373,18 @@ def _evaluate_detail_records(
         if field in first_record and _value_present(first_record.get(field))
     ]
     missing_fields = [field for field in expected_fields if field not in found_fields]
+    has_record = bool(records)
     result.update(
         {
             "candidate_fields": sorted(first_record),
             "found_fields": found_fields,
             "missing_fields": missing_fields,
-            "ok": not missing_fields,
+            "ok": has_record and not missing_fields,
         }
     )
-    if missing_fields:
+    if not has_record:
+        result["issue"] = "Expected at least one detail record, got 0"
+    elif missing_fields:
         result["issue"] = f"Missing expected fields: {missing_fields}"
 
 

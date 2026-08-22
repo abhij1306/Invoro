@@ -21,11 +21,11 @@ from app.services.extract.detail.variants.state_targets import state_variant_tar
 from app.services.extract.variant_choice_collection import (
     iter_variant_choice_groups,
     iter_variant_select_groups,
+    variant_dom_cues_present,
 )
 from app.services.extract.variant_choice_traversal import (
     infer_variant_group_name_from_values,
     resolve_variant_group_name,
-    variant_dom_cues_present,
 )
 from app.services.extract.variant_dom_provenance import (
     build_variant_candidate_group,

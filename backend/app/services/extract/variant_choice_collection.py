@@ -3,6 +3,7 @@ from __future__ import annotations
 __all__ = (
     "iter_variant_choice_groups",
     "iter_variant_select_groups",
+    "variant_dom_cues_present",
     "variant_choice_container_for_input",
 )
 
@@ -57,6 +58,29 @@ _variant_anchor_href_markers = tuple(
     )
     if str(marker or "").strip()
 )
+_VARIANT_CHOICE_CACHE_ATTR = "_crawler_variant_choice_cache"
+
+
+def _variant_choice_cache(soup: Any) -> dict[object, object]:
+    cache = getattr(soup, _VARIANT_CHOICE_CACHE_ATTR, None)
+    if isinstance(cache, dict):
+        return cache
+    cache = {}
+    try:
+        setattr(soup, _VARIANT_CHOICE_CACHE_ATTR, cache)
+    except Exception:
+        return {}
+    return cache
+
+
+def variant_dom_cues_present(soup: Any) -> bool:
+    cache = _variant_choice_cache(soup)
+    cache_key = "variant_dom_cues_present"
+    if cache_key not in cache:
+        cache[cache_key] = bool(
+            iter_variant_select_groups(soup) or iter_variant_choice_groups(soup)
+        )
+    return bool(cache[cache_key])
 
 
 def _variant_group_has_multiple_options(node: Any) -> bool:
@@ -75,6 +99,11 @@ def _variant_group_has_multiple_options(node: Any) -> bool:
     return len(option_nodes) >= 2
 
 
+def _node_identity(node: Any) -> object:
+    """Return stable DOM identity even when the parser recreates wrappers."""
+    return getattr(node, "node", node)
+
+
 def _select_is_quantity_node(node: Any) -> bool:
     """Return True when the <select> element is a quantity picker."""
     if not hasattr(node, "get"):
@@ -91,7 +120,7 @@ def _select_is_quantity_node(node: Any) -> bool:
 
 def iter_variant_select_groups(soup: Any) -> list[Any]:
     groups: list[Any] = []
-    seen_ids: set[int] = set()
+    seen_nodes: set[object] = set()
     for select in select_variant_nodes(soup, VARIANT_SELECT_GROUP_SELECTOR):
         if _select_is_quantity_node(select):
             continue
@@ -99,13 +128,13 @@ def iter_variant_select_groups(soup: Any) -> list[Any]:
             continue
         if resolve_variant_group_name(select):
             groups.append(select)
-            seen_ids.add(id(select))
+            seen_nodes.add(_node_identity(select))
         if len(groups) >= int(VARIANT_SELECT_GROUP_MAX):
             break
     if len(groups) >= int(VARIANT_SELECT_GROUP_MAX):
         return groups
     for select in select_variant_nodes(soup, "select"):
-        if id(select) in seen_ids:
+        if _node_identity(select) in seen_nodes:
             continue
         if _select_is_quantity_node(select):
             continue
@@ -113,22 +142,22 @@ def iter_variant_select_groups(soup: Any) -> list[Any]:
             continue
         if resolve_variant_group_name(select):
             groups.append(select)
-            seen_ids.add(id(select))
+            seen_nodes.add(_node_identity(select))
         if len(groups) >= int(VARIANT_SELECT_GROUP_MAX):
             break
     return groups
 
 
-def _append_choice_group(groups: list[Any], seen: set[int], node: Any) -> bool:
-    node_id = id(node)
-    if node_id in seen:
+def _append_choice_group(groups: list[Any], seen: set[object], node: Any) -> bool:
+    node_identity = _node_identity(node)
+    if node_identity in seen:
         return False
     groups.append(node)
-    seen.add(node_id)
+    seen.add(node_identity)
     return len(groups) >= int(VARIANT_CHOICE_GROUP_MAX)
 
 
-def _add_labeled_role_groups(soup: Any, groups: list[Any], seen: set[int]) -> bool:
+def _add_labeled_role_groups(soup: Any, groups: list[Any], seen: set[object]) -> bool:
     for container in soup.select("[role='group'][aria-label]"):
         name = resolve_variant_group_name(container)
         axis = normalized_variant_axis_key(name)
@@ -140,9 +169,13 @@ def _add_labeled_role_groups(soup: Any, groups: list[Any], seen: set[int]) -> bo
     return False
 
 
-def _add_configured_choice_groups(soup: Any, groups: list[Any], seen: set[int]) -> bool:
+def _add_configured_choice_groups(
+    soup: Any, groups: list[Any], seen: set[object]
+) -> bool:
     for container in select_variant_nodes(soup, VARIANT_CHOICE_GROUP_SELECTOR):
-        if id(container) in seen or variant_choice_container_is_overbroad(container):
+        if _node_identity(container) in seen or variant_choice_container_is_overbroad(
+            container
+        ):
             continue
         name = resolve_variant_group_name(container)
         inferred = (
@@ -156,7 +189,7 @@ def _add_configured_choice_groups(soup: Any, groups: list[Any], seen: set[int]) 
     return False
 
 
-def _add_input_choice_groups(soup: Any, groups: list[Any], seen: set[int]) -> bool:
+def _add_input_choice_groups(soup: Any, groups: list[Any], seen: set[object]) -> bool:
     for node in soup.select("input[type='radio'], input[type='checkbox']"):
         if variant_node_in_noise_context(node):
             continue
@@ -168,7 +201,7 @@ def _add_input_choice_groups(soup: Any, groups: list[Any], seen: set[int]) -> bo
     return False
 
 
-def _add_button_choice_groups(soup: Any, groups: list[Any], seen: set[int]) -> bool:
+def _add_button_choice_groups(soup: Any, groups: list[Any], seen: set[object]) -> bool:
     selector = "button[data-variant], button.variant-option, button.size-option, button.color-option"
     for node in soup.select(selector):
         if variant_node_in_noise_context(node):
@@ -182,13 +215,13 @@ def _ordered_swatch_buttons(soup: Any) -> list[Any]:
     priority = soup.select(
         "[data-testid='swatch' i], [data-testid*='swatch-option' i], [role='button'][aria-label]"
     )
-    priority_ids = {id(node) for node in priority}
+    priority_nodes = {_node_identity(node) for node in priority}
     buttons = [
         *priority,
         *(
             node
             for node in soup.select(VARIANT_SWATCH_BUTTON_SELECTOR)
-            if id(node) not in priority_ids
+            if _node_identity(node) not in priority_nodes
         ),
     ]
     return buttons[: int(VARIANT_SWATCH_BUTTON_LIMIT)]
@@ -234,7 +267,7 @@ def _swatch_parent_has_axis(tag: str, role: str, classes: str, parent: Any) -> b
 
 
 def _swatch_container_for_button(
-    button: Any, seen: set[int], cache: dict[int, list[Any]]
+    button: Any, seen: set[object], cache: dict[object, list[Any]]
 ) -> Any | None:
     if str(
         getattr(button, "name", "") or ""
@@ -247,7 +280,8 @@ def _swatch_container_for_button(
             parent = getattr(parent, "parent", None)
             depth += 1
             continue
-        if id(parent) in seen:
+        parent_identity = _node_identity(parent)
+        if parent_identity in seen:
             return None
         tag, role, classes = _swatch_parent_metadata(parent)
         if not _swatch_parent_can_contain_group(tag, role, classes):
@@ -255,7 +289,7 @@ def _swatch_container_for_button(
             depth += 1
             continue
         siblings = cache.setdefault(
-            id(parent), parent.select(VARIANT_SWATCH_BUTTON_SELECTOR)
+            parent_identity, parent.select(VARIANT_SWATCH_BUTTON_SELECTOR)
         )
         if len(siblings) >= 2:
             if _swatch_parent_has_axis(
@@ -268,8 +302,8 @@ def _swatch_container_for_button(
     return None
 
 
-def _add_swatch_choice_groups(soup: Any, groups: list[Any], seen: set[int]) -> None:
-    cache: dict[int, list[Any]] = {}
+def _add_swatch_choice_groups(soup: Any, groups: list[Any], seen: set[object]) -> None:
+    cache: dict[object, list[Any]] = {}
     for button in _ordered_swatch_buttons(soup):
         candidate = _swatch_container_for_button(button, seen, cache)
         if candidate is not None and _append_choice_group(groups, seen, candidate):
@@ -279,7 +313,7 @@ def _add_swatch_choice_groups(soup: Any, groups: list[Any], seen: set[int]) -> N
 def iter_variant_choice_groups(soup: Any) -> list[Any]:
     """Find variant groups in deterministic discovery order."""
     groups: list[Any] = []
-    seen: set[int] = set()
+    seen: set[object] = set()
     stages = (
         _add_labeled_role_groups,
         _add_configured_choice_groups,
