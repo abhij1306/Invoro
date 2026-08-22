@@ -117,10 +117,14 @@ exclude = ["tests", "alembic", "\\.venv"]
 
 [[tool.mypy.overrides]]
 module = [
+  "aiohttp",
+  "aiohttp.*",
   "celery",
   "celery.*",
   "glom",
   "defusedxml",
+  "fastmcp",
+  "fastmcp.*",
   "jsonschema",
   "jsonschema.*",
 ]

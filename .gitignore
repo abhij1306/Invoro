@@ -30,6 +30,7 @@ backend/.tmp_project_requirements.txt
 
 frontend/.next/
 frontend/node_modules/
+frontend/.pnpm-store/
 frontend/.turbo/
 frontend/coverage/
 frontend/tsconfig.tsbuildinfo

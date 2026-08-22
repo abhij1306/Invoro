@@ -29,7 +29,6 @@ import { api, monitorsApi } from '../../lib/api';
 import type { User } from '../../lib/api/types';
 import { STORAGE_KEYS } from '../../lib/constants/storage-keys';
 import { cn } from '../../lib/utils';
-import { ThemeToggle } from '../ui/theme-toggle';
 import { InlineAlert } from '../ui/alert';
 import { LogoMark } from './logo-mark';
 
@@ -198,31 +197,22 @@ export function Sidebar({ pathname, user }: Readonly<{ pathname: string; user: U
 
       <div className="app-sidebar-footer">
         {!collapsed ? (
-          <>
-            <div className="app-sidebar-footer-row">
-              <div className="min-w-0">
-                <div className="app-sidebar-footer-title truncate">{user.email}</div>
-                <div className="app-sidebar-footer-subtitle capitalize">{user.role}</div>
-              </div>
-              <button
-                type="button"
-                className="app-icon-button"
-                onClick={() => logoutMutation.mutate()}
-                disabled={logoutMutation.isPending}
-                aria-label="Log out"
-                title="Log out"
-              >
-                <LogOut className="size-3.5" />
-              </button>
+          <div className="app-sidebar-footer-row">
+            <div className="min-w-0">
+              <div className="app-sidebar-footer-title truncate">{user.email}</div>
+              <div className="app-sidebar-footer-subtitle capitalize">{user.role}</div>
             </div>
-            <div className="app-sidebar-footer-row">
-              <div>
-                <div className="app-sidebar-footer-title">Display</div>
-                <div className="app-sidebar-footer-subtitle">Theme preference</div>
-              </div>
-              <ThemeToggle compact />
-            </div>
-          </>
+            <button
+              type="button"
+              className="app-icon-button"
+              onClick={() => logoutMutation.mutate()}
+              disabled={logoutMutation.isPending}
+              aria-label="Log out"
+              title="Log out"
+            >
+              <LogOut className="size-3.5" />
+            </button>
+          </div>
         ) : (
           <button
             type="button"
