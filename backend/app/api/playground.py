@@ -227,7 +227,7 @@ async def playground_pipeline(
     session: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[User, Depends(get_current_user)],
 ) -> PlaygroundPipelineResponse:
-    """Run selected downstream operations (enrich, compare, monitor, audit)."""
+    """Run selected downstream operations (enrich, compare, monitor)."""
     try:
         playground = await get_session(session, session_id=session_id, user=user)
         launched, dispatch_specs = await start_pipeline(
@@ -237,7 +237,6 @@ async def playground_pipeline(
             enrich=payload.enrich,
             compare=payload.compare,
             monitor=payload.monitor,
-            audit=payload.audit,
         )
     except LookupError as exc:
         raise HTTPException(

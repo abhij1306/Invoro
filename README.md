@@ -31,7 +31,6 @@ Invoro extracts structured data from ecommerce, job, content, article, forum-thr
 | Public API v1          | Exposes API-key authenticated extraction with auto/content/article/forum routing, domain lookup, capabilities, and alert endpoints under `/api/v1`. |
 | MCP wrappers           | Provides a hosted FastMCP server for product extraction tools and a stdio alert wrapper over public alert endpoints.                                |
 | Orchestration          | Groups projects and workflows around normal crawl runs; current workflow supports competitive pricing snapshots and monitor promotion.              |
-| UCP audit              | Runs deterministic UCP compliance audits, stores report artifacts, and exports JSON/Markdown repair roadmaps.                                       |
 | Observability          | Uses structured logs, correlation IDs, health checks, Prometheus metrics, run logs, and artifact capture.                                           |
 
 ## Architecture
@@ -131,7 +130,6 @@ UI: `http://127.0.0.1:3000`
 | `/monitors`             | Recurring extraction monitors with events, history, snapshots, and exports. |
 | `/alerts`               | Product price/availability alerts with optional webhooks.                   |
 | `/projects`             | Orchestration projects and competitive pricing workflows.                   |
-| `/ucp-audit`            | UCP compliance audit jobs and repair-roadmap exports.                       |
 | `/admin/llm`            | Runtime LLM provider configuration, test connection, and cost log.          |
 | `/admin/users`          | Admin user management.                                                      |
 
@@ -147,7 +145,6 @@ UI: `http://127.0.0.1:3000`
 | `/api/monitors`                                | Monitor CRUD, run-now, events, history, snapshots, and exports.                     |
 | `/api/alerts`                                  | Console-auth alert CRUD, test poll, history, and webhook deliveries.                |
 | `/api/orchestration`                           | Projects, templates, workflow runs, promotion, and price comparison results.        |
-| `/api/ucp-audit`                               | Audit job lifecycle and JSON/Markdown report export.                                |
 | `/api/v1`                                      | API-key authenticated public extraction, domain, capabilities, and alert endpoints. |
 | `/api/health`, `/health/live`, `/health/ready` | Health checks.                                                                      |
 | `/api/metrics`                                 | Prometheus metrics.                                                                 |

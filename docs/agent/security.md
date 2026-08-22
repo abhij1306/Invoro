@@ -68,6 +68,7 @@ row := db.QueryRow("SELECT * FROM users WHERE email = ?", userInput)
 ```python
 # BAD — shell=True with user input is always dangerous
 import subprocess
+
 subprocess.run(f"convert {filename}", shell=True)
 
 # GOOD — pass args as a list, shell=False (default)
@@ -103,13 +104,18 @@ Check ownership at the handler level, not only role membership. A role check alo
 def get_invoice(invoice_id: int, current_user=Depends(get_current_user)):
     return db.query(Invoice).filter(Invoice.id == invoice_id).first()
 
+
 # GOOD — verifies the resource belongs to the caller
 @app.get("/invoices/{invoice_id}")
 def get_invoice(invoice_id: int, current_user=Depends(get_current_user)):
-    invoice = db.query(Invoice).filter(
-        Invoice.id == invoice_id,
-        Invoice.owner_id == current_user.id,  # ownership check
-    ).first()
+    invoice = (
+        db.query(Invoice)
+        .filter(
+            Invoice.id == invoice_id,
+            Invoice.owner_id == current_user.id,  # ownership check
+        )
+        .first()
+    )
     if not invoice:
         raise HTTPException(status_code=404)
     return invoice
@@ -136,10 +142,11 @@ Never store plaintext passwords or hashes produced by MD5, SHA-1, or unsalted SH
 ```python
 # Python — bcrypt via passlib
 from passlib.context import CryptContext
+
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto", bcrypt__rounds=12)
 
 hashed = pwd_context.hash("user_plaintext_password")
-valid  = pwd_context.verify("user_plaintext_password", hashed)
+valid = pwd_context.verify("user_plaintext_password", hashed)
 ```
 
 ```typescript
@@ -192,7 +199,7 @@ import jwt
 
 payload = jwt.decode(
     token,
-    public_key,           # RS256: public key; HS256: shared secret
+    public_key,  # RS256: public key; HS256: shared secret
     algorithms=["RS256"],
     audience="my-api",
     options={"require": ["exp", "iss", "sub", "aud"]},
@@ -320,6 +327,7 @@ class PostPolicy:
     def can_publish(self, user, post) -> bool:
         return user.role in ("editor", "admin")
 
+
 # Handler
 policy = PostPolicy()
 if not policy.can_edit(current_user, post):
@@ -344,7 +352,8 @@ The rule: never commit secrets. A `.env` file is for local development only — 
 
 # GOOD — read from environment at runtime
 import os
-SECRET_KEY  = os.environ["SECRET_KEY"]
+
+SECRET_KEY = os.environ["SECRET_KEY"]
 DATABASE_URL = os.environ["DATABASE_URL"]
 ```
 
@@ -388,7 +397,9 @@ Always use parameterized queries or an ORM with parameter binding. No exceptions
 
 ```python
 # BAD
-cursor.execute("INSERT INTO orders (user_id, item) VALUES ('" + user_id + "', '" + item + "')")
+cursor.execute(
+    "INSERT INTO orders (user_id, item) VALUES ('" + user_id + "', '" + item + "')"
+)
 
 # GOOD — psycopg2 / SQLAlchemy
 cursor.execute("INSERT INTO orders (user_id, item) VALUES (%s, %s)", (user_id, item))
@@ -417,6 +428,7 @@ import magic  # python-magic (libmagic binding)
 
 ALLOWED_TYPES = {"image/jpeg", "image/png", "application/pdf"}
 MAX_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB
+
 
 def validate_upload(file_bytes: bytes, claimed_extension: str) -> None:
     if len(file_bytes) > MAX_SIZE_BYTES:
@@ -492,12 +504,15 @@ CORS(app, origins=["https://app.example.com", "https://admin.example.com"])
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
+
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
-        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        response.headers["Strict-Transport-Security"] = (
+            "max-age=31536000; includeSubDomains"
+        )
         return response
 ```
 

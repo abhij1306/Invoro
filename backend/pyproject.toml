@@ -65,6 +65,7 @@ dev = [
   "types-jmespath>=1.1.0.20260408,<2",
   "types-cachetools>=6.2.0.20260408,<8",
   "types-passlib>=1.7.7.20260211,<2",
+  "types-pytz>=2025.2.0.20250809,<2027",
   "pylint>=4.0.5,<5",
   "basedpyright>=1.39.2,<2",
   "bandit>=1.9.4,<2",

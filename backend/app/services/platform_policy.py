@@ -218,52 +218,78 @@ def detect_platform_family(url: str, html: str = "") -> str | None:
     normalized_html = str(html or "").lower()[: _platform_detection_html_search_limit()]
     domain = normalize_domain(urlparse(normalized_url).netloc)
 
-    for config in platform_configs():
-        domain_patterns = _normalize_patterns(config.domain_patterns)
-        if any(_matches_domain(domain, pattern) for pattern in domain_patterns):
-            return config.family
+    return (
+        _family_by_domain(domain)
+        or _family_by_html(domain, normalized_html)
+        or _family_by_url(domain, normalized_url)
+        or _generic_platform_family(normalized_url)
+    )
 
+
+def _family_by_domain(domain: str) -> str | None:
+    return next(
+        (
+            config.family
+            for config in platform_configs()
+            if any(
+                _matches_domain(domain, pattern)
+                for pattern in _normalize_patterns(config.domain_patterns)
+            )
+        ),
+        None,
+    )
+
+
+def _family_by_html(domain: str, html: str) -> str | None:
     for config in platform_configs():
         domain_patterns = _normalize_patterns(config.domain_patterns)
         if domain_patterns and not any(
             _matches_domain(domain, pattern) for pattern in domain_patterns
         ):
             continue
-        html_patterns = _normalize_patterns(config.html_contains)
-        if any(pattern in normalized_html for pattern in html_patterns):
+        if any(
+            pattern in html for pattern in _normalize_patterns(config.html_contains)
+        ):
             return config.family
-        for pattern in config.html_regex:
-            raw_pattern = str(pattern or "").strip()
-            if not raw_pattern:
-                continue
-            try:
-                if re.search(raw_pattern, normalized_html, re.IGNORECASE):
-                    return config.family
-            except re.error as exc:
-                logger.warning(
-                    "Skipping invalid platform html_regex for family=%s pattern=%r: %s",
-                    config.family,
-                    raw_pattern,
-                    exc,
-                )
+        if _html_regex_matches(config, html):
+            return config.family
+    return None
 
+
+def _html_regex_matches(config: PlatformConfig, html: str) -> bool:
+    for pattern in config.html_regex:
+        raw_pattern = str(pattern or "").strip()
+        if not raw_pattern:
+            continue
+        try:
+            if re.search(raw_pattern, html, re.IGNORECASE):
+                return True
+        except re.error as exc:
+            logger.warning(
+                "Skipping invalid platform html_regex for family=%s pattern=%r: %s",
+                config.family,
+                raw_pattern,
+                exc,
+            )
+    return False
+
+
+def _family_by_url(domain: str, url: str) -> str | None:
     for config in platform_configs():
         url_patterns = _normalize_patterns(config.url_contains)
-        if not url_patterns:
-            continue
         domain_patterns = _normalize_patterns(config.domain_patterns)
-        if domain_patterns and not any(
+        domain_allowed = not domain_patterns or any(
             _matches_domain(domain, pattern) for pattern in domain_patterns
-        ):
-            continue
-        if any(pattern in normalized_url for pattern in url_patterns):
+        )
+        if domain_allowed and any(pattern in url for pattern in url_patterns):
             return config.family
+    return None
 
-    if any(token in normalized_url for token in GENERIC_PLATFORM_URL_TOKENS["job"]):
+
+def _generic_platform_family(url: str) -> str | None:
+    if any(token in url for token in GENERIC_PLATFORM_URL_TOKENS["job"]):
         return "generic_jobs"
-    if any(
-        token in normalized_url for token in GENERIC_PLATFORM_URL_TOKENS["ecommerce"]
-    ):
+    if any(token in url for token in GENERIC_PLATFORM_URL_TOKENS["ecommerce"]):
         return "generic_commerce"
     return None
 
@@ -285,22 +311,41 @@ def resolve_listing_readiness_platform(url: str) -> str | None:
             for pattern in config.readiness_path_patterns
             if str(pattern or "").strip()
         ]
-        if not readiness_domains or not readiness_patterns:
-            continue
-        if not any(_matches_domain(host, pattern) for pattern in readiness_domains):
-            continue
-        for pattern in readiness_patterns:
-            try:
-                if re.search(pattern, path, re.IGNORECASE):
-                    return config.family
-            except re.error as exc:
-                logger.warning(
-                    "Skipping invalid readiness path regex for family=%s pattern=%r: %s",
-                    config.family,
-                    pattern,
-                    exc,
-                )
+        if _readiness_config_matches(
+            config,
+            host=host,
+            path=path,
+            readiness_domains=readiness_domains,
+            readiness_patterns=readiness_patterns,
+        ):
+            return config.family
     return None
+
+
+def _readiness_config_matches(
+    config: PlatformConfig,
+    *,
+    host: str,
+    path: str,
+    readiness_domains: list[str],
+    readiness_patterns: list[str],
+) -> bool:
+    if not readiness_domains or not readiness_patterns:
+        return False
+    if not any(_matches_domain(host, pattern) for pattern in readiness_domains):
+        return False
+    for pattern in readiness_patterns:
+        try:
+            if re.search(pattern, path, re.IGNORECASE):
+                return True
+        except re.error as exc:
+            logger.warning(
+                "Skipping invalid readiness path regex for family=%s pattern=%r: %s",
+                config.family,
+                pattern,
+                exc,
+            )
+    return False
 
 
 def _platform_detection_html_search_limit() -> int:

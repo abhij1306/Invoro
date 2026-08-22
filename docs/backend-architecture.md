@@ -182,11 +182,11 @@ Primary files:
 - `pipeline/types.py`
 - `pipeline/runtime_helpers.py`
 - `pipeline/acquisition_timeline.py`, `pipeline/extraction_trace.py`
-- `data_enrichment/service.py`
+- `data_enrichment/service.py`, `data_enrichment/job_execution.py`
 - `monitor_service.py`, `monitor_scheduler_service.py`, `monitor_async_loop.py`, `monitor_change_detection.py`, `monitor_retention.py`
-- `playground_service.py`
-- `data_enrichment/deterministic.py`
-- `data_enrichment/shopify_catalog.py`
+- `playground_service.py`, `playground_progress.py`
+- `data_enrichment/deterministic.py`, `data_enrichment/candidate_values.py`, `data_enrichment/catalog_metadata.py`
+- `data_enrichment/shopify_catalog.py`, `data_enrichment/shopify_attributes.py`, `data_enrichment/taxonomy_text.py`
 
 Responsibilities:
 
@@ -530,9 +530,6 @@ Primary models:
 - `ReviewPromotion`
 - `DataEnrichmentJob`
 - `EnrichedProduct`
-- `UCPAuditJob`
-- `UCPAuditPageResult`
-- `UCPAuditReport`
 - `MonitorJob`
 - `MonitorEvent`
 - `MonitorSnapshot`
@@ -551,7 +548,6 @@ Notable current schema direction:
 - max-records trigger support
 - URL identity keys on records
 - enrichment status metadata on crawl records, with derived enrichment data stored separately in `enriched_products`
-- AI Discoverability audit report storage separated from crawl records, with JSON/Markdown artifacts in `ucp_audit_reports`; report JSON now carries sampled catalog crawl metadata, D-AID1 gate caps, structured markup signals, product sample summaries, robots/sitemap discovery signals, and evidence-backed repair roadmap items
 - playground sessions store step state and references only; extracted data stays in `crawl_records`, derived enrichment data stays in `enriched_products`, and recurring state stays in monitor tables
 - domain-memory storage
 - split crawl-data reset versus domain-memory reset, so destructive cleanup no longer wipes learned selectors/profiles/cookies by default
@@ -584,6 +580,8 @@ The normal records API hides:
 ## 9. Product Intelligence Discovery
 
 Product Intelligence lives under `app/services/product_intelligence/` and remains upstream of candidate crawl/export paths. SerpAPI discovery is Shopping-first: `engine=google_shopping` results are parsed, Immersive Product store links are expanded, then organic results remain as fallback evidence. Candidate ranking prefers exact identifiers, Shopping product-group evidence, and title overlap before source-type authority, so a strong marketplace match can outrank a weak brand-site adjacent product without adding extra search queries.
+
+Discovery orchestration remains in `discovery.py`; query construction, SerpAPI parsing, and persistence live in `query_builder.py`, `serpapi_parsing.py`, and `discovery_persistence.py`. Candidate crawl orchestration remains in `service.py`, with record shaping, identity, scoring, options, and shared search types separated into same-package owners.
 
 Belk brand inference uses data files under `app/data/product_intelligence/`, with `belk_brands.txt` for longest-match brand inference from Belk source titles/URLs and `belk_exclusive_brands.txt` for private-label exclusion. Belk detail extraction preserves UPC-like `sku_upc` values as public `barcode`/Product Intelligence `gtin` evidence while keeping retailer SKU/product ID separate. Confidence scoring is deterministic and evidence-based: title similarity, brand match, valid GTIN/barcode match, retailer SKU match, MPN/style match, Shopping product-group evidence, price band, and source authority are scored separately so the UI can explain why a candidate URL is strong or weak.
 

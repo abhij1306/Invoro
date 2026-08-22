@@ -160,7 +160,6 @@ describe('usePlaygroundWorkflow', () => {
       enrich: false,
       compare: false,
       monitor: false,
-      audit: false,
     });
   });
 
@@ -252,7 +251,6 @@ describe('usePlaygroundWorkflow', () => {
         enrich: true,
         compare: false,
         monitor: true,
-        audit: true,
       });
     });
     act(() => result.current.handlePipeline());
@@ -264,7 +262,6 @@ describe('usePlaygroundWorkflow', () => {
         enrich: true,
         compare: false,
         monitor: true,
-        audit: true,
       });
     });
   });

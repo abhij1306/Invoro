@@ -56,8 +56,8 @@ response.set_cookie(
     "access_token",
     token,
     httponly=True,
-    samesite="strict",       # Upgrade to strict for the login cookie
-    secure=True,             # REQUIRED — only send over HTTPS
+    samesite="strict",  # Upgrade to strict for the login cookie
+    secure=True,  # REQUIRED — only send over HTTPS
     max_age=int(settings.jwt_expire_hours * 3600),
     path="/",
 )
@@ -66,7 +66,13 @@ response.set_cookie(
 Only omit `secure=True` in local `APP_ENV=development` to avoid breaking localhost development:
 ```python
 secure = settings.app_env != "development"
-response.set_cookie("access_token", token, httponly=True, samesite="lax" if not secure else "strict", secure=secure)
+response.set_cookie(
+    "access_token",
+    token,
+    httponly=True,
+    samesite="lax" if not secure else "strict",
+    secure=secure,
+)
 ```
 
 **OWASP:** A07 (Identification and Authentication Failures) — Cookie flags missing on session tokens
@@ -105,6 +111,7 @@ Alternatively, implement the same token-bucket pattern already used in `rate_lim
 ```python
 from passlib.hash import pbkdf2_sha256
 
+
 def hash_password(password: str) -> str:
     return pbkdf2_sha256.hash(password)
 ```
@@ -118,8 +125,10 @@ from passlib.context import CryptContext
 # bcrypt with work factor 12 (OWASP minimum)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto", bcrypt__rounds=12)
 
+
 def hash_password(password: str) -> str:
     return pwd_context.hash(password)
+
 
 def verify_password(password: str, hashed: str) -> bool:
     try:
@@ -180,17 +189,23 @@ The application has `CORSMiddleware` but no middleware adding any security heade
 ```python
 from starlette.middleware.base import BaseHTTPMiddleware
 
+
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
-        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        response.headers["Strict-Transport-Security"] = (
+            "max-age=31536000; includeSubDomains"
+        )
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+        response.headers["Permissions-Policy"] = (
+            "camera=(), microphone=(), geolocation=()"
+        )
         if request.url.path.startswith("/api/"):
             response.headers["Cache-Control"] = "no-store"
         return response
+
 
 app.add_middleware(SecurityHeadersMiddleware)
 ```
@@ -210,8 +225,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=get_frontend_origins(),  # ✅ GOOD — uses an allowlist
     allow_credentials=True,
-    allow_methods=["*"],                   # ❌ too broad
-    allow_headers=["*"],                   # ❌ too broad
+    allow_methods=["*"],  # ❌ too broad
+    allow_headers=["*"],  # ❌ too broad
 )
 ```
 

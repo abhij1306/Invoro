@@ -55,16 +55,13 @@ def run_health_verdict(summary: dict[str, object] | object) -> dict[str, object]
         1 for verdict in verdicts if verdict not in {VERDICT_SUCCESS, VERDICT_PARTIAL}
     )
     failure_rate = failures / total if total else 0.0
-    status = "unknown"
-    if total:
-        if failure_rate >= crawler_runtime_settings.run_health_failed_error_rate:
-            status = "failed"
-        elif failure_rate >= crawler_runtime_settings.run_health_degraded_error_rate:
-            status = "degraded"
-        else:
-            status = "healthy"
-    elif isinstance(raw_verdicts, list):
-        status = "healthy"
+    status = _run_health_status(
+        total=total,
+        failure_rate=failure_rate,
+        has_verdict_list=isinstance(raw_verdicts, list),
+        degraded_rate=crawler_runtime_settings.run_health_degraded_error_rate,
+        failed_rate=crawler_runtime_settings.run_health_failed_error_rate,
+    )
     return {
         "status": status,
         "url_count": total,
@@ -73,3 +70,20 @@ def run_health_verdict(summary: dict[str, object] | object) -> dict[str, object]
         "degraded_error_rate": crawler_runtime_settings.run_health_degraded_error_rate,
         "failed_error_rate": crawler_runtime_settings.run_health_failed_error_rate,
     }
+
+
+def _run_health_status(
+    *,
+    total: int,
+    failure_rate: float,
+    has_verdict_list: bool,
+    degraded_rate: float,
+    failed_rate: float,
+) -> str:
+    if not total:
+        return "healthy" if has_verdict_list else "unknown"
+    if failure_rate >= failed_rate:
+        return "failed"
+    if failure_rate >= degraded_rate:
+        return "degraded"
+    return "healthy"

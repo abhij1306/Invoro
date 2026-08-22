@@ -7,13 +7,8 @@ from urllib.parse import urlparse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.crawl_run import CrawlRecord, CrawlRun
 from app.models.playground import PlaygroundSession
 from app.models.user import User
-from app.services.config.aid_score import (
-    AID_AUDIT_JOB_STATUS_COMPLETE,
-    AID_AUDIT_JOB_STATUS_FAILED,
-)
 from app.services.config.data_enrichment import (
     DATA_ENRICHMENT_JOB_TERMINAL_STATUSES,
     ECOMMERCE_DETAIL_SURFACE,
@@ -30,12 +25,17 @@ from app.services.config.sitemap import (
 )
 from app.services.crawl.category_discovery import discover_category_urls
 from app.services.crawl.ingestion_service import create_crawl_run_from_payload
-from app.services.crawl.state import TERMINAL_STATUSES
+from app.services.playground_progress import (
+    auto_advance as _auto_advance,
+    extract_record_ids as _extract_record_ids,
+    extract_run_ids as _extract_run_ids,
+    get_results as _get_results,
+    merge_seed_detail_products as _merge_seed_detail_products_impl,
+)
 from app.services.surface_resolver import resolve_auto_surface
 
 logger = logging.getLogger(__name__)
 
-_AUDIT_TERMINAL_STATUSES = {AID_AUDIT_JOB_STATUS_COMPLETE, AID_AUDIT_JOB_STATUS_FAILED}
 _PI_TERMINAL_STATUSES = {
     PRODUCT_INTELLIGENCE_JOB_STATUS_COMPLETE,
     PRODUCT_INTELLIGENCE_JOB_STATUS_FAILED,
@@ -43,6 +43,18 @@ _PI_TERMINAL_STATUSES = {
 _ENRICH_TERMINAL_STATUSES = set(DATA_ENRICHMENT_JOB_TERMINAL_STATUSES)
 
 MAX_PRODUCTS = 50
+
+
+async def get_results(
+    session: AsyncSession, *, playground: PlaygroundSession
+) -> dict[str, Any]:
+    return await _get_results(session, playground=playground)
+
+
+def _merge_seed_detail_products(
+    step_data: dict[str, Any], discovered_products: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    return _merge_seed_detail_products_impl(step_data, discovered_products)
 
 
 def _classify_input_url(url: str) -> str:
@@ -239,60 +251,79 @@ async def _resolve_category_list_for_inputs(
     *,
     limit: int,
 ) -> dict[str, Any]:
-    discover_urls: list[str] = []
-    input_listing_urls: list[str] = []
-    groups: dict[str, list[str]] = {}
-    sources: dict[str, str] = {}
-    for url in urls:
-        classification = _classify_input_url(url)
-        if classification == "listing":
-            input_listing_urls.append(url)
-            groups[url] = [url]
-            sources[url] = "input"
-        elif classification != "detail":
-            discover_urls.append(url)
-
+    discover_urls, input_listing_urls = _partition_category_inputs(urls)
     discovered: dict[str, Any] = (
         await discover_category_urls(discover_urls, limit=limit)
         if discover_urls
-        else {
-            "status": "completed",
-            "source": "input",
-            "sources": {},
-            "urls": [],
-            "groups": {},
-            "trees": {},
-            "errors": {},
-            "diagnostics": {},
-            "total_found": 0,
-            "limit": limit,
-        }
+        else _empty_category_discovery(limit)
     )
-    merged_groups = {**groups, **dict(discovered.get("groups") or {})}
-    merged_sources = {**sources, **dict(discovered.get("sources") or {})}
-    flat_urls: list[str] = []
-    for url in [*input_listing_urls, *list(discovered.get("urls") or [])]:
-        if isinstance(url, str) and url not in flat_urls:
-            flat_urls.append(url)
-    source = str(discovered.get("source") or "multi")
-    if input_listing_urls and not discover_urls:
-        source = "input"
-    elif input_listing_urls:
-        source = "multi"
+    input_groups = {url: [url] for url in input_listing_urls}
+    input_sources = dict.fromkeys(input_listing_urls, "input")
+    flat_urls = list(
+        dict.fromkeys(
+            [
+                url
+                for url in [*input_listing_urls, *list(discovered.get("urls") or [])]
+                if isinstance(url, str)
+            ]
+        )
+    )
     discovered_total = int(discovered.get("total_found") or 0)
     total_found = max(len(flat_urls), discovered_total + len(input_listing_urls))
     return {
         "status": "completed",
-        "source": source,
-        "sources": merged_sources,
+        "source": _category_result_source(
+            discovered,
+            input_listing_urls=input_listing_urls,
+            discover_urls=discover_urls,
+        ),
+        "sources": {**input_sources, **dict(discovered.get("sources") or {})},
         "urls": flat_urls[:limit],
-        "groups": merged_groups,
+        "groups": {**input_groups, **dict(discovered.get("groups") or {})},
         "trees": dict(discovered.get("trees") or {}),
         "errors": dict(discovered.get("errors") or {}),
         "diagnostics": dict(discovered.get("diagnostics") or {}),
         "total_found": total_found,
         "limit": limit,
     }
+
+
+def _partition_category_inputs(urls: list[str]) -> tuple[list[str], list[str]]:
+    discover_urls: list[str] = []
+    listing_urls: list[str] = []
+    for url in urls:
+        classification = _classify_input_url(url)
+        if classification == "listing":
+            listing_urls.append(url)
+        elif classification != "detail":
+            discover_urls.append(url)
+    return discover_urls, listing_urls
+
+
+def _empty_category_discovery(limit: int) -> dict[str, Any]:
+    return {
+        "status": "completed",
+        "source": "input",
+        "sources": {},
+        "urls": [],
+        "groups": {},
+        "trees": {},
+        "errors": {},
+        "diagnostics": {},
+        "total_found": 0,
+        "limit": limit,
+    }
+
+
+def _category_result_source(
+    discovered: dict[str, Any],
+    *,
+    input_listing_urls: list[str],
+    discover_urls: list[str],
+) -> str:
+    if input_listing_urls:
+        return "multi" if discover_urls else "input"
+    return str(discovered.get("source") or "multi")
 
 
 async def select_category(
@@ -412,13 +443,10 @@ async def start_pipeline(
     enrich: bool = False,
     compare: bool = False,
     monitor: bool = False,
-    audit: bool = False,
 ) -> tuple[dict[str, Any], list[tuple[Any, int]]]:
-    needs_extracted = bool(enrich or compare or monitor)
-    if needs_extracted:
-        _require_state(playground, "extracted")
-    elif playground.state == "created":
-        raise ValueError("Session not started — call discover first")
+    needs_extracted = _validate_pipeline_start(
+        playground, enrich=enrich, compare=compare, monitor=monitor
+    )
 
     launched: dict[str, Any] = {}
     dispatch_specs: list[tuple[Any, int]] = []
@@ -525,29 +553,6 @@ async def start_pipeline(
                 }
         step_data["monitor"] = launched["monitor"]
 
-    if audit:
-        from app.services.ucp_audit.service import (
-            create_ucp_audit_job,
-            run_ucp_audit_job,
-        )
-
-        try:
-            audit_job = await create_ucp_audit_job(
-                session,
-                user=user,
-                payload={"domain": playground.input_url},
-            )
-            launched["audit"] = {"job_id": audit_job.id, "status": "running"}
-            dispatch_specs.append((run_ucp_audit_job, audit_job.id))
-        except Exception as exc:
-            logger.error("Pipeline audit failed: %s", exc, exc_info=True)
-            launched["audit"] = {
-                "job_id": None,
-                "status": "failed",
-                "error": str(exc),
-            }
-        step_data["audit"] = launched["audit"]
-
     if needs_extracted:
         playground.state = "running_pipeline"
     playground.step_data = step_data
@@ -555,214 +560,15 @@ async def start_pipeline(
     return launched, dispatch_specs
 
 
-async def get_results(
-    session: AsyncSession,
-    *,
-    playground: PlaygroundSession,
-) -> dict[str, Any]:
-    step_data = dict(playground.step_data or {})
-    results: dict[str, Any] = {
-        "state": playground.state,
-        "input_url": playground.input_url,
-        "steps": {},
-    }
-
-    discover = step_data.get("discover", {})
-    if discover:
-        results["steps"]["discover"] = {
-            "status": discover.get("status"),
-            "total_found": discover.get("total_found", 0),
-            "products": discover.get("products", []),
-        }
-
-    results["steps"]["selected_urls"] = step_data.get("selected_urls", [])
-
-    extract = step_data.get("extract", {})
-    if extract:
-        records = await _extract_records(session, _extract_run_ids(step_data))
-        results["steps"]["extract"] = {
-            "status": extract.get("status"),
-            "run_id": extract.get("run_id"),
-            "run_ids": _extract_run_ids(step_data),
-            "url_count": extract.get("url_count", 0),
-            "record_count": len(records),
-            "records": records,
-        }
-
-    for key in ("enrich", "compare", "monitor", "audit"):
-        if key in step_data:
-            results["steps"][key] = step_data[key]
-
-    return results
-
-
-async def _auto_advance(
-    session: AsyncSession,
-    playground: PlaygroundSession,
-) -> None:
-    step_data = dict(playground.step_data or {})
-
-    if playground.state == "discovering":
-        run_id = step_data.get("discover", {}).get("run_id")
-        if run_id:
-            run = await session.get(CrawlRun, run_id)
-            if run and run.status in {s.value for s in TERMINAL_STATUSES}:
-                products = await _extract_discovered_products(session, run_id)
-                products = _merge_seed_detail_products(step_data, products)
-                step_data["discover"] = {
-                    **step_data.get("discover", {}),
-                    "status": "completed",
-                    "products": products[:MAX_PRODUCTS],
-                    "total_found": len(products),
-                }
-                playground.state = "discovered"
-                playground.step_data = step_data
-
-    elif playground.state == "extracting":
-        extract_info = step_data.get("extract", {}) or {}
-        extract_runs = await _resolve_extract_runs(
-            session,
-            playground=playground,
-            step_data=step_data,
-        )
-        resolved_run_ids = [int(run.id) for run in extract_runs]
-        if resolved_run_ids:
-            step_data["extract"] = {
-                **extract_info,
-                "run_id": resolved_run_ids[0],
-                "run_ids": resolved_run_ids,
-            }
-            extract_info = step_data["extract"]
-        expected_run_count = _expected_extract_run_count(step_data)
-        if resolved_run_ids and len(resolved_run_ids) >= expected_run_count:
-            terminal = {s.value for s in TERMINAL_STATUSES}
-            statuses = [str(run.status) for run in extract_runs]
-            if all(status in terminal for status in statuses):
-                step_data["extract"] = {
-                    **extract_info,
-                    "status": "completed",
-                }
-                playground.state = "extracted"
-                playground.step_data = step_data
-
-    elif playground.state == "running_pipeline":
-        mutated = False
-        for key, refresher in (
-            ("enrich", _refresh_enrich_status),
-            ("compare", _refresh_compare_status),
-            ("audit", _refresh_audit_status),
-        ):
-            info = step_data.get(key)
-            if not info or not isinstance(info, dict):
-                continue
-            updated = await refresher(session, info)
-            if updated is not None and updated != info:
-                step_data[key] = updated
-                mutated = True
-
-        all_done = True
-        for key in ("enrich", "compare", "audit"):
-            info = step_data.get(key, {})
-            if isinstance(info, dict) and info.get("status") == "running":
-                all_done = False
-                break
-        if all_done:
-            playground.state = "complete"
-            mutated = True
-        if mutated:
-            playground.step_data = step_data
-
-    if playground.state != "running_pipeline":
-        audit_info = step_data.get("audit")
-        if isinstance(audit_info, dict) and audit_info.get("status") == "running":
-            updated = await _refresh_audit_status(session, audit_info)
-            if updated is not None and updated != audit_info:
-                step_data["audit"] = updated
-                playground.step_data = step_data
-
-
-async def _refresh_enrich_status(
-    session: AsyncSession,
-    info: dict[str, Any],
-) -> dict[str, Any] | None:
-    job_id = info.get("job_id")
-    if not isinstance(job_id, int):
-        return None
-    from app.models.data_enrichment import DataEnrichmentJob
-
-    job = await session.get(DataEnrichmentJob, job_id)
-    if job is None:
-        return None
-    status = str(job.status or "").strip().lower()
-    if status in _ENRICH_TERMINAL_STATUSES:
-        return {**info, "status": status}
-    return None
-
-
-async def _refresh_compare_status(
-    session: AsyncSession,
-    info: dict[str, Any],
-) -> dict[str, Any] | None:
-    job_id = info.get("job_id")
-    if not isinstance(job_id, int):
-        return None
-    from app.models.product_intelligence import ProductIntelligenceJob
-
-    job = await session.get(ProductIntelligenceJob, job_id)
-    if job is None:
-        return None
-    status = str(job.status or "").strip().lower()
-    if status in _PI_TERMINAL_STATUSES:
-        return {**info, "status": status}
-    return None
-
-
-async def _refresh_audit_status(
-    session: AsyncSession,
-    info: dict[str, Any],
-) -> dict[str, Any] | None:
-    job_id = info.get("job_id")
-    if not isinstance(job_id, int):
-        return None
-    from app.models.ucp_audit import UCPAuditJob
-
-    job = await session.get(UCPAuditJob, job_id)
-    if job is None:
-        return None
-    status = str(job.status or "").strip().lower()
-    if status in _AUDIT_TERMINAL_STATUSES:
-        return {**info, "status": status}
-    return None
-
-
-async def _extract_discovered_products(
-    session: AsyncSession,
-    run_id: int,
-) -> list[dict[str, Any]]:
-    rows = await session.scalars(
-        select(CrawlRecord).where(CrawlRecord.run_id == run_id).limit(MAX_PRODUCTS)
-    )
-    products = []
-    for record in rows.all():
-        data = record.data or {}
-        product_url = (
-            data.get("url")
-            or data.get("product_url")
-            or data.get("detail_url")
-            or data.get("canonical_url")
-            or record.source_url
-        )
-        if product_url:
-            products.append(
-                {
-                    "url": str(product_url),
-                    "title": str(data.get("title") or ""),
-                    "brand": str(data.get("brand") or ""),
-                    "price": str(data.get("price") or ""),
-                    "image": str(data.get("image") or data.get("image_url") or ""),
-                }
-            )
-    return products
+def _validate_pipeline_start(
+    playground: PlaygroundSession, *, enrich: bool, compare: bool, monitor: bool
+) -> bool:
+    needs_extracted = any((enrich, compare, monitor))
+    if needs_extracted:
+        _require_state(playground, "extracted")
+    elif playground.state == "created":
+        raise ValueError("Session not started — call discover first")
+    return needs_extracted
 
 
 async def _launch_extract_runs(
@@ -873,142 +679,6 @@ def _session_category_limit(playground: PlaygroundSession) -> int:
             PLAYGROUND_CATEGORY_DEFAULT_LIMIT,
         )
     )
-
-
-def _merge_seed_detail_products(
-    step_data: dict[str, Any],
-    discovered_products: list[dict[str, Any]],
-) -> list[dict[str, Any]]:
-    merged: list[dict[str, Any]] = []
-    seen: set[str] = set()
-    for seed_url in step_data.get("seed_detail_urls", []) or []:
-        normalized = str(seed_url or "").strip()
-        if not normalized or normalized in seen:
-            continue
-        merged.append(
-            {"url": normalized, "title": "", "brand": "", "price": "", "image": ""}
-        )
-        seen.add(normalized)
-    for product in discovered_products:
-        normalized = str(product.get("url") or "").strip()
-        if not normalized or normalized in seen:
-            continue
-        merged.append(product)
-        seen.add(normalized)
-    return merged
-
-
-def _extract_run_ids(step_data: dict[str, Any]) -> list[int]:
-    extract = step_data.get("extract", {}) or {}
-    raw_run_ids = extract.get("run_ids")
-    if isinstance(raw_run_ids, list):
-        run_ids = [
-            run_id for run_id in raw_run_ids if isinstance(run_id, int) and run_id > 0
-        ]
-        if run_ids:
-            return run_ids
-    run_id = extract.get("run_id")
-    if isinstance(run_id, int) and run_id > 0:
-        return [run_id]
-    return []
-
-
-async def _extract_record_ids(
-    session: AsyncSession,
-    run_ids: list[int],
-) -> list[int]:
-    if not run_ids:
-        return []
-    rows = await session.scalars(
-        select(CrawlRecord.id)
-        .where(CrawlRecord.run_id.in_(run_ids))
-        .order_by(CrawlRecord.run_id.asc(), CrawlRecord.id.asc())
-    )
-    return [int(record_id) for record_id in rows.all() if record_id is not None]
-
-
-async def _extract_records(
-    session: AsyncSession,
-    run_ids: list[int],
-) -> list[dict[str, Any]]:
-    if not run_ids:
-        return []
-    rows = await session.scalars(
-        select(CrawlRecord)
-        .where(CrawlRecord.run_id.in_(run_ids))
-        .order_by(CrawlRecord.run_id.asc(), CrawlRecord.id.asc())
-    )
-    records: list[dict[str, Any]] = []
-    for record in rows.all():
-        records.append(
-            {
-                "id": int(record.id),
-                "run_id": int(record.run_id),
-                "source_url": str(record.source_url),
-                "data": dict(record.data or {}),
-            }
-        )
-    return records
-
-
-def _extract_selected_urls(step_data: dict[str, Any]) -> list[str]:
-    selected_urls = step_data.get("selected_urls")
-    if not isinstance(selected_urls, list):
-        return []
-    return [
-        url.strip() for url in selected_urls if isinstance(url, str) and url.strip()
-    ]
-
-
-def _expected_extract_run_count(step_data: dict[str, Any]) -> int:
-    extract = step_data.get("extract", {}) or {}
-    url_count = extract.get("url_count")
-    expected = max(
-        len(_extract_selected_urls(step_data)),
-        url_count if isinstance(url_count, int) and url_count > 0 else 0,
-    )
-    if expected > 0:
-        return expected
-    run_ids = _extract_run_ids(step_data)
-    return len(run_ids)
-
-
-async def _resolve_extract_runs(
-    session: AsyncSession,
-    *,
-    playground: PlaygroundSession,
-    step_data: dict[str, Any],
-) -> list[CrawlRun]:
-    resolved: dict[int, CrawlRun] = {}
-    run_ids = _extract_run_ids(step_data)
-    if run_ids:
-        rows = await session.scalars(select(CrawlRun).where(CrawlRun.id.in_(run_ids)))
-        run_by_id = {int(run.id): run for run in rows.all()}
-        for run_id in run_ids:
-            run = run_by_id.get(run_id)
-            if run is None:
-                continue
-            resolved[int(run.id)] = run
-
-    selected_urls = _extract_selected_urls(step_data)
-    if selected_urls:
-        rows = await session.scalars(
-            select(CrawlRun)
-            .where(
-                CrawlRun.user_id == playground.user_id,
-                CrawlRun.run_type == "crawl",
-                CrawlRun.url.in_(selected_urls),
-                CrawlRun.created_at >= playground.created_at,
-            )
-            .order_by(CrawlRun.id.asc())
-        )
-        for run in rows.all():
-            settings = run.settings if isinstance(run.settings, dict) else {}
-            if settings.get("playground_session_id") != playground.id:
-                continue
-            resolved.setdefault(int(run.id), run)
-
-    return [resolved[run_id] for run_id in sorted(resolved)]
 
 
 def _require_state(playground: PlaygroundSession, expected: str) -> None:

@@ -10,14 +10,12 @@ from app.services.db_utils import mapping_or_empty
 from app.services.shared.field_coerce import object_list as _object_list
 from app.services.public_record_firewall import public_record_data_for_surface
 from app.services.export.schema import build_source_trace
-from app.services.observability.browser_artifact import shape_browser_artifact
-from app.services.observability.run_trace import RunTrace
-from app.services.config import observability as obs_config
 from app.services.artifact_store import (
     persist_html_artifact,
     persist_json_artifact,
     persist_png_artifact,
     persist_png_artifact_from_file,
+    shape_browser_artifact,
 )
 from app.services.publish.metadata import refresh_record_commit_metadata
 from sqlalchemy import select
@@ -116,31 +114,6 @@ def _update_stored_record(
     row.source_trace = source_trace
     row.raw_html_path = raw_html_path
     row.content_fingerprint = content_fingerprint
-
-
-async def persist_run_trace(
-    *,
-    run_id: int,
-    source_url: str,
-    trace: RunTrace,
-    flagged: bool = False,
-) -> str:
-    """Persist the per-URL RunTrace as a JSON artifact (observe-only).
-
-    Written next to the page's other artifacts as ``<hash>.trace.json``. No-op
-    when tracing is disabled (NullRunTrace serializes an empty timeline) or when
-    the run id is missing.
-    """
-    if not obs_config.RUN_TRACE_ENABLED:
-        return ""
-    payload = trace.to_dict(flagged=flagged)
-    return await asyncio.to_thread(
-        persist_json_artifact,
-        run_id=run_id,
-        source_url=source_url,
-        suffix="trace",
-        payload=payload,
-    )
 
 
 async def persist_acquisition_artifacts(

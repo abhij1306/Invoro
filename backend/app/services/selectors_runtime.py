@@ -231,18 +231,7 @@ async def create_selector_record(
     )
     rules = selector_rules_from_memory(memory)
     next_id = await _next_selector_id(session)
-    record = {
-        "id": next_id,
-        "field_name": str(payload.get("field_name") or "").strip().lower(),
-        "css_selector": str(payload.get("css_selector") or "").strip() or None,
-        "xpath": str(payload.get("xpath") or "").strip() or None,
-        "regex": str(payload.get("regex") or "").strip() or None,
-        "status": str(payload.get("status") or "validated").strip(),
-        "sample_value": str(payload.get("sample_value") or "").strip() or None,
-        "source": str(payload.get("source") or "domain_memory").strip(),
-        "source_run_id": payload.get("source_run_id"),
-        "is_active": bool(payload.get("is_active", True)),
-    }
+    record = _new_selector_record(payload, selector_id=next_id)
     rules = [row for row in rules if _coerce_int(row.get("id"), default=0) != next_id]
     rules.append(record)
     await save_domain_memory(
@@ -269,6 +258,23 @@ async def create_selector_record(
     }
 
 
+def _new_selector_record(
+    payload: dict[str, object], *, selector_id: int
+) -> dict[str, object]:
+    return {
+        "id": selector_id,
+        "field_name": str(payload.get("field_name") or "").strip().lower(),
+        "css_selector": str(payload.get("css_selector") or "").strip() or None,
+        "xpath": str(payload.get("xpath") or "").strip() or None,
+        "regex": str(payload.get("regex") or "").strip() or None,
+        "status": str(payload.get("status") or "validated").strip(),
+        "sample_value": str(payload.get("sample_value") or "").strip() or None,
+        "source": str(payload.get("source") or "domain_memory").strip(),
+        "source_run_id": payload.get("source_run_id"),
+        "is_active": bool(payload.get("is_active", True)),
+    }
+
+
 async def update_selector_record(
     session: AsyncSession,
     *,
@@ -279,35 +285,10 @@ async def update_selector_record(
     await _ensure_unique_selector_ids(session)
     for memory in await _all_domain_memories(session):
         rules = selector_rules_from_memory(memory)
-        updated = False
-        for row in rules:
-            if _coerce_int(row.get("id"), default=0) != int(selector_id):
-                continue
-            for key in (
-                "field_name",
-                "css_selector",
-                "xpath",
-                "regex",
-                "status",
-                "sample_value",
-                "source",
-                "source_run_id",
-                "is_active",
-            ):
-                if key not in payload:
-                    continue
-                value = payload.get(key)
-                if key == "field_name":
-                    row[key] = str(value or "").strip().lower()
-                elif key == "is_active":
-                    row[key] = bool(value)
-                elif key == "source_run_id":
-                    row[key] = value
-                else:
-                    row[key] = str(value or "").strip() or None
-            updated = True
-            break
-        if not updated:
+        updated_row = _update_rule_by_id(
+            rules, selector_id=selector_id, payload=payload
+        )
+        if updated_row is None:
             continue
         await save_domain_memory(
             session,
@@ -325,13 +306,7 @@ async def update_selector_record(
             domain=memory.domain,
             surface=memory.surface,
         )
-        refreshed = None
-        for row in rules:
-            if _coerce_int(row.get("id"), default=0) == int(selector_id):
-                refreshed = row
-                break
-        if refreshed is None:
-            raise ValueError(f"Selector {selector_id} was not found after update")
+        refreshed = updated_row
         return {
             "domain": memory.domain,
             "surface": memory.surface,
@@ -344,6 +319,48 @@ async def update_selector_record(
             ),
         }
     return None
+
+
+def _update_rule_by_id(
+    rules: list[dict[str, object]],
+    *,
+    selector_id: int,
+    payload: dict[str, object],
+) -> dict[str, object] | None:
+    row = next(
+        (
+            candidate
+            for candidate in rules
+            if _coerce_int(candidate.get("id"), default=0) == int(selector_id)
+        ),
+        None,
+    )
+    if row is None:
+        return None
+    for key in (
+        "field_name",
+        "css_selector",
+        "xpath",
+        "regex",
+        "status",
+        "sample_value",
+        "source",
+        "source_run_id",
+        "is_active",
+    ):
+        if key in payload:
+            row[key] = _updated_selector_value(key, payload.get(key))
+    return row
+
+
+def _updated_selector_value(key: str, value: object) -> object:
+    if key == "field_name":
+        return str(value or "").strip().lower()
+    if key == "is_active":
+        return bool(value)
+    if key == "source_run_id":
+        return value
+    return str(value or "").strip() or None
 
 
 async def delete_selector_record(
@@ -418,39 +435,26 @@ async def suggest_selectors(
     domain = normalize_domain(final_url)
     suggestions: dict[str, list[dict[str, object]]] = defaultdict(list)
 
-    for row in await list_selector_records(
+    saved_rows = await list_selector_records(
         session,
         domain=domain,
         surface=resolved_surface,
-    ):
-        field_name = str(row.get("field_name") or "").strip().lower()
-        if field_name and field_name in {
-            normalize_field_key(item) for item in expected_columns
-        }:
-            suggestions[field_name].append(selector_suggestion_from_record(row))
+    )
+    _add_saved_suggestions(suggestions, saved_rows, expected_columns=expected_columns)
 
     soup = BeautifulSoup(html, _HTML_PARSER)
-    for field_name in expected_columns:
-        normalized_field = normalize_field_key(field_name)
-        for row in deterministic_suggestions(
-            soup,
-            html=html,
-            url=final_url,
-            field_name=normalized_field,
-        ):
-            if not suggestion_exists(suggestions[normalized_field], row):
-                suggestions[normalized_field].append(row)
+    _add_deterministic_suggestions(
+        suggestions,
+        soup=soup,
+        html=html,
+        url=final_url,
+        expected_columns=expected_columns,
+    )
 
     if resolved_surface.endswith("_listing"):
-        for field_name in expected_columns:
-            normalized_field = normalize_field_key(field_name)
-            for row in listing_card_suggestions(
-                soup,
-                html=html,
-                field_name=normalized_field,
-            ):
-                if not suggestion_exists(suggestions[normalized_field], row):
-                    suggestions[normalized_field].append(row)
+        _add_listing_suggestions(
+            suggestions, soup=soup, html=html, expected_columns=expected_columns
+        )
 
     llm_candidates, llm_error = await discover_xpath_candidates(
         session,
@@ -462,50 +466,7 @@ async def suggest_selectors(
         existing_values={},
     )
     if not llm_error:
-        for row in llm_candidates:
-            if not isinstance(row, dict):
-                continue
-            field_name = normalize_field_key(str(row.get("field_name") or ""))
-            if not field_name:
-                continue
-            xpath = str(row.get("xpath") or "").strip() or None
-            css_selector = str(row.get("css_selector") or "").strip() or None
-            if not xpath and not css_selector:
-                continue
-            if xpath:
-                validated_xpath, _ = validate_or_convert_xpath(xpath)
-                if validated_xpath:
-                    sample_value, _count, selector_used = extract_selector_value(
-                        html,
-                        xpath=validated_xpath,
-                    )
-                    if is_noise_value(sample_value, field_name):
-                        xpath = None
-                    elif sample_value or selector_used:
-                        candidate: dict[str, object] = {
-                            "field_name": field_name,
-                            "xpath": selector_used or validated_xpath,
-                            "sample_value": sample_value,
-                            "source": "llm_xpath",
-                        }
-                        if not suggestion_exists(suggestions[field_name], candidate):
-                            suggestions[field_name].append(candidate)
-            if css_selector:
-                sample_value, _count, selector_used = extract_selector_value(
-                    html,
-                    css_selector=css_selector,
-                )
-                if is_noise_value(sample_value, field_name):
-                    css_selector = None
-                elif sample_value or selector_used:
-                    css_candidate: dict[str, object] = {
-                        "field_name": field_name,
-                        "css_selector": selector_used or css_selector,
-                        "sample_value": sample_value,
-                        "source": "llm_css",
-                    }
-                    if not suggestion_exists(suggestions[field_name], css_candidate):
-                        suggestions[field_name].append(css_candidate)
+        _add_llm_suggestions(suggestions, html=html, candidates=llm_candidates)
 
     return {
         "surface": resolved_surface,
@@ -515,6 +476,103 @@ async def suggest_selectors(
             normalize_field_key(field_name): values[:5]
             for field_name, values in suggestions.items()
         },
+    }
+
+
+def _add_saved_suggestions(
+    suggestions: dict[str, list[dict[str, object]]],
+    rows: list[dict[str, object]],
+    *,
+    expected_columns: list[str],
+) -> None:
+    expected = {normalize_field_key(item) for item in expected_columns}
+    for row in rows:
+        field_name = str(row.get("field_name") or "").strip().lower()
+        if field_name and field_name in expected:
+            suggestions[field_name].append(selector_suggestion_from_record(row))
+
+
+def _add_deterministic_suggestions(
+    suggestions: dict[str, list[dict[str, object]]],
+    *,
+    soup: BeautifulSoup,
+    html: str,
+    url: str,
+    expected_columns: list[str],
+) -> None:
+    for field_name in expected_columns:
+        normalized = normalize_field_key(field_name)
+        candidates = deterministic_suggestions(
+            soup, html=html, url=url, field_name=normalized
+        )
+        _append_new_suggestions(suggestions[normalized], candidates)
+
+
+def _add_listing_suggestions(
+    suggestions: dict[str, list[dict[str, object]]],
+    *,
+    soup: BeautifulSoup,
+    html: str,
+    expected_columns: list[str],
+) -> None:
+    for field_name in expected_columns:
+        normalized = normalize_field_key(field_name)
+        candidates = listing_card_suggestions(soup, html=html, field_name=normalized)
+        _append_new_suggestions(suggestions[normalized], candidates)
+
+
+def _append_new_suggestions(
+    existing: list[dict[str, object]], candidates: list[dict[str, object]]
+) -> None:
+    for candidate in candidates:
+        if not suggestion_exists(existing, candidate):
+            existing.append(candidate)
+
+
+def _add_llm_suggestions(
+    suggestions: dict[str, list[dict[str, object]]],
+    *,
+    html: str,
+    candidates: list[dict[str, object]],
+) -> None:
+    for row in candidates:
+        if not isinstance(row, dict):
+            continue
+        field_name = normalize_field_key(str(row.get("field_name") or ""))
+        if not field_name:
+            continue
+        for selector_kind in ("xpath", "css_selector"):
+            candidate = _validated_llm_suggestion(
+                html, row=row, field_name=field_name, selector_kind=selector_kind
+            )
+            if candidate and not suggestion_exists(suggestions[field_name], candidate):
+                suggestions[field_name].append(candidate)
+
+
+def _validated_llm_suggestion(
+    html: str,
+    *,
+    row: dict[str, object],
+    field_name: str,
+    selector_kind: str,
+) -> dict[str, object] | None:
+    selector = str(row.get(selector_kind) or "").strip()
+    if not selector:
+        return None
+    if selector_kind == "xpath":
+        validated_selector, _ = validate_or_convert_xpath(selector)
+        if not validated_selector:
+            return None
+        selector = validated_selector
+    kwargs = {selector_kind: selector}
+    sample_value, _count, selector_used = extract_selector_value(html, **kwargs)
+    if is_noise_value(sample_value, field_name) or not (sample_value or selector_used):
+        return None
+    return {
+        "field_name": field_name,
+        selector_kind: selector_used or selector,
+        "sample_value": sample_value,
+        "source": "llm_xpath" if selector_kind == "xpath" else "llm_css",
     }
 
 

@@ -97,19 +97,8 @@ def normalize_decimal_price(
     if isinstance(value, (list, tuple, set)):
         return None
     if isinstance(value, dict):
-        val = None
-        for k in (
-            "value",
-            "amount",
-            "price",
-            "standard_price",
-            "list_price",
-            "listPrice",
-        ):
-            if k in value:
-                val = value[k]
-                break
-        if val is not None and not isinstance(val, (dict, list, tuple, set)):
+        val = _price_mapping_value(value)
+        if val is not None:
             return normalize_decimal_price(
                 val, interpret_integral_as_cents=interpret_integral_as_cents
             )
@@ -117,27 +106,19 @@ def normalize_decimal_price(
     text = _normalize_text(value)
     if not text:
         return None
-    if re.match(
-        rf"^[-−]\s*(?:[$€£¥₹]|rs\.?|\b(?:{_CURRENCY_CODE_CONTEXT_PATTERN}))?\s*\d",
-        text,
-        re.I,
-    ) or re.match(
-        rf"^(?:[$€£¥₹]|rs\.?|\b(?:{_CURRENCY_CODE_CONTEXT_PATTERN})\b)\s*[-−]\s*\d",
-        text,
-        re.I,
-    ):
+    if _price_text_is_negative(text):
         return None
     if isinstance(value, str):
-        stripped = _canonicalize_decimal_candidate(text)
-        if stripped is None:
-            return None
-        if (
-            not interpret_integral_as_cents
-            and "." not in stripped
-            and len(re.sub(r"\D+", "", stripped)) <= 3
-            and _CURRENCY_CONTEXT_RE.search(text) is None
+        if not _price_string_is_candidate(
+            text, interpret_integral_as_cents=interpret_integral_as_cents
         ):
             return None
+    return _decimal_from_text(
+        text, interpret_integral_as_cents=interpret_integral_as_cents
+    )
+
+
+def _decimal_from_text(text: str, *, interpret_integral_as_cents: bool) -> str | None:
     match = _NUMERIC_TEXT_RE.search(text)
     if match is None:
         return None
@@ -156,6 +137,46 @@ def normalize_decimal_price(
     return format(decimal, "f")
 
 
+def _price_mapping_value(value: dict) -> object:
+    candidate = next(
+        (
+            value[key]
+            for key in (
+                "value",
+                "amount",
+                "price",
+                "standard_price",
+                "list_price",
+                "listPrice",
+            )
+            if key in value
+        ),
+        None,
+    )
+    return None if isinstance(candidate, (dict, list, tuple, set)) else candidate
+
+
+def _price_text_is_negative(text: str) -> bool:
+    patterns = (
+        rf"^[-−]\s*(?:[$€£¥₹]|rs\.?|\b(?:{_CURRENCY_CODE_CONTEXT_PATTERN}))?\s*\d",
+        rf"^(?:[$€£¥₹]|rs\.?|\b(?:{_CURRENCY_CODE_CONTEXT_PATTERN})\b)\s*[-−]\s*\d",
+    )
+    return any(re.match(pattern, text, re.I) for pattern in patterns)
+
+
+def _price_string_is_candidate(text: str, *, interpret_integral_as_cents: bool) -> bool:
+    stripped = _canonicalize_decimal_candidate(text)
+    if stripped is None:
+        return False
+    ambiguous_small_integer = (
+        not interpret_integral_as_cents
+        and "." not in stripped
+        and len(re.sub(r"\D+", "", stripped)) <= 3
+        and _CURRENCY_CONTEXT_RE.search(text) is None
+    )
+    return not ambiguous_small_integer
+
+
 def _canonicalize_decimal_candidate(value: str) -> str | None:
     text = _normalize_text(value).translate(str.maketrans(_UNICODE_MINUS_CHARS, "-"))
     if not text:
@@ -164,21 +185,33 @@ def _canonicalize_decimal_candidate(value: str) -> str | None:
     if match is None:
         return None
     candidate = match.group(0)
+    return _canonicalize_decimal_separators(candidate)
+
+
+def _canonicalize_decimal_separators(candidate: str) -> str:
     if "," in candidate and "." in candidate:
-        if candidate.rfind(",") > candidate.rfind("."):
-            return candidate.replace(".", "").replace(",", ".")
-        return candidate.replace(",", "")
+        return (
+            candidate.replace(".", "").replace(",", ".")
+            if candidate.rfind(",") > candidate.rfind(".")
+            else candidate.replace(",", "")
+        )
     if "," in candidate:
         head, tail = candidate.rsplit(",", 1)
-        if tail.isdigit() and len(tail) in {1, 2} and re.search(r"\d", head):
-            return head.replace(",", "").replace(".", "") + "." + tail
-        return candidate.replace(",", "")
-    if "." in candidate:
-        parts = candidate.split(".")
-        if len(parts) > 1 and all(part.isdigit() for part in parts):
-            if all(len(part) == 3 for part in parts[1:]):
-                return "".join(parts)
-    return candidate
+        decimal_comma = (
+            tail.isdigit() and len(tail) in {1, 2} and re.search(r"\d", head)
+        )
+        return (
+            head.replace(",", "").replace(".", "") + "." + tail
+            if decimal_comma
+            else candidate.replace(",", "")
+        )
+    parts = candidate.split(".")
+    thousands = (
+        len(parts) > 1
+        and all(part.isdigit() for part in parts)
+        and all(len(part) == 3 for part in parts[1:])
+    )
+    return "".join(parts) if thousands else candidate
 
 
 def _normalize_int(value: object) -> int | str:
@@ -229,33 +262,35 @@ def normalize_value(field_name: str, value: object) -> object:
         parsed = _unwrap_singleton_literal_list(value)
         if parsed is not None:
             value = parsed
+    matched, result = _normalize_configured_field(normalized_field, value)
+    if matched:
+        return result
+    return _normalize_untyped_value(normalized_field, value)
+
+
+def _normalize_configured_field(
+    normalized_field: str, value: object
+) -> tuple[bool, object]:
     if normalized_field in NORMALIZER_LIST_TEXT_FIELDS:
-        return _normalize_text_list(value)
+        return True, _normalize_text_list(value)
     if normalized_field in NORMALIZER_BOOLEAN_FIELDS:
-        return _normalize_bool(value)
+        return True, _normalize_bool(value)
     if normalized_field == "availability":
-        return _normalize_availability(value)
+        return True, _normalize_availability(value)
     if normalized_field == "rating":
         result = normalize_decimal_price(value)
-        return _normalize_rating(result) if result is not None else ""
+        return True, _normalize_rating(result) if result is not None else ""
     if normalized_field in NORMALIZER_DECIMAL_FIELDS:
-        if isinstance(value, str):
-            trimmed = value.strip()
-            if re.fullmatch(r"[-+]?\d+(?:\.\d+)?", trimmed):
-                candidate = _canonicalize_decimal_candidate(trimmed)
-                if candidate is None:
-                    return ""
-                try:
-                    return format(Decimal(candidate), "f")
-                except (InvalidOperation, ValueError):
-                    return ""
-        result = normalize_decimal_price(value)
-        return result if result is not None else ""
+        return True, _normalize_decimal_field(value)
     if (
         normalized_field.endswith("_count")
         or normalized_field in NORMALIZER_INTEGER_FIELDS
     ):
-        return _normalize_int(value)
+        return True, _normalize_int(value)
+    return False, None
+
+
+def _normalize_untyped_value(normalized_field: str, value: object) -> object:
     if isinstance(value, str):
         return _normalize_text(value)
     if isinstance(value, list):
@@ -273,6 +308,19 @@ def normalize_value(field_name: str, value: object) -> object:
     if isinstance(value, (bool, int, float)):
         return value
     return _normalize_text(value)
+
+
+def _normalize_decimal_field(value: object) -> str:
+    if isinstance(value, str) and re.fullmatch(r"[-+]?\d+(?:\.\d+)?", value.strip()):
+        candidate = _canonicalize_decimal_candidate(value.strip())
+        if candidate is None:
+            return ""
+        try:
+            return format(Decimal(candidate), "f")
+        except (InvalidOperation, ValueError):
+            return ""
+    result = normalize_decimal_price(value)
+    return result if result is not None else ""
 
 
 def _unwrap_singleton_literal_list(value: str) -> str | None:

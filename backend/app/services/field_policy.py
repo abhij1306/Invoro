@@ -64,55 +64,61 @@ def get_surface_field_aliases(surface: str) -> dict[str, list[str]]:
         if canonical in allowed
     }
     if normalized in {"automobile_listing", "automobile_detail"}:
-        automobile_aliases = {
-            canonical: list(values) for canonical, values in aliases.items()
-        }
-        make_aliases = automobile_aliases.setdefault("make", [])
-        if "manufacturer" not in make_aliases:
-            make_aliases.append("manufacturer")
-        brand_aliases = automobile_aliases.get("brand")
-        if brand_aliases is not None:
-            automobile_aliases["brand"] = [
-                alias for alias in brand_aliases if alias != "manufacturer"
-            ]
-        return automobile_aliases
+        return _automobile_field_aliases(aliases)
     if normalized.startswith("ecommerce_"):
-        ecommerce_aliases = {
-            canonical: list(values) for canonical, values in aliases.items()
-        }
-        for field_name, field_aliases in {
-            "capacity": (
-                "capacity_l",
-                "capacity_liter",
-                "capacity_litre",
-                "capacity_liters",
-                "capacity_litres",
-            ),
-            "energy_rating": ("energy_rating", "energy_star_rating", "star_rating"),
-        }.items():
-            bucket = ecommerce_aliases.setdefault(field_name, [])
-            for alias in field_aliases:
-                if alias not in bucket:
-                    bucket.append(alias)
-        category_aliases = ecommerce_aliases.get("category")
-        if category_aliases is not None:
-            ecommerce_aliases["category"] = [
-                alias
-                for alias in category_aliases
-                if alias not in {"type", "job_type", "employment_type"}
-            ]
-            for alias in ("product_type",):
-                if alias not in ecommerce_aliases["category"]:
-                    ecommerce_aliases["category"].append(alias)
-        return ecommerce_aliases
+        return _ecommerce_field_aliases(aliases)
     if normalized.startswith("job_"):
-        job_aliases = {canonical: list(values) for canonical, values in aliases.items()}
-        if "job_type" in job_aliases:
-            for alias in ("type", "employment_type", "commitment", "work_type"):
-                if alias not in job_aliases["job_type"]:
-                    job_aliases["job_type"].append(alias)
-        return job_aliases
+        return _job_field_aliases(aliases)
     return aliases
+
+
+def _automobile_field_aliases(aliases: dict[str, list[str]]) -> dict[str, list[str]]:
+    result = {key: list(values) for key, values in aliases.items()}
+    if "manufacturer" not in result.setdefault("make", []):
+        result["make"].append("manufacturer")
+    if "brand" in result:
+        result["brand"] = [
+            value for value in result["brand"] if value != "manufacturer"
+        ]
+    return result
+
+
+def _ecommerce_field_aliases(aliases: dict[str, list[str]]) -> dict[str, list[str]]:
+    result = {key: list(values) for key, values in aliases.items()}
+    additions = {
+        "capacity": (
+            "capacity_l",
+            "capacity_liter",
+            "capacity_litre",
+            "capacity_liters",
+            "capacity_litres",
+        ),
+        "energy_rating": ("energy_rating", "energy_star_rating", "star_rating"),
+    }
+    for field_name, values in additions.items():
+        bucket = result.setdefault(field_name, [])
+        bucket.extend(value for value in values if value not in bucket)
+    if "category" in result:
+        result["category"] = [
+            value
+            for value in result["category"]
+            if value not in {"type", "job_type", "employment_type"}
+        ]
+        if "product_type" not in result["category"]:
+            result["category"].append("product_type")
+    return result
+
+
+def _job_field_aliases(aliases: dict[str, list[str]]) -> dict[str, list[str]]:
+    result = {key: list(values) for key, values in aliases.items()}
+    bucket = result.get("job_type")
+    if bucket is not None:
+        bucket.extend(
+            value
+            for value in ("type", "employment_type", "commitment", "work_type")
+            if value not in bucket
+        )
+    return result
 
 
 def normalize_field_key(value: str | None) -> str:
@@ -120,21 +126,7 @@ def normalize_field_key(value: str | None) -> str:
     if not text:
         return ""
     text = text.replace("&", " ")
-    separated: list[str] = []
-    for index, char in enumerate(text):
-        previous = text[index - 1] if index else ""
-        next_char = text[index + 1] if index + 1 < len(text) else ""
-        if (
-            index
-            and char.isupper()
-            and (
-                previous.islower()
-                or previous.isdigit()
-                or (previous.isupper() and next_char.islower())
-            )
-        ):
-            separated.append("_")
-        separated.append(char.lower())
+    separated = _separate_camel_case(text)
     normalized: list[str] = []
     last_was_separator = False
     for char in separated:
@@ -145,6 +137,26 @@ def normalize_field_key(value: str | None) -> str:
             normalized.append("_")
             last_was_separator = True
     return "".join(normalized).strip("_.")
+
+
+def _separate_camel_case(text: str) -> list[str]:
+    separated: list[str] = []
+    for index, char in enumerate(text):
+        previous = text[index - 1] if index else ""
+        next_char = text[index + 1] if index + 1 < len(text) else ""
+        boundary = (
+            index
+            and char.isupper()
+            and (
+                previous.islower()
+                or previous.isdigit()
+                or (previous.isupper() and next_char.islower())
+            )
+        )
+        if boundary:
+            separated.append("_")
+        separated.append(char.lower())
+    return separated
 
 
 def _dedupe_aliases(*groups: object) -> list[str]:

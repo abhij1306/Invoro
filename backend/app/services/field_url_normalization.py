@@ -184,26 +184,46 @@ def canonical_public_record_url(
     parsed = urlparse(text)
     if not parsed.query:
         return text
-    remove_keys = {
-        str(key or "").strip().lower()
-        for key in tuple(PUBLIC_RECORD_DETAIL_CANONICAL_QUERY_KEYS or ())
-        if str(key or "").strip()
-    }
-    remove_prefixes = tuple(
-        str(prefix or "").strip().lower()
-        for prefix in tuple(PUBLIC_RECORD_DETAIL_CANONICAL_QUERY_PREFIXES or ())
-        if str(prefix or "").strip()
+    remove_keys, remove_prefixes = _canonical_query_policy()
+    kept_pairs, changed = _filter_canonical_query_pairs(
+        parse_qsl(parsed.query, keep_blank_values=True),
+        remove_keys=remove_keys,
+        remove_prefixes=remove_prefixes,
     )
-    kept_pairs = []
-    changed = False
-    for key, value in parse_qsl(parsed.query, keep_blank_values=True):
-        lowered = str(key or "").strip().lower()
-        if lowered in remove_keys or any(
-            lowered.startswith(prefix) for prefix in remove_prefixes
-        ):
-            changed = True
-            continue
-        kept_pairs.append((key, value))
     if not changed:
         return text
     return urlunparse(parsed._replace(query=urlencode(kept_pairs, doseq=True)))
+
+
+def _canonical_query_policy() -> tuple[set[str], tuple[str, ...]]:
+    keys = {
+        normalized
+        for key in tuple(PUBLIC_RECORD_DETAIL_CANONICAL_QUERY_KEYS or ())
+        if (normalized := str(key or "").strip().lower())
+    }
+    prefixes = tuple(
+        normalized
+        for prefix in tuple(PUBLIC_RECORD_DETAIL_CANONICAL_QUERY_PREFIXES or ())
+        if (normalized := str(prefix or "").strip().lower())
+    )
+    return keys, prefixes
+
+
+def _filter_canonical_query_pairs(
+    pairs: list[tuple[str, str]],
+    *,
+    remove_keys: set[str],
+    remove_prefixes: tuple[str, ...],
+) -> tuple[list[tuple[str, str]], bool]:
+    kept = []
+    changed = False
+    for key, value in pairs:
+        lowered = str(key or "").strip().lower()
+        remove = lowered in remove_keys or any(
+            lowered.startswith(prefix) for prefix in remove_prefixes
+        )
+        if remove:
+            changed = True
+        else:
+            kept.append((key, value))
+    return kept, changed

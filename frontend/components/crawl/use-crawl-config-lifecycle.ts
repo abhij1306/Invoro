@@ -25,7 +25,6 @@ import {
 import {
   bindCrawlConfigLocalDispatch,
   isBulkPrefill,
-  type CrawlConfigScreenProps,
   type CrawlRouteAction,
 } from './crawl-config-state';
 import { DOMAIN_OPTIONS } from './domain-surface-config';
@@ -34,8 +33,6 @@ import { uniqueRequestedFields, type FieldRow } from './shared';
 type LocalDispatch = ReturnType<typeof bindCrawlConfigLocalDispatch>;
 
 type Options = {
-  requestedWorkspace: NonNullable<CrawlConfigScreenProps['requestedWorkspace']>;
-  requestedUrl: string;
   profileLookupKey: string;
   domainMemoryLookupKey: string;
   targetUrl: string;
@@ -51,8 +48,6 @@ type Options = {
 
 export function useCrawlConfigLifecycle(options: Options) {
   const {
-    requestedWorkspace,
-    requestedUrl,
     profileLookupKey,
     domainMemoryLookupKey,
     targetUrl,
@@ -69,10 +64,6 @@ export function useCrawlConfigLifecycle(options: Options) {
   const memoryRequestRef = useRef(0);
   const profileTargetUrlRef = useRef('');
   const profileDirtyRef = useRef(false);
-
-  useEffect(() => {
-    if (requestedWorkspace === 'audit' && requestedUrl) setTargetUrl(requestedUrl);
-  }, [requestedUrl, requestedWorkspace, setTargetUrl]);
 
   useLayoutEffect(() => {
     const stored = window.sessionStorage.getItem(STORAGE_KEYS.BULK_PREFILL);

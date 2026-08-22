@@ -34,36 +34,15 @@ def score_record_confidence(
         )
 
     total_weight = sum(weights.values()) or 1.0
-    score = 0.0
-    present_fields: list[str] = []
-    missing_fields: list[str] = []
-    penalties: list[dict[str, Any]] = []
-    source_tier_weights: defaultdict[str, float] = defaultdict(float)
     field_sources = _normalized_field_sources(record)
-
-    for field_name, weight in weights.items():
-        value = record.get(field_name)
-        if value in (None, "", [], {}):
-            missing_fields.append(field_name)
-            continue
-        present_fields.append(field_name)
-        source_quality, tier_name = _field_source_quality(
-            field_sources.get(field_name),
-            fallback_source=record.get("_source"),
-        )
-        penalty_items = _field_penalties(
+    score, present_fields, missing_fields, penalties, source_tier_weights = (
+        _weighted_field_confidence(
+            record,
             surface=normalized_surface,
-            field_name=field_name,
-            value=value,
-            sources=field_sources.get(field_name),
+            weights=weights,
+            field_sources=field_sources,
         )
-        penalty_total = min(
-            sum(float(item.get("weight") or 0.0) for item in penalty_items),
-            0.85,
-        )
-        score += weight * source_quality * (1.0 - penalty_total)
-        source_tier_weights[tier_name] += weight
-        penalties.extend(penalty_items)
+    )
 
     raw_requested = [
         " ".join(str(field_name or "").split()).strip()
@@ -71,51 +50,21 @@ def score_record_confidence(
         if " ".join(str(field_name or "").split()).strip()
     ]
     requested = repair_target_fields_for_surface(normalized_surface, raw_requested)
-    field_sources_by_key = {
-        normalize_field_key(field_name): field_name
-        for field_name in field_sources
-        if normalize_field_key(field_name)
-    }
     alias_map = get_surface_field_aliases(normalized_surface)
     requested_match_keys = _requested_match_keys(
         requested=requested,
         raw_requested=raw_requested,
         alias_map=alias_map,
     )
-    requested_matches = [
-        match
-        for field_name in requested_match_keys
-        if (
-            match := _resolve_requested_field_match(
-                record,
-                field_name=field_name,
-                alias_map=alias_map,
-                field_sources_by_key=field_sources_by_key,
-            )
-        )
-        is not None
-    ]
-    for field_name in requested:
-        if (
-            _resolve_requested_field_match(
-                record,
-                field_name=field_name,
-                alias_map=alias_map,
-                field_sources_by_key=field_sources_by_key,
-            )
-            is None
-            and field_name not in missing_fields
-        ):
-            missing_fields.append(field_name)
-    requested_found_total = len(requested_matches)
+    requested_found_total, requested_bonus = _requested_confidence(
+        record,
+        requested=requested,
+        requested_match_keys=requested_match_keys,
+        alias_map=alias_map,
+        field_sources=field_sources,
+        missing_fields=missing_fields,
+    )
     if requested:
-        requested_bonus = 0.0
-        for _requested_key, actual_field_name in requested_matches:
-            source_quality, _ = _field_source_quality(
-                field_sources.get(actual_field_name),
-                fallback_source=record.get("_source"),
-            )
-            requested_bonus += source_quality / max(len(requested), 1)
         score += 0.15 * requested_bonus
         total_weight += 0.15
 
@@ -140,6 +89,77 @@ def score_record_confidence(
         ],
         "source_tier": source_reasoning,
     }
+
+
+def _weighted_field_confidence(record, *, surface, weights, field_sources):
+    score = 0.0
+    present_fields: list[str] = []
+    missing_fields: list[str] = []
+    penalties: list[dict[str, Any]] = []
+    source_tier_weights: defaultdict[str, float] = defaultdict(float)
+    for field_name, weight in weights.items():
+        value = record.get(field_name)
+        if value in (None, "", [], {}):
+            missing_fields.append(field_name)
+            continue
+        present_fields.append(field_name)
+        quality, tier = _field_source_quality(
+            field_sources.get(field_name), fallback_source=record.get("_source")
+        )
+        items = _field_penalties(
+            surface=surface,
+            field_name=field_name,
+            value=value,
+            sources=field_sources.get(field_name),
+        )
+        penalty = min(sum(float(item.get("weight") or 0.0) for item in items), 0.85)
+        score += weight * quality * (1.0 - penalty)
+        source_tier_weights[tier] += weight
+        penalties.extend(items)
+    return score, present_fields, missing_fields, penalties, source_tier_weights
+
+
+def _requested_confidence(
+    record,
+    *,
+    requested,
+    requested_match_keys,
+    alias_map,
+    field_sources,
+    missing_fields,
+) -> tuple[int, float]:
+    sources_by_key = {
+        normalize_field_key(name): name
+        for name in field_sources
+        if normalize_field_key(name)
+    }
+    matches = [
+        match
+        for field_name in requested_match_keys
+        if (
+            match := _resolve_requested_field_match(
+                record,
+                field_name=field_name,
+                alias_map=alias_map,
+                field_sources_by_key=sources_by_key,
+            )
+        )
+        is not None
+    ]
+    matched_requested = {requested_key for requested_key, _actual in matches}
+    missing_fields.extend(
+        field
+        for field in requested
+        if field not in matched_requested and field not in missing_fields
+    )
+    bonus = sum(
+        _field_source_quality(
+            field_sources.get(actual), fallback_source=record.get("_source")
+        )[0]
+        / max(len(requested), 1)
+        for _requested_key, actual in matches
+    )
+    return len(matches), bonus
 
 
 def _requested_match_keys(
@@ -257,35 +277,8 @@ def _field_penalties(
     lowered = text.lower()
     normalized_sources = {str(source or "").strip() for source in sources or []}
 
-    if field_name == "title":
-        if _GENERIC_TITLE_RE.match(text):
-            penalties.append(
-                {"field": field_name, "kind": "generic_title", "weight": 0.55}
-            )
-        elif "url_slug" in normalized_sources:
-            penalties.append(
-                {"field": field_name, "kind": "generic_title", "weight": 0.25}
-            )
-        elif len(text) < 4:
-            penalties.append({"field": field_name, "kind": "too_short", "weight": 0.35})
-
-    if field_name in {"description", "responsibilities", "qualifications"}:
-        if len(text) < 40:
-            penalties.append(
-                {"field": field_name, "kind": "thin_content", "weight": 0.4}
-            )
-
-    if field_name in {"price", "salary"} and text and not _PRICEISH_RE.search(text):
-        penalties.append(
-            {"field": field_name, "kind": "non_numeric_value", "weight": 0.45}
-        )
-
-    if (
-        field_name in {"image_url", "apply_url", "url"}
-        and text
-        and not _URLISH_RE.match(text)
-    ):
-        penalties.append({"field": field_name, "kind": "non_url_value", "weight": 0.45})
+    penalties.extend(_title_penalties(field_name, text, normalized_sources))
+    penalties.extend(_content_shape_penalties(field_name, text))
 
     if surface == "ecommerce_detail" and field_name == "availability":
         if lowered in {"maybe", "unknown", "n/a"}:
@@ -299,6 +292,42 @@ def _field_penalties(
                 {"field": field_name, "kind": "partial_date", "weight": 0.25}
             )
 
+    return penalties
+
+
+def _title_penalties(
+    field_name: str, text: str, sources: set[str]
+) -> list[dict[str, Any]]:
+    if field_name != "title":
+        return []
+    if _GENERIC_TITLE_RE.match(text):
+        return [{"field": field_name, "kind": "generic_title", "weight": 0.55}]
+    if "url_slug" in sources:
+        return [{"field": field_name, "kind": "generic_title", "weight": 0.25}]
+    return (
+        [{"field": field_name, "kind": "too_short", "weight": 0.35}]
+        if len(text) < 4
+        else []
+    )
+
+
+def _content_shape_penalties(field_name: str, text: str) -> list[dict[str, Any]]:
+    penalties = []
+    if (
+        field_name in {"description", "responsibilities", "qualifications"}
+        and len(text) < 40
+    ):
+        penalties.append({"field": field_name, "kind": "thin_content", "weight": 0.4})
+    if field_name in {"price", "salary"} and text and not _PRICEISH_RE.search(text):
+        penalties.append(
+            {"field": field_name, "kind": "non_numeric_value", "weight": 0.45}
+        )
+    if (
+        field_name in {"image_url", "apply_url", "url"}
+        and text
+        and not _URLISH_RE.match(text)
+    ):
+        penalties.append({"field": field_name, "kind": "non_url_value", "weight": 0.45})
     return penalties
 
 

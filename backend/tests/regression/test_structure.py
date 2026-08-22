@@ -104,7 +104,6 @@ ALLOWED_PRIVATE_TEST_IMPORTS: set[str] = {
     "tests/unit/test_detail_image_cleanup.py -> app.services.extract.detail.images.cleanup:_detail_image_candidate_is_usable",
     "tests/unit/test_materials_sanitizer.py -> app.services.extract.detail.text.sanitizer:_clean_materials_pollution",
     "tests/component/test_public_api.py -> app.main:_crawler_app_state",
-    "tests/services/observability/test_extraction_trace_projection.py -> app.services.pipeline.extraction_loop:_record_extraction_trace",
     "tests/regression/test_detail_extractor_structured_sources.py -> app.services.extract.field_candidates.variant_rows:_structured_variants_from_product_payload",
     "tests/regression/test_selectolax_css_migration.py -> app.services.extract.field_candidates.variant_rows:_structured_variants_from_product_payload",
     "tests/unit/test_normalizers.py -> app.services.extract.detail.assembly.final_cleanup:_reconcile_variant_derived_parent_fields",
@@ -146,7 +145,6 @@ DEFAULT_LOC_BUDGET = 1000
 # baselines are grandfathered, but may only shrink; the normal budgets remain.
 LEGACY_SOURCE_LOC_RATCHETS = {
     Path("app/services/acquisition/browser_detail.py"): 1018,
-    Path("app/services/page_audit/analysis.py"): 1142,
     Path("app/services/config/extraction_rules/_detail.py"): 664,
 }
 CRITICAL_TEST_LOC_RATCHETS = {
@@ -720,14 +718,6 @@ def test_model_bootstrap_registers_domain_memory_tables() -> None:
         "host_protection_memory",
     }
     assert expected.issubset(Base.metadata.tables)
-
-
-@pytest.mark.regression
-def test_model_bootstrap_registers_page_audit_tables() -> None:
-    assert {
-        "page_audit_jobs",
-        "page_audit_results",
-    }.issubset(Base.metadata.tables)
 
 
 @pytest.mark.regression

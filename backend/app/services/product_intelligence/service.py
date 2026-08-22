@@ -14,23 +14,16 @@ from app.models.product_intelligence import (
     ProductIntelligenceMatch,
     ProductIntelligenceSourceProduct,
 )
-from app.models.crawl_run import CrawlRecord, CrawlRun
+from app.models.crawl_run import CrawlRun
 from app.models.user import User
 from app.services.config.product_intelligence import (
     ADMIN_ROLE,
-    CRAWL_RUN_FINAL_STATUSES,
     ECOMMERCE_DETAIL_SURFACE,
     PRIVATE_LABEL_EXCLUDE,
-    PRIVATE_LABEL_FLAG,
-    PRIVATE_LABEL_INCLUDE,
     PRODUCT_INTELLIGENCE_BRAND_INFERENCE_LLM_TASK,
     PRODUCT_INTELLIGENCE_LLM_TASK,
-    PRODUCT_INTELLIGENCE_CANDIDATE_STATUS_CRAWL_COMPLETE,
     PRODUCT_INTELLIGENCE_CANDIDATE_STATUS_CRAWL_QUEUED,
     PRODUCT_INTELLIGENCE_CANDIDATE_STATUS_CRAWL_TIMEOUT,
-    PRODUCT_INTELLIGENCE_CANDIDATE_STATUS_DISCOVERED,
-    PRODUCT_INTELLIGENCE_CANDIDATE_STATUS_FAILED,
-    PRODUCT_INTELLIGENCE_CANDIDATE_STATUS_NO_RECORDS,
     PRODUCT_INTELLIGENCE_JOB_STATUS_COMPLETE,
     PRODUCT_INTELLIGENCE_JOB_STATUS_FAILED,
     PRODUCT_INTELLIGENCE_JOB_STATUS_QUEUED,
@@ -51,9 +44,6 @@ from app.services.domain_utils import normalize_domain
 from app.services.llm.runtime import run_prompt_task
 from app.services.product_intelligence.discovery import discover_candidates
 from app.services.product_intelligence.discovery import shared_query_runner
-from app.services.product_intelligence.candidate_urls import (
-    looks_like_product_detail_url,
-)
 from app.services.product_intelligence.matching import (
     build_search_result_intelligence,
     extract_product_snapshot,
@@ -62,26 +52,30 @@ from app.services.product_intelligence.matching import (
     score_candidate,
     source_domain,
 )
+from app.services.product_intelligence.options import (
+    as_float_or_default as _as_float_or_default,
+    as_int as _as_int,
+    as_price as _as_price,
+    int_list as _int_list,
+    meets_confidence_threshold as _meets_confidence_threshold,
+    normalized_options as _normalized_options,
+    option_int as _option_int,
+    string_list as _string_list,
+)
+from app.services.product_intelligence.records import (
+    resolved_source_url as _resolved_source_url,
+    row_data_payload as _row_data_payload,
+    row_from_record as _row_from_record,
+    source_product_payload as _source_product_payload,
+)
+from app.services.product_intelligence.discovery_persistence import (
+    persist_discovery_job,
+)
+from app.services.product_intelligence.candidate_scoring import (
+    score_candidate_if_ready as score_persisted_candidate_if_ready,
+)
 
 logger = logging.getLogger(__name__)
-
-
-def _row_data_payload(row: dict[str, object]) -> dict[str, object]:
-    raw_data = row.get("data")
-    if isinstance(raw_data, dict):
-        return {str(key): value for key, value in raw_data.items()}
-    return {}
-
-
-def _resolved_source_url(
-    row: dict[str, object],
-    snapshot: dict[str, object],
-) -> str:
-    row_url = str(row.get("source_url") or "").strip()
-    snapshot_url = str(snapshot.get("url") or "").strip()
-    if snapshot_url and (not row_url or not looks_like_product_detail_url(row_url)):
-        return snapshot_url
-    return row_url or snapshot_url
 
 
 async def create_product_intelligence_job(
@@ -414,151 +408,17 @@ async def _persist_discovery_job(
     discovered_payloads: list[dict[str, object]],
     resolved_snapshots: dict[int, dict[str, object]] | None = None,
 ) -> ProductIntelligenceJob:
-    job = ProductIntelligenceJob(
-        user_id=user.id,
+    return await persist_discovery_job(
+        session,
+        user=user,
         source_run_id=source_run_id,
-        status=PRODUCT_INTELLIGENCE_JOB_STATUS_COMPLETE,
+        source_rows=source_rows,
+        processed_source_count=processed_source_count,
         options=options,
-        summary={
-            "mode": "discovery",
-            "source_count": min(
-                processed_source_count,
-                _option_int(
-                    options,
-                    "max_source_products",
-                    default=product_intelligence_settings.max_source_products,
-                ),
-            ),
-            "candidate_count": len(discovered_payloads),
-            "search_provider": str(options.get("search_provider") or ""),
-            "match_count": len(discovered_payloads),
-            "updated_at": datetime.now(UTC).isoformat(),
-        },
-        completed_at=datetime.now(UTC),
+        discovered_payloads=discovered_payloads,
+        resolved_snapshots=resolved_snapshots,
+        resolve_snapshot=_resolve_source_snapshot,
     )
-    session.add(job)
-    await session.flush()
-
-    source_products_by_index: dict[int, ProductIntelligenceSourceProduct] = {}
-    snapshots_lookup = resolved_snapshots or {}
-    llm_enabled = bool(options.get("llm_enrichment_enabled"))
-    for index, row in enumerate(
-        source_rows[
-            : _option_int(
-                options,
-                "max_source_products",
-                default=product_intelligence_settings.max_source_products,
-            )
-        ]
-    ):
-        snapshot = snapshots_lookup.get(index) or await _resolve_source_snapshot(
-            session,
-            raw=_row_data_payload(row),
-            llm_enabled=llm_enabled,
-        )
-        source_url = _resolved_source_url(row, snapshot)
-        source = ProductIntelligenceSourceProduct(
-            job_id=job.id,
-            source_run_id=_as_int(row.get("source_run_id")) or source_run_id,
-            source_record_id=_as_int(row.get("source_record_id")),
-            source_url=source_url,
-            brand=str(snapshot.get("brand") or ""),
-            normalized_brand=str(snapshot.get("normalized_brand") or ""),
-            title=str(snapshot.get("title") or ""),
-            sku=str(snapshot.get("sku") or ""),
-            mpn=str(snapshot.get("mpn") or ""),
-            gtin=str(snapshot.get("gtin") or ""),
-            price=_as_price(snapshot.get("price")),
-            currency=str(snapshot.get("currency") or ""),
-            image_url=str(snapshot.get("image_url") or ""),
-            is_private_label=is_private_label(snapshot.get("brand")),
-            payload=snapshot,
-        )
-        session.add(source)
-        source_products_by_index[index] = source
-
-    await session.flush()
-    source_product_ids_by_index = {
-        index: source.id
-        for index, source in source_products_by_index.items()
-        if source.id is not None
-    }
-
-    for candidate_payload in discovered_payloads:
-        if (
-            "source_index" not in candidate_payload
-            or candidate_payload.get("source_index") is None
-        ):
-            continue
-        source_index = _as_nonnegative_int(candidate_payload.get("source_index"))
-        if source_index is None:
-            continue
-        source_product_id = source_product_ids_by_index.get(source_index)
-        if source_product_id is None:
-            continue
-        payload_value = candidate_payload.get("payload")
-        payload_data = payload_value if isinstance(payload_value, dict) else {}
-        intelligence_value = candidate_payload.get("intelligence")
-        intelligence = (
-            intelligence_value if isinstance(intelligence_value, dict) else {}
-        )
-        candidate = ProductIntelligenceCandidate(
-            job_id=job.id,
-            source_product_id=source_product_id,
-            url=str(candidate_payload.get("url") or ""),
-            domain=str(candidate_payload.get("domain") or ""),
-            source_type=str(candidate_payload.get("source_type") or ""),
-            query_used=str(candidate_payload.get("query_used") or ""),
-            search_rank=_as_int(candidate_payload.get("search_rank")) or 0,
-            payload={
-                **payload_data,
-                "intelligence": intelligence,
-            },
-            status=PRODUCT_INTELLIGENCE_CANDIDATE_STATUS_DISCOVERED,
-        )
-        session.add(candidate)
-        await session.flush()
-        if intelligence:
-            canonical_value = intelligence.get("canonical_record")
-            canonical = canonical_value if isinstance(canonical_value, dict) else {}
-            score_reasons_value = intelligence.get("score_reasons")
-            score_reasons = (
-                score_reasons_value if isinstance(score_reasons_value, dict) else {}
-            )
-            llm_enrichment_value = intelligence.get("llm_enrichment")
-            llm_enrichment = (
-                llm_enrichment_value if isinstance(llm_enrichment_value, dict) else {}
-            )
-            session.add(
-                ProductIntelligenceMatch(
-                    job_id=job.id,
-                    source_product_id=source_product_id,
-                    candidate_id=candidate.id,
-                    candidate_record_id=None,
-                    score=_as_float_or_default(
-                        intelligence.get("confidence_score"), 0.0
-                    ),
-                    score_label=str(intelligence.get("confidence_label") or ""),
-                    review_status=PRODUCT_INTELLIGENCE_REVIEW_PENDING,
-                    source_price=_as_price(candidate_payload.get("source_price")),
-                    candidate_price=_as_price(canonical.get("price")),
-                    currency=str(
-                        canonical.get("currency")
-                        or candidate_payload.get("source_currency")
-                        or ""
-                    ),
-                    availability=str(canonical.get("availability") or ""),
-                    candidate_url=str(canonical.get("url") or candidate.url),
-                    candidate_domain=source_domain(
-                        canonical.get("url") or candidate.url
-                    ),
-                    score_reasons=score_reasons,
-                    llm_enrichment=llm_enrichment,
-                )
-            )
-    await session.commit()
-    await session.refresh(job)
-    return job
 
 
 async def _run_job(session: AsyncSession, job: ProductIntelligenceJob) -> None:
@@ -710,88 +570,12 @@ async def _score_candidate_if_ready(
     job: ProductIntelligenceJob,
     candidate: ProductIntelligenceCandidate,
 ) -> bool:
-    if candidate.candidate_crawl_run_id is None:
-        return False
-    existing = await session.scalar(
-        select(ProductIntelligenceMatch.id).where(
-            ProductIntelligenceMatch.candidate_id == candidate.id
-        )
-    )
-    if existing:
-        return True
-    candidate_run = await session.get(CrawlRun, candidate.candidate_crawl_run_id)
-    if candidate_run is None:
-        candidate.status = PRODUCT_INTELLIGENCE_CANDIDATE_STATUS_FAILED
-        return True
-    if candidate_run.status not in CRAWL_RUN_FINAL_STATUSES:
-        return False
-    record = await session.scalar(
-        select(CrawlRecord)
-        .where(CrawlRecord.run_id == candidate_run.id)
-        .order_by(CrawlRecord.id)
-        .limit(1)
-    )
-    if record is None:
-        candidate.status = PRODUCT_INTELLIGENCE_CANDIDATE_STATUS_NO_RECORDS
-        return True
-    source_product = await session.get(
-        ProductIntelligenceSourceProduct, candidate.source_product_id
-    )
-    if source_product is None:
-        candidate.status = PRODUCT_INTELLIGENCE_CANDIDATE_STATUS_FAILED
-        return True
-    source_snapshot = _source_product_payload(source_product)
-    candidate_snapshot = extract_product_snapshot(
-        {
-            **dict(record.data or {}),
-            "source_url": record.source_url,
-        }
-    )
-    result = score_candidate(
-        source=source_snapshot,
-        candidate=candidate_snapshot,
-        source_type=candidate.source_type,
-    )
-    if not _meets_confidence_threshold(
-        _as_float_or_default(result.get("score"), 0.0),
-        options=job.options,
-    ):
-        candidate.status = PRODUCT_INTELLIGENCE_CANDIDATE_STATUS_CRAWL_COMPLETE
-        return True
-    llm_enrichment = await _build_llm_enrichment(
+    return await score_persisted_candidate_if_ready(
         session,
-        job=job,
-        candidate=candidate,
-        source_snapshot=source_snapshot,
-        candidate_snapshot=candidate_snapshot,
-        deterministic_result=result,
+        job,
+        candidate,
+        build_llm_enrichment=_build_llm_enrichment,
     )
-    reasons_raw = result.get("reasons")
-    session.add(
-        ProductIntelligenceMatch(
-            job_id=job.id,
-            source_product_id=source_product.id,
-            candidate_id=candidate.id,
-            candidate_record_id=record.id,
-            score=_as_float_or_default(result.get("score"), 0.0),
-            score_label=str(result.get("label") or ""),
-            review_status=PRODUCT_INTELLIGENCE_REVIEW_PENDING,
-            source_price=source_product.price,
-            candidate_price=_as_price(candidate_snapshot.get("price")),
-            currency=str(
-                candidate_snapshot.get("currency") or source_product.currency or ""
-            ),
-            availability=str(candidate_snapshot.get("availability") or ""),
-            candidate_url=str(candidate_snapshot.get("url") or candidate.url),
-            candidate_domain=source_domain(
-                candidate_snapshot.get("url") or candidate.url
-            ),
-            score_reasons=dict(reasons_raw) if isinstance(reasons_raw, dict) else {},
-            llm_enrichment=llm_enrichment,
-        )
-    )
-    candidate.status = PRODUCT_INTELLIGENCE_CANDIDATE_STATUS_CRAWL_COMPLETE
-    return True
 
 
 async def _resolve_source_snapshot(
@@ -997,156 +781,6 @@ async def _load_source_rows(
             }
         )
     return rows
-
-
-def _row_from_record(record: CrawlRecord) -> dict[str, object]:
-    data = dict(record.data or {})
-    data.setdefault("source_url", record.source_url)
-    # Prefer data["url"] (canonical extraction URL) over record.source_url (original crawl URL).
-    # data["source_url"] is populated above for downstream consumers but not used here.
-    source_url = str(data.get("url") or record.source_url or "").strip()
-    return {
-        "source_record_id": record.id,
-        "source_run_id": record.run_id,
-        "source_url": source_url,
-        "data": data,
-    }
-
-
-def _source_product_payload(
-    source: ProductIntelligenceSourceProduct,
-) -> dict[str, object]:
-    return {
-        **dict(source.payload or {}),
-        "title": source.title,
-        "brand": source.brand,
-        "normalized_brand": source.normalized_brand,
-        "price": source.price,
-        "currency": source.currency,
-        "image_url": source.image_url,
-        "url": source.source_url,
-        "sku": source.sku,
-        "mpn": source.mpn,
-        "gtin": source.gtin,
-    }
-
-
-def _normalized_options(value: object) -> dict[str, object]:
-    raw = dict(value or {}) if isinstance(value, dict) else {}
-    return {
-        "max_source_products": _bounded_int(
-            raw.get("max_source_products"),
-            product_intelligence_settings.max_source_products,
-        ),
-        "max_candidates_per_product": _bounded_int(
-            raw.get("max_candidates_per_product"),
-            product_intelligence_settings.max_candidates_per_product,
-        ),
-        "search_provider": str(
-            raw.get("search_provider")
-            or product_intelligence_settings.default_search_provider
-        )
-        .strip()
-        .lower(),
-        "private_label_mode": _private_label_mode(raw.get("private_label_mode")),
-        "confidence_threshold": _bounded_float(
-            raw.get("confidence_threshold"),
-            product_intelligence_settings.confidence_threshold,
-        ),
-        "allowed_domains": _string_list(raw.get("allowed_domains")),
-        "excluded_domains": _string_list(raw.get("excluded_domains")),
-        "llm_enrichment_enabled": bool(raw.get("llm_enrichment_enabled")),
-    }
-
-
-def _meets_confidence_threshold(
-    score: float,
-    *,
-    options: dict[str, object] | None,
-) -> bool:
-    threshold = _bounded_float(
-        (options or {}).get("confidence_threshold"),
-        product_intelligence_settings.confidence_threshold,
-    )
-    return float(score) >= threshold
-
-
-def _private_label_mode(value: object) -> str:
-    mode = str(value or PRIVATE_LABEL_EXCLUDE).strip().lower()
-    return (
-        mode
-        if mode in {PRIVATE_LABEL_EXCLUDE, PRIVATE_LABEL_FLAG, PRIVATE_LABEL_INCLUDE}
-        else PRIVATE_LABEL_EXCLUDE
-    )
-
-
-def _bounded_int(value: object, default: int) -> int:
-    try:
-        parsed = int(value) if isinstance(value, (int, float)) else int(str(value))
-    except (TypeError, ValueError):
-        parsed = int(default)
-    return max(1, parsed)
-
-
-def _bounded_float(value: object, default: float) -> float:
-    try:
-        parsed = float(value) if isinstance(value, (int, float)) else float(str(value))
-    except (TypeError, ValueError):
-        parsed = float(default)
-    return min(max(parsed, 0.0), 1.0)
-
-
-def _as_float_or_default(value: object, default: float) -> float:
-    try:
-        return float(value) if isinstance(value, (int, float)) else float(str(value))
-    except (TypeError, ValueError):
-        return default
-
-
-def _as_price(value: object) -> float | None:
-    return float(value) if isinstance(value, (int, float)) else None
-
-
-def _as_int(value: object) -> int | None:
-    try:
-        parsed = int(value) if isinstance(value, (int, float)) else int(str(value))
-    except (TypeError, ValueError):
-        return None
-    return parsed if parsed > 0 else None
-
-
-def _as_nonnegative_int(value: object) -> int | None:
-    try:
-        parsed = int(value) if isinstance(value, (int, float)) else int(str(value))
-    except (TypeError, ValueError):
-        return None
-    return parsed if parsed >= 0 else None
-
-
-def _option_int(options: dict[str, object], key: str, *, default: int) -> int:
-    return _bounded_int(options.get(key), default)
-
-
-def _int_list(value: object) -> list[int]:
-    if not isinstance(value, list):
-        return []
-    result: list[int] = []
-    for item in value:
-        parsed = _as_int(item)
-        if parsed is not None:
-            result.append(parsed)
-    return result
-
-
-def _string_list(value: object) -> list[str]:
-    if not isinstance(value, list):
-        if isinstance(value, str):
-            value = [line.strip() for line in value.splitlines()]
-        else:
-            return []
-    return [
-        str(item or "").strip().lower() for item in value if str(item or "").strip()
-    ]
 
 
 backfill_candidate_brand = _backfill_candidate_brand

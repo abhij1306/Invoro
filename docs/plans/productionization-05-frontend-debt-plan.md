@@ -4,7 +4,7 @@
 **Agent:** Codex
 **Status:** QUEUED — set to `IN PROGRESS` only when this plan is assigned
 **PR boundary:** One independent PR. Frontend source, tests, and architecture scripts only.
-**Touches buckets:** Next.js routes, Crawl Studio UI, UCP/Playground/Selectors UI, API types, frontend tests and architecture scripts
+**Touches buckets:** Next.js routes, Crawl Studio UI, Playground/Selectors UI, API types, frontend tests and architecture scripts
 
 ## Goal
 
@@ -34,7 +34,6 @@ Hard behavior constraints:
 
 Oversized files that must be reduced below 800 physical lines:
 
-- `frontend/app/ucp-audit/ucp-audit-components.tsx` (audit: 1410)
 - `frontend/components/crawl/crawl-config-screen.tsx` (1323)
 - `frontend/components/crawl/crawl-run-screen.test.tsx` (1280)
 - `frontend/app/playground/page.tsx` (1144)
@@ -49,7 +48,7 @@ Complexity scope is all maintained `.ts`, `.tsx`, `.js`, and `.mjs` under `front
 - monitor and alert forms/reducers
 - selector workspace assembly and row merging
 - Playground workflow/normalizers
-- Dashboard, run-trace, page-audit, Product Intelligence, and app-shell components
+- Dashboard, Product Intelligence, and app-shell components
 - shared dropdown/field keyboard and variant logic
 - `frontend/scripts/check-crawl-architecture.mjs:scanTemplateLiteral`
 
@@ -88,18 +87,18 @@ Complexity scope is all maintained `.ts`, `.tsx`, `.js`, and `.mjs` under `front
 **What:** Keep controllers/hooks responsible for state and effects; split render sections into named presentational components. Replace icon/stage switches with data maps when semantics are identical. Split tests by observable screen behavior. Delete duplicated rendering/normalization. Keep every destination file under 800 and callable under 16.
 **Verify:** Run crawl-related Vitest files, `pnpm run check:crawl-architecture`, ESLint complexity command, and typecheck.
 
-### Slice 3: UCP, Playground, Selectors, and API Types
+### Slice 3: Playground, Selectors, and API Types
 
 **Status:** TODO
-**Files:** oversized UCP/Playground/Selectors files, workflow/normalizer owners, `lib/api/types.ts`, focused tests
-**What:** Split UCP panels, Playground stage UI/log humanization, selector reducer/suggestion rows, and API DTOs by existing domain. Preserve import ergonomics with explicit public barrels only where one already exists. Do not create circular barrels or duplicate DTOs.
-**Verify:** Run focused UCP, Playground, selector, API client/type tests; then architecture checks and typecheck.
+**Files:** oversized Playground/Selectors files, workflow/normalizer owners, `lib/api/types.ts`, focused tests
+**What:** Split Playground stage UI/log humanization, selector reducer/suggestion rows, and API DTOs by existing domain. Preserve import ergonomics with explicit public barrels only where one already exists. Do not create circular barrels or duplicate DTOs.
+**Verify:** Run focused Playground, selector, API client/type tests; then architecture checks and typecheck.
 
 ### Slice 4: Remaining Frontend Complexity
 
 **Status:** TODO
 **Files:** every remaining file reported by the exact ESLint complexity command
-**What:** Reduce Data Enrichment, Markdown, monitor/alert, dashboard, run-trace, Product Intelligence, app-shell, shared UI, and architecture-script complexity. Prefer named predicates, section components, and effect/query separation. Preserve reducer and keyboard semantics.
+**What:** Reduce Data Enrichment, Markdown, monitor/alert, dashboard, Product Intelligence, app-shell, shared UI, and architecture-script complexity. Prefer named predicates, section components, and effect/query separation. Preserve reducer and keyboard semantics.
 **Verify:** `cd frontend; pnpm exec eslint . --rule "complexity: [error, 15]" --max-warnings=0`; run focused tests for every touched owner.
 
 ### Slice 5: Metrics and Full Frontend Verification
@@ -120,4 +119,4 @@ Complexity scope is all maintained `.ts`, `.tsx`, `.js`, and `.mjs` under `front
 
 - Source evidence: `docs/audits/productionization-evidence-report-2026-08-21.md`, sections 4–8.
 - `frontend/scripts/check-crawl-architecture.mjs` currently permits higher file budgets. Do not change gate policy here; Plan 07 replaces the budgets after this plan is green.
-
+- UCP Audit, Run Trace/AI Observability, and the Design Crawl feature were removed before this plan under Productionization 04; do not recreate or baseline them.

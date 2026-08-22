@@ -72,7 +72,7 @@ class ExportRecord(BaseModel):
             raise ValueError("source_url must be an absolute http(s) URL")
         return text
 
-    def model_post_init(self, __context: Any) -> None:
+    def model_post_init(self, _context: Any) -> None:
         record_url = self.data.get("url")
         # Missing record URLs are intentional: skip URL parsing for partial records.
         if record_url in (None, ""):
@@ -144,7 +144,6 @@ def build_source_trace(
             "review_bucket": _object_list(record.get("_review_bucket")),
             "semantic": mapping_or_empty(record.get("_semantic")),
             "rejected_public_fields": rejected_public_fields,
-            "dom_skip": mapping_or_empty(record.get("_dom_skip_decision")),
             "completed_tiers": _completed_tiers_list(record.get("_extraction_tiers")),
         },
         "field_discovery": field_discovery,
