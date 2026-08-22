@@ -188,5 +188,17 @@ def build_playwright_context_options(
     )
 
 
+def build_native_real_chrome_context_spec(
+    *, locality_profile: Mapping[str, object] | None = None
+) -> PlaywrightContextSpec:
+    context_options: dict[str, Any] = dict(NATIVE_REAL_CHROME_CONTEXT_OPTIONS)
+    if locality_profile is not None:
+        _apply_locality_profile(context_options, locality_profile)
+    return PlaywrightContextSpec(
+        context_options=context_options,
+        init_script=None,
+    )
+
+
 def clear_browser_identity_cache() -> None:
     return None

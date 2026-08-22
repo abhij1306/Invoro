@@ -512,9 +512,8 @@ class TestNativeContextContract:
     def test_native_real_chrome_spec_keeps_locality_without_identity_defaults(
         self,
     ) -> None:
-        spec = browser_identity.build_playwright_context_spec(
+        spec = browser_identity.build_native_real_chrome_context_spec(
             locality_profile={"locale": "en-IN", "timezone_id": "Asia/Kolkata"},
-            apply_identity_defaults=False,
         )
 
         assert spec.context_options["locale"] == "en-IN"

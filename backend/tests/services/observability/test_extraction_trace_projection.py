@@ -14,7 +14,6 @@ import pytest
 
 from app.services.observability.run_trace import RunTrace
 from app.services.pipeline.extraction_loop import _record_extraction_trace
-from app.services.pipeline.extraction_trace import _field_value_preview
 
 pytestmark = pytest.mark.unit
 
@@ -84,9 +83,33 @@ def test_projects_high_value_field_winning_sources_only():
 
 
 def test_sensitive_field_candidate_preview_is_redacted():
-    assert _field_value_preview("email", "person@example.com") == "[redacted]"
-    assert _field_value_preview("auth_token", "secret-value") == "[redacted]"
-    assert _field_value_preview("title", "Widget") == "Widget"
+    class _Trace:
+        previews: dict[str, str] = {}
+
+        def record_completed_tiers(self, _tiers) -> None:
+            return None
+
+        def record_skip_dom_decision(self, **_kwargs) -> None:
+            return None
+
+        def record_field_candidate(self, field_name: str, **kwargs) -> None:
+            self.previews[field_name] = kwargs["value_preview"]
+
+        def trace_field_names(self) -> list[str]:
+            return ["email", "title"]
+
+        def record_field_state(self, *_args, **_kwargs) -> None:
+            return None
+
+    record = _detail_record()
+    record["email"] = "person@example.com"
+    record["_field_sources"]["email"] = ["dom"]
+    trace = _Trace()
+
+    _record_extraction_trace(_context(trace), [record])
+
+    assert trace.previews["email"] == "[redacted]"
+    assert trace.previews["title"] == "Widget"
 
 
 def test_projects_missing_variant_candidate_state():

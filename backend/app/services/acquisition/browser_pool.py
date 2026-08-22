@@ -20,6 +20,7 @@ from app.services.acquisition.browser_diagnostics import (
 )
 from app.services.acquisition.browser_identity import (
     PlaywrightContextSpec,
+    build_native_real_chrome_context_spec,
     clear_browser_identity_cache,
 )
 from app.services.acquisition.browser_pool_spec import (
@@ -330,6 +331,8 @@ class SharedBrowserRuntime:
         locality_profile: dict[str, object] | None = None,
     ) -> PlaywrightContextSpec:
         native_real_chrome = _use_native_real_chrome_context(self.browser_engine)
+        if native_real_chrome:
+            return build_native_real_chrome_context_spec(locality_profile=locality_profile)
         browser_major_version = None
         if self._browser is not None:
             raw_version = str(getattr(self._browser, "version", "") or "")
@@ -342,7 +345,6 @@ class SharedBrowserRuntime:
             run_id=run_id,
             browser_major_version=browser_major_version,
             locality_profile=locality_profile,
-            apply_identity_defaults=not native_real_chrome,
         )
         return PlaywrightContextSpec(
             context_options=dict(spec.context_options),
