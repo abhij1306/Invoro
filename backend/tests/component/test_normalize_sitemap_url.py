@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .test_sitemap_resolver import SITEMAP_NS, SecurityError, SimpleNamespace, ValidatedTarget, _FakeClient, _SequencedFakeClient, _normalize_sitemap_url, _valid_target, _xml_response, httpx, pytest, resolve_category_urls_from_sitemap, resolve_category_urls_from_sitemap_result, sitemap_resolver  # fmt: skip
 
+
 @pytest.mark.parametrize(
     ("raw", "expected"),
     [
@@ -14,10 +15,12 @@ from .test_sitemap_resolver import SITEMAP_NS, SecurityError, SimpleNamespace, V
 def test_normalize_sitemap_url(raw: str, expected: str) -> None:
     assert _normalize_sitemap_url(raw) == expected
 
+
 @pytest.mark.component
 def test_normalize_sitemap_url_rejects_empty_domain() -> None:
     with pytest.raises(ValueError, match="empty domain"):
         _normalize_sitemap_url(" ")
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -79,6 +82,7 @@ async def test_resolve_sitemap_index_filters_final_urls_not_child_sitemaps(
         "https://example.com/sitemap_pages_2.xml",
     ]
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_resolve_sitemap_retries_transient_root_fetch_failure(
@@ -116,6 +120,7 @@ async def test_resolve_sitemap_retries_transient_root_fetch_failure(
 
     assert urls == ["https://example.com/collections/a"]
     assert fake_client.requested_urls == [root_url, root_url]
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -171,6 +176,7 @@ async def test_resolve_sitemap_index_skips_failed_child_sitemaps(
         collections_child_url,
     ]
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_resolve_direct_urlset_filters_urls_and_clamps(
@@ -201,6 +207,7 @@ async def test_resolve_direct_urlset_filters_urls_and_clamps(
     urls = await resolve_category_urls_from_sitemap("example.com", "collections", 1)
 
     assert urls == ["https://example.com/collections/a"]
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -237,6 +244,7 @@ async def test_resolver_raises_when_no_final_urls_match(
     with pytest.raises(ValueError, match="No URLs matched filter"):
         await resolve_category_urls_from_sitemap("example.com", "collections", 500)
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_resolver_default_does_not_filter_urls(
@@ -269,6 +277,7 @@ async def test_resolver_default_does_not_filter_urls(
         "https://example.com/pages/a",
         "https://example.com/products/p",
     ]
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -307,6 +316,7 @@ async def test_resolver_category_only_filters_non_category_urls(
         "https://example.com/collections/women",
         "https://example.com/shop/sale",
     ]
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -367,6 +377,7 @@ async def test_resolver_builds_nav_tree_from_sitemap_category_urls(
         }
     ]
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_homepage_fallback_nav_tree_prefers_anchor_text_labels(
@@ -422,6 +433,7 @@ async def test_homepage_fallback_nav_tree_prefers_anchor_text_labels(
             ],
         }
     ]
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -479,6 +491,7 @@ async def test_resolver_category_only_falls_back_when_sitemap_has_account_links(
         "https://tommyhilfiger.nnnow.com/men",
     ]
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_homepage_category_only_keeps_auto_listing_without_anchor_signal(
@@ -489,7 +502,7 @@ async def test_homepage_category_only_keeps_auto_listing_without_anchor_signal(
         _valid_target,
     )
     monkeypatch.setattr(
-        "app.services.crawl.sitemap_resolver.resolve_auto_surface",
+        "app.services.crawl.sitemap_navigation.resolve_auto_surface",
         lambda **kwargs: SimpleNamespace(surface="ecommerce_listing", confidence=0.8),
     )
 
@@ -503,6 +516,7 @@ async def test_homepage_category_only_keeps_auto_listing_without_anchor_signal(
 
     assert urls == ["https://example.com/lookbook"]
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_homepage_category_only_keeps_anchor_category_without_auto_listing(
@@ -513,7 +527,7 @@ async def test_homepage_category_only_keeps_anchor_category_without_auto_listing
         _valid_target,
     )
     monkeypatch.setattr(
-        "app.services.crawl.sitemap_resolver.resolve_auto_surface",
+        "app.services.crawl.sitemap_navigation.resolve_auto_surface",
         lambda **kwargs: SimpleNamespace(surface="unknown", confidence=0.0),
     )
 
@@ -526,6 +540,7 @@ async def test_homepage_category_only_keeps_anchor_category_without_auto_listing
     )
 
     assert urls == ["https://example.com/women"]
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -553,6 +568,7 @@ async def test_resolver_empty_urlset_without_filter_reports_no_urls(
     with pytest.raises(ValueError, match="No URLs found in sitemap"):
         await resolve_category_urls_from_sitemap("example.com", "", 500)
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_resolver_raises_for_invalid_xml(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -570,6 +586,7 @@ async def test_resolver_raises_for_invalid_xml(monkeypatch: pytest.MonkeyPatch) 
     with pytest.raises(ValueError, match="Invalid XML in sitemap"):
         await resolve_category_urls_from_sitemap("example.com", "collections", 500)
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_resolver_raises_for_non_200(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -586,6 +603,7 @@ async def test_resolver_raises_for_non_200(monkeypatch: pytest.MonkeyPatch) -> N
 
     with pytest.raises(ValueError, match="returned HTTP 404"):
         await resolve_category_urls_from_sitemap("example.com", "collections", 500)
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -620,6 +638,7 @@ async def test_resolver_rejects_unsafe_discovered_urls(
 
     with pytest.raises(SecurityError):
         await resolve_category_urls_from_sitemap("example.com", "collections", 500)
+
 
 @pytest.mark.asyncio
 @pytest.mark.component

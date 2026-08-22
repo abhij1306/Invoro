@@ -5,7 +5,7 @@ import argparse
 import json
 import time
 from app.core.database import SessionLocal  # fmt: skip
-from app.services.acquisition.browser_runtime import _display_proxy  # fmt: skip
+from app.services.acquisition.browser_proxy_config import display_proxy as _display_proxy  # fmt: skip
 from app.services.crawl.crud import get_run  # fmt: skip
 from dataclasses import dataclass  # fmt: skip
 from datetime import UTC, datetime  # fmt: skip

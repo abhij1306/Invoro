@@ -4,11 +4,13 @@ from .test_batch_runtime import AcquisitionResult, AsyncSession, CrawlLog, Crawl
 
 pytest_plugins = ["tests.regression.test_batch_runtime"]
 
+
 @pytest.mark.unit
 def test_parallel_worker_record_limit_bounds_each_worker_budget() -> None:
     assert _parallel_worker_record_limit(5, 2) == 3
     assert _parallel_worker_record_limit(100, 8) == 13
     assert _parallel_worker_record_limit(1, 2) == 1
+
 
 @pytest.mark.unit
 def test_parallel_url_concurrency_respects_browser_runtime_capacity(
@@ -21,18 +23,22 @@ def test_parallel_url_concurrency_respects_browser_runtime_capacity(
 
     assert _parallel_url_concurrency(10, settings_view) == 3
 
+
 @pytest.mark.unit
 def test_parallel_url_concurrency_does_not_browser_cap_http_only(
     monkeypatch: pytest.MonkeyPatch,
     patch_settings,
 ) -> None:
-    monkeypatch.setattr(batch_runtime_module.settings, "system_max_concurrent_urls", 8)
+    monkeypatch.setattr(
+        "app.services.crawl.batch_parallel.settings.system_max_concurrent_urls", 8
+    )
     patch_settings(url_batch_concurrency=8, browser_runtime_context_capacity=3)
     settings_view = CrawlRunSettings.from_value(
         {"fetch_profile": {"fetch_mode": "http_only"}}
     )
 
     assert _parallel_url_concurrency(10, settings_view) == 8
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -74,6 +80,7 @@ async def test_persist_url_failure_log_prefixes_url_for_parallel_ui(
     if not logs[-1].message.startswith(expected_prefix):
         pytest.fail(f"expected URL-prefixed failure log, got {logs[-1].message!r}")
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_process_run_persists_detail_records(
@@ -113,6 +120,7 @@ async def test_process_run_persists_detail_records(
     assert rows[0].data["title"] == "Widget Prime"
     assert rows[0].data["price"] == "19.99"
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_process_run_marks_empty_listing_as_listing_detection_failed(
@@ -149,6 +157,7 @@ async def test_process_run_marks_empty_listing_as_listing_detection_failed(
     assert run.result_summary["extraction_verdict"] == "listing_detection_failed"
     assert total == 0
     assert rows == []
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -198,6 +207,7 @@ async def test_process_run_tracks_failure_reason_counts(
         "non_detail_seed": 1,
         "challenge_shell": 1,
     }
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -256,6 +266,7 @@ async def test_process_run_starts_with_fresh_batch_progress(
     assert run.result_summary["verdict_counts"] == {"error": 1, "success": 1}
     assert run.result_summary["acquisition_summary"]["methods"] == {"fresh": 2}
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_process_run_defaults_to_sequential_batch_url_processing(
@@ -304,6 +315,7 @@ async def test_process_run_defaults_to_sequential_batch_url_processing(
         "https://example-three.com/products/three",
     ]
     assert {session_id for _url, session_id in seen} == {id(db_session)}
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -372,6 +384,7 @@ async def test_process_run_uses_url_batch_concurrency_setting(
 
     assert max_active == 2
     assert run.result_summary["url_verdicts"] == ["success", "success", "success"]
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -449,6 +462,7 @@ async def test_process_run_runs_same_domain_batch_urls_in_parallel(
 
     assert max_active > 1
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_parallel_run_does_not_mislabel_nested_timeout_as_url_deadline(
@@ -525,6 +539,7 @@ async def test_parallel_run_does_not_mislabel_nested_timeout_as_url_deadline(
     assert not any(
         f"URL processing timed out for {failing_url}" in message for message in messages
     )
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -607,6 +622,7 @@ async def test_process_run_aggregates_quality_summary_from_url_metrics(
         "requested_fields_total": 4,
         "requested_fields_found_best": 4,
     }
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression

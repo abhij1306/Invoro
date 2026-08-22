@@ -59,11 +59,7 @@ def resolve_run_param(
         if candidate is None:
             continue
         try:
-            resolved = int(
-                float(candidate)
-                if isinstance(candidate, (int, float))
-                else float(str(candidate))
-            )
+            resolved = int(float(candidate) if isinstance(candidate, (int, float)) else float(str(candidate)))
         except (TypeError, ValueError):
             continue
         if resolved >= int(min_value):
@@ -86,9 +82,7 @@ def resolved_url_processing_config(
 ) -> URLProcessingConfig:
     if config is not None:
         plan = config.resolved_acquisition_plan(surface=surface)
-        resolved_proxy_list = list(
-            plan.proxy_list or config.proxy_list or proxy_list or []
-        )
+        resolved_proxy_list = list(plan.proxy_list or config.proxy_list or proxy_list or [])
         resolved_traversal_mode = (
             plan.traversal_mode
             if plan.traversal_mode is not None
@@ -96,9 +90,7 @@ def resolved_url_processing_config(
             if config.traversal_mode is not None
             else traversal_mode
         )
-        safety_iteration_cap = int(
-            crawler_runtime_settings.traversal_max_iterations_cap
-        )
+        safety_iteration_cap = int(crawler_runtime_settings.traversal_max_iterations_cap)
         resolved_max_pages = min(
             resolve_run_param(plan.max_pages, config.max_pages, max_pages),
             safety_iteration_cap,

@@ -30,9 +30,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 
 ResolveRunConfigFn = Callable[..., Awaitable[dict[str, object] | None]]
-ExtractRecordsFn = Callable[
-    ..., Awaitable[tuple[list[dict[str, object]] | None, str | None]]
-]
+ExtractRecordsFn = Callable[..., Awaitable[tuple[list[dict[str, object]] | None, str | None]]]
 
 
 def _sanitize_llm_existing_values(record: dict[str, object]) -> dict[str, object]:
@@ -95,13 +93,7 @@ async def apply_direct_record_llm_fallback(
         run.requested_fields or [],
     )
     missing_by_record = [
-        [
-            field_name
-            for field_name in requested_fields
-            if field_allowed_for_surface(run.surface, field_name)
-            and record.get(field_name) in (None, "", [], {})
-        ]
-        for record in records
+        _missing_record_fields(record, surface=run.surface, fields=requested_fields) for record in records
     ]
     if not any(missing_by_record):
         return records
@@ -127,20 +119,41 @@ async def apply_direct_record_llm_fallback(
 
     updated_records: list[dict[str, object]] = []
     for index, record in enumerate(records):
-        next_record = dict(record)
         candidate = candidates[index] if index < len(candidates) else None
-        if isinstance(candidate, dict):
-            for field_name in missing_by_record[index]:
-                value = candidate.get(field_name)
-                if value in (None, "", [], {}) or not _validate_llm_field_type(
-                    field_name, value
-                ):
-                    continue
-                next_record[field_name] = coerce_field_value(
-                    field_name, value, page_url
-                )
+        next_record = _overlay_direct_candidate(
+            record,
+            candidate=candidate,
+            missing_fields=missing_by_record[index],
+            page_url=page_url,
+        )
         updated_records.append(finalize_record(next_record, surface=run.surface))
     return updated_records
+
+
+def _missing_record_fields(record: dict[str, object], *, surface: str, fields: list[str]) -> list[str]:
+    return [
+        field_name
+        for field_name in fields
+        if field_allowed_for_surface(surface, field_name) and record.get(field_name) in (None, "", [], {})
+    ]
+
+
+def _overlay_direct_candidate(
+    record: dict[str, object],
+    *,
+    candidate: object,
+    missing_fields: list[str],
+    page_url: str,
+) -> dict[str, object]:
+    updated = dict(record)
+    if not isinstance(candidate, dict):
+        return updated
+    for field_name in missing_fields:
+        value = candidate.get(field_name)
+        if value in (None, "", [], {}) or not _validate_llm_field_type(field_name, value):
+            continue
+        updated[field_name] = coerce_field_value(field_name, value, page_url)
+    return updated
 
 
 async def apply_llm_fallback(
@@ -158,77 +171,97 @@ async def apply_llm_fallback(
         run.requested_fields or [],
     )
     for record in records:
-        next_record = dict(record)
-        missing_fields = [
-            field_name
-            for field_name in requested_fields
-            if field_allowed_for_surface(run.surface, field_name)
-            and next_record.get(field_name) in (None, "", [], {})
-        ]
-        should_run = bool(missing_fields)
-        if not should_run:
-            updated_records.append(next_record)
-            continue
-        sanitized_existing = _sanitize_llm_existing_values(next_record)
-        payload, error_message = await extract_missing_fields(
-            session,
-            run_id=run.id,
-            domain=domain,
-            url=page_url,
-            html_text=html,
-            missing_fields=missing_fields or requested_fields,
-            existing_values=sanitized_existing,
+        updated_records.append(
+            await _apply_llm_to_record(
+                session,
+                run=run,
+                domain=domain,
+                page_url=page_url,
+                html=html,
+                record=record,
+                requested_fields=requested_fields,
+            )
         )
-        field_sources = mapping_or_empty(next_record.get("_field_sources"))
-        applied_llm_fields: list[str] = []
-        llm_rejected_fields: list[str] = []
-        if isinstance(payload, dict):
-            for field_name, value in payload.items():
-                normalized_field = str(field_name or "").strip().lower()
-                if (
-                    not normalized_field
-                    or not field_allowed_for_surface(run.surface, normalized_field)
-                    or next_record.get(normalized_field) not in (None, "", [], {})
-                ):
-                    continue
-                coerced = coerce_field_value(
-                    normalized_field,
-                    value,
-                    page_url,
-                )
-                if not _validate_llm_field_type(normalized_field, coerced):
-                    llm_rejected_fields.append(normalized_field)
-                    continue
-                if coerced in (None, "", [], {}):
-                    continue
-                next_record[normalized_field] = coerced
-                applied_llm_fields.append(normalized_field)
-                current_sources = string_list(field_sources.get(normalized_field))
-                if "llm_missing_field_extraction" not in current_sources:
-                    current_sources.append("llm_missing_field_extraction")
-                field_sources[normalized_field] = current_sources
-        if applied_llm_fields:
-            canonical_record = {
-                key: value
-                for key, value in next_record.items()
-                if not str(key).startswith("_")
-            }
-            next_record.update(finalize_record(canonical_record, surface=run.surface))
-        next_record["_field_sources"] = field_sources
-        next_record["_confidence"] = score_record_confidence(
-            next_record,
-            surface=run.surface,
-            requested_fields=requested_fields,
-        )
-        if applied_llm_fields and not str(next_record.get("_source") or "").strip():
-            next_record["_source"] = "llm_missing_field_extraction"
-        next_record["_self_heal"] = {
-            "enabled": True,
-            "triggered": True,
-            "threshold": crawler_runtime_settings.llm_confidence_threshold,
-            "mode": "missing_field_extraction",
-            "error": error_message or None,
-            "rejected_fields": llm_rejected_fields or None,
-        }
-        updated_records.append(next_record)
     return updated_records
+
+
+async def _apply_llm_to_record(
+    session: AsyncSession,
+    *,
+    run: CrawlRun,
+    domain: str,
+    page_url: str,
+    html: str,
+    record: dict[str, object],
+    requested_fields: list[str],
+) -> dict[str, object]:
+    updated = dict(record)
+    missing_fields = _missing_record_fields(updated, surface=run.surface, fields=requested_fields)
+    if not missing_fields:
+        return updated
+    payload, error_message = await extract_missing_fields(
+        session,
+        run_id=run.id,
+        domain=domain,
+        url=page_url,
+        html_text=html,
+        missing_fields=missing_fields,
+        existing_values=_sanitize_llm_existing_values(updated),
+    )
+    field_sources = mapping_or_empty(updated.get("_field_sources"))
+    applied, rejected = _apply_llm_payload_fields(
+        updated,
+        payload=payload,
+        field_sources=field_sources,
+        surface=run.surface,
+        page_url=page_url,
+    )
+    if applied:
+        canonical = {key: value for key, value in updated.items() if not str(key).startswith("_")}
+        updated.update(finalize_record(canonical, surface=run.surface))
+    updated["_field_sources"] = field_sources
+    updated["_confidence"] = score_record_confidence(updated, surface=run.surface, requested_fields=requested_fields)
+    if applied and not str(updated.get("_source") or "").strip():
+        updated["_source"] = "llm_missing_field_extraction"
+    updated["_self_heal"] = {
+        "enabled": True,
+        "triggered": True,
+        "threshold": crawler_runtime_settings.llm_confidence_threshold,
+        "mode": "missing_field_extraction",
+        "error": error_message or None,
+        "rejected_fields": rejected or None,
+    }
+    return updated
+
+
+def _apply_llm_payload_fields(
+    record: dict[str, object],
+    *,
+    payload: object,
+    field_sources: dict[str, object],
+    surface: str,
+    page_url: str,
+) -> tuple[list[str], list[str]]:
+    applied: list[str] = []
+    rejected: list[str] = []
+    if not isinstance(payload, dict):
+        return applied, rejected
+    for field_name, value in payload.items():
+        normalized = str(field_name or "").strip().lower()
+        if not normalized or not field_allowed_for_surface(surface, normalized):
+            continue
+        if record.get(normalized) not in (None, "", [], {}):
+            continue
+        coerced = coerce_field_value(normalized, value, page_url)
+        if not _validate_llm_field_type(normalized, coerced):
+            rejected.append(normalized)
+            continue
+        if coerced in (None, "", [], {}):
+            continue
+        record[normalized] = coerced
+        applied.append(normalized)
+        sources = string_list(field_sources.get(normalized))
+        if "llm_missing_field_extraction" not in sources:
+            sources.append("llm_missing_field_extraction")
+        field_sources[normalized] = sources
+    return applied, rejected

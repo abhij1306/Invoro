@@ -82,9 +82,7 @@ async def replay_internal_api_endpoints(
 ) -> dict[str, object] | None:
     if not bool(crawler_runtime_settings.internal_api_replay_enabled):
         return None
-    for endpoint in list(endpoints or [])[
-        : max(1, int(crawler_runtime_settings.internal_api_replay_max_endpoints))
-    ]:
+    for endpoint in list(endpoints or [])[: max(1, int(crawler_runtime_settings.internal_api_replay_max_endpoints))]:
         payload = await _replay_endpoint(
             endpoint,
             page_url=page_url,
@@ -103,9 +101,7 @@ async def _replay_endpoint(
     surface: str,
     requested_fields: list[str],
 ) -> dict[str, object] | None:
-    method = (
-        str(endpoint.get(INTERNAL_API_ENDPOINT_METHOD_KEY) or "GET").strip().upper()
-    )
+    method = str(endpoint.get(INTERNAL_API_ENDPOINT_METHOD_KEY) or "GET").strip().upper()
     url = str(endpoint.get(INTERNAL_API_ENDPOINT_URL_KEY) or "").strip()
     if method not in INTERNAL_API_ENDPOINT_ALLOWED_METHODS or not url:
         return None
@@ -127,14 +123,10 @@ async def _replay_endpoint(
         "status": int(response.status_code),
         "content_type": str(response.headers.get("content-type", "application/json")),
         INTERNAL_API_ENDPOINT_TYPE_KEY: str(
-            endpoint.get(INTERNAL_API_ENDPOINT_TYPE_KEY)
-            or endpoint_info.get("type")
-            or "generic_json"
+            endpoint.get(INTERNAL_API_ENDPOINT_TYPE_KEY) or endpoint_info.get("type") or "generic_json"
         ),
         INTERNAL_API_ENDPOINT_FAMILY_KEY: str(
-            endpoint.get(INTERNAL_API_ENDPOINT_FAMILY_KEY)
-            or endpoint_info.get("family")
-            or ""
+            endpoint.get(INTERNAL_API_ENDPOINT_FAMILY_KEY) or endpoint_info.get("family") or ""
         ),
         "body": body,
     }

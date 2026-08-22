@@ -63,197 +63,319 @@ def extract_records(
     browser_diagnostics: dict[str, object] | None = None,
     record_dom_observed_selectors: bool = False,
 ) -> list[dict]:
-    normalized_surface = str(surface or "").strip().lower()
-    if not normalized_surface or normalized_surface == "auto":
+    surface = str(surface or "").strip().lower()
+    if not surface or surface == "auto":
         raise ValueError(f"Surface must be explicit, got: {surface!r}")
-    xml_records = extract_xml_sitemap_records(
+    handled, records = _extract_initial_tiers(
         html,
-        page_url,
-        normalized_surface,
+        page_url=page_url,
+        surface=surface,
         max_records=max_records,
+        requested_page_url=requested_page_url,
+        requested_fields=requested_fields,
         content_type=content_type,
     )
+    if handled:
+        return records
+    if "listing" in surface:
+        return _extract_listing_surface(
+            html,
+            page_url=page_url,
+            surface=surface,
+            max_records=max_records,
+            requested_fields=requested_fields,
+            adapter_records=adapter_records,
+            network_payloads=network_payloads,
+            artifacts=artifacts,
+            selector_rules=selector_rules,
+            browser_diagnostics=browser_diagnostics,
+            record_dom_observed_selectors=record_dom_observed_selectors,
+        )
+    return _extract_detail_surface(
+        html,
+        page_url=page_url,
+        surface=surface,
+        max_records=max_records,
+        requested_page_url=requested_page_url,
+        requested_fields=requested_fields,
+        adapter_records=adapter_records,
+        network_payloads=network_payloads,
+        selector_rules=selector_rules,
+        extraction_runtime_snapshot=extraction_runtime_snapshot,
+    )
+
+
+def _extract_initial_tiers(
+    html: str,
+    *,
+    page_url: str,
+    surface: str,
+    max_records: int,
+    requested_page_url: str | None,
+    requested_fields: list[str] | None,
+    content_type: str | None,
+) -> tuple[bool, list[dict]]:
+    xml_records = extract_xml_sitemap_records(
+        html, page_url, surface, max_records=max_records, content_type=content_type
+    )
     if xml_records:
-        return xml_records
-    raw_json_surface_field_overlap_absolute = int(
-        crawler_runtime_settings.raw_json_surface_field_overlap_absolute
-    )
-    raw_json_surface_field_overlap_ratio = float(
-        crawler_runtime_settings.raw_json_surface_field_overlap_ratio
-    )
-    with logfire_span(
-        "extract.tier.raw_json",
-        domain=_safe_domain(page_url),
-        surface=normalized_surface,
-    ) as span:
+        return True, xml_records
+    with logfire_span("extract.tier.raw_json", domain=_safe_domain(page_url), surface=surface) as span:
         json_records = extract_raw_json_records(
             html,
             page_url,
-            normalized_surface,
+            surface,
             max_records=max_records,
             requested_fields=requested_fields,
             content_type=content_type,
-            raw_json_surface_field_overlap_absolute=(
-                raw_json_surface_field_overlap_absolute
+            raw_json_surface_field_overlap_absolute=int(
+                crawler_runtime_settings.raw_json_surface_field_overlap_absolute
             ),
-            raw_json_surface_field_overlap_ratio=raw_json_surface_field_overlap_ratio,
+            raw_json_surface_field_overlap_ratio=float(crawler_runtime_settings.raw_json_surface_field_overlap_ratio),
         )
         set_logfire_attributes(span, record_count=len(json_records))
     if json_records:
-        if "listing" in normalized_surface:
-            return json_records
-        return _postprocess_detail_records(
+        if "listing" in surface:
+            return True, json_records
+        return True, _postprocess_detail_records(
             json_records[:max_records],
             html=html,
             page_url=page_url,
             requested_page_url=requested_page_url,
         )
-    if normalized_surface in CONTENT_DETAIL_SURFACES:
-        with logfire_span(
-            "extract.tier.content_detail",
-            domain=_safe_domain(page_url),
-            surface=normalized_surface,
-        ) as span:
-            record = extract_content_surface(
-                BeautifulSoup(html or "", "html.parser"),
-                page_url=page_url,
-                surface=normalized_surface,
-            )
-            set_logfire_attributes(span, record_count=1 if record else 0)
-        if not record:
-            return []
-        if _html_is_blocked_extraction_shell(html) and not _content_record_is_useful(
-            record
-        ):
-            return []
-        finalized_record = finalize_record(record, surface=normalized_surface)
-        if record.get("markdown"):
-            finalized_record["markdown"] = record["markdown"]
-        return [finalized_record]
-    if _html_is_blocked_extraction_shell(html):
-        return []
-    if "listing" in normalized_surface:
-        adapter_rows: list[dict[str, Any]] = []
-        if adapter_records:
-            for record in list(adapter_records or []):
-                if not isinstance(record, dict):
-                    continue
-                shaped = direct_record_to_surface_fields(
-                    record,
-                    surface=normalized_surface,
-                    page_url=page_url,
-                    requested_fields=requested_fields,
-                    base_fields={
-                        "source_url": page_url,
-                        "_source": str(record.get("_source") or "adapter"),
-                    },
-                )
-                if shaped.get("title") and shaped.get("url"):
-                    adapter_rows.append(shaped)
-        with logfire_span(
-            "extract.tier.listing_candidates",
-            domain=_safe_domain(page_url),
-            surface=normalized_surface,
-            adapter_input_count=len(adapter_records or []),
-            network_payload_count=len(network_payloads or []),
-        ) as span:
-            network_rows = extract_listing_rows_from_network(
-                network_payloads,
-                page_url=page_url,
-                surface=normalized_surface,
-                max_records=max_records,
-            )
-            set_logfire_attributes(
-                span,
-                adapter_row_count=len(adapter_rows),
-                network_row_count=len(network_rows),
-            )
-        backfill_listing_rows_from_network(
-            adapter_rows,
-            network_payloads=network_payloads,
-        )
-        adapter_rows = _finalize_listing_rows(adapter_rows)
-        adapter_fast_rows = _adapter_listing_rows_if_sufficient(
-            adapter_rows,
+    if surface in CONTENT_DETAIL_SURFACES:
+        return True, _extract_content_detail(html, page_url=page_url, surface=surface)
+    return _html_is_blocked_extraction_shell(html), []
+
+
+def _extract_content_detail(html: str, *, page_url: str, surface: str) -> list[dict]:
+    with logfire_span("extract.tier.content_detail", domain=_safe_domain(page_url), surface=surface) as span:
+        record = extract_content_surface(
+            BeautifulSoup(html or "", "html.parser"),
             page_url=page_url,
-            surface=normalized_surface,
+            surface=surface,
+        )
+        set_logfire_attributes(span, record_count=1 if record else 0)
+    if not record:
+        return []
+    if _html_is_blocked_extraction_shell(html) and not _content_record_is_useful(record):
+        return []
+    finalized = finalize_record(record, surface=surface)
+    if record.get("markdown"):
+        finalized["markdown"] = record["markdown"]
+    return [finalized]
+
+
+def _extract_listing_surface(
+    html: str,
+    *,
+    page_url: str,
+    surface: str,
+    max_records: int,
+    requested_fields: list[str] | None,
+    adapter_records: list[dict] | None,
+    network_payloads: list[dict[str, object]] | None,
+    artifacts: dict[str, object] | None,
+    selector_rules: list[dict[str, object]] | None,
+    browser_diagnostics: dict[str, object] | None,
+    record_dom_observed_selectors: bool,
+) -> list[dict]:
+    adapter_rows = _shape_adapter_rows(
+        adapter_records,
+        surface=surface,
+        page_url=page_url,
+        requested_fields=requested_fields,
+    )
+    with logfire_span(
+        "extract.tier.listing_candidates",
+        domain=_safe_domain(page_url),
+        surface=surface,
+        adapter_input_count=len(adapter_records or []),
+        network_payload_count=len(network_payloads or []),
+    ) as span:
+        network_rows = extract_listing_rows_from_network(
+            network_payloads,
+            page_url=page_url,
+            surface=surface,
+            max_records=max_records,
+        )
+        set_logfire_attributes(
+            span,
+            adapter_row_count=len(adapter_rows),
+            network_row_count=len(network_rows),
+        )
+    backfill_listing_rows_from_network(
+        adapter_rows,
+        network_payloads=network_payloads,
+    )
+    adapter_rows = _finalize_listing_rows(adapter_rows)
+    adapter_fast_rows = _adapter_listing_rows_if_sufficient(
+        adapter_rows,
+        page_url=page_url,
+        surface=surface,
+        max_records=max_records,
+        artifacts=artifacts,
+        browser_diagnostics=browser_diagnostics,
+    )
+    if adapter_fast_rows:
+        return adapter_fast_rows
+    listing_rows = _extract_dom_listing_rows(
+        html,
+        page_url=page_url,
+        surface=surface,
+        max_records=max_records,
+        artifacts=artifacts,
+        selector_rules=selector_rules,
+        network_payloads=network_payloads,
+        record_dom_observed_selectors=record_dom_observed_selectors,
+    )
+    backfill_listing_rows_from_network(
+        listing_rows,
+        network_payloads=network_payloads,
+    )
+    listing_rows = _finalize_listing_rows(listing_rows)
+    network_rows = _finalize_listing_rows(network_rows)
+    if _valid_content_table_rows(listing_rows, surface=surface):
+        return listing_rows[:max_records]
+    generic_rows = _overlay_listing_rows_from_adapter(
+        listing_rows,
+        adapter_rows=adapter_rows,
+    )
+    return _select_listing_candidate_rows(
+        adapter_rows=adapter_rows,
+        generic_rows=generic_rows,
+        network_rows=network_rows,
+        page_url=page_url,
+        surface=surface,
+        max_records=max_records,
+        artifacts=artifacts,
+        browser_diagnostics=browser_diagnostics,
+    )
+
+
+def _shape_adapter_rows(
+    records: list[dict] | None,
+    *,
+    surface: str,
+    page_url: str,
+    requested_fields: list[str] | None,
+) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for record in list(records or []):
+        if not isinstance(record, dict):
+            continue
+        shaped = direct_record_to_surface_fields(
+            record,
+            surface=surface,
+            page_url=page_url,
+            requested_fields=requested_fields,
+            base_fields={
+                "source_url": page_url,
+                "_source": str(record.get("_source") or "adapter"),
+            },
+        )
+        if shaped.get("title") and shaped.get("url"):
+            rows.append(shaped)
+    return rows
+
+
+def _extract_dom_listing_rows(
+    html: str,
+    *,
+    page_url: str,
+    surface: str,
+    max_records: int,
+    artifacts: dict[str, object] | None,
+    selector_rules: list[dict[str, object]] | None,
+    network_payloads: list[dict[str, object]] | None,
+    record_dom_observed_selectors: bool,
+) -> list[dict]:
+    with logfire_span(
+        "extract.tier.dom_listing",
+        domain=_safe_domain(page_url),
+        surface=surface,
+        selector_rule_count=len(selector_rules or []),
+    ) as span:
+        rows = extract_listing_records(
+            html,
+            page_url,
+            surface,
             max_records=max_records,
             artifacts=artifacts,
-            browser_diagnostics=browser_diagnostics,
-        )
-        if adapter_fast_rows:
-            return adapter_fast_rows
-        with logfire_span(
-            "extract.tier.dom_listing",
-            domain=_safe_domain(page_url),
-            surface=normalized_surface,
-            selector_rule_count=len(selector_rules or []),
-        ) as span:
-            listing_rows = extract_listing_records(
-                html,
-                page_url,
-                normalized_surface,
-                max_records=max_records,
-                artifacts=artifacts,
-                selector_rules=selector_rules,
-                network_payloads=network_payloads,
-                record_dom_observed_selectors=record_dom_observed_selectors,
-            )
-            set_logfire_attributes(span, record_count=len(listing_rows))
-        backfill_listing_rows_from_network(
-            listing_rows,
+            selector_rules=selector_rules,
             network_payloads=network_payloads,
+            record_dom_observed_selectors=record_dom_observed_selectors,
         )
-        listing_rows = _finalize_listing_rows(listing_rows)
-        network_rows = _finalize_listing_rows(network_rows)
-        if (
-            normalized_surface == "content_listing"
-            and listing_rows
-            and all(row.get("_extraction_mode") == "table_rows" for row in listing_rows)
-            and validate_table_rows_quality(listing_rows)
-        ):
-            return listing_rows[:max_records]
-        generic_rows = _overlay_listing_rows_from_adapter(
-            listing_rows,
-            adapter_rows=adapter_rows,
+        set_logfire_attributes(span, record_count=len(rows))
+    return rows
+
+
+def _valid_content_table_rows(rows: list[dict], *, surface: str) -> bool:
+    return (
+        surface == "content_listing"
+        and bool(rows)
+        and all(row.get("_extraction_mode") == "table_rows" for row in rows)
+        and validate_table_rows_quality(rows)
+    )
+
+
+def _select_listing_candidate_rows(
+    *,
+    adapter_rows: list[dict[str, Any]],
+    generic_rows: list[dict[str, Any]],
+    network_rows: list[dict[str, Any]],
+    page_url: str,
+    surface: str,
+    max_records: int,
+    artifacts: dict[str, object] | None,
+    browser_diagnostics: dict[str, object] | None,
+) -> list[dict]:
+    candidate_sets = [
+        (label, rows)
+        for label, rows in (
+            ("adapter", adapter_rows),
+            ("generic", generic_rows),
+            ("network", network_rows),
         )
-        candidate_sets: list[tuple[str, list[dict[str, Any]]]] = []
-        if adapter_rows:
-            candidate_sets.append(("adapter", adapter_rows))
-        if generic_rows:
-            candidate_sets.append(("generic", generic_rows))
-        if network_rows:
-            candidate_sets.append(("network", network_rows))
-        combined_rows = [*generic_rows, *adapter_rows, *network_rows]
-        if len(candidate_sets) >= 2 and combined_rows and not adapter_rows:
-            candidate_sets.append(("combined", combined_rows))
-        if candidate_sets:
-            candidate_rows = best_listing_candidate_set(
-                candidate_sets,
-                page_url=page_url,
-                surface=normalized_surface,
-                max_records=max_records,
-                title_is_noise=is_title_noise,
-                url_is_structural=listing_url_is_structural,
-                detail_like_url=lambda candidate_url: listing_detail_like_path(
-                    candidate_url,
-                    is_job=str(normalized_surface or "").startswith("job_"),
-                ),
-            )[:max_records]
-            gated_rows = apply_listing_integrity_gate(
-                candidate_rows,
-                page_url=page_url,
-                surface=normalized_surface,
-                artifacts=artifacts,
-            )
-            propagate_listing_integrity_to_diagnostics(artifacts, browser_diagnostics)
-            return gated_rows
+        if rows
+    ]
+    combined_rows = [*generic_rows, *adapter_rows, *network_rows]
+    if len(candidate_sets) >= 2 and combined_rows and not adapter_rows:
+        candidate_sets.append(("combined", combined_rows))
+    if not candidate_sets:
         propagate_listing_integrity_to_diagnostics(artifacts, browser_diagnostics)
         return []
+    selected = best_listing_candidate_set(
+        candidate_sets,
+        page_url=page_url,
+        surface=surface,
+        max_records=max_records,
+        title_is_noise=is_title_noise,
+        url_is_structural=listing_url_is_structural,
+        detail_like_url=lambda url: listing_detail_like_path(url, is_job=surface.startswith("job_")),
+    )[:max_records]
+    gated = apply_listing_integrity_gate(selected, page_url=page_url, surface=surface, artifacts=artifacts)
+    propagate_listing_integrity_to_diagnostics(artifacts, browser_diagnostics)
+    return gated
+
+
+def _extract_detail_surface(
+    html: str,
+    *,
+    page_url: str,
+    surface: str,
+    max_records: int,
+    requested_page_url: str | None,
+    requested_fields: list[str] | None,
+    adapter_records: list[dict] | None,
+    network_payloads: list[dict[str, object]] | None,
+    selector_rules: list[dict[str, object]] | None,
+    extraction_runtime_snapshot: dict[str, object] | None,
+) -> list[dict]:
     with logfire_span(
         "extract.tier.detail",
         domain=_safe_domain(page_url),
-        surface=normalized_surface,
+        surface=surface,
         adapter_record_count=len(adapter_records or []),
         network_payload_count=len(network_payloads or []),
         selector_rule_count=len(selector_rules or []),
@@ -262,7 +384,7 @@ def extract_records(
             extract_detail_records(
                 html,
                 page_url,
-                normalized_surface,
+                surface,
                 requested_page_url=requested_page_url,
                 requested_fields=requested_fields,
                 adapter_records=adapter_records,
@@ -273,7 +395,7 @@ def extract_records(
             html=html,
             page_url=page_url,
             requested_page_url=requested_page_url,
-            surface=normalized_surface,
+            surface=surface,
             repair_quality=False,
             finalize_rows=False,
         )
@@ -298,11 +420,7 @@ def _html_is_blocked_extraction_shell(html: str) -> bool:
         return True
     return bool(
         (classification.active_provider_hits or classification.challenge_element_hits)
-        and (
-            classification.strong_hits
-            or classification.weak_hits
-            or classification.title_matches
-        )
+        and (classification.strong_hits or classification.weak_hits or classification.title_matches)
     )
 
 
@@ -313,11 +431,7 @@ def _content_record_is_useful(record: dict[str, Any]) -> bool:
 
 
 def _finalize_listing_rows(rows: list[dict]) -> list[dict[str, Any]]:
-    return [
-        finalize_listing_price_fields(dict(row))
-        for row in rows
-        if isinstance(row, dict)
-    ]
+    return [finalize_listing_price_fields(dict(row)) for row in rows if isinstance(row, dict)]
 
 
 def _adapter_listing_rows_if_sufficient(
@@ -380,9 +494,7 @@ def _postprocess_detail_records(
                 requested_page_url=requested_page_url,
             )
         drop_low_signal_zero_detail_price(record)
-        rows.append(
-            finalize_record(record, surface=surface) if finalize_rows else record
-        )
+        rows.append(finalize_record(record, surface=surface) if finalize_rows else record)
     return rows
 
 
@@ -394,38 +506,51 @@ def _overlay_listing_rows_from_adapter(
 ) -> list[dict[str, Any]]:
     if not rows or not adapter_rows:
         return [dict(row) for row in rows if isinstance(row, dict)]
-    adapter_by_url = {
-        str(row.get("url") or "").strip(): row
-        for row in adapter_rows
-        if isinstance(row, dict) and str(row.get("url") or "").strip()
-    }
-    adapter_by_identity = {
-        identity: row
-        for row in adapter_rows
-        if isinstance(row, dict) and (identity := _listing_row_identity(row))
-    }
+    adapter_by_url, adapter_by_identity = _adapter_row_indexes(adapter_rows)
     if not adapter_by_url and not adapter_by_identity:
         return [dict(row) for row in rows if isinstance(row, dict)]
     overlaid_rows: list[dict[str, Any]] = []
     for row in rows:
         if not isinstance(row, dict):
             continue
-        overlaid = dict(row)
-        adapter_row = adapter_by_url.get(str(row.get("url") or "").strip())
-        if adapter_row is None:
-            row_identity = _listing_row_identity(row)
-            if row_identity:
-                adapter_row = adapter_by_identity.get(row_identity)
-        if isinstance(adapter_row, dict):
-            overlaid = overlay_record(overlaid, adapter_row, skip_private=True)
-        overlaid_rows.append(overlaid)
+        overlaid_rows.append(
+            _overlay_adapter_row(
+                row,
+                adapter_by_url=adapter_by_url,
+                adapter_by_identity=adapter_by_identity,
+            )
+        )
     return overlaid_rows
 
 
+def _adapter_row_indexes(
+    rows: list[dict[str, Any]],
+) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
+    by_url = {
+        str(row.get("url") or "").strip(): row
+        for row in rows
+        if isinstance(row, dict) and str(row.get("url") or "").strip()
+    }
+    by_identity = {identity: row for row in rows if isinstance(row, dict) and (identity := _listing_row_identity(row))}
+    return by_url, by_identity
+
+
+def _overlay_adapter_row(
+    row: dict[str, Any],
+    *,
+    adapter_by_url: dict[str, dict[str, Any]],
+    adapter_by_identity: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    adapter_row = adapter_by_url.get(str(row.get("url") or "").strip())
+    if adapter_row is None:
+        adapter_row = adapter_by_identity.get(_listing_row_identity(row))
+    if not isinstance(adapter_row, dict):
+        return dict(row)
+    return overlay_record(dict(row), adapter_row, skip_private=True)
+
+
 def _listing_row_identity(row: dict[str, Any]) -> str:
-    product_id = clean_text(
-        row.get("product_id") or row.get("productId") or row.get("sku")
-    )
+    product_id = clean_text(row.get("product_id") or row.get("productId") or row.get("sku"))
     if product_id:
         return product_id.lower()
     return listing_identity_from_url(str(row.get("url") or ""))

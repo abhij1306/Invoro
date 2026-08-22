@@ -13,7 +13,6 @@ from app.services.config import observability as obs_config
 from app.services.config.pipeline_reasons import NON_RETRYABLE_HTTP_STATUS_REASON
 from app.services.config.runtime_settings import crawler_runtime_settings
 from app.services.db_utils import mapping_or_empty
-from app.services.shared.field_coerce import object_list as _object_list
 from app.services.domain_memory_service import load_domain_selector_rules
 from app.services.domain_utils import normalize_domain
 from app.services.shared.field_coerce import validate_record_for_surface
@@ -55,6 +54,8 @@ from .extraction_retry_decision import (
     annotate_field_repair as _annotate_field_repair,
     empty_extraction_browser_retry_decision as _empty_extraction_browser_retry_decision,
 )
+from .extraction_trace import record_extraction_trace as _record_extraction_trace
+from .acquisition_timeline import record_acquire_timeline as _record_acquire_timeline
 from .retry import (
     apply_detail_rejection_guard as _apply_detail_rejection_guard,
     build_acquisition_request as _build_acquisition_request,
@@ -157,19 +158,11 @@ async def process_single_url(
         config=_resolved_url_processing_config(
             config,
             surface=run.surface,
-            proxy_list=proxy_list
-            if proxy_list is not None
-            else settings_view.proxy_list(),
-            traversal_mode=traversal_mode
-            if traversal_mode is not None
-            else settings_view.traversal_mode(),
+            proxy_list=proxy_list if proxy_list is not None else settings_view.proxy_list(),
+            traversal_mode=traversal_mode if traversal_mode is not None else settings_view.traversal_mode(),
             max_pages=max_pages if max_pages is not None else settings_view.max_pages(),
-            max_scrolls=max_scrolls
-            if max_scrolls is not None
-            else settings_view.max_scrolls(),
-            max_records=max_records
-            if max_records is not None
-            else settings_view.max_records(),
+            max_scrolls=max_scrolls if max_scrolls is not None else settings_view.max_scrolls(),
+            max_records=max_records if max_records is not None else settings_view.max_records(),
             sleep_ms=sleep_ms if sleep_ms is not None else settings_view.sleep_ms(),
             update_run_state=update_run_state,
             persist_logs=persist_logs,
@@ -302,12 +295,8 @@ async def _run_acquisition_stage(
         prefetched=bool(prefetched_acquisition),
     ) as span:
         acquisition_request = await _build_acquisition_request(context)
-        acquisition_result = prefetched_acquisition or await acquire(
-            acquisition_request
-        )
-        diagnostics = mapping_or_empty(
-            getattr(acquisition_result, "browser_diagnostics", {})
-        )
+        acquisition_result = prefetched_acquisition or await acquire(acquisition_request)
+        diagnostics = mapping_or_empty(getattr(acquisition_result, "browser_diagnostics", {}))
         timings = mapping_or_empty(diagnostics.get("phase_timings_ms", {}))
         set_logfire_attributes(
             span,
@@ -319,16 +308,12 @@ async def _run_acquisition_stage(
             browser_engine=diagnostics.get("browser_engine"),
             total_ms=timings.get("total"),
             navigation_ms=timings.get("navigation"),
-            final_domain=normalize_domain(
-                str(getattr(acquisition_result, "final_url", "") or context.url)
-            ),
+            final_domain=normalize_domain(str(getattr(acquisition_result, "final_url", "") or context.url)),
         )
     method = getattr(acquisition_result, "method", "unknown")
     if method == "browser":
         if getattr(acquisition_request, "on_event", None) is None:
-            diagnostics = mapping_or_empty(
-                getattr(acquisition_result, "browser_diagnostics", {})
-            )
+            diagnostics = mapping_or_empty(getattr(acquisition_result, "browser_diagnostics", {}))
             timings = mapping_or_empty(diagnostics.get("phase_timings_ms", {}))
             load_ms = timings.get("navigation", 0) or timings.get("total", 0)
             await _log_pipeline_event(
@@ -367,104 +352,6 @@ async def _run_acquisition_stage(
             requested_fields=list(context.requested_fields),
         ),
     )
-
-
-def _record_acquire_timeline(
-    context: _URLProcessingContext,
-    acquisition_result,
-) -> None:
-    """Project acquisition diagnostics into the ordered RunTrace acquire timeline.
-
-    Closes the launch -> rendered blackhole: navigation strategy, each readiness
-    probe, interstitial action, policy decisions, and escalation become ordered
-    events instead of only summed phase timings. No-op when tracing is disabled.
-    """
-    trace = context.trace
-    if trace is None:
-        return
-    method = str(getattr(acquisition_result, "method", "") or "")
-    diagnostics = mapping_or_empty(
-        getattr(acquisition_result, "browser_diagnostics", {})
-    )
-    timings = mapping_or_empty(diagnostics.get("phase_timings_ms"))
-
-    for decision in _object_list(diagnostics.get("policy_decisions")):
-        if isinstance(decision, dict):
-            trace.record_acquire_event(
-                obs_config.ACQUIRE_EVENT_POLICY_DECISION,
-                detail={
-                    "action": decision.get("action"),
-                    "reason": decision.get("reason"),
-                    "stage": decision.get("stage"),
-                },
-            )
-
-    host_outcome = mapping_or_empty(diagnostics.get("host_outcome"))
-    if host_outcome:
-        trace.record_host_outcome(host_outcome)
-
-    if method != "browser":
-        trace.record_acquire_event(
-            obs_config.ACQUIRE_EVENT_HTTP_FETCH,
-            detail={
-                "method": method,
-                "status_code": getattr(acquisition_result, "status_code", None),
-                "blocked": bool(getattr(acquisition_result, "blocked", False)),
-            },
-        )
-        return
-
-    if method == "browser":
-        trace.record_acquire_event(
-            obs_config.ACQUIRE_EVENT_NAVIGATION,
-            detail={
-                "engine": diagnostics.get("browser_engine"),
-                "strategy": diagnostics.get("navigation_strategy"),
-                "reason": diagnostics.get("browser_reason"),
-            },
-            duration_ms=_as_int(timings.get("navigation")),
-        )
-        for probe in _object_list(diagnostics.get("readiness_probes")):
-            if isinstance(probe, dict):
-                trace.record_acquire_event(
-                    obs_config.ACQUIRE_EVENT_READINESS_PROBE,
-                    detail={
-                        "stage": probe.get("stage"),
-                        "is_ready": probe.get("is_ready"),
-                        "visible_text_length": probe.get("visible_text_length"),
-                        "detail_like": probe.get("detail_like"),
-                        "listing_card_count": probe.get("listing_card_count"),
-                    },
-                )
-        interstitial = mapping_or_empty(diagnostics.get("interstitial"))
-        if interstitial:
-            interstitial_status = str(interstitial.get("status") or "").strip().lower()
-            interstitial_timing_key = (
-                obs_config.INTERSTITIAL_DISMISSAL_TIMING_KEY
-                if interstitial_status == "dismissed"
-                else obs_config.INTERSTITIAL_PROBE_TIMING_KEY
-            )
-            trace.record_acquire_event(
-                obs_config.ACQUIRE_EVENT_INTERSTITIAL,
-                detail={"status": interstitial.get("status")},
-                duration_ms=_as_int(timings.get(interstitial_timing_key)),
-            )
-        challenge_wait = _as_int(timings.get("challenge_wait"))
-        if challenge_wait:
-            trace.record_acquire_event(
-                obs_config.ACQUIRE_EVENT_CHALLENGE,
-                detail={"outcome": diagnostics.get("browser_outcome")},
-                duration_ms=challenge_wait,
-            )
-        escalation_lane = diagnostics.get("escalation_lane")
-        if escalation_lane:
-            trace.record_acquire_event(
-                obs_config.ACQUIRE_EVENT_ESCALATION,
-                detail={
-                    "lane": escalation_lane,
-                    "engine": diagnostics.get("browser_engine"),
-                },
-            )
 
 
 def _build_prefetch_only_result(
@@ -593,82 +480,6 @@ async def _run_extraction_stage_observed(
     return _ExtractedURLStage(fetched=fetched, records=records)
 
 
-def _record_extraction_trace(
-    context: _URLProcessingContext,
-    records: list[dict[str, object]],
-) -> None:
-    """Project extraction internals into the RunTrace (observe-only).
-
-    Closes the extraction blackhole: tier execution (`_extraction_tiers`), the
-    skip-DOM decision (`_dom_skip_decision`), and per-high-value-field winning
-    source (`_field_sources`) become first-class trace data. No-op when tracing
-    is disabled. Reads only fields the extractor already attaches; never mutates
-    the record or changes selection.
-    """
-    trace = getattr(context, "trace", None)
-    if trace is None:
-        return
-    primary = next(
-        (record for record in records if isinstance(record, dict)),
-        None,
-    )
-    if primary is None:
-        return
-
-    tiers = mapping_or_empty(primary.get("_extraction_tiers"))
-    completed = tiers.get("completed")
-    if isinstance(completed, list):
-        trace.record_completed_tiers([str(item) for item in completed])
-        dom_in_completed = any(
-            str(item).strip().lower() == obs_config.EXTRACTION_TIER_DOM
-            for item in completed
-        )
-    else:
-        dom_in_completed = False
-
-    skip_decision = mapping_or_empty(primary.get("_dom_skip_decision"))
-    if skip_decision:
-        trace.record_skip_dom_decision(
-            dom_skipped=bool(skip_decision.get("dom_skipped", not dom_in_completed)),
-            confidence=_as_float(skip_decision.get("confidence")),
-            threshold=_as_float(skip_decision.get("threshold")),
-            dom_completion_reason=str(skip_decision.get("reason") or "") or None,
-        )
-
-    field_sources = mapping_or_empty(primary.get("_field_sources"))
-    for field_name, sources in field_sources.items():
-        source_list = sources if isinstance(sources, list) else [sources]
-        winning_source = next(
-            (str(item) for item in source_list if str(item or "").strip()),
-            "",
-        )
-        if not winning_source:
-            continue
-        value = primary.get(field_name)
-        trace.record_field_candidate(
-            str(field_name),
-            source=winning_source,
-            won=True,
-            value_preview="" if value in (None, "", [], {}) else str(value),
-        )
-    trace_fields = set(field_sources)
-    trace_field_names = getattr(trace, "trace_field_names", None)
-    if callable(trace_field_names):
-        trace_fields.update(str(field_name) for field_name in trace_field_names())
-    for field_name in sorted(trace_fields):
-        source_values = field_sources.get(field_name)
-        source_list = (
-            source_values if isinstance(source_values, list) else [source_values]
-        )
-        trace.record_field_state(
-            str(field_name),
-            value=primary.get(field_name),
-            candidate_sources=[
-                str(item) for item in source_list if str(item or "").strip()
-            ],
-        )
-
-
 def _is_content_detail_surface(surface: str) -> bool:
     return str(surface or "").strip().lower() in CONTENT_DETAIL_SURFACES
 
@@ -699,8 +510,7 @@ async def _run_normalization_stage(
             await _log_pipeline_event(
                 context,
                 "warning",
-                "Schema validation cleaned record "
-                f"{index} for {context.url}: {'; '.join(validation_errors)}",
+                f"Schema validation cleaned record {index} for {context.url}: {'; '.join(validation_errors)}",
             )
     if not _suppress_empty_downstream_record_logs(
         acquisition_result,
@@ -799,9 +609,7 @@ async def _run_persistence_stage(
             run_id=context.run.id,
             acquisition_result=acquisition_result,
             browser_attempted=_browser_attempted(acquisition_result),
-            screenshot_required=_screenshot_required(
-                _browser_outcome(acquisition_result)
-            ),
+            screenshot_required=_screenshot_required(_browser_outcome(acquisition_result)),
             surface=context.surface,
             blocked=_effective_blocked(acquisition_result),
         )
@@ -827,17 +635,12 @@ async def _run_persistence_stage(
             records=extracted_records,
             source_run_id=context.run.id,
         )
-    verdict = compute_verdict(
-        is_listing="listing" in context.surface,
-        blocked=_effective_blocked(acquisition_result),
-        record_count=persisted_count,
+    verdict = _persistence_verdict(
+        context,
+        extracted,
+        acquisition_result=acquisition_result,
+        persisted_count=persisted_count,
     )
-    status_code = int(getattr(acquisition_result, "status_code", 0) or 0)
-    if persisted_count == 0 and is_non_retryable_http_status(status_code):
-        url_metrics = mapping_or_empty(extracted.fetched.url_metrics)
-        url_metrics["failure_reason"] = NON_RETRYABLE_HTTP_STATUS_REASON
-        extracted.fetched.url_metrics = url_metrics
-        verdict = VERDICT_ERROR
     if not _suppress_empty_downstream_record_logs(
         acquisition_result,
         extracted_records,
@@ -848,28 +651,7 @@ async def _run_persistence_stage(
             f"Persisted {persisted_count} record(s) for {acquisition_result.final_url}",
             commit=False,
         )
-    if (
-        verdict == VERDICT_EMPTY
-        and "listing" in context.surface
-        and persisted_count == 0
-    ):
-        verdict = VERDICT_LISTING_FAILED
-    trace = context.trace
-    if trace is not None:
-        diagnostics = mapping_or_empty(
-            getattr(acquisition_result, "browser_diagnostics", {})
-        )
-        failure_reason = mapping_or_empty(extracted.fetched.url_metrics).get(
-            "failure_reason"
-        ) or diagnostics.get("failure_reason")
-        trace.record_extraction_rejection(str(failure_reason or "").strip() or None)
-        trace.record_verdict(verdict)
-        await persist_run_trace(
-            run_id=context.run.id,
-            source_url=acquisition_result.final_url,
-            trace=trace,
-            flagged=verdict not in obs_config.TRACE_SUCCESS_VERDICTS,
-        )
+    await _persist_url_trace(context, extracted, acquisition_result=acquisition_result, verdict=verdict)
     await update_acquisition_contract_memory(
         context,
         acquisition_result=acquisition_result,
@@ -877,11 +659,7 @@ async def _run_persistence_stage(
         persisted_count=persisted_count,
         verdict=verdict,
     )
-    result_records = []
-    for record in extracted_records:
-        next_record = dict(record)
-        next_record.pop("_field_repair", None)
-        result_records.append(next_record)
+    result_records = [_result_record(record) for record in extracted_records]
     return URLProcessingResult(
         records=result_records,
         verdict=verdict,
@@ -892,24 +670,59 @@ async def _run_persistence_stage(
     )
 
 
+def _persistence_verdict(
+    context: _URLProcessingContext,
+    extracted: _ExtractedURLStage,
+    *,
+    acquisition_result,
+    persisted_count: int,
+) -> str:
+    verdict = compute_verdict(
+        is_listing="listing" in context.surface,
+        blocked=_effective_blocked(acquisition_result),
+        record_count=persisted_count,
+    )
+    status_code = int(getattr(acquisition_result, "status_code", 0) or 0)
+    if persisted_count == 0 and is_non_retryable_http_status(status_code):
+        metrics = mapping_or_empty(extracted.fetched.url_metrics)
+        metrics["failure_reason"] = NON_RETRYABLE_HTTP_STATUS_REASON
+        extracted.fetched.url_metrics = metrics
+        return VERDICT_ERROR
+    if verdict == VERDICT_EMPTY and "listing" in context.surface and persisted_count == 0:
+        return VERDICT_LISTING_FAILED
+    return verdict
+
+
+async def _persist_url_trace(
+    context: _URLProcessingContext,
+    extracted: _ExtractedURLStage,
+    *,
+    acquisition_result,
+    verdict: str,
+) -> None:
+    trace = context.trace
+    if trace is None:
+        return
+    diagnostics = mapping_or_empty(getattr(acquisition_result, "browser_diagnostics", {}))
+    failure_reason = mapping_or_empty(extracted.fetched.url_metrics).get("failure_reason") or diagnostics.get(
+        "failure_reason"
+    )
+    trace.record_extraction_rejection(str(failure_reason or "").strip() or None)
+    trace.record_verdict(verdict)
+    await persist_run_trace(
+        run_id=context.run.id,
+        source_url=acquisition_result.final_url,
+        trace=trace,
+        flagged=verdict not in obs_config.TRACE_SUCCESS_VERDICTS,
+    )
+
+
+def _result_record(record: dict[str, object]) -> dict[str, object]:
+    result = dict(record)
+    result.pop("_field_repair", None)
+    return result
+
+
 URLProcessingContext = _URLProcessingContext
 empty_extraction_browser_retry_decision = _empty_extraction_browser_retry_decision
 resolved_url_processing_config = _resolved_url_processing_config
-
-
-def _as_int(value: object) -> int | None:
-    if value in (None, ""):
-        return None
-    try:
-        return int(float(value))  # type: ignore[arg-type]
-    except (TypeError, ValueError):
-        return None
-
-
-def _as_float(value: object) -> float | None:
-    if value in (None, ""):
-        return None
-    try:
-        return float(value)  # type: ignore[arg-type]
-    except (TypeError, ValueError):
-        return None

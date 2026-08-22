@@ -44,24 +44,29 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-async def count_listing_cards(
-    page: Page, *, surface: str, allow_heuristic: bool = True
-) -> int:
-    selector_group = (
-        "jobs" if str(surface or "").strip().lower().startswith("job_") else "ecommerce"
-    )
-    selectors = (
-        CARD_SELECTORS.get(selector_group) if isinstance(CARD_SELECTORS, dict) else []
-    )
-    normalized_selectors = [
-        str(selector).strip() for selector in selectors or [] if str(selector).strip()
-    ]
+async def count_listing_cards(page: Page, *, surface: str, allow_heuristic: bool = True) -> int:
+    selector_group = "jobs" if str(surface or "").strip().lower().startswith("job_") else "ecommerce"
+    selectors = CARD_SELECTORS.get(selector_group) if isinstance(CARD_SELECTORS, dict) else []
+    normalized_selectors = [str(selector).strip() for selector in selectors or [] if str(selector).strip()]
     if not normalized_selectors:
-        return (
-            await _heuristic_card_count(page, surface=surface) if allow_heuristic else 0
-        )
+        return await _heuristic_card_count(page, surface=surface) if allow_heuristic else 0
+    selector_counts = await _selector_card_counts(page, selectors=normalized_selectors, surface=surface)
+    if isinstance(selector_counts, int):
+        if selector_counts > 0 or not allow_heuristic:
+            return selector_counts
+        return await _heuristic_card_count(page, surface=surface)
+    resolved, use_heuristic = _resolve_selector_card_count(selector_counts, allow_heuristic=allow_heuristic)
+    if use_heuristic:
+        heuristic_count = await _heuristic_card_count(page, surface=surface)
+        return max(resolved, heuristic_count) if heuristic_count > 0 else 0
+    if resolved > 0:
+        return resolved
+    return await _heuristic_card_count(page, surface=surface) if allow_heuristic else 0
+
+
+async def _selector_card_counts(page: Page, *, selectors: list[str], surface: str) -> dict[object, object] | int:
     try:
-        selector_counts = await page.evaluate(
+        result = await page.evaluate(
             """
             (selectors) => {
               const counts = {};
@@ -75,7 +80,7 @@ async def count_listing_cards(
               return counts;
             }
             """,
-            normalized_selectors,
+            selectors,
         )
     except PlaywrightError:
         raise
@@ -86,7 +91,7 @@ async def count_listing_cards(
             exc_info=True,
         )
         highest = 0
-        for selector in normalized_selectors:
+        for selector in selectors:
             try:
                 highest = max(highest, await page.locator(selector).count())
             except PlaywrightError:
@@ -100,41 +105,29 @@ async def count_listing_cards(
                 )
                 continue
         return highest
-    if isinstance(selector_counts, dict):
-        strong_count = 0
-        weak_count = 0
-        for selector, raw_count in selector_counts.items():
-            try:
-                count = max(0, int(raw_count or 0))
-            except (TypeError, ValueError):
-                count = 0
-            if listing_selector_is_weak(str(selector or "")):
-                weak_count = max(weak_count, count)
-            else:
-                strong_count = max(strong_count, count)
-        if strong_count > 0:
-            if allow_heuristic and strong_count < max(
-                3,
-                int(crawler_runtime_settings.listing_min_items) + 1,
-            ):
-                heuristic_count = await _heuristic_card_count(page, surface=surface)
-                if heuristic_count <= 0:
-                    return 0
-                return max(strong_count, heuristic_count)
-            return strong_count
-        if weak_count > 0 and allow_heuristic:
-            return await _heuristic_card_count(page, surface=surface)
-        resolved = weak_count
-    else:
-        try:
-            resolved = max(0, int(selector_counts or 0))
-        except (TypeError, ValueError):
-            resolved = 0
-    if resolved > 0:
-        return resolved
-    if allow_heuristic:
-        return await _heuristic_card_count(page, surface=surface)
-    return 0
+    return result if isinstance(result, dict) else _nonnegative_int(result)
+
+
+def _resolve_selector_card_count(selector_counts: dict[object, object], *, allow_heuristic: bool) -> tuple[int, bool]:
+    strong_count = 0
+    weak_count = 0
+    for selector, raw_count in selector_counts.items():
+        count = _nonnegative_int(raw_count)
+        if listing_selector_is_weak(str(selector or "")):
+            weak_count = max(weak_count, count)
+        else:
+            strong_count = max(strong_count, count)
+    sparse_strong_count = strong_count < max(3, int(crawler_runtime_settings.listing_min_items) + 1)
+    if strong_count > 0:
+        return strong_count, allow_heuristic and sparse_strong_count
+    return weak_count, allow_heuristic
+
+
+def _nonnegative_int(value: object) -> int:
+    try:
+        return max(0, int(value or 0))  # type: ignore[call-overload]
+    except (TypeError, ValueError):
+        return 0
 
 
 async def _heuristic_card_count(page: Page, *, surface: str) -> int:
@@ -159,9 +152,7 @@ def _unique_listing_card_identity_count_from_html(
         surface=surface,
         limit=max(1, int(crawler_runtime_settings.listing_fallback_fragment_limit)),
     ):
-        identity = _listing_card_identity(
-            cast(_SelectolaxNode, card), page_url=page_url
-        )
+        identity = _listing_card_identity(cast(_SelectolaxNode, card), page_url=page_url)
         if identity:
             identities.add(identity)
     return len(identities)
@@ -237,15 +228,12 @@ async def page_snapshot(page: Page, *, surface: str) -> dict[str, Any]:
     )
     card_count = (
         unique_card_count
-        if unique_card_count >= int(crawler_runtime_settings.listing_min_items)
-        and unique_card_count < raw_card_count
+        if unique_card_count >= int(crawler_runtime_settings.listing_min_items) and unique_card_count < raw_card_count
         else raw_card_count
     )
     return {
         "card_count": card_count,
-        "content_signature": _content_signature(
-            snapshot.pop("content_signature_source", "")
-        ),
+        "content_signature": _content_signature(snapshot.pop("content_signature_source", "")),
         **snapshot,
     }
 
@@ -253,20 +241,16 @@ async def page_snapshot(page: Page, *, surface: str) -> dict[str, Any]:
 def snapshot_progressed(previous: dict[str, Any], current: dict[str, Any]) -> bool:
     if int(current.get("card_count", 0)) > int(previous.get("card_count", 0)):
         return True
-    if str(current.get("content_signature") or "") != str(
-        previous.get("content_signature") or ""
-    ):
+    if str(current.get("content_signature") or "") != str(previous.get("content_signature") or ""):
         return True
-    if int(current.get("scroll_height", 0)) >= int(
-        previous.get("scroll_height", 0)
-    ) + int(crawler_runtime_settings.traversal_force_probe_min_advance_px):
+    if int(current.get("scroll_height", 0)) >= int(previous.get("scroll_height", 0)) + int(
+        crawler_runtime_settings.traversal_force_probe_min_advance_px
+    ):
         return True
     return False
 
 
-def paginate_snapshot_progressed(
-    previous: dict[str, Any], current: dict[str, Any]
-) -> bool:
+def paginate_snapshot_progressed(previous: dict[str, Any], current: dict[str, Any]) -> bool:
     previous_count = int(previous.get("card_count", 0))
     current_count = int(current.get("card_count", 0))
     if current_count > previous_count:
@@ -276,9 +260,7 @@ def paginate_snapshot_progressed(
     return snapshot_progressed(previous, current)
 
 
-def is_marginal_card_gain(
-    *, card_gain: int, best_gain: int, current_count: int
-) -> bool:
+def is_marginal_card_gain(*, card_gain: int, best_gain: int, current_count: int) -> bool:
     if card_gain <= 0:
         return False
     if current_count < max(6, int(crawler_runtime_settings.listing_min_items) * 3):
@@ -301,11 +283,7 @@ def paginate_fragment_budget_reached(
             target = int(target_records)
         except (TypeError, ValueError):
             target = 0
-        if (
-            target > 0
-            and int(current_count if current_count is not None else result.card_count)
-            < target
-        ):
+        if target > 0 and int(current_count if current_count is not None else result.card_count) < target:
             return False
     fragment_budget = max(
         8_192,

@@ -28,10 +28,7 @@ def normalize_browser_engine(value: object) -> str:
 
 def launch_headless_for_engine(engine: str) -> bool:
     normalized_engine = normalize_browser_engine(engine)
-    if (
-        normalized_engine == REAL_CHROME_BROWSER_ENGINE
-        and crawler_runtime_settings.browser_real_chrome_force_headful
-    ):
+    if normalized_engine == REAL_CHROME_BROWSER_ENGINE and crawler_runtime_settings.browser_real_chrome_force_headful:
         return False
     return bool(settings.playwright_headless)
 
@@ -97,9 +94,7 @@ def _merge_phase_timings(
     else:
         timing_errors.append("incoming")
     if timing_errors:
-        payload["phase_timings_error"] = "invalid_phase_timings_ms:" + ",".join(
-            timing_errors
-        )
+        payload["phase_timings_error"] = "invalid_phase_timings_ms:" + ",".join(timing_errors)
         logger.warning(
             "Invalid browser phase timings payload existing=%r incoming=%r",
             phase_timings_payload,
@@ -158,31 +153,46 @@ def is_timeout_error(exc: Exception) -> bool:
 def browser_failure_kind(exc: Exception) -> str:
     class_name = type(exc).__name__.lower()
     message = str(exc or "").lower()
-    if "targetclosed" in class_name or "target closed" in message:
+    if _page_closed_failure(class_name, message):
         return "page_closed"
-    if "page closed" in message or "browser has been closed" in message:
-        return "page_closed"
-    if "connection closed while reading from the driver" in message:
+    if _driver_closed_failure(class_name, message):
         return "browser_driver_closed"
-    if class_name == "attributeerror":
-        squashed = message.replace("'", "")
-        if any(
-            f"{obj} object has no attribute {attr}" in squashed
-            for obj in ("connection", "nonetype")
-            for attr in ("send", "_send")
-        ):
-            return "browser_driver_closed"
-    if "real chrome executable is not available" in message:
+    if _engine_unavailable_failure(message):
         return "engine_unavailable"
-    if "patchright package is not available" in message:
-        return "engine_unavailable"
-    if (
-        isinstance(exc, ValueError) and "browser proxy" in message
-    ) or "socks5 proxy authentication" in message:
+    if (isinstance(exc, ValueError) and "browser proxy" in message) or "socks5 proxy authentication" in message:
         return "unsupported_proxy"
     if is_timeout_error(exc):
         return "timeout"
     return "navigation_error"
+
+
+def _page_closed_failure(class_name: str, message: str) -> bool:
+    return "targetclosed" in class_name or any(
+        token in message for token in ("target closed", "page closed", "browser has been closed")
+    )
+
+
+def _driver_closed_failure(class_name: str, message: str) -> bool:
+    if "connection closed while reading from the driver" in message:
+        return True
+    if class_name != "attributeerror":
+        return False
+    squashed = message.replace("'", "")
+    return any(
+        f"{obj} object has no attribute {attr}" in squashed
+        for obj in ("connection", "nonetype")
+        for attr in ("send", "_send")
+    )
+
+
+def _engine_unavailable_failure(message: str) -> bool:
+    return any(
+        token in message
+        for token in (
+            "real chrome executable is not available",
+            "patchright package is not available",
+        )
+    )
 
 
 def build_failed_browser_diagnostics(
@@ -199,9 +209,7 @@ def build_failed_browser_diagnostics(
 ) -> dict[str, object]:
     outcome = "render_timeout" if is_timeout_error(exc) else "navigation_failed"
     failure_kind = browser_failure_kind(exc)
-    failure_stage = str(
-        getattr(exc, "browser_failure_stage", "navigation") or "navigation"
-    )
+    failure_stage = str(getattr(exc, "browser_failure_stage", "navigation") or "navigation")
     normalized_engine = normalize_browser_engine(browser_engine)
     diagnostics = {
         "failure_kind": failure_kind,

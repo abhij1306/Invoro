@@ -168,8 +168,10 @@ Primary files:
 - `crawl/crud.py`
 - `crawl/events.py`
 - `crawl/batch_runtime.py`
+- `crawl/batch_parallel.py`
 - `crawl/category_discovery.py`
 - `crawl/sitemap_resolver.py`
+- `crawl/sitemap_navigation.py`
 - `crawl/site_link_discovery.py`
 - `crawl/profile/*`
 - `pipeline/core.py`
@@ -179,6 +181,7 @@ Primary files:
 - `pipeline/extraction_retry_stage.py`
 - `pipeline/types.py`
 - `pipeline/runtime_helpers.py`
+- `pipeline/acquisition_timeline.py`, `pipeline/extraction_trace.py`
 - `data_enrichment/service.py`
 - `monitor_service.py`, `monitor_scheduler_service.py`, `monitor_async_loop.py`, `monitor_change_detection.py`, `monitor_retention.py`
 - `playground_service.py`
@@ -226,9 +229,13 @@ Primary files:
 - `acquisition/browser_capture.py`
 - `acquisition/browser_runtime.py`
 - `acquisition/browser_pool.py`
+- `acquisition/browser_pool_spec.py`
 - `acquisition/browser_page_flow.py`
 - `acquisition/browser_result_builder.py`
 - `acquisition/browser_page_helpers.py`
+- `acquisition/browser_accessibility_expansion.py`
+- `acquisition/browser_origin_warmup.py`
+- `acquisition/content_signals.py`
 - `acquisition/http_client.py` (thin adapter over `runtime.get_shared_http_client`)
 - `acquisition/browser_identity.py`
 - `acquisition/cookie_store.py`
@@ -237,6 +244,8 @@ Primary files:
 - `acquisition/traversal_helpers.py`
 - `acquisition/traversal_recovery.py`
 - `fetch/fetch_context.py`
+- `fetch/browser_attempts.py`
+- `fetch/host_memory.py`
 - `fetch/browser_policy.py`
 - `fetch/types.py`
 - `config/runtime_settings.py`
@@ -271,7 +280,7 @@ Current live behavior:
 - blocked browser runs also do not rewrite per-run Playwright storage snapshots, so one challenged detail page does not poison later URLs in the same batch run
 - browser-to-HTTP handoff is guarded: only sanitized engine-scoped session state is exported, direct-lane reuse is allowed, proxy-scoped replay is skipped unless proxy affinity is explicit, and drift/challenge re-entry falls back to browser
 - shared HTTP acquisition is intentionally shallow: one `curl_cffi` attempt, one `httpx` fallback attempt when curl transport fails, then browser escalation; there is no hidden multi-attempt HTTP backoff loop inside `fetch_context.py`
-- `fetch_context.py` owns attempt I/O and state transitions; `fetch/browser_policy.py` owns pure proxy, engine-order, escalation, handoff, and remaining-deadline decisions through typed plans from `fetch/types.py`
+- `fetch_context.py` owns the public fetch facade and HTTP state flow; `fetch/browser_attempts.py` executes browser plans, `fetch/host_memory.py` records short-lived host outcomes, and `fetch/browser_policy.py` owns pure proxy, engine-order, escalation, handoff, and remaining-deadline decisions through typed plans from `fetch/types.py`
 - successful acquisition paths can autosave an editable `DomainRunProfile.acquisition_contract`; future runs may reuse a proven browser engine, mark whether curl-cookie handoff is actually eligible, and record whether rendering, traversal, or network payloads were required. Host memory no longer owns the durable success path; it only biases short-lived protection/backoff choices.
 - browser diagnostics now persist explicit lane identity (`browser_engine`, `browser_profile`, launch mode, native-context flag, stealth-enabled flag) so metrics and audits can distinguish shaped Chromium from native real Chrome without inferring from free-form logs
 - traversal is explicit and separate from browser escalation; only explicit traversal modes are supported

@@ -42,9 +42,7 @@ def extract_raw_json_records(
     items = _raw_json_items(
         payload,
         surface=surface,
-        raw_json_surface_field_overlap_absolute=(
-            raw_json_surface_field_overlap_absolute
-        ),
+        raw_json_surface_field_overlap_absolute=(raw_json_surface_field_overlap_absolute),
         raw_json_surface_field_overlap_ratio=raw_json_surface_field_overlap_ratio,
     )
     if not items:
@@ -145,10 +143,7 @@ def _has_surface_field_overlap_for_runtime(
     raw_json_surface_field_overlap_absolute: int | None,
     raw_json_surface_field_overlap_ratio: float | None,
 ) -> bool:
-    if (
-        raw_json_surface_field_overlap_absolute is None
-        and raw_json_surface_field_overlap_ratio is None
-    ):
+    if raw_json_surface_field_overlap_absolute is None and raw_json_surface_field_overlap_ratio is None:
         return _has_surface_field_overlap(items, surface=surface)
     return _has_surface_field_overlap(
         items,
@@ -197,9 +192,7 @@ def _raw_json_items(
         if is_listing_surface and not _has_surface_field_overlap_for_runtime(
             payload,
             surface=surface,
-            raw_json_surface_field_overlap_absolute=(
-                raw_json_surface_field_overlap_absolute
-            ),
+            raw_json_surface_field_overlap_absolute=(raw_json_surface_field_overlap_absolute),
             raw_json_surface_field_overlap_ratio=raw_json_surface_field_overlap_ratio,
         ):
             _log_raw_json_overlap_warning(
@@ -217,9 +210,7 @@ def _raw_json_items(
             if is_listing_surface and not _has_surface_field_overlap_for_runtime(
                 value,
                 surface=surface,
-                raw_json_surface_field_overlap_absolute=(
-                    raw_json_surface_field_overlap_absolute
-                ),
+                raw_json_surface_field_overlap_absolute=(raw_json_surface_field_overlap_absolute),
                 raw_json_surface_field_overlap_ratio=raw_json_surface_field_overlap_ratio,
             ):
                 _log_raw_json_overlap_warning(
@@ -233,9 +224,7 @@ def _raw_json_items(
         return _best_nested_listing_items(
             payload,
             surface=surface,
-            raw_json_surface_field_overlap_absolute=(
-                raw_json_surface_field_overlap_absolute
-            ),
+            raw_json_surface_field_overlap_absolute=(raw_json_surface_field_overlap_absolute),
             raw_json_surface_field_overlap_ratio=raw_json_surface_field_overlap_ratio,
         )
     return [payload]
@@ -251,96 +240,149 @@ def _best_nested_listing_items(
 ) -> list[object]:
     if depth > 6:
         return []
-    candidates: list[tuple[int, list[object]]] = []
     if isinstance(payload, dict):
-        for key, value in payload.items():
-            if isinstance(value, list):
-                score = _listing_items_score(key, value)
-                if score > 0:
-                    if surface and not _has_surface_field_overlap_for_runtime(
-                        value,
-                        surface=surface,
-                        raw_json_surface_field_overlap_absolute=(
-                            raw_json_surface_field_overlap_absolute
-                        ),
-                        raw_json_surface_field_overlap_ratio=(
-                            raw_json_surface_field_overlap_ratio
-                        ),
-                    ):
-                        _log_raw_json_overlap_warning(
-                            value,
-                            surface=surface,
-                            location=f"nested_dict_key:{key}_depth:{depth}",
-                        )
-                        score = 0
-                if score > 0:
-                    candidates.append((score, value))
-                if score > 0 and _list_candidate_owns_descendants(key):
-                    continue
-                for item in value[:10]:
-                    nested = _best_nested_listing_items(
-                        item,
-                        depth=depth + 1,
-                        surface=surface,
-                        raw_json_surface_field_overlap_absolute=(
-                            raw_json_surface_field_overlap_absolute
-                        ),
-                        raw_json_surface_field_overlap_ratio=(
-                            raw_json_surface_field_overlap_ratio
-                        ),
-                    )
-                    if nested:
-                        candidates.append(
-                            (_listing_items_score("nested", nested), nested)
-                        )
-            elif isinstance(value, dict):
-                nested = _best_nested_listing_items(
-                    value,
-                    depth=depth + 1,
-                    surface=surface,
-                    raw_json_surface_field_overlap_absolute=(
-                        raw_json_surface_field_overlap_absolute
-                    ),
-                    raw_json_surface_field_overlap_ratio=(
-                        raw_json_surface_field_overlap_ratio
-                    ),
-                )
-                if nested:
-                    candidates.append((_listing_items_score(key, nested), nested))
+        candidates = _nested_dict_candidates(
+            payload,
+            depth=depth,
+            surface=surface,
+            overlap_absolute=raw_json_surface_field_overlap_absolute,
+            overlap_ratio=raw_json_surface_field_overlap_ratio,
+        )
     elif isinstance(payload, list):
-        score = _listing_items_score("list", payload)
-        if score > 0:
-            if surface and not _has_surface_field_overlap_for_runtime(
-                payload,
-                surface=surface,
-                raw_json_surface_field_overlap_absolute=(
-                    raw_json_surface_field_overlap_absolute
-                ),
-                raw_json_surface_field_overlap_ratio=raw_json_surface_field_overlap_ratio,
-            ):
-                _log_raw_json_overlap_warning(
-                    payload,
-                    surface=surface,
-                    location=f"nested_list_depth:{depth}",
-                )
-                score = 0
-        if score > 0:
-            candidates.append((score, payload))
-        for item in payload[:10]:
-            nested = _best_nested_listing_items(
-                item,
-                depth=depth + 1,
-                surface=surface,
-                raw_json_surface_field_overlap_absolute=(
-                    raw_json_surface_field_overlap_absolute
-                ),
-                raw_json_surface_field_overlap_ratio=raw_json_surface_field_overlap_ratio,
-            )
-            if nested:
-                candidates.append((_listing_items_score("nested", nested), nested))
+        candidates = _nested_list_candidates(
+            payload,
+            depth=depth,
+            surface=surface,
+            overlap_absolute=raw_json_surface_field_overlap_absolute,
+            overlap_ratio=raw_json_surface_field_overlap_ratio,
+        )
+    else:
+        candidates = []
     if not candidates:
         return []
     return max(candidates, key=lambda row: (row[0], len(row[1])))[1]
+
+
+def _nested_dict_candidates(
+    payload: dict[object, object],
+    *,
+    depth: int,
+    surface: str,
+    overlap_absolute: int | None,
+    overlap_ratio: float | None,
+) -> list[tuple[int, list[object]]]:
+    candidates: list[tuple[int, list[object]]] = []
+    for key, value in payload.items():
+        key_text = str(key)
+        if isinstance(value, list):
+            score = _validated_listing_score(
+                key_text,
+                value,
+                surface=surface,
+                overlap_absolute=overlap_absolute,
+                overlap_ratio=overlap_ratio,
+                location=f"nested_dict_key:{key}_depth:{depth}",
+            )
+            if score > 0:
+                candidates.append((score, value))
+            if score > 0 and _list_candidate_owns_descendants(key_text):
+                continue
+            candidates.extend(
+                _nested_child_candidates(
+                    value,
+                    depth=depth,
+                    surface=surface,
+                    overlap_absolute=overlap_absolute,
+                    overlap_ratio=overlap_ratio,
+                )
+            )
+        elif isinstance(value, dict):
+            nested = _best_nested_listing_items(
+                value,
+                depth=depth + 1,
+                surface=surface,
+                raw_json_surface_field_overlap_absolute=overlap_absolute,
+                raw_json_surface_field_overlap_ratio=overlap_ratio,
+            )
+            if nested:
+                candidates.append((_listing_items_score(key_text, nested), nested))
+    return candidates
+
+
+def _nested_list_candidates(
+    payload: list[object],
+    *,
+    depth: int,
+    surface: str,
+    overlap_absolute: int | None,
+    overlap_ratio: float | None,
+) -> list[tuple[int, list[object]]]:
+    candidates: list[tuple[int, list[object]]] = []
+    score = _validated_listing_score(
+        "list",
+        payload,
+        surface=surface,
+        overlap_absolute=overlap_absolute,
+        overlap_ratio=overlap_ratio,
+        location=f"nested_list_depth:{depth}",
+    )
+    if score > 0:
+        candidates.append((score, payload))
+    candidates.extend(
+        _nested_child_candidates(
+            payload,
+            depth=depth,
+            surface=surface,
+            overlap_absolute=overlap_absolute,
+            overlap_ratio=overlap_ratio,
+        )
+    )
+    return candidates
+
+
+def _nested_child_candidates(
+    values: list[object],
+    *,
+    depth: int,
+    surface: str,
+    overlap_absolute: int | None,
+    overlap_ratio: float | None,
+) -> list[tuple[int, list[object]]]:
+    candidates: list[tuple[int, list[object]]] = []
+    for item in values[:10]:
+        nested = _best_nested_listing_items(
+            item,
+            depth=depth + 1,
+            surface=surface,
+            raw_json_surface_field_overlap_absolute=overlap_absolute,
+            raw_json_surface_field_overlap_ratio=overlap_ratio,
+        )
+        if nested:
+            candidates.append((_listing_items_score("nested", nested), nested))
+    return candidates
+
+
+def _validated_listing_score(
+    key: str,
+    values: list[object],
+    *,
+    surface: str,
+    overlap_absolute: int | None,
+    overlap_ratio: float | None,
+    location: str,
+) -> int:
+    score = _listing_items_score(key, values)
+    if score <= 0 or not surface:
+        return score
+    if _has_surface_field_overlap_for_runtime(
+        values,
+        surface=surface,
+        raw_json_surface_field_overlap_absolute=overlap_absolute,
+        raw_json_surface_field_overlap_ratio=overlap_ratio,
+    ):
+        return score
+    _log_raw_json_overlap_warning(values, surface=surface, location=location)
+    return 0
 
 
 def _list_candidate_owns_descendants(key: str) -> bool:
@@ -361,8 +403,7 @@ def _listing_items_score(key: str, items: list[object]) -> int:
     if lowered_key in {"edges", "nodes"}:
         score += 10
     if any(
-        isinstance(item, dict)
-        and any(token in item for token in ("node", "url", "title", "name"))
+        isinstance(item, dict) and any(token in item for token in ("node", "url", "title", "name"))
         for item in items[:10]
     ):
         score += 5
@@ -402,9 +443,7 @@ def _raw_json_record(
                 surface_fields(surface, requested_fields),
             )
         )
-        preferred_title = coerce_text(
-            payload.get("title") or payload.get("name") or payload.get("label")
-        )
+        preferred_title = coerce_text(payload.get("title") or payload.get("name") or payload.get("label"))
         if preferred_title:
             record["title"] = preferred_title
         if not record.get("description"):
@@ -412,9 +451,7 @@ def _raw_json_record(
             if description:
                 record["description"] = description
         if not record.get("url"):
-            record["url"] = _raw_json_url(
-                payload, page_url, fallback_index=fallback_index
-            )
+            record["url"] = _raw_json_url(payload, page_url, fallback_index=fallback_index)
         cleaned = finalize_record(record, surface=surface)
         if "listing" in surface:
             cleaned = finalize_listing_price_fields(cleaned)
@@ -451,9 +488,7 @@ def _raw_json_url(
         resolved = absolute_url(page_url, author_url)
         if resolved:
             return resolved
-    identifier = clean_text(
-        payload.get("id") or payload.get("slug") or payload.get("handle")
-    )
+    identifier = clean_text(payload.get("id") or payload.get("slug") or payload.get("handle"))
     base_url = page_url.split("#", 1)[0]
     if identifier:
         return f"{base_url}#item-{identifier}"

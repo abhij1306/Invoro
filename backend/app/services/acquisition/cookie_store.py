@@ -32,14 +32,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 def validate_cookie_policy_config() -> None:
     if settings.cookie_store_dir.exists() and not settings.cookie_store_dir.is_dir():
-        raise ValueError(
-            f"cookie_store_dir must be a directory: {settings.cookie_store_dir}"
-        )
+        raise ValueError(f"cookie_store_dir must be a directory: {settings.cookie_store_dir}")
     settings.cookie_store_dir.mkdir(parents=True, exist_ok=True)
     if not settings.cookie_store_dir.is_dir():
-        raise ValueError(
-            f"cookie_store_dir must be a directory: {settings.cookie_store_dir}"
-        )
+        raise ValueError(f"cookie_store_dir must be a directory: {settings.cookie_store_dir}")
 
 
 _RUN_STORAGE_STATE_CACHE: dict[str, dict[str, object]] = {}
@@ -305,11 +301,7 @@ async def list_domain_cookie_memory(
         DomainCookieMemory.id.desc(),
     )
     if normalized_domain:
-        statement = statement.where(
-            DomainCookieMemory.domain.in_(
-                _domain_storage_lookup_keys(normalized_domain)
-            )
-        )
+        statement = statement.where(DomainCookieMemory.domain.in_(_domain_storage_lookup_keys(normalized_domain)))
     rows = list((await session.execute(statement)).scalars().all())
     payload: list[dict[str, object]] = []
     for row in rows:
@@ -343,8 +335,7 @@ def _storage_state_fingerprint(
     payload = json.dumps(
         _normalize_storage_state_payload(
             storage_state,
-            browser_engine=browser_engine
-            or _storage_state_browser_engine(storage_state),
+            browser_engine=browser_engine or _storage_state_browser_engine(storage_state),
         ),
         sort_keys=True,
         separators=(",", ":"),
@@ -389,9 +380,7 @@ def _domain_storage_lookup_keys(
     if normalized_engine == DEFAULT_STORAGE_STATE_ENGINE:
         return (normalized_domain,)
     if normalized_engine:
-        return (
-            _domain_storage_key(normalized_domain, browser_engine=normalized_engine),
-        )
+        return (_domain_storage_key(normalized_domain, browser_engine=normalized_engine),)
     return (
         normalized_domain,
         *(
@@ -469,11 +458,7 @@ def _normalize_storage_state(storage_state: Mapping[str, object]) -> dict[str, o
         "cookies": _normalize_cookies(storage_state.get("cookies")),
         # Replaying origin-scoped state causes headful Chrome to wake stale site state
         # before the requested URL. Keep reusable memory cookie-only.
-        "origins": (
-            _object_list(storage_state.get("origins"))
-            if INCLUDE_ORIGIN_STATE_IN_STORAGE
-            else []
-        ),
+        "origins": (_object_list(storage_state.get("origins")) if INCLUDE_ORIGIN_STATE_IN_STORAGE else []),
     }
 
 
@@ -521,32 +506,9 @@ def _has_reusable_storage_state(storage_state: Mapping[str, object]) -> bool:
 def _normalize_cookies(value: object) -> list[dict[str, object]]:
     now = time.time()
     cookies_by_key: dict[tuple[str, str, str], dict[str, object]] = {}
-    rows = (
-        list(value)
-        if isinstance(value, Iterable)
-        and not isinstance(value, (str, bytes, bytearray, Mapping))
-        else _object_list(value)
-    )
-    for item in rows:
-        if not isinstance(item, Mapping):
-            continue
-        cookie: dict[str, object] = {}
-        for field_name in COOKIE_FIELDS:
-            raw_value = item.get(field_name)
-            if raw_value in (None, ""):
-                continue
-            cookie[field_name] = _sanitize_storage_state_scalar(raw_value)
-        if not cookie.get("name") or not cookie.get("value"):
-            continue
-        # Do not learn challenge-state cookies as reusable domain memory.
-        if _cookie_is_challenge_state(cookie):
-            continue
-        expires = cookie.get("expires")
-        if (
-            isinstance(expires, (int, float))
-            and float(expires) > 0
-            and float(expires) <= now
-        ):
+    for item in _iterable_rows(value):
+        cookie = _normalize_cookie(item, now=now)
+        if cookie is None:
             continue
         key = (
             str(cookie.get("name") or "").strip().lower(),
@@ -555,6 +517,30 @@ def _normalize_cookies(value: object) -> list[dict[str, object]]:
         )
         cookies_by_key[key] = cookie
     return list(cookies_by_key.values())
+
+
+def _iterable_rows(value: object) -> list[object]:
+    if isinstance(value, Iterable) and not isinstance(value, (str, bytes, bytearray, Mapping)):
+        return list(value)
+    return _object_list(value)
+
+
+def _normalize_cookie(item: object, *, now: float) -> dict[str, object] | None:
+    if not isinstance(item, Mapping):
+        return None
+    cookie = {
+        field_name: _sanitize_storage_state_scalar(item.get(field_name))
+        for field_name in COOKIE_FIELDS
+        if item.get(field_name) not in (None, "")
+    }
+    if not cookie.get("name") or not cookie.get("value"):
+        return None
+    if _cookie_is_challenge_state(cookie):
+        return None
+    expires = cookie.get("expires")
+    if isinstance(expires, (int, float)) and 0 < float(expires) <= now:
+        return None
+    return cookie
 
 
 def _normalized_browser_engine(value: object) -> str | None:
@@ -617,13 +603,7 @@ def _storage_row_browser_engine(row: DomainCookieMemory) -> str:
 
 def _normalize_origins(value: object) -> list[dict[str, object]]:
     origins: list[dict[str, object]] = []
-    rows = (
-        list(value)
-        if isinstance(value, Iterable)
-        and not isinstance(value, (str, bytes, bytearray, Mapping))
-        else _object_list(value)
-    )
-    for item in rows:
+    for item in _iterable_rows(value):
         if not isinstance(item, Mapping):
             continue
         origin = str(_sanitize_storage_state_scalar(item.get("origin")) or "").strip()
@@ -631,13 +611,7 @@ def _normalize_origins(value: object) -> list[dict[str, object]]:
             continue
         local_storage_rows: list[dict[str, str]] = []
         raw_entries = item.get("localStorage")
-        entries = (
-            list(raw_entries)
-            if isinstance(raw_entries, Iterable)
-            and not isinstance(raw_entries, (str, bytes, bytearray, Mapping))
-            else _object_list(raw_entries)
-        )
-        for entry in entries:
+        for entry in _iterable_rows(raw_entries):
             if not isinstance(entry, Mapping):
                 continue
             name = str(_sanitize_storage_state_scalar(entry.get("name")) or "").strip()
@@ -649,9 +623,7 @@ def _normalize_origins(value: object) -> list[dict[str, object]]:
             local_storage_rows.append(
                 {
                     "name": name,
-                    "value": str(
-                        _sanitize_storage_state_scalar(entry.get("value")) or ""
-                    ),
+                    "value": str(_sanitize_storage_state_scalar(entry.get("value")) or ""),
                 }
             )
         origins.append({"origin": origin, "localStorage": local_storage_rows})
@@ -731,36 +703,33 @@ def _http_cookie_pairs_for_url(
 ) -> list[tuple[str, str]]:
     host = _cookie_target_host(url)
     path = _cookie_target_path(url)
-    candidates: list[tuple[int, int, str, str]] = []
-    for cookie in _object_list(storage_state.get("cookies")):
-        if not isinstance(cookie, Mapping):
-            continue
-        name = str(cookie.get("name") or "").strip()
-        value = str(cookie.get("value") or "").strip()
-        if not name or value == "":
-            continue
-        domain = str(cookie.get("domain") or "").strip().lower()
-        cookie_path = str(cookie.get("path") or "/").strip() or "/"
-        if host and domain and not _cookie_domain_matches(host, domain):
-            continue
-        if path and not _cookie_path_matches(path, cookie_path):
-            continue
-        domain_score = len(domain.lstrip("."))
-        path_score = len(cookie_path)
-        candidates.append((domain_score, path_score, name, value))
     selected: dict[str, tuple[int, int, str, str]] = {}
-    for domain_score, path_score, name, value in candidates:
+    for cookie in _object_list(storage_state.get("cookies")):
+        candidate = _http_cookie_candidate(cookie, host=host, path=path)
+        if candidate is None:
+            continue
+        domain_score, path_score, name, value = candidate
         key = name.lower()
         existing = selected.get(key)
-        if existing is None or (domain_score, path_score) >= (
-            existing[0],
-            existing[1],
-        ):
+        if existing is None or (domain_score, path_score) >= existing[:2]:
             selected[key] = (domain_score, path_score, name, value)
-    return [
-        (name, value)
-        for _key, (_domain_score, _path_score, name, value) in selected.items()
-    ]
+    return [(name, value) for _key, (_domain_score, _path_score, name, value) in selected.items()]
+
+
+def _http_cookie_candidate(cookie: object, *, host: str, path: str) -> tuple[int, int, str, str] | None:
+    if not isinstance(cookie, Mapping):
+        return None
+    name = str(cookie.get("name") or "").strip()
+    value = str(cookie.get("value") or "").strip()
+    if not name or value == "":
+        return None
+    domain = str(cookie.get("domain") or "").strip().lower()
+    cookie_path = str(cookie.get("path") or "/").strip() or "/"
+    if host and domain and not _cookie_domain_matches(host, domain):
+        return None
+    if path and not _cookie_path_matches(path, cookie_path):
+        return None
+    return len(domain.lstrip(".")), len(cookie_path), name, value
 
 
 def _cookie_target_host(url: str | None) -> str:
@@ -793,8 +762,5 @@ def _cookie_path_matches(request_path: str, cookie_path: str) -> bool:
         return False
     return (
         normalized_cookie_path.endswith("/")
-        or normalized_request_path[
-            len(normalized_cookie_path) : len(normalized_cookie_path) + 1
-        ]
-        == "/"
+        or normalized_request_path[len(normalized_cookie_path) : len(normalized_cookie_path) + 1] == "/"
     )

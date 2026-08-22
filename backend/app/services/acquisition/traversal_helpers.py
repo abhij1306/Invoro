@@ -132,37 +132,21 @@ async def looks_like_paginate_control(locator) -> bool:
     except _RECOVERABLE_ERRORS:
         logger.debug("Traversal next_page control inspection failed", exc_info=True)
         return False
-    if not isinstance(inspection, dict):
-        return False
-    if bool(inspection.get("pagination_container")) and (
-        bool(inspection.get("has_click_handler"))
-        or bool(inspection.get("is_button_like"))
-    ):
-        return True
-    if (
-        bool(inspection.get("pagination_container"))
-        and bool(inspection.get("follows_current_page"))
-        and (
-            bool(inspection.get("arrow_only"))
-            or bool(inspection.get("raw_href"))
-            or bool(inspection.get("is_button_like"))
-            or bool(inspection.get("has_click_handler"))
-        )
-    ):
-        return True
-    if (
-        bool(inspection.get("pagination_container"))
-        and bool(inspection.get("sibling_page_numbers"))
-        and bool(inspection.get("arrow_only"))
-    ):
-        return True
-    if bool(inspection.get("pagination_text")) and (
-        bool(inspection.get("has_click_handler"))
-        or bool(inspection.get("sibling_page_numbers"))
-        or bool(inspection.get("is_button_like"))
-    ):
-        return True
-    return False
+    return isinstance(inspection, dict) and _paginate_inspection_matches(inspection)
+
+
+def _paginate_inspection_matches(inspection: dict[str, object]) -> bool:
+    def present(key: str) -> bool:
+        return bool(inspection.get(key))
+
+    actionable = present("has_click_handler") or present("is_button_like")
+    in_container = present("pagination_container")
+    follows_current = present("follows_current_page") and any(
+        present(key) for key in ("arrow_only", "raw_href", "is_button_like", "has_click_handler")
+    )
+    numbered_arrow = present("sibling_page_numbers") and present("arrow_only")
+    text_evidence = present("pagination_text") and (actionable or present("sibling_page_numbers"))
+    return (in_container and (actionable or follows_current or numbered_arrow)) or text_evidence
 
 
 async def _looks_like_next_page_control(locator) -> bool:
@@ -264,16 +248,7 @@ def _collect_structured_script_fragments(
         script_id = str(attrs.get("id") or "").strip().lower()
         script_type = str(attrs.get("type") or "").strip().lower()
         text = str(node.text(strip=True) or "")
-        if not text:
-            continue
-        if not (
-            script_type in TRAVERSAL_STRUCTURED_SCRIPT_TYPES
-            or script_id in TRAVERSAL_STRUCTURED_SCRIPT_IDS
-            or any(
-                marker in text.lower()
-                for marker in TRAVERSAL_STRUCTURED_SCRIPT_TEXT_MARKERS
-            )
-        ):
+        if not _is_structured_script(script_id, script_type, text):
             continue
         fragment = str(node.html or "").strip()
         if not fragment or fragment in seen:
@@ -285,6 +260,16 @@ def _collect_structured_script_fragments(
         fragments.append(fragment)
         used_bytes += fragment_bytes
     return fragments
+
+
+def _is_structured_script(script_id: str, script_type: str, text: str) -> bool:
+    if not text:
+        return False
+    return (
+        script_type in TRAVERSAL_STRUCTURED_SCRIPT_TYPES
+        or script_id in TRAVERSAL_STRUCTURED_SCRIPT_IDS
+        or any(marker in text.lower() for marker in TRAVERSAL_STRUCTURED_SCRIPT_TEXT_MARKERS)
+    )
 
 
 def _collect_listing_card_fragments(
@@ -329,9 +314,7 @@ async def _settle_after_action(
             exc_info=True,
         )
     try:
-        await page.wait_for_load_state(
-            "domcontentloaded", timeout=min(1500, wait_ms * 2)
-        )
+        await page.wait_for_load_state("domcontentloaded", timeout=min(1500, wait_ms * 2))
     except _RECOVERABLE_ERRORS:
         logger.debug(
             "Traversal domcontentloaded settle wait failed url=%s",
@@ -410,9 +393,7 @@ def _deadline_reached(deadline_at: float | None) -> bool:
     return deadline_at is not None and time.monotonic() >= deadline_at
 
 
-def _remaining_timeout_ms(
-    deadline_at: float | None, default_ms: int, *, min_ms: int = 500
-) -> int:
+def _remaining_timeout_ms(deadline_at: float | None, default_ms: int, *, min_ms: int = 500) -> int:
     if deadline_at is None:
         return max(min_ms, int(default_ms))
     remaining_ms = int((deadline_at - time.monotonic()) * 1000)
@@ -448,12 +429,8 @@ def is_same_origin(current_url: str, next_url: str) -> bool:
     # Also compare the first path segment to prevent cross-tenant bleed
     # on path-based multi-tenant architectures (e.g. myworkdayjobs.com/TenantA).
     if _requires_path_tenant_boundary(current_url, next_url):
-        current_first = (str(current.path or "").strip("/").split("/") + [""])[
-            0
-        ].lower()
-        next_first = (str(next_value.path or "").strip("/").split("/") + [""])[
-            0
-        ].lower()
+        current_first = (str(current.path or "").strip("/").split("/") + [""])[0].lower()
+        next_first = (str(next_value.path or "").strip("/").split("/") + [""])[0].lower()
         if current_first and next_first and current_first != next_first:
             return False
     return True
@@ -461,6 +438,20 @@ def is_same_origin(current_url: str, next_url: str) -> bool:
 
 def _host_without_port(netloc: str) -> str:
     return str(netloc or "").split(":", 1)[0].lower()
+
+
+def paginate_cycle_detected(
+    resolved_url: str,
+    *,
+    current_url: str,
+    intended_url: str | None,
+    visited_urls: set[str],
+) -> bool:
+    if resolved_url not in visited_urls:
+        return False
+    if intended_url is not None:
+        return resolved_url != intended_url
+    return resolved_url != current_url
 
 
 def _requires_path_tenant_boundary(current_url: str, next_url: str) -> bool:

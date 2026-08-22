@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from typing import Any
 
 from app.services.dom.html_parser import BeautifulSoup
@@ -33,10 +34,52 @@ from app.services.config.selectors import (
     LISTING_VISUAL_CAPTURE_SELECTORS,
 )
 from app.services.config.runtime_settings import crawler_runtime_settings
+from app.services.config.network_capture import (
+    BLOCKED_BROWSER_RESOURCE_TYPES,
+    BLOCKED_BROWSER_ROUTE_TOKENS,
+    PROTECTED_CHALLENGE_ROUTE_TOKENS,
+)
 from app.services.config.surface_hints import detail_path_hints
 from app.services.dom.selector_engine import requested_content_extractability
 
 logger = logging.getLogger(__name__)
+
+
+async def block_unneeded_route(route: Any) -> None:
+    request = getattr(route, "request", None)
+    resource_type = str(getattr(request, "resource_type", "") or "").lower()
+    request_url = str(getattr(request, "url", "") or "").lower()
+    if any(token in request_url for token in PROTECTED_CHALLENGE_ROUTE_TOKENS):
+        await _continue_route(route, resource_type=resource_type, request_url=request_url)
+        return
+    should_abort = resource_type in BLOCKED_BROWSER_RESOURCE_TYPES or any(
+        token in request_url for token in BLOCKED_BROWSER_ROUTE_TOKENS
+    )
+    if not should_abort:
+        await _continue_route(route, resource_type=resource_type, request_url=request_url)
+        return
+    try:
+        await route.abort()
+    except Exception:
+        logger.debug(
+            "Browser request abort failed for resource_type=%s url=%s; attempting continue",
+            resource_type,
+            request_url,
+            exc_info=True,
+        )
+        await _continue_route(route, resource_type=resource_type, request_url=request_url)
+
+
+async def _continue_route(route: Any, *, resource_type: str, request_url: str) -> None:
+    try:
+        await route.continue_()
+    except Exception:
+        logger.debug(
+            "Browser request continue failed for resource_type=%s url=%s",
+            resource_type,
+            request_url,
+            exc_info=True,
+        )
 
 
 def _object_int(value: object, default: int = 0) -> int:
@@ -74,9 +117,7 @@ def _select_primary_browser_html(
     rendered_html: str,
     listing_min_items: int,
 ) -> str:
-    if traversal_result is None or not getattr(traversal_result, "activated", False):
-        return traversal_html or rendered_html
-    if "listing" not in str(surface or "").strip().lower():
+    if not _traversal_html_selection_applies(traversal_result, surface=surface):
         return traversal_html or rendered_html
     if not str(rendered_html or "").strip():
         return traversal_html
@@ -95,23 +136,52 @@ def _select_primary_browser_html(
     )
     if rendered_signal_count > traversal_signal_count:
         return rendered_html
-    if progress_events > 0 and (
-        card_count >= max(1, int(listing_min_items))
-        or traversal_signal_count >= max(2, rendered_signal_count)
+    if _traversal_progress_is_useful(
+        progress_events=progress_events,
+        card_count=card_count,
+        listing_min_items=listing_min_items,
+        traversal_signal_count=traversal_signal_count,
+        rendered_signal_count=rendered_signal_count,
     ):
         return traversal_html
     if card_count >= max(1, int(listing_min_items)):
         return rendered_html
-    if stop_reason.endswith("_blocked") and traversal_signal_count >= max(
-        2,
-        int(listing_min_items),
+    if _blocked_traversal_has_enough_signals(
+        stop_reason=stop_reason,
+        traversal_signal_count=traversal_signal_count,
+        listing_min_items=listing_min_items,
     ):
         return traversal_html
-    if stop_reason.endswith(
-        ("_not_found", "_no_progress", "_click_failed", "_blocked")
-    ):
+    if stop_reason.endswith(("_not_found", "_no_progress", "_click_failed", "_blocked")):
         return rendered_html
     return traversal_html
+
+
+def _traversal_html_selection_applies(traversal_result: Any, *, surface: str | None) -> bool:
+    return bool(
+        traversal_result is not None
+        and getattr(traversal_result, "activated", False)
+        and "listing" in str(surface or "").strip().lower()
+    )
+
+
+def _traversal_progress_is_useful(
+    *,
+    progress_events: int,
+    card_count: int,
+    listing_min_items: int,
+    traversal_signal_count: int,
+    rendered_signal_count: int,
+) -> bool:
+    enough_cards = card_count >= max(1, int(listing_min_items))
+    enough_signals = traversal_signal_count >= max(2, rendered_signal_count)
+    return progress_events > 0 and (enough_cards or enough_signals)
+
+
+def _blocked_traversal_has_enough_signals(
+    *, stop_reason: str, traversal_signal_count: int, listing_min_items: int
+) -> bool:
+    return stop_reason.endswith("_blocked") and traversal_signal_count >= max(2, int(listing_min_items))
 
 
 def _listing_html_detail_anchor_count(
@@ -121,9 +191,7 @@ def _listing_html_detail_anchor_count(
 ) -> int:
     soup = BeautifulSoup(str(html or ""), HTML_PARSER)
     detail_markers = tuple(
-        str(marker or "").strip().lower()
-        for marker in detail_path_hints(surface)
-        if str(marker or "").strip()
+        str(marker or "").strip().lower() for marker in detail_path_hints(surface) if str(marker or "").strip()
     )
     count = 0
     for anchor in soup.find_all("a", href=True):
@@ -175,16 +243,7 @@ def _detail_expansion_probe_fields(
     requested_fields: list[str] | None,
 ) -> list[str] | None:
     if requested_fields:
-        return (
-            sorted(
-                {
-                    str(field_name).strip()
-                    for field_name in requested_fields
-                    if str(field_name).strip()
-                }
-            )
-            or None
-        )
+        return sorted({str(field_name).strip() for field_name in requested_fields if str(field_name).strip()}) or None
     normalized_surface = str(surface or "").strip().lower()
     probe_fields = {
         *set(DOM_HIGH_VALUE_FIELDS.get(normalized_surface) or ()),
@@ -201,20 +260,14 @@ def _detail_expansion_can_skip(
     readiness_probe: dict[str, object] | None = None,
 ) -> tuple[bool, str | None]:
     if list(requested_fields or []):
-        can_skip = bool(extractability.get("verified")) and bool(
-            extractability.get("matched_requested_fields")
-        )
+        can_skip = bool(extractability.get("verified")) and bool(extractability.get("matched_requested_fields"))
         return (
             can_skip,
             "requested_content_already_extractable" if can_skip else None,
         )
     normalized_surface = str(surface or "").strip().lower()
-    if normalized_surface == ECOMMERCE_DETAIL_SURFACE and bool(
-        (readiness_probe or {}).get("is_ready")
-    ):
-        if not list(requested_fields or []) and _ready_probe_has_detail_content(
-            readiness_probe
-        ):
+    if normalized_surface == ECOMMERCE_DETAIL_SURFACE and bool((readiness_probe or {}).get("is_ready")):
+        if not list(requested_fields or []) and _ready_probe_has_detail_content(readiness_probe):
             return True, "canonical_detail_already_ready"
         can_skip = bool(extractability.get("verified"))
         return can_skip, "canonical_detail_already_ready" if can_skip else None
@@ -230,10 +283,7 @@ def _ready_probe_has_detail_content(
     probe = readiness_probe if isinstance(readiness_probe, dict) else {}
     visible_text_length = _object_int(probe.get("visible_text_length"))
     visible_text_min = int(crawler_runtime_settings.browser_readiness_visible_text_min)
-    if (
-        bool(probe.get("structured_data_present"))
-        and visible_text_length >= visible_text_min
-    ):
+    if bool(probe.get("structured_data_present")) and visible_text_length >= visible_text_min:
         return True
     detail_hint_count = _object_int(probe.get("detail_hint_count"))
     if (
@@ -379,21 +429,13 @@ async def _capture_listing_visual_elements(
                 return rows.slice(0, 300);
             }""",
             {
-                "detailUrlHints": [
-                    hint.lower() for hint in detail_path_hints("ecommerce_detail")
-                ],
-                "utilityUrlTokens": [
-                    token.lower() for token in LISTING_UTILITY_URL_TOKENS
-                ],
+                "detailUrlHints": [hint.lower() for hint in detail_path_hints("ecommerce_detail")],
+                "utilityUrlTokens": [token.lower() for token in LISTING_UTILITY_URL_TOKENS],
                 "brandSelectors": list(LISTING_BRAND_SELECTORS),
                 "anchorSelector": ANCHOR_SELECTOR,
                 "captureSelectors": list(LISTING_VISUAL_CAPTURE_SELECTORS),
-                "candidateContainerSelectors": list(
-                    LISTING_VISUAL_CANDIDATE_CONTAINER_SELECTORS
-                ),
-                "structuralAncestorSelectors": list(
-                    LISTING_CAPTURE_STRUCTURAL_ANCESTOR_SELECTORS
-                ),
+                "candidateContainerSelectors": list(LISTING_VISUAL_CANDIDATE_CONTAINER_SELECTORS),
+                "structuralAncestorSelectors": list(LISTING_CAPTURE_STRUCTURAL_ANCESTOR_SELECTORS),
                 "priceRegexPattern": LISTING_VISUAL_PRICE_REGEX_PATTERN,
             },
         )
@@ -420,6 +462,77 @@ async def _capture_listing_visual_elements(
             continue
         rows.append(dict(item))
     return rows
+
+
+async def run_detail_expansion(
+    page: Any,
+    *,
+    surface: str,
+    requested_fields: list[str] | None,
+    current_probe: dict[str, object],
+    is_detail_surface: bool,
+    cached_html,
+    cached_analysis,
+    phase_timings_ms: dict[str, int],
+    cached_probe,
+    readiness_probes: list[dict[str, object]],
+    expand_detail_content_if_needed,
+    append_readiness_probe,
+    elapsed_ms,
+) -> tuple[dict[str, object], dict[str, object]]:
+    if not is_detail_surface:
+        phase_timings_ms["expansion"] = 0
+        return current_probe, _skipped_expansion("non_detail_surface")
+    analysis = cached_analysis()
+    extractability = _detail_expansion_extractability(
+        html=cached_html(),
+        soup=analysis.soup if analysis is not None else None,
+        surface=surface or "",
+        requested_fields=requested_fields,
+    )
+    skip, reason = _detail_expansion_can_skip(
+        extractability,
+        surface=surface,
+        requested_fields=requested_fields,
+        readiness_probe=current_probe,
+    )
+    if skip:
+        phase_timings_ms["expansion"] = 0
+        diagnostics = _skipped_expansion(reason)
+        diagnostics["extractability"] = extractability
+        return current_probe, diagnostics
+    started_at = time.perf_counter()
+    diagnostics = await expand_detail_content_if_needed(
+        page,
+        surface=surface,
+        readiness_probe=current_probe,
+        requested_fields=requested_fields,
+    )
+    phase_timings_ms["expansion"] = elapsed_ms(started_at)
+    if not diagnostics.get("clicked_count", 0):
+        return current_probe, diagnostics
+    probe = await cached_probe(refresh_html=True)
+    append_readiness_probe(readiness_probes, stage="after_detail_expansion", probe=probe)
+    analysis = cached_analysis()
+    diagnostics["extractability"] = _detail_expansion_extractability(
+        html=cached_html(),
+        soup=analysis.soup if analysis is not None else None,
+        surface=surface or "",
+        requested_fields=requested_fields,
+    )
+    return probe, diagnostics
+
+
+def _skipped_expansion(reason: str | None) -> dict[str, object]:
+    return {
+        "status": "skipped",
+        "reason": reason,
+        "clicked_count": 0,
+        "expanded_elements": [],
+        "interaction_failures": [],
+        "dom": {},
+        "aom": {},
+    }
 
 
 object_int = _object_int

@@ -106,11 +106,7 @@ def listing_integrity_escalation_decision(
     method = str(getattr(acquisition_result, "method", "") or "").strip().lower()
     browser_diagnostics = getattr(acquisition_result, "browser_diagnostics", None) or {}
     browser_engine = (
-        str(
-            browser_diagnostics.get("browser_engine", "")
-            if isinstance(browser_diagnostics, dict)
-            else ""
-        )
+        str(browser_diagnostics.get("browser_engine", "") if isinstance(browser_diagnostics, dict) else "")
         .strip()
         .lower()
     )

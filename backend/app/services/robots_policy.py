@@ -137,9 +137,7 @@ async def _load_robots_snapshot(base_url: str) -> _RobotsSnapshot:
         inflight = _get_inflight()
         fetch_task = inflight.get(base_url)
         if fetch_task is None:
-            fetch_task = _track_fetch_task(
-                asyncio.create_task(_fetch_robots_snapshot(base_url))
-            )
+            fetch_task = _track_fetch_task(asyncio.create_task(_fetch_robots_snapshot(base_url)))
             inflight[base_url] = fetch_task
     try:
         snapshot = await fetch_task

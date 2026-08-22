@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from ._core_shared import _object_dict, _object_list, logger  # fmt: skip
 import asyncio
-from app.services.acquisition.browser_runtime import SharedBrowserRuntime, _display_proxy, get_browser_runtime  # fmt: skip
+from app.services.acquisition.browser_pool import SharedBrowserRuntime, get_browser_runtime  # fmt: skip
+from app.services.acquisition.browser_proxy_config import display_proxy as _display_proxy  # fmt: skip
 from app.services.config.browser_surface_probe import BROWSER_SURFACE_PROBE_REQUEST_DELAY_MS, BROWSER_SURFACE_PROBE_RETRY_BACKOFF_MS, BROWSER_SURFACE_PROBE_SITE_MAX_RETRIES, BROWSER_SURFACE_PROBE_TARGETS  # fmt: skip
 from browser_surface_probe.report_rendering import build_agent_summary, render_markdown  # fmt: skip
 from datetime import UTC, datetime  # fmt: skip

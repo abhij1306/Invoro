@@ -105,62 +105,17 @@ async def discover_rendered_category_links(
     fetched_keys: set[str] = set()
     queued_keys: set[str] = {category_url_key(normalized_seed)}
     candidates: dict[str, SiteLinkCandidate] = {}
-
-    while queue and len(fetched_keys) < bounded_pages:
-        page_url, depth = queue.popleft()
-        queued_keys.discard(category_url_key(page_url))
-        page_key = category_url_key(page_url)
-        if page_key in fetched_keys:
-            continue
-        fetched_keys.add(page_key)
-        result = await fetch_page_impl(
-            page_url,
-            timeout_seconds=SITE_LINK_DISCOVERY_FETCH_TIMEOUT_SECONDS,
-            fetch_mode="auto",
-            prefer_browser=True,
-            browser_reason="site-link-discovery",
-            surface=ECOMMERCE_LISTING_SURFACE,
-            max_pages=1,
-            max_scrolls=1,
-        )
-        final_url = str(getattr(result, "final_url", "") or page_url)
-        html = str(getattr(result, "html", "") or "")
-        diagnostics.fetched.append(
-            {
-                "url": page_url,
-                "final_url": final_url,
-                "status_code": int(getattr(result, "status_code", 0) or 0),
-                "method": str(getattr(result, "method", "") or ""),
-                "blocked": bool(getattr(result, "blocked", False)),
-                "html_length": len(html),
-                "depth": depth,
-            }
-        )
-        if not html or bool(getattr(result, "blocked", False)):
-            diagnostics.reject("empty_or_blocked_page")
-            continue
-        page_candidates = _extract_rendered_candidates(
-            html=html,
-            page_url=final_url,
-            origin=origin,
-            depth=depth,
-            diagnostics=diagnostics,
-        )
-        for candidate in page_candidates:
-            existing = candidates.get(candidate.url)
-            if existing is None or candidate.score > existing.score:
-                candidates[candidate.url] = candidate
-        if depth >= bounded_depth:
-            continue
-        for candidate in page_candidates:
-            key = category_url_key(candidate.url)
-            if key in fetched_keys or key in queued_keys:
-                continue
-            if len(fetched_keys) + len(queue) >= bounded_pages:
-                break
-            queue.append((candidate.url, depth + 1))
-            queued_keys.add(key)
-
+    await _crawl_rendered_links(
+        queue=queue,
+        fetched_keys=fetched_keys,
+        queued_keys=queued_keys,
+        candidates=candidates,
+        origin=origin,
+        bounded_depth=bounded_depth,
+        bounded_pages=bounded_pages,
+        diagnostics=diagnostics,
+        fetch_page_impl=fetch_page_impl,
+    )
     ranked = _rank_candidates(candidates.values())
     if validate_candidates:
         ranked = await _validate_ranked_candidates(
@@ -171,15 +126,120 @@ async def discover_rendered_category_links(
         )
     selected = ranked[:bounded_limit]
     urls = [candidate.url for candidate in selected]
-    labels = {
-        candidate.url: candidate.label for candidate in selected if candidate.label
-    }
+    labels = {candidate.url: candidate.label for candidate in selected if candidate.label}
     return SitemapResolutionResult(
         urls=urls,
         source="rendered_site_links",
         nav_tree=build_category_nav_tree(urls, labels_by_url=labels),
         diagnostics=diagnostics.as_dict(),
     )
+
+
+async def _crawl_rendered_links(
+    *,
+    queue: deque[tuple[str, int]],
+    fetched_keys: set[str],
+    queued_keys: set[str],
+    candidates: dict[str, SiteLinkCandidate],
+    origin: tuple[str, str, int],
+    bounded_depth: int,
+    bounded_pages: int,
+    diagnostics: SiteLinkDiscoveryDiagnostics,
+    fetch_page_impl: FetchPage,
+) -> None:
+    while queue and len(fetched_keys) < bounded_pages:
+        page_url, depth = queue.popleft()
+        queued_keys.discard(category_url_key(page_url))
+        page_key = category_url_key(page_url)
+        if page_key in fetched_keys:
+            continue
+        fetched_keys.add(page_key)
+        page_candidates = await _fetch_rendered_candidates(
+            page_url,
+            depth=depth,
+            origin=origin,
+            diagnostics=diagnostics,
+            fetch_page_impl=fetch_page_impl,
+        )
+        if page_candidates is None:
+            continue
+        for candidate in page_candidates:
+            existing = candidates.get(candidate.url)
+            if existing is None or candidate.score > existing.score:
+                candidates[candidate.url] = candidate
+        if depth >= bounded_depth:
+            continue
+        _queue_rendered_candidates(
+            page_candidates,
+            depth=depth,
+            queue=queue,
+            fetched_keys=fetched_keys,
+            queued_keys=queued_keys,
+            bounded_pages=bounded_pages,
+        )
+
+
+async def _fetch_rendered_candidates(
+    page_url: str,
+    *,
+    depth: int,
+    origin: tuple[str, str, int],
+    diagnostics: SiteLinkDiscoveryDiagnostics,
+    fetch_page_impl: FetchPage,
+) -> list[SiteLinkCandidate] | None:
+    result = await fetch_page_impl(
+        page_url,
+        timeout_seconds=SITE_LINK_DISCOVERY_FETCH_TIMEOUT_SECONDS,
+        fetch_mode="auto",
+        prefer_browser=True,
+        browser_reason="site-link-discovery",
+        surface=ECOMMERCE_LISTING_SURFACE,
+        max_pages=1,
+        max_scrolls=1,
+    )
+    final_url = str(getattr(result, "final_url", "") or page_url)
+    html = str(getattr(result, "html", "") or "")
+    blocked = bool(getattr(result, "blocked", False))
+    diagnostics.fetched.append(
+        {
+            "url": page_url,
+            "final_url": final_url,
+            "status_code": int(getattr(result, "status_code", 0) or 0),
+            "method": str(getattr(result, "method", "") or ""),
+            "blocked": blocked,
+            "html_length": len(html),
+            "depth": depth,
+        }
+    )
+    if not html or blocked:
+        diagnostics.reject("empty_or_blocked_page")
+        return None
+    return _extract_rendered_candidates(
+        html=html,
+        page_url=final_url,
+        origin=origin,
+        depth=depth,
+        diagnostics=diagnostics,
+    )
+
+
+def _queue_rendered_candidates(
+    candidates: list[SiteLinkCandidate],
+    *,
+    depth: int,
+    queue: deque[tuple[str, int]],
+    fetched_keys: set[str],
+    queued_keys: set[str],
+    bounded_pages: int,
+) -> None:
+    for candidate in candidates:
+        key = category_url_key(candidate.url)
+        if key in fetched_keys or key in queued_keys:
+            continue
+        if len(fetched_keys) + len(queue) >= bounded_pages:
+            break
+        queue.append((candidate.url, depth + 1))
+        queued_keys.add(key)
 
 
 def _extract_rendered_candidates(
@@ -196,9 +256,7 @@ def _extract_rendered_candidates(
     page_key = category_url_key(page_url)
     for anchor in anchors:
         raw_href = anchor.get("href")
-        candidate_url = normalize_target_url(
-            strip_url_fragment(absolute_url(page_url, raw_href))
-        )
+        candidate_url = normalize_target_url(strip_url_fragment(absolute_url(page_url, raw_href)))
         if not candidate_url:
             diagnostics.reject("invalid_url")
             continue
@@ -251,9 +309,7 @@ def _score_candidate(url: str, anchor: Tag, label: str | None) -> tuple[int, str
     if anchor.find_parent(("nav", "header", "menu")) is not None:
         score += 25
         reasons.append("nav")
-    if any(
-        text_has_token(text, token) for token in SITEMAP_CATEGORY_ANCHOR_TEXT_TOKENS
-    ):
+    if any(text_has_token(text, token) for token in SITEMAP_CATEGORY_ANCHOR_TEXT_TOKENS):
         score += 40
         reasons.append("category_text")
     if path.count("/") > 4:
@@ -331,17 +387,11 @@ async def _validate_ranked_candidates(
 
 def _html_has_listing_signals(html: str) -> bool:
     soup = BeautifulSoup(html or "", "html.parser")
-    productish_nodes = sum(
-        len(soup.select(selector))
-        for selector in SITE_LINK_DISCOVERY_CARD_SELECTOR_HINTS
-    )
+    productish_nodes = sum(len(soup.select(selector)) for selector in SITE_LINK_DISCOVERY_CARD_SELECTOR_HINTS)
     product_links = [
         anchor
         for anchor in soup.select("a[href]")
-        if any(
-            token in str(anchor.get("href") or "").lower()
-            for token in _listing_detail_path_hints
-        )
+        if any(token in str(anchor.get("href") or "").lower() for token in _listing_detail_path_hints)
     ]
     price_hits = len(_PRICE_RE.findall(soup.get_text(" ", strip=True)[:20_000]))
     return productish_nodes >= 4 or (len(product_links) >= 3 and price_hits >= 2)
@@ -350,10 +400,7 @@ def _html_has_listing_signals(html: str) -> bool:
 def _anchor_text_rejected(text: str) -> bool:
     if not text:
         return False
-    return any(
-        text_has_token(text, token)
-        for token in SITEMAP_CATEGORY_ANCHOR_TEXT_EXCLUDED_TOKENS
-    )
+    return any(text_has_token(text, token) for token in SITEMAP_CATEGORY_ANCHOR_TEXT_EXCLUDED_TOKENS)
 
 
 def _anchor_label(anchor: Tag) -> str | None:

@@ -33,9 +33,7 @@ def update_run_status(run, target: str | CrawlStatus) -> CrawlStatus:
     previous_status = str(run.status)
     next_status = transition_status(run.status, target)
     run.status = next_status.value
-    if next_status in TERMINAL_STATUSES and (
-        next_status.value != previous_status or run.completed_at is None
-    ):
+    if next_status in TERMINAL_STATUSES and (next_status.value != previous_status or run.completed_at is None):
         run.completed_at = datetime.now(UTC)
         run_id = getattr(run, "id", None)
         if isinstance(run_id, int):

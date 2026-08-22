@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from .test_browser_context import SimpleNamespace, _authority_with_credentials, _context_spec, _credential_url, _masked_proxy_display, _secret_mapping, acquisition_browser_pool, acquisition_browser_runtime, build_browser_proxy_config, cookie_store, crawl_fetch_runtime, pytest  # fmt: skip
+from app.services.acquisition.browser_proxy_config import display_proxy
 
 pytest_plugins = ["tests.component._cookie_store_test_support"]
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -91,6 +93,7 @@ async def test_shared_browser_runtime_launches_http_proxy_directly(
             },
         }
     ]
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -188,9 +191,10 @@ async def test_shared_browser_runtime_launches_real_chrome_headful_for_fallback(
         }
     ]
 
+
 @pytest.mark.component
 def test_display_proxy_masks_authenticated_proxy_credentials() -> None:
-    assert acquisition_browser_runtime._display_proxy(
+    assert display_proxy(
         _credential_url(
             scheme="http",
             username="user-name",
@@ -199,6 +203,7 @@ def test_display_proxy_masks_authenticated_proxy_credentials() -> None:
             port=6077,
         )
     ) == _masked_proxy_display(scheme="http", host="31.58.9.4", port=6077)
+
 
 @pytest.mark.component
 def test_build_browser_proxy_config_normalizes_scheme_and_requires_username_for_password() -> (
@@ -218,10 +223,11 @@ def test_build_browser_proxy_config_normalizes_scheme_and_requires_username_for_
         **_secret_mapping("pass"),
     }
 
+
 @pytest.mark.component
 def test_display_proxy_redacts_invalid_proxy_credentials() -> None:
     assert (
-        acquisition_browser_runtime._display_proxy(
+        display_proxy(
             _authority_with_credentials(
                 username="user",
                 secret="pass",
@@ -232,9 +238,11 @@ def test_display_proxy_redacts_invalid_proxy_credentials() -> None:
         == "REDACTED"
     )
 
+
 @pytest.mark.component
 def test_storage_state_entry_count_ignores_generators() -> None:
     assert cookie_store._storage_state_entry_count((item for item in range(3))) == 0
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -269,6 +277,7 @@ async def test_block_unneeded_route_allows_fonts_and_protected_challenge_urls() 
         "continue:script:https://geo.captcha-delivery.com/captcha/?initialCid=abc",
     ]
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_block_unneeded_route_aborts_third_party_trackers() -> None:
@@ -292,6 +301,7 @@ async def test_block_unneeded_route_aborts_third_party_trackers() -> None:
     )
 
     assert events == ["abort:script:https://tr.snapchat.com/p?pid=abc"]
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -441,6 +451,7 @@ async def test_shared_browser_runtime_reuses_run_storage_state(
         )
     ]
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_shared_browser_runtime_skips_storage_state_reuse_when_disallowed(
@@ -502,6 +513,7 @@ async def test_shared_browser_runtime_skips_storage_state_reuse_when_disallowed(
         pass
 
     assert captured_kwargs == [{}]
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -584,6 +596,7 @@ async def test_shared_browser_runtime_skips_domain_storage_for_proxied_runtime_b
     assert captured_kwargs == [{}]
     assert domain_load_calls == []
     assert domain_persist_calls == []
+
 
 @pytest.mark.asyncio
 @pytest.mark.component

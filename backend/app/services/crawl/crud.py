@@ -37,46 +37,29 @@ from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
-async def create_crawl_run(
-    session: AsyncSession, user_id: int, payload: dict
-) -> CrawlRun:
+async def create_crawl_run(session: AsyncSession, user_id: int, payload: dict) -> CrawlRun:
     payload = dict(payload or {})
     payload["url"] = normalize_target_url(payload.get("url"))
-    payload["urls"] = [
-        normalize_target_url(value) for value in (payload.get("urls") or [])
-    ]
-    urls = [value for value in (payload.get("urls") or []) if value]
+    urls = _normalize_run_urls(payload.get("urls"))
+    payload["urls"] = urls
     primary_url = payload.get("url") or (urls[0] if urls else "")
-    normalized_surface = str(payload.get("surface") or "").strip().lower()
     settings_payload = dict(payload.get("settings") or {})
     run_type = payload.get("run_type")
     if not run_type:
         raise ValueError("run_type is required")
-    if normalized_surface == AUTO_SURFACE:
-        resolution = resolve_surface(
-            normalized_surface,
-            url=primary_url,
-            run_type=str(run_type),
-            crawl_module=str(settings_payload.get("crawl_module") or ""),
-        )
-        normalized_surface = resolution.surface
-        settings_payload["surface_resolution"] = resolution.as_dict()
-    if not normalized_surface:
-        raise ValueError("surface is required")
-    if normalized_surface in INVALID_SURFACE_VALUES:
-        raise ValueError(SURFACE_VALIDATION_ERROR)
-    if run_type == "crawl" and primary_url:
-        saved_profile_record = await load_domain_run_profile(
-            session,
-            domain=normalize_domain(primary_url),
-            surface=normalized_surface,
-        )
-        if saved_profile_record is not None:
-            settings_payload = merge_saved_run_profile(
-                settings_payload,
-                saved_profile_record.profile,
-                ignore_default_equivalent_values=False,
-            )
+    normalized_surface = _resolve_requested_surface(
+        payload.get("surface"),
+        primary_url=primary_url,
+        run_type=str(run_type),
+        settings_payload=settings_payload,
+    )
+    settings_payload = await _merge_saved_crawl_profile(
+        session,
+        settings_payload=settings_payload,
+        run_type=str(run_type),
+        primary_url=primary_url,
+        surface=normalized_surface,
+    )
     settings = normalize_crawl_settings(settings_payload)
     settings_view = CrawlRunSettings.from_value(settings)
     if run_type == "batch" and urls:
@@ -84,20 +67,10 @@ async def create_crawl_run(
         settings_view = CrawlRunSettings.from_value(settings)
     await ensure_public_crawl_targets(collect_target_urls(payload, settings_view))
     validate_extraction_contract(settings_view.extraction_contract())
-    domain_requested_fields = await load_domain_requested_fields(
-        session, url=primary_url, surface=normalized_surface
-    )
-    requested_fields = preserve_requested_fields(
-        [
-            *domain_requested_fields,
-            *(payload.get("requested_fields") or []),
-            *(payload.get("additional_fields") or []),
-        ]
-    )
+    domain_requested_fields = await load_domain_requested_fields(session, url=primary_url, surface=normalized_surface)
+    requested_fields = _requested_fields(payload, domain_requested_fields)
     if domain_requested_fields:
-        settings = settings_view.with_updates(
-            domain_requested_fields=domain_requested_fields
-        ).as_dict()
+        settings = settings_view.with_updates(domain_requested_fields=domain_requested_fields).as_dict()
         settings_view = CrawlRunSettings.from_value(settings)
     settings = settings_view.with_updates(
         requested_fields=requested_fields,
@@ -126,6 +99,65 @@ async def create_crawl_run(
     return run
 
 
+def _normalize_run_urls(value: object) -> list[str]:
+    values = value if isinstance(value, list) else []
+    return [normalized for item in values if (normalized := normalize_target_url(item))]
+
+
+def _requested_fields(payload: dict, domain_fields: list[str]) -> list[str]:
+    return preserve_requested_fields(
+        [
+            *domain_fields,
+            *(payload.get("requested_fields") or []),
+            *(payload.get("additional_fields") or []),
+        ]
+    )
+
+
+def _resolve_requested_surface(
+    value: object,
+    *,
+    primary_url: str,
+    run_type: str,
+    settings_payload: dict,
+) -> str:
+    surface = str(value or "").strip().lower()
+    if surface == AUTO_SURFACE:
+        resolution = resolve_surface(
+            surface,
+            url=primary_url,
+            run_type=run_type,
+            crawl_module=str(settings_payload.get("crawl_module") or ""),
+        )
+        surface = resolution.surface
+        settings_payload["surface_resolution"] = resolution.as_dict()
+    if not surface:
+        raise ValueError("surface is required")
+    if surface in INVALID_SURFACE_VALUES:
+        raise ValueError(SURFACE_VALIDATION_ERROR)
+    return surface
+
+
+async def _merge_saved_crawl_profile(
+    session: AsyncSession,
+    *,
+    settings_payload: dict,
+    run_type: str,
+    primary_url: str,
+    surface: str,
+) -> dict:
+    if run_type != "crawl" or not primary_url:
+        return settings_payload
+    saved = await load_domain_run_profile(session, domain=normalize_domain(primary_url), surface=surface)
+    if saved is None:
+        return settings_payload
+    return merge_saved_run_profile(
+        settings_payload,
+        saved.profile,
+        ignore_default_equivalent_values=False,
+    )
+
+
 async def list_runs(
     session: AsyncSession,
     page: int,
@@ -151,15 +183,9 @@ async def list_runs(
         escaped = escape_like_pattern(url_search.lower())
         pattern = f"%{escaped}%"
         query = query.where(func.lower(CrawlRun.url).like(pattern, escape="\\"))
-        count_query = count_query.where(
-            func.lower(CrawlRun.url).like(pattern, escape="\\")
-        )
+        count_query = count_query.where(func.lower(CrawlRun.url).like(pattern, escape="\\"))
     total = int((await session.execute(count_query)).scalar() or 0)
-    result = await session.execute(
-        query.order_by(CrawlRun.created_at.desc())
-        .offset((page - 1) * limit)
-        .limit(limit)
-    )
+    result = await session.execute(query.order_by(CrawlRun.created_at.desc()).offset((page - 1) * limit).limit(limit))
     return list(result.scalars().all()), total
 
 
@@ -177,17 +203,11 @@ async def delete_run(session: AsyncSession, run: CrawlRun) -> None:
     await session.commit()
 
 
-async def get_run_records(
-    session: AsyncSession, run_id: int, page: int, limit: int
-) -> tuple[list[CrawlRecord], int]:
+async def get_run_records(session: AsyncSession, run_id: int, page: int, limit: int) -> tuple[list[CrawlRecord], int]:
     page = max(1, page)
     total = int(
         (
-            await session.execute(
-                select(func.count())
-                .select_from(CrawlRecord)
-                .where(CrawlRecord.run_id == run_id)
-            )
+            await session.execute(select(func.count()).select_from(CrawlRecord).where(CrawlRecord.run_id == run_id))
         ).scalar()
         or 0
     )
@@ -208,11 +228,7 @@ async def get_run_logs(
     after_id: int | None = None,
     limit: int | None = None,
 ) -> list[CrawlLog]:
-    query = (
-        select(CrawlLog)
-        .where(CrawlLog.run_id == run_id)
-        .order_by(CrawlLog.created_at.asc())
-    )
+    query = select(CrawlLog).where(CrawlLog.run_id == run_id).order_by(CrawlLog.created_at.asc())
     if after_id is not None:
         query = query.where(CrawlLog.id > after_id)
     if limit is not None:
@@ -256,35 +272,20 @@ async def commit_selected_fields(
 ) -> tuple[int, int]:
     if not items:
         return 0, 0
-    valid_record_ids: list[int] = []
-    for item in items:
-        raw_record_id = item.get("record_id")
-        if raw_record_id is None:
-            continue
-        try:
-            valid_record_ids.append(int(raw_record_id))
-        except (TypeError, ValueError):
-            continue
-    record_ids = sorted(set(valid_record_ids))
+    record_ids = sorted(set(_valid_record_ids(items)))
     db_run = await session.get(CrawlRun, run.id)
     if db_run is None:
         return 0, 0
     result = await session.execute(
-        select(CrawlRecord).where(
-            CrawlRecord.run_id == db_run.id, CrawlRecord.id.in_(record_ids)
-        )
+        select(CrawlRecord).where(CrawlRecord.run_id == db_run.id, CrawlRecord.id.in_(record_ids))
     )
     records = {record.id: record for record in result.scalars().all()}
     updated_fields = 0
     updated_record_ids: set[int] = set()
 
     for item in items:
-        raw_record_id = item.get("record_id")
-        if raw_record_id is None:
-            continue
-        try:
-            record_id = int(raw_record_id)
-        except (TypeError, ValueError):
+        record_id = _coerce_record_id(item.get("record_id"))
+        if record_id is None:
             continue
         record = records.get(record_id)
         if record is None:
@@ -298,9 +299,7 @@ async def commit_selected_fields(
         data[field_name] = normalized_value
         record.data = data
 
-        refresh_record_commit_metadata(
-            record, run=db_run, field_name=field_name, value=normalized_value
-        )
+        refresh_record_commit_metadata(record, run=db_run, field_name=field_name, value=normalized_value)
 
         source_trace = dict(record.source_trace or {})
         llm_suggestions = dict(source_trace.get("llm_cleanup_suggestions") or {})
@@ -327,6 +326,19 @@ async def commit_selected_fields(
     return updated_records, updated_fields
 
 
+def _valid_record_ids(items: list[dict]) -> list[int]:
+    return [record_id for item in items if (record_id := _coerce_record_id(item.get("record_id"))) is not None]
+
+
+def _coerce_record_id(value: object) -> int | None:
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
 async def commit_llm_suggestions(
     session: AsyncSession,
     *,
@@ -336,9 +348,7 @@ async def commit_llm_suggestions(
     return await commit_selected_fields(session=session, run=run, items=items)
 
 
-async def active_jobs(
-    session: AsyncSession, *, user_id: int | None = None
-) -> list[dict]:
+async def active_jobs(session: AsyncSession, *, user_id: int | None = None) -> list[dict]:
     query = (
         select(CrawlRun)
         .where(CrawlRun.status.in_([status.value for status in ACTIVE_STATUSES]))
