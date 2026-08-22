@@ -82,5 +82,8 @@ jobs:
       - name: Mypy
         run: uv run --frozen --extra dev mypy app
 
+      - name: Absolute Python quality gates
+        run: uv run --frozen --extra dev pytest tests/regression/test_structure.py -q -m regression
+
       - name: Pytest
         run: uv run --frozen --extra dev pytest tests -q -m "unit or component or regression"

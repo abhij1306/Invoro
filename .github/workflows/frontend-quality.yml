@@ -1,6 +1,12 @@
 name: Frontend Quality
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - "frontend/**"
+      - ".github/workflows/frontend-quality.yml"
   pull_request:
     paths:
       - "frontend/**"
@@ -50,6 +56,9 @@ jobs:
 
       - name: Run ESLint
         run: pnpm run lint:eslint
+
+      - name: Test absolute quality gate boundaries
+        run: pnpm run check:quality-gates
 
       - name: Check token escapes
         run: pnpm run check:tokens

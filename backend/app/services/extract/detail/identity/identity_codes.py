@@ -79,8 +79,15 @@ def detail_identity_codes_from_url(url: object) -> set[str]:
     if not text:
         return set()
     parsed = urlparse(text)
+    codes = _path_identity_codes(text)
+    codes.update(_dwvar_identity_codes(parsed.query))
+    codes.update(detail_query_identity_codes_from_url(text))
+    return codes
+
+
+def _path_identity_codes(url: str) -> set[str]:
     codes: set[str] = set()
-    segments = detail_url_path_segments(text)
+    segments = detail_url_path_segments(url)
     path_markers = frozenset(
         marker.strip("/").casefold()
         for marker in detail_path_hints("ecommerce_detail")
@@ -108,7 +115,12 @@ def detail_identity_codes_from_url(url: object) -> set[str]:
         ):
             if normalized := normalized_detail_identity_code(match):
                 codes.add(normalized)
-    for key, _value in parse_qsl(parsed.query, keep_blank_values=True):
+    return codes
+
+
+def _dwvar_identity_codes(query: str) -> set[str]:
+    codes: set[str] = set()
+    for key, _value in parse_qsl(query, keep_blank_values=True):
         match = re.match(
             r"dwvar_([A-Za-z0-9][A-Za-z0-9_-]{6,}[A-Za-z0-9])_",
             str(key or ""),
@@ -119,7 +131,6 @@ def detail_identity_codes_from_url(url: object) -> set[str]:
         normalized = detail_segment_code(match.group(1))
         if normalized:
             codes.add(normalized)
-    codes.update(detail_query_identity_codes_from_url(text))
     return codes
 
 

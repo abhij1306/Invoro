@@ -319,6 +319,8 @@ Frontend tests currently cover:
 
 There is also Playwright e2e coverage under `frontend/e2e`.
 
+Canonical frontend quality checks are `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, and `pnpm build`. `pnpm check:quality-gates` proves the exact 800/801 physical-line and 15/16 complexity boundaries with temporary fixtures.
+
 ## 8. Architectural Notes
 
 - The frontend is intentionally thin on domain logic; the backend owns crawl semantics.
