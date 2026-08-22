@@ -392,7 +392,7 @@ async def _run_optimistic_readiness_wait(
             timeout=wait_ms,
         )
     except PlaywrightTimeoutError:
-        pass
+        pass  # Readiness is re-probed after the bounded wait.
     phase_timings_ms["optimistic_wait"] = elapsed_ms(started_at)
     probe = await cached_probe(refresh_html=True)
     append_readiness_probe(readiness_probes, stage="after_optimistic_wait", probe=probe)
@@ -603,7 +603,7 @@ async def _wait_for_generic_detail_readiness(
                 timeout=min(int(timeout_seconds * 1000), max_wait_ms),
             )
         except PlaywrightTimeoutError:
-            pass
+            pass  # The final readiness probe owns the outcome.
     phase_timings_ms["readiness_wait"] = elapsed_ms(started_at)
     probe = await cached_probe(refresh_html=True)
     append_readiness_probe(readiness_probes, stage="after_generic_detail_readiness", probe=probe)

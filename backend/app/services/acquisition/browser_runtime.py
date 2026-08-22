@@ -109,9 +109,6 @@ from app.services.domain_utils import normalize_domain
 
 logger = logging.getLogger(__name__)
 
-_ORIGIN_WARMUP_IN_FLIGHT = _origin_warmup.ORIGIN_WARMUP_IN_FLIGHT
-_ORIGIN_WARMUP_RECENT = _origin_warmup.ORIGIN_WARMUP_RECENT
-_origin_warmup_state_lock = _origin_warmup.origin_warmup_state_lock
 _maybe_warm_origin_before_navigation = _origin_warmup.maybe_warm_origin_before_navigation
 
 
