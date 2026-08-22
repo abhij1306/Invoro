@@ -17,31 +17,13 @@ export function Field({ label, hint, error, required, className, children }: Rea
   const describedBy =
     [error ? errorId : null, hint && !error ? hintId : null].filter(Boolean).join(' ') || undefined;
 
-  const isRenderProp = typeof children === 'function';
-
-  if (isRenderProp) {
+  if (typeof children === 'function') {
     return (
-      <div className={cn('grid gap-1.5', className)}>
-        <label htmlFor={id} className="text-secondary text-sm font-medium">
-          {label}
-          {required ? <span className="text-danger ml-0.5">*</span> : null}
-        </label>
-        {children({
-          id,
-          'aria-invalid': error ? true : undefined,
-          'aria-describedby': describedBy,
-        })}
-        {hint && !error ? (
-          <span id={hintId} className="text-muted text-xs">
-            {hint}
-          </span>
-        ) : null}
-        {error ? (
-          <span id={errorId} role="alert" className="text-danger-text text-xs">
-            {error}
-          </span>
-        ) : null}
-      </div>
+      <RenderPropField
+        {...{ label, hint, error, required, className, id, hintId, errorId, describedBy }}
+      >
+        {children}
+      </RenderPropField>
     );
   }
 
@@ -73,6 +55,55 @@ export function Field({ label, hint, error, required, className, children }: Rea
       ) : null}
     </div>
   );
+}
+
+type FieldFrameProps = Pick<FieldProps, 'label' | 'hint' | 'error' | 'required' | 'className'> & {
+  id: string;
+  hintId: string;
+  errorId: string;
+  describedBy?: string;
+};
+
+function RenderPropField({
+  children,
+  ...frame
+}: FieldFrameProps & { children: Exclude<FieldProps['children'], ReactNode> }) {
+  const { id, describedBy } = frame;
+  return (
+    <div className={cn('grid gap-1.5', frame.className)}>
+      <FieldLabel {...frame} />
+      {children({
+        id,
+        'aria-invalid': frame.error ? true : undefined,
+        'aria-describedby': describedBy,
+      })}
+      <FieldDescription {...frame} />
+    </div>
+  );
+}
+
+function FieldLabel({ id, label, required }: FieldFrameProps) {
+  return (
+    <label htmlFor={id} className="text-secondary text-sm font-medium">
+      {label}
+      {required ? <span className="text-danger ml-0.5">*</span> : null}
+    </label>
+  );
+}
+
+function FieldDescription({ hint, error, hintId, errorId }: FieldFrameProps) {
+  if (error) {
+    return (
+      <span id={errorId} role="alert" className="text-danger-text text-xs">
+        {error}
+      </span>
+    );
+  }
+  return hint ? (
+    <span id={hintId} className="text-muted text-xs">
+      {hint}
+    </span>
+  ) : null;
 }
 export type FieldProps = {
   label: string;

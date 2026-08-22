@@ -83,21 +83,8 @@ function sameFieldSet(left: readonly string[], right: readonly string[]) {
 }
 
 export function AlertForm({ initial, onSubmit, onCancel, submitLabel }: Readonly<AlertFormProps>) {
-  const initialUrl = initial?.urls?.[0] ?? '';
-  const initialFields = (() => {
-    const initialTrackedFields = initial?.tracked_fields ?? [];
-    if (!initialTrackedFields.length) {
-      return ['price', 'availability'];
-    }
-    const filteredFields = initialTrackedFields.filter((field) => fieldOptions.includes(field));
-    const droppedFields = initialTrackedFields.filter((field) => !fieldOptions.includes(field));
-    if (process.env.NODE_ENV === 'development' && droppedFields.length) {
-      console.warn(
-        `alert-form initial.tracked_fields contained unsupported fields: ${droppedFields.join(', ')}`,
-      );
-    }
-    return filteredFields;
-  })();
+  const initialUrl = alertInitialUrl(initial);
+  const initialFields = initialAlertFields(initial);
   const [state, dispatch] = useReducer(alertFormReducer, {
     url: initialUrl,
     targetFields: initialFields,
@@ -122,35 +109,18 @@ export function AlertForm({ initial, onSubmit, onCancel, submitLabel }: Readonly
   async function submit() {
     const cleanUrl = url.trim();
     const cleanWebhook = webhookUrl.trim();
-    if (!editing && !/^https?:\/\//i.test(cleanUrl)) {
-      dispatch({ type: 'validationFailed', message: 'URL must start with http:// or https://.' });
-      return;
-    }
-    if (!targetFields.length) {
-      dispatch({ type: 'validationFailed', message: 'Select at least one field.' });
-      return;
-    }
-    if (cleanWebhook && !/^https?:\/\//i.test(cleanWebhook)) {
-      dispatch({
-        type: 'validationFailed',
-        message: 'Webhook URL must start with http:// or https://.',
-      });
-      return;
-    }
+    const validationError = validateAlertForm(editing, cleanUrl, targetFields, cleanWebhook);
+    if (validationError) return dispatch({ type: 'validationFailed', message: validationError });
     dispatch({ type: 'submitStarted' });
     try {
-      const initialTrackedFields = Array.isArray(initial?.tracked_fields)
-        ? initial.tracked_fields
-        : initialFields;
-      const fieldsChanged = !sameFieldSet(targetFields, initialTrackedFields);
-      const payload = {
-        target_fields: targetFields,
-        target_rules:
-          !fieldsChanged && initial?.target_rules?.length ? initial.target_rules : undefined,
-        condition: condition.trim() || null,
-        webhook_url: cleanWebhook || null,
-        poll_interval_seconds: Number.parseInt(pollInterval, 10),
-      };
+      const payload = buildAlertPayload(
+        initial,
+        initialFields,
+        targetFields,
+        condition,
+        cleanWebhook,
+        pollInterval,
+      );
       await onSubmit(editing ? payload : { ...payload, url: cleanUrl });
     } catch (submitError) {
       dispatch({
@@ -230,6 +200,51 @@ export function AlertForm({ initial, onSubmit, onCancel, submitLabel }: Readonly
       </div>
     </div>
   );
+}
+
+function initialAlertFields(initial: Partial<MonitorJob> | undefined) {
+  const tracked = initial?.tracked_fields ?? [];
+  if (!tracked.length) return ['price', 'availability'];
+  const supported = tracked.filter((field) => fieldOptions.includes(field));
+  const dropped = tracked.filter((field) => !fieldOptions.includes(field));
+  if (process.env.NODE_ENV === 'development' && dropped.length)
+    console.warn(
+      `alert-form initial.tracked_fields contained unsupported fields: ${dropped.join(', ')}`,
+    );
+  return supported;
+}
+
+function alertInitialUrl(initial: Partial<MonitorJob> | undefined) {
+  return initial?.urls?.[0] ?? '';
+}
+
+function validateAlertForm(editing: boolean, url: string, fields: string[], webhook: string) {
+  if (!editing && !/^https?:\/\//i.test(url)) return 'URL must start with http:// or https://.';
+  if (!fields.length) return 'Select at least one field.';
+  if (webhook && !/^https?:\/\//i.test(webhook))
+    return 'Webhook URL must start with http:// or https://.';
+  return '';
+}
+
+function buildAlertPayload(
+  initial: Partial<MonitorJob> | undefined,
+  initialFields: string[],
+  fields: string[],
+  condition: string,
+  webhook: string,
+  interval: string,
+) {
+  const tracked = Array.isArray(initial?.tracked_fields) ? initial.tracked_fields : initialFields;
+  return {
+    target_fields: fields,
+    target_rules:
+      sameFieldSet(fields, tracked) && initial?.target_rules?.length
+        ? initial.target_rules
+        : undefined,
+    condition: condition.trim() || null,
+    webhook_url: webhook || null,
+    poll_interval_seconds: Number.parseInt(interval, 10),
+  };
 }
 
 function formatValue(value: unknown) {

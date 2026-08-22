@@ -72,6 +72,7 @@ Responsibilities:
 
 - session gating
 - shell layout and nav
+- notification menu presentation in `components/layout/notification-menu.tsx`
 - auth-route vs app-route split
 - header state
 - theme toggle and common shell framing
@@ -83,11 +84,13 @@ Primary files:
 - `lib/api/client.ts`
 - `lib/api/index.ts`
 - `lib/api/types.ts`
+- `lib/api/monitor-types.ts`
 
 Responsibilities:
 
 - all backend HTTP calls
 - API typing
+- monitor and alert DTO ownership in the monitor-specific type module, re-exported by `types.ts`
 - auth-aware fetch wrapper
 - URL helpers for review HTML and selector preview HTML
 
@@ -98,6 +101,8 @@ This layer is the frontend/backend contract chokepoint.
 Primary files:
 
 - `components/crawl/crawl-config-screen.tsx`
+- `components/crawl/crawl-config-screen-content.tsx`
+- `components/crawl/crawl-config-advanced.tsx`
 - `components/crawl/use-crawl-config.ts`
 - `components/crawl/use-crawl-config-lifecycle.ts`
 - `components/crawl/domain-surface-config.ts`
@@ -110,6 +115,7 @@ Responsibilities:
 
 - choose domain/surface tab/mode
 - own Crawl Studio form validation and manual field arrays through React Hook Form and Zod
+- keep form state/effects in the screen model, target and quick settings in the content owner, and field/advanced controls in their named sections
 - coordinate one-shot prefill, saved run-profile loading, dirty-edit protection, and stale domain-memory responses in the feature lifecycle hook
 - derive surface from the domain/tab dispatch map
 - build dispatch payload
@@ -134,6 +140,9 @@ Current UI settings behavior reflects the backend contract:
 Primary files:
 
 - `components/crawl/crawl-run-screen.tsx`
+- `components/crawl/use-crawl-run-screen-model.ts`
+- `components/crawl/crawl-run-screen-content.tsx`
+- `components/crawl/crawl-run-output-content.tsx`
 - `components/crawl/use-crawl-run-controller.ts`
 - `components/crawl/crawl-diagnostics.ts`
 - `components/crawl/use-run-workspace.ts`
@@ -150,6 +159,7 @@ Responsibilities:
 - consume websocket logs when available
 - show quality/verdict/progress signals
 - coordinate derived record selection, result handoffs, run controls, and run-change UI reset through the crawl-run controller
+- keep polling/effects in the run-screen model, workspace chrome in the screen-content owner, and output-tab rendering in the output-content owner
 - normalize open crawl acquisition, phase timing, confidence, and LLM source diagnostics before renderers consume them
 - expose pause/resume/kill and export actions
 - keep run workspace UI coordination in the crawl Zustand store, not in server-query state
@@ -166,6 +176,8 @@ Important live data features:
 Primary files:
 
 - `app/playground/page.tsx`
+- `app/playground/playground-view.tsx`
+- `app/playground/playground-panels.tsx`
 - `app/playground/use-playground-workflow.ts`
 - `app/playground/playground-normalizers.ts`
 - `app/dashboard/page.tsx`
@@ -177,6 +189,8 @@ Primary files:
 - `app/admin/llm/page.tsx`
 
 Responsibilities:
+
+- keep Playground route composition thin while stage layout and reusable panels live in their named owners
 
 - guided playground flow for URL intake, product discovery, product selection, PDP extraction, pipeline launch, and unified results, with workflow queries/transitions owned by `use-playground-workflow.ts` and tolerant payload shaping owned by `playground-normalizers.ts`
 - single-page source/rendered-DOM technical audit workspace with deterministic checks and JSON/Markdown exports

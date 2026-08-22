@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useReducer, useRef } from 'react';
+import type { Dispatch, RefObject } from 'react';
 
 import type {
   MonitorJob,
@@ -96,6 +97,159 @@ function monitorHeaderReducer(
   }
 }
 
+function MonitorHeaderSummary({ monitor, isAlert }: { monitor: MonitorJob; isAlert: boolean }) {
+  const visibleDomains = monitor.domains.slice(0, 3).join(', ');
+  const hiddenDomains = Math.max(0, monitor.domains.length - 3);
+  return (
+    <div className="min-w-0 space-y-2">
+      <Link
+        href={isAlert ? '/alerts' : '/monitors'}
+        className="text-muted hover:text-foreground type-caption inline-flex items-center gap-1"
+      >
+        <ArrowLeft className="size-3.5" />
+        {isAlert ? 'Product Alerts' : 'Monitors'}
+      </Link>
+      <div className="flex flex-wrap items-center gap-2">
+        <h2 className="type-heading-2 m-0 truncate">{isAlert ? monitor.urls[0] : monitor.name}</h2>
+        <MonitorStatusBadge status={monitor.status} />
+        <MonitorPriorityBadge priority={monitor.priority} />
+      </div>
+      <p className="text-secondary type-body-sm">
+        every{' '}
+        {isAlert
+          ? formatSeconds(monitor.poll_interval_seconds ?? 0)
+          : `${monitor.schedule_interval_hours}h`}{' '}
+        · {monitor.urls.length} URL{monitor.urls.length === 1 ? '' : 's'} · {visibleDomains}
+        {hiddenDomains ? ` +${hiddenDomains}` : ''}
+      </p>
+    </div>
+  );
+}
+
+function MonitorHeaderActions({
+  monitor,
+  runPending,
+  statusPending,
+  menuOpen,
+  menuTriggerRef,
+  onRunNow,
+  updateStatus,
+  openEditDialog,
+  openDeleteDialog,
+  dispatch,
+}: {
+  monitor: MonitorJob;
+  runPending: boolean;
+  statusPending: boolean;
+  menuOpen: boolean;
+  menuTriggerRef: RefObject<HTMLButtonElement | null>;
+  onRunNow: () => void;
+  updateStatus: (status: MonitorStatus) => Promise<void>;
+  openEditDialog: () => void;
+  openDeleteDialog: () => void;
+  dispatch: Dispatch<MonitorHeaderAction>;
+}) {
+  const active = monitor.status === 'active';
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <Button
+        type="button"
+        variant="neutral"
+        disabled={statusPending}
+        onClick={() => void updateStatus(active ? 'paused' : 'active')}
+      >
+        {active ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}
+        {active ? 'Pause' : 'Resume'}
+      </Button>
+      <Button type="button" variant="neutral" onClick={openEditDialog}>
+        <Settings className="size-3.5" />
+        Edit
+      </Button>
+      <Button type="button" onClick={onRunNow} disabled={runPending}>
+        <RotateCw className={cn('size-3.5', runPending && 'animate-spin')} />
+        {runPending ? 'Running...' : 'Run Now'}
+      </Button>
+      <div className="relative">
+        <Button
+          ref={menuTriggerRef}
+          type="button"
+          variant="quiet"
+          size="icon"
+          aria-label="More actions"
+          onClick={() => dispatch({ type: 'menuToggled' })}
+        >
+          <MoreHorizontal className="size-4" />
+        </Button>
+        {menuOpen ? (
+          <div className="border-border bg-background-elevated shadow-card absolute right-0 z-20 mt-1 w-36 rounded-md border py-1">
+            <button
+              type="button"
+              onClick={openDeleteDialog}
+              className="text-danger hover:bg-danger-bg flex w-full items-center gap-2 px-3 py-2 text-sm"
+            >
+              <Trash2 className="size-3.5" />
+              Delete
+            </button>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function MonitorEditDrawer({
+  open,
+  isAlert,
+  monitor,
+  onSave,
+  onClose,
+}: {
+  open: boolean;
+  isAlert: boolean;
+  monitor: MonitorJob;
+  onSave: MonitorHeaderProps['onSave'];
+  onClose: () => void;
+}) {
+  if (!open) return null;
+  async function save(payload: MonitorUpdatePayload | AlertCreatePayload | AlertUpdatePayload) {
+    await onSave(payload);
+    onClose();
+  }
+  return (
+    <div className="fixed inset-0 z-[100] bg-[color-mix(in_srgb,var(--bg-base)_34%,black)]">
+      <dialog
+        open
+        aria-labelledby="monitor-edit-title"
+        className="border-border bg-background shadow-card fixed top-0 right-0 z-[101] h-dvh w-[min(560px,100vw)] overflow-y-auto border-l p-5"
+      >
+        <div className="mb-5 flex items-center justify-between gap-4">
+          <h2 id="monitor-edit-title" className="type-heading-3">
+            Edit {isAlert ? 'alert' : 'monitor'}
+          </h2>
+          <Button type="button" variant="quiet" size="icon" aria-label="Close" onClick={onClose}>
+            <X className="size-4" />
+          </Button>
+        </div>
+        {isAlert ? (
+          <AlertForm
+            initial={monitor}
+            submitLabel="Save Changes"
+            onCancel={onClose}
+            onSubmit={save}
+          />
+        ) : (
+          <MonitorForm
+            initial={monitor}
+            submitLabel="Save Changes"
+            onCancel={onClose}
+            onSubmit={save}
+          />
+        )}
+      </dialog>
+    </div>
+  );
+}
+
 export function MonitorHeader({
   monitor,
   runPending,
@@ -112,12 +266,7 @@ export function MonitorHeader({
   const deleteConfirmRef = useRef<HTMLButtonElement | null>(null);
   const deletePreviousFocusRef = useRef<HTMLElement | null>(null);
   const deletePendingRef = useRef(deletePending);
-  const active = monitor.status === 'active';
   const isAlert = Boolean(monitor.poll_interval_seconds);
-  const parentHref = isAlert ? '/alerts' : '/monitors';
-  const parentLabel = isAlert ? 'Product Alerts' : 'Monitors';
-  const visibleDomains = monitor.domains.slice(0, 3).join(', ');
-  const hiddenDomains = Math.max(0, monitor.domains.length - 3);
 
   useEffect(() => {
     deletePendingRef.current = deletePending;
@@ -186,74 +335,21 @@ export function MonitorHeader({
   return (
     <div className="border-border card-gradient rounded-lg border p-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0 space-y-2">
-          <Link
-            href={parentHref}
-            className="text-muted hover:text-foreground type-caption inline-flex items-center gap-1"
-          >
-            <ArrowLeft className="size-3.5" />
-            {parentLabel}
-          </Link>
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="type-heading-2 m-0 truncate">
-              {isAlert ? monitor.urls[0] : monitor.name}
-            </h2>
-            <MonitorStatusBadge status={monitor.status} />
-            <MonitorPriorityBadge priority={monitor.priority} />
-          </div>
-          <p className="text-secondary type-body-sm">
-            every{' '}
-            {isAlert
-              ? formatSeconds(monitor.poll_interval_seconds ?? 0)
-              : `${monitor.schedule_interval_hours}h`}{' '}
-            · {monitor.urls.length} URL
-            {monitor.urls.length === 1 ? '' : 's'} · {visibleDomains}
-            {hiddenDomains ? ` +${hiddenDomains}` : ''}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            type="button"
-            variant="neutral"
-            disabled={statusPending}
-            onClick={() => void updateStatus(active ? 'paused' : 'active')}
-          >
-            {active ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}
-            {active ? 'Pause' : 'Resume'}
-          </Button>
-          <Button type="button" variant="neutral" onClick={openEditDialog}>
-            <Settings className="size-3.5" />
-            Edit
-          </Button>
-          <Button type="button" onClick={onRunNow} disabled={runPending}>
-            <RotateCw className={cn('size-3.5', runPending && 'animate-spin')} />
-            {runPending ? 'Running...' : 'Run Now'}
-          </Button>
-          <div className="relative">
-            <Button
-              ref={menuTriggerRef}
-              type="button"
-              variant="quiet"
-              size="icon"
-              aria-label="More actions"
-              onClick={() => dispatch({ type: 'menuToggled' })}
-            >
-              <MoreHorizontal className="size-4" />
-            </Button>
-            {menuOpen ? (
-              <div className="border-border bg-background-elevated shadow-card absolute right-0 z-20 mt-1 w-36 rounded-md border py-1">
-                <button
-                  type="button"
-                  onClick={openDeleteDialog}
-                  className="text-danger hover:bg-danger-bg flex w-full items-center gap-2 px-3 py-2 text-sm"
-                >
-                  <Trash2 className="size-3.5" />
-                  Delete
-                </button>
-              </div>
-            ) : null}
-          </div>
-        </div>
+        <MonitorHeaderSummary monitor={monitor} isAlert={isAlert} />
+        <MonitorHeaderActions
+          {...{
+            monitor,
+            runPending,
+            statusPending,
+            menuOpen,
+            menuTriggerRef,
+            onRunNow,
+            updateStatus,
+            openEditDialog,
+            openDeleteDialog,
+            dispatch,
+          }}
+        />
       </div>
       {runError ? <p className="text-danger type-caption mt-3">{runError}</p> : null}
       <div className="mt-5 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
@@ -268,51 +364,13 @@ export function MonitorHeader({
           value={isAlert ? monitor.condition || 'Any delta' : `${monitor.retention_days} days`}
         />
       </div>
-      {editOpen ? (
-        <div className="fixed inset-0 z-[100] bg-[color-mix(in_srgb,var(--bg-base)_34%,black)]">
-          <dialog
-            open
-            aria-labelledby="monitor-edit-title"
-            className="border-border bg-background shadow-card fixed top-0 right-0 z-[101] h-dvh w-[min(560px,100vw)] overflow-y-auto border-l p-5"
-          >
-            <div className="mb-5 flex items-center justify-between gap-4">
-              <h2 id="monitor-edit-title" className="type-heading-3">
-                Edit {isAlert ? 'alert' : 'monitor'}
-              </h2>
-              <Button
-                type="button"
-                variant="quiet"
-                size="icon"
-                aria-label="Close"
-                onClick={() => dispatch({ type: 'editClosed' })}
-              >
-                <X className="size-4" />
-              </Button>
-            </div>
-            {isAlert ? (
-              <AlertForm
-                initial={monitor}
-                submitLabel="Save Changes"
-                onCancel={() => dispatch({ type: 'editClosed' })}
-                onSubmit={async (payload) => {
-                  await onSave(payload);
-                  dispatch({ type: 'editClosed' });
-                }}
-              />
-            ) : (
-              <MonitorForm
-                initial={monitor}
-                submitLabel="Save Changes"
-                onCancel={() => dispatch({ type: 'editClosed' })}
-                onSubmit={async (payload) => {
-                  await onSave(payload);
-                  dispatch({ type: 'editClosed' });
-                }}
-              />
-            )}
-          </dialog>
-        </div>
-      ) : null}
+      <MonitorEditDrawer
+        open={editOpen}
+        isAlert={isAlert}
+        monitor={monitor}
+        onSave={onSave}
+        onClose={() => dispatch({ type: 'editClosed' })}
+      />
       {deleteOpen ? (
         <ConfirmDialog
           dialogRef={deleteDialogRef}

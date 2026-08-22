@@ -39,143 +39,202 @@ export function buildDomainWorkspaces({
   const byDomain = new Map<string, Map<string, SurfaceWorkspace>>();
   const cookiesByDomain = new Map(cookies.map((row) => [row.domain, row] as const));
   const runsByDomain = new Map<string, Map<string, CrawlRun[]>>();
+  ingestSelectorSummaries(byDomain, selectorSummaries, query, surfaceFilter);
+  ingestSelectorRecords(byDomain, records, query, surfaceFilter);
+  ingestProfiles(byDomain, profiles, query, surfaceFilter);
+  ingestFeedback(byDomain, feedback, query, surfaceFilter);
+  ingestCompletedRuns(byDomain, runsByDomain, completedRuns, query, surfaceFilter);
+  return materializeWorkspaces(
+    byDomain,
+    runsByDomain,
+    cookiesByDomain,
+    cookies,
+    query,
+    surfaceFilter,
+  ).sort(compareDomainWorkspaces);
+}
 
-  function ensureSurfaceWorkspace(domain: string, surface: string): SurfaceWorkspace {
-    const domainEntry = byDomain.get(domain) ?? new Map<string, SurfaceWorkspace>();
-    if (!byDomain.has(domain)) byDomain.set(domain, domainEntry);
-    const existing = domainEntry.get(surface);
-    if (existing) return existing;
-    const created: SurfaceWorkspace = {
-      surface,
-      selectorCount: 0,
-      selectors: [],
-      profile: null,
-      learning: [],
-      completedRuns: [],
-    };
-    domainEntry.set(surface, created);
-    return created;
+type WorkspaceIndex = Map<string, Map<string, SurfaceWorkspace>>;
+
+function ensureSurfaceWorkspace(
+  index: WorkspaceIndex,
+  domain: string,
+  surface: string,
+): SurfaceWorkspace {
+  const domainEntry = index.get(domain) ?? new Map<string, SurfaceWorkspace>();
+  if (!index.has(domain)) index.set(domain, domainEntry);
+  const existing = domainEntry.get(surface);
+  if (existing) return existing;
+  const created: SurfaceWorkspace = {
+    surface,
+    selectorCount: 0,
+    selectors: [],
+    profile: null,
+    learning: [],
+    completedRuns: [],
+  };
+  domainEntry.set(surface, created);
+  return created;
+}
+
+function matchesFilter(surface: string, searchable: string, query: string, surfaceFilter: string) {
+  return (
+    (surfaceFilter === 'all' || surface === surfaceFilter) &&
+    (!query || searchable.toLowerCase().includes(query))
+  );
+}
+
+function ingestSelectorSummaries(
+  index: WorkspaceIndex,
+  rows: SelectorDomainSummary[],
+  query: string,
+  filter: string,
+) {
+  for (const row of rows) {
+    if (!matchesFilter(row.surface, `${row.domain} ${row.surface}`, query, filter)) continue;
+    ensureSurfaceWorkspace(index, row.domain, row.surface).selectorCount = row.selector_count;
   }
+}
 
-  function ensureDomainRuns(domain: string, surface: string) {
-    const domainEntry = runsByDomain.get(domain) ?? new Map<string, CrawlRun[]>();
-    if (!runsByDomain.has(domain)) runsByDomain.set(domain, domainEntry);
-    const existing = domainEntry.get(surface);
-    if (existing) return existing;
-    const created: CrawlRun[] = [];
-    domainEntry.set(surface, created);
-    return created;
-  }
-
-  for (const summary of selectorSummaries) {
-    if (surfaceFilter !== 'all' && summary.surface !== surfaceFilter) continue;
-    const searchable = [summary.domain, summary.surface].join(' ').toLowerCase();
-    if (query && !searchable.includes(query)) {
-      continue;
-    }
-    ensureSurfaceWorkspace(summary.domain, summary.surface).selectorCount = summary.selector_count;
-  }
-
-  for (const record of records) {
-    if (surfaceFilter !== 'all' && record.surface !== surfaceFilter) continue;
+function ingestSelectorRecords(
+  index: WorkspaceIndex,
+  rows: LocalRecord[],
+  query: string,
+  filter: string,
+) {
+  for (const row of rows) {
     const searchable = [
-      record.domain,
-      record.surface,
-      record.field_name,
-      record.source,
-      selectorValue(record),
-    ]
-      .join(' ')
-      .toLowerCase();
-    if (query && !searchable.includes(query)) {
-      continue;
-    }
-    const workspace = ensureSurfaceWorkspace(record.domain, record.surface);
-    workspace.selectors.push(record);
+      row.domain,
+      row.surface,
+      row.field_name,
+      row.source,
+      selectorValue(row),
+    ].join(' ');
+    if (!matchesFilter(row.surface, searchable, query, filter)) continue;
+    const workspace = ensureSurfaceWorkspace(index, row.domain, row.surface);
+    workspace.selectors.push(row);
     workspace.selectorCount = Math.max(workspace.selectorCount, workspace.selectors.length);
   }
+}
 
-  for (const profile of profiles) {
-    if (surfaceFilter !== 'all' && profile.surface !== surfaceFilter) continue;
-    if (
-      query &&
-      !profileSearchText(profile).includes(query) &&
-      !profile.domain.toLowerCase().includes(query)
-    ) {
-      continue;
-    }
-    ensureSurfaceWorkspace(profile.domain, profile.surface).profile = profile;
+function ingestProfiles(
+  index: WorkspaceIndex,
+  rows: DomainRunProfileRecord[],
+  query: string,
+  filter: string,
+) {
+  for (const row of rows) {
+    const searchable = `${profileSearchText(row)} ${row.domain}`;
+    if (!matchesFilter(row.surface, searchable, query, filter)) continue;
+    ensureSurfaceWorkspace(index, row.domain, row.surface).profile = row;
   }
+}
 
-  for (const row of feedback) {
-    if (surfaceFilter !== 'all' && row.surface !== surfaceFilter) continue;
-    if (
-      query &&
-      !feedbackSearchText(row).includes(query) &&
-      !row.domain.toLowerCase().includes(query)
-    ) {
-      continue;
-    }
-    ensureSurfaceWorkspace(row.domain, row.surface).learning.push(row);
+function ingestFeedback(
+  index: WorkspaceIndex,
+  rows: DomainFieldFeedbackRecord[],
+  query: string,
+  filter: string,
+) {
+  for (const row of rows) {
+    const searchable = `${feedbackSearchText(row)} ${row.domain}`;
+    if (!matchesFilter(row.surface, searchable, query, filter)) continue;
+    ensureSurfaceWorkspace(index, row.domain, row.surface).learning.push(row);
   }
+}
 
-  for (const run of completedRuns) {
+function ingestCompletedRuns(
+  index: WorkspaceIndex,
+  runsIndex: Map<string, Map<string, CrawlRun[]>>,
+  runs: CrawlRun[],
+  query: string,
+  filter: string,
+) {
+  for (const run of runs) {
     const domain = String(run.result_summary?.domain || '').trim() || getNormalizedDomain(run.url);
     if (!domain || isSpecialUseDomain(domain)) continue;
-    if (surfaceFilter !== 'all' && run.surface !== surfaceFilter) continue;
-    const searchable = [domain, run.surface, run.url, run.status].join(' ').toLowerCase();
-    if (query && !searchable.includes(query)) continue;
-    ensureDomainRuns(domain, run.surface).push(run);
-    ensureSurfaceWorkspace(domain, run.surface).completedRuns.push(run);
-  }
-
-  const visibleDomains = new Set<string>([
-    ...byDomain.keys(),
-    ...runsByDomain.keys(),
-    ...cookies.flatMap((row) =>
-      surfaceFilter === 'all' && (!query || row.domain.toLowerCase().includes(query))
-        ? [row.domain]
-        : [],
-    ),
-  ]);
-
-  const workspaces: DomainWorkspace[] = [];
-  for (const domain of visibleDomains) {
-    const normalizedDomain = String(domain || '').trim();
-    if (!normalizedDomain || isSpecialUseDomain(normalizedDomain)) continue;
-    const surfaces = Array.from(
-      (byDomain.get(domain) ?? new Map<string, SurfaceWorkspace>()).values(),
-    ).sort((left, right) => left.surface.localeCompare(right.surface));
-    const completedRunCount = surfaces.reduce(
-      (count, surface) => count + surface.completedRuns.length,
-      0,
-    );
-    const latestCompletedAt = latestCompletedAtFor(surfaces);
-    const cookieMemory = cookiesByDomain.get(domain) ?? null;
-    const learning = surfaces.flatMap((surface) => surface.learning);
     if (
-      isInternalDomainMemoryArtifact(
-        normalizedDomain,
-        surfaces.length,
-        Boolean(cookieMemory),
-        learning.length,
-        completedRunCount,
+      !matchesFilter(
+        run.surface,
+        `${domain} ${run.surface} ${run.url} ${run.status}`,
+        query,
+        filter,
       )
-    ) {
+    )
       continue;
-    }
-    if (!surfaces.length && !cookieMemory) continue;
-    workspaces.push({
-      domain,
-      surfaces,
-      cookieMemory,
-      learning,
-      completedRunCount,
-      latestCompletedAt,
-    });
+    const domainRuns = runsIndex.get(domain) ?? new Map<string, CrawlRun[]>();
+    if (!runsIndex.has(domain)) runsIndex.set(domain, domainRuns);
+    const surfaceRuns = domainRuns.get(run.surface) ?? [];
+    if (!domainRuns.has(run.surface)) domainRuns.set(run.surface, surfaceRuns);
+    surfaceRuns.push(run);
+    ensureSurfaceWorkspace(index, domain, run.surface).completedRuns.push(run);
   }
+}
 
-  return workspaces.sort(compareDomainWorkspaces);
+function visibleDomainNames(
+  index: WorkspaceIndex,
+  runsIndex: Map<string, Map<string, CrawlRun[]>>,
+  cookies: DomainCookieMemoryRecord[],
+  query: string,
+  filter: string,
+) {
+  const cookieDomains = cookies.flatMap((row) =>
+    filter === 'all' && (!query || row.domain.toLowerCase().includes(query)) ? [row.domain] : [],
+  );
+  return new Set<string>([...index.keys(), ...runsIndex.keys(), ...cookieDomains]);
+}
+
+function materializeWorkspaces(
+  index: WorkspaceIndex,
+  runsIndex: Map<string, Map<string, CrawlRun[]>>,
+  cookiesByDomain: Map<string, DomainCookieMemoryRecord>,
+  cookies: DomainCookieMemoryRecord[],
+  query: string,
+  filter: string,
+) {
+  const workspaces: DomainWorkspace[] = [];
+  for (const domain of visibleDomainNames(index, runsIndex, cookies, query, filter)) {
+    const workspace = materializeWorkspace(domain, index, cookiesByDomain);
+    if (workspace) workspaces.push(workspace);
+  }
+  return workspaces;
+}
+
+function materializeWorkspace(
+  domain: string,
+  index: WorkspaceIndex,
+  cookiesByDomain: Map<string, DomainCookieMemoryRecord>,
+): DomainWorkspace | null {
+  const normalizedDomain = String(domain || '').trim();
+  if (!normalizedDomain || isSpecialUseDomain(normalizedDomain)) return null;
+  const surfaces = Array.from(
+    (index.get(domain) ?? new Map<string, SurfaceWorkspace>()).values(),
+  ).sort((left, right) => left.surface.localeCompare(right.surface));
+  const completedRunCount = surfaces.reduce(
+    (count, surface) => count + surface.completedRuns.length,
+    0,
+  );
+  const cookieMemory = cookiesByDomain.get(domain) ?? null;
+  const learning = surfaces.flatMap((surface) => surface.learning);
+  if (
+    isInternalDomainMemoryArtifact(
+      normalizedDomain,
+      surfaces.length,
+      Boolean(cookieMemory),
+      learning.length,
+      completedRunCount,
+    )
+  )
+    return null;
+  if (!surfaces.length && !cookieMemory) return null;
+  return {
+    domain,
+    surfaces,
+    cookieMemory,
+    learning,
+    completedRunCount,
+    latestCompletedAt: latestCompletedAtFor(surfaces),
+  };
 }
 
 function latestCompletedAtFor(surfaces: SurfaceWorkspace[]) {

@@ -64,23 +64,36 @@ export function mergeSelectorRows(
       merged.set(key, row);
       continue;
     }
-    merged.set(key, {
-      ...existing,
-      selectorId: existing.selectorId ?? row.selectorId,
-      surface: existing.surface ?? row.surface,
-      fieldName: existing.fieldName || row.fieldName,
-      kind: preferIncoming ? row.kind : existing.selectorValue ? existing.kind : row.kind,
-      selectorValue: preferIncoming
-        ? row.selectorValue
-        : existing.selectorValue || row.selectorValue,
-      extractedValue: preferIncoming
-        ? row.extractedValue
-        : existing.extractedValue || row.extractedValue,
-      source: preferIncoming ? row.source : existing.source || row.source,
-      state: preferIncoming ? row.state : existing.state === 'saved' ? 'saved' : row.state,
-    });
+    merged.set(key, mergeSelectorRow(existing, row, preferIncoming));
   }
   return Array.from(merged.values());
+}
+
+function mergeSelectorRow(existing: SelectorRow, incoming: SelectorRow, preferIncoming: boolean) {
+  if (preferIncoming) {
+    return {
+      ...existing,
+      selectorId: existing.selectorId ?? incoming.selectorId,
+      surface: existing.surface ?? incoming.surface,
+      fieldName: existing.fieldName || incoming.fieldName,
+      kind: incoming.kind,
+      selectorValue: incoming.selectorValue,
+      extractedValue: incoming.extractedValue,
+      source: incoming.source,
+      state: incoming.state,
+    };
+  }
+  return {
+    ...existing,
+    selectorId: existing.selectorId ?? incoming.selectorId,
+    surface: existing.surface ?? incoming.surface,
+    fieldName: existing.fieldName || incoming.fieldName,
+    kind: existing.selectorValue ? existing.kind : incoming.kind,
+    selectorValue: existing.selectorValue || incoming.selectorValue,
+    extractedValue: existing.extractedValue || incoming.extractedValue,
+    source: existing.source || incoming.source,
+    state: existing.state === 'saved' ? 'saved' : incoming.state,
+  };
 }
 
 export function buildXPathForElement(element: Element): string {

@@ -86,51 +86,41 @@ function parseInlineMarkdownNodes(text: string): ReactNode[] {
     const token = match[0];
     const key = `${index}-${token}`;
 
-    if (token.startsWith('$$') && token.endsWith('$$')) {
-      const math = token.slice(2, -2);
-      nodes.push(<MathRenderer key={key} math={math} displayMode={true} />);
-    } else if (token.startsWith('$') && token.endsWith('$')) {
-      const math = token.slice(1, -1);
-      nodes.push(<MathRenderer key={key} math={math} displayMode={false} />);
-    } else if (token.startsWith('`') && token.endsWith('`')) {
-      nodes.push(
-        <code
-          key={key}
-          className="bg-background-alt rounded-sm px-1 py-0.5 font-mono text-[0.92em]"
-        >
-          {token.slice(1, -1)}
-        </code>,
-      );
-    } else if (token.startsWith('**') && token.endsWith('**')) {
-      nodes.push(<strong key={key}>{token.slice(2, -2)}</strong>);
-    } else if (token.startsWith('*') && token.endsWith('*')) {
-      nodes.push(<em key={key}>{token.slice(1, -1)}</em>);
-    } else if (token.startsWith('_') && token.endsWith('_')) {
-      nodes.push(<em key={key}>{token.slice(1, -1)}</em>);
-    } else {
-      const linkMatch = token.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
-      if (linkMatch) {
-        nodes.push(
-          <a
-            key={key}
-            href={linkMatch[2]}
-            target={linkMatch[2].startsWith('#') ? undefined : '_blank'}
-            rel={linkMatch[2].startsWith('#') ? undefined : 'noreferrer'}
-            className="link-accent underline-offset-2 hover:underline"
-          >
-            {linkMatch[1]}
-          </a>,
-        );
-      } else {
-        nodes.push(token);
-      }
-    }
+    nodes.push(renderInlineToken(token, key));
     cursor = index + token.length;
   }
   if (cursor < text.length) {
     nodes.push(text.slice(cursor));
   }
   return nodes;
+}
+
+function renderInlineToken(token: string, key: string): ReactNode {
+  if (/^\$\$[\s\S]*\$\$$/.test(token))
+    return <MathRenderer key={key} math={token.slice(2, -2)} displayMode />;
+  if (/^\$[^$\n]+\$$/.test(token)) return <MathRenderer key={key} math={token.slice(1, -1)} />;
+  if (/^`[^`]+`$/.test(token))
+    return (
+      <code key={key} className="bg-background-alt rounded-sm px-1 py-0.5 font-mono text-[0.92em]">
+        {token.slice(1, -1)}
+      </code>
+    );
+  if (/^\*\*[^*]+\*\*$/.test(token)) return <strong key={key}>{token.slice(2, -2)}</strong>;
+  if (/^(?:\*[^*]+\*|_[^_]+_)$/.test(token)) return <em key={key}>{token.slice(1, -1)}</em>;
+  const link = token.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+  if (!link) return token;
+  const external = !link[2].startsWith('#');
+  return (
+    <a
+      key={key}
+      href={link[2]}
+      target={external ? '_blank' : undefined}
+      rel={external ? 'noreferrer' : undefined}
+      className="link-accent underline-offset-2 hover:underline"
+    >
+      {link[1]}
+    </a>
+  );
 }
 
 function InlineMarkdown({ text }: Readonly<{ text: string }>) {
@@ -151,259 +141,273 @@ function isTableDivider(line: string): boolean {
   return cells.length > 0 && cells.every((cell) => /^:?-{3,}:?$/.test(cell));
 }
 
+type MarkdownCursor = { lines: string[]; index: number; sequence: number };
+
 function MarkdownPreview({ markdown }: Readonly<{ markdown: string }>) {
-  const lines = markdown.replace(/\r\n/g, '\n').split('\n');
+  const cursor: MarkdownCursor = {
+    lines: markdown.replace(/\r\n/g, '\n').split('\n'),
+    index: 0,
+    sequence: 0,
+  };
   const blocks: ReactNode[] = [];
-  let index = 0;
-  let blockSeq = 0;
-  const nextKey = (prefix: string) => `${prefix}-${(blockSeq += 1)}`;
-
-  while (index < lines.length) {
-    const line = lines[index];
-    const trimmed = line.trim();
-    if (!trimmed) {
-      index += 1;
+  while (cursor.index < cursor.lines.length) {
+    if (!cursor.lines[cursor.index].trim()) {
+      cursor.index += 1;
       continue;
     }
+    blocks.push(parseMarkdownBlock(cursor));
+  }
+  return <div className="px-3 py-5">{blocks}</div>;
+}
 
-    if (
-      index === 0 &&
-      trimmed === '---' &&
-      lines.findIndex((candidate, candidateIndex) => {
-        return candidateIndex > index && candidate.trim() === '---';
-      }) !== -1
-    ) {
-      const frontmatter: string[] = [];
-      index += 1;
-      while (index < lines.length && lines[index].trim() !== '---') {
-        frontmatter.push(lines[index]);
-        index += 1;
-      }
-      index += 1;
-      blocks.push(
-        <section
-          key="frontmatter"
-          className="border-border bg-background-alt/60 my-3 overflow-hidden rounded-md border"
-        >
-          <div className="border-border bg-panel flex items-center justify-between border-b px-4 py-2">
-            <div className="type-label text-secondary">Design Tokens</div>
-            <div className="text-secondary font-mono text-xs">YAML</div>
-          </div>
-          <pre className="px-4 py-3 text-xs leading-relaxed whitespace-pre-wrap">
-            <code className="font-mono">{frontmatter.join('\n')}</code>
-          </pre>
-        </section>,
-      );
-      continue;
-    }
+function nextBlockKey(cursor: MarkdownCursor, prefix: string) {
+  cursor.sequence += 1;
+  return prefix + '-' + cursor.sequence;
+}
 
-    if (trimmed.startsWith('```')) {
-      const lang = trimmed.slice(3).trim();
-      const code: string[] = [];
-      const maxCodeLines = 500;
-      index += 1;
-      while (
-        index < lines.length &&
-        !lines[index].trim().startsWith('```') &&
-        code.length < maxCodeLines
-      ) {
-        code.push(lines[index]);
-        index += 1;
-      }
-      while (index < lines.length && !lines[index].trim().startsWith('```')) {
-        index += 1;
-      }
-      if (index < lines.length && lines[index].trim().startsWith('```')) {
-        index += 1;
-      }
-      blocks.push(
-        <div key={nextKey('code')} className="my-4 overflow-hidden rounded-md border">
-          {lang && (
-            <div className="bg-background-alt text-secondary border-b px-4 py-1.5 font-mono text-xs">
-              {lang}
-            </div>
-          )}
-          <pre className="bg-background-alt overflow-x-auto px-4 py-3 text-sm leading-relaxed whitespace-pre">
-            <code className="font-mono">{code.join('\n')}</code>
-          </pre>
-        </div>,
-      );
-      continue;
-    }
+function parseMarkdownBlock(cursor: MarkdownCursor): ReactNode {
+  const trimmed = cursor.lines[cursor.index].trim();
+  if (isFrontmatterStart(cursor, trimmed)) return parseFrontmatterBlock(cursor);
+  if (trimmed.startsWith('```')) return parseCodeBlock(cursor, trimmed);
+  if (isTableStart(cursor, trimmed)) return parseTableBlock(cursor, trimmed);
+  if (trimmed.startsWith('$$')) return parseMathBlock(cursor, trimmed);
+  const heading = trimmed.match(/^(#{1,6})\s+(.+)$/);
+  if (heading) return parseHeadingBlock(cursor, heading);
+  if (/^[-*_]{3,}$/.test(trimmed)) return parseRuleBlock(cursor);
+  if (trimmed.startsWith('>')) return parseQuoteBlock(cursor);
+  if (/^(?:[-*]\s+|\d+\.\s+)/.test(trimmed)) return parseListBlock(cursor, trimmed);
+  return parseParagraphBlock(cursor);
+}
 
-    if (trimmed.startsWith('|') && index + 1 < lines.length && isTableDivider(lines[index + 1])) {
-      const headers = parseTableRow(trimmed);
-      index += 2;
-      const rows: string[][] = [];
-      while (index < lines.length && lines[index].trim().startsWith('|')) {
-        rows.push(parseTableRow(lines[index]));
-        index += 1;
-      }
-      blocks.push(
-        <div
-          key={nextKey('table')}
-          className="border-border my-4 overflow-x-auto rounded-md border"
-        >
-          <table className="w-full min-w-[560px] border-collapse text-sm">
-            <thead className="bg-background-alt text-secondary">
-              <tr>
-                {headers.map((header) => (
-                  <th
-                    key={header}
-                    className="border-border border-b px-3 py-2 text-left font-mono text-xs font-semibold tracking-wide uppercase"
-                  >
-                    <InlineMarkdown text={header} />
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.join('|')} className="odd:bg-background even:bg-background-alt/40">
-                  {headers.map((header, cellIndex) => (
-                    <td
-                      key={header}
-                      className="border-border/70 text-foreground border-b px-3 py-2 align-top"
-                    >
-                      <InlineMarkdown text={row[cellIndex] || ''} />
-                    </td>
-                  ))}
-                </tr>
+function isFrontmatterStart(cursor: MarkdownCursor, trimmed: string) {
+  if (cursor.index !== 0 || trimmed !== '---') return false;
+  return cursor.lines.slice(1).some((line) => line.trim() === '---');
+}
+
+function parseFrontmatterBlock(cursor: MarkdownCursor) {
+  const lines: string[] = [];
+  cursor.index += 1;
+  while (cursor.index < cursor.lines.length && cursor.lines[cursor.index].trim() !== '---') {
+    lines.push(cursor.lines[cursor.index]);
+    cursor.index += 1;
+  }
+  cursor.index += 1;
+  return (
+    <section
+      key="frontmatter"
+      className="border-border bg-background-alt/60 my-3 overflow-hidden rounded-md border"
+    >
+      <div className="border-border bg-panel flex items-center justify-between border-b px-4 py-2">
+        <div className="type-label text-secondary">Design Tokens</div>
+        <div className="text-secondary font-mono text-xs">YAML</div>
+      </div>
+      <pre className="px-4 py-3 text-xs leading-relaxed whitespace-pre-wrap">
+        <code className="font-mono">{lines.join('\n')}</code>
+      </pre>
+    </section>
+  );
+}
+
+function parseCodeBlock(cursor: MarkdownCursor, opening: string) {
+  const language = opening.slice(3).trim();
+  const code: string[] = [];
+  cursor.index += 1;
+  while (
+    cursor.index < cursor.lines.length &&
+    !cursor.lines[cursor.index].trim().startsWith('```') &&
+    code.length < 500
+  ) {
+    code.push(cursor.lines[cursor.index]);
+    cursor.index += 1;
+  }
+  while (cursor.index < cursor.lines.length && !cursor.lines[cursor.index].trim().startsWith('```'))
+    cursor.index += 1;
+  if (cursor.index < cursor.lines.length) cursor.index += 1;
+  return (
+    <div key={nextBlockKey(cursor, 'code')} className="my-4 overflow-hidden rounded-md border">
+      {language ? (
+        <div className="bg-background-alt text-secondary border-b px-4 py-1.5 font-mono text-xs">
+          {language}
+        </div>
+      ) : null}
+      <pre className="bg-background-alt overflow-x-auto px-4 py-3 text-sm leading-relaxed whitespace-pre">
+        <code className="font-mono">{code.join('\n')}</code>
+      </pre>
+    </div>
+  );
+}
+
+function isTableStart(cursor: MarkdownCursor, trimmed: string) {
+  return (
+    trimmed.startsWith('|') &&
+    cursor.index + 1 < cursor.lines.length &&
+    isTableDivider(cursor.lines[cursor.index + 1])
+  );
+}
+
+function parseTableBlock(cursor: MarkdownCursor, opening: string) {
+  const headers = parseTableRow(opening);
+  const rows: string[][] = [];
+  cursor.index += 2;
+  while (cursor.index < cursor.lines.length && cursor.lines[cursor.index].trim().startsWith('|')) {
+    rows.push(parseTableRow(cursor.lines[cursor.index]));
+    cursor.index += 1;
+  }
+  return (
+    <div
+      key={nextBlockKey(cursor, 'table')}
+      className="border-border my-4 overflow-x-auto rounded-md border"
+    >
+      <table className="w-full min-w-[560px] border-collapse text-sm">
+        <thead className="bg-background-alt text-secondary">
+          <tr>
+            {headers.map((header) => (
+              <th
+                key={header}
+                className="border-border border-b px-3 py-2 text-left font-mono text-xs font-semibold tracking-wide uppercase"
+              >
+                <InlineMarkdown text={header} />
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.join('|')} className="odd:bg-background even:bg-background-alt/40">
+              {headers.map((header, cellIndex) => (
+                <td
+                  key={header}
+                  className="border-border/70 text-foreground border-b px-3 py-2 align-top"
+                >
+                  <InlineMarkdown text={row[cellIndex] || ''} />
+                </td>
               ))}
-            </tbody>
-          </table>
-        </div>,
-      );
-      continue;
-    }
-
-    if (trimmed.startsWith('$$')) {
-      const mathLines: string[] = [];
-      if (trimmed.endsWith('$$') && trimmed.length > 2) {
-        const math = trimmed.slice(2, -2);
-        blocks.push(
-          <div key={nextKey('math')} className="my-4">
-            <MathRenderer math={math} displayMode={true} />
-          </div>,
-        );
-        index += 1;
-        continue;
-      }
-
-      index += 1;
-      while (index < lines.length && !lines[index].trim().startsWith('$$')) {
-        mathLines.push(lines[index]);
-        index += 1;
-      }
-      index += 1; // skip closing $$
-      blocks.push(
-        <div key={nextKey('math')} className="my-4">
-          <MathRenderer math={mathLines.join('\n')} displayMode={true} />
-        </div>,
-      );
-      continue;
-    }
-
-    const heading = trimmed.match(/^(#{1,6})\s+(.+)$/);
-    if (heading) {
-      const level = heading[1].length;
-      const className =
-        level === 1
-          ? 'type-title text-foreground mt-1 mb-3'
-          : level === 2
-            ? 'type-section text-foreground mt-6 mb-2'
-            : 'type-body text-foreground mt-4 mb-2 font-semibold';
-      const HeadingTag = `h${Math.min(level, 6)}` as 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6';
-      blocks.push(
-        <HeadingTag key={nextKey('heading')} className={className}>
-          <InlineMarkdown text={heading[2]} />
-        </HeadingTag>,
-      );
-      index += 1;
-      continue;
-    }
-
-    if (/^[-*_]{3,}$/.test(trimmed)) {
-      blocks.push(<hr key={nextKey('hr')} className="border-divider my-6" />);
-      index += 1;
-      continue;
-    }
-
-    if (trimmed.startsWith('>')) {
-      const quote: string[] = [];
-      while (index < lines.length && lines[index].trim().startsWith('>')) {
-        quote.push(lines[index].trim().replace(/^>\s?/, ''));
-        index += 1;
-      }
-      blocks.push(
-        <blockquote
-          key={nextKey('quote')}
-          className="border-accent/40 text-secondary border-l-2 pl-4 leading-relaxed"
-        >
-          {quote.map((item, itemIndex) => (
-            <p key={`${item}-${itemIndex}`} className="type-body my-1">
-              <InlineMarkdown text={item} />
-            </p>
+            </tr>
           ))}
-        </blockquote>,
-      );
-      continue;
-    }
+        </tbody>
+      </table>
+    </div>
+  );
+}
 
-    const unordered = trimmed.match(/^[-*]\s+(.+)$/);
-    const ordered = trimmed.match(/^\d+\.\s+(.+)$/);
-    if (unordered || ordered) {
-      const items: string[] = [];
-      const orderedList = Boolean(ordered);
-      while (index < lines.length) {
-        const item = lines[index].trim().match(orderedList ? /^\d+\.\s+(.+)$/ : /^[-*]\s+(.+)$/);
-        if (!item) break;
-        items.push(item[1]);
-        index += 1;
-      }
-      const ListTag: 'ol' | 'ul' = orderedList ? 'ol' : 'ul';
-      blocks.push(
-        <ListTag
-          key={nextKey('list')}
-          className="type-body text-foreground my-3 space-y-1 pl-6 leading-relaxed"
-        >
-          {items.map((item, itemIndex) => (
-            <li key={`${item}-${itemIndex}`} className={orderedList ? 'list-decimal' : 'list-disc'}>
-              <InlineMarkdown text={item} />
-            </li>
-          ))}
-        </ListTag>,
-      );
-      continue;
-    }
-
-    const paragraph: string[] = [];
-    while (index < lines.length) {
-      const current = lines[index].trim();
-      if (
-        !current ||
-        current.startsWith('```') ||
-        current.startsWith('$$') ||
-        current.startsWith('>') ||
-        /^(#{1,6})\s+/.test(current) ||
-        /^[-*_]{3,}$/.test(current) ||
-        (current.startsWith('|') && index + 1 < lines.length && isTableDivider(lines[index + 1])) ||
-        /^[-*]\s+/.test(current) ||
-        /^\d+\.\s+/.test(current)
-      ) {
-        break;
-      }
-      paragraph.push(current);
-      index += 1;
-    }
-    blocks.push(
-      <p key={nextKey('p')} className="type-body text-foreground my-3 leading-[1.72]">
-        <InlineMarkdown text={paragraph.join(' ')} />
-      </p>,
+function parseMathBlock(cursor: MarkdownCursor, opening: string) {
+  if (opening.endsWith('$$') && opening.length > 2) {
+    cursor.index += 1;
+    return (
+      <div key={nextBlockKey(cursor, 'math')} className="my-4">
+        <MathRenderer math={opening.slice(2, -2)} displayMode />
+      </div>
     );
   }
+  const lines: string[] = [];
+  cursor.index += 1;
+  while (
+    cursor.index < cursor.lines.length &&
+    !cursor.lines[cursor.index].trim().startsWith('$$')
+  ) {
+    lines.push(cursor.lines[cursor.index]);
+    cursor.index += 1;
+  }
+  cursor.index += 1;
+  return (
+    <div key={nextBlockKey(cursor, 'math')} className="my-4">
+      <MathRenderer math={lines.join('\n')} displayMode />
+    </div>
+  );
+}
 
-  return <div className="px-3 py-5">{blocks}</div>;
+function parseHeadingBlock(cursor: MarkdownCursor, heading: RegExpMatchArray) {
+  const level = heading[1].length;
+  const className = headingClass(level);
+  const HeadingTag = ('h' + Math.min(level, 6)) as 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6';
+  cursor.index += 1;
+  return (
+    <HeadingTag key={nextBlockKey(cursor, 'heading')} className={className}>
+      <InlineMarkdown text={heading[2]} />
+    </HeadingTag>
+  );
+}
+
+function headingClass(level: number) {
+  if (level === 1) return 'type-title text-foreground mt-1 mb-3';
+  if (level === 2) return 'type-section text-foreground mt-6 mb-2';
+  return 'type-body text-foreground mt-4 mb-2 font-semibold';
+}
+
+function parseRuleBlock(cursor: MarkdownCursor) {
+  cursor.index += 1;
+  return <hr key={nextBlockKey(cursor, 'hr')} className="border-divider my-6" />;
+}
+
+function parseQuoteBlock(cursor: MarkdownCursor) {
+  const lines: string[] = [];
+  while (cursor.index < cursor.lines.length && cursor.lines[cursor.index].trim().startsWith('>')) {
+    lines.push(cursor.lines[cursor.index].trim().replace(/^>\s?/, ''));
+    cursor.index += 1;
+  }
+  return (
+    <blockquote
+      key={nextBlockKey(cursor, 'quote')}
+      className="border-accent/40 text-secondary border-l-2 pl-4 leading-relaxed"
+    >
+      {lines.map((line, index) => (
+        <p key={line + '-' + index} className="type-body my-1">
+          <InlineMarkdown text={line} />
+        </p>
+      ))}
+    </blockquote>
+  );
+}
+
+function parseListBlock(cursor: MarkdownCursor, opening: string) {
+  const ordered = /^\d+\.\s+/.test(opening);
+  const pattern = ordered ? /^\d+\.\s+(.+)$/ : /^[-*]\s+(.+)$/;
+  const items: string[] = [];
+  while (cursor.index < cursor.lines.length) {
+    const item = cursor.lines[cursor.index].trim().match(pattern);
+    if (!item) break;
+    items.push(item[1]);
+    cursor.index += 1;
+  }
+  const ListTag: 'ol' | 'ul' = ordered ? 'ol' : 'ul';
+  return (
+    <ListTag
+      key={nextBlockKey(cursor, 'list')}
+      className="type-body text-foreground my-3 space-y-1 pl-6 leading-relaxed"
+    >
+      {items.map((item, index) => (
+        <li key={item + '-' + index} className={ordered ? 'list-decimal' : 'list-disc'}>
+          <InlineMarkdown text={item} />
+        </li>
+      ))}
+    </ListTag>
+  );
+}
+
+function parseParagraphBlock(cursor: MarkdownCursor) {
+  const lines: string[] = [];
+  while (cursor.index < cursor.lines.length && !startsMarkdownBlock(cursor)) {
+    lines.push(cursor.lines[cursor.index].trim());
+    cursor.index += 1;
+  }
+  if (!lines.length && cursor.index < cursor.lines.length) {
+    lines.push(cursor.lines[cursor.index].trim());
+    cursor.index += 1;
+  }
+  return (
+    <p key={nextBlockKey(cursor, 'p')} className="type-body text-foreground my-3 leading-[1.72]">
+      <InlineMarkdown text={lines.join(' ')} />
+    </p>
+  );
+}
+
+function startsMarkdownBlock(cursor: MarkdownCursor) {
+  const current = cursor.lines[cursor.index].trim();
+  if (!current || current.startsWith('```') || current.startsWith('$$') || current.startsWith('>'))
+    return true;
+  if (/^[-\*\_]{3,}$/.test(current)) return true;
+  if (/^(?:#{1,6}\s+|[-*]\s+|\d+\.\s+)/.test(current)) return true;
+  return isTableStart(cursor, current);
 }
 
 function fallbackCopy(text: string) {

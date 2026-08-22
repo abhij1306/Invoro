@@ -2,7 +2,8 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { NavTreePanel, type NavTreeGroup } from './page';
+import type { NavTreeGroup } from './playground-normalizers';
+import { NavTreePanel, PipelineStepCard } from './playground-panels';
 
 const groups: NavTreeGroup[] = [
   {
@@ -28,13 +29,19 @@ const groups: NavTreeGroup[] = [
   },
 ];
 
-function NavTreeHarness({ onConfirm }: { onConfirm?: (urls: string[]) => void }) {
+function NavTreeHarness({
+  onConfirm,
+  treeGroups = groups,
+}: {
+  onConfirm?: (urls: string[]) => void;
+  treeGroups?: NavTreeGroup[];
+}) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const selectedUrls = Array.from(selected);
 
   return (
     <NavTreePanel
-      groups={groups}
+      groups={treeGroups}
       selected={selected}
       onToggleUrls={(urls) => {
         setSelected((prev) => {
@@ -99,5 +106,27 @@ describe('NavTreePanel', () => {
     fireEvent.click(screen.getByRole('button', { name: /crawl 1 url/i }));
 
     expect(onConfirm).toHaveBeenCalledWith(['https://shop.example/men/shorts']);
+  });
+
+  it('adds late-arriving top-level groups to the default open state', () => {
+    const { rerender } = render(<NavTreeHarness treeGroups={[]} />);
+
+    rerender(<NavTreeHarness treeGroups={groups} />);
+
+    expect(screen.getByRole('checkbox', { name: 'Select Shorts' })).toBeVisible();
+  });
+
+  it('keeps leaf expand controls non-interactive and labels selection checkboxes', () => {
+    render(<NavTreeHarness />);
+
+    expect(screen.getAllByRole('button', { name: 'Collapse category' })).toHaveLength(1);
+    expect(screen.getByRole('checkbox', { name: 'Select Men' })).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Select Shorts' })).toBeInTheDocument();
+  });
+
+  it('renders failed pipeline status with a danger badge', () => {
+    render(<PipelineStepCard label="Extract" stepData={{ status: 'failed' }} />);
+
+    expect(screen.getByText('Failed')).toHaveClass('text-danger-text');
   });
 });

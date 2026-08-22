@@ -104,31 +104,9 @@ export function detailToDiscovery(
     sourcesById.set(source.id, { source, index });
   });
   const matchesByCandidateId = new Map(detail.matches.map((match) => [match.candidate_id, match]));
-  const candidates = detail.candidates.map((candidate) => {
-    const sourceEntry = sourcesById.get(candidate.source_product_id);
-    const source = sourceEntry?.source;
-    const payload = candidate.payload ?? {};
-    const payloadIntelligence = isRecord(payload.intelligence) ? payload.intelligence : null;
-    const match = matchesByCandidateId.get(candidate.id);
-    const intelligence = payloadIntelligence ?? matchToIntelligence(match, candidate);
-    return {
-      source_record_id: source?.source_record_id ?? null,
-      source_run_id: source?.source_run_id ?? null,
-      source_url: source?.source_url ?? '',
-      source_title: source?.title ?? '',
-      source_brand: source?.brand ?? '',
-      source_price: source?.price ?? null,
-      source_currency: source?.currency ?? '',
-      source_index: sourceEntry?.index ?? 0,
-      url: candidate.url,
-      domain: candidate.domain,
-      source_type: candidate.source_type,
-      query_used: candidate.query_used,
-      search_rank: candidate.search_rank,
-      payload,
-      intelligence,
-    };
-  });
+  const candidates = detail.candidates.map((candidate) =>
+    discoveryCandidate(candidate, sourcesById, matchesByCandidateId),
+  );
   return {
     job_id: detail.job.id,
     options: detail.job.options ?? {},
@@ -136,6 +114,49 @@ export function detailToDiscovery(
     candidate_count: candidates.length,
     candidates,
   };
+}
+
+function discoveryCandidate(
+  candidate: ProductIntelligenceJobDetail['candidates'][number],
+  sourcesById: Map<
+    number,
+    { source: ProductIntelligenceJobDetail['source_products'][number]; index: number }
+  >,
+  matchesByCandidateId: Map<number, ProductIntelligenceJobDetail['matches'][number]>,
+) {
+  const sourceEntry = sourcesById.get(candidate.source_product_id);
+  const source = sourceEntry?.source;
+  const payload = candidate.payload ?? {};
+  const payloadIntelligence = isRecord(payload.intelligence) ? payload.intelligence : null;
+  return {
+    source_record_id: sourceValue(source, 'source_record_id', null),
+    source_run_id: sourceValue(source, 'source_run_id', null),
+    source_url: sourceValue(source, 'source_url', ''),
+    source_title: sourceValue(source, 'title', ''),
+    source_brand: sourceValue(source, 'brand', ''),
+    source_price: sourceValue(source, 'price', null),
+    source_currency: sourceValue(source, 'currency', ''),
+    source_index: sourceEntry?.index ?? 0,
+    url: candidate.url,
+    domain: candidate.domain,
+    source_type: candidate.source_type,
+    query_used: candidate.query_used,
+    search_rank: candidate.search_rank,
+    payload,
+    intelligence:
+      payloadIntelligence ?? matchToIntelligence(matchesByCandidateId.get(candidate.id), candidate),
+  };
+}
+
+function sourceValue<
+  Key extends keyof ProductIntelligenceJobDetail['source_products'][number],
+  Fallback,
+>(
+  source: ProductIntelligenceJobDetail['source_products'][number] | undefined,
+  key: Key,
+  fallback: Fallback,
+) {
+  return source?.[key] ?? fallback;
 }
 
 function matchToIntelligence(

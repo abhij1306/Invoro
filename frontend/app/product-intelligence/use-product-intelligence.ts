@@ -7,7 +7,12 @@ import { useMemo, useState } from 'react';
 
 import type { HistoryItem } from '../../components/ui/history-drawer';
 import { api } from '../../lib/api';
-import type { ProductIntelligenceDiscoveryResponse } from '../../lib/api/types';
+import type {
+  ProductIntelligenceDiscoveryResponse,
+  ProductIntelligenceJobDetail,
+  ProductIntelligenceOptions,
+  ProductIntelligenceSourceRecordInput,
+} from '../../lib/api/types';
 import { STORAGE_KEYS } from '../../lib/constants/storage-keys';
 import { searchProviderLabel } from './product-intelligence-utils';
 import {
@@ -48,7 +53,10 @@ export function useProductIntelligence() {
     queryFn: () => api.listProductIntelligenceJobs({ limit: 20 }),
   });
   const sourceRecords = prefill.records ?? [];
-  const defaultJobId = sourceRecords.length ? null : (jobsQuery.data?.[0]?.id ?? null);
+  const defaultJobId = defaultProductIntelligenceJobId(
+    sourceRecords.length,
+    jobsQuery.data?.[0]?.id,
+  );
   const resolvedActiveJobId = activeJobId ?? defaultJobId;
   const detailQuery = useQuery({
     queryKey: ['product-intelligence-job', resolvedActiveJobId],
@@ -70,33 +78,30 @@ export function useProductIntelligence() {
     () => (detailQuery.data ? detailOptions(detailQuery.data.job.options) : DEFAULT_OPTIONS),
     [detailQuery.data],
   );
-  const discovery =
-    discoveryOverride ?? (detailQuery.data ? detailToDiscovery(detailQuery.data) : null);
-  const effectiveOptions = optionsEdited || !detailQuery.data ? options : detailHydratedOptions;
-  const effectiveAllowedDomainsText = optionsEdited
-    ? allowedDomainsText
-    : detailHydratedOptions.allowed_domains.join('\n');
-  const effectiveExcludedDomainsText = optionsEdited
-    ? excludedDomainsText
-    : detailHydratedOptions.excluded_domains.join('\n');
-  const visibleSourceRecords = sourceRecords.length
-    ? sourceRecords
-    : detailQuery.data
-      ? detailQuery.data.source_products.map((source) => ({
-          id: source.source_record_id,
-          run_id: source.source_run_id,
-          source_url: source.source_url,
-          data: source.payload,
-        }))
-      : [];
-  const activeSourceRunId = sourceRecords.length
-    ? (prefill.source_run_id ??
-      sourceRecords.find((record) => typeof record.run_id === 'number')?.run_id ??
-      null)
-    : (detailQuery.data?.job.source_run_id ??
-      visibleSourceRecords.find((record) => typeof record.run_id === 'number')?.run_id ??
-      prefill.source_run_id ??
-      null);
+  const discovery = resolveDiscovery(discoveryOverride, detailQuery.data);
+  const effectiveOptions = resolveEffectiveOptions(
+    optionsEdited,
+    detailQuery.data,
+    options,
+    detailHydratedOptions,
+  );
+  const effectiveAllowedDomainsText = resolveDomainText(
+    optionsEdited,
+    allowedDomainsText,
+    detailHydratedOptions.allowed_domains,
+  );
+  const effectiveExcludedDomainsText = resolveDomainText(
+    optionsEdited,
+    excludedDomainsText,
+    detailHydratedOptions.excluded_domains,
+  );
+  const visibleSourceRecords = resolveVisibleSourceRecords(sourceRecords, detailQuery.data);
+  const activeSourceRunId = resolveActiveSourceRunId(
+    sourceRecords,
+    prefill.source_run_id,
+    detailQuery.data,
+    visibleSourceRecords,
+  );
   const uniqueSelectedUrls = useMemo(
     () =>
       Array.from(new Set(selectedUrls)).filter((url) =>
@@ -297,6 +302,56 @@ export function useProductIntelligence() {
 }
 
 export type ProductIntelligenceController = ReturnType<typeof useProductIntelligence>;
+
+function defaultProductIntelligenceJobId(sourceCount: number, firstJobId: number | undefined) {
+  return sourceCount ? null : (firstJobId ?? null);
+}
+
+function resolveDiscovery(
+  override: ProductIntelligenceDiscoveryResponse | null,
+  detail: ProductIntelligenceJobDetail | undefined,
+) {
+  if (override) return override;
+  return detail ? detailToDiscovery(detail) : null;
+}
+
+function resolveEffectiveOptions(
+  optionsEdited: boolean,
+  detail: ProductIntelligenceJobDetail | undefined,
+  options: ProductIntelligenceOptions,
+  hydrated: ProductIntelligenceOptions,
+) {
+  return optionsEdited || !detail ? options : hydrated;
+}
+
+function resolveDomainText(optionsEdited: boolean, edited: string, hydrated: string[]) {
+  return optionsEdited ? edited : hydrated.join('\n');
+}
+
+function resolveVisibleSourceRecords(
+  sourceRecords: ProductIntelligenceSourceRecordInput[],
+  detail: ProductIntelligenceJobDetail | undefined,
+): ProductIntelligenceSourceRecordInput[] {
+  if (sourceRecords.length) return sourceRecords;
+  return (detail?.source_products ?? []).map((source) => ({
+    id: source.source_record_id,
+    run_id: source.source_run_id,
+    source_url: source.source_url,
+    data: source.payload,
+  }));
+}
+
+function resolveActiveSourceRunId(
+  sourceRecords: ProductIntelligenceSourceRecordInput[],
+  prefillRunId: number | null | undefined,
+  detail: ProductIntelligenceJobDetail | undefined,
+  visibleSourceRecords: ProductIntelligenceSourceRecordInput[],
+) {
+  const recordRunId = (records: ProductIntelligenceSourceRecordInput[]) =>
+    records.find((record) => typeof record.run_id === 'number')?.run_id;
+  if (sourceRecords.length) return prefillRunId ?? recordRunId(sourceRecords) ?? null;
+  return detail?.job.source_run_id ?? recordRunId(visibleSourceRecords) ?? prefillRunId ?? null;
+}
 
 function candidateVisible(
   candidate: ProductIntelligenceDiscoveryResponse['candidates'][number],

@@ -322,14 +322,31 @@ export function buildDispatch(
     studioMode?: StudioMode;
   },
 ): PendingDispatch {
-  const additionalFields = uniqueRequestedFields(config.additional_fields);
+  const additionalFields = validatedAdditionalFields(config.additional_fields);
+  const surface = deriveSurface(config.domain, config.module);
+  const commonSettings = buildCommonSettings(config, fieldRows, additionalFields, options);
+  return config.module === 'category'
+    ? buildCategoryDispatch(config, surface, commonSettings, additionalFields)
+    : buildPdpDispatch(config, surface, commonSettings, additionalFields);
+}
+
+function validatedAdditionalFields(fields: string[]) {
+  const additionalFields = uniqueRequestedFields(fields);
   for (const field of additionalFields) {
     const reason = validateAdditionalFieldName(field);
     if (reason) {
       throw new Error(`Invalid additional field "${field}": ${reason}`);
     }
   }
-  const surface = deriveSurface(config.domain, config.module);
+  return additionalFields;
+}
+
+function buildCommonSettings(
+  config: CrawlConfig,
+  fieldRows: FieldRow[],
+  additionalFields: string[],
+  options?: { runProfile?: DomainRunProfile; studioMode?: StudioMode },
+) {
   const runProfile = cloneRunProfile(options?.runProfile);
   const studioMode = options?.studioMode ?? 'quick';
   const traversalMode = studioMode === 'advanced' ? runProfile.fetch_profile.traversal_mode : null;
@@ -372,35 +389,48 @@ export function buildDispatch(
     acquisition_contract: { ...runProfile.acquisition_contract },
     extraction_contract: buildExtractionContract(fieldRows),
   };
+  return commonSettings;
+}
 
-  if (config.module === 'category') {
-    if (config.mode === 'sitemap') {
-      const domain = config.sitemap_domain?.trim();
-      if (!domain) throw new Error('Enter a site domain for sitemap discovery.');
-      return {
-        runType: 'batch',
-        surface,
-        url: domain,
-        urls: undefined,
-        settings: {
-          ...commonSettings,
-          sitemap_domain: domain,
-          sitemap_filter_keyword: config.sitemap_filter_keyword?.trim() || 'collections',
-          sitemap_max_urls: config.sitemap_max_urls ?? 500,
-        },
-        additionalFields,
-        csvFile: null,
-      };
-    }
-    if (config.mode === 'bulk') {
-      const urls = parseLines(config.bulk_urls);
-      if (!urls.length) throw new Error('Bulk crawl needs at least one URL.');
-      return buildBatchDispatch(surface, urls, commonSettings, additionalFields);
-    }
-    if (!config.target_url.trim()) throw new Error('Enter a target URL.');
-    return buildSingleUrlDispatch(surface, config.target_url, commonSettings, additionalFields);
+function buildCategoryDispatch(
+  config: CrawlConfig,
+  surface: PendingDispatch['surface'],
+  commonSettings: Record<string, unknown>,
+  additionalFields: string[],
+): PendingDispatch {
+  if (config.mode === 'sitemap') {
+    const domain = config.sitemap_domain?.trim();
+    if (!domain) throw new Error('Enter a site domain for sitemap discovery.');
+    return {
+      runType: 'batch',
+      surface,
+      url: domain,
+      urls: undefined,
+      settings: {
+        ...commonSettings,
+        sitemap_domain: domain,
+        sitemap_filter_keyword: config.sitemap_filter_keyword?.trim() || 'collections',
+        sitemap_max_urls: config.sitemap_max_urls ?? 500,
+      },
+      additionalFields,
+      csvFile: null,
+    };
   }
+  if (config.mode === 'bulk') {
+    const urls = parseLines(config.bulk_urls);
+    if (!urls.length) throw new Error('Bulk crawl needs at least one URL.');
+    return buildBatchDispatch(surface, urls, commonSettings, additionalFields);
+  }
+  if (!config.target_url.trim()) throw new Error('Enter a target URL.');
+  return buildSingleUrlDispatch(surface, config.target_url, commonSettings, additionalFields);
+}
 
+function buildPdpDispatch(
+  config: CrawlConfig,
+  surface: PendingDispatch['surface'],
+  commonSettings: Record<string, unknown>,
+  additionalFields: string[],
+): PendingDispatch {
   if (config.mode === 'csv') {
     if (!config.csv_file) throw new Error('Select a CSV file.');
     return {

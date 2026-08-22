@@ -51,375 +51,22 @@ import {
 } from './log-terminal-utils';
 import type { LogStage, LogSiteGroup } from './log-terminal-utils';
 
-function useLogViewport(_logCount: number, ref?: RefObject<HTMLDivElement | null>) {
-  const internalRef = useRef<HTMLDivElement | null>(null);
-  const targetRef = ref ?? internalRef;
-
-  useEffect(() => {
-    if (!ref) {
-      scrollViewportToBottom(internalRef);
-    }
-  }, [_logCount, ref]);
-
-  return targetRef;
-}
-function getLogIconDescriptor(level: string, message: string) {
-  const msg = message.toLowerCase();
-  const isWarning = level === 'warning' || level === 'warn';
-  const isError = logMessageIsError(level, message);
-  const hasUrl = /https?:\/\//i.test(message);
-  const isBrowser =
-    msg.includes('browser') ||
-    msg.includes('playwright') ||
-    msg.includes('patchright') ||
-    msg.includes('headless');
-  const isChallenge =
-    msg.includes('challenge') ||
-    msg.includes('blocked') ||
-    msg.includes('captcha') ||
-    msg.includes('bot check');
-  const isComplete =
-    msg.includes('complete') ||
-    msg.includes('success') ||
-    msg.includes('done') ||
-    msg.includes('finished');
-  const isRetry = msg.includes('retry') || msg.includes('retrying');
-
-  let Icon = Dot;
-  if (isError) Icon = XCircle;
-  else if (isWarning) Icon = AlertTriangle;
-  else if (msg.includes('starting crawl')) Icon = Activity;
-  else if (msg.includes('ignoring robots.txt')) Icon = ShieldAlert;
-  else if (msg.includes('extracted')) Icon = Database;
-  else if (msg.includes('normalized') || msg.includes('normalised')) Icon = Layers;
-  else if (msg.includes('persisted')) Icon = HardDrive;
-  else if (msg.includes('acquiring') || msg.includes('fetching')) Icon = Globe;
-  else if (isBrowser) Icon = Monitor;
-  else if (msg.includes('record')) Icon = Database;
-  else if (msg.includes('page loaded') || msg.includes('page load')) Icon = Zap;
-  else if (isChallenge) Icon = ShieldAlert;
-  else if (hasUrl) Icon = Globe;
-  else if (isRetry || msg.includes('refresh')) Icon = RefreshCw;
-  else if (isComplete) Icon = CheckCircle2;
-
-  let iconCls = 'text-secondary';
-  if (isError || isChallenge) {
-    iconCls = 'text-danger';
-  } else if (isWarning || msg.includes('ignoring robots.txt')) {
-    iconCls = 'text-warning';
-  } else if (msg.includes('resolved')) {
-    iconCls = 'text-muted ';
-  } else if (
-    msg.includes('starting crawl') ||
-    msg.includes('acquired') ||
-    msg.includes('acquiring') ||
-    msg.includes('fetching') ||
-    isBrowser ||
-    hasUrl
-  ) {
-    iconCls = 'text-info';
-  } else if (
-    msg.includes('extracted') ||
-    msg.includes('persisted') ||
-    msg.includes('record') ||
-    isComplete
-  ) {
-    iconCls = 'text-success';
-  } else if (
-    msg.includes('normalized') ||
-    msg.includes('normalised') ||
-    msg.includes('page loaded') ||
-    msg.includes('page load')
-  ) {
-    iconCls = 'text-warning';
-  } else if (isRetry) {
-    iconCls = 'text-info';
-  } else if (level === 'debug') {
-    iconCls = 'text-muted';
-  }
-
-  return { Icon, iconCls };
-}
-
-function StageChip({ stage, showIcon = true }: { stage: LogStage; showIcon?: boolean }) {
-  const config = STAGE_CONFIG[stage];
-  let Icon = Activity;
-  if (stage === 'acquisition') Icon = Globe;
-  if (stage === 'extraction') Icon = Database;
-  if (stage === 'normalize') Icon = Layers;
-  if (stage === 'persistence') Icon = HardDrive;
-
-  return (
-    <span
-      className={cn(
-        'inline-flex items-center gap-1 text-xs tracking-wide uppercase',
-        config.textOnlyClass,
-      )}
-    >
-      {showIcon ? <Icon className="size-3" /> : null}
-      <span>{config.label}</span>
-    </span>
-  );
-}
-
-function severityTone(group: LogSiteGroup, index: number) {
-  // REMOVED ALL BACKGROUND COLORS AS PER USER REQUEST - TERMINAL IS NOW MONOCHROMATIC
-  if (group.hasError) {
-    return 'bg-transparent border-l-2 border-l-danger';
-  }
-  if (group.hasWarning) {
-    return 'bg-transparent border-l-2 border-l-warning';
-  }
-  if (group.recordCount > 0 || group.stageLogs.persistence.length > 0) {
-    return 'bg-transparent border-l-2 border-l-success';
-  }
-  return index % 2 === 0
-    ? 'bg-[color-mix(in_srgb,var(--bg-alt)_40%,transparent)]'
-    : 'bg-transparent';
-}
-
-function payloadSnapshot(group: LogSiteGroup) {
-  if (!group.records.length) {
-    return '';
-  }
-  const payload =
-    group.records.length === 1
-      ? cleanRecordForDisplay(group.records[0])
-      : group.records.map(cleanRecordForDisplay);
-  return JSON.stringify(payload, null, 2);
-}
-
-function publicFieldNames(record: CrawlRecord) {
-  return Object.entries(record.data ?? {}).flatMap(([key, value]) =>
-    !key.startsWith('_') && isInformativeValue(value) ? [key] : [],
-  );
-}
-
-function groupConfidence(group: LogSiteGroup): { score: number; level: string } | null {
-  const scores = group.records
-    .map(recordConfidenceSummary)
-    .filter((value): value is { score: number; level: string } => value !== null);
-  if (!scores.length) {
-    return null;
-  }
-  const average = scores.reduce((total, item) => total + item.score, 0) / scores.length;
-  return {
-    score: average,
-    level: String(qualityLevelFromScore(average)),
-  };
-}
-
-function groupDurationMs(group: LogSiteGroup, activeNowMs?: number): number | null {
-  const recordDurations = group.records
-    .map((record) => acquisitionDiagnosticsSummary(record).durationMs)
-    .filter((value): value is number => value !== null);
-  const startedAt = group.logs[0]?.created_at;
-  if (!startedAt) {
-    return null;
-  }
-  const startedMs = parseApiDate(startedAt).getTime();
-  if (!Number.isFinite(startedMs)) {
-    return null;
-  }
-  const lastLog = group.logs.at(-1);
-  const endCandidatesMs = [
-    activeNowMs,
-    lastLog?.created_at ? parseApiDate(lastLog.created_at).getTime() : null,
-    ...group.records.map((record) => parseApiDate(record.created_at).getTime()),
-    ...recordDurations.map((durationMs) => startedMs + durationMs),
-  ].filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
-  if (!endCandidatesMs.length) {
-    return null;
-  }
-  return Math.max(0, Math.max(...endCandidatesMs) - startedMs);
-}
-
-function groupStillActive(group: LogSiteGroup) {
-  if (!group.url) {
-    return false;
-  }
-  const lastMessage = sanitizeLogMessage(group.logs.at(-1)?.message ?? '').toLowerCase();
-  return !(
-    group.stageLogs.persistence.length > 0 ||
-    group.hasError ||
-    lastMessage.includes('processing failed') ||
-    lastMessage.includes('timed out') ||
-    lastMessage.includes('stopped after reaching max_records')
-  );
-}
-
-function groupFieldCoverage(group: LogSiteGroup, requestedFields: string[]) {
-  const requested = uniqueRequestedFields(requestedFields);
-  const normalizedRequested = requested.map(normalizeField);
-  const foundNormalized = new Set<string>();
-  const foundOriginal = new Map<string, string>();
-
-  for (const record of group.records) {
-    for (const field of publicFieldNames(record)) {
-      const normalized = normalizeField(field);
-      foundNormalized.add(normalized);
-      if (!foundOriginal.has(normalized)) {
-        foundOriginal.set(normalized, field);
-      }
-    }
-  }
-
-  if (requested.length) {
-    const covered = requested.filter(
-      (field, index) =>
-        foundNormalized.has(normalizedRequested[index]) || foundNormalized.has(field),
-    );
-    return {
-      foundCount: covered.length,
-      totalCount: requested.length,
-      labels: covered,
-    };
-  }
-
-  const labels = Array.from(foundOriginal.values());
-  return {
-    foundCount: labels.length,
-    totalCount: labels.length,
-    labels,
-  };
-}
-
-function toneForConfidence(level: string) {
-  if (level === 'high') return 'text-success';
-  if (level === 'medium') return 'text-warning';
-  if (level === 'low') return 'text-danger';
-  return 'text-muted';
-}
-
-type ExpandedLogRow = {
-  key: string;
-  stage: LogStage;
-  level: string;
-  message: string;
-  createdAt?: string | null;
-  payloadAction?: boolean;
-};
-
-function buildExpandedRows(
-  group: LogSiteGroup,
-  coverage: ReturnType<typeof groupFieldCoverage>,
-  confidence: ReturnType<typeof groupConfidence>,
-  durationMs: number | null,
-): ExpandedLogRow[] {
-  const rows: ExpandedLogRow[] = group.logs.map((log) => ({
-    key: `log-${log.id}`,
-    stage: parseStartingLog(log.message) ? 'system' : getLogStage(log.message),
-    level: log.level,
-    message: log.message,
-    createdAt: log.created_at,
-  }));
-
-  if (coverage.totalCount > 0 || coverage.labels.length > 0 || confidence) {
-    const parts: string[] = [];
-    if (coverage.totalCount > 0) {
-      const labels = coverage.labels.length
-        ? coverage.labels.map(humanizeFieldName).join(', ')
-        : 'none';
-      parts.push(
-        `${TERMINAL_STRINGS.FIELDS} ${coverage.foundCount}/${coverage.totalCount}: ${labels}`,
-      );
-    }
-    if (confidence) {
-      parts.push(`${TERMINAL_STRINGS.CONFIDENCE} ${Math.round(confidence.score * 100)}%`);
-    }
-    if (durationMs !== null) {
-      parts.push(`${TERMINAL_STRINGS.TIME} ${formatDurationMs(durationMs)}`);
-    }
-    rows.push({
-      key: `${group.key}-fields`,
-      stage: 'persistence',
-      level: 'info',
-      message: parts.join(' | '),
-      payloadAction: group.records.length > 0,
-    });
-  }
-
-  return rows;
-}
-
-function formatShortUrlLabel(url: string) {
-  try {
-    const parsed = new URL(url);
-    const domain = parsed.hostname.replace(/^www\./, '');
-    const parts = parsed.pathname.split('/').filter(Boolean);
-    const lastPart = parts.at(-1) || '';
-    if (parts.length > 1) {
-      return `${domain}/.../${lastPart}`;
-    }
-    return domain + (lastPart ? `/${lastPart}` : '');
-  } catch {
-    return url.length > 40 ? url.slice(0, 40) + '…' : url;
-  }
-}
-
-function ShortenedUrl({ url }: { url: string }) {
-  return (
-    <a
-      href={url}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="text-info decoration-info/20 hover:text-accent underline underline-offset-4 transition-colors"
-      title={url}
-      onClick={(e) => e.stopPropagation()}
-    >
-      {formatShortUrlLabel(url)}
-    </a>
-  );
-}
-
-function renderLogContent(message: string, isStartingCrawl: boolean): React.ReactNode {
-  let text = sanitizeLogMessage(message).replace(LOG_PATTERNS.ROBOTS_PREFIX, '');
-  text = text.replace(
-    LOG_PATTERNS.HEADLESS_BROWSER,
-    (_, engine) => `Launched ${engine.trim()} browser`,
-  );
-
-  const urlRegex = LOG_PATTERNS.URL;
-  const parts: React.ReactNode[] = [];
-  let lastIndex = 0;
-  let match;
-
-  while ((match = urlRegex.exec(text)) !== null) {
-    if (match.index > lastIndex) {
-      parts.push(text.slice(lastIndex, match.index));
-    }
-    parts.push(<ShortenedUrl key={match.index} url={match[0]} />);
-    lastIndex = urlRegex.lastIndex;
-  }
-  if (lastIndex < text.length) {
-    parts.push(text.slice(lastIndex));
-  }
-
-  const baseContent = parts.length > 0 ? parts : [text];
-
-  if (isStartingCrawl) {
-    return baseContent.map((part) => {
-      if (typeof part === 'string') {
-        const counterMatch = part.match(LOG_PATTERNS.COUNTER);
-        if (counterMatch && counterMatch.index !== undefined) {
-          const before = part.slice(0, counterMatch.index);
-          const after = part.slice(counterMatch.index + counterMatch[0].length);
-          return (
-            <React.Fragment key={`${before}-${counterMatch[0]}-${after}`}>
-              {before}
-              <span className="text-blue-400/70">{counterMatch[0]}</span>
-              {after}
-            </React.Fragment>
-          );
-        }
-      }
-      return part;
-    });
-  }
-
-  return baseContent;
-}
-
+import {
+  buildExpandedRows,
+  formatShortUrlLabel,
+  getLogIconDescriptor,
+  groupConfidence,
+  groupDurationMs,
+  groupFieldCoverage,
+  groupStillActive,
+  payloadSnapshot,
+  renderLogContent,
+  severityTone,
+  ShortenedUrl,
+  StageChip,
+  toneForConfidence,
+  useLogViewport,
+} from './log-terminal-presentation';
 export const LogTerminal = memo(function LogTerminal({
   logs,
   records = [],
@@ -654,241 +301,25 @@ export const LogTerminal = memo(function LogTerminal({
         aria-atomic="false"
       >
         {groups.length ? (
-          groups.map((group, index) => {
-            const isLiveActive = group.key === activeGroupKey;
-            const expanded = expandedGroupKey === group.key || isLiveActive;
-            const isRunEventGroup = !group.url;
-            const payload = payloadSnapshot(group);
-            const confidence = groupConfidence(group);
-            const coverage = groupFieldCoverage(group, requestedFields);
-            const activeGroup = live && (isLiveActive || groupStillActive(group));
-            const durationMs = groupDurationMs(group, activeGroup ? nowMs : undefined);
-            const lastLog = group.logs.at(-1);
-            const summaryLog =
-              [...group.logs].reverse().find((log) => !isPersistenceSummaryLog(log.message)) ??
-              lastLog;
-            const expandedRows = buildExpandedRows(group, coverage, confidence, durationMs);
-            return (
-              <section key={group.key} id={siteDomId(group.key)} className="overflow-hidden">
-                <div
-                  className={cn(
-                    'group/row grid w-full cursor-pointer items-center gap-3 px-6 py-1 text-left text-xs transition-colors outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-inset',
-                    isRunEventGroup
-                      ? 'grid-cols-[32px_minmax(280px,1fr)_auto_minmax(260px,1.4fr)_60px]'
-                      : 'grid-cols-[32px_minmax(280px,2fr)_75px_80px_85px_auto_minmax(200px,1.2fr)_80px_70px]',
-                    severityTone(group, index),
-                  )}
-                >
-                  <div className="text-muted text-xs font-medium opacity-60">
-                    {(group.index ?? siteOrdinalByKey.get(group.key) ?? index + 1)
-                      .toString()
-                      .padStart(2, '0')}
-                  </div>
-                  <div className="flex min-w-0 items-center gap-2">
-                    {!isRunEventGroup && <Globe className="text-muted size-3.5 shrink-0" />}
-                    {isRunEventGroup ? (
-                      <span
-                        className="text-secondary block truncate text-xs font-medium"
-                        title={group.label}
-                      >
-                        {group.label}
-                      </span>
-                    ) : (
-                      <a
-                        href={group.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="text-info block truncate text-xs font-normal underline-offset-4 hover:underline"
-                        title={group.url}
-                      >
-                        {formatShortUrlLabel(group.url)}
-                      </a>
-                    )}
-                    {isParallelCrawl && group.url && (
-                      <span className="text-muted border-border shrink-0 rounded border px-1 py-px text-xs font-semibold tracking-widest uppercase">
-                        Parallel
-                      </span>
-                    )}
-                    <span className="text-muted shrink-0 font-mono text-xs opacity-50">
-                      {group.logs.length} logs
-                    </span>
-                  </div>
-                  {!isRunEventGroup ? (
-                    <>
-                      <div
-                        className="border-border text-secondary flex items-center gap-1 rounded-md border bg-[color-mix(in_srgb,var(--bg-alt)_50%,transparent)] px-1.5 py-0.5 text-xs font-medium whitespace-nowrap shadow-sm"
-                        title="Fields Extracted"
-                      >
-                        <Database className="text-muted size-3 shrink-0" />
-                        <span>
-                          {coverage.foundCount}/{coverage.totalCount || 0}
-                        </span>
-                      </div>
-                      <div
-                        className="border-border text-secondary flex items-center gap-1 rounded-md border bg-[color-mix(in_srgb,var(--bg-alt)_50%,transparent)] px-1.5 py-0.5 text-xs font-medium whitespace-nowrap shadow-sm"
-                        title="Confidence Score"
-                      >
-                        <CheckCircle2
-                          className={cn(
-                            'size-3 shrink-0',
-                            confidence ? toneForConfidence(confidence.level) : 'text-muted',
-                          )}
-                        />
-                        <span
-                          className={cn(
-                            confidence ? toneForConfidence(confidence.level) : 'text-muted',
-                          )}
-                        >
-                          {confidence ? `${Math.round(confidence.score * 100)}%` : '--'}
-                        </span>
-                      </div>
-                      <div
-                        className="border-border text-secondary flex items-center gap-1 rounded-md border bg-[color-mix(in_srgb,var(--bg-alt)_50%,transparent)] px-1.5 py-0.5 text-xs font-medium whitespace-nowrap shadow-sm"
-                        title="Duration"
-                      >
-                        <Clock className="text-muted size-3 shrink-0" />
-                        <span>{durationMs !== null ? formatDurationMs(durationMs) : '--'}</span>
-                      </div>
-                    </>
-                  ) : null}
-                  <div className="flex items-center justify-center">
-                    {isRunEventGroup ? (
-                      <div className="type-label-mono text-xs uppercase">Run</div>
-                    ) : group.lastStage !== 'system' ? (
-                      <StageChip stage={group.lastStage} />
-                    ) : null}
-                  </div>
-                  <div className="min-w-0">
-                    <div
-                      className="text-secondary truncate text-xs"
-                      title={summaryLog?.message || ''}
-                    >
-                      {summaryLog
-                        ? sanitizeLogMessage(summaryLog.message)
-                        : TERMINAL_STRINGS.PENDING}
-                    </div>
-                  </div>
-                  {!isRunEventGroup ? (
-                    <div className="flex items-center justify-end">
-                      {payload ? (
-                        <Button
-                          type="button"
-                          variant="quiet"
-                          size="sm"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            setPeekedGroupKey(group.key);
-                            setPeekedRecordIndex(0);
-                          }}
-                        >
-                          Peek
-                        </Button>
-                      ) : (
-                        <span className="type-caption text-xs opacity-25">--</span>
-                      )}
-                    </div>
-                  ) : null}
-                  <button
-                    type="button"
-                    aria-expanded={isLiveActive ? undefined : expanded}
-                    aria-label={
-                      isLiveActive
-                        ? `Active logs for ${group.url || group.label}`
-                        : `${expanded ? 'Collapse' : 'Expand'} logs for ${group.url || group.label}`
-                    }
-                    disabled={isLiveActive}
-                    onClick={() => toggleGroup(group.key)}
-                    className="focus-ring flex items-center justify-end gap-1.5 rounded-sm pr-2"
-                  >
-                    <span className="text-muted font-mono text-xs uppercase">
-                      {isLiveActive ? (
-                        <span className="text-accent flex items-center gap-1.5 font-semibold">
-                          <span className="relative flex size-1.5">
-                            <span className="bg-accent absolute inline-flex h-full w-full animate-ping rounded-full opacity-75"></span>
-                            <span className="bg-accent relative inline-flex size-1.5 rounded-full"></span>
-                          </span>
-                          Active
-                        </span>
-                      ) : expanded ? (
-                        'Less'
-                      ) : (
-                        'More'
-                      )}
-                    </span>
-                    {!isLiveActive && (
-                      <ChevronDown
-                        className={cn(
-                          'text-muted size-3.5 transition-transform duration-200',
-                          expanded && 'rotate-180',
-                        )}
-                      />
-                    )}
-                  </button>
-                </div>
-
-                {expanded ? (
-                  <div className="bg-[color-mix(in_srgb,var(--bg-alt)_60%,transparent)]">
-                    <div className="overflow-hidden">
-                      {expandedRows.length ? (
-                        expandedRows.map((row, expandedIndex) => {
-                          const { Icon: IconComponent, iconCls } = getLogIconDescriptor(
-                            row.level,
-                            row.message,
-                          );
-                          return (
-                            <div
-                              key={row.key}
-                              className={cn(
-                                'grid grid-cols-[64px_24px_105px_minmax(0,1fr)_auto] items-center gap-4 px-6 py-0.5 text-xs',
-                                expandedIndex % 2 === 0
-                                  ? 'bg-[color-mix(in_srgb,var(--bg-alt)_35%,transparent)]'
-                                  : 'bg-transparent',
-                              )}
-                            >
-                              <span className="text-muted font-mono text-xs font-normal tabular-nums">
-                                {row.createdAt ? formatTimeHms(row.createdAt) : '--'}
-                              </span>
-                              <div className="flex justify-center">
-                                <IconComponent className={cn('size-3.5', iconCls)} />
-                              </div>
-                              <div className="flex">
-                                <StageChip stage={row.stage} showIcon={false} />
-                              </div>
-                              <span className="text-secondary min-w-0 text-xs font-medium break-words">
-                                {!row.createdAt
-                                  ? row.message
-                                  : renderLogContent(row.message, row.stage === 'system')}
-                              </span>
-                              <span className="flex items-center gap-2">
-                                {row.payloadAction ? (
-                                  <Button
-                                    type="button"
-                                    variant="quiet"
-                                    size="sm"
-                                    onClick={() => {
-                                      setPeekedGroupKey(group.key);
-                                      setPeekedRecordIndex(0);
-                                    }}
-                                  >
-                                    Peek payload
-                                  </Button>
-                                ) : null}
-                              </span>
-                            </div>
-                          );
-                        })
-                      ) : (
-                        <div className="px-3 py-2 text-xs opacity-40">
-                          {TERMINAL_STRINGS.NO_LOGS}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ) : null}
-              </section>
-            );
-          })
+          groups.map((group, index) => (
+            <LogGroupSection
+              key={group.key}
+              {...{
+                group,
+                index,
+                activeGroupKey,
+                expandedGroupKey,
+                requestedFields,
+                live,
+                nowMs,
+                siteOrdinalByKey,
+                isParallelCrawl,
+                toggleGroup,
+                setPeekedGroupKey,
+                setPeekedRecordIndex,
+              }}
+            />
+          ))
         ) : (
           <div className="px-6 py-8 text-center text-xs italic opacity-55">
             {live ? 'Waiting for log stream...' : 'No log activity recorded'}
@@ -896,80 +327,488 @@ export const LogTerminal = memo(function LogTerminal({
         )}
       </div>
 
-      {activePeekedGroupKey ? (
-        <div className="absolute inset-0 z-40 bg-[color-mix(in_srgb,var(--bg-base)_60%,transparent)] backdrop-blur-sm">
-          <div
-            ref={peekPanelRef}
-            className="animate-in slide-in-from-right absolute inset-y-0 right-0 z-50 w-[36rem] max-w-full border-l duration-300"
-            style={{
-              borderColor: 'var(--terminal-border)',
-              backgroundColor: 'var(--terminal-code-bg)',
-              color: 'var(--terminal-fg)',
-              boxShadow: 'var(--terminal-shadow)',
-            }}
-          >
+      <PayloadPeekPanel
+        {...{
+          activePeekedGroupKey,
+          peekPanelRef,
+          peekedGroup,
+          safePeekedRecordIndex,
+          peekedRecordJson,
+          setPeekedGroupKey,
+        }}
+      />
+    </div>
+  );
+});
+
+type LogGroupSectionProps = {
+  group: LogSiteGroup;
+  index: number;
+  activeGroupKey: string | null;
+  expandedGroupKey: string | null;
+  requestedFields: string[];
+  live: boolean;
+  nowMs: number;
+  siteOrdinalByKey: Map<string, number>;
+  isParallelCrawl: boolean;
+  toggleGroup: (key: string) => void;
+  setPeekedGroupKey: React.Dispatch<React.SetStateAction<string | null>>;
+  setPeekedRecordIndex: React.Dispatch<React.SetStateAction<number>>;
+};
+
+function LogGroupSection({
+  group,
+  index,
+  activeGroupKey,
+  expandedGroupKey,
+  requestedFields,
+  live,
+  nowMs,
+  siteOrdinalByKey,
+  isParallelCrawl,
+  toggleGroup,
+  setPeekedGroupKey,
+  setPeekedRecordIndex,
+}: LogGroupSectionProps) {
+  const isLiveActive = group.key === activeGroupKey;
+  const expanded = expandedGroupKey === group.key || isLiveActive;
+  const isRunEventGroup = !group.url;
+  const payload = payloadSnapshot(group);
+  const confidence = groupConfidence(group);
+  const coverage = groupFieldCoverage(group, requestedFields);
+  const activeGroup = live && (isLiveActive || groupStillActive(group));
+  const durationMs = groupDurationMs(group, activeGroup ? nowMs : undefined);
+  const lastLog = group.logs.at(-1);
+  const summaryLog =
+    [...group.logs].reverse().find((log) => !isPersistenceSummaryLog(log.message)) ?? lastLog;
+  const expandedRows = buildExpandedRows(group, coverage, confidence, durationMs);
+  return (
+    <section id={siteDomId(group.key)} className="overflow-hidden">
+      <LogGroupSummaryRow
+        {...{
+          group,
+          index,
+          isLiveActive,
+          expanded,
+          isRunEventGroup,
+          payload,
+          confidence,
+          coverage,
+          durationMs,
+          summaryLog,
+          siteOrdinalByKey,
+          isParallelCrawl,
+          toggleGroup,
+          setPeekedGroupKey,
+          setPeekedRecordIndex,
+        }}
+      />
+      {expanded ? (
+        <ExpandedLogRows
+          groupKey={group.key}
+          rows={expandedRows}
+          {...{ setPeekedGroupKey, setPeekedRecordIndex }}
+        />
+      ) : null}
+    </section>
+  );
+}
+
+type CoverageSummary = ReturnType<typeof groupFieldCoverage>;
+type ConfidenceSummary = ReturnType<typeof groupConfidence>;
+type ExpandedLogRow = ReturnType<typeof buildExpandedRows>[number];
+
+type LogGroupSummaryProps = Pick<
+  LogGroupSectionProps,
+  | 'group'
+  | 'index'
+  | 'siteOrdinalByKey'
+  | 'isParallelCrawl'
+  | 'toggleGroup'
+  | 'setPeekedGroupKey'
+  | 'setPeekedRecordIndex'
+> & {
+  isLiveActive: boolean;
+  expanded: boolean;
+  isRunEventGroup: boolean;
+  payload: unknown;
+  confidence: ConfidenceSummary;
+  coverage: CoverageSummary;
+  durationMs: number | null;
+  summaryLog: CrawlLog | undefined;
+};
+
+function LogGroupSummaryRow(props: LogGroupSummaryProps) {
+  const { group, index, isRunEventGroup, coverage, confidence, durationMs, summaryLog } = props;
+  return (
+    <div
+      className={cn(
+        'group/row grid w-full cursor-pointer items-center gap-3 px-6 py-1 text-left text-xs transition-colors outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-inset',
+        isRunEventGroup
+          ? 'grid-cols-[32px_minmax(280px,1fr)_auto_minmax(260px,1.4fr)_60px]'
+          : 'grid-cols-[32px_minmax(280px,2fr)_75px_80px_85px_auto_minmax(200px,1.2fr)_80px_70px]',
+        severityTone(group, index),
+      )}
+    >
+      <div className="text-muted text-xs font-medium opacity-60">
+        {groupOrdinal(props).toString().padStart(2, '0')}
+      </div>
+      <LogGroupIdentity
+        group={group}
+        isRunEventGroup={isRunEventGroup}
+        isParallelCrawl={props.isParallelCrawl}
+      />
+      {isRunEventGroup ? null : <LogGroupMetrics {...{ coverage, confidence, durationMs }} />}
+      <LogGroupStage group={group} isRunEventGroup={isRunEventGroup} />
+      <div className="min-w-0">
+        <div className="text-secondary truncate text-xs" title={summaryLog?.message || ''}>
+          {summaryLog ? sanitizeLogMessage(summaryLog.message) : TERMINAL_STRINGS.PENDING}
+        </div>
+      </div>
+      {isRunEventGroup ? null : <PayloadPeekAction {...props} />}
+      <LogGroupExpandButton {...props} />
+    </div>
+  );
+}
+
+function groupOrdinal({ group, index, siteOrdinalByKey }: LogGroupSummaryProps) {
+  return group.index ?? siteOrdinalByKey.get(group.key) ?? index + 1;
+}
+
+function LogGroupIdentity({
+  group,
+  isRunEventGroup,
+  isParallelCrawl,
+}: {
+  group: LogSiteGroup;
+  isRunEventGroup: boolean;
+  isParallelCrawl: boolean;
+}) {
+  return (
+    <div className="flex min-w-0 items-center gap-2">
+      {isRunEventGroup ? null : <Globe className="text-muted size-3.5 shrink-0" />}
+      {isRunEventGroup ? (
+        <span className="text-secondary block truncate text-xs font-medium" title={group.label}>
+          {group.label}
+        </span>
+      ) : (
+        <a
+          href={group.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(event) => event.stopPropagation()}
+          className="text-info block truncate text-xs font-normal underline-offset-4 hover:underline"
+          title={group.url}
+        >
+          {formatShortUrlLabel(group.url)}
+        </a>
+      )}
+      {isParallelCrawl && group.url ? (
+        <span className="text-muted border-border shrink-0 rounded border px-1 py-px text-xs font-semibold tracking-widest uppercase">
+          Parallel
+        </span>
+      ) : null}
+      <span className="text-muted shrink-0 font-mono text-xs opacity-50">
+        {group.logs.length} logs
+      </span>
+    </div>
+  );
+}
+
+function LogGroupMetrics({
+  coverage,
+  confidence,
+  durationMs,
+}: {
+  coverage: CoverageSummary;
+  confidence: ConfidenceSummary;
+  durationMs: number | null;
+}) {
+  const confidenceTone = confidence ? toneForConfidence(confidence.level) : 'text-muted';
+  return (
+    <>
+      <div
+        className="border-border text-secondary flex items-center gap-1 rounded-md border bg-[color-mix(in_srgb,var(--bg-alt)_50%,transparent)] px-1.5 py-0.5 text-xs font-medium whitespace-nowrap shadow-sm"
+        title="Fields Extracted"
+      >
+        <Database className="text-muted size-3 shrink-0" />
+        <span>
+          {coverage.foundCount}/{coverage.totalCount || 0}
+        </span>
+      </div>
+      <div
+        className="border-border text-secondary flex items-center gap-1 rounded-md border bg-[color-mix(in_srgb,var(--bg-alt)_50%,transparent)] px-1.5 py-0.5 text-xs font-medium whitespace-nowrap shadow-sm"
+        title="Confidence Score"
+      >
+        <CheckCircle2 className={cn('size-3 shrink-0', confidenceTone)} />
+        <span className={confidenceTone}>
+          {confidence ? Math.round(confidence.score * 100) + '%' : '--'}
+        </span>
+      </div>
+      <div
+        className="border-border text-secondary flex items-center gap-1 rounded-md border bg-[color-mix(in_srgb,var(--bg-alt)_50%,transparent)] px-1.5 py-0.5 text-xs font-medium whitespace-nowrap shadow-sm"
+        title="Duration"
+      >
+        <Clock className="text-muted size-3 shrink-0" />
+        <span>{durationMs === null ? '--' : formatDurationMs(durationMs)}</span>
+      </div>
+    </>
+  );
+}
+
+function LogGroupStage({
+  group,
+  isRunEventGroup,
+}: {
+  group: LogSiteGroup;
+  isRunEventGroup: boolean;
+}) {
+  if (isRunEventGroup)
+    return (
+      <div className="flex items-center justify-center">
+        <div className="type-label-mono text-xs uppercase">Run</div>
+      </div>
+    );
+  return (
+    <div className="flex items-center justify-center">
+      {group.lastStage === 'system' ? null : <StageChip stage={group.lastStage} />}
+    </div>
+  );
+}
+
+function PayloadPeekAction({
+  group,
+  payload,
+  setPeekedGroupKey,
+  setPeekedRecordIndex,
+}: LogGroupSummaryProps) {
+  function open(event: React.MouseEvent) {
+    event.stopPropagation();
+    setPeekedGroupKey(group.key);
+    setPeekedRecordIndex(0);
+  }
+  return (
+    <div className="flex items-center justify-end">
+      {payload ? (
+        <Button type="button" variant="quiet" size="sm" onClick={open}>
+          Peek
+        </Button>
+      ) : (
+        <span className="type-caption text-xs opacity-25">--</span>
+      )}
+    </div>
+  );
+}
+
+function LogGroupExpandButton({
+  group,
+  isLiveActive,
+  expanded,
+  toggleGroup,
+}: LogGroupSummaryProps) {
+  const label = isLiveActive
+    ? 'Active logs for ' + (group.url || group.label)
+    : (expanded ? 'Collapse' : 'Expand') + ' logs for ' + (group.url || group.label);
+  return (
+    <button
+      type="button"
+      aria-expanded={isLiveActive ? undefined : expanded}
+      aria-label={label}
+      disabled={isLiveActive}
+      onClick={() => toggleGroup(group.key)}
+      className="focus-ring flex items-center justify-end gap-1.5 rounded-sm pr-2"
+    >
+      <span className="text-muted font-mono text-xs uppercase">
+        {isLiveActive ? (
+          <span className="text-accent flex items-center gap-1.5 font-semibold">
+            <span className="relative flex size-1.5">
+              <span className="bg-accent absolute inline-flex h-full w-full animate-ping rounded-full opacity-75" />
+              <span className="bg-accent relative inline-flex size-1.5 rounded-full" />
+            </span>
+            Active
+          </span>
+        ) : expanded ? (
+          'Less'
+        ) : (
+          'More'
+        )}
+      </span>
+      {isLiveActive ? null : (
+        <ChevronDown
+          className={cn(
+            'text-muted size-3.5 transition-transform duration-200',
+            expanded && 'rotate-180',
+          )}
+        />
+      )}
+    </button>
+  );
+}
+
+function ExpandedLogRows({
+  groupKey,
+  rows,
+  setPeekedGroupKey,
+  setPeekedRecordIndex,
+}: {
+  groupKey: string;
+  rows: ExpandedLogRow[];
+  setPeekedGroupKey: LogGroupSectionProps['setPeekedGroupKey'];
+  setPeekedRecordIndex: LogGroupSectionProps['setPeekedRecordIndex'];
+}) {
+  if (!rows.length)
+    return (
+      <div className="bg-[color-mix(in_srgb,var(--bg-alt)_60%,transparent)]">
+        <div className="px-3 py-2 text-xs opacity-40">{TERMINAL_STRINGS.NO_LOGS}</div>
+      </div>
+    );
+  return (
+    <div className="bg-[color-mix(in_srgb,var(--bg-alt)_60%,transparent)]">
+      <div className="overflow-hidden">
+        {rows.map((row, index) => (
+          <ExpandedLogRowView
+            key={row.key}
+            {...{ row, index, groupKey, setPeekedGroupKey, setPeekedRecordIndex }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ExpandedLogRowView({
+  row,
+  index,
+  groupKey,
+  setPeekedGroupKey,
+  setPeekedRecordIndex,
+}: {
+  row: ExpandedLogRow;
+  index: number;
+  groupKey: string;
+  setPeekedGroupKey: LogGroupSectionProps['setPeekedGroupKey'];
+  setPeekedRecordIndex: LogGroupSectionProps['setPeekedRecordIndex'];
+}) {
+  const { Icon: IconComponent, iconCls } = getLogIconDescriptor(row.level, row.message);
+  function peek() {
+    setPeekedGroupKey(groupKey);
+    setPeekedRecordIndex(0);
+  }
+  return (
+    <div
+      className={cn(
+        'grid grid-cols-[64px_24px_105px_minmax(0,1fr)_auto] items-center gap-4 px-6 py-0.5 text-xs',
+        index % 2 === 0
+          ? 'bg-[color-mix(in_srgb,var(--bg-alt)_35%,transparent)]'
+          : 'bg-transparent',
+      )}
+    >
+      <span className="text-muted font-mono text-xs font-normal tabular-nums">
+        {row.createdAt ? formatTimeHms(row.createdAt) : '--'}
+      </span>
+      <div className="flex justify-center">
+        <IconComponent className={cn('size-3.5', iconCls)} />
+      </div>
+      <div className="flex">
+        <StageChip stage={row.stage} showIcon={false} />
+      </div>
+      <span className="text-secondary min-w-0 text-xs font-medium break-words">
+        {row.createdAt ? renderLogContent(row.message, row.stage === 'system') : row.message}
+      </span>
+      <span className="flex items-center gap-2">
+        {row.payloadAction ? (
+          <Button type="button" variant="quiet" size="sm" onClick={peek}>
+            Peek payload
+          </Button>
+        ) : null}
+      </span>
+    </div>
+  );
+}
+
+function PayloadPeekPanel({
+  activePeekedGroupKey,
+  peekPanelRef,
+  peekedGroup,
+  safePeekedRecordIndex,
+  peekedRecordJson,
+  setPeekedGroupKey,
+}: {
+  activePeekedGroupKey: string | null;
+  peekPanelRef: React.RefObject<HTMLDivElement | null>;
+  peekedGroup: LogSiteGroup | null;
+  safePeekedRecordIndex: number;
+  peekedRecordJson: string;
+  setPeekedGroupKey: React.Dispatch<React.SetStateAction<string | null>>;
+}) {
+  if (!activePeekedGroupKey) return null;
+  return (
+    <div className="absolute inset-0 z-40 bg-[color-mix(in_srgb,var(--bg-base)_60%,transparent)] backdrop-blur-sm">
+      <div
+        ref={peekPanelRef}
+        className="animate-in slide-in-from-right absolute inset-y-0 right-0 z-50 w-[36rem] max-w-full border-l duration-300"
+        style={{
+          borderColor: 'var(--terminal-border)',
+          backgroundColor: 'var(--terminal-code-bg)',
+          color: 'var(--terminal-fg)',
+          boxShadow: 'var(--terminal-shadow)',
+        }}
+      >
+        <div
+          className="flex items-center justify-between border-b px-6 py-3"
+          style={{
+            borderColor: 'var(--terminal-border)',
+            backgroundColor: 'var(--terminal-bg)',
+          }}
+        >
+          <div className="min-w-0 flex-1">
+            <div className="text-accent type-label-mono">{TERMINAL_STRINGS.PAYLOAD_PEEK}</div>
             <div
-              className="flex items-center justify-between border-b px-6 py-3"
-              style={{
-                borderColor: 'var(--terminal-border)',
-                backgroundColor: 'var(--terminal-bg)',
-              }}
+              className="mt-0.5 truncate pr-4 text-xs font-medium tabular-nums"
+              style={{ color: 'var(--text-muted)' }}
+              title={peekedGroup?.label ?? ''}
             >
-              <div className="min-w-0 flex-1">
-                <div className="text-accent type-label-mono">{TERMINAL_STRINGS.PAYLOAD_PEEK}</div>
-                <div
-                  className="mt-0.5 truncate pr-4 text-xs font-medium tabular-nums"
-                  style={{ color: 'var(--text-muted)' }}
-                  title={peekedGroup?.label ?? ''}
-                >
-                  {peekedGroup?.label ?? TERMINAL_STRINGS.SITE_PAYLOAD}
-                </div>
-              </div>
+              {peekedGroup?.label ?? TERMINAL_STRINGS.SITE_PAYLOAD}
+            </div>
+          </div>
+          <Button type="button" variant="quiet" size="sm" onClick={() => setPeekedGroupKey(null)}>
+            Close
+          </Button>
+        </div>
+        <div className="relative h-[calc(100%-56px)] overflow-hidden p-6">
+          <div className="group relative h-full">
+            <div className="absolute top-3 right-3 z-10 opacity-0 transition-opacity group-hover:opacity-100">
               <Button
                 type="button"
                 variant="quiet"
                 size="sm"
-                onClick={() => setPeekedGroupKey(null)}
+                onClick={() => {
+                  if (!peekedGroup) return;
+                  const currentRecord =
+                    peekedGroup.records[safePeekedRecordIndex] ?? peekedGroup.records[0];
+                  if (!currentRecord) return;
+                  void navigator.clipboard.writeText(
+                    JSON.stringify(cleanRecordForDisplay(currentRecord), null, 2),
+                  );
+                }}
               >
-                Close
+                <Copy className="mr-1.5 size-3" />
+                Copy
               </Button>
             </div>
-            <div className="relative h-[calc(100%-56px)] overflow-hidden p-6">
-              <div className="group relative h-full">
-                <div className="absolute top-3 right-3 z-10 opacity-0 transition-opacity group-hover:opacity-100">
-                  <Button
-                    type="button"
-                    variant="quiet"
-                    size="sm"
-                    onClick={() => {
-                      if (!peekedGroup) return;
-                      const currentRecord =
-                        peekedGroup.records[safePeekedRecordIndex] ?? peekedGroup.records[0];
-                      if (!currentRecord) return;
-                      void navigator.clipboard.writeText(
-                        JSON.stringify(cleanRecordForDisplay(currentRecord), null, 2),
-                      );
-                    }}
-                  >
-                    <Copy className="mr-1.5 size-3" />
-                    Copy
-                  </Button>
-                </div>
-                {peekedRecordJson ? (
-                  <pre className="crawl-terminal crawl-terminal-json h-full max-h-full overflow-auto">
-                    <span className="sr-only">{peekedRecordJson}</span>
-                    <span aria-hidden="true">{syntaxHighlightJsonNodes(peekedRecordJson)}</span>
-                  </pre>
-                ) : (
-                  <pre className="crawl-terminal crawl-terminal-json h-full max-h-full overflow-auto">
-                    {TERMINAL_STRINGS.NO_PAYLOAD}
-                  </pre>
-                )}
-              </div>
-            </div>
+            {peekedRecordJson ? (
+              <pre className="crawl-terminal crawl-terminal-json h-full max-h-full overflow-auto">
+                <span className="sr-only">{peekedRecordJson}</span>
+                <span aria-hidden="true">{syntaxHighlightJsonNodes(peekedRecordJson)}</span>
+              </pre>
+            ) : (
+              <pre className="crawl-terminal crawl-terminal-json h-full max-h-full overflow-auto">
+                {TERMINAL_STRINGS.NO_PAYLOAD}
+              </pre>
+            )}
           </div>
         </div>
-      ) : null}
+      </div>
     </div>
   );
-});
+}

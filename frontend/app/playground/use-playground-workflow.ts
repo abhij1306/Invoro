@@ -77,7 +77,7 @@ export function usePlaygroundWorkflow() {
     mutationFn: (inputUrl: string) => {
       const inputUrls = parseUrlInput(inputUrl);
       return api.createPlaygroundSession({
-        url: inputUrls[0] ?? inputUrl,
+        url: firstInputUrl(inputUrls, inputUrl),
         urls: inputUrls.slice(1),
         category_limit: clampCategoryLimit(categoryLimit),
       });
@@ -196,12 +196,7 @@ export function usePlaygroundWorkflow() {
     () => normalizePlaygroundResults(resultsQuery.data),
     [resultsQuery.data],
   );
-  const hasPipelineActivity = Boolean(
-    session?.step_data?.enrich ||
-    session?.step_data?.compare ||
-    session?.step_data?.monitor ||
-    session?.step_data?.audit,
-  );
+  const hasPipelineActivity = sessionHasPipelineActivity(session);
 
   const toggleProduct = useCallback((productUrl: string) => {
     setSelectedUrls((previous) => {
@@ -240,7 +235,7 @@ export function usePlaygroundWorkflow() {
     sessionId,
     session,
     state,
-    currentStep: state ? playgroundStepIndex(state) : -1,
+    currentStep: currentPlaygroundStep(state),
     url,
     setUrl,
     categoryLimit,
@@ -279,4 +274,19 @@ export function usePlaygroundWorkflow() {
     selectUrls,
     selectAll,
   };
+}
+
+export type PlaygroundWorkflow = ReturnType<typeof usePlaygroundWorkflow>;
+
+function firstInputUrl(urls: string[], fallback: string) {
+  return urls.length ? urls[0] : fallback;
+}
+
+function sessionHasPipelineActivity(session: PlaygroundSessionResponse | undefined) {
+  const steps = session?.step_data;
+  return Boolean(steps && ['enrich', 'compare', 'monitor', 'audit'].some((key) => steps[key]));
+}
+
+function currentPlaygroundStep(state: PlaygroundSessionState | undefined) {
+  return state ? playgroundStepIndex(state) : -1;
 }
