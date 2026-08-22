@@ -98,7 +98,18 @@ def _redact_fastapi_request_attributes(
 ) -> dict[str, Any]:
     """Keep validation diagnostics while excluding endpoint argument values."""
     errors = attributes.get("errors")
-    return {"errors": errors} if errors else {}
+    if not isinstance(errors, (list, tuple)) or not errors:
+        return {}
+    safe_errors: list[dict[str, Any]] = []
+    for error in errors:
+        if not isinstance(error, dict):
+            continue
+        safe_error = {
+            field: error[field] for field in ("type", "loc") if field in error
+        }
+        if safe_error:
+            safe_errors.append(safe_error)
+    return {"errors": safe_errors} if safe_errors else {}
 
 
 def instrument_fastapi(app: FastAPI) -> bool:

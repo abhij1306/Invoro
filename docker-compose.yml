@@ -48,7 +48,23 @@ services:
         }
         if ! database_exists "$$POSTGRES_DB"; then
           if [ "$$POSTGRES_DB" = "invoro" ] && database_exists "crawlerai"; then
-            psql --dbname postgres --command 'ALTER DATABASE crawlerai RENAME TO invoro'
+            psql --dbname postgres --set ON_ERROR_STOP=1 --command \
+              'ALTER DATABASE crawlerai WITH ALLOW_CONNECTIONS false'
+            psql --dbname postgres --set ON_ERROR_STOP=1 --command \
+              "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = 'crawlerai' AND pid <> pg_backend_pid()"
+            if ! psql --dbname postgres --set ON_ERROR_STOP=1 --command \
+              'ALTER DATABASE crawlerai RENAME TO invoro'; then
+              psql --dbname postgres --command \
+                'ALTER DATABASE crawlerai WITH ALLOW_CONNECTIONS true' || true
+              echo >&2 "Could not rename crawlerai to invoro. Stop clients using crawlerai, then retry db-rename."
+              exit 1
+            fi
+            psql --dbname postgres --set ON_ERROR_STOP=1 --command \
+              'ALTER DATABASE invoro WITH ALLOW_CONNECTIONS true'
+            # The canonical baseline consolidates the legacy chain. Preserve the
+            # schema/data and replace only its obsolete Alembic revision marker.
+            psql --dbname invoro --set ON_ERROR_STOP=1 --command \
+              "CREATE TABLE IF NOT EXISTS alembic_version (version_num VARCHAR(32) NOT NULL); TRUNCATE alembic_version; INSERT INTO alembic_version (version_num) VALUES ('20260822_0001')"
           else
             createdb --maintenance-db postgres "$$POSTGRES_DB"
           fi
@@ -194,7 +210,6 @@ services:
     environment:
       HOSTNAME: 0.0.0.0
       PORT: "4000"
-      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://127.0.0.1:9000}
     depends_on:
       api:
         condition: service_healthy

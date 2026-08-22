@@ -221,10 +221,19 @@ def test_logfire_fastapi_mapper_excludes_argument_values() -> None:
         object(),
         {
             "values": {"password": "secret", "url": "https://example.com/?token=x"},
-            "errors": [{"type": "missing", "loc": ["body", "name"]}],
+            "errors": [
+                {
+                    "type": "missing",
+                    "loc": ["body", "name"],
+                    "input": "secret",
+                    "msg": "Input should contain secret",
+                    "ctx": {"provided": "secret"},
+                }
+            ],
         },
     ) == {"errors": [{"type": "missing", "loc": ["body", "name"]}]}
     assert mapper(object(), {"values": {"password": "secret"}, "errors": []}) == {}
+    assert mapper(object(), {"errors": [{"input": "secret"}]}) == {}
 
 
 @pytest.mark.component
