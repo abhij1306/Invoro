@@ -46,6 +46,26 @@ services:
             | sed 's/^[[:space:]]*//;s/[[:space:]]*$$//' \
             | grep -Fqx -- "$$1"
         }
+        reconcile_legacy_baseline() {
+          version_table=$$(psql --dbname "$$POSTGRES_DB" --tuples-only --no-align --command \
+            "SELECT to_regclass('public.alembic_version')")
+          if [ -z "$$version_table" ]; then
+            return
+          fi
+          revision=$$(psql --dbname "$$POSTGRES_DB" --tuples-only --no-align --command \
+            'SELECT version_num FROM alembic_version')
+          case "$$revision" in
+            20260822_0001) ;;
+            20260822_0010)
+              psql --dbname "$$POSTGRES_DB" --set ON_ERROR_STOP=1 --command \
+                "TRUNCATE alembic_version; INSERT INTO alembic_version (version_num) VALUES ('20260822_0001')"
+              ;;
+            *)
+              echo >&2 "Database $$POSTGRES_DB has unsupported Alembic revision '$$revision'. Upgrade it to legacy head 20260822_0010 before starting this release."
+              exit 1
+              ;;
+          esac
+        }
         if ! database_exists "$$POSTGRES_DB"; then
           if [ "$$POSTGRES_DB" = "invoro" ] && database_exists "crawlerai"; then
             psql --dbname postgres --set ON_ERROR_STOP=1 --command \
@@ -61,14 +81,13 @@ services:
             fi
             psql --dbname postgres --set ON_ERROR_STOP=1 --command \
               'ALTER DATABASE invoro WITH ALLOW_CONNECTIONS true'
-            # The canonical baseline consolidates the legacy chain. Preserve the
-            # schema/data and replace only its obsolete Alembic revision marker.
-            psql --dbname invoro --set ON_ERROR_STOP=1 --command \
-              "CREATE TABLE IF NOT EXISTS alembic_version (version_num VARCHAR(32) NOT NULL); TRUNCATE alembic_version; INSERT INTO alembic_version (version_num) VALUES ('20260822_0001')"
           else
             createdb --maintenance-db postgres "$$POSTGRES_DB"
           fi
         fi
+        # The canonical baseline matches the fully migrated legacy schema. Preserve
+        # all schema/data and replace only the obsolete legacy-head marker.
+        reconcile_legacy_baseline
         database_exists "$$POSTGRES_DB"
 
   redis:
