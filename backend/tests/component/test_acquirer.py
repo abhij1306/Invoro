@@ -5,7 +5,7 @@ import asyncio
 import httpx
 import pytest
 
-from app.services.acquisition import browser_runtime
+from app.services.acquisition import browser_origin_warmup
 from app.services.acquisition.acquirer import (
     AcquisitionRequest,
     PageEvidence,
@@ -25,8 +25,8 @@ from app.services.crawl.utils import (
 def test_origin_warmup_state_lock_is_scoped_to_running_loop() -> None:
     async def _locks() -> tuple[asyncio.Lock, asyncio.Lock]:
         return (
-            browser_runtime._origin_warmup_state_lock(),
-            browser_runtime._origin_warmup_state_lock(),
+            browser_origin_warmup.origin_warmup_state_lock(),
+            browser_origin_warmup.origin_warmup_state_lock(),
         )
 
     first_lock, repeated_first_lock = asyncio.run(_locks())

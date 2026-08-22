@@ -28,7 +28,7 @@ from app.services.acquisition import browser_capture, browser_detail, browser_re
 
 from app.services.acquisition.browser_capture import BrowserNetworkCapture
 
-from app.services.acquisition import browser_page_flow, browser_page_helpers, browser_pool, browser_readiness, browser_result_builder, browser_runtime  # fmt: skip
+from app.services.acquisition import browser_origin_warmup, browser_page_flow, browser_page_helpers, browser_pool, browser_readiness, browser_result_builder, browser_runtime  # fmt: skip
 
 from app.services.acquisition.browser_fetch_support import build_browser_fetch_result
 
@@ -42,6 +42,7 @@ from app.services.config.selectors import CARD_SELECTORS
 
 from app.services.pipeline.extract_records import extract_records
 
+
 @pytest.fixture(autouse=True)
 def _reset_origin_warmup_state(monkeypatch: pytest.MonkeyPatch):
     async def _no_saved_domain_state(*_args, **_kwargs):
@@ -53,14 +54,16 @@ def _reset_origin_warmup_state(monkeypatch: pytest.MonkeyPatch):
         "load_storage_state_for_domain",
         _no_saved_domain_state,
     )
-    browser_runtime._ORIGIN_WARMUP_IN_FLIGHT.clear()
-    browser_runtime._ORIGIN_WARMUP_RECENT.clear()
+    browser_origin_warmup.ORIGIN_WARMUP_IN_FLIGHT.clear()
+    browser_origin_warmup.ORIGIN_WARMUP_RECENT.clear()
     yield
-    browser_runtime._ORIGIN_WARMUP_IN_FLIGHT.clear()
-    browser_runtime._ORIGIN_WARMUP_RECENT.clear()
+    browser_origin_warmup.ORIGIN_WARMUP_IN_FLIGHT.clear()
+    browser_origin_warmup.ORIGIN_WARMUP_RECENT.clear()
+
 
 async def _async_checkpoint() -> None:
     await asyncio.sleep(0)
+
 
 def _network_capture_summary() -> SimpleNamespace:
     return SimpleNamespace(
