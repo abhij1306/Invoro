@@ -1,13 +1,10 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { render } from '@testing-library/react';
+import { afterEach, beforeEach, describe, vi } from 'vitest';
 
 import type { CrawlLog, CrawlRecord, CrawlRun, DomainRecipe } from '../../lib/api/types';
-import { POLLING_INTERVALS } from '../../lib/constants/timing';
 import { TopBarProvider } from '../layout/top-bar-context';
-import { LogTerminal } from './log-terminal';
 import { CrawlRunScreen } from './crawl-run-screen';
-import { storeProductIntelligencePrefill } from './crawl-run-prefill';
 
 export const replaceMock = vi.fn();
 export const pushMock = vi.fn();

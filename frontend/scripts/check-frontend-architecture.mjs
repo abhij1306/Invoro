@@ -20,16 +20,6 @@ export const SOURCE_SCAN_EXCLUDED_DIRECTORIES = new Set([
   'test-results',
 ]);
 
-function read(relativePath) {
-  try {
-    return fs.readFileSync(path.join(root, relativePath), 'utf8');
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    failures.push(`${relativePath} could not be read: ${message}`);
-    return null;
-  }
-}
-
 const requiredOwners = [
   'components/ui/dropdown.tsx',
   'components/ui/field.tsx',

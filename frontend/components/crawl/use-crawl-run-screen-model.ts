@@ -482,8 +482,6 @@ export function useCrawlRunScreenModel(runId: number) {
     selectAll,
   } = controller;
 
-  const runErrorMessage =
-    typeof run?.result_summary?.error === 'string' ? run.result_summary.error : '';
   const knownTableRecordsTotal = Math.max(tableTotal, tableRecordsQuery.data?.meta?.total ?? 0);
   const terminalRecordsNeedSync = terminalSyncNeeded(
     terminal,

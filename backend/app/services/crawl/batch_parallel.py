@@ -144,7 +144,7 @@ async def process_urls_in_parallel(
     for work_item in enumerate(url_list, start=1):
         work_queue.put_nowait(work_item)
     result_queue: asyncio.Queue[
-        tuple[int, str, URLProcessingResult, int] | BaseException
+        tuple[int, str, URLProcessingResult, int] | Exception
     ] = asyncio.Queue(maxsize=concurrency)
 
     async def worker(worker_number: int) -> None:
@@ -170,7 +170,7 @@ async def process_urls_in_parallel(
             except asyncio.CancelledError:
                 await record_budget.release(claimed)
                 raise
-            except BaseException as exc:
+            except Exception as exc:
                 await record_budget.release(claimed)
                 await result_queue.put(exc)
                 return
@@ -186,11 +186,9 @@ async def process_urls_in_parallel(
     verdicts: list[str] = []
 
     async def record_result(
-        item: tuple[int, str, URLProcessingResult, int] | BaseException,
+        item: tuple[int, str, URLProcessingResult, int],
     ) -> bool:
         nonlocal record_count
-        if isinstance(item, BaseException):
-            raise item
         idx, url, result, count = item
         verdict = str(result.verdict or VERDICT_ERROR)
         verdicts.append(verdict)
@@ -211,13 +209,17 @@ async def process_urls_in_parallel(
         await session.commit()
         return record_count >= max_records
 
-    async def drain_ready_results() -> None:
+    async def drain_ready_results() -> Exception | None:
+        first_error: Exception | None = None
         while True:
             try:
                 item = result_queue.get_nowait()
             except asyncio.QueueEmpty:
-                return
-            await record_result(item)
+                return first_error
+            if isinstance(item, Exception):
+                first_error = first_error or item
+            else:
+                await record_result(item)
             result_queue.task_done()
 
     try:
@@ -226,17 +228,25 @@ async def process_urls_in_parallel(
             completed_item = await result_queue.get()
             result_queue.task_done()
             completed_urls += 1
+            if isinstance(completed_item, Exception):
+                await cancel_pending_tasks(tasks)
+                await drain_ready_results()
+                raise completed_item
             record_limit_reached = await record_result(completed_item)
             await session.refresh(run)
             control_request = get_control_request(run)
             if control_request in (CONTROL_REQUEST_PAUSE, CONTROL_REQUEST_KILL):
-                await drain_ready_results()
+                queued_error = await drain_ready_results()
                 await cancel_pending_tasks(tasks)
+                if queued_error is not None:
+                    raise queued_error
                 await _persist_parallel_control(session, run, control_request)
                 return verdicts, record_count
             if record_limit_reached:
-                await drain_ready_results()
+                queued_error = await drain_ready_results()
                 await cancel_pending_tasks(tasks)
+                if queued_error is not None:
+                    raise queued_error
                 await log_event(
                     session,
                     run.id,
@@ -245,7 +255,10 @@ async def process_urls_in_parallel(
                 )
                 await session.commit()
                 break
-    except BaseException:
+    except asyncio.CancelledError:
+        await cancel_pending_tasks(tasks)
+        raise
+    except Exception:
         await cancel_pending_tasks(tasks)
         raise
     await asyncio.gather(*tasks)

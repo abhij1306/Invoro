@@ -1,6 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { expect, it, vi } from 'vitest';
-import { POLLING_INTERVALS } from '../../lib/constants/timing';
 import { LogTerminal } from './log-terminal';
 import {
   apiMock,
@@ -13,7 +12,6 @@ import {
   pushMock,
   renderRunScreen,
   replaceMock,
-  runningRun,
   terminalRun,
 } from './crawl-run-screen.test-harness';
 

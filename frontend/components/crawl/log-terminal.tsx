@@ -1,53 +1,22 @@
 'use client';
 
-import {
-  Activity,
-  AlertTriangle,
-  CheckCircle2,
-  ChevronDown,
-  Clock,
-  Database,
-  Dot,
-  Globe,
-  HardDrive,
-  Layers,
-  Monitor,
-  RefreshCw,
-  ShieldAlert,
-  XCircle,
-  Zap,
-} from 'lucide-react';
+import { CheckCircle2, ChevronDown, Clock, Database, Globe } from 'lucide-react';
 import React, { memo, useEffect, useMemo, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 
 import type { CrawlLog, CrawlRecord } from '../../lib/api/types';
 import { cn } from '../../lib/utils';
-import {
-  formatDurationMs,
-  formatTimeHms,
-  humanizeFieldName,
-  normalizeField,
-  parseApiDate,
-} from '../../lib/crawl/format';
-import { uniqueRequestedFields } from '../../lib/crawl/fields';
+import { formatDurationMs, formatTimeHms, parseApiDate } from '../../lib/crawl/format';
 import { cleanRecordForDisplay } from '../../lib/crawl/record-utils';
-import { isInformativeValue, qualityLevelFromScore } from '../../lib/crawl/quality';
-import { scrollViewportToBottom } from '../../lib/crawl/scroll';
 import { Button } from '../ui/primitives';
-import { acquisitionDiagnosticsSummary, recordConfidenceSummary } from './crawl-diagnostics';
 import {
   buildLogSiteGroups,
-  getLogStage,
   isPersistenceSummaryLog,
-  LOG_PATTERNS,
-  logMessageIsError,
-  parseStartingLog,
   sanitizeLogMessage,
   siteDomId,
-  STAGE_CONFIG,
   TERMINAL_STRINGS,
 } from './log-terminal-utils';
-import type { LogStage, LogSiteGroup } from './log-terminal-utils';
+import type { LogSiteGroup } from './log-terminal-utils';
 import { PayloadPeekPanel } from './log-terminal-payload';
 
 import {
@@ -61,7 +30,6 @@ import {
   payloadSnapshot,
   renderLogContent,
   severityTone,
-  ShortenedUrl,
   StageChip,
   toneForConfidence,
   useLogViewport,

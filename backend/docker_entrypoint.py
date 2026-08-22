@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import sys
+from collections.abc import MutableMapping
 from urllib.parse import quote
 
 
@@ -18,17 +19,25 @@ def build_database_url(
     )
 
 
+def configure_database_url(environment: MutableMapping[str, str]) -> None:
+    """Synthesize the Compose URL without overriding an explicit database URL."""
+    if environment.get("DATABASE_URL", "").strip():
+        return
+    password = environment.get("POSTGRES_PASSWORD")
+    if password is None:
+        return
+    environment["DATABASE_URL"] = build_database_url(
+        user=environment.get("POSTGRES_USER", "postgres"),
+        password=password,
+        host=environment.get("POSTGRES_HOST", "db"),
+        port=environment.get("POSTGRES_PORT", "5432"),
+        database=environment.get("POSTGRES_DB", "invoro"),
+    )
+
+
 def main() -> None:
     """Populate DATABASE_URL from Compose inputs and replace this process."""
-    password = os.environ.get("POSTGRES_PASSWORD")
-    if password is not None:
-        os.environ["DATABASE_URL"] = build_database_url(
-            user=os.environ.get("POSTGRES_USER", "postgres"),
-            password=password,
-            host=os.environ.get("POSTGRES_HOST", "db"),
-            port=os.environ.get("POSTGRES_PORT", "5432"),
-            database=os.environ.get("POSTGRES_DB", "invoro"),
-        )
+    configure_database_url(os.environ)
     if len(sys.argv) < 2:
         raise SystemExit("No container command provided")
     os.execvp(sys.argv[1], sys.argv[1:])

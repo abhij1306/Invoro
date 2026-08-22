@@ -14,11 +14,11 @@ RUN pnpm install --frozen-lockfile
 FROM base AS builder
 
 WORKDIR /app
-ARG NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:9000
+ARG NEXT_PUBLIC_API_BASE_URL
 ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY frontend/ ./
-RUN pnpm build
+RUN test -n "$NEXT_PUBLIC_API_BASE_URL" && pnpm build
 
 FROM node:24-alpine AS runner
 

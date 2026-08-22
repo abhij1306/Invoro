@@ -1,26 +1,12 @@
 'use client';
-import { Globe, Info, Plus, SlidersHorizontal, Sparkles } from 'lucide-react';
 import type { Route } from 'next';
 import { useRouter } from 'next/navigation';
 import { startTransition, useCallback, useEffect, useMemo, useReducer } from 'react';
-import { cn } from '../../lib/utils';
-import { InlineAlert, TabBar } from '../ui/patterns';
-import { Badge, Button, Dropdown, Card, Input, Textarea, Toggle, Tooltip } from '../ui/primitives';
 import { api } from '../../lib/api';
 import type { CrawlConfig, CrawlDomain } from '../../lib/api/types';
 import { CRAWL_DEFAULTS, CRAWL_LIMITS } from '../../lib/constants/crawl-defaults';
 import { getNormalizedDomain } from '../../lib/format/domain';
 import { telemetryErrorPayload, trackEvent } from '../../lib/telemetry/events';
-import {
-  AdditionalFieldInput,
-  CsvFileField,
-  FieldEditorHeader,
-  ManualFieldEditor,
-  SettingSection,
-  SliderRow,
-  SitemapConfigFields,
-  TargetUrlField,
-} from './shared-components';
 import {
   clampNumber,
   deriveSurface,
@@ -29,57 +15,30 @@ import {
   type PdpMode,
   normalizeField,
   parseLines,
-  parseRequestedCategoryMode,
-  parseRequestedCrawlTab,
-  parseRequestedPdpMode,
-  uniqueRequestedFields,
 } from './shared';
 import {
-  applyDiagnosticsPreset,
-  BROWSER_ENGINE_OPTIONS,
   buildDispatch,
   buildFieldRowFromSuggestion,
   canPreview,
-  CAPTURE_NETWORK_OPTIONS,
   diagnosticsPresetForProfile,
-  EXTRACTION_SOURCE_OPTIONS,
-  FETCH_MODE_OPTIONS,
   inferRunTypeHint,
   isSingleUrlMode,
-  JS_MODE_OPTIONS,
   mergeFieldRows,
   normalizeHttpLookupDomain,
-  parseOptionalClampedNumber,
   selectRelevantSelectorRecords,
   selectorGenerationFields,
   surfaceLabel,
-  TRAVERSAL_MODE_OPTIONS,
-  type BrowserEngine,
-  type CaptureNetworkMode,
-  type DiagnosticsPreset,
-  type ExtractionSource,
-  type FetchMode,
-  type JsMode,
-  type TraversalDropdownValue,
 } from './crawl-config-logic';
 import { resolveAutoSurface } from './auto-surface';
-import { CrawlActionButtons } from './crawl-action-buttons';
 import { testCrawlFieldRow } from './crawl-field-test';
 import {
-  ADVANCED_COLUMN_CLASS,
-  ADVANCED_CONTROL_ROW_CLASS,
-  ADVANCED_SECTION_TITLE_CLASS,
-  ADVANCED_SUBSECTION_CLASS,
   bindCrawlConfigLocalDispatch,
   buildInitialLocalState,
   crawlConfigLocalReducer,
-  RUN_SETUP_CONTROL_CLASS,
-  RUN_SETUP_LABEL_CLASS,
-  RUN_SETUP_ROW_CLASS,
   type CrawlConfigScreenProps,
   useCrawlRouteState,
 } from './crawl-config-state';
-import { DOMAIN_OPTIONS, DOMAIN_TABS } from './domain-surface-config';
+import { DOMAIN_TABS } from './domain-surface-config';
 import * as crawlConfigForm from './use-crawl-config';
 import { useCrawlConfigLifecycle } from './use-crawl-config-lifecycle';
 import { CrawlConfigScreenContent } from './crawl-config-screen-content';

@@ -4,8 +4,6 @@ import {
   Activity,
   AlertTriangle,
   CheckCircle2,
-  Clock,
-  Copy,
   Database,
   Dot,
   Globe,
@@ -19,11 +17,10 @@ import {
 } from 'lucide-react';
 import React, { useEffect, useRef } from 'react';
 import type { RefObject } from 'react';
-import type { CrawlLog, CrawlRecord } from '../../lib/api/types';
+import type { CrawlRecord } from '../../lib/api/types';
 import { cn } from '../../lib/utils';
 import {
   formatDurationMs,
-  formatTimeHms,
   humanizeFieldName,
   normalizeField,
   parseApiDate,
@@ -32,12 +29,9 @@ import { uniqueRequestedFields } from '../../lib/crawl/fields';
 import { cleanRecordForDisplay } from '../../lib/crawl/record-utils';
 import { isInformativeValue, qualityLevelFromScore } from '../../lib/crawl/quality';
 import { scrollViewportToBottom } from '../../lib/crawl/scroll';
-import { syntaxHighlightJsonNodes } from '../../lib/ui/syntax';
-import { Button } from '../ui/primitives';
 import { acquisitionDiagnosticsSummary, recordConfidenceSummary } from './crawl-diagnostics';
 import {
   getLogStage,
-  isPersistenceSummaryLog,
   LOG_PATTERNS,
   logMessageIsError,
   parseStartingLog,
