@@ -92,15 +92,9 @@ def build_playwright_context_spec(
     # may still override user_agent below (explicit locality wins).
     if apply_identity_defaults:
         context_options["user_agent"] = _deheadless_user_agent(browser_major_version)
-        context_options["extra_http_headers"] = _coherent_chrome_client_hint_headers(
-            browser_major_version
-        )
+        context_options["extra_http_headers"] = _coherent_chrome_client_hint_headers(browser_major_version)  # fmt: skip
 
-    default_permissions = [
-        str(value).strip()
-        for value in crawler_runtime_settings.browser_context_permissions
-        if str(value).strip()
-    ]
+    default_permissions = [str(value).strip() for value in crawler_runtime_settings.browser_context_permissions if str(value).strip()]  # fmt: skip
     if default_permissions and "permissions" not in context_options:
         context_options["permissions"] = default_permissions
 
@@ -113,9 +107,7 @@ def build_playwright_context_spec(
     )
 
 
-def _apply_locality_profile(
-    context_options: dict[str, Any], locality_profile: Mapping[str, object]
-) -> None:
+def _apply_locality_profile(context_options: dict[str, Any], locality_profile: Mapping[str, object]) -> None:  # fmt: skip
     for option_name in ("locale", "timezone_id"):
         value = locality_profile.get(option_name)
         if isinstance(value, str) and value.strip():
@@ -125,9 +117,7 @@ def _apply_locality_profile(
         _apply_browser_context_profile(context_options, profile)
     _apply_geolocation(context_options, locality_profile.get("geolocation"))
     if "permissions" in context_options:
-        context_options["permissions"] = _normalized_permissions(
-            context_options["permissions"]
-        )
+        context_options["permissions"] = _normalized_permissions(context_options["permissions"])  # fmt: skip
 
 
 def _apply_geolocation(context_options: dict[str, Any], value: object) -> None:
@@ -153,28 +143,17 @@ def _apply_geolocation(context_options: dict[str, Any], value: object) -> None:
     context_options["permissions"] = permissions
 
 
-def _apply_browser_context_profile(
-    context_options: dict[str, Any], profile: Mapping[str, object]
-) -> None:
+def _apply_browser_context_profile(context_options: dict[str, Any], profile: Mapping[str, object]) -> None:  # fmt: skip
     if isinstance(profile.get("user_agent"), str):
         headers = dict(context_options.get("extra_http_headers") or {})
-        context_options["extra_http_headers"] = {
-            key: value
-            for key, value in headers.items()
-            if not str(key).lower().startswith("sec-ch-ua")
-        }
+        context_options["extra_http_headers"] = {key: value for key, value in headers.items() if not str(key).lower().startswith("sec-ch-ua")}  # fmt: skip
     for key, value in profile.items():
         normalized_key = str(key)
         if value is None:
             continue
         if normalized_key == "extra_http_headers" and isinstance(value, Mapping):
             current_headers = dict(context_options.get("extra_http_headers") or {})
-            current_headers.update(
-                {
-                    str(header): str(header_value)
-                    for header, header_value in value.items()
-                }
-            )
+            current_headers.update({str(header): str(header_value) for header, header_value in value.items()})  # fmt: skip
             context_options[normalized_key] = current_headers
         else:
             context_options[normalized_key] = value

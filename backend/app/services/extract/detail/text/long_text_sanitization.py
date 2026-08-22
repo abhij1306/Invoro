@@ -98,25 +98,11 @@ from app.services.config.detail_extraction_constants import MAX_STRUCTURED_TEXT_
 from app.services.shared.field_coerce import LONG_TEXT_FIELDS, clean_text, text_or_none
 from app.services.shared.regex_patterns import compile_regex_patterns
 
-document_link_label_patterns = compile_regex_patterns(
-    DETAIL_DOCUMENT_LINK_LABEL_PATTERNS or ()
-)
-fulfillment_only_long_text_phrases = frozenset(
-    clean_text(phrase).lower()
-    for phrase in tuple(DETAIL_FULFILLMENT_ONLY_LONG_TEXT_PHRASES or ())
-    if clean_text(phrase)
-)
-fulfillment_long_text_patterns = compile_regex_patterns(
-    DETAIL_FULFILLMENT_LONG_TEXT_PATTERNS or ()
-)
-guide_glossary_text_patterns = compile_regex_patterns(
-    DETAIL_GUIDE_GLOSSARY_TEXT_PATTERNS or ()
-)
-guide_glossary_heading_tokens = frozenset(
-    clean_text(value).lower()
-    for value in tuple(DETAIL_GUIDE_GLOSSARY_HEADING_TOKENS or ())
-    if clean_text(value)
-)
+document_link_label_patterns = compile_regex_patterns(DETAIL_DOCUMENT_LINK_LABEL_PATTERNS or ())  # fmt: skip
+fulfillment_only_long_text_phrases = frozenset(clean_text(phrase).lower() for phrase in tuple(DETAIL_FULFILLMENT_ONLY_LONG_TEXT_PHRASES or ()) if clean_text(phrase))  # fmt: skip
+fulfillment_long_text_patterns = compile_regex_patterns(DETAIL_FULFILLMENT_LONG_TEXT_PATTERNS or ())  # fmt: skip
+guide_glossary_text_patterns = compile_regex_patterns(DETAIL_GUIDE_GLOSSARY_TEXT_PATTERNS or ())  # fmt: skip
+guide_glossary_heading_tokens = frozenset(clean_text(value).lower() for value in tuple(DETAIL_GUIDE_GLOSSARY_HEADING_TOKENS or ()) if clean_text(value))  # fmt: skip
 long_text_disclaimer_patterns = compile_regex_patterns(
     DETAIL_LONG_TEXT_DISCLAIMER_PATTERNS or ()
 )
