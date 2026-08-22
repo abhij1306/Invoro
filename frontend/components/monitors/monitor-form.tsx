@@ -62,6 +62,13 @@ type MonitorFormAction =
   | { type: 'validationFailed'; message: string };
 
 function monitorFormReducer(state: MonitorFormState, action: MonitorFormAction): MonitorFormState {
+  return reduceMonitorFields(state, action) ?? reduceMonitorRuntime(state, action) ?? state;
+}
+
+function reduceMonitorFields(
+  state: MonitorFormState,
+  action: MonitorFormAction,
+): MonitorFormState | null {
   switch (action.type) {
     case 'nameChanged':
       return { ...state, name: action.value };
@@ -89,6 +96,16 @@ function monitorFormReducer(state: MonitorFormState, action: MonitorFormAction):
       return { ...state, priority: action.value };
     case 'retentionDaysChanged':
       return { ...state, retentionDays: action.value };
+    default:
+      return null;
+  }
+}
+
+function reduceMonitorRuntime(
+  state: MonitorFormState,
+  action: MonitorFormAction,
+): MonitorFormState | null {
+  switch (action.type) {
     case 'advancedOpenChanged':
       return { ...state, advancedOpen: action.value };
     case 'proxyEnabledChanged':
@@ -104,6 +121,8 @@ function monitorFormReducer(state: MonitorFormState, action: MonitorFormAction):
       return failFormSubmit(state, action.message);
     case 'submitSettled':
       return settleFormSubmit(state);
+    default:
+      return null;
   }
 }
 
@@ -129,31 +148,7 @@ export function MonitorForm({
   submitLabel,
   layout = 'stack',
 }: Readonly<MonitorFormProps>) {
-  const initialHours = initial?.schedule_interval_hours ?? 24;
-  const [state, dispatch] = useReducer(monitorFormReducer, {
-    name: initial?.name ?? '',
-    urlsText: (initial?.urls ?? []).join('\n'),
-    surface: (initial?.surface as CrawlSurface | undefined) ?? 'ecommerce_detail',
-    trackedFields: initial?.tracked_fields?.length ? initial.tracked_fields : ['price'],
-    intervalUnit: initialHours >= 24 && initialHours % 24 === 0 ? 'days' : 'hours',
-    intervalValue: String(
-      initialHours >= 24 && initialHours % 24 === 0 ? initialHours / 24 : initialHours,
-    ),
-    priority: initial?.priority ?? 'background',
-    retentionDays: initial?.retention_days ?? 30,
-    advancedOpen: false,
-    skipHeadCheck:
-      typeof initial?.settings?.skip_head_check === 'boolean'
-        ? Boolean(initial.settings.skip_head_check)
-        : skipsHeadByDefault((initial?.surface as string | undefined) ?? 'ecommerce_detail'),
-    proxyEnabled: Boolean(initial?.settings?.proxy_enabled),
-    jsRendering:
-      String(
-        (initial?.settings?.fetch_profile as { js_mode?: string } | undefined)?.js_mode ?? '',
-      ) === 'enabled',
-    error: '',
-    submitting: false,
-  });
+  const [state, dispatch] = useReducer(monitorFormReducer, initial, buildInitialMonitorFormState);
   const {
     name,
     urlsText,
@@ -194,37 +189,14 @@ export function MonitorForm({
   }
 
   async function submit() {
-    if (!name.trim()) {
-      dispatch({ type: 'validationFailed', message: 'Name is required.' });
-      return;
-    }
-    if (name.trim().length > 100) {
-      dispatch({ type: 'validationFailed', message: 'Name must be 100 characters or less.' });
-      return;
-    }
-    if (!urls.length) {
-      dispatch({ type: 'validationFailed', message: 'At least one URL is required.' });
-      return;
-    }
-    if (invalidUrls.length) {
-      dispatch({
-        type: 'validationFailed',
-        message: 'Every URL must start with http:// or https://.',
-      });
-      return;
-    }
-    if (urls.length > 500) {
-      dispatch({ type: 'validationFailed', message: 'No more than 500 URLs are allowed.' });
-      return;
-    }
-    if (!trackedFields.length) {
-      dispatch({ type: 'validationFailed', message: 'Select at least one tracked field.' });
-      return;
-    }
-    if (intervalHours < 1) {
-      dispatch({ type: 'validationFailed', message: 'Schedule interval must be at least 1 hour.' });
-      return;
-    }
+    const validationError = validateMonitorForm(
+      name,
+      urls,
+      invalidUrls,
+      trackedFields,
+      intervalHours,
+    );
+    if (validationError) return dispatch({ type: 'validationFailed', message: validationError });
     dispatch({ type: 'submitStarted' });
     try {
       await onSubmit({
@@ -445,4 +417,66 @@ export function MonitorForm({
       </div>
     </div>
   );
+}
+
+function buildInitialMonitorFormState(
+  initial: Partial<MonitorCreatePayload> | undefined,
+): MonitorFormState {
+  const hours = valueOr(initial?.schedule_interval_hours, 24);
+  const interval = initialInterval(hours);
+  const surface = valueOr(initial?.surface as CrawlSurface | undefined, 'ecommerce_detail');
+  const explicitSkipHead = initial?.settings?.skip_head_check;
+  const jsMode = (initial?.settings?.fetch_profile as { js_mode?: string } | undefined)?.js_mode;
+  return {
+    name: valueOr(initial?.name, ''),
+    urlsText: valueOr(initial?.urls, []).join('\n'),
+    surface,
+    trackedFields: initialTrackedFields(initial),
+    intervalUnit: interval.unit,
+    intervalValue: interval.value,
+    priority: valueOr(initial?.priority, 'background'),
+    retentionDays: valueOr(initial?.retention_days, 30),
+    advancedOpen: false,
+    skipHeadCheck: initialSkipHead(explicitSkipHead, surface),
+    proxyEnabled: Boolean(initial?.settings?.proxy_enabled),
+    jsRendering: jsMode === 'enabled',
+    error: '',
+    submitting: false,
+  };
+}
+
+function initialInterval(hours: number): { unit: IntervalUnit; value: string } {
+  const usesDays = hours >= 24 && hours % 24 === 0;
+  return usesDays
+    ? { unit: 'days', value: String(hours / 24) }
+    : { unit: 'hours', value: String(hours) };
+}
+
+function valueOr<T>(value: T | null | undefined, fallback: T): T {
+  return value ?? fallback;
+}
+
+function initialTrackedFields(initial: Partial<MonitorCreatePayload> | undefined) {
+  return initial?.tracked_fields?.length ? initial.tracked_fields : ['price'];
+}
+
+function initialSkipHead(value: unknown, surface: string) {
+  return typeof value === 'boolean' ? value : skipsHeadByDefault(surface);
+}
+
+function validateMonitorForm(
+  name: string,
+  urls: string[],
+  invalidUrls: string[],
+  fields: string[],
+  intervalHours: number,
+) {
+  if (!name.trim()) return 'Name is required.';
+  if (name.trim().length > 100) return 'Name must be 100 characters or less.';
+  if (!urls.length) return 'At least one URL is required.';
+  if (invalidUrls.length) return 'Every URL must start with http:// or https://.';
+  if (urls.length > 500) return 'No more than 500 URLs are allowed.';
+  if (!fields.length) return 'Select at least one tracked field.';
+  if (intervalHours < 1) return 'Schedule interval must be at least 1 hour.';
+  return '';
 }

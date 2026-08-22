@@ -120,18 +120,32 @@ export function normalizeDiscoveredProducts(
 
 export function normalizeSitemap(session: PlaygroundSessionResponse | undefined) {
   const sitemap = step(session, 'sitemap');
-  const source = sitemap?.source;
-  let sourceLabel = 'sitemap';
-  if (source === 'homepage') sourceLabel = 'homepage';
-  else if (source === 'rendered_site_links') sourceLabel = 'rendered site links';
-  else if (source === 'mixed' || String(source ?? '').includes('rendered_site_links')) {
-    sourceLabel = 'mixed discovery';
-  }
-
-  const groups = objectOrNull(sitemap?.groups);
   const sources = objectOrNull(sitemap?.sources) ?? {};
   const errors = objectOrNull(sitemap?.errors) ?? {};
-  const sitemapGroups: SitemapGroup[] = groups
+  return {
+    urls: stringList(sitemap?.urls),
+    sourceLabel: sitemapSourceLabel(sitemap?.source),
+    groups: normalizeSitemapGroups(sitemap?.groups, sources, errors),
+    navTreeGroups: normalizeNavTreeGroups(sitemap, sources, errors, session),
+  };
+}
+
+function sitemapSourceLabel(source: unknown) {
+  if (source === 'homepage') return 'homepage';
+  if (source === 'rendered_site_links') return 'rendered site links';
+  if (source === 'mixed' || String(source ?? '').includes('rendered_site_links')) {
+    return 'mixed discovery';
+  }
+  return 'sitemap';
+}
+
+function normalizeSitemapGroups(
+  value: unknown,
+  sources: UnknownRecord,
+  errors: UnknownRecord,
+): SitemapGroup[] {
+  const groups = objectOrNull(value);
+  return groups
     ? Object.entries(groups).map(([inputUrl, urls]) => ({
         inputUrl,
         urls: stringList(urls),
@@ -139,9 +153,16 @@ export function normalizeSitemap(session: PlaygroundSessionResponse | undefined)
         error: stringOrUndefined(errors[inputUrl]),
       }))
     : [];
+}
 
+function normalizeNavTreeGroups(
+  sitemap: UnknownRecord | null,
+  sources: UnknownRecord,
+  errors: UnknownRecord,
+  session: PlaygroundSessionResponse | undefined,
+): NavTreeGroup[] {
   const trees = objectOrNull(sitemap?.trees);
-  let navTreeGroups: NavTreeGroup[] = trees
+  const groups = trees
     ? Object.entries(trees)
         .map(([inputUrl, tree]) => ({
           inputUrl,
@@ -151,27 +172,18 @@ export function normalizeSitemap(session: PlaygroundSessionResponse | undefined)
         }))
         .filter((group) => group.tree.length > 0)
     : [];
-
-  if (!navTreeGroups.length && session) {
-    const tree = normalizeNavTree(sitemap?.nav_tree);
-    if (tree.length) {
-      navTreeGroups = [
+  if (groups.length || !session) return groups;
+  const tree = normalizeNavTree(sitemap?.nav_tree);
+  return tree.length
+    ? [
         {
           inputUrl: session.input_url,
           source: stringOrUndefined(sitemap?.source) ?? 'unknown',
           error: stringOrUndefined(sitemap?.error),
           tree,
         },
-      ];
-    }
-  }
-
-  return {
-    urls: stringList(sitemap?.urls),
-    sourceLabel,
-    groups: sitemapGroups,
-    navTreeGroups,
-  };
+      ]
+    : [];
 }
 
 export function normalizePlaygroundResults(payload: unknown) {

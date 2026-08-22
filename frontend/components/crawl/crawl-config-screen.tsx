@@ -25,6 +25,8 @@ import {
   clampNumber,
   deriveSurface,
   type FieldRow,
+  type CategoryMode,
+  type PdpMode,
   normalizeField,
   parseLines,
   parseRequestedCategoryMode,
@@ -80,8 +82,54 @@ import {
 import { DOMAIN_OPTIONS, DOMAIN_TABS } from './domain-surface-config';
 import * as crawlConfigForm from './use-crawl-config';
 import { useCrawlConfigLifecycle } from './use-crawl-config-lifecycle';
+import { CrawlConfigScreenContent } from './crawl-config-screen-content';
 
-export function CrawlConfigScreen({
+function deriveCrawlRoutePresentation(
+  crawlDomain: CrawlDomain,
+  crawlTab: CrawlConfig['module'],
+  categoryMode: CategoryMode,
+  pdpMode: PdpMode,
+  targetUrl: string,
+) {
+  const modePickerEnabled = crawlDomain === 'commerce' || crawlDomain === 'jobs';
+  const selectedMode: CategoryMode | PdpMode = crawlTab === 'category' ? categoryMode : pdpMode;
+  const activeMode: CategoryMode | PdpMode = modePickerEnabled ? selectedMode : 'single';
+  const surface = deriveSurface(crawlDomain, crawlTab);
+  const autoSurfaceResolution = surface === 'auto' ? resolveAutoSurface(targetUrl, crawlTab) : null;
+  const effectiveSurface = autoSurfaceResolution?.surface ?? surface;
+  const domainTabs = DOMAIN_TABS[crawlDomain];
+  return {
+    activeMode,
+    surface,
+    effectiveSurface,
+    domainTabs,
+    activeTabLabel:
+      domainTabs.find((tab) => tab.value === crawlTab)?.label ?? surfaceLabel(surface),
+    showSurfaceTabs: domainTabs.length > 1,
+    showModePicker: modePickerEnabled,
+    singleUrlMode: isSingleUrlMode(crawlTab, activeMode),
+  };
+}
+
+function lookupKey(enabled: boolean, domain: string, surface: string) {
+  return enabled && domain && surface ? `${domain}|${surface}` : '';
+}
+
+function hasCrawlTarget(
+  crawlTab: CrawlConfig['module'],
+  activeMode: CategoryMode | PdpMode,
+  sitemapDomain: string,
+  singleUrlMode: boolean,
+  targetUrl: string,
+  bulkUrls: string,
+  csvFile: File | null,
+) {
+  if (crawlTab === 'category' && activeMode === 'sitemap') return sitemapDomain.trim().length > 0;
+  if (singleUrlMode) return targetUrl.trim().length > 0;
+  return bulkUrls.trim().length > 0 || csvFile !== null;
+}
+
+function useCrawlConfigScreenModel({
   requestedTab,
   requestedCategoryMode,
   requestedPdpMode,
@@ -134,30 +182,22 @@ export function CrawlConfigScreen({
   } = localState;
   const localDispatch = useMemo(() => bindCrawlConfigLocalDispatch(dispatchLocal), [dispatchLocal]);
 
-  const modePickerEnabled = crawlDomain === 'commerce' || crawlDomain === 'jobs';
-  const selectedMode = crawlTab === 'category' ? categoryMode : pdpMode;
-  const activeMode = modePickerEnabled ? selectedMode : 'single';
-  const surface = deriveSurface(crawlDomain, crawlTab);
-  const autoSurfaceResolution = useMemo(
-    () => (surface === 'auto' ? resolveAutoSurface(targetUrl, crawlTab) : null),
-    [targetUrl, crawlTab, surface],
+  const {
+    activeMode,
+    surface,
+    effectiveSurface,
+    domainTabs,
+    activeTabLabel,
+    showSurfaceTabs,
+    showModePicker,
+    singleUrlMode,
+  } = useMemo(
+    () => deriveCrawlRoutePresentation(crawlDomain, crawlTab, categoryMode, pdpMode, targetUrl),
+    [categoryMode, crawlDomain, crawlTab, pdpMode, targetUrl],
   );
-  const effectiveSurface = autoSurfaceResolution?.surface ?? surface;
-  const domainTabs = DOMAIN_TABS[crawlDomain];
-  const activeTabLabel =
-    domainTabs.find((tab) => tab.value === crawlTab)?.label ?? surfaceLabel(surface);
-  const showSurfaceTabs = domainTabs.length > 1;
-  const showModePicker = modePickerEnabled;
-  const singleUrlMode = isSingleUrlMode(crawlTab, activeMode);
   const normalizedTargetDomain = normalizeHttpLookupDomain(targetUrl);
-  const profileLookupKey =
-    singleUrlMode && normalizedTargetDomain && effectiveSurface
-      ? `${normalizedTargetDomain}|${effectiveSurface}`
-      : '';
-  const domainMemoryLookupKey =
-    singleUrlMode && normalizedTargetDomain && effectiveSurface
-      ? `${normalizedTargetDomain}|${effectiveSurface}`
-      : '';
+  const profileLookupKey = lookupKey(singleUrlMode, normalizedTargetDomain, effectiveSurface);
+  const domainMemoryLookupKey = lookupKey(singleUrlMode, normalizedTargetDomain, effectiveSurface);
   const diagnosticsPreset = diagnosticsPresetForProfile(runProfile);
   const setLifecycleBulkUrls = useCallback(
     (value: string) => setValue('bulkUrls', value),
@@ -463,797 +503,75 @@ export function CrawlConfigScreen({
       localDispatch.setSavingDomainMemory(false);
     }
   }
-  const hasTarget =
-    crawlTab === 'category' && activeMode === 'sitemap'
-      ? sitemapDomain.trim().length > 0
-      : singleUrlMode
-        ? targetUrl.trim().length > 0
-        : bulkUrls.trim().length > 0 || csvFile !== null;
+  const hasTarget = hasCrawlTarget(
+    crawlTab,
+    activeMode,
+    sitemapDomain,
+    singleUrlMode,
+    targetUrl,
+    bulkUrls,
+    csvFile,
+  );
   const canSubmit =
     hasTarget && canPreview(config, fieldRows, { runProfile, studioMode }) && !isSubmitting;
-  return (
-    <div className="page-stack gap-4">
-      <form
-        className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_380px] xl:items-stretch"
-        onSubmit={(event) => void handleSubmit(startCrawl)(event)}
-      >
-        <Card className="section-card overflow-hidden p-0">
-          <header className="border-border flex h-10 items-center justify-between border-b bg-[color-mix(in_srgb,var(--bg-alt)_40%,var(--bg-panel))] px-6">
-            <span className="type-heading-3">Target URL</span>
-            <Badge tone="accent" className="h-5 px-1.5 text-xs font-medium">
-              {activeTabLabel}
-            </Badge>
-          </header>
-          <div className="space-y-5 px-6 pt-4 pb-6">
-            <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
-              <div className="ml-[-4px] flex flex-wrap items-center gap-2.5">
-                {showSurfaceTabs ? (
-                  <TabBar
-                    value={crawlTab}
-                    onChange={(value) => {
-                      const parsed = parseRequestedCrawlTab(value);
-                      if (parsed) {
-                        dispatchRoute({ type: 'setTab', tab: parsed });
-                      }
-                    }}
-                    options={domainTabs}
-                  />
-                ) : null}
-                {showModePicker ? (
-                  <div className="ml-[-4px] flex flex-wrap items-center gap-2.5">
-                    {crawlTab === 'category' ? (
-                      <TabBar
-                        value={categoryMode}
-                        compact
-                        onChange={(value) => {
-                          const parsed = parseRequestedCategoryMode(value);
-                          if (parsed) {
-                            dispatchRoute({ type: 'setCategoryMode', mode: parsed });
-                          }
-                        }}
-                        options={[
-                          { value: 'single', label: 'Single' },
-                          { value: 'sitemap', label: 'Sitemap' },
-                          { value: 'bulk', label: 'Bulk' },
-                        ]}
-                      />
-                    ) : (
-                      <TabBar
-                        value={pdpMode}
-                        compact
-                        onChange={(value) => {
-                          const parsed = parseRequestedPdpMode(value);
-                          if (parsed) {
-                            dispatchRoute({ type: 'setPdpMode', mode: parsed });
-                          }
-                        }}
-                        options={[
-                          { value: 'single', label: 'Single' },
-                          { value: 'batch', label: 'Batch' },
-                          { value: 'csv', label: 'CSV Upload' },
-                        ]}
-                      />
-                    )}
-                  </div>
-                ) : null}
-              </div>
-              <CrawlActionButtons canSubmit={canSubmit} isSubmitting={isSubmitting} />
-            </div>
+  return {
+    crawlTab,
+    activeMode,
+    activeTabLabel,
+    showSurfaceTabs,
+    dispatchRoute,
+    domainTabs,
+    showModePicker,
+    categoryMode,
+    pdpMode,
+    canSubmit,
+    isSubmitting,
+    handleSubmit,
+    startCrawl,
+    bulkUrls,
+    setValue,
+    csvFile,
+    localDispatch,
+    sitemapDomain,
+    sitemapFilterKeyword,
+    sitemapMaxUrls,
+    targetUrl,
+    savedProfileMessage,
+    additionalDraft,
+    additionalFields,
+    crawlDomain,
+    studioMode,
+    smartExtraction,
+    proxyEnabled,
+    proxyInput,
+    singleUrlMode,
+    savedProfileLoaded,
+    savedProfileDomain,
+    effectiveSurface,
+    generatingSelectors,
+    generateFieldSelectors,
+    addManualField,
+    savingDomainMemory,
+    saveToDomainMemory,
+    fieldRows,
+    fieldConfigMessage,
+    fieldConfigError,
+    fieldRowMessages,
+    setFieldRows,
+    activeFieldTestId,
+    testFieldRow,
+    configError,
+    runProfile,
+    markProfileDirty,
+    respectRobotsTxt,
+    maxRecords,
+    diagnosticsPreset,
+  };
+}
 
-            {(crawlTab === 'category' && categoryMode === 'bulk') ||
-            (crawlTab === 'pdp' && pdpMode === 'batch') ? (
-              <label className="grid gap-2">
-                <span className="type-control font-medium">URLs (one per line)</span>
-                <div className="relative">
-                  <Textarea
-                    value={bulkUrls}
-                    onChange={(event) => setValue('bulkUrls', event.target.value)}
-                    placeholder={'https://example.com/page-1\nhttps://example.com/page-2'}
-                    className="min-h-[420px] font-mono"
-                    aria-label="Bulk URLs input"
-                  />
-                  {bulkUrls.trim() ? (
-                    <div className="bg-background/80 text-foreground type-caption absolute right-2 bottom-2 rounded-sm px-2 py-1 backdrop-blur-sm">
-                      {parseLines(bulkUrls).length} URLs
-                    </div>
-                  ) : null}
-                </div>
-              </label>
-            ) : crawlTab === 'pdp' && pdpMode === 'csv' ? (
-              <CsvFileField file={csvFile} onChange={localDispatch.setCsvFile} />
-            ) : crawlTab === 'category' && activeMode === 'sitemap' ? (
-              <SitemapConfigFields
-                domain={sitemapDomain}
-                filterKeyword={sitemapFilterKeyword}
-                maxUrls={sitemapMaxUrls}
-                onDomainChange={localDispatch.setSitemapDomain}
-                onFilterKeywordChange={localDispatch.setSitemapFilterKeyword}
-                onMaxUrlsChange={localDispatch.setSitemapMaxUrls}
-              />
-            ) : (
-              <TargetUrlField
-                value={targetUrl}
-                onChange={(value) => setValue('targetUrl', value)}
-                placeholder={
-                  crawlTab === 'category' ? 'https://example.com/list' : 'https://example.com/page'
-                }
-              />
-            )}
+export type CrawlConfigScreenModel = ReturnType<typeof useCrawlConfigScreenModel>;
 
-            {savedProfileMessage ? (
-              <div className="border-subtle-panel-border bg-subtle-panel text-secondary type-body rounded-md border px-3 py-2 leading-relaxed">
-                {savedProfileMessage}
-              </div>
-            ) : null}
-
-            <AdditionalFieldInput
-              value={additionalDraft}
-              fields={additionalFields}
-              onChange={localDispatch.setAdditionalDraft}
-              onCommit={(value) =>
-                localDispatch.setAdditionalFields((current) =>
-                  uniqueRequestedFields([...current, value]),
-                )
-              }
-              onRemove={(value) =>
-                localDispatch.setAdditionalFields((current) =>
-                  current.filter((field) => field !== value),
-                )
-              }
-            />
-          </div>
-        </Card>
-
-        <div className="h-full xl:self-stretch">
-          <div className="h-full xl:sticky xl:top-[68px]">
-            <Card className="section-card h-full overflow-hidden p-0">
-              <header className="border-border flex h-10 items-center justify-between border-b bg-[color-mix(in_srgb,var(--bg-alt)_40%,var(--bg-panel))] px-6">
-                <span className="type-heading-3">Crawl Settings</span>
-                <Badge tone="accent" className="h-5 px-1.5 text-xs font-medium">
-                  {studioMode === 'advanced' ? 'Advanced' : 'Quick'}
-                </Badge>
-              </header>
-              <div className="page-stack px-6 pt-4 pb-6">
-                <div className={RUN_SETUP_ROW_CLASS}>
-                  <div className={RUN_SETUP_LABEL_CLASS}>
-                    <Globe className="text-accent size-4 shrink-0" />
-                    <div className="type-body-sm text-foreground font-semibold">Domain</div>
-                  </div>
-                  <Dropdown<CrawlDomain>
-                    ariaLabel="Domain"
-                    value={crawlDomain}
-                    className={RUN_SETUP_CONTROL_CLASS}
-                    onChange={(value) => {
-                      if (DOMAIN_OPTIONS.some((option) => option.value === value)) {
-                        dispatchRoute({ type: 'setDomain', domain: value });
-                      }
-                    }}
-                    options={DOMAIN_OPTIONS}
-                  />
-                </div>
-                <div className={RUN_SETUP_ROW_CLASS}>
-                  <div className={RUN_SETUP_LABEL_CLASS}>
-                    <SlidersHorizontal className="text-accent size-4 shrink-0" />
-                    <div className="flex items-center gap-1.5">
-                      <div className="type-body-sm text-foreground font-semibold">Mode</div>
-                      <Tooltip content="Advanced Mode exposes the full fetch, locality, diagnostics, and selector controls.">
-                        <Info className="text-muted hover:text-secondary size-3.5 cursor-help transition-colors" />
-                      </Tooltip>
-                    </div>
-                  </div>
-                  <TabBar
-                    value={studioMode}
-                    compact
-                    className={RUN_SETUP_CONTROL_CLASS}
-                    onChange={(value) => {
-                      if (value === 'quick' || value === 'advanced') {
-                        localDispatch.setStudioMode(value);
-                      }
-                    }}
-                    options={[
-                      { value: 'quick', label: 'Quick' },
-                      { value: 'advanced', label: 'Advanced' },
-                    ]}
-                  />
-                </div>
-
-                <div className="flex h-[var(--control-height)] items-center justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="text-accent size-4 shrink-0" />
-                    <span className="type-body-sm text-foreground font-semibold">
-                      LLM Processing
-                    </span>
-                    <Tooltip content="Per-run enrichment only. This does not overwrite saved domain defaults.">
-                      <Info className="text-muted hover:text-secondary size-3.5 cursor-help transition-colors" />
-                    </Tooltip>
-                  </div>
-                  <Toggle
-                    checked={smartExtraction}
-                    onChange={localDispatch.setSmartExtraction}
-                    ariaLabel="LLM Processing"
-                  />
-                </div>
-
-                <div className="border-border border-t pt-4">
-                  <div className="flex h-[var(--control-height)] items-center justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                      <Globe className="text-accent size-4 shrink-0" />
-                      <span className="type-body-sm text-foreground font-semibold">Proxy List</span>
-                      <Tooltip content={'Example:\nhttp://host:port\nhttp://user:pass@host:port'}>
-                        <Info className="text-muted hover:text-secondary size-3.5 cursor-help transition-colors" />
-                      </Tooltip>
-                    </div>
-                    <Toggle
-                      checked={proxyEnabled}
-                      onChange={localDispatch.setProxyEnabled}
-                      ariaLabel="Proxy List enabled"
-                    />
-                  </div>
-                </div>
-
-                {proxyEnabled ? (
-                  <div className="ml-8 flex flex-col gap-4">
-                    <div className="type-body-sm text-foreground font-semibold">Proxy URLs</div>
-                    <Textarea
-                      value={proxyInput}
-                      onChange={(event) => {
-                        setValue('proxyInput', event.target.value);
-                      }}
-                      placeholder={'http://host:port\nhttp://user:pass@host:port'}
-                      className="min-h-[104px] font-mono leading-relaxed"
-                      aria-label="Proxy pool input"
-                    />
-                  </div>
-                ) : null}
-
-                {singleUrlMode && savedProfileLoaded ? (
-                  <div className="text-secondary type-body leading-relaxed">
-                    Saved domain profile active:{' '}
-                    <span className="type-label-mono text-foreground">{savedProfileDomain}</span> ·{' '}
-                    {surfaceLabel(effectiveSurface)}
-                  </div>
-                ) : null}
-              </div>
-            </Card>
-          </div>
-        </div>
-
-        {studioMode === 'advanced' ? (
-          <Card className="section-card overflow-hidden p-0 xl:col-span-2">
-            <header className="border-border flex h-10 items-center justify-between border-b bg-[color-mix(in_srgb,var(--bg-alt)_40%,var(--bg-panel))] px-6">
-              <span className="type-heading-3">Field Configuration</span>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="quiet"
-                  type="button"
-                  size="sm"
-                  onClick={() => void generateFieldSelectors()}
-                  disabled={generatingSelectors}
-                >
-                  <Sparkles className="size-3" />
-                  {generatingSelectors ? 'Generating...' : 'Generate'}
-                </Button>
-                <Button variant="quiet" type="button" size="sm" onClick={addManualField}>
-                  <Plus className="size-3" />
-                  New Field
-                </Button>
-                <Button
-                  variant="action"
-                  type="button"
-                  size="sm"
-                  onClick={() => void saveToDomainMemory()}
-                  disabled={
-                    savingDomainMemory ||
-                    !fieldRows.some(
-                      (row) =>
-                        normalizeField(row.fieldName) &&
-                        (row.cssSelector.trim() || row.xpath.trim() || row.regex.trim()),
-                    )
-                  }
-                >
-                  {savingDomainMemory ? 'Saving...' : 'Save to Memory'}
-                </Button>
-              </div>
-            </header>
-            <div className="space-y-4 px-6 pt-6 pb-6">
-              {fieldConfigMessage ? (
-                <p className="text-success type-body leading-relaxed">{fieldConfigMessage}</p>
-              ) : null}
-              {fieldConfigError ? <InlineAlert message={fieldConfigError} /> : null}
-              <div className="flex flex-col gap-2">
-                {fieldRows.length ? (
-                  <>
-                    <FieldEditorHeader />
-                    {fieldRows.map((row) => (
-                      <ManualFieldEditor
-                        key={row.id}
-                        row={row}
-                        showLabels={false}
-                        message={fieldRowMessages[row.id]?.message}
-                        messageTone={fieldRowMessages[row.id]?.tone}
-                        onChange={(patch) => {
-                          setFieldRows((current) =>
-                            current.map((entry) =>
-                              entry.id === row.id ? { ...entry, ...patch } : entry,
-                            ),
-                          );
-                          localDispatch.setFieldRowMessages((current) => {
-                            if (!current[row.id]) {
-                              return current;
-                            }
-                            const next = { ...current };
-                            delete next[row.id];
-                            return next;
-                          });
-                        }}
-                        onDelete={() => {
-                          setFieldRows((current) => current.filter((entry) => entry.id !== row.id));
-                          localDispatch.setFieldRowMessages((current) => {
-                            if (!current[row.id]) {
-                              return current;
-                            }
-                            const next = { ...current };
-                            delete next[row.id];
-                            return next;
-                          });
-                        }}
-                        onTest={() => void testFieldRow(row)}
-                        testing={activeFieldTestId === row.id}
-                        testDisabled={
-                          !targetUrl.trim() ||
-                          (!row.cssSelector.trim() && !row.xpath.trim() && !row.regex.trim())
-                        }
-                      />
-                    ))}
-                  </>
-                ) : (
-                  <div className="surface-muted text-secondary type-body rounded-md border-dashed px-4 py-6 leading-relaxed">
-                    No selector rows yet.
-                  </div>
-                )}
-              </div>
-            </div>
-          </Card>
-        ) : null}
-
-        {configError ? (
-          <div className="xl:col-span-2">
-            <InlineAlert message={configError} />
-          </div>
-        ) : null}
-
-        {studioMode === 'advanced' ? (
-          <Card className="section-card overflow-visible p-0 xl:col-span-2">
-            <header className="border-border flex h-10 items-center justify-between border-b bg-[color-mix(in_srgb,var(--bg-alt)_40%,var(--bg-panel))] px-6">
-              <span className="type-heading-3 flex items-center gap-1.5">
-                <SlidersHorizontal className="size-3.5" /> Advanced Settings
-              </span>
-              <Tooltip content="Fine-tune fetch, limits, locality, and diagnostics for this exploratory run.">
-                <Info className="text-muted hover:text-secondary size-3.5 cursor-help transition-colors" />
-              </Tooltip>
-            </header>
-            <div className="grid gap-0 p-6 xl:grid-cols-3 xl:divide-x xl:divide-[var(--border)]">
-              <section className={cn(ADVANCED_COLUMN_CLASS, 'xl:pr-6')}>
-                <div className={ADVANCED_SECTION_TITLE_CLASS}>
-                  <h3>Execution</h3>
-                  <Tooltip content="Control how the crawler fetches, renders, and traverses the target.">
-                    <Info className="text-muted hover:text-secondary size-3 cursor-help transition-colors" />
-                  </Tooltip>
-                </div>
-                <div className={ADVANCED_SUBSECTION_CLASS}>
-                  <div className={ADVANCED_CONTROL_ROW_CLASS}>
-                    <div className="type-body-sm text-foreground font-semibold">Fetch Mode</div>
-                    <Dropdown<FetchMode>
-                      ariaLabel="Fetch mode"
-                      value={runProfile.fetch_profile.fetch_mode}
-                      onChange={(next) => {
-                        if (FETCH_MODE_OPTIONS.has(next)) {
-                          markProfileDirty((current) => ({
-                            ...current,
-                            fetch_profile: {
-                              ...current.fetch_profile,
-                              fetch_mode: next,
-                            },
-                            acquisition_contract:
-                              next === 'browser_only'
-                                ? {
-                                    ...current.acquisition_contract,
-                                    prefer_browser: true,
-                                    prefer_curl_handoff: false,
-                                    handoff_cookie_engine: 'auto',
-                                  }
-                                : current.acquisition_contract,
-                          }));
-                        }
-                      }}
-                      options={[
-                        { value: 'auto', label: 'Auto' },
-                        { value: 'http_only', label: 'HTTP Only' },
-                        { value: 'browser_only', label: 'Browser Only' },
-                        { value: 'http_then_browser', label: 'HTTP Then Browser' },
-                      ]}
-                    />
-                  </div>
-                  <div className={ADVANCED_CONTROL_ROW_CLASS}>
-                    <div className="type-body-sm text-foreground font-semibold">Browser Engine</div>
-                    <Dropdown<BrowserEngine>
-                      ariaLabel="Browser engine"
-                      value={runProfile.acquisition_contract.preferred_browser_engine}
-                      onChange={(next) => {
-                        if (BROWSER_ENGINE_OPTIONS.has(next)) {
-                          markProfileDirty((current) => ({
-                            ...current,
-                            acquisition_contract: {
-                              ...current.acquisition_contract,
-                              preferred_browser_engine: next,
-                              prefer_browser: next === 'auto' ? false : true,
-                              prefer_curl_handoff: false,
-                              handoff_cookie_engine: next === 'auto' ? 'auto' : next,
-                            },
-                          }));
-                        }
-                      }}
-                      options={[
-                        { value: 'auto', label: 'Auto' },
-                        { value: 'patchright', label: 'Patchright' },
-                        { value: 'real_chrome', label: 'Real Chrome' },
-                      ]}
-                    />
-                  </div>
-                  <div className={ADVANCED_CONTROL_ROW_CLASS}>
-                    <div className="type-body-sm text-foreground font-semibold">Extraction</div>
-                    <Dropdown<ExtractionSource>
-                      ariaLabel="Extraction source"
-                      value={runProfile.fetch_profile.extraction_source}
-                      onChange={(next) => {
-                        if (EXTRACTION_SOURCE_OPTIONS.has(next)) {
-                          markProfileDirty((current) => ({
-                            ...current,
-                            fetch_profile: {
-                              ...current.fetch_profile,
-                              extraction_source: next,
-                            },
-                          }));
-                        }
-                      }}
-                      options={[
-                        { value: 'raw_html', label: 'Raw HTML' },
-                        { value: 'rendered_dom', label: 'Rendered DOM' },
-                        { value: 'rendered_dom_visual', label: 'Rendered + Visual' },
-                        { value: 'network_payload_first', label: 'Network Payload First' },
-                      ]}
-                    />
-                  </div>
-                  <div className={ADVANCED_CONTROL_ROW_CLASS}>
-                    <div className="type-body-sm text-foreground font-semibold">JS Mode</div>
-                    <Dropdown<JsMode>
-                      ariaLabel="JavaScript mode"
-                      value={runProfile.fetch_profile.js_mode}
-                      onChange={(next) => {
-                        if (JS_MODE_OPTIONS.has(next)) {
-                          markProfileDirty((current) => ({
-                            ...current,
-                            fetch_profile: {
-                              ...current.fetch_profile,
-                              js_mode: next,
-                            },
-                          }));
-                        }
-                      }}
-                      options={[
-                        { value: 'auto', label: 'Auto' },
-                        { value: 'enabled', label: 'Enabled' },
-                        { value: 'disabled', label: 'Disabled' },
-                      ]}
-                    />
-                  </div>
-                  <div className={ADVANCED_CONTROL_ROW_CLASS}>
-                    <div className="type-body-sm text-foreground font-semibold">Traversal</div>
-                    <Dropdown<TraversalDropdownValue>
-                      ariaLabel="Traversal mode"
-                      value={runProfile.fetch_profile.traversal_mode ?? 'off'}
-                      onChange={(next) => {
-                        if (next === 'off') {
-                          markProfileDirty((current) => ({
-                            ...current,
-                            fetch_profile: {
-                              ...current.fetch_profile,
-                              traversal_mode: null,
-                            },
-                          }));
-                          return;
-                        }
-                        if (TRAVERSAL_MODE_OPTIONS.has(next)) {
-                          markProfileDirty((current) => ({
-                            ...current,
-                            fetch_profile: {
-                              ...current.fetch_profile,
-                              traversal_mode: next,
-                            },
-                          }));
-                        }
-                      }}
-                      options={[
-                        { value: 'off', label: 'Off' },
-                        { value: 'paginate', label: 'Paginate' },
-                        { value: 'scroll', label: 'Scroll' },
-                        { value: 'load_more', label: 'Load More' },
-                        { value: 'view_all', label: 'View All' },
-                      ]}
-                    />
-                  </div>
-                </div>
-                <div className={ADVANCED_SUBSECTION_CLASS}>
-                  <SettingSection
-                    label="Include iframes"
-                    description="Allow iframe content to participate in extraction and selector recovery."
-                    checked={runProfile.fetch_profile.include_iframes}
-                    onChange={(next) =>
-                      markProfileDirty((current) => ({
-                        ...current,
-                        fetch_profile: {
-                          ...current.fetch_profile,
-                          include_iframes: next,
-                        },
-                      }))
-                    }
-                  />
-                  <SettingSection
-                    label="Respect robots.txt"
-                    description="Skip disallowed paths and honor crawl-delay."
-                    checked={respectRobotsTxt}
-                    onChange={localDispatch.setRespectRobotsTxt}
-                  />
-                </div>
-              </section>
-              <section className={cn(ADVANCED_COLUMN_CLASS, 'xl:px-6')}>
-                <div className={ADVANCED_SECTION_TITLE_CLASS}>
-                  <h3>Limits &amp; Locales</h3>
-                  <Tooltip content="Set repeat-run bounds and regional hints before dispatch.">
-                    <Info className="text-muted hover:text-secondary size-3 cursor-help transition-colors" />
-                  </Tooltip>
-                </div>
-                <div className={ADVANCED_SUBSECTION_CLASS}>
-                  <SliderRow
-                    label="Request Delay"
-                    description="Wait time between requests to the same target."
-                    value={String(runProfile.fetch_profile.request_delay_ms)}
-                    min={CRAWL_LIMITS.MIN_REQUEST_DELAY_MS}
-                    max={CRAWL_LIMITS.MAX_REQUEST_DELAY_MS}
-                    step={100}
-                    onChange={(next) =>
-                      markProfileDirty((current) => ({
-                        ...current,
-                        fetch_profile: {
-                          ...current.fetch_profile,
-                          request_delay_ms: clampNumber(
-                            next,
-                            CRAWL_LIMITS.MIN_REQUEST_DELAY_MS,
-                            CRAWL_LIMITS.MAX_REQUEST_DELAY_MS,
-                            CRAWL_DEFAULTS.REQUEST_DELAY_MS,
-                          ),
-                        },
-                      }))
-                    }
-                    onReset={() =>
-                      markProfileDirty((current) => ({
-                        ...current,
-                        fetch_profile: {
-                          ...current.fetch_profile,
-                          request_delay_ms: CRAWL_DEFAULTS.REQUEST_DELAY_MS,
-                        },
-                      }))
-                    }
-                  />
-                  <SliderRow
-                    label="Max Records"
-                    description="Target record count. The crawler stops after a page reaches this target; it does not trim extra rows from that page."
-                    value={maxRecords}
-                    min={CRAWL_LIMITS.MIN_RECORDS}
-                    max={CRAWL_LIMITS.MAX_RECORDS}
-                    step={10}
-                    onChange={(value) => setValue('maxRecords', value)}
-                    onReset={() => setValue('maxRecords', String(CRAWL_DEFAULTS.MAX_RECORDS))}
-                  />
-                  <div className={ADVANCED_CONTROL_ROW_CLASS}>
-                    <div className="flex items-center gap-2">
-                      <div className="type-body-sm text-foreground font-semibold">
-                        Host Memory TTL
-                      </div>
-                      <Tooltip
-                        content={`Blank uses default ${CRAWL_DEFAULTS.HOST_MEMORY_TTL_SECONDS}s. Lower TTL forgets host block and pacing memory sooner.`}
-                      >
-                        <Info className="text-muted hover:text-secondary size-3 cursor-help transition-colors" />
-                      </Tooltip>
-                    </div>
-                    <Input
-                      type="number"
-                      min={CRAWL_LIMITS.MIN_HOST_MEMORY_TTL_SECONDS}
-                      max={CRAWL_LIMITS.MAX_HOST_MEMORY_TTL_SECONDS}
-                      placeholder={String(CRAWL_DEFAULTS.HOST_MEMORY_TTL_SECONDS)}
-                      value={runProfile.fetch_profile.host_memory_ttl_seconds ?? ''}
-                      onChange={(event) =>
-                        markProfileDirty((current) => ({
-                          ...current,
-                          fetch_profile: {
-                            ...current.fetch_profile,
-                            host_memory_ttl_seconds: parseOptionalClampedNumber(
-                              event.target.value,
-                              CRAWL_LIMITS.MIN_HOST_MEMORY_TTL_SECONDS,
-                              CRAWL_LIMITS.MAX_HOST_MEMORY_TTL_SECONDS,
-                            ),
-                          },
-                        }))
-                      }
-                      aria-label="Host memory TTL seconds"
-                    />
-                  </div>
-                </div>
-                <div className={ADVANCED_SUBSECTION_CLASS}>
-                  <div className={ADVANCED_CONTROL_ROW_CLASS}>
-                    <div className="type-body-sm text-foreground font-semibold">Geo Country</div>
-                    <Input
-                      value={runProfile.locality_profile.geo_country}
-                      onChange={(event) =>
-                        markProfileDirty((current) => ({
-                          ...current,
-                          locality_profile: {
-                            ...current.locality_profile,
-                            geo_country: event.target.value.trim() || 'auto',
-                          },
-                        }))
-                      }
-                      aria-label="Geo country"
-                    />
-                  </div>
-                  <div className={ADVANCED_CONTROL_ROW_CLASS}>
-                    <div className="type-body-sm text-foreground font-semibold">Language Hint</div>
-                    <Input
-                      value={runProfile.locality_profile.language_hint ?? ''}
-                      onChange={(event) =>
-                        markProfileDirty((current) => ({
-                          ...current,
-                          locality_profile: {
-                            ...current.locality_profile,
-                            language_hint: event.target.value.trim() || null,
-                          },
-                        }))
-                      }
-                      aria-label="Language hint"
-                    />
-                  </div>
-                  <div className={ADVANCED_CONTROL_ROW_CLASS}>
-                    <div className="type-body-sm text-foreground font-semibold">Currency Hint</div>
-                    <Input
-                      value={runProfile.locality_profile.currency_hint ?? ''}
-                      onChange={(event) =>
-                        markProfileDirty((current) => ({
-                          ...current,
-                          locality_profile: {
-                            ...current.locality_profile,
-                            currency_hint: event.target.value.trim() || null,
-                          },
-                        }))
-                      }
-                      aria-label="Currency hint"
-                    />
-                  </div>
-                </div>
-              </section>
-              <section className={cn(ADVANCED_COLUMN_CLASS, 'xl:pl-6')}>
-                <div className={ADVANCED_SECTION_TITLE_CLASS}>
-                  <h3>Output &amp; Diagnostics</h3>
-                  <Tooltip content="Choose what evidence and artifacts stay attached to this run.">
-                    <Info className="text-muted hover:text-secondary size-3 cursor-help transition-colors" />
-                  </Tooltip>
-                </div>
-                <div className={ADVANCED_SUBSECTION_CLASS}>
-                  <div className={ADVANCED_CONTROL_ROW_CLASS}>
-                    <div className="type-body-sm text-foreground font-semibold">Diagnostics</div>
-                    <Dropdown<DiagnosticsPreset>
-                      ariaLabel="Diagnostics preset"
-                      value={diagnosticsPreset}
-                      onChange={(next) => {
-                        if (next === 'lean' || next === 'standard' || next === 'deep_debug') {
-                          markProfileDirty((current) => applyDiagnosticsPreset(current, next));
-                        }
-                      }}
-                      options={[
-                        { value: 'lean', label: 'Lean' },
-                        { value: 'standard', label: 'Standard' },
-                        { value: 'deep_debug', label: 'Deep Debug' },
-                      ]}
-                    />
-                  </div>
-                  <div className={ADVANCED_CONTROL_ROW_CLASS}>
-                    <div className="type-body-sm text-foreground font-semibold">
-                      Network Capture
-                    </div>
-                    <Dropdown<CaptureNetworkMode>
-                      ariaLabel="Network capture"
-                      value={runProfile.diagnostics_profile.capture_network}
-                      onChange={(next) => {
-                        if (CAPTURE_NETWORK_OPTIONS.has(next)) {
-                          markProfileDirty((current) => ({
-                            ...current,
-                            diagnostics_profile: {
-                              ...current.diagnostics_profile,
-                              capture_network: next,
-                            },
-                          }));
-                        }
-                      }}
-                      options={[
-                        { value: 'off', label: 'Off' },
-                        { value: 'matched_only', label: 'Matched Only' },
-                        { value: 'all_small_json', label: 'All Small JSON' },
-                      ]}
-                    />
-                  </div>
-                </div>
-                <div className={ADVANCED_SUBSECTION_CLASS}>
-                  <SettingSection
-                    label="Capture HTML"
-                    description="Persist the page HTML artifact for this run."
-                    checked={runProfile.diagnostics_profile.capture_html}
-                    onChange={(next) =>
-                      markProfileDirty((current) => ({
-                        ...current,
-                        diagnostics_profile: {
-                          ...current.diagnostics_profile,
-                          capture_html: next,
-                        },
-                      }))
-                    }
-                  />
-                  <SettingSection
-                    label="Capture Screenshot"
-                    description="Store browser screenshots when available."
-                    checked={runProfile.diagnostics_profile.capture_screenshot}
-                    onChange={(next) =>
-                      markProfileDirty((current) => ({
-                        ...current,
-                        diagnostics_profile: {
-                          ...current.diagnostics_profile,
-                          capture_screenshot: next,
-                        },
-                      }))
-                    }
-                  />
-                  <SettingSection
-                    label="Capture Response Headers"
-                    description="Preserve response-header diagnostics."
-                    checked={runProfile.diagnostics_profile.capture_response_headers}
-                    onChange={(next) =>
-                      markProfileDirty((current) => ({
-                        ...current,
-                        diagnostics_profile: {
-                          ...current.diagnostics_profile,
-                          capture_response_headers: next,
-                        },
-                      }))
-                    }
-                  />
-                  <SettingSection
-                    label="Capture Browser Diagnostics"
-                    description="Keep detailed browser-attempt diagnostics for debugging."
-                    checked={runProfile.diagnostics_profile.capture_browser_diagnostics}
-                    onChange={(next) =>
-                      markProfileDirty((current) => ({
-                        ...current,
-                        diagnostics_profile: {
-                          ...current.diagnostics_profile,
-                          capture_browser_diagnostics: next,
-                        },
-                      }))
-                    }
-                  />
-                </div>
-              </section>
-            </div>
-          </Card>
-        ) : null}
-      </form>
-    </div>
-  );
+export function CrawlConfigScreen(props: Readonly<CrawlConfigScreenProps>) {
+  const model = useCrawlConfigScreenModel(props);
+  return <CrawlConfigScreenContent model={model} />;
 }

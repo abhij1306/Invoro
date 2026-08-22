@@ -4,7 +4,7 @@ import Link from 'next/link';
 import type { Route } from 'next';
 import { MoreHorizontal, Pause, Play, RotateCw, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import type { Ref } from 'react';
+import type { Ref, RefObject } from 'react';
 
 import type { MonitorJob } from '../../lib/api/types';
 import { formatNextRun, formatRelativeTime } from '../../lib/format/date';
@@ -37,11 +37,6 @@ export function MonitorListItem({
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const firstActionRef = useRef<HTMLButtonElement>(null);
-  const id = monitor.id;
-  const active = monitor.status === 'active';
-  const isAlert = Boolean(monitor.poll_interval_seconds);
-  const firstUrl = monitor.urls[0] ?? '';
-  const currentValues = monitor.last_known_values ?? {};
 
   useEffect(() => {
     if (!open) return;
@@ -76,105 +71,161 @@ export function MonitorListItem({
         open && 'relative z-10',
       )}
     >
-      <div className="min-w-0">
-        <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <span
-            className={cn(
-              'size-2 rounded-full',
-              active ? 'bg-info' : monitor.status === 'paused' ? 'bg-warning' : 'bg-muted',
-            )}
-            aria-hidden
-          />
-          <Link
-            href={detailHref ?? (`/monitors/${id}` as Route)}
-            className="type-subheading text-foreground truncate"
+      <MonitorListDetails monitor={monitor} detailHref={detailHref} />
+      <MonitorListActions
+        {...{
+          monitor,
+          running,
+          open,
+          setOpen,
+          buttonRef,
+          menuRef,
+          firstActionRef,
+          onRunNow,
+          onPause,
+          onResume,
+          onDelete,
+        }}
+      />
+    </div>
+  );
+}
+
+function MonitorListDetails({ monitor, detailHref }: { monitor: MonitorJob; detailHref?: Route }) {
+  const id = monitor.id;
+  const active = monitor.status === 'active';
+  const isAlert = Boolean(monitor.poll_interval_seconds);
+  const firstUrl = monitor.urls[0] ?? '';
+  const currentValues = monitor.last_known_values ?? {};
+  return (
+    <div className="min-w-0">
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
+        <span
+          className={cn(
+            'size-2 rounded-full',
+            active ? 'bg-info' : monitor.status === 'paused' ? 'bg-warning' : 'bg-muted',
+          )}
+          aria-hidden
+        />
+        <Link
+          href={detailHref ?? (`/monitors/${id}` as Route)}
+          className="type-subheading text-foreground truncate"
+        >
+          {isAlert ? monitorHostPath(firstUrl, 'Alert') : monitor.name}
+        </Link>
+        <MonitorStatusBadge status={monitor.status} />
+        <MonitorPriorityBadge priority={monitor.priority} />
+      </div>
+      <div className="text-secondary type-body-sm mt-2 flex flex-wrap gap-x-3 gap-y-1">
+        <span>{isAlert ? 'alert' : `${monitor.urls.length} URLs`}</span>
+        <span>
+          every{' '}
+          {isAlert
+            ? formatSeconds(monitor.poll_interval_seconds ?? 0)
+            : `${monitor.schedule_interval_hours}h`}
+        </span>
+        <span>
+          {monitor.last_checked_at
+            ? `checked ${formatRelativeTime(monitor.last_checked_at)}`
+            : formatNextRun(monitor.next_run_at)}
+        </span>
+        <span>{monitor.change_count ?? 0} changes</span>
+        {monitor.last_run_at ? <span>last {formatRelativeTime(monitor.last_run_at)}</span> : null}
+      </div>
+      {isAlert ? (
+        <div className="type-caption mt-1 flex flex-wrap gap-x-3 gap-y-1">
+          {monitor.tracked_fields.map((field) => (
+            <span key={field}>
+              {field}: {formatMonitorValue(currentValues[field])}
+            </span>
+          ))}
+          {monitor.last_error ? <span className="text-danger">{monitor.last_error}</span> : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+type MonitorListActionsProps = Pick<
+  MonitorListItemProps,
+  'monitor' | 'running' | 'onRunNow' | 'onPause' | 'onResume' | 'onDelete'
+> & {
+  open: boolean;
+  setOpen: (open: boolean | ((value: boolean) => boolean)) => void;
+  buttonRef: RefObject<HTMLButtonElement | null>;
+  menuRef: RefObject<HTMLDivElement | null>;
+  firstActionRef: RefObject<HTMLButtonElement | null>;
+};
+
+function MonitorListActions({
+  monitor,
+  running,
+  open,
+  setOpen,
+  buttonRef,
+  menuRef,
+  firstActionRef,
+  onRunNow,
+  onPause,
+  onResume,
+  onDelete,
+}: MonitorListActionsProps) {
+  const id = monitor.id;
+  const active = monitor.status === 'active';
+  return (
+    <div className="flex items-center justify-end gap-2">
+      <Button
+        type="button"
+        variant="neutral"
+        size="sm"
+        onClick={() => onRunNow(id)}
+        disabled={running || monitor.status !== 'active'}
+        title={monitor.status !== 'active' ? `Monitor is ${monitor.status}` : undefined}
+        className="min-w-[92px]"
+      >
+        <RotateCw className={cn('size-3.5', running && 'animate-spin')} />
+        {running ? 'Running...' : 'Run Now'}
+      </Button>
+      <div className="relative">
+        <Button
+          ref={buttonRef}
+          type="button"
+          variant="quiet"
+          size="icon"
+          aria-label="Monitor actions"
+          aria-haspopup="menu"
+          aria-expanded={open}
+          aria-controls={`monitor-actions-${id}`}
+          onClick={() => setOpen((value) => !value)}
+        >
+          <MoreHorizontal className="size-4" />
+        </Button>
+        {open ? (
+          <div
+            ref={menuRef}
+            id={`monitor-actions-${id}`}
+            role="menu"
+            className="border-border bg-background-elevated shadow-card absolute right-0 z-20 mt-1 w-36 rounded-md border py-1"
           >
-            {isAlert ? monitorHostPath(firstUrl, 'Alert') : monitor.name}
-          </Link>
-          <MonitorStatusBadge status={monitor.status} />
-          <MonitorPriorityBadge priority={monitor.priority} />
-        </div>
-        <div className="text-secondary type-body-sm mt-2 flex flex-wrap gap-x-3 gap-y-1">
-          <span>{isAlert ? 'alert' : `${monitor.urls.length} URLs`}</span>
-          <span>
-            every{' '}
-            {isAlert
-              ? formatSeconds(monitor.poll_interval_seconds ?? 0)
-              : `${monitor.schedule_interval_hours}h`}
-          </span>
-          <span>
-            {monitor.last_checked_at
-              ? `checked ${formatRelativeTime(monitor.last_checked_at)}`
-              : formatNextRun(monitor.next_run_at)}
-          </span>
-          <span>{monitor.change_count ?? 0} changes</span>
-          {monitor.last_run_at ? <span>last {formatRelativeTime(monitor.last_run_at)}</span> : null}
-        </div>
-        {isAlert ? (
-          <div className="type-caption mt-1 flex flex-wrap gap-x-3 gap-y-1">
-            {monitor.tracked_fields.map((field) => (
-              <span key={field}>
-                {field}: {formatMonitorValue(currentValues[field])}
-              </span>
-            ))}
-            {monitor.last_error ? <span className="text-danger">{monitor.last_error}</span> : null}
+            <ActionButton
+              ref={firstActionRef}
+              icon={active ? Pause : Play}
+              label={active ? 'Pause' : 'Resume'}
+              onClick={() => {
+                setOpen(false);
+                active ? onPause(id) : onResume(id);
+              }}
+            />
+            <ActionButton
+              icon={Trash2}
+              label="Delete"
+              onClick={() => {
+                setOpen(false);
+                onDelete(id);
+              }}
+            />
           </div>
         ) : null}
-      </div>
-      <div className="flex items-center justify-end gap-2">
-        <Button
-          type="button"
-          variant="neutral"
-          size="sm"
-          onClick={() => onRunNow(id)}
-          disabled={running || monitor.status !== 'active'}
-          title={monitor.status !== 'active' ? `Monitor is ${monitor.status}` : undefined}
-          className="min-w-[92px]"
-        >
-          <RotateCw className={cn('size-3.5', running && 'animate-spin')} />
-          {running ? 'Running...' : 'Run Now'}
-        </Button>
-        <div className="relative">
-          <Button
-            ref={buttonRef}
-            type="button"
-            variant="quiet"
-            size="icon"
-            aria-label="Monitor actions"
-            aria-haspopup="menu"
-            aria-expanded={open}
-            aria-controls={`monitor-actions-${id}`}
-            onClick={() => setOpen((value) => !value)}
-          >
-            <MoreHorizontal className="size-4" />
-          </Button>
-          {open ? (
-            <div
-              ref={menuRef}
-              id={`monitor-actions-${id}`}
-              role="menu"
-              className="border-border bg-background-elevated shadow-card absolute right-0 z-20 mt-1 w-36 rounded-md border py-1"
-            >
-              <ActionButton
-                ref={firstActionRef}
-                icon={active ? Pause : Play}
-                label={active ? 'Pause' : 'Resume'}
-                onClick={() => {
-                  setOpen(false);
-                  active ? onPause(id) : onResume(id);
-                }}
-              />
-              <ActionButton
-                icon={Trash2}
-                label="Delete"
-                onClick={() => {
-                  setOpen(false);
-                  onDelete(id);
-                }}
-              />
-            </div>
-          ) : null}
-        </div>
       </div>
     </div>
   );

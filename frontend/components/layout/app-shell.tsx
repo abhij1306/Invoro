@@ -1,17 +1,14 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import Link from 'next/link';
-import type { Route } from 'next';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Bell, Check, Trash2 } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 
 import { api } from '../../lib/api';
 import { httpErrorStatus } from '../../lib/api/client';
 import { trapFocus } from '../../lib/focus-trap';
-import { formatRelativeTime } from '../../lib/format/date';
 import { getAuthSessionQueryOptions, isAuthRoute } from './auth-session-query';
 import { Button } from '../ui/button';
 import { ConfirmDialog } from '../ui/confirm-dialog';
@@ -20,6 +17,7 @@ import { TopBarProvider, useTopBarHeader } from './top-bar-context';
 import { ThemeToggle } from '../ui/theme-toggle';
 import { LogoMark } from './logo-mark';
 import { Sidebar, SidebarSkeletonNavigation } from './sidebar';
+import { NotificationMenu } from './notification-menu';
 import './app-shell.module.css';
 import './auth-shell.module.css';
 
@@ -289,69 +287,15 @@ function ShellContent({
             </div>
           ) : null}
           <ThemeToggle compact />
-          <div className="relative">
-            <button
-              type="button"
-              className="app-icon-button relative"
-              aria-label="Notifications"
-              onClick={() => setNotificationsOpen((value) => !value)}
-            >
-              <Bell className="size-3.5" />
-              {(notificationCountQuery.data?.count ?? 0) > 0 ? (
-                <span className="bg-danger absolute -top-1 -right-1 min-w-4 rounded-full px-1 text-center text-xs leading-4 font-semibold text-white">
-                  {notificationCountQuery.data?.count}
-                </span>
-              ) : null}
-            </button>
-            {notificationsOpen ? (
-              <div className="border-border bg-background-elevated absolute top-9 right-0 z-[250] w-[min(340px,calc(100vw-32px))] rounded-lg border p-2 shadow-lg">
-                <div className="border-divider flex items-center justify-between border-b px-2 py-1.5">
-                  <p className="type-label m-0">Notifications</p>
-                  <span className="type-caption">
-                    {notificationCountQuery.data?.count ?? 0} unread
-                  </span>
-                </div>
-                <div className="max-h-80 overflow-y-auto py-1">
-                  {notificationsQuery.isPending ? (
-                    <div className="space-y-2 p-2">
-                      <div className="skeleton h-12 w-full" />
-                      <div className="skeleton h-12 w-full" />
-                    </div>
-                  ) : notificationsQuery.data?.length ? (
-                    notificationsQuery.data.map((item) => (
-                      <div
-                        key={item.id}
-                        className="hover:bg-background-alt flex items-start gap-2 rounded-md p-2"
-                      >
-                        <Link
-                          href={`/monitors/${item.monitor_id}` as Route}
-                          className="min-w-0 flex-1"
-                          onClick={() => setNotificationsOpen(false)}
-                        >
-                          <p className="text-foreground m-0 truncate text-sm font-medium">
-                            {item.message}
-                          </p>
-                          <p className="type-caption m-0">{formatRelativeTime(item.created_at)}</p>
-                        </Link>
-                        <button
-                          type="button"
-                          className="app-icon-button"
-                          aria-label="Mark notification read"
-                          onClick={() => markReadMutation.mutate(item.id)}
-                        >
-                          <Check className="size-3.5" />
-                        </button>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-muted m-0 px-2 py-4 text-center text-sm">
-                      No unread notifications.
-                    </p>
-                  )}
-                </div>
-              </div>
-            ) : null}
-          </div>
+          <NotificationMenu
+            open={notificationsOpen}
+            count={notificationCountQuery.data?.count ?? 0}
+            pending={notificationsQuery.isPending}
+            items={notificationsQuery.data ?? []}
+            onToggle={() => setNotificationsOpen((value) => !value)}
+            onClose={() => setNotificationsOpen(false)}
+            onRead={(id) => markReadMutation.mutate(id)}
+          />
         </div>
       </header>
 

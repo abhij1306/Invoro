@@ -7,12 +7,7 @@ import { useReducer } from 'react';
 import { EmptyPanel, InlineAlert, PageHeader, SectionCard } from '../../components/ui/patterns';
 import { Badge, Button, Dropdown, Field, Input, Textarea } from '../../components/ui/primitives';
 import { api } from '../../lib/api';
-import { httpErrorStatus } from '../../lib/api/client';
-import type {
-  SelectorCreatePayload,
-  SelectorRecord,
-  SelectorSuggestion,
-} from '../../lib/api/types';
+import type { SelectorCreatePayload } from '../../lib/api/types';
 import { getNormalizedDomain } from '../../lib/format/domain';
 import { cn } from '../../lib/utils';
 import {
@@ -20,160 +15,26 @@ import {
   mergeSelectorRows,
   normalizeField,
   selectRelevantSelectorRecords,
-  type RowState,
   type SelectorKind,
   type SelectorRow,
 } from './selector-page-utils';
-
-type StatusTone = 'success' | 'warning' | 'danger';
-
-type RowMessage = {
-  tone: StatusTone;
-  message: string;
-};
-
-type SelectorsPageState = {
-  url: string;
-  loadedUrl: string;
-  previewUrl: string;
-  resolvedSurface: string;
-  iframePromoted: boolean;
-  expectedColumns: string;
-  rows: SelectorRow[];
-  rowMessages: Record<string, RowMessage>;
-  loadError: string;
-  loadingSuggestions: boolean;
-  savingAccepted: boolean;
-  activeTestKey: string | null;
-  activeDetectKey: string | null;
-};
-
-type SelectorsPageAction =
-  | { type: 'urlChanged'; value: string }
-  | { type: 'expectedColumnsChanged'; value: string }
-  | { type: 'loadFailed'; message: string }
-  | { type: 'suggestionsStarted' }
-  | {
-      type: 'suggestionsLoaded';
-      loadedUrl: string;
-      previewUrl: string;
-      resolvedSurface: string;
-      iframePromoted: boolean;
-      rows: SelectorRow[];
-    }
-  | { type: 'suggestionsFinished' }
-  | { type: 'rowPatched'; key: string; patch: Partial<SelectorRow> }
-  | { type: 'rowAdded' }
-  | { type: 'rowRemoved'; key: string }
-  | { type: 'rowMessageSet'; key: string; message: RowMessage }
-  | { type: 'detectStarted'; key: string }
-  | { type: 'detectFinished' }
-  | { type: 'testStarted'; key: string }
-  | { type: 'testFinished' }
-  | { type: 'saveStarted' }
-  | { type: 'saveFinished' }
-  | {
-      type: 'rowsSaved';
-      savedRows: Map<string, number>;
-      resolvedSurface: string;
-      nextMessages: Record<string, RowMessage>;
-    };
-
-const INITIAL_SELECTORS_PAGE_STATE: SelectorsPageState = {
-  url: '',
-  loadedUrl: '',
-  previewUrl: '',
-  resolvedSurface: 'generic',
-  iframePromoted: false,
-  expectedColumns: '',
-  rows: [],
-  rowMessages: {},
-  loadError: '',
-  loadingSuggestions: false,
-  savingAccepted: false,
-  activeTestKey: null,
-  activeDetectKey: null,
-};
-
-function selectorsPageReducer(
-  state: SelectorsPageState,
-  action: SelectorsPageAction,
-): SelectorsPageState {
-  switch (action.type) {
-    case 'urlChanged':
-      return { ...state, url: action.value };
-    case 'expectedColumnsChanged':
-      return { ...state, expectedColumns: action.value };
-    case 'loadFailed':
-      return { ...state, loadError: action.message };
-    case 'suggestionsStarted':
-      return { ...state, loadError: '', loadingSuggestions: true };
-    case 'suggestionsLoaded':
-      return {
-        ...state,
-        loadedUrl: action.loadedUrl,
-        previewUrl: action.previewUrl,
-        resolvedSurface: action.resolvedSurface,
-        iframePromoted: action.iframePromoted,
-        rows: action.rows,
-        rowMessages: {},
-      };
-    case 'suggestionsFinished':
-      return { ...state, loadingSuggestions: false };
-    case 'rowPatched':
-      return {
-        ...state,
-        rows: state.rows.map((row) => (row.key === action.key ? { ...row, ...action.patch } : row)),
-      };
-    case 'rowAdded':
-      return { ...state, rows: [...state.rows, createEmptyRow()] };
-    case 'rowRemoved': {
-      const nextMessages = { ...state.rowMessages };
-      delete nextMessages[action.key];
-      return {
-        ...state,
-        rows: state.rows.filter((row) => row.key !== action.key),
-        rowMessages: nextMessages,
-      };
-    }
-    case 'rowMessageSet':
-      return {
-        ...state,
-        rowMessages: { ...state.rowMessages, [action.key]: action.message },
-      };
-    case 'detectStarted':
-      return { ...state, activeDetectKey: action.key };
-    case 'detectFinished':
-      return { ...state, activeDetectKey: null };
-    case 'testStarted':
-      return { ...state, activeTestKey: action.key };
-    case 'testFinished':
-      return { ...state, activeTestKey: null };
-    case 'saveStarted':
-      return { ...state, savingAccepted: true, loadError: '' };
-    case 'saveFinished':
-      return { ...state, savingAccepted: false };
-    case 'rowsSaved': {
-      const remainingMessages = Object.fromEntries(
-        Object.entries(state.rowMessages).filter(([key]) => !action.savedRows.has(key)),
-      ) as Record<string, RowMessage>;
-      return {
-        ...state,
-        rows: state.rows.map((entry) =>
-          action.savedRows.has(entry.key)
-            ? {
-                ...entry,
-                selectorId: action.savedRows.get(entry.key) ?? entry.selectorId,
-                surface: action.resolvedSurface,
-                state: 'saved',
-              }
-            : entry,
-        ),
-        rowMessages: { ...remainingMessages, ...action.nextMessages },
-      };
-    }
-  }
-}
+import {
+  buildRowFromSelectorRecord,
+  buildRowFromSuggestion,
+  createEmptyRow,
+  formatSelectorMatchMessage,
+  INITIAL_SELECTORS_PAGE_STATE,
+  isDuplicateSelectorError,
+  nextEditedState,
+  nextSelectorRowState,
+  parseExpectedColumns,
+  selectorsPageReducer,
+  selectorPlaceholder,
+  selectorSource,
+  selectorStateLabel,
+  selectorStateTone,
+  type RowMessage,
+} from './selector-page-state';
 
 // skipcq: JS-0067
 export default function SelectorsPage() {
@@ -692,192 +553,4 @@ export default function SelectorsPage() {
       </div>
     </div>
   );
-}
-
-function parseExpectedColumns(value: string) {
-  return Array.from(
-    new Set(
-      value.split(/[\n,]/).flatMap((item) => {
-        const field = normalizeField(item);
-        return field ? [field] : [];
-      }),
-    ),
-  );
-}
-
-function selectorPlaceholder(kind: SelectorKind) {
-  if (kind === 'xpath') return "//span[@class='price']";
-  if (kind === 'css_selector') return '.price';
-  return '\\$[\\d,.]+';
-}
-
-function selectorSource(kind: SelectorKind) {
-  if (kind === 'xpath') return 'llm_xpath';
-  if (kind === 'css_selector') return 'llm_css';
-  return 'llm_regex';
-}
-
-function formatSelectorMatchMessage(count: number) {
-  if (count <= 0) {
-    return 'No matches.';
-  }
-  const suffix = count === 1 ? '' : 's';
-  return `Matched ${count} result${suffix}.`;
-}
-
-function nextSelectorRowState(state: RowState): RowState {
-  if (state === 'saved') return 'saved';
-  if (state === 'accepted') return 'idle';
-  return 'accepted';
-}
-
-function selectorStateLabel(state: RowState) {
-  if (state === 'saved') return 'Saved';
-  if (state === 'accepted') return 'Accepted';
-  return 'Accept';
-}
-
-function selectorStateTone(state: RowState) {
-  if (state === 'saved') return 'success' as const;
-  if (state === 'accepted') return 'warning' as const;
-  return 'neutral' as const;
-}
-
-function nextEditedState(state: RowState): RowState {
-  if (state === 'saved') return 'accepted';
-  if (state === 'idle') return 'idle';
-  return state;
-}
-
-function buildRowFromSelectorRecord(record: SelectorRecord): SelectorRow {
-  if (record.xpath) {
-    return {
-      key: `selector:${record.id}`,
-      selectorId: record.id,
-      surface: record.surface,
-      fieldName: record.field_name,
-      kind: 'xpath',
-      selectorValue: record.xpath,
-      extractedValue: record.sample_value || '',
-      source: record.source || 'domain_memory',
-      state: 'saved',
-    };
-  }
-  if (record.css_selector) {
-    return {
-      key: `selector:${record.id}`,
-      selectorId: record.id,
-      surface: record.surface,
-      fieldName: record.field_name,
-      kind: 'css_selector',
-      selectorValue: record.css_selector,
-      extractedValue: record.sample_value || '',
-      source: record.source || 'domain_memory',
-      state: 'saved',
-    };
-  }
-  return {
-    key: `selector:${record.id}`,
-    selectorId: record.id,
-    surface: record.surface,
-    fieldName: record.field_name,
-    kind: 'regex',
-    selectorValue: record.regex || '',
-    extractedValue: record.sample_value || '',
-    source: record.source || 'domain_memory',
-    state: 'saved',
-  };
-}
-
-function buildRowFromSuggestion(
-  fieldName: string,
-  suggestion?: SelectorSuggestion,
-  surface?: string | null,
-): SelectorRow {
-  if (suggestion?.xpath) {
-    return {
-      key: createRowKey(),
-      selectorId: null,
-      surface: surface ?? null,
-      fieldName,
-      kind: 'xpath',
-      selectorValue: suggestion.xpath,
-      extractedValue: suggestion.sample_value || '',
-      source: suggestion.source || 'llm_xpath',
-      state: 'idle',
-    };
-  }
-  if (suggestion?.css_selector) {
-    return {
-      key: createRowKey(),
-      selectorId: null,
-      surface: surface ?? null,
-      fieldName,
-      kind: 'css_selector',
-      selectorValue: suggestion.css_selector,
-      extractedValue: suggestion.sample_value || '',
-      source: suggestion.source || 'llm_css',
-      state: 'idle',
-    };
-  }
-  if (suggestion?.regex) {
-    return {
-      key: createRowKey(),
-      selectorId: null,
-      surface: surface ?? null,
-      fieldName,
-      kind: 'regex',
-      selectorValue: suggestion.regex,
-      extractedValue: suggestion.sample_value || '',
-      source: suggestion.source || 'llm_regex',
-      state: 'idle',
-    };
-  }
-  return {
-    key: createRowKey(),
-    selectorId: null,
-    surface: surface ?? null,
-    fieldName,
-    kind: 'xpath',
-    selectorValue: '',
-    extractedValue: '',
-    source: 'manual',
-    state: 'idle',
-  };
-}
-
-function createEmptyRow(): SelectorRow {
-  return {
-    key: createRowKey(),
-    selectorId: null,
-    surface: null,
-    fieldName: '',
-    kind: 'xpath',
-    selectorValue: '',
-    extractedValue: '',
-    source: 'manual',
-    state: 'idle',
-  };
-}
-
-function createRowKey() {
-  return `selector:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function isDuplicateSelectorError(error: unknown): boolean {
-  if (httpErrorStatus(error) === 409) {
-    return true;
-  }
-  const fragments = [];
-  if (error instanceof Error) {
-    fragments.push(error.message);
-  }
-  if (typeof error === 'object' && error !== null && 'body' in error) {
-    const body = (error as { body?: unknown }).body;
-    if (typeof body === 'string') {
-      fragments.push(body);
-    }
-  }
-  const message = fragments.join('').toLowerCase();
-  return message.includes('already exists') || message.includes('duplicate');
 }

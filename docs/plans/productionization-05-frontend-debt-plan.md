@@ -2,7 +2,7 @@
 
 **Created:** 2026-08-21
 **Agent:** Codex
-**Status:** QUEUED — set to `IN PROGRESS` only when this plan is assigned
+**Status:** COMPLETE
 **PR boundary:** One independent PR. Frontend source, tests, and architecture scripts only.
 **Touches buckets:** Next.js routes, Crawl Studio UI, Playground/Selectors UI, API types, frontend tests and architecture scripts
 
@@ -54,15 +54,15 @@ Complexity scope is all maintained `.ts`, `.tsx`, `.js`, and `.mjs` under `front
 
 ## Acceptance Criteria
 
-- [ ] Record starting commit, dirty state, scoped physical LOC, files over 800, and all ESLint CC violations in Notes.
-- [ ] Every maintained frontend JS/TS/TSX file is `<=800` physical lines.
-- [ ] `pnpm exec eslint . --rule "complexity: [error, 15]" --max-warnings=0` exits 0.
-- [ ] Scoped physical LOC is lower than baseline.
-- [ ] All existing routes, UI flows, visual states, accessibility behavior, API requests, and DTO shapes remain stable.
-- [ ] Existing design tokens/components are reused; no redesign or parallel component system is introduced.
-- [ ] Exact duplicate logic is deleted after jscpd/search validation; intentional fixture/UI repetition is not abstracted blindly.
-- [ ] Existing lint, format, typecheck, architecture checks, unit tests, and production build pass.
-- [ ] No backend, dependency, lockfile, workflow, or broad-format-only changes are included.
+- [x] Record starting commit, dirty state, scoped physical LOC, files over 800, and all ESLint CC violations in Notes.
+- [x] Every maintained frontend JS/TS/TSX file is `<=800` physical lines.
+- [x] `pnpm exec eslint . --rule "complexity: [error, 15]" --max-warnings=0` exits 0.
+- [x] Scoped physical LOC is lower than baseline.
+- [x] All existing routes, UI flows, visual states, accessibility behavior, API requests, and DTO shapes remain stable.
+- [x] Existing design tokens/components are reused; no redesign or parallel component system is introduced.
+- [x] Exact duplicate logic is deleted after jscpd/search validation; intentional fixture/UI repetition is not abstracted blindly.
+- [x] Existing lint, format, typecheck, architecture checks, unit tests, and production build pass.
+- [x] No backend, dependency, lockfile, workflow, or broad-format-only changes are included.
 
 ## Do Not Touch
 
@@ -75,48 +75,54 @@ Complexity scope is all maintained `.ts`, `.tsx`, `.js`, and `.mjs` under `front
 
 ### Slice 1: Baseline and Component Ownership Map
 
-**Status:** TODO
+**Status:** COMPLETE
 **Files:** full frontend scope; architecture docs and tests read-only
 **What:** Record physical LOC and exact ESLint complexity JSON. Run jscpd as a lead. Map every violation to an existing route, component, hook, reducer, normalizer, or API-domain owner. Identify deletions and split seams before editing.
 **Verify:** `cd frontend; pnpm run lint:eslint; pnpm run typecheck; pnpm test`
 
 ### Slice 2: Crawl Studio Screens and Log Terminal
 
-**Status:** TODO
+**Status:** COMPLETE
 **Files:** crawl config/run screens, controller, log terminal/utils, crawl screen tests, current crawl components
 **What:** Keep controllers/hooks responsible for state and effects; split render sections into named presentational components. Replace icon/stage switches with data maps when semantics are identical. Split tests by observable screen behavior. Delete duplicated rendering/normalization. Keep every destination file under 800 and callable under 16.
 **Verify:** Run crawl-related Vitest files, `pnpm run check:crawl-architecture`, ESLint complexity command, and typecheck.
 
 ### Slice 3: Playground, Selectors, and API Types
 
-**Status:** TODO
+**Status:** COMPLETE
 **Files:** oversized Playground/Selectors files, workflow/normalizer owners, `lib/api/types.ts`, focused tests
 **What:** Split Playground stage UI/log humanization, selector reducer/suggestion rows, and API DTOs by existing domain. Preserve import ergonomics with explicit public barrels only where one already exists. Do not create circular barrels or duplicate DTOs.
 **Verify:** Run focused Playground, selector, API client/type tests; then architecture checks and typecheck.
 
 ### Slice 4: Remaining Frontend Complexity
 
-**Status:** TODO
+**Status:** COMPLETE
 **Files:** every remaining file reported by the exact ESLint complexity command
 **What:** Reduce Data Enrichment, Markdown, monitor/alert, dashboard, Product Intelligence, app-shell, shared UI, and architecture-script complexity. Prefer named predicates, section components, and effect/query separation. Preserve reducer and keyboard semantics.
 **Verify:** `cd frontend; pnpm exec eslint . --rule "complexity: [error, 15]" --max-warnings=0`; run focused tests for every touched owner.
 
 ### Slice 5: Metrics and Full Frontend Verification
 
-**Status:** TODO
+**Status:** COMPLETE
 **Files:** all touched frontend files; docs if stable ownership moved
 **What:** Re-run physical LOC, ESLint complexity, jscpd, normal lint, format check, typecheck, architecture checks, unit tests, and build. Prove total scoped LOC decreased.
 **Verify:** `cd frontend; pnpm run format:check; pnpm run lint; pnpm run typecheck; pnpm test; pnpm run build`
 
 ## Doc Updates Required
 
-- [ ] `docs/frontend-architecture.md` — stable component/hook/type ownership changes.
-- [ ] `docs/CODEBASE_MAP.md` — only for meaningful route/component ownership changes.
-- [ ] `docs/BUSINESS_LOGIC.md` — no change unless the user approves a product behavior decision.
-- [ ] `docs/plans/ACTIVE.md` — active pointer and closeout.
+- [x] `docs/frontend-architecture.md` — stable component/hook/type ownership changes.
+- [x] `docs/CODEBASE_MAP.md` — only for meaningful route/component ownership changes.
+- [x] `docs/BUSINESS_LOGIC.md` — no change required; behavior did not change.
+- [x] `docs/plans/ACTIVE.md` — active pointer and closeout.
 
 ## Notes
 
 - Source evidence: `docs/audits/productionization-evidence-report-2026-08-21.md`, sections 4–8.
 - `frontend/scripts/check-crawl-architecture.mjs` currently permits higher file budgets. Do not change gate policy here; Plan 07 replaces the budgets after this plan is green.
 - UCP Audit, Run Trace/AI Observability, and the Design Crawl feature were removed before this plan under Productionization 04; do not recreate or baseline them.
+- Baseline commit: `60868d883d8a96c408be35ad9a6c49f16caec465`; worktree clean.
+- Baseline scoped physical LOC: 32,439. Final scoped physical LOC: 31,809 (down 630).
+- Baseline oversized files: `crawl-config-screen.tsx` 1,259; `crawl-run-screen.test.tsx` 1,229; `crawl-run-screen.tsx` 1,124; `playground/page.tsx` 1,118; `log-terminal.tsx` 975; `selectors/page-view.tsx` 883; `lib/api/types.ts` 872. Final count over 800: zero; largest file is `log-terminal.tsx` at 788.
+- Baseline exact complexity scan: 36 violations. Owners were Crawl config/run screens and controller; log terminal stage/group/icon rendering; Markdown parsing; Playground page/workflow/normalizer; Data Enrichment; selector page/reducer/row merge/workspace assembly; monitor and alert forms, reducer, header, list item, and alert builder; Dashboard; Product Intelligence page/normalizers; app shell; dropdown and field primitives; API/config dispatch helpers; and the crawl architecture template scanner. Final exact scan: zero violations.
+- `jscpd@4.0.5` reported 24 clones / 1.46% duplicated lines. The refactor-created 324-line crawl test preamble clone was removed into `crawl-run-screen.test-harness.tsx`; remaining hits are pre-existing fixtures, short UI parallels, or unrelated cross-owner similarities and were not abstracted blindly.
+- Verification: format check; normal ESLint; exact CC 15 ESLint; typecheck; crawl architecture check; 66 focused crawl tests; full Vitest suite (31 files, 170 tests); production Next.js build; `git diff --check`.

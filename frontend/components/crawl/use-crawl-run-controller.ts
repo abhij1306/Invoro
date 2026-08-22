@@ -105,7 +105,7 @@ export function useCrawlRunController(options: ControllerOptions) {
     });
   }, [records, tableRecords]);
 
-  const visibleRecords = effectiveOutputTab === 'table' ? tableRecords : records;
+  const visibleRecords = recordsForOutputTab(effectiveOutputTab, tableRecords, records);
   const visibleRecordIds = useMemo(
     () => new Set(visibleRecords.map((record) => record.id)),
     [visibleRecords],
@@ -121,7 +121,7 @@ export function useCrawlRunController(options: ControllerOptions) {
       ),
     [runId, visibleRecords, visibleSelectedIds],
   );
-  const batchSourceRecords = tableRecords.length ? tableRecords : records;
+  const batchSourceRecords = preferredRecords(tableRecords, records);
   const resultUrls = useMemo(
     () => uniqueStrings(batchSourceRecords.map((record) => extractRecordUrl(record))),
     [batchSourceRecords],
@@ -147,7 +147,7 @@ export function useCrawlRunController(options: ControllerOptions) {
   }, [batchSourceRecords, run?.settings?.llm_enabled]);
 
   const listingRun = isListingRun(run);
-  const ecommerceDetailRun = String(run?.surface ?? '') === 'ecommerce_detail';
+  const ecommerceDetailRun = isEcommerceDetailRun(run);
   const verdict = extractionVerdict(run);
   const persistedQualityLevel = useMemo(() => {
     const level = String(run?.result_summary?.quality_summary?.level ?? '')
@@ -161,43 +161,29 @@ export function useCrawlRunController(options: ControllerOptions) {
     () => estimateDataQuality(batchSourceRecords, visibleColumns),
     [batchSourceRecords, visibleColumns],
   );
-  const completedQualityLevel = terminal ? (persistedQualityLevel ?? quality.level) : quality.level;
-  const emptyRecordsState =
-    verdict === 'blocked'
-      ? {
-          title: 'Access blocked',
-          description:
-            'The target site blocked acquisition for this run. Check Logs or browser diagnostics for challenge details.',
-        }
-      : {
-          title: 'No records captured yet',
-          description: 'Records will appear here once extraction returns rows.',
-        };
-
-  const summaryRecordsFromRun = Number(run?.result_summary?.record_count ?? 0) || 0;
-  const summaryRecordsFromTable =
-    Number(tableRecordsQueryData?.meta?.total ?? tableRecordsQueryData?.items?.length ?? 0) || 0;
-  const summaryPagesFromRun =
-    Number(run?.result_summary?.processed_urls ?? run?.result_summary?.completed_urls ?? 0) || 0;
-  const summaryCurrentUrlIndex = Number(run?.result_summary?.current_url_index ?? 0) || 0;
-  const summary = {
-    records: Math.max(summaryRecordsFromRun, recordsTotal, summaryRecordsFromTable),
-    pages: Math.max(
-      summaryPagesFromRun,
-      summaryCurrentUrlIndex,
-      Number(run?.result_summary?.progress ?? 0) > 0 ? 1 : 0,
-    ),
-    fields: visibleColumns.length,
-    duration:
-      (terminal ? formatDurationMs(run?.result_summary?.duration_ms) : null) ??
-      formatDuration(
-        new Date(effectiveStartMs).toISOString(),
-        terminal ? run?.completed_at : new Date(localNow).toISOString(),
-      ),
-  };
-
-  const batchFromResultsUrls = selectedResultUrls.length ? selectedResultUrls : resultUrls;
-  const downstreamRecords = selectedRecords.length ? selectedRecords : batchSourceRecords;
+  const completedQualityLevel = resolveCompletedQualityLevel(
+    terminal,
+    persistedQualityLevel,
+    quality.level,
+  );
+  const emptyRecordsState = emptyStateForVerdict(verdict);
+  const { summaryRecordsFromRun, summary } = buildRunSummary({
+    run,
+    terminal,
+    localNow,
+    effectiveStartMs,
+    recordsTotal,
+    tableRecordsQueryData,
+    visibleColumnCount: visibleColumns.length,
+  });
+  const batchFromResultsUrls = preferredValues(selectedResultUrls, resultUrls);
+  const downstreamRecords = preferredValues(selectedRecords, batchSourceRecords);
+  const labels = buildResultActionLabels(
+    selectedResultUrls,
+    resultUrls,
+    selectedRecords,
+    downstreamRecords,
+  );
 
   function toggleRecord(id: number, checked: boolean) {
     setSelectedIds((current) =>
@@ -306,16 +292,10 @@ export function useCrawlRunController(options: ControllerOptions) {
     summaryRecordsFromRun,
     summary,
     batchFromResultsUrls,
-    batchFromResultsLabel: selectedResultUrls.length
-      ? `Batch Crawl Selected (${selectedResultUrls.length})`
-      : `Batch Crawl (${resultUrls.length})`,
+    batchFromResultsLabel: labels.batch,
     downstreamRecords,
-    productIntelligenceLabel: selectedRecords.length
-      ? `Product Intelligence Selected (${selectedRecords.length})`
-      : `Product Intelligence (${downstreamRecords.length})`,
-    dataEnrichmentLabel: selectedRecords.length
-      ? `Enrich Selected (${selectedRecords.length})`
-      : `Enrich Records (${downstreamRecords.length})`,
+    productIntelligenceLabel: labels.intelligence,
+    dataEnrichmentLabel: labels.enrichment,
     toggleRecord,
     selectAll,
     resetToConfig,
@@ -324,5 +304,132 @@ export function useCrawlRunController(options: ControllerOptions) {
     triggerBatchCrawlFromResults,
     triggerProductIntelligenceFromResults,
     triggerDataEnrichmentFromResults,
+  };
+}
+
+function recordsForOutputTab(
+  tab: OutputTabKey,
+  tableRecords: CrawlRecord[],
+  records: CrawlRecord[],
+) {
+  return tab === 'table' ? tableRecords : records;
+}
+
+function preferredRecords(primary: CrawlRecord[], fallback: CrawlRecord[]) {
+  return primary.length ? primary : fallback;
+}
+
+function preferredValues<T>(primary: T[], fallback: T[]) {
+  return primary.length ? primary : fallback;
+}
+
+function isEcommerceDetailRun(run: CrawlRun | undefined) {
+  return run?.surface === 'ecommerce_detail';
+}
+
+function resolveCompletedQualityLevel(
+  terminal: boolean,
+  persisted: ResultSummaryQualityLevel | null,
+  estimated: ResultSummaryQualityLevel,
+) {
+  if (!terminal) return estimated;
+  return persisted ?? estimated;
+}
+
+function emptyStateForVerdict(verdict: string) {
+  if (verdict === 'blocked')
+    return {
+      title: 'Access blocked',
+      description:
+        'The target site blocked acquisition for this run. Check Logs or browser diagnostics for challenge details.',
+    };
+  return {
+    title: 'No records captured yet',
+    description: 'Records will appear here once extraction returns rows.',
+  };
+}
+
+function buildRunSummary({
+  run,
+  terminal,
+  localNow,
+  effectiveStartMs,
+  recordsTotal,
+  tableRecordsQueryData,
+  visibleColumnCount,
+}: Pick<
+  ControllerOptions,
+  'run' | 'terminal' | 'localNow' | 'effectiveStartMs' | 'recordsTotal' | 'tableRecordsQueryData'
+> & { visibleColumnCount: number }) {
+  const counts = runSummaryCounts(run, tableRecordsQueryData);
+  const duration = runSummaryDuration(run, terminal, localNow, effectiveStartMs);
+  return {
+    summaryRecordsFromRun: counts.records,
+    summary: {
+      records: Math.max(counts.records, recordsTotal, counts.tableRecords),
+      pages: Math.max(counts.pages, counts.currentPage, counts.progressPage),
+      fields: visibleColumnCount,
+      duration,
+    },
+  };
+}
+
+function numeric(value: unknown) {
+  return Number(value) || 0;
+}
+
+function runSummaryCounts(
+  run: CrawlRun | undefined,
+  tableData: ControllerOptions['tableRecordsQueryData'],
+) {
+  const tableTotal = firstDefined(tableData?.meta?.total, tableData?.items?.length);
+  const completedPages = firstDefined(
+    run?.result_summary?.processed_urls,
+    run?.result_summary?.completed_urls,
+  );
+  return {
+    records: numeric(run?.result_summary?.record_count),
+    tableRecords: numeric(tableTotal),
+    pages: numeric(completedPages),
+    currentPage: numeric(run?.result_summary?.current_url_index),
+    progressPage: progressPageCount(run?.result_summary?.progress),
+  };
+}
+
+function progressPageCount(value: unknown) {
+  return numeric(value) > 0 ? 1 : 0;
+}
+
+function firstDefined<T>(...values: Array<T | null | undefined>) {
+  return values.find((value) => value !== null && value !== undefined);
+}
+
+function runSummaryDuration(
+  run: CrawlRun | undefined,
+  terminal: boolean,
+  localNow: number,
+  startMs: number,
+) {
+  const persisted = terminal ? formatDurationMs(run?.result_summary?.duration_ms) : null;
+  const end = terminal ? run?.completed_at : new Date(localNow).toISOString();
+  return persisted ?? formatDuration(new Date(startMs).toISOString(), end);
+}
+
+function buildResultActionLabels(
+  selectedUrls: string[],
+  allUrls: string[],
+  selectedRecords: CrawlRecord[],
+  downstreamRecords: CrawlRecord[],
+) {
+  return {
+    batch: selectedUrls.length
+      ? `Batch Crawl Selected (${selectedUrls.length})`
+      : `Batch Crawl (${allUrls.length})`,
+    intelligence: selectedRecords.length
+      ? `Product Intelligence Selected (${selectedRecords.length})`
+      : `Product Intelligence (${downstreamRecords.length})`,
+    enrichment: selectedRecords.length
+      ? `Enrich Selected (${selectedRecords.length})`
+      : `Enrich Records (${downstreamRecords.length})`,
   };
 }

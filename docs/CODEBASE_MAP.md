@@ -354,7 +354,7 @@ All selector memory is scoped by normalized `(domain, surface)`.
 | Path | Purpose |
 |---|---|
 | `app/` | Next.js App Router pages |
-| `app/playground/page.tsx` | Guided Playground rendering and panel composition |
+| `app/playground/page.tsx`, `app/playground/playground-view.tsx`, `app/playground/playground-panels.tsx` | Guided Playground route composition, stage layout, and reusable panels |
 | `app/playground/use-playground-workflow.ts` | Playground session queries, mutations, polling, retries, automatic transitions, and reset ownership |
 | `app/playground/playground-normalizers.ts` | Tolerant normalization for Playground navigation, discovery, and extracted-result payloads |
 | `app/product-intelligence/product-intelligence-components.tsx` | Product Intelligence local UI pieces |
@@ -364,13 +364,13 @@ All selector memory is scoped by normalized `(domain, surface)`.
 | `components/ui/primitives.tsx` | compatibility barrel plus dropdown, toggle, tooltip, skeleton, field helpers |
 | `components/ui/patterns.tsx` | shared operator-page UI patterns |
 | `components/ui/table.module.css` | compact and commerce table styling |
-| `components/crawl/crawl-config-screen.tsx` | Crawl Studio form and dispatch |
+| `components/crawl/crawl-config-screen.tsx`, `crawl-config-screen-content.tsx`, `crawl-config-advanced.tsx` | Crawl Studio state/dispatch, target and quick settings, field configuration, and advanced controls |
 | `components/crawl/use-crawl-config-lifecycle.ts` | Crawl Studio prefill, saved-profile, and domain-memory lifecycle coordination |
-| `components/crawl/crawl-run-screen.tsx` | Run workspace rendering and Domain Recipe workflow |
+| `components/crawl/crawl-run-screen.tsx`, `use-crawl-run-screen-model.ts`, `crawl-run-screen-content.tsx`, `crawl-run-output-content.tsx` | Run workspace entry, queries/effects, workspace chrome, output tabs, and Domain Recipe workflow |
 | `components/crawl/use-crawl-run-controller.ts` | Run-workspace derived state, record selection, controls, handoffs, and run-change UI reset coordination |
 | `components/crawl/crawl-diagnostics.ts` | Tolerant normalization boundary for open crawl acquisition, timing, confidence, and LLM source diagnostics |
 | `components/crawl/form-fields.tsx` | Crawl form field controls and manual selector editor |
-| `components/crawl/log-terminal.tsx` | Crawl run log terminal grouping and rendering |
+| `components/crawl/log-terminal.tsx`, `log-terminal-presentation.tsx` | Crawl run log terminal grouping, rendering, and presentation descriptors |
 | `components/crawl/records-table.tsx` | Crawl records table rendering |
 | `components/crawl/record-thumbnail.tsx` | Crawl record image thumbnail rendering and broken-image cache |
 | `components/crawl/crawl.module.css` | Crawl Studio feature styling |
@@ -382,7 +382,7 @@ All selector memory is scoped by normalized `(domain, surface)`.
 | `lib/crawl/scroll.ts` | Crawl viewport scroll helper |
 | `lib/api/client.ts` | auth-aware fetch wrapper |
 | `lib/api/index.ts` | only frontend backend-access layer |
-| `lib/api/types.ts` | frontend API types |
+| `lib/api/types.ts`, `lib/api/monitor-types.ts` | shared frontend API types and monitor/alert DTO ownership |
 | `scripts/check-token-escapes.mjs` | frontend guard against new raw CSS-var Tailwind token escapes |
 
 ---

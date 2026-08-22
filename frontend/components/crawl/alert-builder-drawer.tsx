@@ -81,7 +81,7 @@ const ALERT_BUILDER_DEFAULT_VALUES: AlertBuilderForm = {
 const MAX_VARIANTS_DISPLAY = 12;
 const MAX_FIELDS_PER_VARIANT = 5;
 
-export function AlertBuilderDrawer({
+function useAlertBuilderModel({
   open,
   onOpenChange,
   records,
@@ -186,6 +186,78 @@ export function AlertBuilderDrawer({
     }
   }
 
+  return {
+    open,
+    onOpenChange,
+    records,
+    run,
+    onCreated,
+    submitError,
+    isSubmitting,
+    errors,
+    handleSubmit,
+    reset,
+    setValue,
+    selectedRecordId,
+    rules,
+    pollInterval,
+    webhookUrl,
+    selectedRecord,
+    selectedData,
+    variants,
+    rootFields,
+    variantFields,
+    recordOptions,
+    validationError,
+    visibleVariants,
+    hiddenVariantCount,
+    visibleVariantFields,
+    hiddenVariantFieldCount,
+    toggleRule,
+    updateRule,
+    createAlert,
+  };
+}
+
+export type AlertBuilderModel = ReturnType<typeof useAlertBuilderModel>;
+
+export function AlertBuilderDrawer(props: AlertBuilderDrawerProps) {
+  const model = useAlertBuilderModel(props);
+  return <AlertBuilderContent model={model} />;
+}
+
+function AlertBuilderContent({ model }: { model: AlertBuilderModel }) {
+  const {
+    open,
+    onOpenChange,
+    records,
+    run,
+    onCreated,
+    submitError,
+    isSubmitting,
+    errors,
+    handleSubmit,
+    reset,
+    setValue,
+    selectedRecordId,
+    rules,
+    pollInterval,
+    webhookUrl,
+    selectedRecord,
+    selectedData,
+    variants,
+    rootFields,
+    variantFields,
+    recordOptions,
+    validationError,
+    visibleVariants,
+    hiddenVariantCount,
+    visibleVariantFields,
+    hiddenVariantFieldCount,
+    toggleRule,
+    updateRule,
+    createAlert,
+  } = model;
   return (
     <DialogPrimitive.Root
       open={open}
@@ -272,184 +344,11 @@ export function AlertBuilderDrawer({
                 </div>
               </section>
 
-              {variants.length ? (
-                <section>
-                  <DrawerStepHeader
-                    step={recordOptions.length > 1 ? 3 : 2}
-                    title="Variants"
-                    subtitle={`${variants.length} variant${variants.length !== 1 ? 's' : ''} detected`}
-                  />
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {variantFields.map((field) => {
-                      const rule = buildAlertRule({
-                        path: `variants[*].${field}`,
-                        label: `Any variant ${humanizeFieldName(field).toLowerCase()}`,
-                      });
-                      return (
-                        <Button
-                          key={field}
-                          type="button"
-                          variant={
-                            rules.some(
-                              (item) => alertRuleSignature(item) === alertRuleSignature(rule),
-                            )
-                              ? 'action'
-                              : 'neutral'
-                          }
-                          size="sm"
-                          onClick={() => toggleRule(rule)}
-                        >
-                          <Bell className="size-3.5" />
-                          Any {humanizeFieldName(field)}
-                        </Button>
-                      );
-                    })}
-                  </div>
-                  <div className="mt-3 space-y-2">
-                    {visibleVariants.map((variant, index) => {
-                      const hasActiveRule = variantFields.some((field) => {
-                        const rule = buildAlertRule({
-                          path: `variants[*].${field}`,
-                          label: '',
-                          variant_match: variantMatch(variant),
-                        });
-                        return rules.some(
-                          (item) => alertRuleSignature(item) === alertRuleSignature(rule),
-                        );
-                      });
-                      return (
-                        <div
-                          key={variantIdentity(variant, index)}
-                          className={cn(
-                            'border-border bg-panel rounded-md border p-3 transition-colors',
-                            hasActiveRule && 'border-l-accent border-l-2',
-                          )}
-                        >
-                          <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
-                            <span className="text-foreground type-body-sm font-semibold">
-                              {variantTitle(variant, index)}
-                            </span>
-                            <Badge tone="neutral">
-                              {formatAlertValue(
-                                variant.availability ?? variant.price ?? variant.sku,
-                              )}
-                            </Badge>
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            {visibleVariantFields.map((field) => {
-                              const rule = buildAlertRule({
-                                path: `variants[*].${field}`,
-                                label: `${variantTitle(variant, index)} ${humanizeFieldName(field).toLowerCase()}`,
-                                variant_match: variantMatch(variant),
-                              });
-                              return (
-                                <Button
-                                  key={field}
-                                  type="button"
-                                  size="sm"
-                                  variant={
-                                    rules.some(
-                                      (item) =>
-                                        alertRuleSignature(item) === alertRuleSignature(rule),
-                                    )
-                                      ? 'action'
-                                      : 'quiet'
-                                  }
-                                  onClick={() => toggleRule(rule)}
-                                >
-                                  {humanizeFieldName(field)}
-                                </Button>
-                              );
-                            })}
-                            {hiddenVariantFieldCount > 0 ? (
-                              <span className="text-muted type-body-sm inline-flex h-8 items-center px-1.5">
-                                and {hiddenVariantFieldCount} more…
-                              </span>
-                            ) : null}
-                          </div>
-                        </div>
-                      );
-                    })}
-                    {hiddenVariantCount > 0 ? (
-                      <div className="text-muted type-body-sm px-1.5 py-1">
-                        and {hiddenVariantCount} more…
-                      </div>
-                    ) : null}
-                  </div>
-                </section>
-              ) : null}
+              <AlertVariantsSection model={model} />
 
               <hr className="border-border" />
 
-              <section>
-                <DrawerStepHeader
-                  step={
-                    recordOptions.length > 1 ? (variants.length ? 4 : 3) : variants.length ? 3 : 2
-                  }
-                  title="Active Rules"
-                  subtitle={
-                    rules.length
-                      ? `${rules.length} rule${rules.length !== 1 ? 's' : ''} configured`
-                      : undefined
-                  }
-                />
-                {rules.length ? (
-                  <div className="mt-3 space-y-2">
-                    {rules.map((rule) => (
-                      <div
-                        key={rule.id}
-                        className="border-border bg-panel grid gap-3 rounded-md border p-3.5 md:grid-cols-[1fr_150px_140px_auto]"
-                      >
-                        <div className="min-w-0">
-                          <div className="text-foreground type-body-sm truncate font-semibold">
-                            {rule.label || rule.path}
-                          </div>
-                          <div className="text-muted type-body-sm mt-0.5 truncate">{rule.path}</div>
-                        </div>
-                        <Dropdown
-                          value={rule.operator || 'changed'}
-                          onChange={(operator) => updateRule(rule.id, { operator })}
-                          options={alertOperatorOptions}
-                          ariaLabel="Operator"
-                          size="sm"
-                          portal={false}
-                        />
-                        {needsAlertRuleValue(rule.operator) ? (
-                          <Input
-                            value={String(rule.value ?? '')}
-                            onChange={(event) => updateRule(rule.id, { value: event.target.value })}
-                            placeholder="Value"
-                          />
-                        ) : (
-                          <div />
-                        )}
-                        <Button
-                          type="button"
-                          variant="quiet"
-                          size="icon"
-                          aria-label="Remove rule"
-                          onClick={() =>
-                            setValue(
-                              'rules',
-                              rules.filter((item) => item.id !== rule.id),
-                              { shouldValidate: true },
-                            )
-                          }
-                        >
-                          <X className="size-4" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="mt-3">
-                    <InlineAlert
-                      tone="warning"
-                      message="Click product fields or variant attributes above to add alert rules."
-                    />
-                  </div>
-                )}
-              </section>
+              <ActiveAlertRulesSection model={model} />
 
               <section className="bg-background-alt rounded-lg p-4">
                 <h3 className="type-body-sm text-foreground mb-3 flex items-center gap-2 font-semibold">
@@ -664,4 +563,186 @@ function formatAlertValue(value: unknown) {
 
 function isRecordObject(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+}
+function AlertVariantsSection({ model }: { model: AlertBuilderModel }) {
+  const {
+    variants,
+    recordOptions,
+    variantFields,
+    rules,
+    toggleRule,
+    visibleVariants,
+    visibleVariantFields,
+    hiddenVariantFieldCount,
+    hiddenVariantCount,
+  } = model;
+  if (!variants.length) return null;
+  return (
+    <section>
+      <DrawerStepHeader
+        step={recordOptions.length > 1 ? 3 : 2}
+        title="Variants"
+        subtitle={`${variants.length} variant${variants.length !== 1 ? 's' : ''} detected`}
+      />
+      <div className="mt-3 flex flex-wrap gap-2">
+        {variantFields.map((field) => {
+          const rule = buildAlertRule({
+            path: `variants[*].${field}`,
+            label: `Any variant ${humanizeFieldName(field).toLowerCase()}`,
+          });
+          return (
+            <Button
+              key={field}
+              type="button"
+              variant={
+                rules.some((item) => alertRuleSignature(item) === alertRuleSignature(rule))
+                  ? 'action'
+                  : 'neutral'
+              }
+              size="sm"
+              onClick={() => toggleRule(rule)}
+            >
+              <Bell className="size-3.5" />
+              Any {humanizeFieldName(field)}
+            </Button>
+          );
+        })}
+      </div>
+      <div className="mt-3 space-y-2">
+        {visibleVariants.map((variant, index) => {
+          const hasActiveRule = variantFields.some((field) => {
+            const rule = buildAlertRule({
+              path: `variants[*].${field}`,
+              label: '',
+              variant_match: variantMatch(variant),
+            });
+            return rules.some((item) => alertRuleSignature(item) === alertRuleSignature(rule));
+          });
+          return (
+            <div
+              key={variantIdentity(variant, index)}
+              className={cn(
+                'border-border bg-panel rounded-md border p-3 transition-colors',
+                hasActiveRule && 'border-l-accent border-l-2',
+              )}
+            >
+              <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
+                <span className="text-foreground type-body-sm font-semibold">
+                  {variantTitle(variant, index)}
+                </span>
+                <Badge tone="neutral">
+                  {formatAlertValue(variant.availability ?? variant.price ?? variant.sku)}
+                </Badge>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {visibleVariantFields.map((field) => {
+                  const rule = buildAlertRule({
+                    path: `variants[*].${field}`,
+                    label: `${variantTitle(variant, index)} ${humanizeFieldName(field).toLowerCase()}`,
+                    variant_match: variantMatch(variant),
+                  });
+                  return (
+                    <Button
+                      key={field}
+                      type="button"
+                      size="sm"
+                      variant={
+                        rules.some((item) => alertRuleSignature(item) === alertRuleSignature(rule))
+                          ? 'action'
+                          : 'quiet'
+                      }
+                      onClick={() => toggleRule(rule)}
+                    >
+                      {humanizeFieldName(field)}
+                    </Button>
+                  );
+                })}
+                {hiddenVariantFieldCount > 0 ? (
+                  <span className="text-muted type-body-sm inline-flex h-8 items-center px-1.5">
+                    and {hiddenVariantFieldCount} more…
+                  </span>
+                ) : null}
+              </div>
+            </div>
+          );
+        })}
+        {hiddenVariantCount > 0 ? (
+          <div className="text-muted type-body-sm px-1.5 py-1">and {hiddenVariantCount} more…</div>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
+function ActiveAlertRulesSection({ model }: { model: AlertBuilderModel }) {
+  const { recordOptions, variants, rules, updateRule, setValue } = model;
+  return (
+    <section>
+      <DrawerStepHeader
+        step={recordOptions.length > 1 ? (variants.length ? 4 : 3) : variants.length ? 3 : 2}
+        title="Active Rules"
+        subtitle={
+          rules.length
+            ? `${rules.length} rule${rules.length !== 1 ? 's' : ''} configured`
+            : undefined
+        }
+      />
+      {rules.length ? (
+        <div className="mt-3 space-y-2">
+          {rules.map((rule) => (
+            <div
+              key={rule.id}
+              className="border-border bg-panel grid gap-3 rounded-md border p-3.5 md:grid-cols-[1fr_150px_140px_auto]"
+            >
+              <div className="min-w-0">
+                <div className="text-foreground type-body-sm truncate font-semibold">
+                  {rule.label || rule.path}
+                </div>
+                <div className="text-muted type-body-sm mt-0.5 truncate">{rule.path}</div>
+              </div>
+              <Dropdown
+                value={rule.operator || 'changed'}
+                onChange={(operator) => updateRule(rule.id, { operator })}
+                options={alertOperatorOptions}
+                ariaLabel="Operator"
+                size="sm"
+                portal={false}
+              />
+              {needsAlertRuleValue(rule.operator) ? (
+                <Input
+                  value={String(rule.value ?? '')}
+                  onChange={(event) => updateRule(rule.id, { value: event.target.value })}
+                  placeholder="Value"
+                />
+              ) : (
+                <div />
+              )}
+              <Button
+                type="button"
+                variant="quiet"
+                size="icon"
+                aria-label="Remove rule"
+                onClick={() =>
+                  setValue(
+                    'rules',
+                    rules.filter((item) => item.id !== rule.id),
+                    { shouldValidate: true },
+                  )
+                }
+              >
+                <X className="size-4" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="mt-3">
+          <InlineAlert
+            tone="warning"
+            message="Click product fields or variant attributes above to add alert rules."
+          />
+        </div>
+      )}
+    </section>
+  );
 }

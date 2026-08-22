@@ -57,17 +57,11 @@ export function Dropdown<T extends string>({
     side: 'top' | 'bottom';
   }>({ top: 0, left: 0, width: 0, side: 'bottom' });
   const closeTimerRef = React.useRef<number | undefined>(undefined);
-  const dropdownId = useId().replace(/[^a-zA-Z0-9_-]+/g, '') || 'dropdown';
+  const dropdownId = normalizedDropdownId(useId());
   const activeIndex = options.findIndex((o) => o.value === value);
   const listboxId = `${dropdownId}-listbox`;
-  const activeDescendant =
-    open && highlightedIndex >= 0 && options[highlightedIndex]
-      ? `${dropdownId}-option-${highlightedIndex}-${sanitizeIdSegment(options[highlightedIndex].value)}`
-      : undefined;
-
-  if (process.env.NODE_ENV === 'development' && activeIndex === -1 && options.length > 0) {
-    console.warn(`Dropdown: value "${value}" not found in options`);
-  }
+  const activeDescendant = activeDescendantId(open, highlightedIndex, options, dropdownId);
+  warnForMissingDropdownValue(value, activeIndex, options.length);
 
   function scheduleClose() {
     closeTimerRef.current = window.setTimeout(() => setOpen(false), 120) as unknown as number;
@@ -149,95 +143,32 @@ export function Dropdown<T extends string>({
   }, [open]);
 
   function handleKeyDown(e: React.KeyboardEvent) {
-    if (!open && (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown')) {
-      e.preventDefault();
-      setHighlightedIndex(activeIndex >= 0 ? activeIndex : 0);
-      setOpen(true);
-      return;
-    }
+    if (handleClosedDropdownKey(e, open, activeIndex, setHighlightedIndex, setOpen)) return;
     if (!open) return;
-    if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && options.length === 0) {
-      e.preventDefault();
-      return;
-    }
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      setHighlightedIndex((current) => (current < 0 ? 0 : (current + 1) % options.length));
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      setHighlightedIndex((current) =>
-        current < 0 ? 0 : (current - 1 + options.length) % options.length,
-      );
-    } else if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      if (highlightedIndex >= 0 && options[highlightedIndex]) {
-        onChange(options[highlightedIndex].value);
-      }
-      setOpen(false);
-    }
+    handleOpenDropdownKey(e, options, highlightedIndex, setHighlightedIndex, setOpen, onChange);
   }
 
-  const selectedLabel = options[activeIndex]?.label ?? value;
+  const selectedLabel = selectedDropdownLabel(options, activeIndex, value);
 
   const listboxElement = (
-    <div
-      ref={listboxRef}
-      id={listboxId}
-      role={DROPDOWN_LISTBOX_ROLE}
-      tabIndex={-1}
-      onMouseEnter={cancelClose}
-      onMouseLeave={scheduleClose}
-      className={cn(
-        'border-border bg-background-elevated z-[300] max-h-[320px] w-max overflow-y-auto rounded-lg border py-1',
-        portal ? 'fixed' : 'absolute',
-        listboxPosition.side === 'bottom'
-          ? 'animate-[dropdown-in_150ms_cubic-bezier(0.16,1,0.3,1)]'
-          : 'animate-[dropdown-in-up_150ms_cubic-bezier(0.16,1,0.3,1)]',
-      )}
-      style={
-        portal
-          ? {
-              top: `${listboxPosition.top}px`,
-              left: `${listboxPosition.left}px`,
-              minWidth: `${listboxPosition.width}px`,
-            }
-          : {
-              minWidth: '100%',
-              top: listboxPosition.side === 'top' ? 'auto' : '100%',
-              bottom: listboxPosition.side === 'top' ? '100%' : 'auto',
-              transform: listboxPosition.side === 'top' ? 'translateY(-4px)' : 'translateY(4px)',
-            }
-      }
-    >
-      {options.map((option, index) => {
-        const optionId = `${dropdownId}-option-${index}-${sanitizeIdSegment(option.value)}`;
-        return (
-          <button
-            key={option.value}
-            id={optionId}
-            type="button"
-            role="option"
-            aria-selected={option.value === value}
-            data-highlighted={index === highlightedIndex ? '' : undefined}
-            onClick={() => {
-              onChange(option.value);
-              setOpen(false);
-            }}
-            onMouseDown={(e) => e.preventDefault()}
-            onMouseEnter={() => setHighlightedIndex(index)}
-            className={cn(
-              'flex w-full items-center py-2 text-sm leading-snug transition-colors',
-              align === 'center' ? 'justify-center px-8' : 'justify-start px-3',
-              option.value === value
-                ? 'bg-accent-subtle text-accent font-medium'
-                : 'text-foreground hover:bg-background-alt data-[highlighted]:bg-background-alt',
-            )}
-          >
-            {option.label}
-          </button>
-        );
-      })}
-    </div>
+    <DropdownListbox
+      {...{
+        listboxRef,
+        listboxId,
+        cancelClose,
+        scheduleClose,
+        portal,
+        listboxPosition,
+        options,
+        dropdownId,
+        value,
+        highlightedIndex,
+        onChange,
+        setOpen,
+        setHighlightedIndex,
+        align,
+      }}
+    />
   );
 
   return (
@@ -272,12 +203,7 @@ export function Dropdown<T extends string>({
         }}
         disabled={disabled}
         onKeyDown={handleKeyDown}
-        className={cn(
-          'focus-ring border-border bg-panel text-foreground hover:border-border-strong focus:border-accent flex w-full items-center gap-2 rounded-sm border px-3 leading-snug font-normal transition-[background-color,border-color]',
-          size === 'sm' ? 'h-8 text-xs' : 'h-[var(--control-height)] text-sm',
-          align === 'center' ? 'justify-center text-center' : 'justify-between text-left',
-          triggerClassName,
-        )}
+        className={dropdownTriggerClass(size, align, triggerClassName)}
       >
         <span className="truncate">{selectedLabel}</span>
         <svg
@@ -296,11 +222,227 @@ export function Dropdown<T extends string>({
           <path d="M4 6l4 4 4-4" />
         </svg>
       </button>
-      {open && typeof document !== 'undefined'
-        ? portal
-          ? createPortal(listboxElement, document.body)
-          : listboxElement
-        : null}
+      {renderDropdownListbox(open, portal, listboxElement)}
     </div>
+  );
+}
+
+function normalizedDropdownId(id: string) {
+  return id.replace(/[^a-zA-Z0-9_-]+/g, '') || 'dropdown';
+}
+
+function activeDescendantId<T extends string>(
+  open: boolean,
+  index: number,
+  options: Array<{ value: T }>,
+  dropdownId: string,
+) {
+  if (!open || index < 0 || !options[index]) return undefined;
+  return `${dropdownId}-option-${index}-${sanitizeIdSegment(options[index].value)}`;
+}
+
+function warnForMissingDropdownValue(value: string, activeIndex: number, optionCount: number) {
+  if (process.env.NODE_ENV !== 'development' || activeIndex !== -1 || optionCount === 0) return;
+  console.warn(`Dropdown: value "${value}" not found in options`);
+}
+
+function selectedDropdownLabel<T extends string>(
+  options: Array<{ value: T; label: string }>,
+  index: number,
+  fallback: T,
+) {
+  return index >= 0 ? options[index].label : fallback;
+}
+
+function dropdownTriggerClass(size: 'sm' | 'md', align: 'left' | 'center', className?: string) {
+  return cn(
+    'focus-ring border-border bg-panel text-foreground hover:border-border-strong focus:border-accent flex w-full items-center gap-2 rounded-sm border px-3 leading-snug font-normal transition-[background-color,border-color]',
+    size === 'sm' ? 'h-8 text-xs' : 'h-[var(--control-height)] text-sm',
+    align === 'center' ? 'justify-center text-center' : 'justify-between text-left',
+    className,
+  );
+}
+
+function renderDropdownListbox(open: boolean, portal: boolean, element: React.ReactNode) {
+  if (!open || typeof document === 'undefined') return null;
+  return portal ? createPortal(element, document.body) : element;
+}
+
+function handleClosedDropdownKey(
+  e: React.KeyboardEvent,
+  open: boolean,
+  activeIndex: number,
+  setHighlightedIndex: React.Dispatch<React.SetStateAction<number>>,
+  setOpen: React.Dispatch<React.SetStateAction<boolean>>,
+) {
+  if (open || !['Enter', ' ', 'ArrowDown'].includes(e.key)) return false;
+  e.preventDefault();
+  setHighlightedIndex(activeIndex >= 0 ? activeIndex : 0);
+  setOpen(true);
+  return true;
+}
+
+function handleOpenDropdownKey<T extends string>(
+  e: React.KeyboardEvent,
+  options: Array<{ value: T; label: string }>,
+  highlightedIndex: number,
+  setHighlightedIndex: React.Dispatch<React.SetStateAction<number>>,
+  setOpen: React.Dispatch<React.SetStateAction<boolean>>,
+  onChange: (value: T) => void,
+) {
+  if (['ArrowDown', 'ArrowUp'].includes(e.key) && options.length === 0) {
+    e.preventDefault();
+    return;
+  }
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    setHighlightedIndex((current) => (current < 0 ? 0 : (current + 1) % options.length));
+    return;
+  }
+  if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    setHighlightedIndex((current) =>
+      current < 0 ? 0 : (current - 1 + options.length) % options.length,
+    );
+    return;
+  }
+  if (!['Enter', ' '].includes(e.key)) return;
+  e.preventDefault();
+  const option = options[highlightedIndex];
+  if (highlightedIndex >= 0 && option) onChange(option.value);
+  setOpen(false);
+}
+
+type ListboxPosition = { top: number; left: number; width: number; side: 'top' | 'bottom' };
+
+function DropdownListbox<T extends string>({
+  listboxRef,
+  listboxId,
+  cancelClose,
+  scheduleClose,
+  portal,
+  listboxPosition,
+  options,
+  dropdownId,
+  value,
+  highlightedIndex,
+  onChange,
+  setOpen,
+  setHighlightedIndex,
+  align,
+}: {
+  listboxRef: React.RefObject<HTMLDivElement | null>;
+  listboxId: string;
+  cancelClose: () => void;
+  scheduleClose: () => void;
+  portal: boolean;
+  listboxPosition: ListboxPosition;
+  options: Array<{ value: T; label: string }>;
+  dropdownId: string;
+  value: T;
+  highlightedIndex: number;
+  onChange: (value: T) => void;
+  setOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  setHighlightedIndex: React.Dispatch<React.SetStateAction<number>>;
+  align: 'left' | 'center';
+}) {
+  return (
+    <div
+      ref={listboxRef}
+      id={listboxId}
+      role={DROPDOWN_LISTBOX_ROLE}
+      tabIndex={-1}
+      onMouseEnter={cancelClose}
+      onMouseLeave={scheduleClose}
+      className={cn(
+        'border-border bg-background-elevated z-[300] max-h-[320px] w-max overflow-y-auto rounded-lg border py-1',
+        portal ? 'fixed' : 'absolute',
+        listboxPosition.side === 'bottom'
+          ? 'animate-[dropdown-in_150ms_cubic-bezier(0.16,1,0.3,1)]'
+          : 'animate-[dropdown-in-up_150ms_cubic-bezier(0.16,1,0.3,1)]',
+      )}
+      style={listboxStyle(portal, listboxPosition)}
+    >
+      {options.map((option, index) => (
+        <DropdownOption
+          key={option.value}
+          {...{
+            option,
+            index,
+            dropdownId,
+            value,
+            highlightedIndex,
+            onChange,
+            setOpen,
+            setHighlightedIndex,
+            align,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function listboxStyle(portal: boolean, position: ListboxPosition): React.CSSProperties {
+  if (portal)
+    return {
+      top: `${position.top}px`,
+      left: `${position.left}px`,
+      minWidth: `${position.width}px`,
+    };
+  const opensTop = position.side === 'top';
+  return {
+    minWidth: '100%',
+    top: opensTop ? 'auto' : '100%',
+    bottom: opensTop ? '100%' : 'auto',
+    transform: opensTop ? 'translateY(-4px)' : 'translateY(4px)',
+  };
+}
+
+function DropdownOption<T extends string>({
+  option,
+  index,
+  dropdownId,
+  value,
+  highlightedIndex,
+  onChange,
+  setOpen,
+  setHighlightedIndex,
+  align,
+}: {
+  option: { value: T; label: string };
+  index: number;
+  dropdownId: string;
+  value: T;
+  highlightedIndex: number;
+  onChange: (value: T) => void;
+  setOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  setHighlightedIndex: React.Dispatch<React.SetStateAction<number>>;
+  align: 'left' | 'center';
+}) {
+  const optionId = `${dropdownId}-option-${index}-${sanitizeIdSegment(option.value)}`;
+  return (
+    <button
+      id={optionId}
+      type="button"
+      role="option"
+      aria-selected={option.value === value}
+      data-highlighted={index === highlightedIndex ? '' : undefined}
+      onClick={() => {
+        onChange(option.value);
+        setOpen(false);
+      }}
+      onMouseDown={(e) => e.preventDefault()}
+      onMouseEnter={() => setHighlightedIndex(index)}
+      className={cn(
+        'flex w-full items-center py-2 text-sm leading-snug transition-colors',
+        align === 'center' ? 'justify-center px-8' : 'justify-start px-3',
+        option.value === value
+          ? 'bg-accent-subtle text-accent font-medium'
+          : 'text-foreground hover:bg-background-alt data-[highlighted]:bg-background-alt',
+      )}
+    >
+      {option.label}
+    </button>
   );
 }

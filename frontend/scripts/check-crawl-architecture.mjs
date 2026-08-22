@@ -98,42 +98,42 @@ function scanTemplateLiteral(content, start) {
       continue;
     }
     if (char === '$' && content[index + 1] === '{') {
-      masked += '  ';
-      index += 2;
-      let depth = 1;
-      while (index < content.length && depth > 0) {
-        const inner = content[index];
-        if (inner === "'" || inner === '"') {
-          const scanned = scanQuotedString(content, index, inner);
-          masked += scanned.masked;
-          index = scanned.end;
-          continue;
-        }
-        if (inner === '`') {
-          const scanned = scanTemplateLiteral(content, index);
-          masked += scanned.masked;
-          index = scanned.end;
-          continue;
-        }
-        masked += inner === '\n' ? '\n' : ' ';
-        if (inner === '{') {
-          depth += 1;
-        } else if (inner === '}') {
-          depth -= 1;
-        } else if (inner === '\\') {
-          index += 1;
-          if (index < content.length) {
-            masked += content[index] === '\n' ? '\n' : ' ';
-          }
-        }
-        index += 1;
-      }
+      const scanned = scanTemplateExpression(content, index + 2);
+      masked += `  ${scanned.masked}`;
+      index = scanned.end;
       continue;
     }
     masked += char === '\n' ? '\n' : ' ';
     index += 1;
   }
   return { end: content.length, masked };
+}
+
+function scanTemplateExpression(content, start) {
+  let index = start;
+  let depth = 1;
+  let masked = '';
+  while (index < content.length && depth > 0) {
+    const inner = content[index];
+    if (inner === "'" || inner === '"' || inner === '`') {
+      const scanned =
+        inner === '`'
+          ? scanTemplateLiteral(content, index)
+          : scanQuotedString(content, index, inner);
+      masked += scanned.masked;
+      index = scanned.end;
+      continue;
+    }
+    masked += inner === '\n' ? '\n' : ' ';
+    if (inner === '{') depth += 1;
+    if (inner === '}') depth -= 1;
+    if (inner === '\\') {
+      index += 1;
+      if (index < content.length) masked += content[index] === '\n' ? '\n' : ' ';
+    }
+    index += 1;
+  }
+  return { end: index, masked };
 }
 
 function stripTemplateLiterals(content) {
