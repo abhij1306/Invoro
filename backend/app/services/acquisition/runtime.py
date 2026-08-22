@@ -23,9 +23,6 @@ from app.services.acquisition.content_signals import (
 from app.core.config import settings
 from app.services.config.block_signatures import BLOCK_SIGNATURES, CAPTCHA_MARKER
 from app.services.config.content_types import HTML_CONTENT_TYPE
-from app.services.config.extraction_rules import (
-    BROWSER_DETAIL_READINESS_HINTS,
-)
 from app.services.config.runtime_settings import crawler_runtime_settings
 from app.services.db_utils import mapping_or_empty
 from app.services.network_resolution import (
@@ -44,18 +41,6 @@ def _challenge_element_hits(soup: Any, lowered_html: str) -> list[str]:
 
 _SHARED_HTTP_CLIENTS: dict[tuple[str | None, str], httpx.AsyncClient] = {}
 _SHARED_HTTP_CLIENT_LOCK = asyncio.Lock()
-_ECOMMERCE_DETAIL_READINESS_HINTS = tuple(
-    str(item).strip().lower()
-    for item in (
-        (
-            BROWSER_DETAIL_READINESS_HINTS.get("ecommerce")
-            if isinstance(BROWSER_DETAIL_READINESS_HINTS, Mapping)
-            else []
-        )
-        or []
-    )
-    if str(item).strip()
-)
 
 
 @dataclass(slots=True)

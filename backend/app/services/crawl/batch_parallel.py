@@ -165,7 +165,7 @@ async def process_urls_in_parallel(
     ]
     verdicts: list[str] = []
 
-    async def record_task(task: asyncio.Task) -> None:
+    async def record_task(task: asyncio.Task) -> bool:
         nonlocal record_count
         idx, url, result, count = await task
         verdict = str(result.verdict or VERDICT_ERROR)
@@ -185,6 +185,7 @@ async def process_urls_in_parallel(
             duration_ms=current_duration_ms(run),
         )
         await session.commit()
+        return record_count >= max_records
 
     async def drain_completed(pending: set[asyncio.Task]) -> None:
         for task in [item for item in pending if item.done()]:
@@ -194,11 +195,12 @@ async def process_urls_in_parallel(
     try:
         pending = set(tasks)
         while pending:
+            record_limit_reached = False
             done, pending = await asyncio.wait(
                 pending, return_when=asyncio.FIRST_COMPLETED
             )
             for task in done:
-                await record_task(task)
+                record_limit_reached = await record_task(task) or record_limit_reached
             await session.refresh(run)
             control_request = get_control_request(run)
             if control_request in (CONTROL_REQUEST_PAUSE, CONTROL_REQUEST_KILL):
@@ -206,7 +208,7 @@ async def process_urls_in_parallel(
                 await cancel_pending_tasks(list(pending))
                 await _persist_parallel_control(session, run, control_request)
                 return verdicts, record_count
-            if record_count >= max_records:
+            if record_limit_reached:
                 await drain_completed(pending)
                 await cancel_pending_tasks(list(pending))
                 await log_event(

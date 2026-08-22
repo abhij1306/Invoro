@@ -10,15 +10,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.playground import PlaygroundSession
 from app.models.user import User
 from app.services.config.data_enrichment import (
-    DATA_ENRICHMENT_JOB_TERMINAL_STATUSES,
     ECOMMERCE_DETAIL_SURFACE,
     ECOMMERCE_LISTING_SURFACE,
 )
 from app.services.config.monitor_settings import MONITOR_PRIORITY_BACKGROUND
-from app.services.config.product_intelligence import (
-    PRODUCT_INTELLIGENCE_JOB_STATUS_COMPLETE,
-    PRODUCT_INTELLIGENCE_JOB_STATUS_FAILED,
-)
 from app.services.config.sitemap import (
     PLAYGROUND_CATEGORY_DEFAULT_LIMIT,
     PLAYGROUND_CATEGORY_MAX_LIMIT,
@@ -35,12 +30,6 @@ from app.services.playground_progress import (
 from app.services.surface_resolver import resolve_auto_surface
 
 logger = logging.getLogger(__name__)
-
-_PI_TERMINAL_STATUSES = {
-    PRODUCT_INTELLIGENCE_JOB_STATUS_COMPLETE,
-    PRODUCT_INTELLIGENCE_JOB_STATUS_FAILED,
-}
-_ENRICH_TERMINAL_STATUSES = set(DATA_ENRICHMENT_JOB_TERMINAL_STATUSES)
 
 MAX_PRODUCTS = 50
 

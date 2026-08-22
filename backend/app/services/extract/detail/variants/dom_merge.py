@@ -60,9 +60,15 @@ def expand_existing_variants_with_dom_axes(
         return []
 
     expanded_rows: list[dict[str, Any]] = []
+    preserve_identity = len(dom_variant_rows) == 1
     for existing_row, dom_row in product(existing_variants, dom_variant_rows):
         expanded_rows.append(
-            _merge_variant_with_dom_axes(existing_row, dom_row, missing_dom_axes)
+            _merge_variant_with_dom_axes(
+                existing_row,
+                dom_row,
+                missing_dom_axes,
+                preserve_identity=preserve_identity,
+            )
         )
     return expanded_rows
 
@@ -72,11 +78,16 @@ def _variant_has_transport(row: dict[str, Any]) -> bool:
 
 
 def _merge_variant_with_dom_axes(
-    existing_row: dict[str, Any], dom_row: dict[str, Any], missing_axes: set[str]
+    existing_row: dict[str, Any],
+    dom_row: dict[str, Any],
+    missing_axes: set[str],
+    *,
+    preserve_identity: bool,
 ) -> dict[str, Any]:
     merged = dict(existing_row)
-    for field_name in ("sku", "variant_id", "barcode"):
-        merged.pop(field_name, None)
+    if not preserve_identity:
+        for field_name in ("sku", "variant_id", "barcode"):
+            merged.pop(field_name, None)
     option_values = {
         key: value
         for source in (existing_row.get("option_values"), dom_row.get("option_values"))

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from .test_traversal_runtime import Any, TraversalResult, _OverlayCookieLocator, click_with_retry, count_listing_cards, locator_still_resolves, pytest, traversal_module  # fmt: skip
+from app.services.acquisition import traversal_recovery
 
 
 @pytest.mark.asyncio
@@ -183,10 +184,10 @@ async def testclick_with_retry_restores_overlays_when_force_click_detaches_locat
             self.force_attempted = False
 
         async def scroll_into_view_if_needed(self, timeout: int | None = None) -> None:
-            del timeout
+            return None
 
         async def evaluate(self, script: str) -> None:
-            del script
+            return None
 
         async def count(self) -> int:
             return 0 if self.force_attempted else 1
@@ -196,16 +197,15 @@ async def testclick_with_retry_restores_overlays_when_force_click_detaches_locat
             self.force_attempted = force
             raise traversal_module.PlaywrightError("intercepted")
 
-    async def _dismiss(*args, **kwargs) -> None:
-        del args, kwargs
+    async def _dismiss(*_args, **_kwargs) -> None:
+        return None
 
-    async def _restore(*args, **kwargs) -> None:
+    async def _restore(*_args, **_kwargs) -> None:
         nonlocal restored
-        del args, kwargs
         restored += 1
 
-    monkeypatch.setattr(traversal_module, "dismiss_overlays_if_needed", _dismiss)
-    monkeypatch.setattr(traversal_module, "_restore_overlays", _restore)
+    monkeypatch.setattr(traversal_recovery, "dismiss_overlays_if_needed", _dismiss)
+    monkeypatch.setattr(traversal_recovery, "_restore_overlays", _restore)
 
     clicked = await click_with_retry(
         _Page(),
