@@ -89,17 +89,18 @@ def variant_option_values(
     option_values = _selected_option_values(variant, option_value_labels)
     if option_values:
         return option_values
-    option_values = _variation_option_values(variant, option_value_labels)
-    if option_values:
-        return option_values
+    variation_values = _variation_option_values(variant, option_value_labels)
+    if variation_values:
+        return variation_values
     for field_name in ("attributes", "traits"):
         values = variant.get(field_name)
         if isinstance(values, dict):
-            _add_option_values_from_mapping(
-                values, option_values, option_value_labels=option_value_labels
+            mapped_values = _option_values_from_mapping(
+                values,
+                option_value_labels=option_value_labels,
             )
-    if option_values:
-        return option_values
+            if mapped_values:
+                return mapped_values
     option_values = _size_chart_option_values(variant, option_value_labels)
     if option_values:
         return option_values
@@ -337,12 +338,12 @@ def _name_value_axis(
     }
 
 
-def _add_option_values_from_mapping(
+def _option_values_from_mapping(
     values: dict[object, object],
-    option_values: dict[str, str],
     *,
     option_value_labels: dict[str, dict[str, str]] | None,
-) -> None:
+) -> dict[str, str]:
+    option_values: dict[str, str] = {}
     for axis_name, raw_value in values.items():
         axis_key = normalized_variant_axis_key(axis_name)
         cleaned = variant_axis_value(axis_key, raw_value, page_url="")
@@ -353,6 +354,7 @@ def _add_option_values_from_mapping(
             cleaned,
             option_value_labels=option_value_labels,
         )
+    return option_values
 
 
 def _display_option_value(
