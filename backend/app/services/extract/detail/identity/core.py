@@ -1,4 +1,3 @@
-# ruff: noqa: F401
 from __future__ import annotations
 
 __all__ = (
@@ -32,20 +31,7 @@ from urllib.parse import parse_qsl, urlparse
 from app.services.dom.html_parser import BeautifulSoup
 
 from app.services.config.extraction_rules import (
-    CANDIDATE_PLACEHOLDER_VALUES,
-    DETAIL_COLLECTION_PATH_TOKENS,
-    DETAIL_GENERIC_TERMINAL_TOKENS,
-    DETAIL_IDENTITY_CODE_MIN_LENGTH,
     DETAIL_NOISE_SECTION_SELECTORS,
-    DETAIL_IDENTITY_STOPWORDS,
-    DETAIL_MODEL_CONFLICT_MIN_SHARED_WORDS,
-    DETAIL_NON_PAGE_FILE_EXTENSIONS,
-    DETAIL_PRODUCT_PATH_TOKENS,
-    DETAIL_SEARCH_QUERY_KEYS,
-    DETAIL_TITLE_FALLBACK_CODE_PATTERN,
-    DETAIL_TITLE_FALLBACK_MIN_SEMANTIC_TOKENS,
-    DETAIL_UTILITY_PATH_TOKENS,
-    AVAILABILITY_UNKNOWN,
     JOB_LISTING_DETAIL_ROOT_MARKERS,
     JOB_LISTING_DETAIL_PATH_MARKERS,
     LISTING_CATEGORY_PATH_SEGMENTS,
@@ -59,35 +45,18 @@ from app.services.config.extraction_rules import (
     PRODUCT_SLUG_MIN_TERMINAL_TOKENS,
     YEAR_SLUG_PATTERN,
 )
-from app.services.config.public_record_policy import (
-    PUBLIC_RECORD_DETAIL_CANONICAL_QUERY_KEYS,
-    PUBLIC_RECORD_DETAIL_CANONICAL_QUERY_PREFIXES,
-)
 from app.services.config.surface_hints import detail_path_hints
 from app.services.extract.listing_candidate_ranking import (
     job_listing_url_is_hub as _job_listing_url_is_hub,
     job_listing_url_looks_like_posting as _job_listing_url_looks_like_posting,
 )
-from app.services.shared.field_coerce import (
-    PRODUCT_URL_HINTS,
-    absolute_url,
-    clean_text,
-    is_title_noise,
-    text_or_none,
-)
-from app.services.field_url_normalization import same_site
+from app.services.shared.field_coerce import absolute_url
 from app.services.extract.detail.identity.jsonld_identity import (
     jsonld_item_candidate_record,
     jsonld_item_product_name,
     jsonld_item_supports_identity,
     jsonld_items,
     prune_duplicate_product_headings,
-)
-from app.services.extract.detail.identity.model_codes import (
-    detail_model_number_sets_compatible,
-    detail_model_number_tokens,
-    detail_small_numeric_model_tokens,
-    normalized_model_token,
 )
 
 logger = logging.getLogger(__name__)
@@ -411,8 +380,7 @@ def _job_detail_query_has_identity(query: str) -> bool:
     return any(token in lowered for token in ("showjob=", "jobid=", "job_id=", "gh_jid="))
 
 from .record_identity import (  # noqa: E402
-    DETAIL_IDENTITY_QUERY_KEYS, DETAIL_IDENTITY_QUERY_PREFIXES, DETAIL_URL_PLACEHOLDER_SEGMENTS, HTML_SUFFIX_RE,
-    LOWER_NON_ALNUM_RE, MIXED_NON_ALNUM_RE, SLUG_SEPARATOR_RE, detail_url_path_segments, path_segment_tokens,
+    LOWER_NON_ALNUM_RE, path_segment_tokens,
     detail_identity_codes_match, detail_identity_codes_from_record_fields, detail_identity_codes_from_url, detail_query_identity_codes_from_url,
     detail_identity_tokens, detail_redirect_identity_is_mismatched, detail_slug_title_fallback_from_url, detail_title_from_url,
     detail_title_fallback_looks_like_code, detail_url_candidate_is_low_signal, detail_url_is_collection_like, detail_url_is_utility,

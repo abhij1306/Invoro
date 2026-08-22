@@ -1,9 +1,45 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from itertools import product
 from typing import Any
 
 from app.services.dom.html_parser import BeautifulSoup
+from app.services.config.extraction_rules import (
+    DOM_VARIANT_CARTESIAN_COMBO_LIMIT,
+    DOM_VARIANT_GROUP_LIMIT,
+)
+from app.services.extract.detail.variants.dom_merge import (
+    dom_variants_add_missing_existing_axis,
+    expand_existing_variants_with_dom_axes,
+)
+from app.services.extract.detail.variants.dom_options import (
+    node_attr_is_truthy,
+    variant_option_availability,
+)
+from app.services.extract.detail.variants.state_targets import state_variant_targets
+from app.services.extract.variant_choice_traversal import (
+    infer_variant_group_name_from_values,
+    iter_variant_choice_groups,
+    iter_variant_select_groups,
+    resolve_variant_group_name,
+    variant_dom_cues_present,
+)
+from app.services.extract.variant_dom_provenance import (
+    build_variant_candidate_group,
+    variant_option_node_types,
+)
+from app.services.extract.variant_group_validator import VariantGroupValidator
+from app.services.extract.variant_identity_merge import (
+    merge_variant_pair,
+    resolve_variants,
+    split_variant_axes,
+)
+from app.services.extract.variant_normalization.contract import (
+    flatten_variants_for_public_output,
+)
+from app.services.js_state.helpers import select_variant
+from app.services.shared.field_coerce import object_dict, object_list
 
 from . import dom_variant_support as core
 
@@ -15,11 +51,11 @@ def _collect_select_candidate_groups(
     page_url: str,
 ) -> list[Any]:
     candidate_groups: list[Any] = []
-    for select in core.iter_variant_select_groups(soup):
+    for select in iter_variant_select_groups(soup):
         raw_option_values = [
             core.clean_text(option.get_text(" ", strip=True)) for option in select.find_all("option") if core.clean_text(option.get_text(" ", strip=True))
         ]
-        cleaned_name = core.resolve_variant_group_name(select) or core.infer_variant_group_name_from_values(raw_option_values)
+        cleaned_name = resolve_variant_group_name(select) or infer_variant_group_name_from_values(raw_option_values)
         cleaned_name = core._prefer_axis_inferred_from_values(
             cleaned_name,
             raw_option_values,
@@ -48,7 +84,7 @@ def _collect_select_candidate_groups(
         deduped_values = list(dict.fromkeys(str(entry["value"]) for entry in option_entries if core.text_or_none(entry.get("value"))))
         if len(deduped_values) >= 2:
             candidate_groups.append(
-                core.build_variant_candidate_group(
+                build_variant_candidate_group(
                     select,
                     name=cleaned_name,
                     values=deduped_values,
@@ -77,9 +113,9 @@ def _select_option_entry(
     if not cleaned_value or core.variant_option_value_is_noise(cleaned_value) or (raw_value_attr is not None and raw_value_attr.lower() in {"select", "choose"}):
         return None
     entry: dict[str, object] = {"value": cleaned_value}
-    if core.node_attr_is_truthy(option, "selected", "aria-selected"):
+    if node_attr_is_truthy(option, "selected", "aria-selected"):
         entry["selected"] = True
-    availability, stock_quantity = core.variant_option_availability(
+    availability, stock_quantity = variant_option_availability(
         node=option,
         label_node=None,
     )
@@ -106,7 +142,7 @@ def _collect_choice_candidate_groups(
     title_hint: str,
 ) -> list[Any]:
     candidate_groups: list[Any] = []
-    for container in core.iter_variant_choice_groups(soup):
+    for container in iter_variant_choice_groups(soup):
         cleaned_name = core._resolve_dom_variant_group_name(container)
         if not cleaned_name:
             continue
@@ -119,13 +155,13 @@ def _collect_choice_candidate_groups(
         cleaned_name = core._prefer_axis_inferred_from_values(cleaned_name, values)
         if len(values) < 2:
             continue
-        option_node_types = core.variant_option_node_types(
+        option_node_types = variant_option_node_types(
             container,
             extractor_path="choice",
         )
         extractor_path = "choice_radio" if any(item in {"input_radio", "role_radio"} for item in option_node_types) else "choice_button"
         candidate_groups.append(
-            core.build_variant_candidate_group(
+            build_variant_candidate_group(
                 container,
                 name=cleaned_name,
                 values=values,
@@ -140,7 +176,7 @@ def _validated_dom_option_groups(
     *,
     page_url: str,
 ) -> list[dict[str, object]]:
-    validator = core.VariantGroupValidator()
+    validator = VariantGroupValidator()
     option_groups = [group.as_option_group() for group in candidate_groups if validator.validate(group, page_url=page_url)]
     expanded_groups: list[dict[str, object]] = []
     for group in option_groups:
@@ -153,7 +189,7 @@ def _merge_dom_option_groups(
 ) -> list[dict[str, object]]:
     merged_groups: dict[str, dict[str, object]] = {}
     for group in groups:
-        values = [core.clean_text(value) for value in core._object_list(group.get("values")) if core.clean_text(value)]
+        values = [core.clean_text(value) for value in object_list(group.get("values")) if core.clean_text(value)]
         name = core.clean_text(group.get("name"))
         axis_key = core.normalized_variant_axis_key(name)
         if len(values) < 2 or not axis_key:
@@ -164,12 +200,12 @@ def _merge_dom_option_groups(
         )
         if len(name) > len(str(merged.get("name") or "")):
             merged["name"] = name
-        merged["values"] = list(dict.fromkeys([*core._object_list(merged.get("values")), *values]))
+        merged["values"] = list(dict.fromkeys([*object_list(merged.get("values")), *values]))
         merged_entries = merged.setdefault("entries", {})
         if not isinstance(merged_entries, dict):
             merged_entries = {}
             merged["entries"] = merged_entries
-        for group_entry in core._object_list(group.get("entries")):
+        for group_entry in object_list(group.get("entries")):
             if isinstance(group_entry, dict):
                 _merge_dom_option_entry(merged_entries, group_entry)
     return _limited_dom_option_groups(merged_groups)
@@ -181,7 +217,7 @@ def _merge_dom_option_entry(
     value = core.clean_text(group_entry.get("value"))
     if not value:
         return
-    existing = core._object_dict(merged_entries.get(value, {"value": value}))
+    existing = object_dict(merged_entries.get(value, {"value": value}))
     availability = core.text_or_none(group_entry.get("availability"))
     if availability and existing.get("availability") in (None, "", [], {}):
         existing["availability"] = availability
@@ -203,20 +239,20 @@ def _limited_dom_option_groups(
     merged_groups: dict[str, dict[str, object]],
 ) -> list[dict[str, object]]:
     group_limit = core._safe_int_config(
-        core.DOM_VARIANT_GROUP_LIMIT,
+        DOM_VARIANT_GROUP_LIMIT,
         1,
         "DOM_VARIANT_GROUP_LIMIT",
     )
     groups: list[dict[str, object]] = []
     for group in merged_groups.values():
-        values = [core.clean_text(value) for value in core._object_list(group.get("values")) if core.clean_text(value)]
+        values = [core.clean_text(value) for value in object_list(group.get("values")) if core.clean_text(value)]
         if len(values) < 2:
             continue
         groups.append(
             {
                 "name": core.clean_text(group.get("name")),
                 "values": values,
-                "entries": list(core._object_dict(group.get("entries")).values()),
+                "entries": list(object_dict(group.get("entries")).values()),
             }
         )
         if len(groups) >= group_limit:
@@ -237,7 +273,7 @@ def _build_dom_variant_axes(
     axis_order: list[tuple[str, str, list[str]]] = []
     for group in groups:
         name = core.clean_text(group.get("name"))
-        values = [str(value) for value in core._object_list(group.get("values"))]
+        values = [str(value) for value in object_list(group.get("values"))]
         axis_key = core.normalized_variant_axis_key(name)
         if not core._dom_variant_axis_allowed(axis_key):
             continue
@@ -267,7 +303,7 @@ def _axis_group_metadata(
             )
             if entry.get(key) not in (None, "", [], {})
         }
-        for entry in core._object_list(group.get("entries"))
+        for entry in object_list(group.get("entries"))
         if isinstance(entry, dict)
         if core.clean_text(entry.get("value"))
     }
@@ -299,14 +335,14 @@ def _assemble_dom_variant_rows(
     axis_names = [axis_key for axis_key, _label, _values in axis_order]
     axis_value_lists = [values for _axis_key, _label, values in axis_order]
     combo_limit = core._safe_int_config(
-        core.DOM_VARIANT_CARTESIAN_COMBO_LIMIT,
+        DOM_VARIANT_CARTESIAN_COMBO_LIMIT,
         1000,
         "DOM_VARIANT_CARTESIAN_COMBO_LIMIT",
     )
     if _dom_variant_combo_count(axis_value_lists) > combo_limit:
         return _axis_only_dom_variants(axis_order, axis_option_metadata)
     rows: list[dict[str, object]] = []
-    for combo in core.product(*axis_value_lists):
+    for combo in product(*axis_value_lists):
         option_values = {axis_name: value for axis_name, value in zip(axis_names, combo, strict=False) if core.clean_text(value)}
         if option_values:
             rows.append(
@@ -367,12 +403,12 @@ def _materialize_dom_variant_record(
     page_url: str,
 ) -> dict[str, object]:
     record: dict[str, object] = {}
-    selectable_axes, single_value_attributes = core.split_variant_axes(
+    selectable_axes, single_value_attributes = split_variant_axes(
         axis_values_by_name,
         always_selectable_axes=frozenset({"size"}),
     )
-    resolved_variants = core.resolve_variants(selectable_axes or axis_values_by_name, variants) if variants else []
-    active_variant = core.select_variant(resolved_variants, page_url=page_url)
+    resolved_variants = resolve_variants(selectable_axes or axis_values_by_name, variants) if variants else []
+    active_variant = select_variant(resolved_variants, page_url=page_url)
     selected_option_values = _selected_dom_option_values(
         [axis_key for axis_key, _label, _values in axis_order],
         axis_option_metadata,
@@ -385,7 +421,7 @@ def _materialize_dom_variant_record(
     for axis_name, value in single_value_attributes.items():
         record.setdefault(axis_name, value)
     flat_variants = (
-        core.flatten_variants_for_public_output(
+        flatten_variants_for_public_output(
             resolved_variants,
             page_url=page_url,
         )
@@ -438,7 +474,7 @@ def extract_variants_from_dom(
     groups = _validated_dom_option_groups(candidate_groups, page_url=page_url)
     if not groups:
         return _cache_dom_variant_record(soup, cache_key, {})
-    state_axis_targets, state_combo_targets = core._state_variant_targets(
+    state_axis_targets, state_combo_targets = state_variant_targets(
         js_state_objects,
         page_url=page_url,
     )
@@ -531,19 +567,19 @@ def backfill_variants_from_dom_if_missing(
     js_state_objects: dict[str, Any] | None = None,
 ) -> None:
     existing_variants = [row for row in record.get("variants") or [] if isinstance(row, dict)]
-    if not core.variant_dom_cues_present(soup):
+    if not variant_dom_cues_present(soup):
         return
     dom_variants = extract_variants_from_dom(
         soup,
         page_url=page_url,
         js_state_objects=js_state_objects,
     )
-    dom_variant_rows = [row for row in core._object_list(dom_variants.get("variants")) if isinstance(row, dict)]
+    dom_variant_rows = [row for row in object_list(dom_variants.get("variants")) if isinstance(row, dict)]
     if not dom_variant_rows:
         return
     if (
         core.record_has_rich_existing_variants(record) or core.existing_variant_cluster_has_transport_signal(existing_variants)
-    ) and not core._dom_variants_add_missing_existing_axis(existing_variants, dom_variant_rows):
+    ) and not dom_variants_add_missing_existing_axis(existing_variants, dom_variant_rows):
         return
     merged_rows = _merge_dom_variant_rows(existing_variants, dom_variant_rows)
     record["variants"] = merged_rows
@@ -551,7 +587,7 @@ def backfill_variants_from_dom_if_missing(
     _backfill_dom_variant_shared_fields(record)
 
 def _merge_dom_variant_rows(existing_variants: list[dict[str, Any]], dom_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    expanded = core._expand_existing_variants_with_dom_axes(existing_variants, dom_rows)
+    expanded = expand_existing_variants_with_dom_axes(existing_variants, dom_rows)
     if expanded:
         return expanded
     existing_by_key: dict[str, dict[str, Any]] = {}
@@ -563,7 +599,7 @@ def _merge_dom_variant_rows(existing_variants: list[dict[str, Any]], dom_rows: l
     for dom_row in dom_rows:
         dom_key = core.text_or_none(dom_row.get("variant_id")) or core.text_or_none(dom_row.get("url"))
         existing_row = existing_by_key.get(dom_key or "") if dom_key else None
-        merged_rows.append(core.merge_variant_pair(existing_row, dom_row) if isinstance(existing_row, dict) else dom_row)
+        merged_rows.append(merge_variant_pair(existing_row, dom_row) if isinstance(existing_row, dict) else dom_row)
     return merged_rows
 
 def _backfill_dom_variant_shared_fields(record: dict[str, Any]) -> None:

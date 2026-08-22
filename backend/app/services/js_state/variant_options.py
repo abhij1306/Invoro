@@ -98,8 +98,8 @@ def variant_option_values(
             _add_option_values_from_mapping(
                 values, option_values, option_value_labels=option_value_labels
             )
-        if option_values:
-            return option_values
+    if option_values:
+        return option_values
     option_values = _size_chart_option_values(variant, option_value_labels)
     if option_values:
         return option_values

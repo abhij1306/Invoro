@@ -5,6 +5,14 @@ from .test_state_mappers import (
     map_network_payloads_to_fields,
     pytest,
 )
+from app.services.js_state.variant_options import variant_option_values
+
+@pytest.mark.unit
+def test_variant_option_values_reads_attribute_mapping() -> None:
+    assert variant_option_values(
+        {"attributes": {"Color": "Blue"}},
+        option_names=[],
+    ) == {"color": "Blue"}
 
 @pytest.mark.unit
 def test_map_js_state_to_fields_recovers_existing_state_product_fields() -> None:
@@ -696,3 +704,35 @@ def test_map_js_state_to_fields_drops_transport_only_variant_matrix_rows() -> No
     assert mapped["variants"][0]["url"] == "/products/relaxed-tee?size=m"
     assert mapped["variants"][0]["availability"] == "in_stock"
     assert mapped["variants"][0]["stock_quantity"] == 4
+
+@pytest.mark.unit
+def test_map_js_state_to_fields_ignores_malformed_variant_matrix_stock_level() -> None:
+    mapped = map_js_state_to_fields(
+        {
+            "__INITIAL_STATE__": {
+                "product": {
+                    "name": "Relaxed Tee",
+                    "price": "32.99",
+                    "variantMatrix": [
+                        {
+                            "isLeaf": True,
+                            "variantValueCategory": {"name": "M"},
+                            "parentVariantCategory": {"name": "Size"},
+                            "variantOption": {
+                                "code": "tee-m",
+                                "stock": {
+                                    "stockLevel": "unknown",
+                                    "stockLevelStatus": "inStock",
+                                },
+                            },
+                        }
+                    ],
+                }
+            }
+        },
+        surface="ecommerce_detail",
+        page_url="https://store.example.com/products/relaxed-tee?size=m",
+    )
+
+    assert mapped["variants"][0]["availability"] == "in_stock"
+    assert "stock_quantity" not in mapped["variants"][0]
