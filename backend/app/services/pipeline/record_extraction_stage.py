@@ -89,7 +89,7 @@ async def _populate_adapter_records(
     adapter_result = _best_adapter_result(adapter_results)
     if not _adapter_result_has_records(adapter_result) and _effective_blocked(acquisition_result):
         adapter_result = await _recover_blocked_adapter(context, acquisition_result)
-    if _adapter_result_has_records(adapter_result):
+    if adapter_result is not None and _adapter_result_has_records(adapter_result):
         acquisition_result.adapter_records = list(adapter_result.records or [])
         acquisition_result.adapter_name = adapter_result.adapter_name or None
         acquisition_result.adapter_source_type = adapter_result.source_type or None

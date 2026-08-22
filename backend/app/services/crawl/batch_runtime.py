@@ -399,7 +399,7 @@ async def _process_urls_in_parallel(
     progress_state: BatchRunProgressState,
     max_records: int,
     url_timeout_seconds: float,
-) -> tuple[CrawlRun, list[str], int]:
+) -> tuple[list[str], int]:
     return await process_urls_in_parallel(
         session,
         run=run,
@@ -425,7 +425,7 @@ async def _process_urls_sequential(
     sleep_ms: int,
     url_timeout_seconds: float,
     run_span,
-) -> tuple[list[str], int]:
+) -> tuple[CrawlRun, list[str], int]:
     verdicts: list[str] = []
     record_count = as_int(run.get_summary("record_count", 0))
     total_urls = len(url_list)

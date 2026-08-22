@@ -135,6 +135,7 @@ async def resolve_category_urls_with_site_links(
         enabled=normalized_strategy != "rendered_only",
     )
     if _static_result_is_complete(static_result, strategy=normalized_strategy):
+        assert static_result is not None
         return static_result
     if normalized_strategy == "static_only":
         return _require_static_category_result(static_result, error=static_error, domain=domain)
