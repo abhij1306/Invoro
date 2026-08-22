@@ -90,26 +90,26 @@ def variant_option_values(
         _selected_option_values(variant, option_value_labels),
         _variation_option_values(variant, option_value_labels),
     )
-    for values in value_sources:
-        for axis_key, value in values.items():
+    for source_values in value_sources:
+        for axis_key, value in source_values.items():
             if axis_key in public_variant_axis_fields:
                 option_values.setdefault(axis_key, value)
     for field_name in ("attributes", "traits"):
-        values = variant.get(field_name)
-        if isinstance(values, dict):
+        mapped_source = variant.get(field_name)
+        if isinstance(mapped_source, dict):
             mapped_values = _option_values_from_mapping(
-                values,
+                mapped_source,
                 option_value_labels=option_value_labels,
             )
             for axis_key, value in mapped_values.items():
                 if axis_key in public_variant_axis_fields:
                     option_values.setdefault(axis_key, value)
-    for values in (
+    for source_values in (
         _size_chart_option_values(variant, option_value_labels),
         _indexed_option_values(variant, option_names, option_value_labels),
         _direct_axis_option_values(variant, option_value_labels),
     ):
-        for axis_key, value in values.items():
+        for axis_key, value in source_values.items():
             if axis_key in public_variant_axis_fields:
                 option_values.setdefault(axis_key, value)
     return option_values
