@@ -270,27 +270,11 @@ class HtmlNode:
         recursive: bool = True,
         **kwargs: object,
     ) -> list[Any]:
-        def string_matches(value: str) -> bool:
-            if string is True:
-                return True
-            if callable(string):
-                return bool(string(value))
-            if hasattr(string, "search"):
-                return bool(string.search(value))
-            return value == string
-
         tags = _normalize_tags(name)
         wanted_attrs = {**(attrs or {}), **kwargs}
         has_tag_filters = name is not None or bool(wanted_attrs)
         if string is not None and not has_tag_filters:
-            text_rows: list[HtmlText] = []
-            items = self.descendants if recursive else self.children
-            for item in items:
-                if isinstance(item, HtmlText) and string_matches(str(item)):
-                    text_rows.append(item)
-                    if limit is not None and len(text_rows) >= limit:
-                        break
-            return text_rows
+            return _matching_text_rows(self, string, limit, recursive)
 
         node_rows: list[HtmlNode] = []
         raw_nodes = self.node.traverse() if recursive else _direct_tag_nodes(self.node)
@@ -298,14 +282,8 @@ class HtmlNode:
             if raw is self.node or _is_text(raw) or _is_comment(raw):
                 continue
             candidate = HtmlNode(raw)
-            if tags is not None and candidate.name not in tags:
+            if not _node_matches_find(candidate, tags, wanted_attrs, string):
                 continue
-            if not _attrs_match(candidate, wanted_attrs):
-                continue
-            if string is not None:
-                candidate_string = candidate.string
-                if candidate_string is None or not string_matches(candidate_string):
-                    continue
             node_rows.append(candidate)
             if limit is not None and len(node_rows) >= limit:
                 break
@@ -481,28 +459,67 @@ Tag = HtmlNode
 def _attrs_match(node: HtmlNode, attrs: Mapping[str, object]) -> bool:
     for key, expected in attrs.items():
         normalized_key = "class" if str(key) == "class_" else str(key)
-        actual = node.get(normalized_key)
-        if callable(expected):
-            if not expected(actual):
-                return False
-        elif hasattr(expected, "search"):
-            if not expected.search(str(actual or "")):
-                return False
-        elif normalized_key == "class" and isinstance(expected, str):
-            if expected not in str(actual or "").split():
-                return False
-        elif isinstance(expected, (tuple, list, set, frozenset)):
-            if actual not in expected:
-                return False
-        elif expected is True:
-            if not node.has_attr(normalized_key):
-                return False
-        elif expected is False:
-            if node.has_attr(normalized_key):
-                return False
-        elif str(actual or "") != str(expected):
+        if not _attribute_matches(node, normalized_key, expected):
             return False
     return True
+
+
+def _string_matches(value: str, expected: object) -> bool:
+    if expected is True:
+        return True
+    if callable(expected):
+        return bool(expected(value))
+    if hasattr(expected, "search"):
+        return bool(expected.search(value))
+    return value == expected
+
+
+def _matching_text_rows(
+    node: HtmlNode, expected: object, limit: int | None, recursive: bool
+) -> list[HtmlText]:
+    rows: list[HtmlText] = []
+    items = node.descendants if recursive else node.children
+    for item in items:
+        if isinstance(item, HtmlText) and _string_matches(str(item), expected):
+            rows.append(item)
+            if limit is not None and len(rows) >= limit:
+                break
+    return rows
+
+
+def _node_matches_find(
+    node: HtmlNode,
+    tags: set[str] | None,
+    attrs: Mapping[str, object],
+    expected_string: object,
+) -> bool:
+    if tags is not None and node.name not in tags:
+        return False
+    if not _attrs_match(node, attrs):
+        return False
+    if expected_string is None:
+        return True
+    candidate_string = node.string
+    return candidate_string is not None and _string_matches(
+        candidate_string, expected_string
+    )
+
+
+def _attribute_matches(node: HtmlNode, key: str, expected: object) -> bool:
+    actual = node.get(key)
+    if callable(expected):
+        return bool(expected(actual))
+    if hasattr(expected, "search"):
+        return bool(expected.search(str(actual or "")))
+    if key == "class" and isinstance(expected, str):
+        return expected in str(actual or "").split()
+    if isinstance(expected, (tuple, list, set, frozenset)):
+        return actual in expected
+    if expected is True:
+        return node.has_attr(key)
+    if expected is False:
+        return not node.has_attr(key)
+    return str(actual or "") == str(expected)
 
 
 class HtmlDocument(HtmlNode):

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from typing import cast
 
 from app.services.dom.html_parser import BeautifulSoup, NavigableString, Tag
@@ -123,22 +124,8 @@ def extract_label_value_pairs(root: BeautifulSoup | Tag) -> list[tuple[str, str]
         return clean_text(node.get_text(" ", strip=True))
 
     rows: list[tuple[str, str]] = []
-    for tr in root.find_all("tr"):
-        cells = tr.find_all(["th", "td"], recursive=False)
-        if len(cells) < 2:
-            continue
-        label = node_text(cells[0])
-        value = node_text(cells[1])
-        if label and value:
-            rows.append((label, value))
-    for dt in root.find_all("dt"):
-        dd = dt.find_next_sibling("dd")
-        if dd is None:
-            continue
-        label = node_text(dt)
-        value = node_text(dd)
-        if label and value:
-            rows.append((label, value))
+    rows.extend(_table_label_value_pairs(root, node_text))
+    rows.extend(_definition_label_value_pairs(root, node_text))
     for node in root.find_all(["li", "p", "div", "span"]):
         text = node_text(node)
         if ":" not in text:
@@ -162,6 +149,32 @@ def extract_label_value_pairs(root: BeautifulSoup | Tag) -> list[tuple[str, str]
     return deduped
 
 
+def _table_label_value_pairs(
+    root: BeautifulSoup | Tag, node_text: Callable[[BeautifulSoup | Tag], str]
+) -> list[tuple[str, str]]:
+    rows: list[tuple[str, str]] = []
+    for tr in root.find_all("tr"):
+        cells = tr.find_all(["th", "td"], recursive=False)
+        if (
+            len(cells) >= 2
+            and (label := node_text(cells[0]))
+            and (value := node_text(cells[1]))
+        ):
+            rows.append((label, value))
+    return rows
+
+
+def _definition_label_value_pairs(
+    root: BeautifulSoup | Tag, node_text: Callable[[BeautifulSoup | Tag], str]
+) -> list[tuple[str, str]]:
+    rows: list[tuple[str, str]] = []
+    for dt in root.find_all("dt"):
+        dd = dt.find_next_sibling("dd")
+        if dd is not None and (label := node_text(dt)) and (value := node_text(dd)):
+            rows.append((label, value))
+    return rows
+
+
 def extract_heading_sections(
     root: BeautifulSoup | Tag,
     *,
@@ -183,54 +196,82 @@ def extract_heading_sections(
         if str(anchor.get("href") or "").startswith("#")
         or anchor.has_attr("aria-controls")
     )
-    for heading in heading_candidates:
-        if heading in seen:
-            continue
-        seen.add(heading)
-        if _node_is_section_navigation_label(heading):
-            continue
-        heading_text = section_label_text(heading)
-        if not _is_section_label(heading_text):
-            continue
-        if normalized_allowed_fields and alias_lookup is not None:
-            canonical_field = alias_lookup.get(normalize_field_key(heading_text))
-            if canonical_field not in normalized_allowed_fields:
-                continue
-        content = extract_section_content(heading, scoped_root)
-        if not content and scoped_root is not root and _section_target_ids(heading):
-            content = extract_section_content(heading, root)
-        if len(content) >= 12:
-            sections.setdefault(heading_text, content)
+    _collect_heading_sections(
+        heading_candidates,
+        scoped_root,
+        root,
+        sections,
+        seen,
+        alias_lookup,
+        normalized_allowed_fields,
+    )
     materials = _extract_product_materials(scoped_root) or _extract_product_materials(
         root
     )
-    if materials and (
-        not normalized_allowed_fields
-        or alias_lookup is None
-        or alias_lookup.get(normalize_field_key("Composition"))
-        in normalized_allowed_fields
+    if materials and _composition_field_allowed(
+        alias_lookup, normalized_allowed_fields
     ):
         sections.setdefault("Composition", materials)
-
-    for anchor in root.find_all("a"):
-        if not (
-            str(anchor.get("href") or "").startswith("#")
-            or anchor.has_attr("aria-controls")
-        ):
-            continue
-        if _node_is_section_navigation_label(anchor):
-            continue
-        heading_text = section_label_text(anchor)
-        if not _is_section_label(heading_text):
-            continue
-        if normalized_allowed_fields and alias_lookup is not None:
-            canonical_field = alias_lookup.get(normalize_field_key(heading_text))
-            if canonical_field not in normalized_allowed_fields:
-                continue
-        content = extract_section_content(anchor, root)
-        if len(content) >= 12:
-            sections.setdefault(heading_text, content)
+    anchors = [
+        anchor for anchor in root.find_all("a") if _anchor_targets_section(anchor)
+    ]
+    _collect_heading_sections(
+        anchors, root, root, sections, seen, alias_lookup, normalized_allowed_fields
+    )
     return sections
+
+
+def _collect_heading_sections(
+    headings: list[Tag],
+    scoped_root: BeautifulSoup | Tag,
+    fallback_root: BeautifulSoup | Tag,
+    sections: dict[str, str],
+    seen: set[Tag],
+    alias_lookup: dict[str, str] | None,
+    allowed_fields: set[str],
+) -> None:
+    for heading in headings:
+        if heading in seen or _node_is_section_navigation_label(heading):
+            continue
+        seen.add(heading)
+        label = section_label_text(heading)
+        if not _heading_label_allowed(label, alias_lookup, allowed_fields):
+            continue
+        content = extract_section_content(heading, scoped_root)
+        if (
+            not content
+            and scoped_root is not fallback_root
+            and _section_target_ids(heading)
+        ):
+            content = extract_section_content(heading, fallback_root)
+        if len(content) >= 12:
+            sections.setdefault(label, content)
+
+
+def _heading_label_allowed(
+    label: str, alias_lookup: dict[str, str] | None, allowed_fields: set[str]
+) -> bool:
+    if not _is_section_label(label):
+        return False
+    if not allowed_fields or alias_lookup is None:
+        return True
+    return alias_lookup.get(normalize_field_key(label)) in allowed_fields
+
+
+def _composition_field_allowed(
+    alias_lookup: dict[str, str] | None, allowed_fields: set[str]
+) -> bool:
+    return bool(
+        not allowed_fields
+        or alias_lookup is None
+        or alias_lookup.get(normalize_field_key("Composition")) in allowed_fields
+    )
+
+
+def _anchor_targets_section(anchor: Tag) -> bool:
+    return str(anchor.get("href") or "").startswith("#") or anchor.has_attr(
+        "aria-controls"
+    )
 
 
 def extract_feature_rows(root: BeautifulSoup | Tag) -> list[str]:
@@ -463,23 +504,23 @@ def section_text_is_meaningful(node: Tag | None, *, label: str, text: str) -> bo
         return False
     if any(pattern in lowered_text for pattern in _SECTION_SKIP_PATTERNS):
         return False
-    if isinstance(node, Tag):
-        role = str(node.get("role") or "").strip().lower()
-        if node.name in {"button", "summary"} or role in {"button", "tab"}:
-            return False
-        interactive_count = len(
-            node.select("a[href], button, [role='button'], [role='tab'], summary")
-        )
-        content_count = sum(
-            1
-            for candidate in node.select("p, li, dd, td, dt")
-            if candidate.find_parent(["a", "button", "summary"]) is None
-            and str(candidate.get("role") or "").strip().lower()
-            not in {"button", "tab"}
-        )
-        if interactive_count and content_count == 0:
-            return False
-    return True
+    return not isinstance(node, Tag) or _section_node_has_meaningful_content(node)
+
+
+def _section_node_has_meaningful_content(node: Tag) -> bool:
+    role = str(node.get("role") or "").strip().lower()
+    if node.name in {"button", "summary"} or role in {"button", "tab"}:
+        return False
+    interactive_count = len(
+        node.select("a[href], button, [role='button'], [role='tab'], summary")
+    )
+    content_count = sum(
+        1
+        for candidate in node.select("p, li, dd, td, dt")
+        if candidate.find_parent(["a", "button", "summary"]) is None
+        and str(candidate.get("role") or "").strip().lower() not in {"button", "tab"}
+    )
+    return not interactive_count or content_count > 0
 
 
 def _page_heading_text(root: BeautifulSoup | Tag) -> str:
@@ -652,29 +693,10 @@ def _extract_product_materials(root: BeautifulSoup | Tag) -> str:
 
 def extract_section_content(node: Tag, root: BeautifulSoup | Tag) -> str:
     label = section_label_text(node)
-    for target_id in _section_target_ids(node):
-        target = root.find(id=target_id) or root.select_one(
-            f"[id='{_css_attribute_string(target_id)}']"
-        )
-        if isinstance(target, Tag):
-            text = _section_text(target, label=label)
-            if (
-                len(text) >= 12
-                and section_text_is_meaningful(target, label=label, text=text)
-                and not _section_matches_page_heading(root, text)
-            ):
-                return text
-
-    if node.name == "summary":
-        parent = node.parent if isinstance(node.parent, Tag) else None
-        if isinstance(parent, Tag) and parent.name == "details":
-            text = _section_text(parent, label=label)
-            if (
-                len(text) >= 12
-                and section_text_is_meaningful(parent, label=label, text=text)
-                and not _section_matches_page_heading(root, text)
-            ):
-                return text
+    if targeted := _targeted_section_content(node, root, label):
+        return targeted
+    if details := _details_section_content(node, root, label):
+        return details
 
     sibling_content = _extract_sibling_content(node, label=label)
     if _section_label_uses_adjacent_panel(node):
@@ -695,6 +717,38 @@ def extract_section_content(node: Tag, root: BeautifulSoup | Tag) -> str:
     ) and not _section_matches_page_heading(root, sibling_content):
         return sibling_content
     return ""
+
+
+def _targeted_section_content(node: Tag, root: BeautifulSoup | Tag, label: str) -> str:
+    for target_id in _section_target_ids(node):
+        target = root.find(id=target_id) or root.select_one(
+            f"[id='{_css_attribute_string(target_id)}']"
+        )
+        if isinstance(target, Tag):
+            text = _section_text(target, label=label)
+            if _valid_section_content(target, root, label, text):
+                return text
+    return ""
+
+
+def _details_section_content(node: Tag, root: BeautifulSoup | Tag, label: str) -> str:
+    if node.name != "summary":
+        return ""
+    parent = node.parent if isinstance(node.parent, Tag) else None
+    if not isinstance(parent, Tag) or parent.name != "details":
+        return ""
+    text = _section_text(parent, label=label)
+    return text if _valid_section_content(parent, root, label, text) else ""
+
+
+def _valid_section_content(
+    node: Tag, root: BeautifulSoup | Tag, label: str, text: str
+) -> bool:
+    return bool(
+        len(text) >= 12
+        and section_text_is_meaningful(node, label=label, text=text)
+        and not _section_matches_page_heading(root, text)
+    )
 
 
 def _feature_rows_from_node(node: Tag) -> list[str]:

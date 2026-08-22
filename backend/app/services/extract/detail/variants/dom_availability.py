@@ -204,18 +204,19 @@ def _control_join_keys(control: Any, label: Any | None) -> set[str]:
         normalized = _normalized_key(node.get_text(" ", strip=True))
         if normalized:
             keys.add(normalized)
-    selected_option = _selected_option_node(control)
-    if selected_option is not None:
-        for value in (
-            selected_option.get_text(" ", strip=True)
-            if hasattr(selected_option, "get_text")
-            else "",
-            selected_option.get("value") if hasattr(selected_option, "get") else "",
-        ):
-            normalized = _normalized_key(value)
-            if normalized:
-                keys.add(normalized)
+    keys.update(_selected_option_join_keys(control))
     return keys
+
+
+def _selected_option_join_keys(control: Any) -> set[str]:
+    option = _selected_option_node(control)
+    if option is None:
+        return set()
+    values = (
+        option.get_text(" ", strip=True) if hasattr(option, "get_text") else "",
+        option.get("value") if hasattr(option, "get") else "",
+    )
+    return {normalized for value in values if (normalized := _normalized_key(value))}
 
 
 def _control_axis_key(control: Any, label_map: dict[str, Any]) -> str | None:
@@ -389,47 +390,18 @@ def reconcile_variant_availability_from_dom(
         return
 
     # Index DOM options by join key; out-of-stock evidence wins per key.
-    index: dict[str, _DomOption] = {}
-    for option in dom_options:
-        for key in option.keys:
-            existing = index.get(key)
-            if existing is None or (
-                existing.availability != AVAILABILITY_OUT_OF_STOCK
-                and option.availability == AVAILABILITY_OUT_OF_STOCK
-            ):
-                index[key] = option
+    index = _index_dom_options(dom_options)
 
     label_axis_key = _varying_axis_key(variants) or _single_axis_key(variants)
     append_axis_key = _single_axis_key(variants)
     matched_options: set[int] = set()
     for row in variants:
-        match: _DomOption | None = None
-        for key in _row_join_keys(row):
-            candidate = index.get(key)
-            if candidate is None:
-                continue
-            if match is None or (
-                candidate.availability == AVAILABILITY_OUT_OF_STOCK
-                and match.availability != AVAILABILITY_OUT_OF_STOCK
-            ):
-                match = candidate
+        match = _matching_dom_option(row, index)
         if match is None:
             continue
         matched_options.add(id(match))
         _maybe_upgrade_axis_label(row, axis_key=label_axis_key, display=match.display)
-        current = text_or_none(row.get("availability"))
-        if match.availability == AVAILABILITY_OUT_OF_STOCK:
-            if current != AVAILABILITY_OUT_OF_STOCK:
-                row["availability"] = AVAILABILITY_OUT_OF_STOCK
-            if match.stock_quantity is not None and row.get("stock_quantity") in (
-                None,
-                "",
-                [],
-                {},
-            ):
-                row["stock_quantity"] = match.stock_quantity
-        elif match.availability == AVAILABILITY_IN_STOCK and not current:
-            row["availability"] = AVAILABILITY_IN_STOCK
+        _apply_dom_option_availability(row, match)
 
     _append_dom_only_out_of_stock_variants(
         record,
@@ -438,6 +410,50 @@ def reconcile_variant_availability_from_dom(
         dom_options=dom_options,
         matched_options=matched_options,
     )
+
+
+def _index_dom_options(options: list[_DomOption]) -> dict[str, _DomOption]:
+    index: dict[str, _DomOption] = {}
+    for option in options:
+        for key in option.keys:
+            existing = index.get(key)
+            if existing is None or (
+                existing.availability != AVAILABILITY_OUT_OF_STOCK
+                and option.availability == AVAILABILITY_OUT_OF_STOCK
+            ):
+                index[key] = option
+    return index
+
+
+def _matching_dom_option(
+    row: dict[str, Any], index: dict[str, _DomOption]
+) -> _DomOption | None:
+    match: _DomOption | None = None
+    for key in _row_join_keys(row):
+        candidate = index.get(key)
+        if candidate is None:
+            continue
+        if match is None or (
+            candidate.availability == AVAILABILITY_OUT_OF_STOCK
+            and match.availability != AVAILABILITY_OUT_OF_STOCK
+        ):
+            match = candidate
+    return match
+
+
+def _apply_dom_option_availability(row: dict[str, Any], option: _DomOption) -> None:
+    current = text_or_none(row.get("availability"))
+    if option.availability == AVAILABILITY_OUT_OF_STOCK:
+        row["availability"] = AVAILABILITY_OUT_OF_STOCK
+        if option.stock_quantity is not None and row.get("stock_quantity") in (
+            None,
+            "",
+            [],
+            {},
+        ):
+            row["stock_quantity"] = option.stock_quantity
+    elif option.availability == AVAILABILITY_IN_STOCK and not current:
+        row["availability"] = AVAILABILITY_IN_STOCK
 
 
 def _append_dom_only_out_of_stock_variants(

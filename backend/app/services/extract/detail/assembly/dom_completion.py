@@ -246,52 +246,17 @@ def _requires_dom_completion(
     raw_soup = breadcrumb_soup or soup
     requested_missing_fields = _missing_requested_fields(record, requested_fields)
     requested_variant_fields = _requested_variant_fields(requested_fields)
-    if normalized_surface == "ecommerce_detail":
-        breadcrumb_category = breadcrumb_category_from_dom(
-            raw_soup,
-            current_title=text_or_none(record.get("title")),
-        )
-        record_category = _normalized_category_path(record.get("category"))
-        dom_category = _normalized_category_path(breadcrumb_category)
-        if record_category and dom_category and record_category != dom_category:
-            return True
-    if (
-        normalized_surface == "ecommerce_detail"
-        and not requested_variant_fields
-        and not selector_rules
-        and _record_has_complete_unrequested_dom_variant_skip_fields(record)
-        and not _requires_dom_long_text_completion(
-            record,
-            extractable_fields=set(DOM_HIGH_VALUE_FIELDS.get(normalized_surface) or ()),
-        )
-    ):
-        return False
-    if (
-        normalized_surface == "ecommerce_detail"
-        and not record_has_rich_existing_variants(record)
-        and (
-            variant_dom_cues_present(soup)
-            or (raw_soup is not soup and variant_dom_cues_present(raw_soup))
-        )
-    ):
-        return True
-    if (
-        normalized_surface == "ecommerce_detail"
-        and record.get("image_url") in (None, "", [], {})
-        and raw_soup.select_one(DETAIL_PRODUCT_IMAGE_CUE_SELECTOR) is not None
-    ):
-        return True
-    if (
-        normalized_surface == "ecommerce_detail"
-        and not requested_fields
-        and not selector_rules
-        and record_has_rich_existing_variants(record)
-        and all(
-            record.get(field_name) not in (None, "", [], {})
-            for field_name in _EARLY_PRICE_REPAIR_REQUIRED_FIELDS
-        )
-    ):
-        return False
+    ecommerce_override = _ecommerce_dom_completion_override(
+        record=record,
+        requested_fields=requested_fields,
+        requested_variant_fields=requested_variant_fields,
+        selector_rules=selector_rules,
+        soup=soup,
+        raw_soup=raw_soup,
+        normalized_surface=normalized_surface,
+    )
+    if ecommerce_override is not None:
+        return ecommerce_override
     high_value_fields = set(DOM_HIGH_VALUE_FIELDS.get(normalized_surface) or ())
     optional_probe_fields = set(DOM_OPTIONAL_CUE_FIELDS.get(normalized_surface) or ())
     probe_fields = sorted(
@@ -313,39 +278,20 @@ def _requires_dom_completion(
         for field_name in _object_list(extractability.get("extractable_fields"))
         if str(field_name).strip()
     }
-    advertised_high_value_fields = extractable_fields & high_value_fields
-    missing_high_value_fields = {
-        field_name
-        for field_name in advertised_high_value_fields
-        if record.get(field_name) in (None, "", [], {})
-    }
-    missing_high_value_fields.update(
-        {
-            field_name
-            for field_name in high_value_fields
-            if field_name in requested_missing_fields
-        }
-    )
-    if extractable_fields & requested_missing_fields:
-        return True
-    if missing_high_value_fields or requested_missing_fields & high_value_fields:
-        return True
-    if normalized_surface == "ecommerce_detail" and _requires_dom_long_text_completion(
-        record,
+    if _extractable_fields_require_completion(
+        record=record,
+        normalized_surface=normalized_surface,
+        requested_missing_fields=requested_missing_fields,
+        high_value_fields=high_value_fields,
         extractable_fields=extractable_fields,
     ):
         return True
-    optional_cue_fields = {
-        field_name
-        for field_name in set(DOM_OPTIONAL_CUE_FIELDS.get(normalized_surface) or ())
-        if record.get(field_name) in (None, "", [], {})
-    }
     dom_pattern_fields = {
         str(field_name).strip()
         for field_name in _object_list(extractability.get("dom_pattern_fields"))
         if str(field_name).strip()
     }
-    if optional_cue_fields & dom_pattern_fields:
+    if _missing_optional_cue_fields(record, normalized_surface) & dom_pattern_fields:
         return True
     selector_backed_fields = {
         str(field_name).strip()
@@ -353,6 +299,129 @@ def _requires_dom_completion(
         if str(field_name).strip()
     }
     return bool(requested_missing_fields & selector_backed_fields)
+
+
+def _ecommerce_dom_completion_override(
+    *,
+    record: dict[str, Any],
+    requested_fields: list[str] | None,
+    requested_variant_fields: set[str],
+    selector_rules: list[dict[str, object]] | None,
+    soup: BeautifulSoup,
+    raw_soup: BeautifulSoup,
+    normalized_surface: str,
+) -> bool | None:
+    if normalized_surface != "ecommerce_detail":
+        return None
+    if _dom_category_conflicts(record, raw_soup):
+        return True
+    if _can_skip_unrequested_variant_dom(
+        record,
+        requested_variant_fields=requested_variant_fields,
+        selector_rules=selector_rules,
+        normalized_surface=normalized_surface,
+    ):
+        return False
+    if not record_has_rich_existing_variants(record) and _has_variant_dom_cues(
+        soup, raw_soup
+    ):
+        return True
+    if (
+        record.get("image_url") in (None, "", [], {})
+        and raw_soup.select_one(DETAIL_PRODUCT_IMAGE_CUE_SELECTOR) is not None
+    ):
+        return True
+    if _can_skip_complete_rich_variants(
+        record, requested_fields=requested_fields, selector_rules=selector_rules
+    ):
+        return False
+    return None
+
+
+def _can_skip_unrequested_variant_dom(
+    record: dict[str, Any],
+    *,
+    requested_variant_fields: set[str],
+    selector_rules: list[dict[str, object]] | None,
+    normalized_surface: str,
+) -> bool:
+    complete = _record_has_complete_unrequested_dom_variant_skip_fields(record)
+    long_text_gap = _requires_dom_long_text_completion(
+        record,
+        extractable_fields=set(DOM_HIGH_VALUE_FIELDS.get(normalized_surface) or ()),
+    )
+    return (
+        not requested_variant_fields
+        and not selector_rules
+        and complete
+        and not long_text_gap
+    )
+
+
+def _can_skip_complete_rich_variants(
+    record: dict[str, Any],
+    *,
+    requested_fields: list[str] | None,
+    selector_rules: list[dict[str, object]] | None,
+) -> bool:
+    repair_fields_present = all(
+        record.get(field) not in (None, "", [], {})
+        for field in _EARLY_PRICE_REPAIR_REQUIRED_FIELDS
+    )
+    return (
+        not requested_fields
+        and not selector_rules
+        and record_has_rich_existing_variants(record)
+        and repair_fields_present
+    )
+
+
+def _dom_category_conflicts(record: dict[str, Any], raw_soup: BeautifulSoup) -> bool:
+    breadcrumb = breadcrumb_category_from_dom(
+        raw_soup, current_title=text_or_none(record.get("title"))
+    )
+    record_category = _normalized_category_path(record.get("category"))
+    dom_category = _normalized_category_path(breadcrumb)
+    return bool(record_category and dom_category and record_category != dom_category)
+
+
+def _has_variant_dom_cues(soup: BeautifulSoup, raw_soup: BeautifulSoup) -> bool:
+    return variant_dom_cues_present(soup) or (
+        raw_soup is not soup and variant_dom_cues_present(raw_soup)
+    )
+
+
+def _extractable_fields_require_completion(
+    *,
+    record: dict[str, Any],
+    normalized_surface: str,
+    requested_missing_fields: set[str],
+    high_value_fields: set[str],
+    extractable_fields: set[str],
+) -> bool:
+    missing_high_value = {
+        field
+        for field in extractable_fields & high_value_fields
+        if record.get(field) in (None, "", [], {})
+    } | (requested_missing_fields & high_value_fields)
+    if extractable_fields & requested_missing_fields or missing_high_value:
+        return True
+    return (
+        normalized_surface == "ecommerce_detail"
+        and _requires_dom_long_text_completion(
+            record, extractable_fields=extractable_fields
+        )
+    )
+
+
+def _missing_optional_cue_fields(
+    record: dict[str, Any], normalized_surface: str
+) -> set[str]:
+    return {
+        field
+        for field in set(DOM_OPTIONAL_CUE_FIELDS.get(normalized_surface) or ())
+        if record.get(field) in (None, "", [], {})
+    }
 
 
 def _normalized_category_path(value: object) -> str:

@@ -47,64 +47,78 @@ def _repair_detail_variant_prices_and_identity(record: dict[str, Any]) -> None:
     parent_title = clean_text(record.get("title"))
     rows = [row for row in record.get("variants") or [] if isinstance(row, dict)]
     for row in rows:
-        if parent_price:
-            row_price = text_or_none(row.get("price"))
-            if (
-                not row_price
-                or _price_is_cents_copy(row_price, parent_price)
-                or _price_is_low_signal_copy(row_price, parent_price)
-            ):
-                row["price"] = parent_price
-        if (
-            parent_availability
-            and row.get("availability") in (None, "", [], {})
-            and any(
-                row.get(field_name) not in (None, "", [], {})
-                for field_name in (
-                    "sku",
-                    "variant_id",
-                    "barcode",
-                    "image_url",
-                    "title",
-                    "size",
-                    "color",
-                    "url",
-                )
-            )
-        ):
-            row["availability"] = parent_availability
-        row_sku = text_or_none(row.get("sku"))
-        if row_sku and _looks_like_uuid(row_sku):
-            row.pop("sku", None)
-        barcode = text_or_none(row.get("barcode"))
-        if (
-            barcode
-            and row.get("sku") == barcode
-            and len(re.sub(r"\D+", "", barcode)) <= 8
-        ):
-            row.pop("barcode", None)
-        title = clean_text(row.get("title"))
-        if title and _variant_title_is_low_signal(title):
-            replacement = _variant_title_from_parent(parent_title, row)
-            if replacement:
-                row["title"] = replacement
-            else:
-                row.pop("title", None)
-    variant_rows = [
-        row for row in record.get("variants") or [] if isinstance(row, dict)
-    ]
-    if (
-        parent_availability == AVAILABILITY_IN_STOCK
-        and variant_rows
-        and all(
-            text_or_none(row.get("availability")) == parent_availability
-            for row in variant_rows
-        )
-    ):
-        for row in variant_rows:
+        _repair_variant_price(row, parent_price)
+        _repair_variant_availability(row, parent_availability)
+        _repair_variant_identity(row, parent_title)
+    if _variants_repeat_parent_availability(rows, parent_availability):
+        for row in rows:
             row.pop("availability", None)
     if parent_sku and _looks_like_uuid(parent_sku):
         record.pop("sku", None)
+
+
+def _repair_variant_price(row: dict[str, Any], parent_price: str | None) -> None:
+    if not parent_price:
+        return
+    row_price = text_or_none(row.get("price"))
+    if (
+        not row_price
+        or _price_is_cents_copy(row_price, parent_price)
+        or _price_is_low_signal_copy(row_price, parent_price)
+    ):
+        row["price"] = parent_price
+
+
+def _repair_variant_availability(
+    row: dict[str, Any], parent_availability: str | None
+) -> None:
+    has_identity = any(
+        row.get(field_name) not in (None, "", [], {})
+        for field_name in (
+            "sku",
+            "variant_id",
+            "barcode",
+            "image_url",
+            "title",
+            "size",
+            "color",
+            "url",
+        )
+    )
+    if (
+        parent_availability
+        and row.get("availability") in (None, "", [], {})
+        and has_identity
+    ):
+        row["availability"] = parent_availability
+
+
+def _repair_variant_identity(row: dict[str, Any], parent_title: str) -> None:
+    row_sku = text_or_none(row.get("sku"))
+    if row_sku and _looks_like_uuid(row_sku):
+        row.pop("sku", None)
+    barcode = text_or_none(row.get("barcode"))
+    if barcode and row.get("sku") == barcode and len(re.sub(r"\D+", "", barcode)) <= 8:
+        row.pop("barcode", None)
+    title = clean_text(row.get("title"))
+    if title and _variant_title_is_low_signal(title):
+        replacement = _variant_title_from_parent(parent_title, row)
+        if replacement:
+            row["title"] = replacement
+        else:
+            row.pop("title", None)
+
+
+def _variants_repeat_parent_availability(
+    rows: list[dict[str, Any]], parent_availability: str | None
+) -> bool:
+    return bool(
+        parent_availability == AVAILABILITY_IN_STOCK
+        and rows
+        and all(
+            text_or_none(row.get("availability")) == parent_availability for row in rows
+        )
+    )
 
 
 def repair_detail_variant_prices_and_identity(record: dict[str, Any]) -> None:
@@ -169,15 +183,23 @@ def _drop_invalid_detail_discounts(record: dict[str, Any]) -> None:
     original_price = detail_price_decimal(record.get("original_price"))
     discount_amount = detail_price_decimal(record.get("discount_amount"))
     discount_percentage = detail_price_decimal(record.get("discount_percentage"))
-    if sale_price is not None and price is not None and sale_price >= price:
-        record.pop("sale_price", None)
-        field_sources = record.get("_field_sources")
-        if isinstance(field_sources, dict):
-            field_sources.pop("sale_price", None)
-    elif (
-        sale_price is not None
-        and price is not None
-        and price > 0
+    if _sale_price_is_invalid(sale_price, price, original_price):
+        _drop_money_field(record, "sale_price")
+    if discount_percentage is not None and not (0 < discount_percentage <= 100):
+        record.pop("discount_percentage", None)
+    if _discount_amount_is_invalid(discount_amount, price, original_price):
+        record.pop("discount_amount", None)
+
+
+def _sale_price_is_invalid(
+    sale_price: Decimal | None, price: Decimal | None, original_price: Decimal | None
+) -> bool:
+    if sale_price is None or price is None:
+        return False
+    if sale_price >= price:
+        return True
+    return bool(
+        price > 0
         and original_price is not None
         and abs(original_price - price)
         <= Decimal(str(DETAIL_PRICE_COMPARISON_TOLERANCE))
@@ -186,23 +208,26 @@ def _drop_invalid_detail_discounts(record: dict[str, Any]) -> None:
             or sale_price / price
             <= Decimal(str(DETAIL_LOW_SIGNAL_SALE_PRICE_RATIO_MAX))
         )
-    ):
-        record.pop("sale_price", None)
-        field_sources = record.get("_field_sources")
-        if isinstance(field_sources, dict):
-            field_sources.pop("sale_price", None)
-    if discount_percentage is not None and not (0 < discount_percentage <= 100):
-        record.pop("discount_percentage", None)
-    if discount_amount is None:
-        return
-    if discount_amount <= 0:
-        record.pop("discount_amount", None)
-        return
-    if price is not None and discount_amount > price:
-        record.pop("discount_amount", None)
-        return
-    if original_price is not None and discount_amount > original_price:
-        record.pop("discount_amount", None)
+    )
+
+
+def _drop_money_field(record: dict[str, Any], field_name: str) -> None:
+    record.pop(field_name, None)
+    sources = record.get("_field_sources")
+    if isinstance(sources, dict):
+        sources.pop(field_name, None)
+
+
+def _discount_amount_is_invalid(
+    amount: Decimal | None, price: Decimal | None, original_price: Decimal | None
+) -> bool:
+    if amount is None:
+        return False
+    if amount <= 0:
+        return True
+    if price is not None and amount > price:
+        return True
+    return original_price is not None and amount > original_price
 
 
 def drop_invalid_detail_discounts(record: dict[str, Any]) -> None:

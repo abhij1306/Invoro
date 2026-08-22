@@ -6,8 +6,18 @@ import pytest
 from app.services.acquisition import browser_identity
 from app.services.acquisition import browser_pool as acquisition_browser_pool
 from app.services.acquisition import browser_runtime as acquisition_browser_runtime
+from app.services.config.browser_surface_probe import (
+    BROWSER_SURFACE_PROBE_TARGET_NAVIGATION_TIMEOUT_MS,
+)
 import run_browser_surface_probe as probe
-
+from browser_surface_probe import probe_runner
+from browser_surface_probe.baseline import _consensus_baseline
+from browser_surface_probe.report_rendering import build_agent_summary
+from browser_surface_probe.target_diagnostics import (
+    _geo_payload_from_text,
+    _navigate_probe_target,
+    _validated_target_url,
+)
 
 def _report(
     *,
@@ -62,7 +72,7 @@ def _report(
         },
     }
     return {
-        "baseline": probe._consensus_baseline(per_site),
+        "baseline": _consensus_baseline(per_site),
         "sites": {
             "sannysoft": {
                 "extracted": {
@@ -91,10 +101,8 @@ def _report(
         "target_diagnostics": [],
     }
 
-
 def _finding_categories(report: dict[str, object]) -> set[str]:
     return {str(item.get("category")) for item in probe.build_findings(report)}
-
 
 def _target_diagnostic(
     *,
@@ -148,7 +156,6 @@ def _target_diagnostic(
         },
     }
 
-
 @pytest.mark.regression
 def test_build_findings_flags_timezone_country_mismatch() -> None:
     categories = _finding_categories(
@@ -158,7 +165,6 @@ def test_build_findings_flags_timezone_country_mismatch() -> None:
         )
     )
     assert "timezone_country_mismatch" in categories
-
 
 @pytest.mark.regression
 def test_build_findings_flags_locale_and_ua_drift() -> None:
@@ -172,14 +178,12 @@ def test_build_findings_flags_locale_and_ua_drift() -> None:
     assert "locale_region_drift" in categories
     assert "ua_version_drift" in categories
 
-
 @pytest.mark.regression
 def test_load_baseline_probe_script_exposes_js_entrypoint() -> None:
     script = probe.load_baseline_probe_script()
 
     assert "__crawlerProbeCollectBaseline" in script
     assert "getHighEntropyValues" in script
-
 
 @pytest.mark.regression
 def test_baseline_probe_closes_audio_context() -> None:
@@ -188,7 +192,6 @@ def test_baseline_probe_closes_audio_context() -> None:
     assert "finally" in script
     assert "osc.stop" in script
     assert "ctx.close" in script
-
 
 @pytest.mark.regression
 def test_build_findings_surfaces_webdriver_headless_and_webrtc() -> None:
@@ -203,7 +206,6 @@ def test_build_findings_surfaces_webdriver_headless_and_webrtc() -> None:
     assert "headless_leakage" in categories
     assert "webrtc_leakage" in categories
 
-
 @pytest.mark.regression
 def test_build_findings_ignores_expected_chrome_runtime_object_marker() -> None:
     report = _report()
@@ -215,7 +217,6 @@ def test_build_findings_ignores_expected_chrome_runtime_object_marker() -> None:
 
     assert "automation_globals_exposure" not in categories
 
-
 @pytest.mark.regression
 def test_build_findings_flags_real_automation_globals() -> None:
     report = _report()
@@ -224,7 +225,6 @@ def test_build_findings_flags_real_automation_globals() -> None:
     categories = _finding_categories(report)
 
     assert "automation_globals_exposure" in categories
-
 
 @pytest.mark.regression
 def test_build_findings_adds_chromium_ja3_info_for_chromium_only() -> None:
@@ -238,7 +238,6 @@ def test_build_findings_adds_chromium_ja3_info_for_chromium_only() -> None:
 
     assert "chromium_ja3_limitation" in chromium_categories
     assert "chromium_ja3_limitation" not in real_chrome_categories
-
 
 @pytest.mark.regression
 def test_build_agent_summary_surfaces_canvas_hash_and_webgl_renderer() -> None:
@@ -278,16 +277,15 @@ def test_build_agent_summary_surfaces_canvas_hash_and_webgl_renderer() -> None:
         "target_diagnostics": [],
     }
 
-    summary = probe.build_agent_summary(report)
+    summary = build_agent_summary(report)
 
     assert summary["baseline"]["canvas_image_data_hash"] == "fnv1a:deadbeef"
     assert summary["baseline"]["canvas_data_url_prefix"] == "data:image/png;base64,abc"
     assert summary["baseline"]["webgl_renderer"] == "ANGLE (Intel, Demo)"
 
-
 @pytest.mark.regression
 def test_build_agent_summary_truncates_non_list_evidence() -> None:
-    summary = probe.build_agent_summary(
+    summary = build_agent_summary(
         {
             "metadata": {},
             "baseline": {"consensus": {}, "drift": {}},
@@ -314,12 +312,10 @@ def test_build_agent_summary_truncates_non_list_evidence() -> None:
     assert len(findings[0]["evidence"]) == 200
     assert len(findings[1]["evidence"]) == 200
 
-
 @pytest.mark.regression
 def test_build_findings_flags_screen_and_viewport_drift() -> None:
     categories = _finding_categories(_report(screen_drift=True))
     assert "screen_viewport_drift" in categories
-
 
 @pytest.mark.regression
 def test_build_findings_flags_target_precontent_block() -> None:
@@ -329,7 +325,6 @@ def test_build_findings_flags_target_precontent_block() -> None:
     report["target_diagnostics"] = [_target_diagnostic()]
     categories = _finding_categories(report)
     assert "target_precontent_block" in categories
-
 
 @pytest.mark.regression
 def test_build_findings_flags_browser_geo_identity_mismatch() -> None:
@@ -347,7 +342,6 @@ def test_build_findings_flags_browser_geo_identity_mismatch() -> None:
     categories = _finding_categories(report)
     assert "browser_geo_identity_mismatch" in categories
 
-
 @pytest.mark.regression
 def test_validated_target_url_rejects_non_http_and_local_targets() -> None:
     for url in (
@@ -356,12 +350,11 @@ def test_validated_target_url_rejects_non_http_and_local_targets() -> None:
         "http://127.0.0.1/admin",
     ):
         with pytest.raises(ValueError):
-            probe._validated_target_url(url)
-
+            _validated_target_url(url)
 
 @pytest.mark.regression
 def test_geo_payload_from_text_accepts_alternate_provider_shapes() -> None:
-    payload = probe._geo_payload_from_text(
+    payload = _geo_payload_from_text(
         '{"ip":"8.8.8.8","country_code":"US","regionName":"California",'
         '"timezone":{"id":"America/Los_Angeles"},"connection":{"org":"Google"}}'
     )
@@ -370,7 +363,6 @@ def test_geo_payload_from_text_accepts_alternate_provider_shapes() -> None:
     assert payload["region"] == "California"
     assert payload["timezone"] == "America/Los_Angeles"
     assert payload["org"] == "Google"
-
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -501,7 +493,7 @@ async def test_build_report_ignores_runtime_page_init_script_path(
         ),
     )
     monkeypatch.setattr(
-        probe,
+        probe_runner,
         "BROWSER_SURFACE_PROBE_TARGETS",
         (
             {
@@ -534,7 +526,6 @@ async def test_build_report_ignores_runtime_page_init_script_path(
 
     assert init_scripts == []
 
-
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_build_report_keeps_partial_report_when_site_context_fails(
@@ -562,7 +553,7 @@ async def test_build_report_keeps_partial_report_when_site_context_fails(
         return FakeRuntime()
 
     monkeypatch.setattr(
-        probe,
+        probe_runner,
         "BROWSER_SURFACE_PROBE_TARGETS",
         (
             {
@@ -572,8 +563,8 @@ async def test_build_report_keeps_partial_report_when_site_context_fails(
             },
         ),
     )
-    monkeypatch.setattr(probe, "BROWSER_SURFACE_PROBE_SITE_MAX_RETRIES", 0)
-    monkeypatch.setattr(probe, "BROWSER_SURFACE_PROBE_REQUEST_DELAY_MS", 0)
+    monkeypatch.setattr(probe_runner, "BROWSER_SURFACE_PROBE_SITE_MAX_RETRIES", 0)
+    monkeypatch.setattr(probe_runner, "BROWSER_SURFACE_PROBE_REQUEST_DELAY_MS", 0)
 
     report = await probe.build_report(
         runtime_source=probe.RuntimeSource(
@@ -601,7 +592,6 @@ async def test_build_report_keeps_partial_report_when_site_context_fails(
         finding["category"] for finding in report["findings"]
     }
 
-
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_build_report_keeps_invalid_target_urls_as_failed_diagnostics(
@@ -624,8 +614,8 @@ async def test_build_report_keeps_invalid_target_urls_as_failed_diagnostics(
             browser_blocked=False, httpx_blocked=False, curl_blocked=False
         )
 
-    monkeypatch.setattr(probe, "BROWSER_SURFACE_PROBE_TARGETS", ())
-    monkeypatch.setattr(probe, "_run_target_diagnostic", _fake_target_diagnostic)
+    monkeypatch.setattr(probe_runner, "BROWSER_SURFACE_PROBE_TARGETS", ())
+    monkeypatch.setattr(probe_runner, "_run_target_diagnostic", _fake_target_diagnostic)
 
     report = await probe.build_report(
         runtime_source=probe.RuntimeSource(
@@ -659,7 +649,6 @@ async def test_build_report_keeps_invalid_target_urls_as_failed_diagnostics(
     )
     assert report["target_diagnostics"][1]["browser"]["status"] == "ok"
 
-
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_build_report_keeps_partial_target_diagnostics_when_one_target_fails(
@@ -685,8 +674,8 @@ async def test_build_report_keeps_partial_target_diagnostics_when_one_target_fai
             curl_blocked=False,
         )
 
-    monkeypatch.setattr(probe, "BROWSER_SURFACE_PROBE_TARGETS", ())
-    monkeypatch.setattr(probe, "_run_target_diagnostic", _fake_target_diagnostic)
+    monkeypatch.setattr(probe_runner, "BROWSER_SURFACE_PROBE_TARGETS", ())
+    monkeypatch.setattr(probe_runner, "_run_target_diagnostic", _fake_target_diagnostic)
 
     report = await probe.build_report(
         runtime_source=probe.RuntimeSource(
@@ -723,7 +712,6 @@ async def test_build_report_keeps_partial_target_diagnostics_when_one_target_fai
     )
     assert report["target_diagnostics"][1]["browser"]["status"] == "ok"
 
-
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_navigate_probe_target_uses_shared_navigation_timeout() -> None:
@@ -745,12 +733,12 @@ async def test_navigate_probe_target_uses_shared_navigation_timeout() -> None:
         async def wait_for_timeout(self, *_args, **_kwargs) -> None:
             return None
 
-    await probe._navigate_probe_target(FakePage(), "https://example.com")
+    await _navigate_probe_target(FakePage(), "https://example.com")
 
     assert calls == [
         {
             "url": "https://example.com",
             "wait_until": "domcontentloaded",
-            "timeout": int(probe.BROWSER_SURFACE_PROBE_TARGET_NAVIGATION_TIMEOUT_MS),
+            "timeout": int(BROWSER_SURFACE_PROBE_TARGET_NAVIGATION_TIMEOUT_MS),
         }
     ]

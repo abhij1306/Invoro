@@ -111,45 +111,59 @@ def _option_group_variant_rows(product: dict[str, Any]) -> list[dict[str, Any]]:
         for group in as_list(product.get(group_key)):
             if not isinstance(group, dict):
                 continue
-            axis_name = text_or_none(
-                group.get("name")
-                or group.get("title")
-                or group.get("label")
-                or group.get("attribute_code")
-                or group.get("id")
-            )
+            axis_name = _option_group_axis_name(group)
             if not axis_name:
                 continue
-            for value_key in JS_STATE_OPTION_GROUP_VALUE_KEYS:
-                values = as_list(group.get(value_key))
-                if values:
-                    break
-            else:
-                values = []
-            for item in values:
-                if not isinstance(item, dict):
-                    continue
-                axis_value = (
-                    text_or_none(item.get("label"))
-                    or text_or_none(item.get("name"))
-                    or text_or_none(item.get("displayValue"))
-                    or text_or_none(item.get("value"))
-                    or text_or_none(item.get("index"))
-                )
-                if not axis_value:
-                    continue
-                row = dict(item)
-                row["name"] = axis_name
-                row["value"] = axis_value
-                simple_id = text_or_none(
-                    item.get("simple_id")
-                    or item.get("simpleId")
-                    or item.get("variantId")
-                )
-                if simple_id and row.get("id") in (None, "", [], {}):
-                    row["id"] = simple_id
-                rows.append(row)
+            rows.extend(
+                row
+                for item in _option_group_values(group)
+                if isinstance(item, dict)
+                and (row := _option_group_row(item, axis_name)) is not None
+            )
     return rows
+
+
+def _option_group_axis_name(group: dict[str, Any]) -> str | None:
+    return next(
+        (
+            value
+            for key in ("name", "title", "label", "attribute_code", "id")
+            if (value := text_or_none(group.get(key)))
+        ),
+        None,
+    )
+
+
+def _option_group_values(group: dict[str, Any]) -> list[Any]:
+    return next(
+        (values for key in JS_STATE_OPTION_GROUP_VALUE_KEYS if (values := as_list(group.get(key)))),
+        [],
+    )
+
+
+def _option_group_row(item: dict[str, Any], axis_name: str) -> dict[str, Any] | None:
+    axis_value = next(
+        (
+            value
+            for key in ("label", "name", "displayValue", "value", "index")
+            if (value := text_or_none(item.get(key)))
+        ),
+        None,
+    )
+    if not axis_value:
+        return None
+    row = {**item, "name": axis_name, "value": axis_value}
+    simple_id = next(
+        (
+            value
+            for key in ("simple_id", "simpleId", "variantId")
+            if (value := text_or_none(item.get(key)))
+        ),
+        None,
+    )
+    if simple_id and row.get("id") in (None, "", [], {}):
+        row["id"] = simple_id
+    return row
 
 
 def _nested_choice_item_variant_rows(product: dict[str, Any]) -> list[dict[str, Any]]:
@@ -328,32 +342,8 @@ def _variant_matrix_row(
     url = text_or_none(variant_option.get("url"))
     if url:
         row["url"] = url
-    price_data = variant_option.get("priceData")
-    if isinstance(price_data, dict):
-        value = price_data.get("value")
-        if value not in (None, "", [], {}):
-            row["price"] = value
-        currency = text_or_none(price_data.get("currencyIso"))
-        if currency:
-            row["currency"] = currency
-    stock = variant_option.get("stock")
-    if isinstance(stock, dict):
-        stock_level = stock.get("stockLevel")
-        if stock_level not in (None, "", [], {}):
-            try:
-                row["stock_quantity"] = int(str(stock_level).strip())
-            except (TypeError, ValueError):
-                # Non-numeric stock level; leave stock_quantity unset.
-                pass
-        status = text_or_none(stock.get("stockLevelStatus"))
-        if status:
-            lowered = status.casefold()
-            if lowered == "instock":
-                row["availability"] = "in_stock"
-            elif lowered == "lowstock":
-                row["availability"] = "in_stock"
-            elif lowered == "outofstock":
-                row["availability"] = "out_of_stock"
+    _apply_matrix_price(row, variant_option.get("priceData"))
+    _apply_matrix_stock(row, variant_option.get("stock"))
     # Variant-matrix rows without any public axis value are transport-only blobs.
     # They are ambiguous in public output even when they carry sku/url/price.
     return (
@@ -361,6 +351,31 @@ def _variant_matrix_row(
         if any(value for key, value in row.items() if key in _MATRIX_AXIS_FIELDS)
         else None
     )
+
+
+def _apply_matrix_price(row: dict[str, Any], price_data: object) -> None:
+    if not isinstance(price_data, dict):
+        return
+    if price_data.get("value") not in (None, "", [], {}):
+        row["price"] = price_data["value"]
+    if currency := text_or_none(price_data.get("currencyIso")):
+        row["currency"] = currency
+
+
+def _apply_matrix_stock(row: dict[str, Any], stock: object) -> None:
+    if not isinstance(stock, dict):
+        return
+    stock_level = stock.get("stockLevel")
+    if stock_level not in (None, "", [], {}):
+        try:
+            row["stock_quantity"] = int(str(stock_level).strip())
+        except (TypeError, ValueError):
+            pass
+    status = clean_text(stock.get("stockLevelStatus")).casefold()
+    if status in {"instock", "lowstock"}:
+        row["availability"] = "in_stock"
+    elif status == "outofstock":
+        row["availability"] = "out_of_stock"
 
 
 def _variant_matrix_axis_value(

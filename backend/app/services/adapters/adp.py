@@ -66,56 +66,60 @@ class ADPAdapter(BaseAdapter):
         records: list[dict] = []
         seen_keys: set[str] = set()
         for card in parser.css(".current-openings-item"):
-            title_node = card.css_first("[id^='lblTitle_'], sdf-link, a")
-            title = clean_text(selectolax_node_text(title_node, separator=" "))
-            if len(title) < 3:
+            record = self._listing_card_record(card, page_url=url)
+            if not record:
                 continue
-
-            job_dom_id = self._extract_job_dom_id(card)
-            record: dict[str, str] = {
-                "title": title,
-                "source_url": url,
-            }
-            if job_dom_id:
-                record["job_id"] = job_dom_id
-                detail_url = self._build_apply_url(url, job_dom_id)
-                record["url"] = detail_url or f"{url}#{job_dom_id}"
-                if detail_url:
-                    record["apply_url"] = detail_url
-            else:
-                record["url"] = url
-
-            location_values: list[str] = []
-            for node in card.css(
-                ".current-opening-location-item span, .current-opening-location-item"
-            ):
-                value = clean_text(selectolax_node_text(node, separator=" "))
-                if value and value not in location_values:
-                    location_values.append(value)
-            location = " | ".join(location_values)
-            post_elem = card.css_first(".current-opening-post-date")
-            posted = clean_text(selectolax_node_text(post_elem, separator=" "))
-            more_locations = clean_text(
-                " ".join(
-                    selectolax_node_text(node, separator=" ")
-                    for node in card.css(
-                        "[id^='job_item_location_'], .mdf-overlay-popover sdf-button"
-                    )
-                )
-            )
-            if location:
-                record["location"] = location
-            if more_locations and more_locations not in {location, title}:
-                record["additional_locations"] = more_locations
-            if posted:
-                record["posted_date"] = posted
-
             key = str(record.get("job_id") or record.get("title") or "").strip().lower()
             if not key or key in seen_keys:
                 continue
             seen_keys.add(key)
             records.append(record)
         return records
+
+    def _listing_card_record(self, card: Any, *, page_url: str) -> dict[str, str] | None:
+        title_node = card.css_first("[id^='lblTitle_'], sdf-link, a")
+        title = clean_text(selectolax_node_text(title_node, separator=" "))
+        if len(title) < 3:
+            return None
+        record: dict[str, str] = {"title": title, "source_url": page_url}
+        self._apply_listing_identity(record, card, page_url=page_url)
+        location = self._listing_locations(card)
+        posted = clean_text(
+            selectolax_node_text(card.css_first(".current-opening-post-date"), separator=" ")
+        )
+        more_locations = clean_text(" ".join(
+            selectolax_node_text(node, separator=" ")
+            for node in card.css("[id^='job_item_location_'], .mdf-overlay-popover sdf-button")
+        ))
+        if location:
+            record["location"] = location
+        if more_locations and more_locations not in {location, title}:
+            record["additional_locations"] = more_locations
+        if posted:
+            record["posted_date"] = posted
+        return record
+
+    def _apply_listing_identity(
+        self, record: dict[str, str], card: Any, *, page_url: str
+    ) -> None:
+        job_id = self._extract_job_dom_id(card)
+        if not job_id:
+            record["url"] = page_url
+            return
+        record["job_id"] = job_id
+        detail_url = self._build_apply_url(page_url, job_id)
+        record["url"] = detail_url or f"{page_url}#{job_id}"
+        if detail_url:
+            record["apply_url"] = detail_url
+
+    @staticmethod
+    def _listing_locations(card: Any) -> str:
+        values: list[str] = []
+        for node in card.css(".current-opening-location-item span, .current-opening-location-item"):
+            value = clean_text(selectolax_node_text(node, separator=" "))
+            if value and value not in values:
+                values.append(value)
+        return " | ".join(values)
 
     def _extract_detail(self, url: str, html: str) -> dict | None:
         parser = LexborHTMLParser(html)

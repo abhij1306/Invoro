@@ -77,41 +77,39 @@ def _extract_listing_records(page_url: str, html: str) -> list[dict[str, Any]]:
     seen_urls: set[str] = set()
     for node in parser.css("li.product-base"):
         record = _listing_record_from_card(node, page_url=page_url)
-        if not record:
-            continue
-        url = str(record.get("url") or "")
-        if not url or url in seen_urls:
-            continue
-        state_record = state_index.get(url)
-        if state_record:
-            merged = dict(state_record)
-            merged.update(
-                {
-                    key: value
-                    for key, value in record.items()
-                    if value not in (None, "", [], {})
-                }
+        if record:
+            _append_myntra_listing_record(
+                records, record, state_index=state_index, seen_urls=seen_urls
             )
-            record = merged
-        record["_source"] = "myntra_adapter"
-        finalized = finalize_record(record, surface="ecommerce_listing")
-        final_url = str(finalized.get("url") or "")
-        if not final_url or final_url in seen_urls:
-            continue
-        seen_urls.add(final_url)
-        records.append(finalized)
     for record in state_index.values():
-        url = str(record.get("url") or "")
-        if not url or url in seen_urls:
-            continue
-        record["_source"] = "myntra_adapter"
-        finalized = finalize_record(record, surface="ecommerce_listing")
-        final_url = str(finalized.get("url") or "")
-        if not final_url or final_url in seen_urls:
-            continue
-        seen_urls.add(final_url)
-        records.append(finalized)
+        _append_myntra_listing_record(
+            records, record, state_index={}, seen_urls=seen_urls
+        )
     return records
+
+
+def _append_myntra_listing_record(
+    records: list[dict[str, Any]],
+    record: dict[str, Any],
+    *,
+    state_index: dict[str, dict[str, Any]],
+    seen_urls: set[str],
+) -> None:
+    url = str(record.get("url") or "")
+    if not url or url in seen_urls:
+        return
+    if state_record := state_index.get(url):
+        record = {
+            **state_record,
+            **{key: value for key, value in record.items() if value not in (None, "", [], {})},
+        }
+    record["_source"] = "myntra_adapter"
+    finalized = finalize_record(record, surface="ecommerce_listing")
+    final_url = str(finalized.get("url") or "")
+    if not final_url or final_url in seen_urls:
+        return
+    seen_urls.add(final_url)
+    records.append(finalized)
 
 
 def _myntra_listing_state_index(page_url: str, html: str) -> dict[str, dict[str, Any]]:

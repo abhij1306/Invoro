@@ -89,40 +89,47 @@ def _remap_generic_variant_axes(record: dict[str, Any]) -> None:
     if not isinstance(variants, list) or not variants:
         return
     # Collect axes that appear across all variant rows (excluding core axes).
-    generic_axis_values: dict[str, list[str]] = {}
-    for variant in variants:
-        if not isinstance(variant, dict):
-            continue
-        for axis in _REMAP_ELIGIBLE_AXES:
-            value = clean_text(variant.get(axis))
-            if value:
-                generic_axis_values.setdefault(axis, []).append(value)
+    generic_axis_values = _generic_variant_axis_values(variants)
     if not generic_axis_values:
         return
     for axis, values in generic_axis_values.items():
-        unique_values = list(dict.fromkeys(values))
-        if len(unique_values) < 2:
-            continue
-        # Only remap if no variant already has the target axis populated.
-        inferred = infer_variant_group_name_from_values(unique_values)
-        if not inferred or inferred not in _CORE_AXES:
-            continue
-        # Check that no variant already has the target axis set.
-        if any(
-            clean_text(variant.get(inferred))
-            for variant in variants
-            if isinstance(variant, dict)
-        ):
-            continue
-        # Check that the parent record does not already have the target axis
-        # populated — remapping would create conflicting parent/variant state.
-        if clean_text(record.get(inferred)):
+        inferred = _remap_target_axis(record, variants, values)
+        if not inferred:
             continue
         # Remap: move values from generic axis to the inferred axis.
         for variant in (item for item in variants if isinstance(item, dict)):
             value = variant.pop(axis, None)
             if value not in (None, "", [], {}):
                 variant[inferred] = value
+
+
+def _generic_variant_axis_values(variants: list[object]) -> dict[str, list[str]]:
+    values_by_axis: dict[str, list[str]] = {}
+    for variant in variants:
+        if not isinstance(variant, dict):
+            continue
+        for axis in _REMAP_ELIGIBLE_AXES:
+            if value := clean_text(variant.get(axis)):
+                values_by_axis.setdefault(axis, []).append(value)
+    return values_by_axis
+
+
+def _remap_target_axis(
+    record: dict[str, Any], variants: list[object], values: list[str]
+) -> str:
+    unique_values = list(dict.fromkeys(values))
+    if len(unique_values) < 2:
+        return ""
+    inferred = infer_variant_group_name_from_values(unique_values)
+    if not inferred or inferred not in _CORE_AXES or clean_text(record.get(inferred)):
+        return ""
+    if any(
+        clean_text(variant.get(inferred))
+        for variant in variants
+        if isinstance(variant, dict)
+    ):
+        return ""
+    return inferred
 
 
 def _sanitize_variant_axes(record: dict[str, Any]) -> None:
@@ -168,32 +175,8 @@ def _clean_variant_rows(record: dict[str, Any]) -> None:
     for variant in variants:
         if not isinstance(variant, dict):
             continue
-        cleaned_variant = dict(variant)
-        drop_row = False
-        for field_name in public_variant_axis_fields:
-            raw_axis_key = _variant_axis_source_key(cleaned_variant, field_name)
-            raw_axis_value = (
-                cleaned_variant.get(raw_axis_key) if raw_axis_key is not None else None
-            )
-            if size_color_extraction._variant_size_axis_value_is_quantity_control(
-                field_name,
-                raw_axis_value,
-            ):
-                drop_row = True
-                break
-            cleaned_value = size_color_extraction._normalize_variant_axis_value(
-                field_name,
-                raw_axis_value,
-            )
-            if cleaned_value:
-                cleaned_variant[field_name] = cleaned_value
-                if raw_axis_key is not None and raw_axis_key != field_name:
-                    cleaned_variant.pop(raw_axis_key, None)
-            else:
-                cleaned_variant.pop(field_name, None)
-                if raw_axis_key is not None and raw_axis_key != field_name:
-                    cleaned_variant.pop(raw_axis_key, None)
-        if drop_row:
+        cleaned_variant = _clean_variant_row_axes(variant)
+        if cleaned_variant is None:
             continue
         _promote_misfiled_color_size(cleaned_variant)
         _drop_shade_code_size_duplicate(cleaned_variant)
@@ -214,6 +197,27 @@ def _clean_variant_rows(record: dict[str, Any]) -> None:
         return
     record.pop("variants", None)
     record.pop("variant_count", None)
+
+
+def _clean_variant_row_axes(variant: dict[str, Any]) -> dict[str, Any] | None:
+    cleaned_variant = dict(variant)
+    for field_name in public_variant_axis_fields:
+        raw_axis_key = _variant_axis_source_key(cleaned_variant, field_name)
+        raw_value = cleaned_variant.get(raw_axis_key) if raw_axis_key is not None else None
+        if size_color_extraction._variant_size_axis_value_is_quantity_control(
+            field_name, raw_value
+        ):
+            return None
+        cleaned_value = size_color_extraction._normalize_variant_axis_value(
+            field_name, raw_value
+        )
+        if cleaned_value:
+            cleaned_variant[field_name] = cleaned_value
+        else:
+            cleaned_variant.pop(field_name, None)
+        if raw_axis_key is not None and raw_axis_key != field_name:
+            cleaned_variant.pop(raw_axis_key, None)
+    return cleaned_variant
 
 
 def _drop_static_duplicate_variant_urls(record: dict[str, Any]) -> None:
@@ -301,29 +305,30 @@ def _drop_polluted_parent_scalar_axes(record: dict[str, Any]) -> None:
         isinstance(variant, dict) for variant in variants
     ):
         return
-    max_tokens = scalar_field_max_option_tokens
     for field_name in ("color", "size"):
-        value = clean_text(record.get(field_name))
-        if not value:
-            continue
-        coerced_value = coerce_field_value(
-            field_name, value, clean_text(record.get("url"))
-        )
-        if not coerced_value:
-            record.pop(field_name, None)
-            continue
-        if clean_text(coerced_value) != value:
-            record[field_name] = coerced_value
-            value = clean_text(coerced_value)
-        lowered = value.casefold()
-        tokens = [token for token in re.split(r"[\s,|/]+", lowered) if token]
-        numeric_tokens = sum(1 for token in tokens if re.search(r"\d", token))
-        if lowered in scalar_field_pollution_values or (
-            field_name == "size"
-            and len(tokens) > max_tokens + 2
-            and numeric_tokens >= 2
-        ):
-            record.pop(field_name, None)
+        _sanitize_parent_scalar_axis(record, field_name)
+
+
+def _sanitize_parent_scalar_axis(record: dict[str, Any], field_name: str) -> None:
+    value = clean_text(record.get(field_name))
+    if not value:
+        return
+    coerced = coerce_field_value(field_name, value, clean_text(record.get("url")))
+    if not coerced:
+        record.pop(field_name, None)
+        return
+    if clean_text(coerced) != value:
+        record[field_name] = coerced
+        value = clean_text(coerced)
+    lowered = value.casefold()
+    tokens = [token for token in re.split(r"[\s,|/]+", lowered) if token]
+    polluted_size = (
+        field_name == "size"
+        and len(tokens) > scalar_field_max_option_tokens + 2
+        and sum(bool(re.search(r"\d", token)) for token in tokens) >= 2
+    )
+    if lowered in scalar_field_pollution_values or polluted_size:
+        record.pop(field_name, None)
 
 
 def _promote_misfiled_color_size(variant: dict[str, Any]) -> None:
@@ -366,37 +371,35 @@ def _normalize_separate_dimension_size_rows(record: dict[str, Any]) -> None:
     rows = [variant for variant in variants if isinstance(variant, dict)]
     if not rows or any(clean_text(row.get("color")) for row in rows):
         return
-    size_values = [
-        clean_text(row.get("size")) for row in rows if clean_text(row.get("size"))
-    ]
-    if len(size_values) < 2:
+    if not _has_separate_size_dimensions(rows):
         return
-    separate_family_hits = [
-        sum(1 for value in size_values if pattern.fullmatch(value))
-        for pattern, _label in variant_separate_dimension_size_rules
-    ]
-    if sum(1 for count in separate_family_hits if count >= 2) < 2:
-        return
-    relabeled_rows: list[dict[str, Any]] = []
-    for row in rows:
-        relabeled = dict(row)
-        size_value = clean_text(relabeled.get("size"))
-        option_values = relabeled.get("option_values")
-        existing_style = clean_text(relabeled.get("style")) or (
-            clean_text(option_values.get("style"))
-            if isinstance(option_values, dict)
-            else ""
-        )
-        style_label = existing_style or _separate_dimension_style_label(size_value)
-        if style_label and size_value:
-            relabeled["option_values"] = (
-                dict(option_values) if isinstance(option_values, dict) else {}
-            )
-            relabeled["option_values"]["style"] = style_label
-            relabeled["option_values"]["size"] = size_value
-        relabeled_rows.append(relabeled)
+    relabeled_rows = [_relabel_separate_size_row(row) for row in rows]
     record["variants"] = relabeled_rows
     record["variant_count"] = len(relabeled_rows)
+
+
+def _has_separate_size_dimensions(rows: list[dict[str, Any]]) -> bool:
+    size_values = [value for row in rows if (value := clean_text(row.get("size")))]
+    if len(size_values) < 2:
+        return False
+    family_hits = (
+        sum(1 for value in size_values if pattern.fullmatch(value))
+        for pattern, _label in variant_separate_dimension_size_rules
+    )
+    return sum(count >= 2 for count in family_hits) >= 2
+
+
+def _relabel_separate_size_row(row: dict[str, Any]) -> dict[str, Any]:
+    relabeled = dict(row)
+    size_value = clean_text(relabeled.get("size"))
+    raw_options = relabeled.get("option_values")
+    options = dict(raw_options) if isinstance(raw_options, dict) else {}
+    style_label = clean_text(relabeled.get("style")) or clean_text(options.get("style"))
+    style_label = style_label or _separate_dimension_style_label(size_value)
+    if style_label and size_value:
+        options.update({"style": style_label, "size": size_value})
+        relabeled["option_values"] = options
+    return relabeled
 
 
 def _separate_dimension_style_label(size_value: str) -> str:

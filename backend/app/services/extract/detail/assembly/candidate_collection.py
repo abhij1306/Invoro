@@ -400,6 +400,57 @@ def _materialize_record(
         soup=soup,
         raw_soup=raw_soup,
     )
+    _materialize_candidate_fields(
+        record=record,
+        fields=fields,
+        surface=surface,
+        page_url=page_url,
+        candidates=candidates,
+        candidate_sources=candidate_sources,
+        selector_trace_candidates=selector_trace_candidates,
+        selected_field_sources=selected_field_sources,
+        selected_selector_traces=selected_selector_traces,
+    )
+    _apply_materialized_images(
+        record, merged_images, merged_image_source, selected_field_sources
+    )
+    _apply_promoted_title(
+        record=record,
+        page_url=page_url,
+        candidates=candidates,
+        candidate_sources=candidate_sources,
+        selector_trace_candidates=selector_trace_candidates,
+        selected_field_sources=selected_field_sources,
+        selected_selector_traces=selected_selector_traces,
+    )
+    _attach_materialization_metadata(
+        record=record,
+        surface=surface,
+        page_url=page_url,
+        requested_fields=requested_fields,
+        field_sources=field_sources,
+        candidates=candidates,
+        selected_field_sources=selected_field_sources,
+        selected_selector_traces=selected_selector_traces,
+        extraction_runtime_snapshot=extraction_runtime_snapshot,
+        tier_name=tier_name,
+        completed_tiers=completed_tiers,
+    )
+    return finalize_record(record, surface=surface)
+
+
+def _materialize_candidate_fields(
+    *,
+    record: dict[str, Any],
+    fields: list[str],
+    surface: str,
+    page_url: str,
+    candidates: dict[str, list[object]],
+    candidate_sources: dict[str, list[str]],
+    selector_trace_candidates: dict[str, list[dict[str, object]]],
+    selected_field_sources: dict[str, str],
+    selected_selector_traces: dict[str, dict[str, object]],
+) -> None:
     for field_name in fields:
         if field_name in {"image_url", "additional_images"}:
             continue
@@ -410,39 +461,9 @@ def _materialize_record(
             candidate_sources,
         )
         grouped_candidates = _group_ordered_candidates_by_source(ordered_candidates)
-        selected_source = grouped_candidates[0][0] if grouped_candidates else None
-        winning_values = grouped_candidates[0][1] if grouped_candidates else []
-        if field_name in DETAIL_LONG_TEXT_RANK_FIELDS and grouped_candidates:
-            selected_long_text = finalize_candidate_value(field_name, winning_values)
-            if _detail_long_text_value_looks_truncated(selected_long_text) or (
-                field_name == "description"
-                and _detail_description_value_looks_thin(selected_long_text)
-            ):
-                for candidate_source, candidate_values in grouped_candidates[1:]:
-                    candidate_long_text = finalize_candidate_value(
-                        field_name, candidate_values
-                    )
-                    if (
-                        candidate_long_text
-                        not in (
-                            None,
-                            "",
-                            [],
-                            {},
-                        )
-                        and not _detail_long_text_value_looks_truncated(
-                            candidate_long_text
-                        )
-                        and not (
-                            field_name == "description"
-                            and _detail_description_value_looks_thin(
-                                candidate_long_text
-                            )
-                        )
-                    ):
-                        selected_source = candidate_source
-                        winning_values = candidate_values
-                        break
+        selected_source, winning_values = _winning_field_values(
+            field_name, grouped_candidates
+        )
         finalized = (
             finalize_candidate_value(
                 field_name, [value for _, value in ordered_candidates]
@@ -468,12 +489,62 @@ def _materialize_record(
                     )
                     if selector_trace:
                         selected_selector_traces[field_name] = selector_trace
+
+
+def _winning_field_values(
+    field_name: str, grouped: list[tuple[str | None, list[object]]]
+) -> tuple[str | None, list[object]]:
+    source = grouped[0][0] if grouped else None
+    values = grouped[0][1] if grouped else []
+    if field_name not in DETAIL_LONG_TEXT_RANK_FIELDS or not grouped:
+        return source, values
+    selected = finalize_candidate_value(field_name, values)
+    weak = _detail_long_text_value_looks_truncated(selected) or (
+        field_name == "description" and _detail_description_value_looks_thin(selected)
+    )
+    if not weak:
+        return source, values
+    for candidate_source, candidate_values in grouped[1:]:
+        candidate = finalize_candidate_value(field_name, candidate_values)
+        usable = candidate not in (
+            None,
+            "",
+            [],
+            {},
+        ) and not _detail_long_text_value_looks_truncated(candidate)
+        if usable and not (
+            field_name == "description"
+            and _detail_description_value_looks_thin(candidate)
+        ):
+            return candidate_source, candidate_values
+    return source, values
+
+
+def _apply_materialized_images(
+    record: dict[str, Any],
+    merged_images: list[str],
+    merged_image_source: str | None,
+    selected_field_sources: dict[str, str],
+) -> None:
     if merged_images:
         record["image_url"] = merged_images[0]
         if len(merged_images) > 1:
             record["additional_images"] = merged_images[1:]
         if merged_image_source:
             selected_field_sources["image_url"] = merged_image_source
+            selected_field_sources["image_url"] = merged_image_source
+
+
+def _apply_promoted_title(
+    *,
+    record: dict[str, Any],
+    page_url: str,
+    candidates: dict[str, list[object]],
+    candidate_sources: dict[str, list[str]],
+    selector_trace_candidates: dict[str, list[dict[str, object]]],
+    selected_field_sources: dict[str, str],
+    selected_selector_traces: dict[str, dict[str, object]],
+) -> None:
     promoted = promote_detail_title(
         record,
         page_url=page_url,
@@ -495,6 +566,22 @@ def _materialize_record(
                 selected_selector_traces.pop("title", None)
         else:
             selected_selector_traces.pop("title", None)
+
+
+def _attach_materialization_metadata(
+    *,
+    record: dict[str, Any],
+    surface: str,
+    page_url: str,
+    requested_fields: list[str] | None,
+    field_sources: dict[str, list[str]],
+    candidates: dict[str, list[object]],
+    selected_field_sources: dict[str, str],
+    selected_selector_traces: dict[str, dict[str, object]],
+    extraction_runtime_snapshot: dict[str, object] | None,
+    tier_name: str,
+    completed_tiers: list[str],
+) -> None:
     record["_field_sources"] = {
         field_name: list(source_list)
         for field_name, source_list in field_sources.items()
@@ -525,4 +612,3 @@ def _materialize_record(
         "triggered": False,
         "threshold": _coerce_float(selector_self_heal.get("threshold")),
     }
-    return finalize_record(record, surface=surface)

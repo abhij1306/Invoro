@@ -8,13 +8,7 @@ export type User = {
 };
 
 export type RunStatus =
-  | 'pending'
-  | 'running'
-  | 'paused'
-  | 'completed'
-  | 'killed'
-  | 'failed'
-  | 'proxy_exhausted';
+  'pending' | 'running' | 'paused' | 'completed' | 'killed' | 'failed' | 'proxy_exhausted';
 
 export type CrawlPhase = 'config' | 'running' | 'complete';
 
@@ -22,13 +16,7 @@ export type CrawlModule = 'category' | 'pdp';
 // Domain boundaries: content is the generic catch-all; article is a specific editorial subtype.
 // forum_thread means an individual discussion thread, while commerce/jobs/automobiles are verticals.
 export type CrawlDomain =
-  | 'auto'
-  | 'content'
-  | 'commerce'
-  | 'jobs'
-  | 'automobiles'
-  | 'article'
-  | 'forum_thread';
+  'auto' | 'content' | 'commerce' | 'jobs' | 'automobiles' | 'article' | 'forum_thread';
 export type CrawlSurface =
   | 'auto'
   | 'content_detail'
@@ -531,10 +519,7 @@ export type DomainRunProfile = {
   fetch_profile: {
     fetch_mode: 'auto' | 'http_only' | 'browser_only' | 'http_then_browser';
     extraction_source:
-      | 'raw_html'
-      | 'rendered_dom'
-      | 'rendered_dom_visual'
-      | 'network_payload_first';
+      'raw_html' | 'rendered_dom' | 'rendered_dom_visual' | 'network_payload_first';
     js_mode: 'auto' | 'enabled' | 'disabled';
     include_iframes: boolean;
     traversal_mode: AdvancedCrawlMode | null;

@@ -122,12 +122,16 @@ def normalized_variant_axis_display_name(value: object) -> str:
     if axis_key not in _variant_axis_allowed_single_tokens:
         return cleaned
     extra_tokens = [token for token in tokens if token != axis_key]
-    if extra_tokens and all(
-        token in _variant_axis_generic_tokens or token.isdigit() or len(token) <= 3
-        for token in extra_tokens
-    ):
+    if _only_generic_axis_qualifiers(extra_tokens):
         return axis_key
     return cleaned
+
+
+def _only_generic_axis_qualifiers(tokens: list[str]) -> bool:
+    return bool(tokens) and all(
+        token in _variant_axis_generic_tokens or token.isdigit() or len(token) <= 3
+        for token in tokens
+    )
 
 
 def _normalized_group_label_candidates(value: object) -> list[str]:
@@ -227,11 +231,7 @@ semantic_group_label_from_text = _semantic_group_label_from_text
 def variant_axis_name_is_semantic(value: object) -> bool:
     cleaned = clean_text(value)
     lowered = cleaned.lower()
-    if not lowered:
-        return False
-    if _variant_axis_label_is_noise(cleaned):
-        return False
-    if any(pattern.fullmatch(lowered) for pattern in _variant_axis_technical_patterns):
+    if _variant_axis_label_is_rejected(cleaned, lowered):
         return False
     if (
         re.fullmatch(r"[a-z0-9]+", lowered)
@@ -239,18 +239,12 @@ def variant_axis_name_is_semantic(value: object) -> bool:
     ):
         return True
     tokens = [token for token in re.split(_ALNUM_SPLIT_PATTERN, lowered) if token]
-    if not tokens or len(tokens) > 4:
-        return False
-    if any(token in _variant_axis_label_noise_tokens for token in tokens):
+    if _variant_axis_tokens_are_rejected(tokens):
         return False
     axis_key = normalized_variant_axis_key(cleaned)
-    if not axis_key or len(axis_key) > 32:
+    if _normalized_axis_key_is_rejected(axis_key):
         return False
     axis_tokens = [token for token in axis_key.split("_") if token]
-    if not axis_tokens:
-        return False
-    if any(pattern.fullmatch(axis_key) for pattern in _variant_axis_technical_patterns):
-        return False
     if any(token in _variant_axis_allowed_single_tokens for token in axis_tokens):
         return True
     non_generic_tokens = [
@@ -258,6 +252,31 @@ def variant_axis_name_is_semantic(value: object) -> bool:
         for token in axis_tokens
         if token not in _variant_axis_generic_tokens and not token.isdigit()
     ]
-    if not non_generic_tokens:
-        return False
-    return True
+    return bool(non_generic_tokens)
+
+
+def _variant_axis_label_is_rejected(cleaned: str, lowered: str) -> bool:
+    return bool(
+        not lowered
+        or _variant_axis_label_is_noise(cleaned)
+        or any(
+            pattern.fullmatch(lowered) for pattern in _variant_axis_technical_patterns
+        )
+    )
+
+
+def _variant_axis_tokens_are_rejected(tokens: list[str]) -> bool:
+    return (
+        not tokens
+        or len(tokens) > 4
+        or any(token in _variant_axis_label_noise_tokens for token in tokens)
+    )
+
+
+def _normalized_axis_key_is_rejected(axis_key: str) -> bool:
+    if not axis_key or len(axis_key) > 32:
+        return True
+    tokens = [token for token in axis_key.split("_") if token]
+    return not tokens or any(
+        pattern.fullmatch(axis_key) for pattern in _variant_axis_technical_patterns
+    )

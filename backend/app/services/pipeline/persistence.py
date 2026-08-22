@@ -177,7 +177,6 @@ async def _persist_browser_artifacts(
     surface: str | None = None,
     blocked: bool = False,
 ) -> None:
-
     diagnostics = mapping_or_empty(
         getattr(acquisition_result, "browser_diagnostics", {})
     )

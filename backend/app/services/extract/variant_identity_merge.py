@@ -140,25 +140,32 @@ def _collapse_mislabeled_duplicate_axes(
                 options_matrix.get(key_b, []),
             ):
                 continue
-            if option_value_axis_counts[key_a] != option_value_axis_counts[key_b]:
-                weaker = (
-                    key_b
-                    if option_value_axis_counts[key_a]
-                    >= option_value_axis_counts[key_b]
-                    else key_a
-                )
-            elif len(options_matrix.get(key_a, [])) >= len(
-                options_matrix.get(key_b, [])
-            ):
-                weaker = key_b
-            else:
-                weaker = key_a
+            weaker = _weaker_duplicate_axis(
+                key_a, key_b, option_value_axis_counts, options_matrix
+            )
             dropped.add(weaker)
             if weaker == key_a:
                 break
+    return _matrix_without_dropped_axes(options_matrix, dropped)
+
+
+def _matrix_without_dropped_axes(
+    matrix: dict[str, list[str]], dropped: set[str]
+) -> dict[str, list[str]]:
     if not dropped:
-        return options_matrix
-    return {key: values for key, values in options_matrix.items() if key not in dropped}
+        return matrix
+    return {key: values for key, values in matrix.items() if key not in dropped}
+
+
+def _weaker_duplicate_axis(
+    left: str,
+    right: str,
+    counts: dict[str, int],
+    matrix: dict[str, list[str]],
+) -> str:
+    if counts[left] != counts[right]:
+        return right if counts[left] >= counts[right] else left
+    return right if len(matrix.get(left, [])) >= len(matrix.get(right, [])) else left
 
 
 def resolve_variants(
@@ -173,22 +180,7 @@ def resolve_variants(
     if not keys:
         return list(variants)
 
-    variant_by_combo: dict[tuple[str, ...], dict[str, Any]] = {}
-    no_option_values: list[dict[str, Any]] = []
-    for variant in variants:
-        option_values = variant.get("option_values")
-        if not isinstance(option_values, dict) or not option_values:
-            no_option_values.append(variant)
-            continue
-        combo = tuple(str(option_values.get(k, "")) for k in keys)
-        if any(not option_values.get(k) for k in keys):
-            no_option_values.append(variant)
-            continue
-        existing = variant_by_combo.get(combo)
-        if existing is None or variant_row_richness(variant) > variant_row_richness(
-            existing
-        ):
-            variant_by_combo[combo] = variant
+    variant_by_combo, no_option_values = _index_variants_by_combo(variants, keys)
 
     resolved: list[dict[str, Any]] = []
     for combo in itertools.product(*(options_matrix[k] for k in keys)):
@@ -196,21 +188,49 @@ def resolve_variants(
         if matched is not None:
             resolved.append(matched)
 
-    if no_option_values:
-        seen_ids = {
-            v.get("variant_id") or v.get("sku")
-            for v in resolved
-            if v.get("variant_id") or v.get("sku")
-        }
-        for v in no_option_values:
-            vid = v.get("variant_id") or v.get("sku")
-            if vid and vid in seen_ids:
-                continue
-            resolved.append(v)
-            if vid:
-                seen_ids.add(vid)
+    _append_identityless_variants(resolved, no_option_values)
 
     return resolved or list(variants)
+
+
+def _index_variants_by_combo(
+    variants: list[dict[str, Any]], keys: list[str]
+) -> tuple[dict[tuple[str, ...], dict[str, Any]], list[dict[str, Any]]]:
+    indexed: dict[tuple[str, ...], dict[str, Any]] = {}
+    incomplete: list[dict[str, Any]] = []
+    for variant in variants:
+        option_values = variant.get("option_values")
+        if (
+            not isinstance(option_values, dict)
+            or not option_values
+            or any(not option_values.get(key) for key in keys)
+        ):
+            incomplete.append(variant)
+            continue
+        combo = tuple(str(option_values.get(key, "")) for key in keys)
+        existing = indexed.get(combo)
+        if existing is None or variant_row_richness(variant) > variant_row_richness(
+            existing
+        ):
+            indexed[combo] = variant
+    return indexed, incomplete
+
+
+def _append_identityless_variants(
+    resolved: list[dict[str, Any]], incomplete: list[dict[str, Any]]
+) -> None:
+    seen_ids = {
+        variant.get("variant_id") or variant.get("sku")
+        for variant in resolved
+        if variant.get("variant_id") or variant.get("sku")
+    }
+    for variant in incomplete:
+        identity = variant.get("variant_id") or variant.get("sku")
+        if identity and identity in seen_ids:
+            continue
+        resolved.append(variant)
+        if identity:
+            seen_ids.add(identity)
 
 
 def variant_identity(variant: dict[str, Any]) -> str | None:
@@ -395,6 +415,28 @@ def merge_variant_pair(
 
 
 def merge_variant_rows(*row_lists: Any) -> list[dict[str, Any]]:
+    deduped_rows = _merge_variant_rows_by_identity(row_lists)
+    merged_by_semantic: dict[str, dict[str, Any]] = {}
+    for row in deduped_rows:
+        semantic_identity = variant_semantic_identity(row)
+        if not semantic_identity:
+            continue
+        current = merged_by_semantic.get(semantic_identity)
+        if current is None:
+            merged_by_semantic[semantic_identity] = dict(row)
+            continue
+        primary, secondary = (
+            (row, current)
+            if variant_row_richness(row) > variant_row_richness(current)
+            else (current, row)
+        )
+        merged_by_semantic[semantic_identity] = merge_variant_pair(primary, secondary)
+    return _dedupe_flat_identity_rows(
+        _emit_semantically_merged_rows(deduped_rows, merged_by_semantic)
+    )
+
+
+def _merge_variant_rows_by_identity(row_lists: tuple[Any, ...]) -> list[dict[str, Any]]:
     merged_by_identity: dict[str, dict[str, Any]] = {}
     ordered_keys: list[str] = []
     identityless_rows: list[dict[str, Any]] = []
@@ -421,21 +463,13 @@ def merge_variant_rows(*row_lists: Any) -> list[dict[str, Any]]:
             merged_by_identity[identity] = merge_variant_pair(primary, secondary)
     deduped_rows = [merged_by_identity[key] for key in ordered_keys]
     deduped_rows.extend(identityless_rows)
-    merged_by_semantic: dict[str, dict[str, Any]] = {}
-    for row in deduped_rows:
-        semantic_identity = variant_semantic_identity(row)
-        if not semantic_identity:
-            continue
-        current = merged_by_semantic.get(semantic_identity)
-        if current is None:
-            merged_by_semantic[semantic_identity] = dict(row)
-            continue
-        primary, secondary = (
-            (row, current)
-            if variant_row_richness(row) > variant_row_richness(current)
-            else (current, row)
-        )
-        merged_by_semantic[semantic_identity] = merge_variant_pair(primary, secondary)
+    return deduped_rows
+
+
+def _emit_semantically_merged_rows(
+    deduped_rows: list[dict[str, Any]],
+    merged_by_semantic: dict[str, dict[str, Any]],
+) -> list[dict[str, Any]]:
     merged_rows: list[dict[str, Any]] = []
     emitted_semantic: set[str] = set()
     for row in deduped_rows:
@@ -456,7 +490,7 @@ def merge_variant_rows(*row_lists: Any) -> list[dict[str, Any]]:
             continue
         emitted_semantic.add(semantic_identity)
         merged_rows.append(merged)
-    return _dedupe_flat_identity_rows(merged_rows)
+    return merged_rows
 
 
 def _dedupe_flat_identity_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:

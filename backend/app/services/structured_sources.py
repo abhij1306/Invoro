@@ -391,15 +391,12 @@ def _balanced_json_fragment(text: str) -> str:
     source = str(text or "")
     if not source:
         return ""
-    start = next(
-        (index for index, char in enumerate(source) if char in "{["),
-        -1,
-    )
+    start = _json_fragment_start(source)
     if start < 0:
         return ""
 
     opening = source[start]
-    closing = "}" if opening == "{" else "]"
+    closing = {"{": "}", "[": "]"}[opening]
     depth = 0
     in_string = False
     escaped = False
@@ -426,6 +423,10 @@ def _balanced_json_fragment(text: str) -> str:
             if depth == 0:
                 return source[start : index + 1]
     return ""
+
+
+def _json_fragment_start(source: str) -> int:
+    return next((index for index, char in enumerate(source) if char in "{["), -1)
 
 
 def _parse_microdata_fallback(
