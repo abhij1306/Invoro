@@ -8,7 +8,7 @@ RUN corepack enable && corepack prepare pnpm@11.9.0 --activate
 FROM base AS dependencies
 
 WORKDIR /app
-COPY frontend/package.json frontend/pnpm-lock.yaml ./
+COPY frontend/package.json frontend/pnpm-lock.yaml frontend/pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 
 FROM base AS builder
@@ -18,7 +18,10 @@ ARG NEXT_PUBLIC_API_BASE_URL
 ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY frontend/ ./
-RUN test -n "$NEXT_PUBLIC_API_BASE_URL" && pnpm build
+RUN test -n "$NEXT_PUBLIC_API_BASE_URL" && \
+    pnpm build && \
+    cp -R node_modules/.pnpm/node_modules/@swc/helpers/esm \
+      .next/standalone/node_modules/.pnpm/node_modules/@swc/helpers/
 
 FROM node:24-alpine AS runner
 

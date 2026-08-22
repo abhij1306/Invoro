@@ -178,6 +178,7 @@ Hosted MCP server:
 
 ```powershell
 cd backend
+uv sync --frozen --extra mcp
 $env:INVORO_API_KEY='<set-api-key-in-shell>'
 $env:INVORO_API_BASE_URL='http://127.0.0.1:9000/api/v1'
 .\.venv\Scripts\python.exe -m app.mcp_server.server

@@ -10,9 +10,7 @@ WORKDIR /app/backend
 # skipcq: DOK-DL3008 - base-image package versions must track Debian security updates.
 # hadolint ignore=DL3008
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
     curl \
-    libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
 COPY backend/ ./
@@ -20,7 +18,7 @@ COPY backend/ ./
 # skipcq: DOK-DL3013 - project dependencies are pinned by package metadata/lock inputs, not CLI flags.
 # hadolint ignore=DL3013
 RUN pip install --upgrade pip && \
-    pip install ".[prod]" && \
+    pip install "." && \
     python -m patchright install --with-deps chromium
 
 RUN useradd --create-home --shell /bin/bash appuser && \
