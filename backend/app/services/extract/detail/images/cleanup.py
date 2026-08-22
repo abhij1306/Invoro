@@ -100,34 +100,23 @@ def _sanitize_detail_images(record: dict[str, Any], *, identity_url: str) -> Non
     images = [upgrade_low_resolution_image_url(image) for image in raw_images if image]
     if not images:
         return
-    cleaned: list[str] = []
-    for image in images:
-        normalized_image = (
-            "https://" + image[7:] if image.lower().startswith("http://") else image
-        )
-        if not _detail_image_candidate_is_usable(
-            normalized_image, identity_url=identity_url
-        ):
-            continue
-        cleaned.append(normalized_image)
+    cleaned = _usable_detail_images(images, identity_url)
     if not cleaned:
         record.pop("image_url", None)
         record.pop("additional_images", None)
         return
     primary_image = _preferred_primary_image(cleaned, record=record) or cleaned[0]
-    family_cleaned: list[str] = []
     ordered_cleaned = [
         primary_image,
         *[image for image in cleaned if image != primary_image],
     ]
-    for normalized_image in ordered_cleaned:
-        if not detail_image_matches_primary_family(
-            normalized_image,
-            primary_image=primary_image,
-            title=record.get("title"),
-        ):
-            continue
-        family_cleaned.append(normalized_image)
+    family_cleaned = [
+        image
+        for image in ordered_cleaned
+        if detail_image_matches_primary_family(
+            image, primary_image=primary_image, title=record.get("title")
+        )
+    ]
     merged = dedupe_image_urls(family_cleaned) or _dedupe_cleaned_detail_images(
         family_cleaned
     )
@@ -140,6 +129,17 @@ def _sanitize_detail_images(record: dict[str, Any], *, identity_url: str) -> Non
         record["additional_images"] = merged[1:]
     else:
         record.pop("additional_images", None)
+
+
+def _usable_detail_images(images: list[str], identity_url: str) -> list[str]:
+    usable: list[str] = []
+    for image in images:
+        normalized = (
+            "https://" + image[7:] if image.lower().startswith("http://") else image
+        )
+        if _detail_image_candidate_is_usable(normalized, identity_url=identity_url):
+            usable.append(normalized)
+    return usable
 
 
 def sanitize_detail_images(record: dict[str, Any], *, identity_url: str) -> None:
@@ -199,32 +199,11 @@ def _dedupe_cleaned_detail_images(urls: list[str]) -> list[str]:
 
 def _detail_image_candidate_is_usable(url: str, *, identity_url: str) -> bool:
     parsed = urlparse(url)
-    if parsed.scheme not in {"http", "https"}:
-        return False
-    if not parsed.netloc:
-        return False
     path = str(parsed.path or "").strip()
-    if not path or path == "/":
-        return False
-    if _BROKEN_FETCH_IMAGE_PATH_RE.fullmatch(path):
-        return False
-    if _LOW_RES_SWATCH_IMAGE_PATH_RE.search(url) and query_dimension_is_tiny(
-        parsed.query
-    ):
+    if _detail_image_url_shape_is_rejected(url, parsed, path):
         return False
     lowered = url.lower()
-    if "base64," in lowered or lowered.startswith("data:"):
-        return False
-    if any(pattern in lowered for pattern in _PLACEHOLDER_IMAGE_URL_PATTERNS_LOWER):
-        return False
-    if any(pattern in lowered for pattern in _NON_PRODUCT_IMAGE_HINTS_LOWER):
-        return False
-    if _detail_image_url_is_extensionless_transform(path):
-        return False
-    if _detail_image_url_looks_like_pdp_link(path, lowered):
-        # Walmart additional_images pulled in PDP URLs (no image extension,
-        # path contains a product-segment like ``/ip/``). Treat those as
-        # page links, not image assets, regardless of host.
+    if _detail_image_url_content_is_rejected(path, lowered):
         return False
     if (
         same_site(identity_url, url)
@@ -234,23 +213,43 @@ def _detail_image_candidate_is_usable(url: str, *, identity_url: str) -> bool:
         return False
     if re.search(r"/products?/[\d?=&-]*$", lowered):
         return False
-    candidate_title = _detail_image_title_from_url(url)
-    if (
-        candidate_title
-        and _detail_image_title_has_identity_signal(candidate_title)
-        and not (
-            (candidate_codes := _detail_identity_codes_from_url(url))
-            and detail_identity_codes_match(
-                _detail_identity_codes_from_url(identity_url), candidate_codes
-            )
-        )
-        and not _detail_image_title_matches_requested_identity(
-            candidate_title,
-            requested_page_url=identity_url,
-        )
+    return not _detail_image_identity_is_rejected(url, identity_url)
+
+
+def _detail_image_url_shape_is_rejected(url: str, parsed: Any, path: str) -> bool:
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return True
+    if not path or path == "/" or _BROKEN_FETCH_IMAGE_PATH_RE.fullmatch(path):
+        return True
+    return bool(
+        _LOW_RES_SWATCH_IMAGE_PATH_RE.search(url)
+        and query_dimension_is_tiny(parsed.query)
+    )
+
+
+def _detail_image_url_content_is_rejected(path: str, lowered: str) -> bool:
+    return bool(
+        "base64," in lowered
+        or lowered.startswith("data:")
+        or any(pattern in lowered for pattern in _PLACEHOLDER_IMAGE_URL_PATTERNS_LOWER)
+        or any(pattern in lowered for pattern in _NON_PRODUCT_IMAGE_HINTS_LOWER)
+        or _detail_image_url_is_extensionless_transform(path)
+        or _detail_image_url_looks_like_pdp_link(path, lowered)
+    )
+
+
+def _detail_image_identity_is_rejected(url: str, identity_url: str) -> bool:
+    title = _detail_image_title_from_url(url)
+    if not title or not _detail_image_title_has_identity_signal(title):
+        return False
+    candidate_codes = _detail_identity_codes_from_url(url)
+    if candidate_codes and detail_identity_codes_match(
+        _detail_identity_codes_from_url(identity_url), candidate_codes
     ):
         return False
-    return True
+    return not _detail_image_title_matches_requested_identity(
+        title, requested_page_url=identity_url
+    )
 
 
 _PDP_PATH_SEGMENT_RE = re.compile(
@@ -302,35 +301,28 @@ def detail_image_matches_primary_family(
         return True
     primary_product_code = _detail_image_product_code(primary_image)
     candidate_product_code = _detail_image_product_code(url)
-    if (
-        primary_product_code
-        and candidate_product_code
-        and primary_product_code != candidate_product_code
+    if _detail_image_product_codes_conflict(
+        primary_product_code, candidate_product_code
     ):
         return False
     primary_color_code = _detail_image_colorway_code(primary_image)
     candidate_color_code = _detail_image_colorway_code(url)
-    if (
-        primary_color_code
-        and candidate_color_code
-        and primary_color_code != candidate_color_code
-        and not (
-            primary_product_code
-            and candidate_product_code
-            and primary_product_code == candidate_product_code
-        )
+    if _detail_image_color_codes_conflict(
+        primary_color_code,
+        candidate_color_code,
+        primary_product_code,
+        candidate_product_code,
     ):
         return False
     primary_tokens = _detail_image_family_tokens(primary_image)
     candidate_tokens = _detail_image_family_tokens(url)
     title_tokens = _semantic_detail_identity_tokens(title)
-    if primary_product_code and not candidate_product_code:
-        if (
-            title_tokens
-            and candidate_tokens
-            and len(title_tokens & candidate_tokens) >= min(2, len(title_tokens))
-        ):
-            return True
+    if (
+        primary_product_code
+        and not candidate_product_code
+        and _tokens_support_same_image(title_tokens, candidate_tokens)
+    ):
+        return True
     # Reject when both filenames carry long alphabetic distinguishing tokens
     # that share a prefix but disagree on the tail (different colorway slugs
     # under the same family code, e.g. ``therockerjetblack`` vs
@@ -339,33 +331,80 @@ def detail_image_matches_primary_family(
         primary_tokens, candidate_tokens
     ):
         return False
-    title_primary_tokens = primary_tokens & title_tokens
-    if (
-        title_primary_tokens
-        and candidate_tokens
-        and len(title_primary_tokens) >= _title_primary_overlap_min
-        and len(candidate_tokens & title_primary_tokens)
-        < min(_title_primary_overlap_min, len(title_primary_tokens))
+    if _candidate_loses_primary_title_overlap(
+        primary_tokens, candidate_tokens, title_tokens
     ):
         return False
-    if (
-        primary_tokens
-        and candidate_tokens
-        and primary_tokens & candidate_tokens
-        and not (primary_product_code and not candidate_product_code)
+    if _image_family_tokens_match(
+        primary_tokens, candidate_tokens, primary_product_code, candidate_product_code
     ):
         return True
-    if (
-        title_tokens
-        and candidate_tokens
-        and len(title_tokens & candidate_tokens) >= min(2, len(title_tokens))
-    ):
+    if _tokens_support_same_image(title_tokens, candidate_tokens):
         return True
-    primary_code = _detail_image_media_code(primary_image)
-    candidate_code = _detail_image_media_code(url)
-    if primary_code and candidate_code and primary_code == candidate_code:
+    if _detail_image_media_codes_match(primary_image, url):
         return True
     return not primary_tokens and not title_tokens
+
+
+def _detail_image_product_codes_conflict(
+    primary: str | None, candidate: str | None
+) -> bool:
+    return bool(primary and candidate and primary != candidate)
+
+
+def _detail_image_color_codes_conflict(
+    primary_color: str | None,
+    candidate_color: str | None,
+    primary_product: str | None,
+    candidate_product: str | None,
+) -> bool:
+    same_product = bool(
+        primary_product and candidate_product and primary_product == candidate_product
+    )
+    return bool(
+        primary_color
+        and candidate_color
+        and primary_color != candidate_color
+        and not same_product
+    )
+
+
+def _tokens_support_same_image(reference: set[str], candidate: set[str]) -> bool:
+    return bool(
+        reference and candidate and len(reference & candidate) >= min(2, len(reference))
+    )
+
+
+def _image_family_tokens_match(
+    primary: set[str],
+    candidate: set[str],
+    primary_code: str | None,
+    candidate_code: str | None,
+) -> bool:
+    return bool(
+        primary
+        and candidate
+        and primary & candidate
+        and not (primary_code and not candidate_code)
+    )
+
+
+def _detail_image_media_codes_match(primary_url: str, candidate_url: str) -> bool:
+    primary = _detail_image_media_code(primary_url)
+    candidate = _detail_image_media_code(candidate_url)
+    return bool(primary and candidate and primary == candidate)
+
+
+def _candidate_loses_primary_title_overlap(
+    primary: set[str], candidate: set[str], title: set[str]
+) -> bool:
+    overlap = primary & title
+    return bool(
+        overlap
+        and candidate
+        and len(overlap) >= _title_primary_overlap_min
+        and len(candidate & overlap) < min(_title_primary_overlap_min, len(overlap))
+    )
 
 
 def _detail_image_family_tokens_disagree_on_colorway(
@@ -391,25 +430,28 @@ def _detail_image_family_tokens_disagree_on_colorway(
     if primary_long & candidate_long:
         return False
     for primary_token in primary_long:
-        if not primary_token.isalnum() or not any(c.isalpha() for c in primary_token):
-            continue
-        primary_alpha_tail = primary_token.lstrip("0123456789")
-        if len(primary_alpha_tail) < 6:
+        primary_alpha_tail = _image_colorway_alpha_tail(primary_token)
+        if not primary_alpha_tail:
             continue
         for candidate_token in candidate_long:
-            if not candidate_token.isalnum() or not any(
-                c.isalpha() for c in candidate_token
-            ):
+            candidate_alpha_tail = _image_colorway_alpha_tail(candidate_token)
+            if not candidate_alpha_tail:
                 continue
-            candidate_alpha_tail = candidate_token.lstrip("0123456789")
-            if len(candidate_alpha_tail) < 6:
-                continue
-            shared = _shared_prefix_length(primary_alpha_tail, candidate_alpha_tail)
-            if shared >= 6 and shared < min(
-                len(primary_alpha_tail), len(candidate_alpha_tail)
-            ):
+            if _colorway_tails_conflict(primary_alpha_tail, candidate_alpha_tail):
                 return True
     return False
+
+
+def _image_colorway_alpha_tail(token: str) -> str:
+    if not token.isalnum() or not any(character.isalpha() for character in token):
+        return ""
+    tail = token.lstrip("0123456789")
+    return tail if len(tail) >= 6 else ""
+
+
+def _colorway_tails_conflict(primary: str, candidate: str) -> bool:
+    shared = _shared_prefix_length(primary, candidate)
+    return shared >= 6 and shared < min(len(primary), len(candidate))
 
 
 def _shared_prefix_length(left: str, right: str) -> int:
@@ -447,12 +489,7 @@ def _detail_image_stem_looks_encoded(stem: str) -> bool:
         return False
     compact = re.sub(r"[^A-Za-z0-9_-]+", "", str(stem or ""))
     alpha = re.sub(r"[^A-Za-z]+", "", compact)
-    if (
-        6 <= len(compact) < 24
-        and re.search(r"[A-Z]", compact)
-        and re.search(r"[a-z]", compact)
-        and not re.search(r"[aeiou]{2,}", alpha, re.I)
-    ):
+    if _short_image_stem_looks_encoded(compact, alpha):
         return True
     if len(compact) < 24:
         return False
@@ -462,6 +499,15 @@ def _detail_image_stem_looks_encoded(stem: str) -> bool:
         return False
     return (
         len(re.findall(r"[A-Z]", compact)) >= 3 and len(re.findall(r"\d", compact)) >= 2
+    )
+
+
+def _short_image_stem_looks_encoded(compact: str, alpha: str) -> bool:
+    return bool(
+        6 <= len(compact) < 24
+        and re.search(r"[A-Z]", compact)
+        and re.search(r"[a-z]", compact)
+        and not re.search(r"[aeiou]{2,}", alpha, re.I)
     )
 
 
@@ -480,42 +526,18 @@ def _detail_image_title_matches_requested_identity(
 ) -> bool:
     requested_codes = _detail_identity_codes_from_url(requested_page_url)
     candidate_codes = _detail_identity_codes_from_record_fields({"title": title})
-    if (
-        requested_codes
-        and candidate_codes
-        and detail_identity_codes_match(requested_codes, candidate_codes)
-    ):
+    if _detail_image_identity_codes_match(requested_codes, candidate_codes):
         return True
     requested_title = _detail_title_from_url(requested_page_url)
     normalized_requested_title = clean_text(requested_title)
     normalized_candidate_title = clean_text(title)
-    if (
-        normalized_requested_title
-        and normalized_candidate_title
-        and normalized_candidate_title.lower().startswith(
-            normalized_requested_title.lower()
-        )
+    if _detail_image_title_prefix_matches(
+        normalized_requested_title, normalized_candidate_title
     ):
         return True
     requested_path = str(urlparse(requested_page_url).path or "")
-    requested_segments = [
-        clean_text(re.sub(r"[_-]+", " ", segment))
-        for segment in requested_path.split("/")
-        if clean_text(re.sub(r"[_-]+", " ", segment))
-    ]
-    requested_slug = next(
-        (
-            segment
-            for segment in reversed(requested_segments)
-            if segment.lower() not in {"product", "products", "p", "pd", "dp"}
-        ),
-        "",
-    )
-    if (
-        requested_slug
-        and normalized_candidate_title
-        and normalized_candidate_title.lower().startswith(requested_slug.lower())
-    ):
+    requested_slug = _detail_requested_slug(requested_path)
+    if _detail_image_title_prefix_matches(requested_slug, normalized_candidate_title):
         return True
     requested_semantic_tokens = _semantic_detail_identity_tokens(
         requested_title or requested_page_url
@@ -534,6 +556,36 @@ def _detail_image_title_matches_requested_identity(
     overlap = requested_tokens & candidate_tokens
     minimum_overlap = 2 if min(len(requested_tokens), len(candidate_tokens)) <= 4 else 4
     return len(overlap) >= min(minimum_overlap, len(requested_tokens))
+
+
+def _detail_image_identity_codes_match(
+    requested: set[str], candidate: set[str]
+) -> bool:
+    return bool(
+        requested and candidate and detail_identity_codes_match(requested, candidate)
+    )
+
+
+def _detail_image_title_prefix_matches(requested: str, candidate: str) -> bool:
+    return bool(
+        requested and candidate and candidate.lower().startswith(requested.lower())
+    )
+
+
+def _detail_requested_slug(path: str) -> str:
+    segments = [
+        clean_text(re.sub(r"[_-]+", " ", segment))
+        for segment in path.split("/")
+        if clean_text(re.sub(r"[_-]+", " ", segment))
+    ]
+    return next(
+        (
+            segment
+            for segment in reversed(segments)
+            if segment.lower() not in {"product", "products", "p", "pd", "dp"}
+        ),
+        "",
+    )
 
 
 def _detail_image_family_tokens(url: str) -> set[str]:

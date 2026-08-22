@@ -69,21 +69,31 @@ class WorkdayAdapter(BaseAdapter):
             if not isinstance(rows, list) or not rows:
                 break
             pages_processed += 1
-            for row in rows:
-                if len(records) >= self.max_records:
-                    break
-                normalized = self._normalize_listing_row(row, context=context)
-                if not normalized:
-                    continue
-                record_url = str(normalized.get("url") or "").strip()
-                if not record_url or record_url in seen_urls:
-                    continue
-                seen_urls.add(record_url)
-                records.append(normalized)
+            self._append_listing_rows(records, rows, context=context, seen_urls=seen_urls)
             offset += len(rows)
             if len(rows) < limit or (total is not None and offset >= total):
                 break
         return records
+
+    def _append_listing_rows(
+        self,
+        records: list[dict],
+        rows: list[object],
+        *,
+        context: dict[str, str],
+        seen_urls: set[str],
+    ) -> None:
+        for row in rows:
+            if len(records) >= self.max_records:
+                return
+            normalized = self._normalize_listing_row(row, context=context)
+            if not normalized:
+                continue
+            record_url = str(normalized.get("url") or "").strip()
+            if not record_url or record_url in seen_urls:
+                continue
+            seen_urls.add(record_url)
+            records.append(normalized)
 
     async def _extract_detail(self, url: str, html: str) -> dict | None:
         context = self._site_context(url, html)

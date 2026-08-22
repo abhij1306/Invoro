@@ -94,32 +94,13 @@ def variant_scope_roots(soup: Any) -> list[Any]:
     cached = cache.get(cache_key)
     if isinstance(cached, tuple):
         return list(cached)
-    roots: list[Any] = []
-    seen: set[Any] = set()
-    for node in soup.select(_variant_scope_selector):
-        if node in seen or variant_node_in_noise_context(node):
-            continue
-        if not (
-            node.select(VARIANT_SELECT_GROUP_SELECTOR)
-            or node.select(VARIANT_CHOICE_GROUP_SELECTOR)
-            or node.select("input[type='radio'], input[type='checkbox']")
-        ):
-            continue
-        roots.append(node)
-        seen.add(node)
-        if max_roots is not None and len(roots) >= max_roots:
-            break
+    roots = _hard_variant_scope_roots(soup, max_roots=max_roots)
+    seen = set(roots)
     soft_limit = None if max_roots is None else max(0, max_roots - len(roots))
     soft_roots = (
         _variant_soft_scope_roots(soup, max_roots=soft_limit) if soft_limit != 0 else []
     )
-    for node in soft_roots:
-        if node in seen or _node_is_within_any_root(node, roots):
-            continue
-        roots.append(node)
-        seen.add(node)
-        if max_roots is not None and len(roots) >= max_roots:
-            break
+    _append_soft_scope_roots(roots, soft_roots, seen=seen, max_roots=max_roots)
     if roots:
         cache[cache_key] = tuple(roots)
         return roots
@@ -127,6 +108,43 @@ def variant_scope_roots(soup: Any) -> list[Any]:
         increment_runtime_metric("variant_scope_miss")
     cache[cache_key] = tuple(roots)
     return roots
+
+
+def _hard_variant_scope_roots(soup: Any, *, max_roots: int | None) -> list[Any]:
+    roots: list[Any] = []
+    for node in soup.select(_variant_scope_selector):
+        if max_roots is not None and len(roots) >= max_roots:
+            break
+        if node in roots or variant_node_in_noise_context(node):
+            continue
+        if not _node_has_hard_variant_signal(node):
+            continue
+        roots.append(node)
+    return roots
+
+
+def _node_has_hard_variant_signal(node: Any) -> bool:
+    return bool(
+        node.select(VARIANT_SELECT_GROUP_SELECTOR)
+        or node.select(VARIANT_CHOICE_GROUP_SELECTOR)
+        or node.select("input[type='radio'], input[type='checkbox']")
+    )
+
+
+def _append_soft_scope_roots(
+    roots: list[Any],
+    soft_roots: list[Any],
+    *,
+    seen: set[Any],
+    max_roots: int | None,
+) -> None:
+    for node in soft_roots:
+        if node in seen or _node_is_within_any_root(node, roots):
+            continue
+        roots.append(node)
+        seen.add(node)
+        if max_roots is not None and len(roots) >= max_roots:
+            return
 
 
 def _variant_soft_scope_roots(soup: Any, *, max_roots: int | None) -> list[Any]:

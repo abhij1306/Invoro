@@ -16,10 +16,17 @@ from app.services.config.adapter_runtime_settings import adapter_runtime_setting
 from app.services.domain_utils import normalize_domain
 from app.services.extraction_html_helpers import extract_job_sections, html_to_text
 from app.services.shared.field_coerce import clean_text
-from app.services.dom.html_parser import BeautifulSoup
+from app.services.dom.html_parser import BeautifulSoup, Tag
 
 _HTML_PARSER = "html.parser"
 _GREENHOUSE_API_HOST = normalize_domain("https://boards-api.greenhouse.io")
+
+
+def _opening_href(anchor: Tag | None, *, page_url: str) -> str:
+    if anchor is None:
+        return ""
+    href = str(anchor.get("href", "") or "")
+    return urljoin(page_url, href) if href and not href.startswith("http") else href
 
 
 class GreenhouseAdapter(BaseAdapter):
@@ -169,45 +176,35 @@ class GreenhouseAdapter(BaseAdapter):
         # Standard Greenhouse board HTML structure
         openings = soup.select(".opening, tr.job-post, [data-mapped='true']")
         for opening in openings:
-            anchor = opening.select_one("a[href]")
-            title_el = (
-                opening.select_one(
-                    ".opening-title, td.cell-title a, a .body--medium, a [class*='title'], a p"
-                )
-                or anchor
-            )
-            location_el = opening.select_one(
-                ".location, .opening-location, td.cell-location"
-            )
-            if not title_el and not anchor:
-                continue
-            if anchor is None and title_el is not None:
-                anchor = title_el if title_el.name == "a" else title_el.find_parent("a")
-            raw_href = anchor.get("href", "") if anchor else ""
-            href = raw_href if isinstance(raw_href, str) else ""
-            if href and not href.startswith("http"):
-                href = urljoin(url, href)
-            title = clean_text(title_el.get_text(" ", strip=True) if title_el else "")
-            if not title and anchor:
-                title = clean_text(anchor.get_text(" ", strip=True))
-            if not title:
-                continue
-            if location_el is None:
-                location_el = opening.select_one(
-                    ".body__secondary.body--metadata, .body--metadata, a [class*='location'], a p + p",
-                )
-            location = clean_text(
-                location_el.get_text(" ", strip=True) if location_el else ""
-            )
-            records.append(
-                {
-                    "title": title,
-                    "url": href,
-                    "location": location,
-                }
-            )
+            if record := self._html_opening_record(opening, page_url=url):
+                records.append(record)
 
         return records
+
+    @staticmethod
+    def _html_opening_record(opening: Tag, *, page_url: str) -> dict | None:
+        anchor = opening.select_one("a[href]")
+        title_el = opening.select_one(
+            ".opening-title, td.cell-title a, a .body--medium, a [class*='title'], a p"
+        ) or anchor
+        if not title_el and not anchor:
+            return None
+        if anchor is None and title_el is not None:
+            anchor = title_el if title_el.name == "a" else title_el.find_parent("a")
+        href = _opening_href(anchor, page_url=page_url)
+        if not href:
+            return None
+        title = clean_text(title_el.get_text(" ", strip=True) if title_el else "")
+        title = title or clean_text(anchor.get_text(" ", strip=True) if anchor else "")
+        if not title:
+            return None
+        location_el = opening.select_one(
+            ".location, .opening-location, td.cell-location, "
+            ".body__secondary.body--metadata, .body--metadata, "
+            "a [class*='location'], a p + p"
+        )
+        location = clean_text(location_el.get_text(" ", strip=True) if location_el else "")
+        return {"title": title, "url": href, "location": location}
 
     def _normalize_detail_record(self, payload: dict, *, page_url: str) -> dict | None:
         title = clean_text(payload.get("title"))
@@ -229,17 +226,8 @@ class GreenhouseAdapter(BaseAdapter):
                 payload.get("first_published") or payload.get("updated_at")
             ),
         }
-        pay_ranges = payload.get("pay_input_ranges")
-        if isinstance(pay_ranges, list) and pay_ranges:
-            salary = self._normalize_pay_range(pay_ranges[0])
-            if salary:
-                record["salary"] = salary
-        content = unescape(str(payload.get("content") or ""))
-        if content:
-            record.update(extract_job_sections(content))
-            description = html_to_text(content)
-            if description:
-                record["description"] = description
+        self._apply_detail_pay(record, payload.get("pay_input_ranges"))
+        self._apply_detail_content(record, payload.get("content"))
         if location_name and "remote" in location_name.lower():
             record["remote"] = True
         return {
@@ -247,6 +235,21 @@ class GreenhouseAdapter(BaseAdapter):
             for key, value in record.items()
             if value not in (None, "", [], {})
         }
+
+    def _apply_detail_pay(self, record: dict[str, object], pay_ranges: object) -> None:
+        if not isinstance(pay_ranges, list) or not pay_ranges:
+            return
+        if salary := self._normalize_pay_range(pay_ranges[0]):
+            record["salary"] = salary
+
+    @staticmethod
+    def _apply_detail_content(record: dict[str, object], raw_content: object) -> None:
+        content = unescape(str(raw_content or ""))
+        if not content:
+            return
+        record.update(extract_job_sections(content))
+        if description := html_to_text(content):
+            record["description"] = description
 
     def _normalize_pay_range(self, payload: object) -> str:
         if not isinstance(payload, dict):

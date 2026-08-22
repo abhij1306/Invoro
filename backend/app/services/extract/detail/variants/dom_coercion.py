@@ -279,27 +279,8 @@ def _expand_compound_option_group(
         if not parsed:
             return None
         parsed_rows.append(parsed)
-    axis_values: dict[str, list[str]] = {axis_key: [] for axis_key, _ in axis_parts}
-    observed_combos: set[tuple[str, ...]] = set()
-    for parsed in parsed_rows:
-        combo = tuple(parsed.get(axis_key, "") for axis_key, _ in axis_parts)
-        if any(not value for value in combo):
-            return None
-        observed_combos.add(combo)
-        for axis_key, _ in axis_parts:
-            axis_value = parsed[axis_key]
-            if axis_value not in axis_values[axis_key]:
-                axis_values[axis_key].append(axis_value)
-    expected_combo_count = 1
-    for axis_key, _ in axis_parts:
-        values = axis_values.get(axis_key) or []
-        if len(values) < 2:
-            return None
-        expected_combo_count *= len(values)
-    if (
-        len(observed_combos) != len(parsed_rows)
-        or len(observed_combos) != expected_combo_count
-    ):
+    axis_values = _compound_axis_values(axis_parts, parsed_rows)
+    if axis_values is None:
         return None
     return [
         {
@@ -309,3 +290,25 @@ def _expand_compound_option_group(
         }
         for axis_key, display_name in axis_parts
     ]
+
+
+def _compound_axis_values(
+    axis_parts: list[tuple[str, str]], parsed_rows: list[dict[str, str]]
+) -> dict[str, list[str]] | None:
+    values_by_axis: dict[str, list[str]] = {key: [] for key, _ in axis_parts}
+    combos: set[tuple[str, ...]] = set()
+    for parsed in parsed_rows:
+        combo = tuple(parsed.get(key, "") for key, _ in axis_parts)
+        if any(not value for value in combo):
+            return None
+        combos.add(combo)
+        for key, _ in axis_parts:
+            if parsed[key] not in values_by_axis[key]:
+                values_by_axis[key].append(parsed[key])
+    lengths = [len(values_by_axis[key]) for key, _ in axis_parts]
+    if any(length < 2 for length in lengths):
+        return None
+    expected = 1
+    for length in lengths:
+        expected *= length
+    return values_by_axis if len(combos) == len(parsed_rows) == expected else None

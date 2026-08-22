@@ -48,10 +48,7 @@ def expand_existing_variants_with_dom_axes(
     if not _variant_axes_present(existing_variants) or not missing_dom_axes:
         return []
     if not all(
-        any(
-            text_or_none(row.get(field_name))
-            for field_name in _VARIANT_TRANSPORT_FIELDS
-        )
+        _variant_has_transport(row)
         for row in existing_variants
         if isinstance(row, dict)
     ):
@@ -64,28 +61,37 @@ def expand_existing_variants_with_dom_axes(
 
     expanded_rows: list[dict[str, Any]] = []
     for existing_row, dom_row in product(existing_variants, dom_variant_rows):
-        merged = dict(existing_row)
-        for field_name in ("sku", "variant_id", "barcode"):
-            merged.pop(field_name, None)
-        option_values = {
-            key: value
-            for source in (
-                existing_row.get("option_values"),
-                dom_row.get("option_values"),
-            )
-            if isinstance(source, dict)
-            for key, value in source.items()
-            if text_or_none(value)
-        }
-        for axis in public_variant_axis_fields:
-            dom_value = text_or_none(dom_row.get(axis))
-            if axis in missing_dom_axes and dom_value:
-                merged[axis] = dom_value
-                option_values[axis] = dom_value
-        if option_values:
-            merged["option_values"] = option_values
-        expanded_rows.append(merged)
+        expanded_rows.append(
+            _merge_variant_with_dom_axes(existing_row, dom_row, missing_dom_axes)
+        )
     return expanded_rows
+
+
+def _variant_has_transport(row: dict[str, Any]) -> bool:
+    return any(text_or_none(row.get(field)) for field in _VARIANT_TRANSPORT_FIELDS)
+
+
+def _merge_variant_with_dom_axes(
+    existing_row: dict[str, Any], dom_row: dict[str, Any], missing_axes: set[str]
+) -> dict[str, Any]:
+    merged = dict(existing_row)
+    for field_name in ("sku", "variant_id", "barcode"):
+        merged.pop(field_name, None)
+    option_values = {
+        key: value
+        for source in (existing_row.get("option_values"), dom_row.get("option_values"))
+        if isinstance(source, dict)
+        for key, value in source.items()
+        if text_or_none(value)
+    }
+    for axis in public_variant_axis_fields:
+        dom_value = text_or_none(dom_row.get(axis))
+        if axis in missing_axes and dom_value:
+            merged[axis] = dom_value
+            option_values[axis] = dom_value
+    if option_values:
+        merged["option_values"] = option_values
+    return merged
 
 
 def _real_new_dom_axes(

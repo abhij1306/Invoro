@@ -164,16 +164,7 @@ class JibeAdapter(PublicEndpointAdapter):
         tags7 = payload.get("tags7")
         description_html = str(payload.get("description") or "")
         description = html_to_text(description_html)
-        full_location = clean_text(payload.get("full_location"))
-        if not full_location:
-            full_location = ", ".join(
-                part
-                for part in [
-                    clean_text(payload.get("location_name") or payload.get("city")),
-                    clean_text(payload.get("state")),
-                ]
-                if part
-            )
+        full_location = self._job_location(payload)
         record = {
             "title": title,
             "url": url,
@@ -194,6 +185,16 @@ class JibeAdapter(PublicEndpointAdapter):
             for key, value in record.items()
             if value not in (None, "", [], {})
         }
+
+    @staticmethod
+    def _job_location(payload: dict) -> str:
+        if full_location := clean_text(payload.get("full_location")):
+            return full_location
+        parts = (
+            clean_text(payload.get("location_name") or payload.get("city")),
+            clean_text(payload.get("state")),
+        )
+        return ", ".join(part for part in parts if part)
 
     def _join_names(self, values: object) -> str:
         if not isinstance(values, list):

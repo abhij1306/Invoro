@@ -3,6 +3,12 @@ from __future__ import annotations
 from datetime import timedelta
 
 import pytest
+from tests.fixtures.assertions import (
+    assert_equal,
+    assert_is,
+    assert_is_not,
+    assert_not_equal,
+)
 from httpx import ASGITransport, AsyncClient
 from app.core.dependencies import get_current_user, get_db
 from app.main import app
@@ -152,72 +158,78 @@ async def test_monitor_api_end_to_end_with_monitor_form_settings(
     create_response = await monitors_api_client.post(
         "/api/monitors", json=create_payload
     )
-    assert create_response.status_code == 201
+    assert_equal(create_response.status_code, 201)
     monitor = create_response.json()
     monitor_id = monitor["id"]
     next_run_at_before = monitor["next_run_at"]
-    assert monitor["tracked_fields"] == ["price", "availability"]
-    assert monitor["priority"] == "priority"
-    assert monitor["retention_days"] == 7
-    assert monitor["settings"] == {
-        "skip_head_check": False,
-        "proxy_enabled": True,
-        "fetch_profile": {
-            "js_mode": "enabled",
-            "extraction_source": "rendered_dom",
+    assert_equal(monitor["tracked_fields"], ["price", "availability"])
+    assert_equal(monitor["priority"], "priority")
+    assert_equal(monitor["retention_days"], 7)
+    assert_equal(
+        monitor["settings"],
+        {
+            "skip_head_check": False,
+            "proxy_enabled": True,
+            "fetch_profile": {
+                "js_mode": "enabled",
+                "extraction_source": "rendered_dom",
+            },
         },
-    }
+    )
 
     first_run_response = await monitors_api_client.post(
         f"/api/monitors/{monitor_id}/run/now"
     )
-    assert first_run_response.status_code == 200
+    assert_equal(first_run_response.status_code, 200)
     first_run_payload = first_run_response.json()
-    assert first_run_payload["url_count"] == 1
-    assert len(first_run_payload["run_ids"]) == 1
-    assert created_run_ids == first_run_payload["run_ids"]
+    assert_equal(first_run_payload["url_count"], 1)
+    assert_equal(len(first_run_payload["run_ids"]), 1)
+    assert_equal(created_run_ids, first_run_payload["run_ids"])
 
     persisted_run = await db_session.get(CrawlRun, first_run_payload["run_id"])
-    assert persisted_run is not None
-    assert persisted_run.status == "completed"
-    assert persisted_run.settings["monitor_id"] == monitor_id
-    assert persisted_run.settings["proxy_enabled"] is True
-    assert persisted_run.settings["fetch_profile"]["js_mode"] == "enabled"
-    assert (
-        persisted_run.settings["fetch_profile"]["extraction_source"] == "rendered_dom"
+    assert_is_not(persisted_run, None)
+    assert_equal(persisted_run.status, "completed")
+    assert_equal(persisted_run.settings["monitor_id"], monitor_id)
+    assert_is(persisted_run.settings["proxy_enabled"], True)
+    assert_equal(persisted_run.settings["fetch_profile"]["js_mode"], "enabled")
+    assert_equal(
+        persisted_run.settings["fetch_profile"]["extraction_source"], "rendered_dom"
     )
-    assert persisted_run.requested_fields == ["title", "price", "availability"]
+    assert_equal(persisted_run.requested_fields, ["title", "price", "availability"])
 
     monitor_after_first_run = await monitors_api_client.get(
         f"/api/monitors/{monitor_id}"
     )
-    assert monitor_after_first_run.status_code == 200
-    assert monitor_after_first_run.json()["next_run_at"] == next_run_at_before
+    assert_equal(monitor_after_first_run.status_code, 200)
+    assert_equal(monitor_after_first_run.json()["next_run_at"], next_run_at_before)
 
     first_snapshot_response = await monitors_api_client.get(
         f"/api/monitors/{monitor_id}/snapshot/current"
     )
-    assert first_snapshot_response.status_code == 200
+    assert_equal(first_snapshot_response.status_code, 200)
     first_snapshot = first_snapshot_response.json()
-    assert len(first_snapshot) == 1
-    assert first_snapshot[0]["field_values"] == {
-        "price": "19.99",
-        "availability": "in_stock",
-    }
+    assert_equal(len(first_snapshot), 1)
+    assert_equal(
+        first_snapshot[0]["field_values"],
+        {
+            "price": "19.99",
+            "availability": "in_stock",
+        },
+    )
 
     first_events_response = await monitors_api_client.get(
         f"/api/monitors/{monitor_id}/events"
     )
-    assert first_events_response.status_code == 200
+    assert_equal(first_events_response.status_code, 200)
     first_events_payload = first_events_response.json()
-    assert first_events_payload["total"] == 1
-    assert first_events_payload["items"][0]["event_type"] == "record_new"
+    assert_equal(first_events_payload["total"], 1)
+    assert_equal(first_events_payload["items"][0]["event_type"], "record_new")
 
     unread_before_change = await monitors_api_client.get(
         "/api/notifications/unread-count"
     )
-    assert unread_before_change.status_code == 200
-    assert unread_before_change.json()["count"] == 0
+    assert_equal(unread_before_change.status_code, 200)
+    assert_equal(unread_before_change.json()["count"], 0)
 
     html_by_url[url] = _detail_html(
         title="Widget Prime",
@@ -228,58 +240,61 @@ async def test_monitor_api_end_to_end_with_monitor_form_settings(
     second_run_response = await monitors_api_client.post(
         f"/api/monitors/{monitor_id}/run/now"
     )
-    assert second_run_response.status_code == 200
+    assert_equal(second_run_response.status_code, 200)
     second_run_id = second_run_response.json()["run_id"]
     second_run = await db_session.get(CrawlRun, second_run_id)
-    assert second_run is not None
-    assert second_run.status == "completed"
-    assert second_run.result_summary["monitor_change_count"] == 2
+    assert_is_not(second_run, None)
+    assert_equal(second_run.status, "completed")
+    assert_equal(second_run.result_summary["monitor_change_count"], 2)
 
     second_snapshot_response = await monitors_api_client.get(
         f"/api/monitors/{monitor_id}/snapshot/current"
     )
-    assert second_snapshot_response.status_code == 200
+    assert_equal(second_snapshot_response.status_code, 200)
     second_snapshot = second_snapshot_response.json()
-    assert second_snapshot[0]["field_values"] == {
-        "price": "17.49",
-        "availability": "out_of_stock",
-    }
+    assert_equal(
+        second_snapshot[0]["field_values"],
+        {
+            "price": "17.49",
+            "availability": "out_of_stock",
+        },
+    )
 
     history_response = await monitors_api_client.get(
         f"/api/monitors/{monitor_id}/history"
     )
-    assert history_response.status_code == 200
+    assert_equal(history_response.status_code, 200)
     history_payload = history_response.json()
-    assert history_payload["total"] == 2
-    assert history_payload["items"][0]["change_count"] == 2
+    assert_equal(history_payload["total"], 2)
+    assert_equal(history_payload["items"][0]["change_count"], 2)
 
     second_events_response = await monitors_api_client.get(
         f"/api/monitors/{monitor_id}/events"
     )
-    assert second_events_response.status_code == 200
+    assert_equal(second_events_response.status_code, 200)
     second_events_payload = second_events_response.json()
     changed_fields = {
         item["field_name"]
         for item in second_events_payload["items"]
         if item["event_type"] == "field_changed"
     }
-    assert changed_fields == {"price", "availability"}
+    assert_equal(changed_fields, {"price", "availability"})
 
     notifications_response = await monitors_api_client.get("/api/notifications")
-    assert notifications_response.status_code == 200
+    assert_equal(notifications_response.status_code, 200)
     notifications = notifications_response.json()
-    assert len(notifications) == 1
-    assert notifications[0]["event_count"] == 2
+    assert_equal(len(notifications), 1)
+    assert_equal(notifications[0]["event_count"], 2)
 
     mark_read_response = await monitors_api_client.post(
         f"/api/notifications/monitors/{monitor_id}/read"
     )
-    assert mark_read_response.status_code == 200
-    assert mark_read_response.json()["updated"] == 1
+    assert_equal(mark_read_response.status_code, 200)
+    assert_equal(mark_read_response.json()["updated"], 1)
 
     unread_after_read = await monitors_api_client.get("/api/notifications/unread-count")
-    assert unread_after_read.status_code == 200
-    assert unread_after_read.json()["count"] == 0
+    assert_equal(unread_after_read.status_code, 200)
+    assert_equal(unread_after_read.json()["count"], 0)
 
     update_response = await monitors_api_client.patch(
         f"/api/monitors/{monitor_id}",
@@ -298,46 +313,49 @@ async def test_monitor_api_end_to_end_with_monitor_form_settings(
             },
         },
     )
-    assert update_response.status_code == 200
+    assert_equal(update_response.status_code, 200)
     updated_monitor = update_response.json()
-    assert updated_monitor["status"] == "paused"
-    assert updated_monitor["priority"] == "on_demand"
-    assert updated_monitor["retention_days"] == 10
-    assert updated_monitor["settings"] == {
-        "skip_head_check": True,
-        "proxy_enabled": False,
-        "fetch_profile": {
-            "js_mode": "disabled",
-            "extraction_source": "raw_html",
+    assert_equal(updated_monitor["status"], "paused")
+    assert_equal(updated_monitor["priority"], "on_demand")
+    assert_equal(updated_monitor["retention_days"], 10)
+    assert_equal(
+        updated_monitor["settings"],
+        {
+            "skip_head_check": True,
+            "proxy_enabled": False,
+            "fetch_profile": {
+                "js_mode": "disabled",
+                "extraction_source": "raw_html",
+            },
         },
-    }
-    assert updated_monitor["next_run_at"] != next_run_at_before
+    )
+    assert_not_equal(updated_monitor["next_run_at"], next_run_at_before)
 
     paused_run_now = await monitors_api_client.post(
         f"/api/monitors/{monitor_id}/run/now"
     )
-    assert paused_run_now.status_code == 400
-    assert paused_run_now.json()["detail"] == "Monitor is paused — resume it first"
+    assert_equal(paused_run_now.status_code, 400)
+    assert_equal(paused_run_now.json()["detail"], "Monitor is paused — resume it first")
 
     resume_response = await monitors_api_client.patch(
         f"/api/monitors/{monitor_id}",
         json={"status": "active"},
     )
-    assert resume_response.status_code == 200
-    assert resume_response.json()["status"] == "active"
+    assert_equal(resume_response.status_code, 200)
+    assert_equal(resume_response.json()["status"], "active")
 
     archive_response = await monitors_api_client.delete(f"/api/monitors/{monitor_id}")
-    assert archive_response.status_code == 204
+    assert_equal(archive_response.status_code, 204)
 
     deleted_get = await monitors_api_client.get(f"/api/monitors/{monitor_id}")
-    assert deleted_get.status_code == 404
-    assert deleted_get.json()["detail"] == "Monitor not found"
+    assert_equal(deleted_get.status_code, 404)
+    assert_equal(deleted_get.json()["detail"], "Monitor not found")
 
     archived_run_now = await monitors_api_client.post(
         f"/api/monitors/{monitor_id}/run/now"
     )
-    assert archived_run_now.status_code == 404
-    assert archived_run_now.json()["detail"] == "Monitor not found"
+    assert_equal(archived_run_now.status_code, 404)
+    assert_equal(archived_run_now.json()["detail"], "Monitor not found")
 
 
 @pytest.mark.asyncio

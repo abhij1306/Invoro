@@ -98,19 +98,8 @@ def _prune_child_size_rows_from_adult_products(record: dict[str, Any]) -> None:
         return
     if not size_color_extraction._record_targets_adult_sizes(record):
         return
-    adult_rows = [
-        variant
-        for variant in variants
-        if isinstance(variant, dict)
-        and size_color_extraction._size_value_is_recognized(variant.get("size"))
-        and not size_color_extraction._size_value_is_child_specific(variant.get("size"))
-    ]
-    child_rows = [
-        variant
-        for variant in variants
-        if isinstance(variant, dict)
-        and size_color_extraction._size_value_is_child_specific(variant.get("size"))
-    ]
+    adult_rows = [variant for variant in variants if _is_adult_size_variant(variant)]
+    child_rows = [variant for variant in variants if _is_child_size_variant(variant)]
     if len(adult_rows) < 2 or not child_rows:
         return
     kept = [
@@ -125,6 +114,22 @@ def _prune_child_size_rows_from_adult_products(record: dict[str, Any]) -> None:
         return
     record.pop("variants", None)
     record.pop("variant_count", None)
+
+
+def _is_adult_size_variant(variant: object) -> bool:
+    if not isinstance(variant, dict):
+        return False
+    size = variant.get("size")
+    return bool(
+        size_color_extraction._size_value_is_recognized(size)
+        and not size_color_extraction._size_value_is_child_specific(size)
+    )
+
+
+def _is_child_size_variant(variant: object) -> bool:
+    return isinstance(variant, dict) and size_color_extraction._size_value_is_child_specific(
+        variant.get("size")
+    )
 
 
 def _dedupe_variant_rows(record: dict[str, Any]) -> None:

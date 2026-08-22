@@ -1,25 +1,19 @@
 # Active Plan
 
-No active plan.
+**Current:** None
+**Status:** READY FOR NEXT PLAN
+**Started:** —
+**Last slice completed:** Productionization 02, Slice 5 — Scoped Metrics and Full Verification
 
 ## Queue
 
-1. LOC and Complexity Reduction from Duplication Audits → `docs/plans/loc-complexity-reduction-plan.md` — blocked on external extraction smoke DNS/browser failure
-2. Agentic Browser Playground → `docs/plans/agentic-browser-playground-plan.md` — queued, not yet started
+1. Acquisition and Orchestration Debt Reduction → `docs/plans/productionization-03-acquisition-orchestration-debt-plan.md` — queued; independent PR
+2. Backend Application Services Debt Reduction → `docs/plans/productionization-04-backend-application-services-debt-plan.md` — queued; independent PR
+3. Frontend Debt Reduction → `docs/plans/productionization-05-frontend-debt-plan.md` — queued; independent PR
+4. Dependency and Reproducibility Hardening → `docs/plans/productionization-06-dependencies-reproducibility-plan.md` — queued; independent PR
+5. Absolute Quality Gates → `docs/plans/productionization-07-quality-gates-plan.md` — queued; execute after Plans 01–06 are green
 
 ## Previously Completed
 
-- Review Findings Remediation → `docs/plans/review-findings-remediation-plan.md`
-  (COMPLETE 2026-08-10; supplied review findings resolved or evidence-skipped; login fonts, crawl thumbnails, and protected-host browser budget fixed; backend safe suite 2,402 passed with 19 fixture skips; frontend 187 passed and production build succeeded)
-- Backend Acquisition, Extraction, and Test Debt Refactor → `docs/plans/backend-core-debt-refactor-plan.md`
-  (COMPLETE 2026-08-10; acquisition/extraction hotspots simplified; repeated parser and adapter work reduced; safe suite 2,393 passed with 25 fixture skips)
-- Frontend Design System v4 And Debt Reduction → `docs/plans/frontend-design-system-v4-plan.md`
-  (DONE 2026-08-10; CrawlerAI v4 system and shell standardized; Satoshi/Switzer local fonts; shared UI hubs split; React Doctor 81 → 15; frontend LOC -7.7%; pnpm CI repaired)
-- Core Architecture Production Hardening → `docs/plans/core-architecture-production-hardening-plan.md`
-  (DONE 2026-06-11; core-only architecture hardening; private reach-ins removed from pipeline, Product Intelligence, and detail identity tests; fetch compatibility shim removed; config export magic reduced; backend `pytest tests -q` 1364 passed)
-- Site-Link Category Discovery for Crawl Studio → `docs/plans/site-link-category-discovery-plan.md`
-  (DONE 2026-06-04; shared Crawl Studio category discovery API; static sitemap/homepage first, rendered DOM site-link fallback; Playground consumes shared contract; backend `pytest tests -q` 1326 passed; frontend lint passed; frontend vitest 133 passed)
-- Self-Healing Observability & Run-Audit Layer → `docs/plans/self-healing-observability-plan.md`
-  (DONE 2026-05-30; Phase 1: trace + honest artifacts + audit + baseline; Phase 2: LLM diagnosis + frontend tab + full verification; obs tests 56 passed, vitest 127 passed)
-- Product Discovery Identity-Anchor Rework (deterministic, No LLM) → `docs/plans/product-discovery-identity-anchor-plan.md`
-  (DONE 2026-05-30; live-verified on real Nike Promina product; full backend suite `pytest tests -q` = 1174 passed; Slices 1–5 all DONE)
+- Extraction Debt Reduction → `docs/plans/productionization-02-extraction-debt-plan.md` — completed 2026-08-22 in PR #97
+- Backend Test and Tooling Debt → `docs/plans/productionization-01-test-tooling-debt-plan.md` — completed 2026-08-21 in PR #96

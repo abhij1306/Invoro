@@ -14,6 +14,98 @@ from app.services.extract.variant_option_value import variant_option_value_is_no
 from app.services.shared.field_coerce import absolute_url, object_dict, text_or_none
 
 
+def _first_text(mapping: dict[str, object], keys: tuple[str, ...]) -> str | None:
+    return next(
+        (text for key in keys if (text := text_or_none(mapping.get(key)))), None
+    )
+
+
+def _state_option_definition(option: object) -> dict[str, object] | None:
+    if not isinstance(option, dict):
+        return None
+    axis_field = _first_text(option, ("id", "key", "name"))
+    axis_key = normalized_variant_axis_key(option.get("label") or axis_field)
+    option_list = option.get("optionList")
+    if not axis_field or not axis_key or not isinstance(option_list, list):
+        return None
+    values: dict[str, str] = {}
+    for item in option_list:
+        if not isinstance(item, dict):
+            continue
+        option_id = _first_text(item, ("id", "value"))
+        option_value = _first_text(item, ("title", "label", "value"))
+        if (
+            option_id
+            and option_value
+            and not variant_option_value_is_noise(option_value)
+        ):
+            values[option_id] = option_value
+    return (
+        {"axis_field": axis_field, "axis_key": axis_key, "value_by_id": values}
+        if values
+        else None
+    )
+
+
+def _state_option_values(
+    row: dict[str, object], definitions: list[dict[str, object]]
+) -> dict[str, str]:
+    values: dict[str, str] = {}
+    for definition in definitions:
+        axis_field = str(definition["axis_field"])
+        option_id = text_or_none(row.get(axis_field))
+        mapped = object_dict(definition.get("value_by_id")).get(option_id or "")
+        if mapped:
+            values[str(definition["axis_key"])] = str(mapped)
+    return values
+
+
+def _state_row_metadata(row: dict[str, object], page_url: str) -> dict[str, object]:
+    metadata: dict[str, object] = {}
+    url_keys = ("url", "href", "productUrl", "product_url", "targetUrl", "target_url")
+    explicit_url = next(
+        (text_or_none(row.get(key)) for key in url_keys if text_or_none(row.get(key))),
+        None,
+    )
+    if explicit_url:
+        metadata["url"] = absolute_url(page_url, explicit_url)
+    for key in ("productId", "product_id", "variantId", "variant_id", "sku", "id"):
+        raw_value = text_or_none(row.get(key))
+        if not raw_value:
+            continue
+        metadata.setdefault("variant_id", raw_value)
+        inferred_url = variant_query_url(page_url, query_key=key, query_value=raw_value)
+        if "url" not in metadata and inferred_url:
+            metadata["url"] = inferred_url
+        break
+    return metadata
+
+
+def _add_state_target(
+    option_values: dict[str, str],
+    metadata: dict[str, object],
+    axis_targets: dict[str, dict[str, dict[str, object]]],
+    combo_targets: dict[tuple[tuple[str, str], ...], dict[str, object]],
+) -> None:
+    if len(option_values) == 1:
+        axis_key, option_value = next(iter(option_values.items()))
+        axis_targets.setdefault(axis_key, {}).setdefault(option_value, {}).update(
+            metadata
+        )
+    combo_targets[tuple(sorted(option_values.items()))] = metadata
+
+
+def _variant_mapping_lists(payload: dict[str, Any]) -> list[list[dict[str, object]]]:
+    return [
+        rows
+        for item in payload.values()
+        if isinstance(item, list)
+        and item
+        and all(isinstance(row, dict) for row in item)
+        for rows in [[row for row in item if isinstance(row, dict)]]
+    ]
+
+
 def state_variant_targets(
     js_state_objects: dict[str, Any] | None,
     *,
@@ -26,113 +118,29 @@ def state_variant_targets(
     combo_targets: dict[tuple[tuple[str, str], ...], dict[str, object]] = {}
     if not isinstance(js_state_objects, dict):
         return axis_targets, combo_targets
-    mapping_row_id_keys = (
-        "productId",
-        "product_id",
-        "variantId",
-        "variant_id",
-        "sku",
-        "id",
-    )
-    url_keys = ("url", "href", "productUrl", "product_url", "targetUrl", "target_url")
     for payload in iter_variant_mapping_payloads(js_state_objects):
         raw_options = payload.get("options")
         if not isinstance(raw_options, list):
             continue
-        option_definitions: list[dict[str, object]] = []
-        for option in raw_options:
-            if not isinstance(option, dict):
-                continue
-            axis_field = text_or_none(
-                option.get("id") or option.get("key") or option.get("name")
-            )
-            axis_key = normalized_variant_axis_key(option.get("label") or axis_field)
-            option_list = (
-                option.get("optionList")
-                if isinstance(option.get("optionList"), list)
-                else None
-            )
-            if not axis_field or not axis_key or not option_list:
-                continue
-            value_by_id: dict[str, str] = {}
-            for item in option_list:
-                if not isinstance(item, dict):
-                    continue
-                option_id = text_or_none(item.get("id") or item.get("value"))
-                option_value = text_or_none(
-                    item.get("title") or item.get("label") or item.get("value")
-                )
-                if (
-                    option_id
-                    and option_value
-                    and not variant_option_value_is_noise(option_value)
-                ):
-                    value_by_id[option_id] = option_value
-            if value_by_id:
-                option_definitions.append(
-                    {
-                        "axis_field": axis_field,
-                        "axis_key": axis_key,
-                        "value_by_id": value_by_id,
-                    }
-                )
+        option_definitions = [
+            definition
+            for option in raw_options
+            if (definition := _state_option_definition(option))
+        ]
         if not option_definitions:
             continue
-        mapping_lists = [
-            item
-            for item in payload.values()
-            if isinstance(item, list)
-            and item
-            and all(isinstance(row, dict) for row in item)
-        ]
+        mapping_lists = _variant_mapping_lists(payload)
         for mapping_rows in mapping_lists:
             for mapping_row in mapping_rows:
-                option_values: dict[str, str] = {}
-                for option_definition in option_definitions:
-                    axis_field = str(option_definition["axis_field"])
-                    axis_key = str(option_definition["axis_key"])
-                    mapping_value_by_id = object_dict(
-                        option_definition.get("value_by_id")
-                    )
-                    option_id = text_or_none(mapping_row.get(axis_field))
-                    mapped_option_value = mapping_value_by_id.get(option_id or "")
-                    if mapped_option_value:
-                        option_values[axis_key] = str(mapped_option_value)
+                option_values = _state_option_values(mapping_row, option_definitions)
                 if not option_values:
                     continue
-                row_metadata: dict[str, object] = {}
-                explicit_url = next(
-                    (
-                        text_or_none(mapping_row.get(key))
-                        for key in url_keys
-                        if text_or_none(mapping_row.get(key))
-                    ),
-                    None,
-                )
-                if explicit_url:
-                    row_metadata["url"] = absolute_url(page_url, explicit_url)
-                for key in mapping_row_id_keys:
-                    raw_value = text_or_none(mapping_row.get(key))
-                    if not raw_value:
-                        continue
-                    row_metadata.setdefault("variant_id", raw_value)
-                    if "url" not in row_metadata:
-                        inferred_url = variant_query_url(
-                            page_url,
-                            query_key=key,
-                            query_value=raw_value,
-                        )
-                        if inferred_url:
-                            row_metadata["url"] = inferred_url
-                    break
+                row_metadata = _state_row_metadata(mapping_row, page_url)
                 if not row_metadata:
                     continue
-                if len(option_values) == 1:
-                    axis_key, option_value = next(iter(option_values.items()))
-                    axis_targets.setdefault(axis_key, {}).setdefault(
-                        option_value, {}
-                    ).update(row_metadata)
-                combo_targets[tuple(sorted(option_values.items()))] = row_metadata
+                _add_state_target(
+                    option_values, row_metadata, axis_targets, combo_targets
+                )
     return axis_targets, combo_targets
 
 

@@ -97,11 +97,9 @@ def evaluate_listing_integrity(
         # support on at least half the set. Small sets are normally not
         # overridden, but article listings may override at any size when every
         # record carries a support signal.
-        support_override = (
-            surface == "article_listing"
-            and record_count > 0
-            and support_signal_count == record_count
-        ) or (record_count >= 5 and support_signal_count >= max(1, record_count // 2))
+        support_override = _has_homogeneity_support_override(
+            surface, record_count, support_signal_count
+        )
         if not support_override:
             return IntegrityDecision(
                 outcome="promo_only_cluster",
@@ -133,6 +131,20 @@ def evaluate_listing_integrity(
         reason="supported_set",
         metrics=metrics,
     )
+
+
+def _has_homogeneity_support_override(
+    surface: str, record_count: int, support_signal_count: int
+) -> bool:
+    article_override = (
+        surface == "article_listing"
+        and record_count > 0
+        and support_signal_count == record_count
+    )
+    normal_override = record_count >= 5 and support_signal_count >= max(
+        1, record_count // 2
+    )
+    return article_override or normal_override
 
 
 # ---------------------------------------------------------------------------

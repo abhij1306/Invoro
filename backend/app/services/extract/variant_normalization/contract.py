@@ -99,70 +99,70 @@ def flatten_variants_for_public_output(
     for raw_variant in value:
         if not isinstance(raw_variant, dict):
             continue
-        merged: dict[str, object] = {}
-        has_option_axis = False
-        option_values = raw_variant.get("option_values")
-        if isinstance(option_values, dict):
-            for axis_name, axis_value in option_values.items():
-                axis_text = text_or_none(axis_name)
-                if not axis_text:
-                    continue
-                axis_key = normalized_variant_axis_key(axis_text)
-                if axis_key not in _PUBLIC_VARIANT_AXIS_KEYS:
-                    continue
-                value_text = _coerce_variant_axis_value(
-                    axis_key,
-                    axis_value,
-                    page_url=page_url,
-                )
-                if not value_text:
-                    continue
-                if axis_key not in merged:
-                    merged[axis_key] = value_text
-                has_option_axis = True
-        for key in FLAT_VARIANT_KEYS:
-            if key in merged and merged[key] not in (None, "", [], {}):
-                continue
-            candidate = raw_variant.get(key)
-            if candidate in (None, "", [], {}):
-                continue
-            coerced = _coerce_variant_transport_value(
-                key,
-                candidate,
-                raw_variant=raw_variant,
-                page_url=page_url,
-            )
-            if coerced in (None, "", [], {}):
-                continue
-            merged[key] = coerced
-        for raw_key, candidate in raw_variant.items():
-            axis_key = normalized_variant_axis_key(raw_key)
-            if axis_key not in _PUBLIC_VARIANT_AXIS_KEYS or axis_key in merged:
-                continue
-            value_text = _coerce_variant_axis_value(
-                axis_key,
-                candidate,
-                page_url=page_url,
-            )
-            if not value_text:
-                continue
-            merged[axis_key] = value_text
-            has_option_axis = True
-        if text_or_none(merged.get("scent")) and any(
-            token in str(page_url or "").casefold()
-            for token in SCENT_DOMINANT_URL_TOKENS
-        ):
-            merged.pop("color", None)
-        if merged and (
-            has_option_axis
-            or any(
-                text_or_none(merged.get(field_name))
-                for field_name in _PUBLIC_VARIANT_AXIS_KEYS
-            )
-        ):
+        merged = _flatten_public_variant(raw_variant, page_url)
+        if merged:
             flattened.append(merged)
     flattened = _drop_geographic_state_public_rows(flattened)
     return flattened or None
+
+
+def _flatten_public_variant(
+    raw_variant: dict[str, Any], page_url: str
+) -> dict[str, object]:
+    merged: dict[str, object] = {}
+    _merge_option_value_axes(merged, raw_variant.get("option_values"), page_url)
+    _merge_variant_transport_fields(merged, raw_variant, page_url)
+    _merge_direct_variant_axes(merged, raw_variant, page_url)
+    if text_or_none(merged.get("scent")) and any(
+        token in str(page_url or "").casefold() for token in SCENT_DOMINANT_URL_TOKENS
+    ):
+        merged.pop("color", None)
+    has_axis = any(
+        text_or_none(merged.get(field_name)) for field_name in _PUBLIC_VARIANT_AXIS_KEYS
+    )
+    return merged if merged and has_axis else {}
+
+
+def _merge_option_value_axes(
+    merged: dict[str, object], option_values: object, page_url: str
+) -> None:
+    if not isinstance(option_values, dict):
+        return
+    for axis_name, axis_value in option_values.items():
+        axis_key = normalized_variant_axis_key(text_or_none(axis_name))
+        if axis_key not in _PUBLIC_VARIANT_AXIS_KEYS or axis_key in merged:
+            continue
+        value = _coerce_variant_axis_value(axis_key, axis_value, page_url=page_url)
+        if value:
+            merged[axis_key] = value
+
+
+def _merge_variant_transport_fields(
+    merged: dict[str, object], raw_variant: dict[str, Any], page_url: str
+) -> None:
+    for key in FLAT_VARIANT_KEYS:
+        if key in merged and merged[key] not in (None, "", [], {}):
+            continue
+        candidate = raw_variant.get(key)
+        if candidate in (None, "", [], {}):
+            continue
+        coerced = _coerce_variant_transport_value(
+            key, candidate, raw_variant=raw_variant, page_url=page_url
+        )
+        if coerced not in (None, "", [], {}):
+            merged[key] = coerced
+
+
+def _merge_direct_variant_axes(
+    merged: dict[str, object], raw_variant: dict[str, Any], page_url: str
+) -> None:
+    for raw_key, candidate in raw_variant.items():
+        axis_key = normalized_variant_axis_key(raw_key)
+        if axis_key not in _PUBLIC_VARIANT_AXIS_KEYS or axis_key in merged:
+            continue
+        value = _coerce_variant_axis_value(axis_key, candidate, page_url=page_url)
+        if value:
+            merged[axis_key] = value
 
 
 def _drop_geographic_state_public_rows(
