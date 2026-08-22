@@ -2,7 +2,7 @@
 
 **Created:** 2026-08-21
 **Agent:** Codex
-**Status:** QUEUED — blocked from execution until Plans 01–05 leave zero LOC/complexity violations
+**Status:** QUEUED — user will start this plan after the Plan 06/prerequisite-debt branch merges
 **PR boundary:** One independent final PR. Quality policy, deterministic checks, and CI enforcement only.
 **Touches buckets:** Backend architecture tests/config, frontend lint/architecture scripts, GitHub Actions, quality documentation
 
@@ -138,4 +138,5 @@ pnpm run build
 - Source evidence: `docs/audits/productionization-evidence-report-2026-08-21.md`, findings F-LOC-800, F-CC-15, F-CI-GATES, F-BE-FORMAT-CI, F-FE-PUSH, F-FE-COMPLEXITY, F-STRUCT-800, and F-FE-BUDGET.
 - Current local quality checks passed in the audit except absolute LOC/complexity and backend CI formatting. Full pytest/Vitest were not run by that audit.
 - External GitHub branch protection is unverified. Repo CI must still be correct; provider enforcement needs separate readback if requested.
-
+- 2026-08-22 precondition scan found remaining debt, so this plan was not started: 9 backend Python files, 1 frontend TSX file, and 26 Python callables exceeded the absolute limits (excluding Radon's aggregate class score). The user moved that cleanup into the Plan 06 branch. Re-run the scans at Plan 07 start.
+- Plan 06 closeout scan reports zero maintained files above 800 lines, zero Python callables above CC 15, and a green frontend ESLint complexity-15 diagnostic. Re-run at Plan 07 start before adding enforcement.

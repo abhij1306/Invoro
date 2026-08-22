@@ -31,12 +31,37 @@ async def auto_save_dom_observed_selectors(
         domain=normalized_domain,
         surface=normalized_surface,
     )
-    protected_fields = {
+    protected_fields = _protected_selector_fields(existing_rows)
+    return await _save_dom_observed_candidates(
+        session,
+        html=html,
+        domain=normalized_domain,
+        surface=normalized_surface,
+        candidates=candidates,
+        existing_rows=existing_rows,
+        protected_fields=protected_fields,
+    )
+
+
+def _protected_selector_fields(existing_rows: list[dict[str, object]]) -> set[str]:
+    return {
         str(row.get("field_name") or "").strip().lower()
         for row in existing_rows
         if bool(row.get("is_active", True))
         and str(row.get("source") or "").strip() not in {"dom_observed", ""}
     }
+
+
+async def _save_dom_observed_candidates(
+    session: AsyncSession,
+    *,
+    html: str,
+    domain: str,
+    surface: str,
+    candidates: list[dict[str, object]],
+    existing_rows: list[dict[str, object]],
+    protected_fields: set[str],
+) -> list[dict[str, object]]:
     existing_signatures = {_selector_signature(row) for row in existing_rows}
     saved_rows: list[dict[str, object]] = []
     for candidate in candidates:
@@ -50,8 +75,8 @@ async def auto_save_dom_observed_selectors(
             continue
         saved = await create_selector_record(
             session,
-            domain=normalized_domain,
-            surface=normalized_surface,
+            domain=domain,
+            surface=surface,
             payload=candidate,
             commit=False,
         )

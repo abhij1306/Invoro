@@ -108,6 +108,25 @@ def test_variant_choice_groups_ignore_navigation_link_lists() -> None:
 
 
 @pytest.mark.unit
+def test_variant_choice_groups_collect_button_container_not_buttons() -> None:
+    soup = BeautifulSoup(
+        """
+        <section class="size-options" aria-label="Size">
+          <button class="size-option" data-variant="small">Small</button>
+          <button class="size-option" data-variant="large">Large</button>
+        </section>
+        """,
+        "html.parser",
+    )
+
+    groups = iter_variant_choice_groups(soup)
+
+    assert len(groups) == 1
+    assert groups[0].name == "section"
+    assert len(groups[0].select("button")) == 2
+
+
+@pytest.mark.unit
 def test_dom_variant_extraction_trusts_size_values_over_color_container_label() -> None:
     soup = BeautifulSoup(
         """

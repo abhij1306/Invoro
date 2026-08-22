@@ -216,6 +216,7 @@ Primary files:
 
 Global CSS policy:
 
+- `frontend/pnpm-lock.yaml` is the canonical frontend dependency graph; local verification and CI use the package-manager pin in `package.json` with `pnpm install --frozen-lockfile`.
 - `app/globals.css` owns tokens, reset, shared browser defaults, animations, and cross-feature utilities only.
 - App/auth shell CSS lives under `components/layout/`.
 - Crawl Studio feature CSS lives under `components/crawl/`.

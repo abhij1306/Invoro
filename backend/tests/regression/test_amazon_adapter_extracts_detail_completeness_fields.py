@@ -57,27 +57,29 @@ async def test_amazon_adapter_extracts_detail_completeness_fields() -> None:
     )
 
     record = result.records[0]
-    assert record["sku"] == "B08J5F3G18"
-    assert record["product_id"] == "B08J5F3G18"
-    assert record["part_number"] == "24G-P5-3987-KR"
-    assert record["barcode"] == "843368067763"
-    assert record["currency"] == "USD"
-    assert record["availability"] == "In Stock."
-    assert record["product_type"] == "Computer Graphics Cards"
-    assert record["features"] == ["24GB GDDR6X memory", "Triple-fan cooling"]
-    assert record["specifications"] == (
-        "ASIN: B08J5F3G18 Item model number: 24G-P5-3987-KR UPC: 843368067763"
+    expected = {
+        "sku": "B08J5F3G18",
+        "product_id": "B08J5F3G18",
+        "part_number": "24G-P5-3987-KR",
+        "barcode": "843368067763",
+        "currency": "USD",
+        "availability": "In Stock.",
+        "product_type": "Computer Graphics Cards",
+        "features": ["24GB GDDR6X memory", "Triple-fan cooling"],
+        "specifications": "ASIN: B08J5F3G18 Item model number: 24G-P5-3987-KR UPC: 843368067763",
+        "product_details": (
+            "Flagship graphics card for 4K gaming. "
+            "24GB GDDR6X memory Triple-fan cooling "
+            "ASIN: B08J5F3G18 Item model number: 24G-P5-3987-KR UPC: 843368067763"
+        ),
+        "image_url": "https://m.media-amazon.com/images/I/71tLsSyLUZL.jpg",
+        "additional_images": None,
+    }
+    assert {key: record.get(key) for key in expected} == expected
+    assert all(
+        token not in record["specifications"]
+        for token in ("Best Sellers Rank", "Customer Reviews", "P.when")
     )
-    assert "Best Sellers Rank" not in record["specifications"]
-    assert "Customer Reviews" not in record["specifications"]
-    assert "P.when" not in record["specifications"]
-    assert record["product_details"] == (
-        "Flagship graphics card for 4K gaming. "
-        "24GB GDDR6X memory Triple-fan cooling "
-        "ASIN: B08J5F3G18 Item model number: 24G-P5-3987-KR UPC: 843368067763"
-    )
-    assert record["image_url"] == "https://m.media-amazon.com/images/I/71tLsSyLUZL.jpg"
-    assert record["additional_images"] is None
 
 
 @pytest.mark.regression

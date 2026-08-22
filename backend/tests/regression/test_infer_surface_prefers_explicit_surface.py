@@ -39,6 +39,9 @@ def test_infer_surface_handles_acceptance_critical_hosts() -> None:
         )
         == "ecommerce_detail"
     )
+    assert infer_surface("https://www.autozone.com/search?q=parts_a_b") != (
+        "ecommerce_detail"
+    )
     assert (
         infer_surface(
             "https://books.toscrape.com/catalogue/a-light-in-the-attic_1000/index.html"

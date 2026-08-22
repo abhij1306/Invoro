@@ -9,7 +9,6 @@ from app.services.config.extraction_rules import (
     DETAIL_COLLECTION_PATH_TOKENS,
     DETAIL_GENERIC_TERMINAL_TOKENS,
     DETAIL_IDENTITY_CODE_MIN_LENGTH,
-    DETAIL_IDENTITY_STOPWORDS,
     DETAIL_MODEL_CONFLICT_MIN_SHARED_WORDS,
     DETAIL_NON_PAGE_FILE_EXTENSIONS,
     DETAIL_PRODUCT_PATH_TOKENS,
@@ -18,9 +17,16 @@ from app.services.config.extraction_rules import (
     DETAIL_TITLE_FALLBACK_MIN_SEMANTIC_TOKENS,
     DETAIL_UTILITY_PATH_TOKENS,
 )
-from app.services.config.public_record_policy import (
-    PUBLIC_RECORD_DETAIL_CANONICAL_QUERY_KEYS,
-    PUBLIC_RECORD_DETAIL_CANONICAL_QUERY_PREFIXES,
+from app.services.extract.detail.identity.identity_codes import (
+    detail_identity_codes_from_record_fields,
+    detail_identity_codes_from_url,
+    detail_identity_codes_match,
+    detail_identity_tokens,
+    detail_query_identity_codes_from_url,
+    detail_segment_looks_like_identity_code,
+    detail_url_path_segments,
+    normalized_detail_identity_code,
+    semantic_detail_identity_tokens,
 )
 from app.services.extract.detail.identity.model_codes import (
     detail_model_number_sets_compatible,
@@ -54,22 +60,10 @@ __all__ = (
     "semantic_detail_identity_tokens",
 )
 
-DETAIL_IDENTITY_QUERY_KEYS = frozenset(
-    str(value).strip().lower()
-    for value in tuple(PUBLIC_RECORD_DETAIL_CANONICAL_QUERY_KEYS or ())
-    if str(value).strip()
-)
-DETAIL_IDENTITY_QUERY_PREFIXES = tuple(
-    str(value).strip().lower()
-    for value in tuple(PUBLIC_RECORD_DETAIL_CANONICAL_QUERY_PREFIXES or ())
-    if str(value).strip()
-)
 DETAIL_URL_PLACEHOLDER_SEGMENTS = frozenset(
-    {
-        str(value).strip().lower()
-        for value in tuple(CANDIDATE_PLACEHOLDER_VALUES or ())
-        if str(value).strip()
-    }
+    str(value).strip().lower()
+    for value in tuple(CANDIDATE_PLACEHOLDER_VALUES or ())
+    if str(value).strip()
 )
 LOWER_NON_ALNUM_RE = re.compile(r"[^a-z0-9]+")
 MIXED_NON_ALNUM_RE = re.compile(r"[^A-Za-z0-9]+")
@@ -83,21 +77,6 @@ def path_segment_tokens(value: str) -> set[str]:
         for token in re.split(r"[\-\.]+", str(value or "").strip().lower())
         if token
     }
-
-
-def detail_url_path_segments(url: str) -> list[str]:
-    parsed = urlparse(str(url or ""))
-    segments = [
-        segment for segment in str(parsed.path or "").strip("/").split("/") if segment
-    ]
-    fragment = str(parsed.fragment or "").strip()
-    if fragment:
-        fragment_path = fragment.split("?", 1)[0].split("&", 1)[0].strip()
-        if "/" in fragment_path:
-            segments.extend(
-                segment for segment in fragment_path.strip("!/").split("/") if segment
-            )
-    return segments
 
 
 def _detail_title_from_url(page_url: str) -> str | None:
@@ -115,7 +94,7 @@ def _detail_title_from_url(page_url: str) -> str | None:
             generic_terminal_tokens=generic_terminal_tokens,
         ):
             continue
-        if _detail_segment_looks_like_identity_code(terminal):
+        if detail_segment_looks_like_identity_code(terminal):
             if _detail_terminal_parent_is_collection(path_segments, index):
                 return None
             continue
@@ -135,7 +114,7 @@ def _detail_terminal_embedded_codes_are_generic(
         for match in re.findall(
             rf"[A-Za-z0-9]{{{DETAIL_IDENTITY_CODE_MIN_LENGTH},}}", terminal
         )
-        if (normalized := _normalized_detail_identity_code(match))
+        if (normalized := normalized_detail_identity_code(match))
     ]
     if not embedded_codes:
         return False
@@ -332,9 +311,9 @@ def _record_matches_requested_detail_identity(
     *,
     requested_page_url: str,
 ) -> bool:
-    requested_codes = _detail_identity_codes_from_url(requested_page_url)
-    requested_query_codes = _detail_query_identity_codes_from_url(requested_page_url)
-    record_field_codes = _detail_identity_codes_from_record_fields(record)
+    requested_codes = detail_identity_codes_from_url(requested_page_url)
+    requested_query_codes = detail_query_identity_codes_from_url(requested_page_url)
+    record_field_codes = detail_identity_codes_from_record_fields(record)
     if requested_query_codes and detail_identity_codes_match(
         requested_query_codes,
         record_field_codes,
@@ -342,8 +321,8 @@ def _record_matches_requested_detail_identity(
         return True
     if detail_identity_codes_match(requested_codes, record_field_codes):
         return True
-    record_url_codes = _detail_identity_codes_from_url(record.get("url"))
-    record_query_codes = _detail_query_identity_codes_from_url(record.get("url"))
+    record_url_codes = detail_identity_codes_from_url(record.get("url"))
+    record_query_codes = detail_query_identity_codes_from_url(record.get("url"))
     if requested_query_codes and detail_identity_codes_match(
         requested_query_codes,
         record_query_codes,
@@ -352,10 +331,10 @@ def _record_matches_requested_detail_identity(
     if requested_query_codes and record_query_codes:
         return False
     requested_title = _detail_title_from_url(requested_page_url)
-    requested_tokens = _detail_identity_tokens(requested_title)
-    candidate_tokens = _detail_identity_tokens(record.get("title"))
+    requested_tokens = detail_identity_tokens(requested_title)
+    candidate_tokens = detail_identity_tokens(record.get("title"))
     if not candidate_tokens:
-        candidate_tokens = _detail_identity_tokens(record.get("description"))
+        candidate_tokens = detail_identity_tokens(record.get("description"))
     title_matches = _detail_token_overlap_matches(requested_tokens, candidate_tokens)
     if not title_matches and requested_tokens:
         supplemental_tokens = _detail_identity_record_tokens(record)
@@ -375,7 +354,7 @@ def _record_matches_requested_detail_identity(
 def _detail_identity_record_tokens(record: dict[str, object]) -> set[str]:
     tokens: set[str] = set()
     for field_name in ("title", "brand", "color", "size", "description"):
-        tokens.update(_detail_identity_tokens(record.get(field_name)))
+        tokens.update(detail_identity_tokens(record.get(field_name)))
     return tokens
 
 
@@ -409,9 +388,9 @@ def _detail_requested_identity_text(page_url: object) -> str:
         if terminal_tokens and terminal_tokens <= generic_terminal_tokens:
             continue
         title = clean_text(SLUG_SEPARATOR_RE.sub(" ", terminal))
-        semantic_tokens = _semantic_detail_identity_tokens(title)
+        semantic_tokens = semantic_detail_identity_tokens(title)
         if (
-            _detail_segment_looks_like_identity_code(terminal)
+            detail_segment_looks_like_identity_code(terminal)
             and len(semantic_tokens) < 2
         ):
             continue
@@ -443,8 +422,8 @@ def _detail_model_numbers_conflict(
         return False
     if detail_model_number_sets_compatible(requested_numbers, candidate_numbers):
         return False
-    requested_words = _semantic_detail_identity_tokens(requested_title)
-    candidate_words = _semantic_detail_identity_tokens(candidate_title)
+    requested_words = semantic_detail_identity_tokens(requested_title)
+    candidate_words = semantic_detail_identity_tokens(candidate_title)
     shared_words = requested_words & candidate_words
     required_shared_words = min(
         int(DETAIL_MODEL_CONFLICT_MIN_SHARED_WORDS),
@@ -476,7 +455,7 @@ def _record_has_strong_requested_identity_code(
     if not requested_codes:
         return False
     for field_name in ("product_id", "variant_id", "part_number", "barcode"):
-        normalized = _normalized_detail_identity_code(record.get(field_name))
+        normalized = normalized_detail_identity_code(record.get(field_name))
         if normalized and detail_identity_codes_match(requested_codes, {normalized}):
             return True
     return False
@@ -513,7 +492,7 @@ def _detail_slug_title_fallback_from_url(identity_url: str) -> str | None:
         if not terminal:
             continue
         title = clean_text(SLUG_SEPARATOR_RE.sub(" ", terminal))
-        semantic_tokens = _semantic_detail_identity_tokens(title)
+        semantic_tokens = semantic_detail_identity_tokens(title)
         if _detail_title_fallback_looks_like_code(terminal) and (
             len(semantic_tokens) < int(DETAIL_TITLE_FALLBACK_MIN_SEMANTIC_TOKENS)
         ):
@@ -550,10 +529,10 @@ def _detail_url_matches_requested_identity(
     *,
     requested_page_url: str,
 ) -> bool:
-    requested_codes = _detail_identity_codes_from_url(requested_page_url)
-    candidate_codes = _detail_identity_codes_from_url(candidate_url)
-    requested_query_codes = _detail_query_identity_codes_from_url(requested_page_url)
-    candidate_query_codes = _detail_query_identity_codes_from_url(candidate_url)
+    requested_codes = detail_identity_codes_from_url(requested_page_url)
+    candidate_codes = detail_identity_codes_from_url(candidate_url)
+    requested_query_codes = detail_query_identity_codes_from_url(requested_page_url)
+    candidate_query_codes = detail_query_identity_codes_from_url(candidate_url)
     if requested_query_codes:
         if detail_identity_codes_match(requested_query_codes, candidate_query_codes):
             return True
@@ -562,129 +541,17 @@ def _detail_url_matches_requested_identity(
     if detail_identity_codes_match(requested_codes, candidate_codes):
         return True
     requested_title = _detail_title_from_url(requested_page_url)
-    requested_tokens = _detail_identity_tokens(requested_title)
+    requested_tokens = detail_identity_tokens(requested_title)
     if not requested_tokens:
         return False
     candidate_title = _detail_title_from_url(candidate_url) or candidate_url
-    candidate_tokens = _detail_identity_tokens(candidate_title)
+    candidate_tokens = detail_identity_tokens(candidate_title)
     if not candidate_tokens:
         return False
     overlap = requested_tokens & candidate_tokens
     if len(requested_tokens) == 1:
         return bool(overlap)
     return len(overlap) >= min(2, len(requested_tokens))
-
-
-def _detail_identity_tokens(value: object) -> set[str]:
-    cleaned = clean_text(value).lower()
-    return {
-        token
-        for token in LOWER_NON_ALNUM_RE.split(cleaned)
-        if len(token) >= 3 and token not in DETAIL_IDENTITY_STOPWORDS
-    }
-
-
-def _semantic_detail_identity_tokens(value: object) -> set[str]:
-    return {
-        token
-        for token in _detail_identity_tokens(value)
-        if re.search(r"[a-z]", token) and not re.search(r"\d", token)
-    }
-
-
-def _detail_identity_codes_from_url(url: object) -> set[str]:
-    text = text_or_none(url)
-    if not text:
-        return set()
-    parsed = urlparse(text)
-    codes: set[str] = set()
-    for segment in detail_url_path_segments(text):
-        terminal = HTML_SUFFIX_RE.sub("", segment)
-        code_like_terminal = _detail_segment_code(terminal)
-        if code_like_terminal:
-            codes.add(code_like_terminal)
-        for match in re.findall(
-            rf"[A-Za-z0-9]{{{DETAIL_IDENTITY_CODE_MIN_LENGTH},}}", terminal
-        ):
-            normalized = _normalized_detail_identity_code(match)
-            if normalized:
-                codes.add(normalized)
-    for key, _value in parse_qsl(parsed.query, keep_blank_values=True):
-        match = re.match(
-            r"dwvar_([A-Za-z0-9][A-Za-z0-9_-]{6,}[A-Za-z0-9])_",
-            str(key or ""),
-            flags=re.I,
-        )
-        if match is None:
-            continue
-        normalized = _detail_segment_code(match.group(1))
-        if normalized:
-            codes.add(normalized)
-    codes.update(_detail_query_identity_codes_from_url(text))
-    return codes
-
-
-def _detail_query_identity_codes_from_url(url: object) -> set[str]:
-    text = text_or_none(url)
-    if not text:
-        return set()
-    parsed = urlparse(text)
-    codes: set[str] = set()
-    for key, value in parse_qsl(parsed.query, keep_blank_values=False):
-        normalized_key = str(key or "").strip().lower()
-        if not normalized_key:
-            continue
-        if normalized_key in DETAIL_IDENTITY_QUERY_KEYS or any(
-            normalized_key.startswith(prefix)
-            for prefix in DETAIL_IDENTITY_QUERY_PREFIXES
-        ):
-            normalized_value = _detail_segment_code(value)
-            if normalized_value:
-                codes.add(normalized_value)
-    return codes
-
-
-def _detail_identity_codes_from_record_fields(record: dict[str, object]) -> set[str]:
-    codes: set[str] = set()
-    for field_name in ("sku", "product_id", "variant_id", "part_number"):
-        normalized = _normalized_detail_identity_code(record.get(field_name))
-        if normalized:
-            codes.add(normalized)
-    return codes
-
-
-def _detail_segment_looks_like_identity_code(value: object) -> bool:
-    text = str(value or "").strip()
-    if not text:
-        return False
-    if re.fullmatch(r"[A-Za-z0-9]+(?:[-_][A-Za-z0-9]+){0,2}", text) is None:
-        return False
-    return _normalized_detail_identity_code(text) is not None
-
-
-def _detail_segment_code(value: object) -> str | None:
-    text = str(value or "").strip()
-    if not _detail_segment_looks_like_identity_code(text):
-        return None
-    return _normalized_detail_identity_code(text)
-
-
-def _normalized_detail_identity_code(value: object) -> str | None:
-    text = MIXED_NON_ALNUM_RE.sub("", str(value or "")).upper()
-    if len(text) < DETAIL_IDENTITY_CODE_MIN_LENGTH:
-        return None
-    if not re.search(r"\d", text):
-        return None
-    return text
-
-
-def detail_identity_codes_match(
-    expected_codes: set[str],
-    candidate_codes: set[str],
-) -> bool:
-    if not expected_codes or not candidate_codes:
-        return False
-    return not expected_codes.isdisjoint(candidate_codes)
 
 
 def _same_url_identity_is_mismatched(
@@ -702,8 +569,8 @@ def _same_url_identity_is_mismatched(
         return True
     requested_title = _detail_requested_identity_text(requested)
     candidate_title = record.get("title")
-    requested_codes = _detail_identity_codes_from_url(requested)
-    record_codes = _detail_identity_codes_from_record_fields(record)
+    requested_codes = detail_identity_codes_from_url(requested)
+    record_codes = detail_identity_codes_from_record_fields(record)
     matching_codes = detail_identity_codes_match(requested_codes, record_codes)
     matching_strong_code = _record_has_strong_requested_identity_code(
         record, requested_codes=requested_codes
@@ -748,8 +615,8 @@ def _same_url_text_identity_is_mismatched(
     strong = strong or bool(availability and availability != AVAILABILITY_UNKNOWN)
     if strong:
         return False
-    requested_tokens = _detail_identity_tokens(requested_title)
-    candidate_tokens = _detail_identity_tokens(candidate_title)
+    requested_tokens = detail_identity_tokens(requested_title)
+    candidate_tokens = detail_identity_tokens(candidate_title)
     mismatch_evidence = (
         any(
             record.get(field) not in (None, "", [], {})
@@ -776,8 +643,8 @@ def _same_url_text_identity_is_mismatched(
 def _redirect_codes_conflict(
     record: dict[str, object], *, requested: str, current: str | None
 ) -> bool:
-    requested_codes = _detail_identity_codes_from_url(requested)
-    record_codes = _detail_identity_codes_from_record_fields(record)
+    requested_codes = detail_identity_codes_from_url(requested)
+    record_codes = detail_identity_codes_from_record_fields(record)
     if (
         not requested_codes
         or not record_codes
@@ -853,10 +720,6 @@ def _detail_redirect_identity_is_mismatched(
 
 
 (
-    detail_identity_codes_from_record_fields,
-    detail_identity_codes_from_url,
-    detail_query_identity_codes_from_url,
-    detail_identity_tokens,
     detail_redirect_identity_is_mismatched,
     detail_slug_title_fallback_from_url,
     detail_title_from_url,
@@ -867,12 +730,7 @@ def _detail_redirect_identity_is_mismatched(
     detail_url_matches_requested_identity,
     preferred_detail_identity_url,
     record_matches_requested_detail_identity,
-    semantic_detail_identity_tokens,
 ) = (
-    _detail_identity_codes_from_record_fields,
-    _detail_identity_codes_from_url,
-    _detail_query_identity_codes_from_url,
-    _detail_identity_tokens,
     _detail_redirect_identity_is_mismatched,
     _detail_slug_title_fallback_from_url,
     _detail_title_from_url,
@@ -883,5 +741,4 @@ def _detail_redirect_identity_is_mismatched(
     _detail_url_matches_requested_identity,
     _preferred_detail_identity_url,
     _record_matches_requested_detail_identity,
-    _semantic_detail_identity_tokens,
 )

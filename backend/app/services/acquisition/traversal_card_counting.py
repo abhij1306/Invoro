@@ -57,8 +57,8 @@ async def count_listing_cards(
         str(selector).strip() for selector in selectors or [] if str(selector).strip()
     ]
     if not normalized_selectors:
-        return (
-            await _heuristic_card_count(page, surface=surface) if allow_heuristic else 0
+        return await _optional_heuristic_card_count(
+            page, surface=surface, allowed=allow_heuristic
         )
     selector_counts = await _selector_card_counts(
         page, selectors=normalized_selectors, surface=surface
@@ -66,7 +66,7 @@ async def count_listing_cards(
     if isinstance(selector_counts, int):
         if selector_counts > 0 or not allow_heuristic:
             return selector_counts
-        return await _heuristic_card_count(page, surface=surface)
+        return await _optional_heuristic_card_count(page, surface=surface, allowed=True)
     resolved, use_heuristic = _resolve_selector_card_count(
         selector_counts, allow_heuristic=allow_heuristic
     )
@@ -75,7 +75,17 @@ async def count_listing_cards(
         return max(resolved, heuristic_count) if heuristic_count > 0 else 0
     if resolved > 0:
         return resolved
-    return await _heuristic_card_count(page, surface=surface) if allow_heuristic else 0
+    return await _optional_heuristic_card_count(
+        page, surface=surface, allowed=allow_heuristic
+    )
+
+
+async def _optional_heuristic_card_count(
+    page: Page, *, surface: str, allowed: bool
+) -> int:
+    if not allowed:
+        return 0
+    return await _heuristic_card_count(page, surface=surface)
 
 
 async def _selector_card_counts(

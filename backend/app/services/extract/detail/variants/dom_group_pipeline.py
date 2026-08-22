@@ -18,12 +18,14 @@ from app.services.extract.detail.variants.dom_options import (
     variant_option_availability,
 )
 from app.services.extract.detail.variants.state_targets import state_variant_targets
-from app.services.extract.variant_choice_traversal import (
-    infer_variant_group_name_from_values,
+from app.services.extract.variant_choice_collection import (
     iter_variant_choice_groups,
     iter_variant_select_groups,
-    resolve_variant_group_name,
     variant_dom_cues_present,
+)
+from app.services.extract.variant_choice_traversal import (
+    infer_variant_group_name_from_values,
+    resolve_variant_group_name,
 )
 from app.services.extract.variant_dom_provenance import (
     build_variant_candidate_group,

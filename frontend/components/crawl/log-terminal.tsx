@@ -6,7 +6,6 @@ import {
   CheckCircle2,
   ChevronDown,
   Clock,
-  Copy,
   Database,
   Dot,
   Globe,
@@ -34,7 +33,6 @@ import { uniqueRequestedFields } from '../../lib/crawl/fields';
 import { cleanRecordForDisplay } from '../../lib/crawl/record-utils';
 import { isInformativeValue, qualityLevelFromScore } from '../../lib/crawl/quality';
 import { scrollViewportToBottom } from '../../lib/crawl/scroll';
-import { syntaxHighlightJsonNodes } from '../../lib/ui/syntax';
 import { Button } from '../ui/primitives';
 import { acquisitionDiagnosticsSummary, recordConfidenceSummary } from './crawl-diagnostics';
 import {
@@ -50,6 +48,7 @@ import {
   TERMINAL_STRINGS,
 } from './log-terminal-utils';
 import type { LogStage, LogSiteGroup } from './log-terminal-utils';
+import { PayloadPeekPanel } from './log-terminal-payload';
 
 import {
   buildExpandedRows,
@@ -82,6 +81,7 @@ export const LogTerminal = memo(function LogTerminal({
 }>) {
   const ref = useLogViewport(logs.length, viewportRef);
   const peekPanelRef = useRef<HTMLDivElement | null>(null);
+  const peekReturnFocusRef = useRef<HTMLElement | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [peekedGroupKey, setPeekedGroupKey] = useState<string | null>(null);
   const [peekedRecordIndex, setPeekedRecordIndex] = useState(0);
@@ -227,6 +227,9 @@ export const LogTerminal = memo(function LogTerminal({
   return (
     <div
       className="crawl-terminal-shell group/terminal relative flex flex-col overflow-hidden rounded-none border"
+      onFocusCapture={(event) => {
+        if (!activePeekedGroupKey) peekReturnFocusRef.current = event.target as HTMLElement;
+      }}
       style={{
         borderColor: 'var(--terminal-border)',
         backgroundColor: 'var(--terminal-bg)',
@@ -331,6 +334,7 @@ export const LogTerminal = memo(function LogTerminal({
         {...{
           activePeekedGroupKey,
           peekPanelRef,
+          peekReturnFocusRef,
           peekedGroup,
           safePeekedRecordIndex,
           peekedRecordJson,
@@ -376,7 +380,7 @@ function LogGroupSection({
   const payload = payloadSnapshot(group);
   const confidence = groupConfidence(group);
   const coverage = groupFieldCoverage(group, requestedFields);
-  const activeGroup = live && (isLiveActive || groupStillActive(group));
+  const activeGroup = live && groupStillActive(group);
   const durationMs = groupDurationMs(group, activeGroup ? nowMs : undefined);
   const lastLog = group.logs.at(-1);
   const summaryLog =
@@ -722,93 +726,6 @@ function ExpandedLogRowView({
           </Button>
         ) : null}
       </span>
-    </div>
-  );
-}
-
-function PayloadPeekPanel({
-  activePeekedGroupKey,
-  peekPanelRef,
-  peekedGroup,
-  safePeekedRecordIndex,
-  peekedRecordJson,
-  setPeekedGroupKey,
-}: {
-  activePeekedGroupKey: string | null;
-  peekPanelRef: React.RefObject<HTMLDivElement | null>;
-  peekedGroup: LogSiteGroup | null;
-  safePeekedRecordIndex: number;
-  peekedRecordJson: string;
-  setPeekedGroupKey: React.Dispatch<React.SetStateAction<string | null>>;
-}) {
-  if (!activePeekedGroupKey) return null;
-  return (
-    <div className="absolute inset-0 z-40 bg-[color-mix(in_srgb,var(--bg-base)_60%,transparent)] backdrop-blur-sm">
-      <div
-        ref={peekPanelRef}
-        className="animate-in slide-in-from-right absolute inset-y-0 right-0 z-50 w-[36rem] max-w-full border-l duration-300"
-        style={{
-          borderColor: 'var(--terminal-border)',
-          backgroundColor: 'var(--terminal-code-bg)',
-          color: 'var(--terminal-fg)',
-          boxShadow: 'var(--terminal-shadow)',
-        }}
-      >
-        <div
-          className="flex items-center justify-between border-b px-6 py-3"
-          style={{
-            borderColor: 'var(--terminal-border)',
-            backgroundColor: 'var(--terminal-bg)',
-          }}
-        >
-          <div className="min-w-0 flex-1">
-            <div className="text-accent type-label-mono">{TERMINAL_STRINGS.PAYLOAD_PEEK}</div>
-            <div
-              className="mt-0.5 truncate pr-4 text-xs font-medium tabular-nums"
-              style={{ color: 'var(--text-muted)' }}
-              title={peekedGroup?.label ?? ''}
-            >
-              {peekedGroup?.label ?? TERMINAL_STRINGS.SITE_PAYLOAD}
-            </div>
-          </div>
-          <Button type="button" variant="quiet" size="sm" onClick={() => setPeekedGroupKey(null)}>
-            Close
-          </Button>
-        </div>
-        <div className="relative h-[calc(100%-56px)] overflow-hidden p-6">
-          <div className="group relative h-full">
-            <div className="absolute top-3 right-3 z-10 opacity-0 transition-opacity group-hover:opacity-100">
-              <Button
-                type="button"
-                variant="quiet"
-                size="sm"
-                onClick={() => {
-                  if (!peekedGroup) return;
-                  const currentRecord =
-                    peekedGroup.records[safePeekedRecordIndex] ?? peekedGroup.records[0];
-                  if (!currentRecord) return;
-                  void navigator.clipboard.writeText(
-                    JSON.stringify(cleanRecordForDisplay(currentRecord), null, 2),
-                  );
-                }}
-              >
-                <Copy className="mr-1.5 size-3" />
-                Copy
-              </Button>
-            </div>
-            {peekedRecordJson ? (
-              <pre className="crawl-terminal crawl-terminal-json h-full max-h-full overflow-auto">
-                <span className="sr-only">{peekedRecordJson}</span>
-                <span aria-hidden="true">{syntaxHighlightJsonNodes(peekedRecordJson)}</span>
-              </pre>
-            ) : (
-              <pre className="crawl-terminal crawl-terminal-json h-full max-h-full overflow-auto">
-                {TERMINAL_STRINGS.NO_PAYLOAD}
-              </pre>
-            )}
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

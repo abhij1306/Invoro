@@ -1,5 +1,12 @@
 from __future__ import annotations
 
+import re
+
+from app.services.config.detail_extraction_constants import (
+    MATERIAL_KEYWORD_TOKENS,
+    ORG_SUFFIX_PATTERN,
+)
+
 from .long_text_sanitization import (
     document_link_label_patterns,
     fulfillment_only_long_text_phrases,
@@ -88,3 +95,13 @@ __all__ = (
 
 def _clean_materials_pollution(value: object) -> str:
     return clean_materials_pollution(value)
+
+
+def materials_value_looks_like_org_name(value: str) -> bool:
+    lowered = value.lower()
+    if any(token in lowered for token in MATERIAL_KEYWORD_TOKENS):
+        return False
+    return bool(
+        (ORG_SUFFIX_PATTERN is not None and ORG_SUFFIX_PATTERN.search(lowered))
+        or re.fullmatch(r"[A-Z0-9 .,&'-]{6,}", value)
+    )

@@ -608,13 +608,16 @@ Still worth treating as active engineering concerns:
 
 Useful local commands:
 
+`backend/uv.lock` is the canonical backend dependency graph. Local verification and CI use uv 0.11.28 with `--frozen --extra dev`; do not replace it with an independently range-resolved pip install.
+
 ```powershell
 cd backend
 $env:PYTHONPATH='.'
-.\.venv\Scripts\python.exe -m pytest tests -q -m "unit or component or regression"
-.\.venv\Scripts\python.exe run_acquire_smoke.py commerce
-.\.venv\Scripts\python.exe run_extraction_smoke.py
-.\.venv\Scripts\python.exe run_test_sites_acceptance.py
+uv sync --frozen --extra dev
+uv run --frozen --extra dev pytest tests -q -m "unit or component or regression"
+uv run --frozen --extra dev python run_acquire_smoke.py commerce
+uv run --frozen --extra dev python run_extraction_smoke.py
+uv run --frozen --extra dev python run_test_sites_acceptance.py
 ```
 
 Acceptance harness note:

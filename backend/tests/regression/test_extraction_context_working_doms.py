@@ -137,3 +137,16 @@ def test_listing_extractor_recovers_partial_rendered_fragment_noise_removal() ->
         "Product Two",
         "Product Three",
     }
+
+
+@pytest.mark.regression
+def test_vtex_listing_slug_encodes_path_and_traversal_separators() -> None:
+    item = extraction_context_module._vtex_listing_item(
+        "Product:1",
+        {"productName": "Widget", "linkText": "../admin/item"},
+        state={},
+        base_origin="https://example.com",
+    )
+
+    assert item is not None
+    assert item["url"] == "https://example.com/%2E%2E%2Fadmin%2Fitem/p"

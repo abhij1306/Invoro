@@ -4,6 +4,7 @@ import pytest
 
 from app.services.dom.html_parser import BeautifulSoup, InvalidSelectorError
 from app.services.dom.query import safe_select
+from app.services.dom.selector_scope import is_other_detail_link, node_within_scope
 from app.services.dom.section_extraction import (
     extract_heading_sections,
     extract_section_content,
@@ -99,3 +100,22 @@ def test_variant_option_text_keeps_direct_text_without_dropped_child_text() -> N
     assert extract_node_value(node, "color", "https://example.com/item") == (
         "Blue Limited edition"
     )
+
+
+def test_node_scope_uses_node_identity_for_equal_siblings() -> None:
+    soup = BeautifulSoup(
+        "<section><i></i></section><section><i></i></section>", "html.parser"
+    )
+    scopes = soup.find_all("section")
+    node = scopes[0].find("i")
+
+    assert node is not None
+    assert node_within_scope(node, scopes[0]) is True
+    assert node_within_scope(node, scopes[1]) is False
+
+
+def test_other_detail_link_resolves_relative_candidate() -> None:
+    page_url = "https://example.com/products/current"
+
+    assert is_other_detail_link("/products/other", page_url) is True
+    assert is_other_detail_link("/products/current", page_url) is False

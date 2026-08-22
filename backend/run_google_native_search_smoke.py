@@ -69,6 +69,31 @@ async def _page_title(page) -> str:
         return ""
 
 
+async def _perform_google_search(
+    page, *, query: str, limit: int, page_status: int
+) -> tuple[int, dict[str, object], dict[str, object]]:
+    behavior = await emit_browser_behavior_activity(page)
+    typed = await type_text_like_human(page, GOOGLE_NATIVE_SEARCH_INPUT_SELECTOR, query)
+    typed_chars = typed.get("typed_chars", 0)
+    keyboard = getattr(page, "keyboard", None)
+    press = getattr(keyboard, "press", None)
+    if isinstance(typed_chars, int) and typed_chars > 0 and callable(press):
+        await press(GOOGLE_NATIVE_SUBMIT_KEY)
+        with suppress(Exception):
+            await page.wait_for_load_state(
+                "domcontentloaded", timeout=int(GOOGLE_NATIVE_NAVIGATION_TIMEOUT_MS)
+            )
+    else:
+        response = await page.goto(
+            _fallback_search_url(query, limit),
+            wait_until="domcontentloaded",
+            timeout=int(GOOGLE_NATIVE_NAVIGATION_TIMEOUT_MS),
+        )
+        page_status = int(getattr(response, "status", page_status) or page_status)
+    await page.wait_for_timeout(int(GOOGLE_NATIVE_RESULT_WAIT_MS))
+    return page_status, behavior, typed
+
+
 async def _run(query: str, *, limit: int, min_results: int, screenshot: bool) -> dict:
     started_at = time.perf_counter()
     artifact_dir = _artifact_dir()
@@ -87,34 +112,9 @@ async def _run(query: str, *, limit: int, min_results: int, screenshot: bool) ->
                 timeout=int(GOOGLE_NATIVE_NAVIGATION_TIMEOUT_MS),
             )
             page_status = int(getattr(response, "status", 0) or 0)
-            behavior = await emit_browser_behavior_activity(page)
-            typed = await type_text_like_human(
-                page,
-                GOOGLE_NATIVE_SEARCH_INPUT_SELECTOR,
-                query,
+            page_status, behavior, typed = await _perform_google_search(
+                page, query=query, limit=limit, page_status=page_status
             )
-            typed_chars = typed.get("typed_chars", 0)
-            if isinstance(typed_chars, int) and typed_chars > 0:
-                keyboard = getattr(page, "keyboard", None)
-                press = getattr(keyboard, "press", None)
-                if callable(press):
-                    await press(GOOGLE_NATIVE_SUBMIT_KEY)
-                    with suppress(Exception):
-                        await page.wait_for_load_state(
-                            "domcontentloaded",
-                            timeout=int(GOOGLE_NATIVE_NAVIGATION_TIMEOUT_MS),
-                        )
-                    await page.wait_for_timeout(int(GOOGLE_NATIVE_RESULT_WAIT_MS))
-            else:
-                response = await page.goto(
-                    _fallback_search_url(query, limit),
-                    wait_until="domcontentloaded",
-                    timeout=int(GOOGLE_NATIVE_NAVIGATION_TIMEOUT_MS),
-                )
-                page_status = int(
-                    getattr(response, "status", page_status) or page_status
-                )
-                await page.wait_for_timeout(int(GOOGLE_NATIVE_RESULT_WAIT_MS))
             html = await get_page_html(page)
             html_path.write_text(html, encoding="utf-8")
             if screenshot:

@@ -5,6 +5,7 @@ import type { DomainRunProfile } from '../../lib/api/types';
 import { UI_DELAYS } from '../../lib/constants/timing';
 import { TopBarProvider } from '../layout/top-bar-context';
 import { CrawlConfigScreen } from './crawl-config-screen';
+import { acquisitionContractForFetchMode } from './crawl-config-advanced';
 
 const { replaceMock, refreshMock, createCrawlMock, getDomainRunProfileMock, listSelectorsMock } =
   vi.hoisted(() => ({
@@ -368,6 +369,16 @@ describe('CrawlConfigScreen profile loading and dispatch behavior', () => {
       });
       expect(replaceMock).toHaveBeenCalledWith('/crawl?run_id=321');
       expect(refreshMock).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('clears browser preference when leaving browser-only mode', () => {
+    const browserOnly = runProfile('browser_only').acquisition_contract;
+
+    expect(acquisitionContractForFetchMode(browserOnly, 'auto')).toMatchObject({
+      prefer_browser: false,
+      prefer_curl_handoff: false,
+      handoff_cookie_engine: 'auto',
     });
   });
 

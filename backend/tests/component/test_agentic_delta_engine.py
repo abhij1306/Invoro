@@ -396,15 +396,17 @@ async def test_alert_api_end_to_end_with_dummy_product_change(
         },
     )
 
-    assert create_response.status_code == 201
     alert = create_response.json()
     alert_id = alert["id"]
-    assert alert["url"] == url
-    assert alert["target_fields"] == ["price", "availability"]
-    assert alert["last_known_values"] == {
-        "price": "19.99",
-        "availability": "in_stock",
+    expected_alert = {
+        "url": url,
+        "target_fields": ["price", "availability"],
+        "last_known_values": {"price": "19.99", "availability": "in_stock"},
     }
+    assert (
+        create_response.status_code == 201
+        and {key: alert[key] for key in expected_alert} == expected_alert
+    )
 
     html_by_url[url] = _detail_html(
         title="Widget Prime",
@@ -414,29 +416,32 @@ async def test_alert_api_end_to_end_with_dummy_product_change(
 
     test_response = await public_client.post(f"/api/alerts/{alert_id}/test")
 
-    assert test_response.status_code == 200
     test_payload = test_response.json()
-    assert test_payload["delta_count"] == 2
-    assert test_payload["current_snapshot"] == {
-        "price": "17.49",
-        "availability": "out_of_stock",
+    expected_test = {
+        "delta_count": 2,
+        "current_snapshot": {"price": "17.49", "availability": "out_of_stock"},
     }
+    assert (
+        test_response.status_code == 200
+        and {key: test_payload[key] for key in expected_test} == expected_test
+    )
     assert test_payload["alert"]["status"] == "triggered"
 
     history_response = await public_client.get(f"/api/alerts/{alert_id}/history")
-    assert history_response.status_code == 200
     history_payload = history_response.json()
-    assert history_payload["total"] == 3
     changed_fields = {
         item["field_name"]
         for item in history_payload["items"]
         if item["event_type"] == MONITOR_EVENT_FIELD_CHANGED
     }
-    assert changed_fields == {"price", "availability"}
+    assert (
+        history_response.status_code,
+        history_payload["total"],
+        changed_fields,
+    ) == (200, 3, {"price", "availability"})
 
     deliveries_response = await public_client.get(f"/api/alerts/{alert_id}/deliveries")
-    assert deliveries_response.status_code == 200
-    assert deliveries_response.json() == []
+    assert (deliveries_response.status_code, deliveries_response.json()) == (200, [])
 
 
 @pytest.mark.asyncio

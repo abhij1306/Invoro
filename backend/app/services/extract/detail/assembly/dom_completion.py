@@ -44,7 +44,7 @@ from app.services.extract.detail.assembly.raw_signals import (
     breadcrumb_category_from_dom,
 )
 from app.services.extract.field_candidates import finalize_candidate_value
-from app.services.extract.variant_choice_traversal import variant_dom_cues_present
+from app.services.extract.variant_choice_collection import variant_dom_cues_present
 from app.services.field_policy import exact_requested_field_key
 from app.services.shared.field_coerce import (
     clean_text,

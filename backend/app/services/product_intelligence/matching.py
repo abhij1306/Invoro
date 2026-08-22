@@ -38,7 +38,6 @@ from app.services.config.product_intelligence import (
     MATCH_TITLE_SIM_MEDIUM,
     MATCH_VARIANT_MISMATCH_PENALTY,
     MATCH_VARIANT_MISMATCH_SCORE_CAP,
-    PRIVATE_LABEL_BRANDS,
     PRODUCT_STYLE_CODE_MIN_LENGTH,
     PRODUCT_STYLE_CODE_PATTERN,
     SOURCE_AVAILABILITY_FIELDS,
@@ -62,20 +61,9 @@ from app.services.config.product_intelligence import (
 from app.services.product_intelligence.brand_registry import (
     infer_belk_brand,
     infer_belk_brand_prefix,
-    is_belk_exclusive_brand,
+    is_private_label as is_private_label,
+    normalize_brand,
 )
-
-
-def normalize_brand(value: object) -> str:
-    text = _normalize_text(value)
-    normalized = re.sub(r"[^a-z0-9]+", " ", text).strip()
-    return BRAND_ALIAS_MAP.get(normalized, normalized)
-
-
-def is_private_label(brand: object) -> bool:
-    return normalize_brand(brand) in PRIVATE_LABEL_BRANDS or is_belk_exclusive_brand(
-        brand
-    )
 
 
 def source_domain(url: object) -> str:

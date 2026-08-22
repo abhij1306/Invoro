@@ -165,6 +165,42 @@ def test_selector_self_heal_persists_valid_css_candidates_as_css_rules() -> None
 
 
 @pytest.mark.regression
+def test_selector_self_heal_rejects_ambiguous_or_out_of_scope_rules() -> None:
+    ambiguous = validated_xpath_rules(
+        html="<main><div class='spec'>A</div><div class='spec'>B</div></main>",
+        candidates=[{"field_name": "specifications", "css_selector": ".spec"}],
+        target_fields=["specifications"],
+    )
+    out_of_scope = validated_xpath_rules(
+        html="""
+        <main class="product-detail"><h1>Widget</h1><div class="price">$10</div></main>
+        <aside><div class="wrong-spec">Other product material</div></aside>
+        """,
+        candidates=[{"field_name": "specifications", "css_selector": ".wrong-spec"}],
+        target_fields=["specifications"],
+    )
+
+    assert ambiguous == []
+    assert out_of_scope == []
+
+
+@pytest.mark.regression
+def test_selector_self_heal_matches_rerun_record_by_identity() -> None:
+    from app.services.selector_self_heal import matching_selector_heal_record
+
+    rerun = matching_selector_heal_record(
+        [
+            {"sku": "first", "specifications": "First product"},
+            {"sku": "second", "specifications": "Second product"},
+        ],
+        fallback={"sku": "second", "specifications": ""},
+        record_index=1,
+    )
+
+    assert rerun["specifications"] == "Second product"
+
+
+@pytest.mark.regression
 def test_extract_records_tracks_dom_observed_selector_traces_for_final_dom_fields() -> (
     None
 ):

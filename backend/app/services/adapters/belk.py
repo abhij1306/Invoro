@@ -212,45 +212,65 @@ def _collect_state_payload_parts(root: object) -> _BelkStatePayloadParts:
     color_name_by_code: dict[str, str] = {}
     product_limit = adapter_runtime_settings.belk_max_products
 
-    def visit(node: object, depth: int) -> None:
-        if depth > 60:
-            return
+    pending: list[tuple[object, int]] = [(root, 0)]
+    while pending:
+        node, depth = pending.pop()
+        if depth > adapter_runtime_settings.belk_state_max_depth:
+            continue
         if isinstance(node, dict):
-            color_map = node.get(BELK_COLOR_MAP_KEY)
-            if isinstance(color_map, dict):
-                for code, value in color_map.items():
-                    code_text = clean_text(code)
-                    if not code_text or code_text in color_name_by_code:
-                        continue
-                    name = _color_name_from_entry(value)
-                    if name:
-                        color_name_by_code[code_text] = name
-
-            keys = {str(k) for k in node.keys()}
-            if (
-                len(variant_objects) < product_limit
-                and (keys & _BELK_VARIANT_ID_KEY_SET)
-                and "size" in keys
-            ):
-                variant_objects.append(node)
-            if len(products) < product_limit and _looks_like_product_payload(node):
-                products.append(node)
-
-            for child in node.values():
-                if isinstance(child, (dict, list)):
-                    visit(child, depth + 1)
-            return
-        if isinstance(node, list):
-            for child in node:
-                if isinstance(child, (dict, list)):
-                    visit(child, depth + 1)
-
-    visit(root, 0)
+            _collect_belk_color_names(node, color_name_by_code)
+            _collect_belk_product_node(node, products, variant_objects, product_limit)
+        pending.extend(
+            (child, depth + 1) for child in reversed(_belk_nested_children(node))
+        )
     return _BelkStatePayloadParts(
         products=products,
         variant_objects=variant_objects,
         color_name_by_code=color_name_by_code,
     )
+
+
+def _belk_nested_children(node: object) -> list[object]:
+    values = (
+        node.values()
+        if isinstance(node, dict)
+        else node
+        if isinstance(node, list)
+        else []
+    )
+    return [value for value in values if isinstance(value, (dict, list))]
+
+
+def _collect_belk_color_names(
+    node: dict[str, Any], color_name_by_code: dict[str, str]
+) -> None:
+    color_map = node.get(BELK_COLOR_MAP_KEY)
+    if not isinstance(color_map, dict):
+        return
+    for code, value in color_map.items():
+        code_text = clean_text(code)
+        if not code_text or code_text in color_name_by_code:
+            continue
+        name = _color_name_from_entry(value)
+        if name:
+            color_name_by_code[code_text] = name
+
+
+def _collect_belk_product_node(
+    node: dict[str, Any],
+    products: list[dict[str, Any]],
+    variant_objects: list[dict[str, Any]],
+    product_limit: int,
+) -> None:
+    keys = {str(key) for key in node}
+    if (
+        len(variant_objects) < product_limit
+        and (keys & _BELK_VARIANT_ID_KEY_SET)
+        and "size" in keys
+    ):
+        variant_objects.append(node)
+    if len(products) < product_limit and _looks_like_product_payload(node):
+        products.append(node)
 
 
 def _color_name_from_entry(value: object) -> str | None:
