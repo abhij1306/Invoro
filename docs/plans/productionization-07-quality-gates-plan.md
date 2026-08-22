@@ -139,3 +139,4 @@ pnpm run build
 - Current local quality checks passed in the audit except absolute LOC/complexity and backend CI formatting. Full pytest/Vitest were not run by that audit.
 - External GitHub branch protection is unverified. Repo CI must still be correct; provider enforcement needs separate readback if requested.
 - 2026-08-22 precondition scan found remaining debt, so this plan was not started: 9 backend Python files, 1 frontend TSX file, and 26 Python callables exceeded the absolute limits (excluding Radon's aggregate class score). The user moved that cleanup into the Plan 06 branch. Re-run the scans at Plan 07 start.
+- Plan 06 closeout scan reports zero maintained files above 800 lines, zero Python callables above CC 15, and a green frontend ESLint complexity-15 diagnostic. Re-run at Plan 07 start before adding enforcement.
