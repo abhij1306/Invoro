@@ -24,6 +24,7 @@ from app.services.config.public_record_policy import (
     PUBLIC_RECORD_DETAIL_CANONICAL_QUERY_KEYS,
     PUBLIC_RECORD_DETAIL_CANONICAL_QUERY_PREFIXES,
 )
+from app.services.config.surface_hints import detail_path_hints
 from app.services.shared.field_coerce import clean_text, text_or_none
 
 DETAIL_IDENTITY_QUERY_KEYS = frozenset(
@@ -39,6 +40,11 @@ DETAIL_IDENTITY_QUERY_PREFIXES = tuple(
 LOWER_NON_ALNUM_RE = re.compile(r"[^a-z0-9]+")
 MIXED_NON_ALNUM_RE = re.compile(r"[^A-Za-z0-9]+")
 HTML_SUFFIX_RE = re.compile(r"\.htm(?:l)?$", re.IGNORECASE)
+_DETAIL_IDENTITY_PATH_MARKERS = frozenset(
+    marker.strip("/").casefold()
+    for marker in detail_path_hints("ecommerce_detail")
+    if marker.strip("/")
+)
 
 
 def detail_url_path_segments(url: str) -> list[str]:
@@ -80,17 +86,30 @@ def detail_identity_codes_from_url(url: object) -> set[str]:
     parsed = urlparse(text)
     codes: set[str] = set()
     segments = detail_url_path_segments(text)
-    terminal = HTML_SUFFIX_RE.sub("", segments[-1]) if segments else ""
-    code_like_terminal = detail_segment_code(terminal)
-    if code_like_terminal:
-        codes.add(code_like_terminal)
-    # Embedded URL identity is authoritative only for numeric product codes in
-    # the terminal segment (for example ``productpage.1317259001.html``).
-    # Mixed slug tokens such as ``widget2025`` are descriptive, not identifiers.
-    for match in re.findall(rf"\d{{{DETAIL_IDENTITY_CODE_MIN_LENGTH},}}", terminal):
-        normalized = normalized_detail_identity_code(match)
-        if normalized:
-            codes.add(normalized)
+    for index, segment in enumerate(segments):
+        candidate = HTML_SUFFIX_RE.sub("", segment)
+        previous_is_marker = (
+            index > 0
+            and segments[index - 1].casefold() in _DETAIL_IDENTITY_PATH_MARKERS
+        )
+        next_is_marker = (
+            index + 1 < len(segments)
+            and segments[index + 1].casefold() in _DETAIL_IDENTITY_PATH_MARKERS
+        )
+        if (
+            index == len(segments) - 1
+            or previous_is_marker
+            or (next_is_marker and candidate.isdigit())
+        ):
+            if code := detail_segment_code(candidate):
+                codes.add(code)
+        # Long numeric runs are authoritative product IDs wherever they appear
+        # in a path. Mixed letter/digit slug tokens remain excluded.
+        for match in re.findall(
+            rf"\d{{{DETAIL_IDENTITY_CODE_MIN_LENGTH},}}", candidate
+        ):
+            if normalized := normalized_detail_identity_code(match):
+                codes.add(normalized)
     for key, _value in parse_qsl(parsed.query, keep_blank_values=True):
         match = re.match(
             r"dwvar_([A-Za-z0-9][A-Za-z0-9_-]{6,}[A-Za-z0-9])_",

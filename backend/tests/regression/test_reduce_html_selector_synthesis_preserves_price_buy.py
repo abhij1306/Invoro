@@ -186,9 +186,9 @@ def test_selector_self_heal_rejects_ambiguous_or_out_of_scope_rules() -> None:
 
 @pytest.mark.regression
 def test_selector_self_heal_matches_rerun_record_by_identity() -> None:
-    from app.services.selector_self_heal import _matching_rerun_record
+    from app.services.selector_self_heal import matching_selector_heal_record
 
-    rerun = _matching_rerun_record(
+    rerun = matching_selector_heal_record(
         [
             {"sku": "first", "specifications": "First product"},
             {"sku": "second", "specifications": "Second product"},

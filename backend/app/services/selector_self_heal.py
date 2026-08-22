@@ -626,3 +626,4 @@ def _list_or_empty(value: object) -> list[object]:
 
 validated_xpath_rules = _validated_xpath_rules
 selector_heal_improved_record = _selector_heal_improved_record
+matching_selector_heal_record = _matching_rerun_record
