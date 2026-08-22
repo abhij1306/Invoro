@@ -57,12 +57,11 @@ from app.services.extract.detail.assembly.raw_signals import (
 from app.services.extract.detail.text.sanitizer import (
     detail_product_type_is_low_signal,
     detail_title_value_is_low_signal,
+    materials_value_looks_like_org_name,
 )
 from app.services.config.detail_extraction_constants import (
     DETAIL_PLACEHOLDER_TITLE_PATTERNS as _DETAIL_PLACEHOLDER_TITLE_PATTERNS,
-    MATERIAL_KEYWORD_TOKENS as _material_keyword_tokens,
     MERCH_CODE_PATTERN as _MERCH_CODE_PATTERN,
-    ORG_SUFFIX_PATTERN as _ORG_SUFFIX_PATTERN,
     UUID_LIKE_PATTERN as _UUID_LIKE_PATTERN,
 )
 
@@ -108,7 +107,7 @@ def _sanitize_detail_product_type_and_materials(record: dict[str, Any]) -> None:
     if detail_product_type_is_low_signal(text_or_none(record.get("product_type"))):
         record.pop("product_type", None)
     materials = text_or_none(record.get("materials"))
-    if materials and _materials_value_looks_like_org_name(materials):
+    if materials and materials_value_looks_like_org_name(materials):
         record.pop("materials", None)
 
 
@@ -792,14 +791,4 @@ def detail_title_looks_like_placeholder(title: str) -> bool:
         return True
     return any(
         pattern.search(normalized) for pattern in _DETAIL_PLACEHOLDER_TITLE_PATTERNS
-    )
-
-
-def _materials_value_looks_like_org_name(value: str) -> bool:
-    lowered = value.lower()
-    if any(token in lowered for token in _material_keyword_tokens):
-        return False
-    return bool(
-        (_ORG_SUFFIX_PATTERN is not None and _ORG_SUFFIX_PATTERN.search(lowered))
-        or re.fullmatch(r"[A-Z0-9 .,&'-]{6,}", value, re.IGNORECASE)
     )

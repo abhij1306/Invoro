@@ -418,6 +418,12 @@ class CrawlerRuntimeSettings(BaseSettings):
             ) or getattr(self, field_name) is None:
                 setattr(self, field_name, profile[field_name])
 
+        self._validate_process_and_browser_settings()
+        self._validate_memory_and_quality_settings()
+        self._validate_detail_and_api_settings()
+        return self
+
+    def _validate_process_and_browser_settings(self) -> None:
         self.worker_orphan_recovery_grace_seconds = max(
             int(self.worker_orphan_recovery_grace_seconds), 60
         )
@@ -520,6 +526,8 @@ class CrawlerRuntimeSettings(BaseSettings):
             raise ValueError(
                 "browser_capture_total_network_payload_bytes must be >= browser_capture_max_network_payload_bytes"
             )
+
+    def _validate_memory_and_quality_settings(self) -> None:
         for field_name in (
             "acquisition_artifact_ttl_seconds",
             "acquisition_artifact_cleanup_interval_seconds",
@@ -561,6 +569,8 @@ class CrawlerRuntimeSettings(BaseSettings):
             _require_open_unit_interval(field_name, getattr(self, field_name))
         if not str(self.host_memory_ttl_seconds_key or "").strip():
             raise ValueError("host_memory_ttl_seconds_key must not be blank")
+
+    def _validate_detail_and_api_settings(self) -> None:
         _require_positive("detail_max_variant_axes", self.detail_max_variant_axes)
         _require_positive(
             "selector_regex_max_pattern_length",
@@ -595,7 +605,6 @@ class CrawlerRuntimeSettings(BaseSettings):
             "api_rate_limit_window_seconds", self.api_rate_limit_window_seconds
         )
         _require_positive("api_rate_limit_max_clients", self.api_rate_limit_max_clients)
-        return self
 
     def coerce_url_timeout_seconds(self, value: object) -> float:
         try:

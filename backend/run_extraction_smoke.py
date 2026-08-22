@@ -184,133 +184,21 @@ async def _run_one(site: dict, run_id: int, timeout_seconds: int) -> dict:
     }
 
     try:
-        acquisition = await asyncio.wait_for(
-            acquire(
-                AcquisitionRequest(
-                    run_id=run_id,
-                    url=url,
-                    plan=AcquisitionPlan(
-                        surface=surface,
-                        traversal_mode=str(site.get("traversal_mode") or "").strip()
-                        or None,
-                        max_pages=5,
-                        max_scrolls=5,
-                    ),
-                    requested_fields=list(site.get("expect_fields") or []),
-                )
-            ),
-            timeout=timeout_seconds,
+        records = await _acquire_and_extract_site(
+            result,
+            site=site,
+            run_id=run_id,
+            timeout_seconds=timeout_seconds,
+            url=url,
+            surface=surface,
         )
-        blocked = (
-            is_blocked_html(acquisition.html or "", acquisition.status_code)
-            if acquisition.content_type.startswith("text/html")
-            else False
-        )
-        adapter_result = None
-        if acquisition.content_type.startswith("text/html"):
-            adapter_result = await run_adapter(url, acquisition.html or "", surface)
-
-        result.update(
-            {
-                "method": acquisition.method,
-                "status_code": acquisition.status_code,
-                "content_type": acquisition.content_type,
-                "platform_family": detect_platform_family(url, acquisition.html or ""),
-                "html_len": len(acquisition.html or ""),
-                "network_payloads": len(acquisition.network_payloads or []),
-                "blocked": blocked,
-                "adapter_name": adapter_result.adapter_name if adapter_result else None,
-                "adapter_records": len(adapter_result.records) if adapter_result else 0,
-                "browser_diagnostics": dict(acquisition.browser_diagnostics or {}),
-            }
-        )
-
-        if acquisition.content_type.startswith("application/json"):
-            result["ok"] = True
-            result["note"] = "JSON response; extraction corpus checks skipped"
+        if records is None:
             return result
 
-        records = extract_records(
-            acquisition.html or "",
-            url,
-            surface,
-            max_records=int(site.get("max_records") or 50),
-            requested_fields=[str(field) for field in site.get("expect_fields") or []]
-            or None,
-            adapter_records=list(adapter_result.records or [])
-            if adapter_result
-            else None,
-            network_payloads=acquisition.network_payloads or [],
-            selector_rules=None,
-        )
-
         if "listing" in surface:
-            required_fields = [
-                str(field) for field in site.get("required_record_fields") or []
-            ]
-            coverage = _listing_field_coverage(
-                records,
-                required_fields,
-                sample_limit=int(site.get("sample_limit") or 10),
-            )
-            thresholds = {
-                str(field): float(threshold)
-                for field, threshold in (
-                    site.get("required_record_field_coverage") or {}
-                ).items()
-            }
-            failing_fields = [
-                field
-                for field, threshold in thresholds.items()
-                if coverage.get(field, 0.0) < threshold
-            ]
-            result.update(
-                {
-                    "records": len(records),
-                    "required_record_fields": required_fields,
-                    "required_record_field_coverage": coverage,
-                    "sample_fields": (
-                        [key for key in records[0] if not str(key).startswith("_")]
-                        if records
-                        else []
-                    ),
-                    "sample_title": (
-                        str(records[0].get("title") or "")[:120] if records else ""
-                    ),
-                }
-            )
-            min_records = int(site.get("expect_min_records") or 0)
-            result["ok"] = len(records) >= min_records and not failing_fields
-            if len(records) < min_records:
-                result["issue"] = (
-                    f"Expected >= {min_records} records, got {len(records)}"
-                )
-            elif failing_fields:
-                result["issue"] = (
-                    f"Coverage below threshold for: {sorted(failing_fields)}"
-                )
+            _evaluate_listing_records(result, site=site, records=records)
         else:
-            expected_fields = [str(field) for field in site.get("expect_fields") or []]
-            found_fields = [
-                field
-                for field in expected_fields
-                if records
-                and field in records[0]
-                and _value_present(records[0].get(field))
-            ]
-            missing_fields = [
-                field for field in expected_fields if field not in found_fields
-            ]
-            result.update(
-                {
-                    "candidate_fields": sorted(records[0].keys()) if records else [],
-                    "found_fields": found_fields,
-                    "missing_fields": missing_fields,
-                }
-            )
-            result["ok"] = not missing_fields
-            if missing_fields:
-                result["issue"] = f"Missing expected fields: {missing_fields}"
+            _evaluate_detail_records(result, site=site, records=records)
     except Exception as exc:  # pylint: disable=broad-exception-caught
         result["ok"] = False
         result["error"] = f"{type(exc).__name__}: {exc}"
@@ -319,6 +207,163 @@ async def _run_one(site: dict, run_id: int, timeout_seconds: int) -> dict:
         _apply_elapsed_assertion(result, site)
 
     return result
+
+
+async def _acquire_and_extract_site(
+    result: dict[str, object],
+    *,
+    site: dict,
+    run_id: int,
+    timeout_seconds: int,
+    url: str,
+    surface: str,
+) -> list[dict] | None:
+    traversal_mode = str(site.get("traversal_mode") or "").strip() or None
+    acquisition = await asyncio.wait_for(
+        acquire(
+            AcquisitionRequest(
+                run_id=run_id,
+                url=url,
+                plan=AcquisitionPlan(
+                    surface=surface,
+                    traversal_mode=traversal_mode,
+                    max_pages=5,
+                    max_scrolls=5,
+                ),
+                requested_fields=list(site.get("expect_fields") or []),
+            )
+        ),
+        timeout=timeout_seconds,
+    )
+    adapter_result = await _smoke_adapter_result(acquisition, url=url, surface=surface)
+    result.update(_smoke_acquisition_metadata(acquisition, adapter_result, url=url))
+    if acquisition.content_type.startswith("application/json"):
+        result["ok"] = True
+        result["note"] = "JSON response; extraction corpus checks skipped"
+        return None
+    return _extract_smoke_records(
+        acquisition, adapter_result, site=site, url=url, surface=surface
+    )
+
+
+async def _smoke_adapter_result(acquisition, *, url: str, surface: str):
+    if not acquisition.content_type.startswith("text/html"):
+        return None
+    return await run_adapter(url, acquisition.html or "", surface)
+
+
+def _smoke_acquisition_metadata(acquisition, adapter_result, *, url: str) -> dict:
+    html = acquisition.html or ""
+    is_html = acquisition.content_type.startswith("text/html")
+    return {
+        "method": acquisition.method,
+        "status_code": acquisition.status_code,
+        "content_type": acquisition.content_type,
+        "platform_family": detect_platform_family(url, html),
+        "html_len": len(html),
+        "network_payloads": len(acquisition.network_payloads or []),
+        "blocked": is_blocked_html(html, acquisition.status_code) if is_html else False,
+        "adapter_name": getattr(adapter_result, "adapter_name", None),
+        "adapter_records": len(getattr(adapter_result, "records", ())),
+        "browser_diagnostics": dict(acquisition.browser_diagnostics or {}),
+    }
+
+
+def _extract_smoke_records(
+    acquisition, adapter_result, *, site: dict, url: str, surface: str
+) -> list[dict]:
+    expected_fields = [str(field) for field in site.get("expect_fields") or []]
+    adapter_records = list(getattr(adapter_result, "records", ()))
+    return extract_records(
+        acquisition.html or "",
+        url,
+        surface,
+        max_records=int(site.get("max_records") or 50),
+        requested_fields=expected_fields or None,
+        adapter_records=adapter_records or None,
+        network_payloads=acquisition.network_payloads or [],
+        selector_rules=None,
+    )
+
+
+def _evaluate_listing_records(
+    result: dict[str, object], *, site: dict, records: list[dict]
+) -> None:
+    required_fields = [str(field) for field in site.get("required_record_fields") or []]
+    coverage = _listing_field_coverage(
+        records, required_fields, sample_limit=int(site.get("sample_limit") or 10)
+    )
+    failing_fields = _failing_listing_coverage_fields(site, coverage=coverage)
+    first_record = records[0] if records else {}
+    result.update(
+        {
+            "records": len(records),
+            "required_record_fields": required_fields,
+            "required_record_field_coverage": coverage,
+            "sample_fields": [
+                key for key in first_record if not str(key).startswith("_")
+            ],
+            "sample_title": str(first_record.get("title") or "")[:120],
+        }
+    )
+    min_records = int(site.get("expect_min_records") or 0)
+    issue = _listing_smoke_issue(
+        record_count=len(records),
+        min_records=min_records,
+        failing_fields=failing_fields,
+    )
+    result["ok"] = issue is None
+    if issue is not None:
+        result["issue"] = issue
+
+
+def _failing_listing_coverage_fields(
+    site: dict, *, coverage: dict[str, float]
+) -> list[str]:
+    thresholds = {
+        str(field): float(threshold)
+        for field, threshold in (
+            site.get("required_record_field_coverage") or {}
+        ).items()
+    }
+    return [
+        field
+        for field, threshold in thresholds.items()
+        if coverage.get(field, 0.0) < threshold
+    ]
+
+
+def _listing_smoke_issue(
+    *, record_count: int, min_records: int, failing_fields: list[str]
+) -> str | None:
+    if record_count < min_records:
+        return f"Expected >= {min_records} records, got {record_count}"
+    if failing_fields:
+        return f"Coverage below threshold for: {sorted(failing_fields)}"
+    return None
+
+
+def _evaluate_detail_records(
+    result: dict[str, object], *, site: dict, records: list[dict]
+) -> None:
+    expected_fields = [str(field) for field in site.get("expect_fields") or []]
+    first_record = records[0] if records else {}
+    found_fields = [
+        field
+        for field in expected_fields
+        if field in first_record and _value_present(first_record.get(field))
+    ]
+    missing_fields = [field for field in expected_fields if field not in found_fields]
+    result.update(
+        {
+            "candidate_fields": sorted(first_record),
+            "found_fields": found_fields,
+            "missing_fields": missing_fields,
+            "ok": not missing_fields,
+        }
+    )
+    if missing_fields:
+        result["issue"] = f"Missing expected fields: {missing_fields}"
 
 
 async def main(argv: list[str]) -> int:

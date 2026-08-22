@@ -205,13 +205,7 @@ export function AlertForm({ initial, onSubmit, onCancel, submitLabel }: Readonly
 function initialAlertFields(initial: Partial<MonitorJob> | undefined) {
   const tracked = initial?.tracked_fields ?? [];
   if (!tracked.length) return ['price', 'availability'];
-  const supported = tracked.filter((field) => fieldOptions.includes(field));
-  const dropped = tracked.filter((field) => !fieldOptions.includes(field));
-  if (process.env.NODE_ENV === 'development' && dropped.length)
-    console.warn(
-      `alert-form initial.tracked_fields contained unsupported fields: ${dropped.join(', ')}`,
-    );
-  return supported;
+  return tracked;
 }
 
 function alertInitialUrl(initial: Partial<MonitorJob> | undefined) {

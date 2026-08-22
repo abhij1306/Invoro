@@ -106,6 +106,7 @@ export function useCrawlRunController(options: ControllerOptions) {
   }, [records, tableRecords]);
 
   const visibleRecords = recordsForOutputTab(effectiveOutputTab, tableRecords, records);
+  const batchSourceRecords = preferredRecords(tableRecords, records);
   const visibleRecordIds = useMemo(
     () => new Set(visibleRecords.map((record) => record.id)),
     [visibleRecords],
@@ -116,12 +117,11 @@ export function useCrawlRunController(options: ControllerOptions) {
   );
   const selectedRecords = useMemo(
     () =>
-      visibleRecords.filter(
-        (record) => record.run_id === runId && visibleSelectedIds.includes(record.id),
+      mergedRecords(tableRecords, records).filter(
+        (record) => record.run_id === runId && selectedIds.includes(record.id),
       ),
-    [runId, visibleRecords, visibleSelectedIds],
+    [records, runId, selectedIds, tableRecords],
   );
-  const batchSourceRecords = preferredRecords(tableRecords, records);
   const resultUrls = useMemo(
     () => uniqueStrings(batchSourceRecords.map((record) => extractRecordUrl(record))),
     [batchSourceRecords],
@@ -317,6 +317,12 @@ function recordsForOutputTab(
 
 function preferredRecords(primary: CrawlRecord[], fallback: CrawlRecord[]) {
   return primary.length ? primary : fallback;
+}
+
+function mergedRecords(primary: CrawlRecord[], secondary: CrawlRecord[]) {
+  const recordsById = new Map(primary.map((record) => [record.id, record]));
+  secondary.forEach((record) => recordsById.set(record.id, record));
+  return Array.from(recordsById.values());
 }
 
 function preferredValues<T>(primary: T[], fallback: T[]) {

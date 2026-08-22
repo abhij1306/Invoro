@@ -18,6 +18,7 @@ class AdapterRuntimeSettings(BaseSettings):
     shopify_max_option_axis_count: int = 3
     shopify_linked_variant_max_handles: int = 8
     belk_max_products: int = 500
+    belk_state_max_depth: int = 60
     icims_pagination_timeout_seconds: int = 15
     icims_page_size: int = 100
     icims_max_offset: int = 1000
@@ -38,50 +39,36 @@ class AdapterRuntimeSettings(BaseSettings):
 
     @model_validator(mode="after")
     def _validate(self) -> AdapterRuntimeSettings:
-        if self.ats_request_timeout_seconds <= 0:
-            raise ValueError("ats_request_timeout_seconds must be > 0")
-        if self.shopify_request_timeout_seconds <= 0:
-            raise ValueError("shopify_request_timeout_seconds must be > 0")
-        if self.shopify_catalog_limit <= 0:
-            raise ValueError("shopify_catalog_limit must be > 0")
-        if self.shopify_max_products <= 0:
-            raise ValueError("shopify_max_products must be > 0")
-        if self.shopify_max_option_axis_count <= 0:
-            raise ValueError("shopify_max_option_axis_count must be > 0")
-        if self.shopify_linked_variant_max_handles <= 0:
-            raise ValueError("shopify_linked_variant_max_handles must be > 0")
-        if self.belk_max_products <= 0:
-            raise ValueError("belk_max_products must be > 0")
-        if self.icims_pagination_timeout_seconds <= 0:
-            raise ValueError("icims_pagination_timeout_seconds must be > 0")
-        if self.icims_page_size <= 0:
-            raise ValueError("icims_page_size must be > 0")
-        if self.icims_max_offset <= 0:
-            raise ValueError("icims_max_offset must be > 0")
-        if self.icims_title_min_length <= 0:
-            raise ValueError("icims_title_min_length must be > 0")
+        positive_fields = (
+            "ats_request_timeout_seconds",
+            "shopify_request_timeout_seconds",
+            "shopify_catalog_limit",
+            "shopify_max_products",
+            "shopify_max_option_axis_count",
+            "shopify_linked_variant_max_handles",
+            "belk_max_products",
+            "belk_state_max_depth",
+            "icims_pagination_timeout_seconds",
+            "icims_page_size",
+            "icims_max_offset",
+            "icims_title_min_length",
+            "bullhorn_page_size",
+            "bullhorn_max_offset",
+            "bullhorn_request_timeout_seconds",
+            "paycom_listing_page_size",
+            "algolia_jobs_hits_per_page",
+            "firestore_jobs_page_size",
+            "oracle_hcm_detail_page_size",
+            "oracle_hcm_listing_page_size",
+            "saashr_pagination_size",
+        )
+        for field_name in positive_fields:
+            if getattr(self, field_name) <= 0:
+                raise ValueError(f"{field_name} must be > 0")
         if self.icims_max_offset < self.icims_page_size:
             raise ValueError("icims_max_offset must be >= icims_page_size")
-        if self.bullhorn_page_size <= 0:
-            raise ValueError("bullhorn_page_size must be > 0")
-        if self.bullhorn_max_offset <= 0:
-            raise ValueError("bullhorn_max_offset must be > 0")
         if self.bullhorn_max_offset < self.bullhorn_page_size:
             raise ValueError("bullhorn_max_offset must be >= bullhorn_page_size")
-        if self.bullhorn_request_timeout_seconds <= 0:
-            raise ValueError("bullhorn_request_timeout_seconds must be > 0")
-        if self.paycom_listing_page_size <= 0:
-            raise ValueError("paycom_listing_page_size must be > 0")
-        if self.algolia_jobs_hits_per_page <= 0:
-            raise ValueError("algolia_jobs_hits_per_page must be > 0")
-        if self.firestore_jobs_page_size <= 0:
-            raise ValueError("firestore_jobs_page_size must be > 0")
-        if self.oracle_hcm_detail_page_size <= 0:
-            raise ValueError("oracle_hcm_detail_page_size must be > 0")
-        if self.oracle_hcm_listing_page_size <= 0:
-            raise ValueError("oracle_hcm_listing_page_size must be > 0")
-        if self.saashr_pagination_size <= 0:
-            raise ValueError("saashr_pagination_size must be > 0")
         if not str(self.saashr_job_reqs_sort or "").strip():
             raise ValueError("saashr_job_reqs_sort must not be empty")
         return self

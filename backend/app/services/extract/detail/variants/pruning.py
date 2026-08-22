@@ -4,7 +4,6 @@ __all__ = ("sanitize_variant_row",)
 
 import logging
 import re
-from decimal import Decimal
 from functools import lru_cache
 from typing import Any
 from urllib.parse import urlparse
@@ -36,6 +35,7 @@ from app.services.extract.variant_option_value import (
     variant_option_value_matches_noise_token,
     variant_option_value_is_noise as _variant_option_value_is_noise,
 )
+from app.services.extract.variant_value_guards import numeric_size_value_in_variants
 from app.services.extract.detail.identity.core import (
     detail_identity_codes_from_url,
     detail_url_looks_like_product as _detail_url_looks_like_product,
@@ -747,7 +747,7 @@ def _should_drop_variant_derived_parent_axis(
         field_name == "size"
         and len(variant_values) >= DETAIL_VARIANT_SIZE_MIN_FOR_NUMERIC_PARENT_DROP
         and re.fullmatch(r"\d+(?:\.\d+)?", parent_value) is not None
-        and not _numeric_size_value_in_variants(parent_value, variant_values)
+        and not numeric_size_value_in_variants(parent_value, variant_values)
         and parent_value.casefold() not in variant_values
     )
     if numeric_size_mismatch or _parent_axis_value_looks_like_variant_dump(
@@ -784,21 +784,3 @@ def _parent_axis_value_looks_like_variant_dump(
         or "−" in normalized_parent
         or "/" in normalized_parent
     )
-
-
-def _numeric_size_value_in_variants(
-    parent_value: str, variant_values: set[str]
-) -> bool:
-    try:
-        parent_number = Decimal(parent_value).normalize()
-    except Exception:
-        return False
-    normalized_values: set[str] = set()
-    for value in variant_values:
-        try:
-            normalized_value = str(Decimal(value).normalize())
-        except Exception:
-            normalized_value = None
-        if normalized_value is not None:
-            normalized_values.add(normalized_value)
-    return str(parent_number) in normalized_values

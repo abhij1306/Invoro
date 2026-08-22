@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import re
+import unicodedata
+from urllib.parse import quote as url_quote
 from dataclasses import dataclass
 import logging
 from typing import Any
@@ -255,44 +257,9 @@ def _extract_vtex_state_listing_items(
     base_origin = f"{parsed_page.scheme}://{parsed_page.netloc}"
     items: list[dict[str, Any]] = []
     for key, value in state.items():
-        if not isinstance(value, dict):
-            continue
-        if not str(key).startswith("Product:"):
-            continue
-        product_name = value.get("productName") or value.get("name")
-        link_text = value.get("linkText") or value.get("slug")
-        if not product_name or not link_text:
-            continue
-        # Normalize slug: strip whitespace, lowercase, replace spaces with hyphens,
-        # percent-encode reserved chars while preserving international characters
-        import unicodedata
-        from urllib.parse import quote as url_quote
-
-        normalized_slug = re.sub(r"\s+", "-", str(link_text).strip().lower())
-        normalized_slug = unicodedata.normalize("NFC", normalized_slug)
-        normalized_slug = url_quote(normalized_slug, safe="-_/")
-        if not normalized_slug:
-            continue
-        url = f"{base_origin}/{normalized_slug}/p"
-        item: dict[str, Any] = {
-            "name": str(product_name),
-            "url": url,
-            "@type": "Product",
-        }
-        brand = value.get("brand")
-        if brand:
-            item["brand"] = str(brand)
-        description = value.get("description") or value.get("metaTagDescription")
-        if description:
-            item["description"] = str(description)
-        # Extract price from items/sellers structure
-        price = _vtex_state_product_price(value, state)
-        if price is not None:
-            item["offers"] = {"price": price}
-        image = _vtex_state_product_image(value, state)
-        if image:
-            item["image"] = image
-        items.append(item)
+        item = _vtex_listing_item(key, value, state=state, base_origin=base_origin)
+        if item is not None:
+            items.append(item)
     if len(items) < 2:
         return []
     return [
@@ -300,56 +267,101 @@ def _extract_vtex_state_listing_items(
     ]
 
 
+def _vtex_listing_item(
+    key: object,
+    value: object,
+    *,
+    state: dict[str, Any],
+    base_origin: str,
+) -> dict[str, Any] | None:
+    if not isinstance(value, dict) or not str(key).startswith("Product:"):
+        return None
+    product_name = value.get("productName") or value.get("name")
+    link_text = value.get("linkText") or value.get("slug")
+    if not product_name or not link_text:
+        return None
+    slug = re.sub(r"\s+", "-", str(link_text).strip().lower())
+    slug = url_quote(unicodedata.normalize("NFC", slug), safe="-_").replace(".", "%2E")
+    if not slug:
+        return None
+    item: dict[str, Any] = {
+        "name": str(product_name),
+        "url": f"{base_origin}/{slug}/p",
+        "@type": "Product",
+    }
+    _add_vtex_listing_metadata(item, value, state=state)
+    return item
+
+
+def _add_vtex_listing_metadata(
+    item: dict[str, Any], product: dict[str, Any], *, state: dict[str, Any]
+) -> None:
+    optional_text = {
+        "brand": product.get("brand"),
+        "description": product.get("description") or product.get("metaTagDescription"),
+    }
+    item.update({key: str(value) for key, value in optional_text.items() if value})
+    if (price := _vtex_state_product_price(product, state)) is not None:
+        item["offers"] = {"price": price}
+    if image := _vtex_state_product_image(product, state):
+        item["image"] = image
+
+
 def _vtex_state_product_price(
     product: dict[str, Any],
     state: dict[str, Any],
 ) -> float | None:
-    """Extract best price from VTEX product state entry.
-
-    VTEX uses Apollo Client normalized cache with ``{type: "id", id: "..."}``
-    references. Prices live at ``$Product:sp-XXX.priceRange.sellingPrice.lowPrice``.
-    """
     product_id = product.get("productId") or product.get("cacheId")
-    # Try Apollo-style priceRange reference resolution
-    price_range_ref = product.get("priceRange")
-    if isinstance(price_range_ref, dict):
-        # Inline or resolved priceRange
-        selling = _resolve_vtex_state_ref(price_range_ref.get("sellingPrice"), state)
-        if isinstance(selling, dict):
-            low = _coerce_positive_float(
-                selling.get("lowPrice") or selling.get("highPrice")
-            )
-            if low is not None:
-                return low
-    # Try resolving via state key pattern: $Product:sp-XXX.priceRange.sellingPrice
-    if product_id:
-        for prefix in (f"$Product:sp-{product_id}", f"$Product:{product_id}"):
-            selling_key = f"{prefix}.priceRange.sellingPrice"
-            selling_obj = _resolve_vtex_state_ref(state.get(selling_key), state)
-            if isinstance(selling_obj, dict):
-                low = _coerce_positive_float(
-                    selling_obj.get("lowPrice") or selling_obj.get("highPrice")
-                )
-                if low is not None:
-                    return low
-    # Fallback: items[0].sellers[0].commertialOffer
-    if product_id:
-        offer_key = next(
-            (
-                k
-                for k in state
-                if k.startswith(f"$Product:sp-{product_id}.items")
-                and "commertialOffer" in k
-            ),
-            None,
+    candidates = (
+        _vtex_inline_price(product, state),
+        _vtex_keyed_price(product_id, state),
+        _vtex_offer_price(product_id, state),
+    )
+    return next((price for price in candidates if price is not None), None)
+
+
+def _vtex_inline_price(product: dict[str, Any], state: dict[str, Any]) -> float | None:
+    price_range = product.get("priceRange")
+    if not isinstance(price_range, dict):
+        return None
+    selling = _resolve_vtex_state_ref(price_range.get("sellingPrice"), state)
+    return _vtex_price_from_mapping(selling)
+
+
+def _vtex_keyed_price(product_id: object, state: dict[str, Any]) -> float | None:
+    if not product_id:
+        return None
+    for prefix in (f"$Product:sp-{product_id}", f"$Product:{product_id}"):
+        selling = _resolve_vtex_state_ref(
+            state.get(f"{prefix}.priceRange.sellingPrice"), state
         )
-        if offer_key:
-            offer = _resolve_vtex_state_ref(state.get(offer_key), state)
-            if isinstance(offer, dict):
-                price = _coerce_positive_float(offer.get("Price") or offer.get("price"))
-                if price is not None:
-                    return price
+        if (price := _vtex_price_from_mapping(selling)) is not None:
+            return price
     return None
+
+
+def _vtex_offer_price(product_id: object, state: dict[str, Any]) -> float | None:
+    if not product_id:
+        return None
+    offer_key = next(
+        (
+            key
+            for key in state
+            if key.startswith(f"$Product:sp-{product_id}.items")
+            and "commertialOffer" in key
+        ),
+        None,
+    )
+    offer = _resolve_vtex_state_ref(state.get(offer_key), state) if offer_key else None
+    if not isinstance(offer, dict):
+        return None
+    return _coerce_positive_float(offer.get("Price") or offer.get("price"))
+
+
+def _vtex_price_from_mapping(value: object) -> float | None:
+    if not isinstance(value, dict):
+        return None
+    return _coerce_positive_float(value.get("lowPrice") or value.get("highPrice"))
 
 
 def _vtex_state_product_image(

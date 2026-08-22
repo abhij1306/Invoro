@@ -74,36 +74,49 @@ def _looks_like_ecommerce_detail(
     host_label: str,
     path_segments: list[str],
 ) -> bool:
-    if (
+    return bool(
+        _is_autozone_product(normalized_url, host)
+        or _is_index_product(path_segments)
+        or any(token in normalized_url for token in _DETAIL_HINTS)
+        or _is_product_file(path_segments)
+        or _is_branded_product_slug(path_segments, host_label=host_label)
+    )
+
+
+def _is_autozone_product(normalized_url: str, host: str) -> bool:
+    return (
         host == "autozone.com" or host.endswith(".autozone.com")
-    ) and normalized_url.rstrip("/").rsplit("/", 1)[-1].count("_") >= 2:
-        return True
-    if (
+    ) and normalized_url.rstrip("/").rsplit("/", 1)[-1].count("_") >= 2
+
+
+def _is_index_product(path_segments: list[str]) -> bool:
+    return bool(
         len(path_segments) >= 2
         and path_segments[-1] == "index.html"
         and _DETAIL_SLUG_WITH_ID_RE.fullmatch(path_segments[-2])
-    ):
-        return True
-    if any(token in normalized_url for token in _DETAIL_HINTS):
-        return True
+    )
+
+
+def _is_product_file(path_segments: list[str]) -> bool:
     terminal = path_segments[-1].lower() if path_segments else ""
-    if (
+    return bool(
         _DETAIL_FILE_RE.fullmatch(terminal)
         and not _NON_DETAIL_FILE_RE.fullmatch(terminal)
         and any(separator in terminal for separator in ("-", "_"))
         and not any(
             token in terminal for token in ("jobs", "careers", "category", "collection")
         )
-    ):
-        return True
-    if (
+    )
+
+
+def _is_branded_product_slug(path_segments: list[str], *, host_label: str) -> bool:
+    terminal = path_segments[-1].lower() if path_segments else ""
+    return bool(
         len(path_segments) == 1
         and _PRODUCT_LIKE_TERMINAL_SLUG_RE.fullmatch(terminal)
         and host_label
         and host_label in terminal
-    ):
-        return True
-    return False
+    )
 
 
 def build_explicit_sites(
@@ -183,11 +196,7 @@ def _site_row(defaults: dict[str, object], item: object) -> dict[str, object] | 
             explicit_surface=site.get("surface"),
         ),
         "bucket": str(site.get("bucket") or "").strip().lower() or None,
-        "expected_failure_modes": [
-            str(value).strip()
-            for value in _object_list(site.get("expected_failure_modes"))
-            if str(value).strip()
-        ],
+        "expected_failure_modes": _expected_failure_modes(site),
         "artifact_run_id": _safe_int(site.get("artifact_run_id")) or None,
         "seed_failure_mode": str(site.get("seed_failure_mode") or "").strip().lower()
         or None,
@@ -196,13 +205,25 @@ def _site_row(defaults: dict[str, object], item: object) -> dict[str, object] | 
             **_object_dict(item.get("quality_expectations")),
         },
     }
-    optional_values = {
+    row.update(_optional_site_values(site))
+    return row
+
+
+def _expected_failure_modes(site: dict[str, object]) -> list[str]:
+    return [
+        str(value).strip()
+        for value in _object_list(site.get("expected_failure_modes"))
+        if str(value).strip()
+    ]
+
+
+def _optional_site_values(site: dict[str, object]) -> dict[str, object]:
+    values = {
         "gate": str(site.get("gate") or "").strip().lower() or None,
         "expected": _object_dict(site.get("expected")) or None,
         "known_failure_mode": str(site.get("known_failure_mode") or "").strip() or None,
     }
-    row.update({key: value for key, value in optional_values.items() if value})
-    return row
+    return {key: value for key, value in values.items() if value}
 
 
 def _markdown_site_row(value: str) -> dict[str, str] | None:

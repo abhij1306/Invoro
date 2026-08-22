@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import pytest
 
-from app.services.extract.detail.text.sanitizer import _clean_materials_pollution
+from app.services.extract.detail.text.sanitizer import (
+    _clean_materials_pollution,
+    materials_value_looks_like_org_name,
+)
 
 
 @pytest.mark.unit
@@ -52,3 +55,9 @@ def test_clean_materials_keeps_long_text_when_head_has_composition() -> None:
     cleaned = _clean_materials_pollution(head_with_compo)
     # The salvage logic should NOT trigger when composition is in the head.
     assert "100% Cotton" in cleaned
+
+
+@pytest.mark.unit
+def test_materials_org_name_fallback_requires_uppercase() -> None:
+    assert materials_value_looks_like_org_name("ACME TRADING") is True
+    assert materials_value_looks_like_org_name("Acme Trading") is False

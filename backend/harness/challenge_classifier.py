@@ -91,13 +91,7 @@ def _adapter_failure_mode(
     del diagnostics
     family = str(result.get("platform_family") or "").strip().lower()
     platform_config = platform_config_for_family(family) if family else None
-    expected_adapters = {
-        str(name).strip().lower()
-        for name in (
-            platform_config.adapter_names if platform_config is not None else []
-        )
-        if str(name or "").strip()
-    }
+    expected_adapters = _expected_adapter_names(platform_config)
     missing_registrations = unavailable_configured_adapters()
     if expected_adapters and expected_adapters.issubset(missing_registrations):
         return "adapter_not_registered"
@@ -116,6 +110,11 @@ def _adapter_failure_mode(
             else "detail_extraction_empty"
         )
     return None
+
+
+def _expected_adapter_names(platform_config: object) -> set[str]:
+    names = getattr(platform_config, "adapter_names", ())
+    return {str(name).strip().lower() for name in names if str(name or "").strip()}
 
 
 def _diagnostics_indicate_challenge(diagnostics: dict[str, object]) -> bool:
@@ -145,21 +144,9 @@ def _challenge_summary_from_diagnostics(
 ) -> dict[str, object] | None:
     if not _diagnostics_indicate_challenge(diagnostics):
         return None
-    provider_hits = [
-        str(item or "").strip()
-        for item in _object_list(diagnostics.get("challenge_provider_hits"))
-        if str(item or "").strip()
-    ]
-    element_hits = [
-        str(item or "").strip()
-        for item in _object_list(diagnostics.get("challenge_element_hits"))
-        if str(item or "").strip()
-    ]
-    evidence = [
-        str(item or "").strip()
-        for item in _object_list(diagnostics.get("challenge_evidence"))
-        if str(item or "").strip()
-    ]
+    provider_hits = _diagnostic_strings(diagnostics, "challenge_provider_hits")
+    element_hits = _diagnostic_strings(diagnostics, "challenge_element_hits")
+    evidence = _diagnostic_strings(diagnostics, "challenge_evidence")
     summary: dict[str, object] = {
         "browser_outcome": str(diagnostics.get("browser_outcome") or "").strip().lower()
         or None,
@@ -169,6 +156,14 @@ def _challenge_summary_from_diagnostics(
         "evidence": evidence[:5],
     }
     return summary
+
+
+def _diagnostic_strings(diagnostics: dict[str, object], field_name: str) -> list[str]:
+    return [
+        str(item or "").strip()
+        for item in _object_list(diagnostics.get(field_name))
+        if str(item or "").strip()
+    ]
 
 
 def _looks_like_placeholder_or_wrong_content(
@@ -266,9 +261,7 @@ def _looks_like_site_shell_success(result: dict[str, object]) -> bool:
         or _safe_int(semantics.get("variant_count")) >= 2
     ):
         return False
-    title_tokens = {
-        token for token in re.split(r"[^a-z0-9]+", sample_title) if len(token) >= 3
-    }
+    title_tokens = _shell_identity_tokens(sample_title)
     host = (
         str(
             urlsplit(
@@ -279,16 +272,16 @@ def _looks_like_site_shell_success(result: dict[str, object]) -> bool:
         .strip()
         .lower()
     )
-    host_tokens = {
-        token
-        for token in re.split(r"[^a-z0-9]+", host.removeprefix("www."))
-        if len(token) >= 3
-    }
+    host_tokens = _shell_identity_tokens(host.removeprefix("www."))
     return bool(
         host_tokens
         and host_tokens & title_tokens
         and _safe_int(result.get("populated_fields")) <= 6
     )
+
+
+def _shell_identity_tokens(value: str) -> set[str]:
+    return {token for token in re.split(r"[^a-z0-9]+", value) if len(token) >= 3}
 
 
 def _looks_like_promo_or_wrong_page(result: dict[str, object]) -> bool:

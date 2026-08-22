@@ -1,12 +1,12 @@
 # Active Plan
 
-**Current:** Dependency and Reproducibility Hardening → `docs/plans/productionization-06-dependencies-reproducibility-plan.md`
-**Status:** QUEUED
+**Current:** Dependency/Reproducibility Hardening + Quality-Gate Preconditions → `docs/plans/productionization-06-dependencies-reproducibility-plan.md`
+**Status:** IN PROGRESS
 **Last completed:** Productionization 05 — Frontend Debt Reduction (2026-08-22)
 
 ## Queue
 
-1. Absolute Quality Gates → `docs/plans/productionization-07-quality-gates-plan.md` — queued; execute after Plans 01–06 are green
+1. Absolute Quality Gates → `docs/plans/productionization-07-quality-gates-plan.md` — queued for a separate branch after the current branch proves zero LOC/complexity violations
 
 ## Previously Completed
 

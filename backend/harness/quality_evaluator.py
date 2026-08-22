@@ -203,40 +203,53 @@ def _quality_category_clean_ok(
     if not category.strip():
         return True
     lowered = f" {category.lower()} "
-    if any(
-        token in lowered
-        for token in (
-            " previous ",
-            " next ",
-            " view all ",
-            " back ",
-            " best sellers ",
-            " shop by ",
-            "···",
-            " … ",
-        )
-    ):
+    if _category_contains_navigation_noise(lowered):
         return False
-    parts = [
+    parts = _category_parts(category)
+    if any(_category_part_is_navigation_noise(part) for part in parts):
+        return False
+    title = _normalized_space(result.get("sample_title")).lower()
+    sku = _normalized_space(
+        _object_dict(result.get("sample_record_data")).get("sku")
+    ).lower()
+    return not _category_contains_record_identity(parts, title=title, sku=sku)
+
+
+def _category_parts(category: str) -> list[str]:
+    return [
         part.strip().lower() for part in re.split(r">\s*|/+", category) if part.strip()
     ]
-    if any(
+
+
+def _category_contains_record_identity(
+    parts: list[str], *, title: str, sku: str
+) -> bool:
+    title_seen = bool(title) and title in parts
+    sku_seen = bool(sku) and any(
+        part == sku or part.endswith(f"sku: {sku}") for part in parts
+    )
+    return title_seen or sku_seen
+
+
+def _category_contains_navigation_noise(category: str) -> bool:
+    tokens = (
+        " previous ",
+        " next ",
+        " view all ",
+        " back ",
+        " best sellers ",
+        " shop by ",
+        "···",
+        " … ",
+    )
+    return any(token in category for token in tokens)
+
+
+def _category_part_is_navigation_noise(part: str) -> bool:
+    return (
         part in {"home", "...", "all categories", "best sellers"}
         or part.startswith(("...", "shop by "))
         or part.endswith("...")
-        for part in parts
-    ):
-        return False
-    title = " ".join(str(result.get("sample_title") or "").strip().lower().split())
-    sku = " ".join(
-        str(_object_dict(result.get("sample_record_data")).get("sku") or "")
-        .strip()
-        .lower()
-        .split()
-    )
-    return not bool(
-        (title and any(part == title for part in parts))
-        or (sku and any(part == sku or part.endswith(f"sku: {sku}") for part in parts))
     )
 
 

@@ -241,9 +241,13 @@ export function groupStillActive(group: LogSiteGroup) {
     return false;
   }
   const lastMessage = sanitizeLogMessage(group.logs.at(-1)?.message ?? '').toLowerCase();
+  const completedSuccessfully =
+    logIconContext('info', lastMessage, lastMessage).isComplete ||
+    lastMessage.includes('extracted');
   return !(
     group.stageLogs.persistence.length > 0 ||
     group.hasError ||
+    completedSuccessfully ||
     lastMessage.includes('processing failed') ||
     lastMessage.includes('timed out') ||
     lastMessage.includes('stopped after reaching max_records')

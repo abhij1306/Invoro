@@ -7,10 +7,8 @@ from decimal import Decimal
 from typing import Any
 
 from app.services.extract.detail.price.parsing import format_detail_price_decimal
-from app.services.extract.variant_choice_traversal import (
-    iter_variant_choice_groups,
-    resolve_variant_group_name,
-)
+from app.services.extract.variant_choice_collection import iter_variant_choice_groups
+from app.services.extract.variant_choice_traversal import resolve_variant_group_name
 from app.services.extract.variant_axis import (
     normalized_variant_axis_key,
     variant_axis_allowed_single_tokens,

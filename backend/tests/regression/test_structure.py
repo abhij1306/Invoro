@@ -346,20 +346,7 @@ def _module_level_names(path: Path) -> set[str]:
 def _module_all_names(path: Path) -> tuple[str, ...] | None:
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     for node in tree.body:
-        value_node: ast.AST | None = None
-        if isinstance(node, ast.Assign):
-            if any(
-                isinstance(target, ast.Name) and target.id == "__all__"
-                for target in node.targets
-            ):
-                value_node = node.value
-        elif (
-            isinstance(node, ast.AnnAssign)
-            and isinstance(node.target, ast.Name)
-            and node.target.id == "__all__"
-            and node.value is not None
-        ):
-            value_node = node.value
+        value_node = _module_all_value_node(node)
         if value_node is None:
             continue
         try:
@@ -371,6 +358,21 @@ def _module_all_names(path: Path) -> tuple[str, ...] | None:
         if not all(isinstance(name, str) and name for name in value):
             return None
         return tuple(value)
+    return None
+
+
+def _module_all_value_node(node: ast.stmt) -> ast.AST | None:
+    if isinstance(node, ast.Assign) and any(
+        isinstance(target, ast.Name) and target.id == "__all__"
+        for target in node.targets
+    ):
+        return node.value
+    if (
+        isinstance(node, ast.AnnAssign)
+        and isinstance(node.target, ast.Name)
+        and node.target.id == "__all__"
+    ):
+        return node.value
     return None
 
 

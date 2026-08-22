@@ -2,8 +2,8 @@
 
 **Created:** 2026-08-21
 **Agent:** Codex
-**Status:** QUEUED — set to `IN PROGRESS` only when this plan is assigned
-**PR boundary:** One independent PR. Dependency graph, frozen installs, and package-manager documentation only.
+**Status:** IN PROGRESS
+**PR boundary:** One branch for dependency hardening plus the remaining Plan 07 LOC/complexity precondition debt. Absolute gate implementation remains in Plan 07.
 **Touches buckets:** Backend/frontend manifests and lockfiles, dependency audit steps, fresh-clone documentation
 
 ## Goal
@@ -100,4 +100,7 @@ Versions change. Re-run registry/audit commands. Use current authoritative evide
 - Source evidence: `docs/audits/productionization-evidence-report-2026-08-21.md`, sections 2, 3, 8, 9, and 14.
 - Plan 07 also edits workflows. Merge this plan first or rebase Plan 07 cleanly; do not discard either plan's steps.
 - Dependency freshness is not “latest at all costs.” Supported, reproducible, verified graph is the target.
-
+- 2026-08-22 branch baseline: commit `b3c4fd662ce3f55bfbf089efa332fdcf14f7cb08`; worktree clean; Python 3.14.6 host, uv 0.11.28, Node 26.7.0, pnpm 11.22.0; Corepack is not installed on the host. The project targets Python 3.12 and pins pnpm 11.9.0.
+- Baseline frozen installs passed: `uv sync --project backend --frozen --extra dev` and `pnpm install --dir frontend --frozen-lockfile`.
+- Baseline frontend audit passed with no known vulnerabilities. `pnpm outdated` reported only `@hookform/resolvers` 5.8.0 -> 5.9.0 plus explicitly deferred ESLint 10 and TypeScript 7 majors. The lock already contains the `nanoid` 3.3.18 override.
+- Scope approved by the user on 2026-08-22: clear all remaining physical LOC >800 and callable CC >15 debt in this branch so Plan 07 can start separately after merge.

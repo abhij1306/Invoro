@@ -68,7 +68,9 @@ User/API request
 ## Prerequisites
 
 - Python 3.12
+- uv 0.11.28
 - Node.js 20+
+- Corepack with pnpm 11.9.0
 - PostgreSQL 15+
 - Redis 7+
 
@@ -96,10 +98,9 @@ Edit `.env` before first run. Minimum local values:
 
 ```powershell
 cd backend
-python -m venv .venv
-.\.venv\Scripts\pip install -e ".[dev]"
-.\.venv\Scripts\python init_db.py
-.\.venv\Scripts\python run_dev_server.py
+uv sync --frozen --extra dev
+uv run --frozen --extra dev python init_db.py
+uv run --frozen --extra dev python run_dev_server.py
 ```
 
 API: `http://127.0.0.1:8000`
@@ -108,8 +109,10 @@ API: `http://127.0.0.1:8000`
 
 ```powershell
 cd frontend
-npm install
-npm run dev
+corepack enable
+corepack prepare pnpm@11.9.0 --activate
+pnpm install --frozen-lockfile
+pnpm dev
 ```
 
 UI: `http://127.0.0.1:3000`
@@ -182,19 +185,30 @@ Backend checks:
 ```powershell
 cd backend
 $env:PYTHONPATH='.'
-.\.venv\Scripts\python.exe -m pytest tests -q -m "unit or component or regression"
-.\.venv\Scripts\python.exe run_acquire_smoke.py commerce
-.\.venv\Scripts\python.exe run_extraction_smoke.py
-.\.venv\Scripts\python.exe run_test_sites_acceptance.py
+uv sync --frozen --extra dev
+uv run --frozen --extra dev pip-audit --local --vulnerability-service osv
+uv run --frozen --extra dev ruff check app tests
+uv run --frozen --extra dev ruff format --check app tests
+uv run --frozen --extra dev mypy app
+uv run --frozen --extra dev pytest tests -q -m "unit or component or regression"
+uv run --frozen --extra dev python run_acquire_smoke.py commerce
+uv run --frozen --extra dev python run_extraction_smoke.py
+uv run --frozen --extra dev python run_test_sites_acceptance.py
 ```
 
 Frontend checks:
 
 ```powershell
 cd frontend
-npm run lint
-npm run test
-npm run test:e2e
+corepack prepare pnpm@11.9.0 --activate
+pnpm install --frozen-lockfile
+pnpm audit --audit-level=high
+pnpm format:check
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm build
+pnpm test:e2e
 ```
 
 Use the smallest relevant check for local slices. Run broader smoke or acceptance checks when changing shared acquisition, extraction, persistence, monitor, or API behavior.

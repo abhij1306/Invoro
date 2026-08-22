@@ -7,6 +7,7 @@ __all__ = (
 )
 
 from collections.abc import Callable
+from decimal import Decimal
 from urllib.parse import urlparse
 
 from app.services.config.variant_migration_rules import (
@@ -55,6 +56,20 @@ def variant_axis_value_exceeds_word_limit(
         return not (axis_key == VARIANT_COLOR_AXIS_FIELD and color_extractor(value))
     except Exception:
         return True
+
+
+def numeric_size_value_in_variants(parent_value: str, variant_values: set[str]) -> bool:
+    try:
+        parent_number = Decimal(parent_value).normalize()
+    except Exception:
+        return False
+    normalized_values: set[str] = set()
+    for value in variant_values:
+        try:
+            normalized_values.add(str(Decimal(value).normalize()))
+        except Exception:
+            continue
+    return str(parent_number) in normalized_values
 
 
 def drop_invalid_variant_urls(variant: dict[str, object]) -> None:

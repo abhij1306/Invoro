@@ -119,14 +119,24 @@ describeCrawlRunScreen(() => {
     renderRunScreen();
 
     fireEvent.click(await screen.findByRole('button', { name: 'Logs' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Peek' }));
+    const peekButton = await screen.findByRole('button', { name: 'Peek' });
+    peekButton.focus();
+    fireEvent.click(peekButton);
 
-    expect(await screen.findByText('Payload Peek')).toBeInTheDocument();
+    const dialog = await screen.findByRole('dialog', { name: 'Payload Peek' });
+    expect(dialog).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Close' })).toHaveFocus();
     expect(screen.getByText(/"title": "Item 1"/)).toBeInTheDocument();
     expect(screen.queryByText(/raw_record/)).not.toBeInTheDocument();
     expect(screen.queryByText(/source_trace/)).not.toBeInTheDocument();
     expect(screen.queryByText(/_confidence/)).not.toBeInTheDocument();
     expect(screen.queryByText(/_internal_metric/)).not.toBeInTheDocument();
+
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+    expect(screen.queryByRole('dialog', { name: 'Payload Peek' })).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Peek' })).toHaveFocus();
+    });
   });
 
   it('does not reopen the log websocket when incoming messages advance the log cursor', async () => {
@@ -204,6 +214,49 @@ describeCrawlRunScreen(() => {
     );
 
     expect(screen.getAllByText('0m 10s')).toHaveLength(2);
+  });
+
+  it('stops ticking a site duration after successful extraction', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-08T10:00:10Z'));
+
+    render(
+      <LogTerminal
+        live
+        logs={[
+          {
+            ...makeLog(1, 'Starting crawl run for https://example.com/p/1 (1/1)'),
+            created_at: '2026-04-08T10:00:00Z',
+          },
+          {
+            ...makeLog(2, 'Extracted 1 record for https://example.com/p/1'),
+            created_at: '2026-04-08T10:00:05Z',
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByText('0m 5s')).toBeInTheDocument();
+  });
+
+  it('preserves selected records when switching from table to logs', async () => {
+    apiMock.getRecords.mockResolvedValue({
+      items: [makeRecord(1), makeRecord(2)],
+      meta: { page: 1, limit: 100, total: 2 },
+    });
+
+    renderRunScreen();
+
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'Select record 1' }));
+    expect(
+      screen.getByRole('button', { name: 'Product Intelligence Selected (1)' }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Logs' }));
+
+    expect(
+      screen.getByRole('button', { name: 'Product Intelligence Selected (1)' }),
+    ).toBeInTheDocument();
   });
 
   it('prefills batch crawl with the originating jobs domain from listing runs', async () => {

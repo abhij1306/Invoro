@@ -4,6 +4,7 @@ import { cn } from '../../lib/utils';
 import { InlineAlert } from '../ui/patterns';
 import { Button, Card, Dropdown, Input, Tooltip } from '../ui/primitives';
 import { CRAWL_DEFAULTS, CRAWL_LIMITS } from '../../lib/constants/crawl-defaults';
+import type { DomainRunProfile } from '../../lib/api/types';
 import {
   FieldEditorHeader,
   ManualFieldEditor,
@@ -35,6 +36,25 @@ import {
   ADVANCED_SUBSECTION_CLASS,
 } from './crawl-config-state';
 import type { CrawlConfigScreenModel } from './crawl-config-screen';
+
+export function acquisitionContractForFetchMode(
+  current: DomainRunProfile['acquisition_contract'],
+  next: FetchMode,
+): DomainRunProfile['acquisition_contract'] {
+  return next === 'browser_only'
+    ? {
+        ...current,
+        prefer_browser: true,
+        prefer_curl_handoff: false,
+        handoff_cookie_engine: 'auto',
+      }
+    : {
+        ...current,
+        prefer_browser: false,
+        prefer_curl_handoff: false,
+        handoff_cookie_engine: 'auto',
+      };
+}
 
 export function FieldConfiguration({ model }: { model: CrawlConfigScreenModel }) {
   const {
@@ -196,15 +216,10 @@ export function AdvancedSettings({ model }: { model: CrawlConfigScreenModel }) {
                         ...current.fetch_profile,
                         fetch_mode: next,
                       },
-                      acquisition_contract:
-                        next === 'browser_only'
-                          ? {
-                              ...current.acquisition_contract,
-                              prefer_browser: true,
-                              prefer_curl_handoff: false,
-                              handoff_cookie_engine: 'auto',
-                            }
-                          : current.acquisition_contract,
+                      acquisition_contract: acquisitionContractForFetchMode(
+                        current.acquisition_contract,
+                        next,
+                      ),
                     }));
                   }
                 }}

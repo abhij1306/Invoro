@@ -33,7 +33,7 @@ def option_int(options: dict[str, object], key: str) -> int:
 def bounded_int(value: object, default: int, *, ceiling: int) -> int:
     try:
         parsed = int(value) if isinstance(value, (int, float)) else int(str(value))
-    except (TypeError, ValueError):
+    except (OverflowError, TypeError, ValueError):
         parsed = int(default)
     return min(max(1, parsed), int(ceiling))
 
@@ -47,6 +47,6 @@ def int_list(value: object) -> list[int]:
 def as_int(value: object) -> int | None:
     try:
         parsed = int(value) if isinstance(value, (int, float)) else int(str(value))
-    except (TypeError, ValueError):
+    except (OverflowError, TypeError, ValueError):
         return None
     return parsed if parsed > 0 else None

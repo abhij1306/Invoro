@@ -52,6 +52,7 @@ async def process_product_ref(
     if record is None:
         product.status = DATA_ENRICHMENT_STATUS_FAILED
         product.diagnostics = {"error": "source_record_missing"}
+        await session.commit()
         return job, False
     record_id = int(record.id)
     try:
