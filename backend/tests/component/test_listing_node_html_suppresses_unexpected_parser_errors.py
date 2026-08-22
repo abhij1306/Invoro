@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .test_traversal_runtime import PAGINATION_SELECTORS, _FakePage, _State, execute_listing_traversal, listing_node_html, pytest, traversal_module  # fmt: skip
 
+
 @pytest.mark.component
 def test_listing_node_html_suppresses_unexpected_parser_errors(caplog) -> None:
     class _BrokenNode:
@@ -11,6 +12,7 @@ def test_listing_node_html_suppresses_unexpected_parser_errors(caplog) -> None:
 
     assert listing_node_html(_BrokenNode()) == ""
     assert "Failed to read listing node HTML fragment" in caplog.text
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -56,6 +58,7 @@ async def test_paginate_traversal_collects_multiple_pages() -> None:
     assert "page-1" in "\n".join(fragments)
     assert "page-2" in "\n".join(fragments)
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_paginate_traversal_does_not_append_duplicate_html_without_progress() -> (
@@ -95,6 +98,7 @@ async def test_paginate_traversal_does_not_append_duplicate_html_without_progres
 
     assert result.stop_reason == "paginate_no_progress"
     assert [f for f, _ in result.html_fragments] == ["<div>page-1</div>"]
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -138,6 +142,7 @@ async def test_paginate_traversal_stops_when_card_count_stays_zero() -> None:
     assert result.progress_events == 0
     assert result.pages_advanced == 0
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_paginate_traversal_settles_thin_initial_listing_before_stopping(
@@ -180,6 +185,7 @@ async def test_paginate_traversal_settles_thin_initial_listing_before_stopping(
     assert result.card_count == 8
     assert "Widget 7" in result.compose_html()
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_paginate_traversal_blocks_off_domain_links() -> None:
@@ -205,6 +211,7 @@ async def test_paginate_traversal_blocks_off_domain_links() -> None:
     assert result.stop_reason == "paginate_off_domain"
     assert [f for f, _ in result.html_fragments] == ["<div>page-1</div>"]
     assert page.goto_calls == []
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -233,6 +240,7 @@ async def test_paginate_traversal_logs_explicit_stop_reason(
 
     assert result.stop_reason == "paginate_off_domain"
     assert "stop_reason=paginate_off_domain" in caplog.text
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -274,6 +282,7 @@ async def test_paginate_traversal_waits_for_navigation_transition() -> None:
     assert result.pages_advanced == 1
     assert "domcontentloaded" in page.load_state_calls
     assert "networkidle" in page.load_state_calls
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -339,6 +348,7 @@ async def test_paginate_traversal_handles_spa_next_button() -> None:
         "<div>page-2</div>",
     ]
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_paginate_traversal_handles_numeric_arrow_button() -> None:
@@ -403,6 +413,7 @@ async def test_paginate_traversal_handles_numeric_arrow_button() -> None:
     assert result.pages_advanced == 1
     assert result.progress_events == 1
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_looks_like_paginate_control_rejects_plain_href_without_pagination_signals() -> (
@@ -432,6 +443,7 @@ async def test_looks_like_paginate_control_rejects_plain_href_without_pagination
     locator = page.locator(PAGINATION_SELECTORS["next_page"][0]).first
 
     assert await traversal_module.looks_like_paginate_control(locator) is False
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -484,6 +496,7 @@ async def test_paginate_traversal_stops_before_recording_block_challenge() -> No
     assert result.progress_events == 0
     assert [f for f, _ in result.html_fragments] == ["<div>page-1</div>"]
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_load_more_traversal_runs_when_button_present() -> None:
@@ -528,6 +541,7 @@ async def test_load_more_traversal_runs_when_button_present() -> None:
         "<div>after</div>",
     ]
     assert "networkidle" in page.load_state_calls
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -579,6 +593,7 @@ async def test_load_more_traversal_stops_at_user_max_records() -> None:
         "<div>after</div>",
     ]
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_load_more_target_uses_unique_card_identities_not_repeated_snapshots() -> (
@@ -627,6 +642,7 @@ async def test_load_more_target_uses_unique_card_identities_not_repeated_snapsho
 
     assert result.stop_reason != "target_records_reached"
     assert result.card_count == 2
+
 
 @pytest.mark.asyncio
 @pytest.mark.component

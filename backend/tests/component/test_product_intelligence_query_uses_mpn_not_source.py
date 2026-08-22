@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .test_product_intelligence import ProductIntelligenceDiscoveryRequest, ProductIntelligenceSettings, SOURCE_TYPE_BRAND_DTC, build_search_queries, build_search_result_intelligence, classify_source_type, extract_product_snapshot, extract_search_result_snapshot, google_native_blocked, is_private_label, normalize_brand, parse_google_native_results, pytest, score_candidate  # fmt: skip
 
+
 @pytest.mark.component
 def test_product_intelligence_query_uses_mpn_not_source_domain_or_sku() -> None:
     queries = build_search_queries(
@@ -23,6 +24,7 @@ def test_product_intelligence_query_uses_mpn_not_source_domain_or_sku() -> None:
     assert any("Men 511 Slim Fit Jeans" in query for query in queries)
     assert all("BELK-ONLY-123" not in query for query in queries)
     assert len(queries) <= 4
+
 
 @pytest.mark.component
 def test_product_intelligence_query_prefers_upc_over_mpn_as_identifier() -> None:
@@ -52,6 +54,7 @@ def test_product_intelligence_query_prefers_upc_over_mpn_as_identifier() -> None
     assert all("04511-2406" not in query for query in queries)
     assert all("BELK-ONLY-123" not in query for query in queries)
 
+
 @pytest.mark.component
 def test_product_intelligence_query_strips_repeated_brand_and_targets_brand_domain() -> (
     None
@@ -69,6 +72,7 @@ def test_product_intelligence_query_strips_repeated_brand_and_targets_brand_doma
     assert queries[1] == "wrangler Relaxed Bootcut Jeans"
     assert "wrangler wrangler" not in " ".join(queries)
 
+
 @pytest.mark.component
 def test_product_intelligence_query_targets_configured_belk_brand_domains() -> None:
     queries = build_search_queries(
@@ -81,6 +85,7 @@ def test_product_intelligence_query_targets_configured_belk_brand_domains() -> N
 
     assert queries[0] == "site:baggallini.com baggallini Modern Everywhere Bag"
     assert all("belk.com" not in query for query in queries)
+
 
 @pytest.mark.component
 def test_product_intelligence_query_keeps_brand_in_all_queries_when_brand_exists() -> (
@@ -103,6 +108,7 @@ def test_product_intelligence_query_keeps_brand_in_all_queries_when_brand_exists
     assert queries[1] == "mamaearth Vit. C Daily Glow Cream 150g"
     assert len(queries) <= 3
 
+
 @pytest.mark.component
 def test_product_intelligence_dtc_score_does_not_promote_short_subset_titles() -> None:
     intelligence = score_candidate(
@@ -119,6 +125,7 @@ def test_product_intelligence_dtc_score_does_not_promote_short_subset_titles() -
 
     assert intelligence["reasons"]["title_similarity"] < 0.5
     assert intelligence["score"] < 0.8
+
 
 @pytest.mark.component
 def test_product_intelligence_query_prefers_clean_brand_query_before_buy_for_aggregator_sources() -> (
@@ -140,6 +147,7 @@ def test_product_intelligence_query_prefers_clean_brand_query_before_buy_for_agg
     assert all("flipkart.com" not in query for query in queries)
     assert len(queries) <= 2
 
+
 @pytest.mark.component
 def test_product_intelligence_query_uses_brandless_fallback_only_when_brand_missing() -> (
     None
@@ -159,6 +167,7 @@ def test_product_intelligence_query_uses_brandless_fallback_only_when_brand_miss
     assert queries[0] == '"Vit. C Daily Glow Cream 150g" "MC150G"'
     assert queries[1] == '"Vit. C Daily Glow Cream 150g" buy'
     assert len(queries) == 2
+
 
 @pytest.mark.component
 def test_product_intelligence_query_ignores_numeric_style_but_allows_alphanumeric_style() -> (
@@ -184,6 +193,7 @@ def test_product_intelligence_query_ignores_numeric_style_but_allows_alphanumeri
     assert all("3200040112342570" not in query for query in numeric_queries)
     assert any("1123A257" in query for query in style_queries)
 
+
 @pytest.mark.component
 def test_product_intelligence_query_preserves_possessives_in_title_phrases() -> None:
     queries = build_search_queries(
@@ -197,6 +207,7 @@ def test_product_intelligence_query_preserves_possessives_in_title_phrases() -> 
     assert queries
     assert any("Men's 511 Slim-Fit Jeans" in query for query in queries)
     assert all("men s" not in query.casefold() for query in queries)
+
 
 @pytest.mark.component
 def test_product_intelligence_variant_spec_mismatch_caps_score() -> None:
@@ -219,6 +230,7 @@ def test_product_intelligence_variant_spec_mismatch_caps_score() -> None:
     assert result["reasons"]["variant_mismatch"] is True
     assert result["score"] <= 0.62
     assert result["label"] != "high"
+
 
 @pytest.mark.component
 def test_product_intelligence_brand_title_match_reaches_high_without_identifier() -> (
@@ -243,6 +255,7 @@ def test_product_intelligence_brand_title_match_reaches_high_without_identifier(
     assert result["score"] >= 0.85
     assert result["label"] == "high"
     assert result["reasons"]["variant_mismatch"] is False
+
 
 @pytest.mark.component
 def test_product_intelligence_scorer_returns_breakdown() -> None:
@@ -272,6 +285,7 @@ def test_product_intelligence_scorer_returns_breakdown() -> None:
     assert "sku_match" not in result["reasons"]
     assert "mpn_or_style_match" not in result["reasons"]
 
+
 @pytest.mark.component
 def test_product_intelligence_barcode_match_can_reach_high_confidence() -> None:
     result = score_candidate(
@@ -295,6 +309,7 @@ def test_product_intelligence_barcode_match_can_reach_high_confidence() -> None:
     assert result["reasons"]["gtin_match"] is True
     assert result["reasons"]["identifier_match"] is True
 
+
 @pytest.mark.component
 def test_product_intelligence_price_band_requires_positive_candidate_price() -> None:
     result = score_candidate(
@@ -305,6 +320,7 @@ def test_product_intelligence_price_band_requires_positive_candidate_price() -> 
 
     assert result["reasons"]["price_band_match"] is False
 
+
 @pytest.mark.component
 def test_product_intelligence_scorer_parses_european_price_formats() -> None:
     result = score_candidate(
@@ -314,6 +330,7 @@ def test_product_intelligence_scorer_parses_european_price_formats() -> None:
     )
 
     assert result["reasons"]["price_band_match"] is True
+
 
 @pytest.mark.component
 def test_product_intelligence_scorer_uses_shopping_evidence_without_image() -> None:
@@ -344,6 +361,7 @@ def test_product_intelligence_scorer_uses_shopping_evidence_without_image() -> N
     assert reasons["price_band_match"] is True
     assert "image" not in reasons
 
+
 @pytest.mark.component
 def test_product_intelligence_scorer_keeps_title_only_low_without_brand() -> None:
     # No brand match means no confidence floor fires: a title-only match is driven
@@ -359,6 +377,7 @@ def test_product_intelligence_scorer_keeps_title_only_low_without_brand() -> Non
     assert result["reasons"]["brand_match"] is False
     assert result["reasons"]["identifier_match"] is False
 
+
 @pytest.mark.component
 def test_product_intelligence_scorer_keeps_weak_title_only_uncertain() -> None:
     result = score_candidate(
@@ -370,6 +389,7 @@ def test_product_intelligence_scorer_keeps_weak_title_only_uncertain() -> None:
     assert result["score"] < 0.4
     assert result["label"] == "uncertain"
     assert result["reasons"]["identifier_match"] is False
+
 
 @pytest.mark.component
 def test_product_intelligence_uses_source_brand_when_candidate_title_mentions_it() -> (
@@ -403,10 +423,12 @@ def test_product_intelligence_uses_source_brand_when_candidate_title_mentions_it
     assert intelligence["confidence_label"] == "medium"
     assert intelligence["score_reasons"]["match_basis"] == "model+brand"
 
+
 @pytest.mark.component
 def test_product_intelligence_classification_avoids_suffix_collisions() -> None:
     assert classify_source_type("badamazon.com", {}) == "unknown"
     assert classify_source_type("shop.amazon.com", {}) == "marketplace"
+
 
 @pytest.mark.component
 def test_product_intelligence_classifies_common_aggregator_sources() -> None:
@@ -414,14 +436,17 @@ def test_product_intelligence_classifies_common_aggregator_sources() -> None:
     assert classify_source_type("www.nykaa.com", {}) == "retailer"
     assert classify_source_type("www.flipkart.com", {}) == "marketplace"
 
+
 @pytest.mark.component
 def test_product_intelligence_classifies_known_mall_mirrors_as_aggregators() -> None:
     assert classify_source_type("thesummitbirmingham.com", {}) == "aggregator"
     assert classify_source_type("www.coolspringsgalleria.com", {}) == "aggregator"
 
+
 @pytest.mark.component
 def test_product_intelligence_normalizes_childrenswear_brand_alias() -> None:
     assert normalize_brand("Ralph Lauren Childrenswear") == "ralph lauren"
+
 
 @pytest.mark.component
 def test_product_intelligence_normalizes_common_brand_aliases() -> None:
@@ -431,6 +456,7 @@ def test_product_intelligence_normalizes_common_brand_aliases() -> None:
         normalize_brand("Collection by Michael Strahan ™")
         == "collection by michael strahan"
     )
+
 
 @pytest.mark.component
 def test_product_intelligence_infers_brand_from_source_url() -> None:
@@ -443,6 +469,7 @@ def test_product_intelligence_infers_brand_from_source_url() -> None:
 
     assert snapshot["brand"] == "ralph lauren"
     assert snapshot["normalized_brand"] == "ralph lauren"
+
 
 @pytest.mark.component
 def test_product_intelligence_query_uses_brand_and_currency_inferred_from_belk_slug() -> (
@@ -463,6 +490,7 @@ def test_product_intelligence_query_uses_brand_and_currency_inferred_from_belk_s
     assert queries
     assert "modern southern home" in queries[0]
 
+
 @pytest.mark.component
 def test_product_intelligence_infers_belk_brand_from_registry() -> None:
     snapshot = extract_product_snapshot(
@@ -477,6 +505,7 @@ def test_product_intelligence_infers_belk_brand_from_registry() -> None:
     assert snapshot["sku"] == "1804101ABC"
     assert is_private_label(snapshot["brand"]) is True
 
+
 @pytest.mark.component
 def test_product_intelligence_canonicalizes_overlong_known_brand() -> None:
     snapshot = extract_product_snapshot(
@@ -490,10 +519,12 @@ def test_product_intelligence_canonicalizes_overlong_known_brand() -> None:
     assert snapshot["brand"] == "columbia"
     assert snapshot["normalized_brand"] == "columbia"
 
+
 @pytest.mark.component
 def test_product_intelligence_excludes_belk_exclusive_aliases() -> None:
     assert is_private_label("Ocean + Coast") is True
     assert is_private_label("goodness & grace") is True
+
 
 @pytest.mark.component
 def test_product_intelligence_request_accepts_max_sources_and_url_aliases() -> None:
@@ -516,6 +547,7 @@ def test_product_intelligence_request_accepts_max_sources_and_url_aliases() -> N
     assert request.options.max_source_products == 17
     assert request.options.max_candidates_per_product == 1
 
+
 @pytest.mark.component
 def test_product_intelligence_search_result_snapshot_keeps_description() -> None:
     snapshot = extract_search_result_snapshot(
@@ -532,6 +564,7 @@ def test_product_intelligence_search_result_snapshot_keeps_description() -> None
     assert snapshot["price"] == pytest.approx(125.0)
     assert snapshot["currency"] == "USD"
 
+
 @pytest.mark.component
 def test_product_intelligence_search_result_snapshot_infers_known_brand_from_compact_domain() -> (
     None
@@ -544,6 +577,7 @@ def test_product_intelligence_search_result_snapshot_infers_known_brand_from_com
 
     assert snapshot["brand"] == "kenneth cole"
     assert snapshot["normalized_brand"] == "kenneth cole"
+
 
 @pytest.mark.component
 def test_product_intelligence_search_result_snapshot_tries_brand_from_title_marker() -> (
@@ -563,17 +597,20 @@ def test_product_intelligence_search_result_snapshot_tries_brand_from_title_mark
     assert snapshot["normalized_brand"] == "crown ivy"
     assert snapshot["currency"] == "USD"
 
+
 @pytest.mark.component
 def test_product_intelligence_settings_accepts_serp_api_key_alias() -> None:
     settings = ProductIntelligenceSettings(_env_file=None, SERP_API_KEY="serp-secret")
 
     assert settings.serpapi_key == "serp-secret"
 
+
 @pytest.mark.component
 def test_product_intelligence_settings_default_provider_is_serpapi() -> None:
     settings = ProductIntelligenceSettings(_env_file=None)
 
     assert settings.default_search_provider == "serpapi"
+
 
 @pytest.mark.component
 def test_product_intelligence_settings_accepts_google_native_provider() -> None:
@@ -584,10 +621,12 @@ def test_product_intelligence_settings_accepts_google_native_provider() -> None:
 
     assert settings.default_search_provider == "google_native"
 
+
 @pytest.mark.component
 def test_product_intelligence_settings_rejects_unknown_provider() -> None:
     with pytest.raises(ValueError):
         ProductIntelligenceSettings(_env_file=None, default_search_provider="bogus")
+
 
 @pytest.mark.component
 def test_product_intelligence_settings_rejects_legacy_duckduckgo_provider() -> None:
@@ -595,6 +634,7 @@ def test_product_intelligence_settings_rejects_legacy_duckduckgo_provider() -> N
         ProductIntelligenceSettings(
             _env_file=None, default_search_provider="duckduckgo"
         )
+
 
 @pytest.mark.component
 def test_parse_google_native_results_extracts_redirect_targets() -> None:
@@ -609,6 +649,7 @@ def test_parse_google_native_results_extracts_redirect_targets() -> None:
 
     assert results[0].url == "https://shop.example.com/p/widget"
     assert results[0].payload["provider"] == "google_native"
+
 
 @pytest.mark.component
 def test_parse_google_native_results_skips_anchors_without_h3() -> None:
@@ -635,6 +676,7 @@ def test_parse_google_native_results_skips_anchors_without_h3() -> None:
         "https://shop.example.com/p/widget",
     ]
 
+
 @pytest.mark.component
 def test_parse_google_native_results_prefers_h3_over_anchor_text() -> None:
     html = """
@@ -651,6 +693,7 @@ def test_parse_google_native_results_prefers_h3_over_anchor_text() -> None:
     results = parse_google_native_results(html, limit=5)
 
     assert results[0].payload["title"] == "Widget Pro Edition"
+
 
 @pytest.mark.component
 def test_parse_google_native_results_extracts_thumbnail_from_result_container() -> None:
@@ -669,6 +712,7 @@ def test_parse_google_native_results_extracts_thumbnail_from_result_container() 
 
     assert results[0].payload["thumbnail"] == "https://example.com/thumb.jpg"
 
+
 @pytest.mark.component
 def test_google_native_block_detection_flags_google_unusual_traffic_page() -> None:
     html = """
@@ -679,6 +723,7 @@ def test_google_native_block_detection_flags_google_unusual_traffic_page() -> No
     """
 
     assert google_native_blocked("https://www.google.com/sorry/index", html) is True
+
 
 @pytest.mark.component
 def test_google_native_thumbnail_flows_into_snapshot_image_url() -> None:
@@ -693,6 +738,7 @@ def test_google_native_thumbnail_flows_into_snapshot_image_url() -> None:
     )
 
     assert snapshot["image_url"] == "https://example.com/thumb.jpg"
+
 
 @pytest.mark.component
 def test_google_native_intelligence_keeps_provider_label() -> None:

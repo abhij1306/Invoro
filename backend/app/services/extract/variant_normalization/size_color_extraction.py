@@ -210,7 +210,9 @@ def _size_candidate_is_gender_artifact(candidate: str, source_text: str) -> bool
     lowered = candidate.lower()
     pattern = _gender_artifact_patterns.get(lowered)
     if pattern is None:
-        pattern = re.compile(gender_artifact_pattern.format(candidate=re.escape(lowered)))
+        pattern = re.compile(
+            gender_artifact_pattern.format(candidate=re.escape(lowered))
+        )
         _gender_artifact_patterns[lowered] = pattern
     return pattern.search(source_text.lower()) is not None
 

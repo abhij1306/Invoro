@@ -28,7 +28,10 @@ def normalize_browser_engine(value: object) -> str:
 
 def launch_headless_for_engine(engine: str) -> bool:
     normalized_engine = normalize_browser_engine(engine)
-    if normalized_engine == REAL_CHROME_BROWSER_ENGINE and crawler_runtime_settings.browser_real_chrome_force_headful:
+    if (
+        normalized_engine == REAL_CHROME_BROWSER_ENGINE
+        and crawler_runtime_settings.browser_real_chrome_force_headful
+    ):
         return False
     return bool(settings.playwright_headless)
 
@@ -94,7 +97,9 @@ def _merge_phase_timings(
     else:
         timing_errors.append("incoming")
     if timing_errors:
-        payload["phase_timings_error"] = "invalid_phase_timings_ms:" + ",".join(timing_errors)
+        payload["phase_timings_error"] = "invalid_phase_timings_ms:" + ",".join(
+            timing_errors
+        )
         logger.warning(
             "Invalid browser phase timings payload existing=%r incoming=%r",
             phase_timings_payload,
@@ -159,7 +164,9 @@ def browser_failure_kind(exc: Exception) -> str:
         return "browser_driver_closed"
     if _engine_unavailable_failure(message):
         return "engine_unavailable"
-    if (isinstance(exc, ValueError) and "browser proxy" in message) or "socks5 proxy authentication" in message:
+    if (
+        isinstance(exc, ValueError) and "browser proxy" in message
+    ) or "socks5 proxy authentication" in message:
         return "unsupported_proxy"
     if is_timeout_error(exc):
         return "timeout"
@@ -168,7 +175,8 @@ def browser_failure_kind(exc: Exception) -> str:
 
 def _page_closed_failure(class_name: str, message: str) -> bool:
     return "targetclosed" in class_name or any(
-        token in message for token in ("target closed", "page closed", "browser has been closed")
+        token in message
+        for token in ("target closed", "page closed", "browser has been closed")
     )
 
 
@@ -209,7 +217,9 @@ def build_failed_browser_diagnostics(
 ) -> dict[str, object]:
     outcome = "render_timeout" if is_timeout_error(exc) else "navigation_failed"
     failure_kind = browser_failure_kind(exc)
-    failure_stage = str(getattr(exc, "browser_failure_stage", "navigation") or "navigation")
+    failure_stage = str(
+        getattr(exc, "browser_failure_stage", "navigation") or "navigation"
+    )
     normalized_engine = normalize_browser_engine(browser_engine)
     diagnostics = {
         "failure_kind": failure_kind,

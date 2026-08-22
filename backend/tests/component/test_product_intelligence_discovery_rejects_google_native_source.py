@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .test_product_intelligence import AsyncSession, CrawlRecord, LLMTaskResult, ProductIntelligenceMatch, ProductIntelligenceSourceProduct, SearchResult, create_product_intelligence_job, discover_candidates, discover_product_intelligence_candidates, product_intelligence_settings, pytest, select  # fmt: skip
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_product_intelligence_discovery_rejects_google_native_source_domain_and_url() -> (
@@ -47,6 +48,7 @@ async def test_product_intelligence_discovery_rejects_google_native_source_domai
     assert [candidate.url for candidate in candidates] == [
         "https://www.nike.com/t/run-defy-womens-road-running-shoes/HM9593"
     ]
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -101,6 +103,7 @@ async def test_product_intelligence_discovery_keeps_search_delay_while_filling_p
     assert recorded_delays == [0.025]
     assert len(candidates) == 1
     assert candidates[0].domain == "levi.com"
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -158,6 +161,7 @@ async def test_product_intelligence_discovery_fills_requested_count_after_strong
     assert recorded_delays == [0.025]
     assert [candidate.domain for candidate in candidates] == ["levi.com", "macys.com"]
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_product_intelligence_job_stores_source_products_and_llm_option(
@@ -208,6 +212,7 @@ async def test_product_intelligence_job_stores_source_products_and_llm_option(
     assert source is not None
     assert source.is_private_label is True
     assert source.price == pytest.approx(19.99)
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -287,6 +292,7 @@ async def test_product_intelligence_discovery_preview_returns_source_and_payload
     )
     assert persisted_match is not None
     assert persisted_match.candidate_price is None
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -370,6 +376,7 @@ async def test_product_intelligence_discovery_preview_skips_search_result_llm_en
         "applied": False,
     }
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_product_intelligence_discovery_prefers_row_source_url_for_query_exclusion(
@@ -426,6 +433,7 @@ async def test_product_intelligence_discovery_prefers_row_source_url_for_query_e
         response["candidates"][0]["source_url"]
         == "https://www.myntra.com/p/shoes/example-item.html"
     )
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -497,6 +505,7 @@ async def test_product_intelligence_discovery_uses_product_url_from_listing_reco
     )
     assert response["candidates"][0]["source_price"] == pytest.approx(39.95)
     assert seen_queries[0] == "site:wrangler.com wrangler Relaxed Bootcut Jeans"
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -571,6 +580,7 @@ async def test_product_intelligence_discovery_reuses_one_query_runner_for_multip
     assert response["candidate_count"] == 2
     assert enter_count == 1
     assert len(seen_queries) >= 2
+
 
 @pytest.mark.asyncio
 @pytest.mark.component

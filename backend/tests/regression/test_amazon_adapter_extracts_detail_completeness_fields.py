@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .test_selectolax_css_migration import AmazonAdapter, BelkAdapter, LexborHTMLParser, amazon, build_detail_record, collect_structured_candidates, pytest  # fmt: skip
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_amazon_adapter_extracts_detail_completeness_fields() -> None:
@@ -78,6 +79,7 @@ async def test_amazon_adapter_extracts_detail_completeness_fields() -> None:
     assert record["image_url"] == "https://m.media-amazon.com/images/I/71tLsSyLUZL.jpg"
     assert record["additional_images"] is None
 
+
 @pytest.mark.regression
 def test_amazon_image_src_fallback_normalizes_low_resolution_url() -> None:
     parser = LexborHTMLParser(
@@ -88,6 +90,7 @@ def test_amazon_image_src_fallback_normalizes_low_resolution_url() -> None:
         amazon._amazon_image_src(parser.css_first("#landingImage"))
         == "https://m.media-amazon.com/images/I/51DRLHAa2AS.jpg"
     )
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -129,6 +132,7 @@ async def test_belk_adapter_extracts_nested_state_brand_price_and_currency() -> 
             "_source": "belk_adapter",
         }
     ]
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -181,6 +185,7 @@ async def test_belk_adapter_extracts_upc_from_listwrapped_utag_data_detail() -> 
         "https://www.belk.com/p/toastmaster-egg-cooker/8100339TM1ECBL.html"
     )
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_belk_adapter_prefers_real_currency_fields_over_scalar_price_text() -> (
@@ -225,6 +230,7 @@ async def test_belk_adapter_prefers_real_currency_fields_over_scalar_price_text(
         }
     ]
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_belk_adapter_ignores_aggregate_range_prices_in_state_payload() -> None:
@@ -263,6 +269,7 @@ async def test_belk_adapter_ignores_aggregate_range_prices_in_state_payload() ->
             "_source": "belk_adapter",
         }
     ]
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -338,6 +345,7 @@ async def test_belk_adapter_extracts_detail_variants_with_color_and_size() -> No
         },
     ]
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_belk_adapter_maps_per_variant_upc_from_utag_sku_arrays() -> None:
@@ -406,6 +414,7 @@ async def test_belk_adapter_maps_per_variant_upc_from_utag_sku_arrays() -> None:
     assert by_size["10M"]["availability"] == "in_stock"
     assert by_size["7.5M"]["barcode"] == "0198633940517"
     assert by_size["7.5M"]["availability"] == "out_of_stock"
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -486,6 +495,7 @@ async def test_belk_adapter_extracts_detail_variants_from_captured_json_payload(
         },
     ]
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_amazon_adapter_does_not_fabricate_multi_axis_twister_product() -> None:
@@ -519,6 +529,7 @@ async def test_amazon_adapter_does_not_fabricate_multi_axis_twister_product() ->
 
     record = result.records[0]
     assert "variants" not in record
+
 
 @pytest.mark.regression
 def test_detail_extractor_recovers_untyped_embedded_size_options_variants() -> None:
@@ -572,6 +583,7 @@ def test_detail_extractor_recovers_untyped_embedded_size_options_variants() -> N
     ]
     assert all(variant["size"] != "control" for variant in record["variants"])
 
+
 @pytest.mark.regression
 def test_detail_extractor_recovers_untyped_embedded_one_size_variant() -> None:
     html = """
@@ -618,6 +630,7 @@ def test_detail_extractor_recovers_untyped_embedded_one_size_variant() -> None:
     assert record["variants"][0]["url"] == url
     assert record["variants"][0]["image_url"] == "https://example.com/cap.jpg"
 
+
 @pytest.mark.regression
 def test_detail_extractor_recovers_embedded_one_size_variant_with_size_name() -> None:
     html = """
@@ -658,6 +671,7 @@ def test_detail_extractor_recovers_embedded_one_size_variant_with_size_name() ->
     assert record["variant_count"] == 1
     assert record["variants"][0]["size"] == "One Size"
     assert record["variants"][0]["sku"] == "PUMAX00420531"
+
 
 @pytest.mark.regression
 def test_structured_product_payload_skips_duplicate_embedded_variants() -> None:

@@ -31,7 +31,9 @@ def _parse_settings_json(settings_json: str) -> dict:
             "_parse_settings_json expected a JSON object",
             extra={"parsed_type": type(parsed).__name__},
         )
-        raise ValueError(f"_parse_settings_json expected a JSON object, got {type(parsed).__name__}")
+        raise ValueError(
+            f"_parse_settings_json expected a JSON object, got {type(parsed).__name__}"
+        )
     return parsed
 
 
@@ -70,7 +72,9 @@ def build_csv_crawl_payload(
     return data, len(urls)
 
 
-async def create_crawl_run_from_payload(session: AsyncSession, user_id: int, payload: dict) -> CrawlRun:
+async def create_crawl_run_from_payload(
+    session: AsyncSession, user_id: int, payload: dict
+) -> CrawlRun:
     data = prepare_crawl_create_payload(payload)
     run = await create_crawl_run(session, user_id, data)
     return await dispatch_run(session, run)

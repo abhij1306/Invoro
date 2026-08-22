@@ -26,7 +26,9 @@ _DEFAULT_URL_CONCURRENCY = 1
 
 
 def parallel_url_concurrency(total_urls: int, settings_view) -> int:
-    system_limit = _positive_int_or_default(getattr(settings, "system_max_concurrent_urls", _DEFAULT_URL_CONCURRENCY))
+    system_limit = _positive_int_or_default(
+        getattr(settings, "system_max_concurrent_urls", _DEFAULT_URL_CONCURRENCY)
+    )
     batch_value = getattr(settings_view, "url_batch_concurrency", None)
     raw_batch_limit = batch_value() if callable(batch_value) else batch_value
     batch_limit = _positive_int_or_default(raw_batch_limit)
@@ -49,14 +51,18 @@ def browser_capacity_limit(settings_view) -> int | None:
         return None
     return max(
         1,
-        _positive_int_or_default(getattr(crawler_runtime_settings, "browser_runtime_context_capacity", 1)),
+        _positive_int_or_default(
+            getattr(crawler_runtime_settings, "browser_runtime_context_capacity", 1)
+        ),
     )
 
 
 def settings_fetch_mode(settings_view) -> str:
     try:
         fetch_profile_attr = getattr(settings_view, "fetch_profile", None)
-        fetch_profile = fetch_profile_attr() if callable(fetch_profile_attr) else fetch_profile_attr
+        fetch_profile = (
+            fetch_profile_attr() if callable(fetch_profile_attr) else fetch_profile_attr
+        )
     except (AttributeError, TypeError, ValueError):
         fetch_profile = None
     if fetch_profile is None:
@@ -173,7 +179,9 @@ async def process_urls_in_parallel(
         )
         touch_heartbeat(run)
         run.update_summary(
-            **progress_state.build_progress_patch(current_url=url, current_url_index=idx),
+            **progress_state.build_progress_patch(
+                current_url=url, current_url_index=idx
+            ),
             duration_ms=current_duration_ms(run),
         )
         await session.commit()
@@ -186,7 +194,9 @@ async def process_urls_in_parallel(
     try:
         pending = set(tasks)
         while pending:
-            done, pending = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
+            done, pending = await asyncio.wait(
+                pending, return_when=asyncio.FIRST_COMPLETED
+            )
             for task in done:
                 await record_task(task)
             await session.refresh(run)
@@ -213,7 +223,9 @@ async def process_urls_in_parallel(
     return verdicts, record_count
 
 
-async def _persist_parallel_control(session: AsyncSession, run: CrawlRun, control_request: str) -> None:
+async def _persist_parallel_control(
+    session: AsyncSession, run: CrawlRun, control_request: str
+) -> None:
     paused = control_request == CONTROL_REQUEST_PAUSE
     update_run_status(run, CrawlStatus.PAUSED if paused else CrawlStatus.KILLED)
     set_control_request(run, None)

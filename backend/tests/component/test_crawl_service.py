@@ -44,6 +44,7 @@ from sqlalchemy.exc import ProgrammingError
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+
 async def _create_running_run(
     db_session: AsyncSession,
     *,

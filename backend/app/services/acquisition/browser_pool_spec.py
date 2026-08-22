@@ -26,11 +26,23 @@ class BrowserRuntimePool:
         self.eviction_cleanup_tasks: set[asyncio.Task[Any]] = set()
 
     def evict_idle_runtimes_locked(self) -> list[Any]:
-        idle_ttl = max(0, int(crawler_runtime_settings.browser_runtime_pool_idle_ttl_seconds))
-        max_entries = max(1, int(crawler_runtime_settings.browser_runtime_pool_max_entries))
-        expired = [entry for entry in self._inactive_entries() if idle_ttl > 0 and entry[2].idle_seconds() >= idle_ttl]
+        idle_ttl = max(
+            0, int(crawler_runtime_settings.browser_runtime_pool_idle_ttl_seconds)
+        )
+        max_entries = max(
+            1, int(crawler_runtime_settings.browser_runtime_pool_max_entries)
+        )
+        expired = [
+            entry
+            for entry in self._inactive_entries()
+            if idle_ttl > 0 and entry[2].idle_seconds() >= idle_ttl
+        ]
         candidate_keys = {(pool_name, key) for pool_name, key, *_ in expired}
-        remaining = [entry for entry in self._inactive_entries() if (entry[0], entry[1]) not in candidate_keys]
+        remaining = [
+            entry
+            for entry in self._inactive_entries()
+            if (entry[0], entry[1]) not in candidate_keys
+        ]
         remaining.sort(key=lambda item: (item[2].eviction_key()[0], item[3]))
         reserve_slot_removals = max(0, self.size() - len(expired) - max_entries + 1)
         candidates = [*expired, *remaining[:reserve_slot_removals]]
@@ -77,7 +89,9 @@ def patchright_async_playwright_factory():
 
 
 def real_chrome_candidate_paths() -> tuple[str, ...]:
-    configured = str(crawler_runtime_settings.browser_real_chrome_executable_path or "").strip()
+    configured = str(
+        crawler_runtime_settings.browser_real_chrome_executable_path or ""
+    ).strip()
     if configured:
         return (configured,)
     return REAL_CHROME_FALLBACK_EXECUTABLE_PATHS
@@ -92,7 +106,9 @@ def browser_launch_timeout_seconds() -> float:
 
 
 def browser_context_slot_timeout_seconds() -> float:
-    return max(0.1, float(crawler_runtime_settings.browser_context_slot_timeout_seconds))
+    return max(
+        0.1, float(crawler_runtime_settings.browser_context_slot_timeout_seconds)
+    )
 
 
 def browser_new_page_timeout_seconds() -> float:
@@ -107,7 +123,9 @@ def browser_runtime_context_capacity() -> int:
     return max(1, int(crawler_runtime_settings.browser_runtime_context_capacity))
 
 
-async def wait_for_browser_step(awaitable: Any, *, timeout_seconds: float, message: str) -> Any:
+async def wait_for_browser_step(
+    awaitable: Any, *, timeout_seconds: float, message: str
+) -> Any:
     bounded_timeout = max(0.1, float(timeout_seconds))
     try:
         return await asyncio.wait_for(awaitable, timeout=bounded_timeout)
@@ -130,12 +148,16 @@ async def close_browser_context_safely(context: Any) -> None:
         logger.debug("Failed to close browser context", exc_info=True)
 
 
-def record_timing(phase_timings_ms: dict[str, int] | None, key: str, started_at: float) -> None:
+def record_timing(
+    phase_timings_ms: dict[str, int] | None, key: str, started_at: float
+) -> None:
     if phase_timings_ms is not None:
         phase_timings_ms[key] = max(0, int((time.perf_counter() - started_at) * 1000))
 
 
-def aggregate_runtime_snapshots(runtimes: list[Any], *, default_capacity: int) -> dict[str, int | bool]:
+def aggregate_runtime_snapshots(
+    runtimes: list[Any], *, default_capacity: int
+) -> dict[str, int | bool]:
     if not runtimes:
         return {
             "ready": False,
@@ -149,13 +171,21 @@ def aggregate_runtime_snapshots(runtimes: list[Any], *, default_capacity: int) -
     return {
         "ready": any(bool(snapshot.get("ready")) for snapshot in snapshots),
         "size": sum(_snapshot_count(snapshot, "size") for snapshot in snapshots),
-        "max_size": sum(_snapshot_count(snapshot, "max_size", "capacity") for snapshot in snapshots),
+        "max_size": sum(
+            _snapshot_count(snapshot, "max_size", "capacity") for snapshot in snapshots
+        ),
         "active": sum(_snapshot_count(snapshot, "active") for snapshot in snapshots),
         "queued": sum(_snapshot_count(snapshot, "queued") for snapshot in snapshots),
-        "capacity": sum(_snapshot_count(snapshot, "capacity", "max_size") for snapshot in snapshots),
-        "total_contexts_created": sum(_snapshot_count(snapshot, "total_contexts_created") for snapshot in snapshots),
+        "capacity": sum(
+            _snapshot_count(snapshot, "capacity", "max_size") for snapshot in snapshots
+        ),
+        "total_contexts_created": sum(
+            _snapshot_count(snapshot, "total_contexts_created")
+            for snapshot in snapshots
+        ),
         "browser_lifetime_seconds": max(
-            _snapshot_count(snapshot, "browser_lifetime_seconds") for snapshot in snapshots
+            _snapshot_count(snapshot, "browser_lifetime_seconds")
+            for snapshot in snapshots
         ),
     }
 

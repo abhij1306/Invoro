@@ -21,14 +21,20 @@ async def wait_for_host_slot(_url: str, *, ttl_seconds: int | None = None) -> No
     min_interval_ms = _host_interval_ms(protected=False)
     resolved_ttl_seconds = max(
         1,
-        int(ttl_seconds if ttl_seconds is not None else crawler_runtime_settings.pacing_host_cache_ttl_seconds),
+        int(
+            ttl_seconds
+            if ttl_seconds is not None
+            else crawler_runtime_settings.pacing_host_cache_ttl_seconds
+        ),
     )
     now = time.monotonic()
     async with _HOST_PACING_LOCK:
         _prune_expired_hosts(now=now, ttl_seconds=resolved_ttl_seconds)
         next_allowed_at = _HOST_NEXT_ALLOWED_AT.get(host, now)
         wait_seconds = max(0.0, next_allowed_at - now)
-        _HOST_NEXT_ALLOWED_AT[host] = max(now, next_allowed_at) + (min_interval_ms / 1000.0)
+        _HOST_NEXT_ALLOWED_AT[host] = max(now, next_allowed_at) + (
+            min_interval_ms / 1000.0
+        )
         _enforce_host_cache_limit()
     if wait_seconds > 0:
         await asyncio.sleep(wait_seconds)
@@ -49,14 +55,20 @@ async def apply_protected_host_backoff(
         return
     resolved_ttl_seconds = max(
         1,
-        int(ttl_seconds if ttl_seconds is not None else crawler_runtime_settings.pacing_host_cache_ttl_seconds),
+        int(
+            ttl_seconds
+            if ttl_seconds is not None
+            else crawler_runtime_settings.pacing_host_cache_ttl_seconds
+        ),
     )
     now = time.monotonic()
     protected_interval_seconds = _host_interval_ms(protected=True) / 1000.0
     async with _HOST_PACING_LOCK:
         _prune_expired_hosts(now=now, ttl_seconds=resolved_ttl_seconds)
         next_allowed_at = _HOST_NEXT_ALLOWED_AT.get(host, now)
-        _HOST_NEXT_ALLOWED_AT[host] = max(next_allowed_at, now + protected_interval_seconds)
+        _HOST_NEXT_ALLOWED_AT[host] = max(
+            next_allowed_at, now + protected_interval_seconds
+        )
         _enforce_host_cache_limit()
 
 
@@ -67,7 +79,9 @@ async def record_fetch_outcome(
     blocked: bool,
     ttl_seconds: int | None = None,
 ) -> bool:
-    if blocked or int(status_code or 0) in set(crawler_runtime_settings.http_retry_status_codes):
+    if blocked or int(status_code or 0) in set(
+        crawler_runtime_settings.http_retry_status_codes
+    ):
         await apply_protected_host_backoff(_url, ttl_seconds=ttl_seconds)
         return True
     return False
@@ -87,7 +101,11 @@ def _host_interval_ms(*, protected: bool) -> int:
 
 
 def _prune_expired_hosts(*, now: float, ttl_seconds: int) -> None:
-    expired_hosts = [host for host, allowed_at in _HOST_NEXT_ALLOWED_AT.items() if now > allowed_at + ttl_seconds]
+    expired_hosts = [
+        host
+        for host, allowed_at in _HOST_NEXT_ALLOWED_AT.items()
+        if now > allowed_at + ttl_seconds
+    ]
     for host in expired_hosts:
         _HOST_NEXT_ALLOWED_AT.pop(host, None)
 

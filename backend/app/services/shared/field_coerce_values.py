@@ -39,15 +39,24 @@ from app.services.shared.text_coerce import coerce_long_text, is_null_text, text
 
 from . import field_coerce_core as core
 
+
 def _sanitize_color_scalar(value: str) -> str | None:
-    if any(predicate(value) for predicate in (core._SMALL_NUMERIC_RE.fullmatch, core._TRACKING_PIXEL_RE.fullmatch)) or core._color_value_is_opaque_code(value):
+    if any(
+        predicate(value)
+        for predicate in (
+            core._SMALL_NUMERIC_RE.fullmatch,
+            core._TRACKING_PIXEL_RE.fullmatch,
+        )
+    ) or core._color_value_is_opaque_code(value):
         return None
     match = re.fullmatch(r"select\s+(.+?)\s+color", value, flags=re.I)
     cleaned = core.clean_text(match.group(1)) if match else value
     cleaned = re.split(r"\bstyle\s*:", cleaned, maxsplit=1, flags=re.I)[0]
     if ":" in cleaned:
         _prefix, suffix = cleaned.rsplit(":", 1)
-        if len(core.clean_text(suffix).split()) <= 4 and core._COLOR_KEYWORD_RE.search(suffix):
+        if len(core.clean_text(suffix).split()) <= 4 and core._COLOR_KEYWORD_RE.search(
+            suffix
+        ):
             cleaned = suffix
     cleaned = re.sub(r"^color\s*:\s*", "", cleaned, flags=re.I)
     cleaned = re.sub(r"\bcolor\s+details\b.*$", "", cleaned, flags=re.I).strip()
@@ -56,6 +65,7 @@ def _sanitize_color_scalar(value: str) -> str | None:
     cleaned = core.clean_text(core._strip_color_value_code_pollution(cleaned))
     return None if not cleaned or re.search(r"\d+\s*x\s*\d+", cleaned) else cleaned
 
+
 def _sanitize_size_scalar(value: str) -> str | None:
     cleaned = re.sub(r"^size\s*:\s*", "", value, flags=re.I)
     cleaned = re.split(r"\bview as list\b", cleaned, maxsplit=1, flags=re.I)[0]
@@ -63,13 +73,22 @@ def _sanitize_size_scalar(value: str) -> str | None:
     cleaned = core.clean_text(cleaned)
     if re.search(r"\b(?:please\s+)?select(?:\s+size)?\b", cleaned, flags=re.I):
         return None
-    return None if cleaned.strip().lower() in core.size_reject_tokens_normalized else cleaned
+    return (
+        None
+        if cleaned.strip().lower() in core.size_reject_tokens_normalized
+        else cleaned
+    )
+
 
 def _sanitize_option_scalar(field_name: str, value: object) -> str | None:
     text = core.coerce_text(value)
     if not text or text.lstrip().startswith(("{", "[")):
         return None
-    cleaned = core._strip_option_suffix_noise(text) if field_name in OPTION_SCALAR_FIELDS else text
+    cleaned = (
+        core._strip_option_suffix_noise(text)
+        if field_name in OPTION_SCALAR_FIELDS
+        else text
+    )
     normalized: str | None = cleaned
     if field_name == "color":
         normalized = _sanitize_color_scalar(cleaned)
@@ -78,6 +97,7 @@ def _sanitize_option_scalar(field_name: str, value: object) -> str | None:
     elif field_name == WEIGHT_FIELD and re.fullmatch(r"\d+(?:\.\d+)?", cleaned):
         return None
     return None if not normalized or is_null_text(normalized) else normalized
+
 
 def coerce_location(value: object) -> str | None:
     if isinstance(value, dict):
@@ -115,6 +135,7 @@ def coerce_location(value: object) -> str | None:
         )
     return core.coerce_text(value)
 
+
 def _salary_from_nested_value(
     nested: dict[str, object],
     *,
@@ -131,9 +152,14 @@ def _salary_from_nested_value(
         return None
     return " ".join(piece for piece in (currency, numbers, unit) if piece)
 
+
 def salary_from_json(value: object) -> str | None:
     if isinstance(value, dict):
-        currency = text_or_none(value.get("currency") or value.get("salaryCurrency") or value.get("currencyCode"))
+        currency = text_or_none(
+            value.get("currency")
+            or value.get("salaryCurrency")
+            or value.get("currencyCode")
+        )
         nested = value.get("value")
         if isinstance(nested, dict):
             nested_salary = _salary_from_nested_value(nested, currency=currency)
@@ -144,19 +170,25 @@ def salary_from_json(value: object) -> str | None:
             return f"{currency} {text}".strip() if currency else text
     return core.coerce_text(value)
 
+
 def coerce_product_attributes(value: object) -> dict[str, object] | None:
     if not isinstance(value, dict):
         return None
     cleaned = _clean_product_attribute_dict(value)
     return cleaned or None
 
+
 def _product_attribute_key_is_noise(value: object) -> bool:
     normalized = core.normalize_field_key(str(value or ""))
     return bool(normalized and normalized in core._NOISY_PRODUCT_ATTRIBUTE_KEYS)
 
+
 def _product_attribute_row_is_noise(value: dict[str, object]) -> bool:
-    row_id = value.get("Id") or value.get("id") or value.get("name") or value.get("label")
+    row_id = (
+        value.get("Id") or value.get("id") or value.get("name") or value.get("label")
+    )
     return _product_attribute_key_is_noise(row_id)
+
 
 def _clean_product_attribute_value(value: object) -> object | None:
     if value in (None, "", [], {}):
@@ -166,9 +198,15 @@ def _clean_product_attribute_value(value: object) -> object | None:
             return None
         return _clean_product_attribute_dict(value)
     if isinstance(value, list):
-        rows = [cleaned for item in value if (cleaned := _clean_product_attribute_value(item)) not in (None, "", [], {})]
+        rows = [
+            cleaned
+            for item in value
+            if (cleaned := _clean_product_attribute_value(item))
+            not in (None, "", [], {})
+        ]
         return rows or None
     return value
+
 
 def _clean_product_attribute_dict(value: dict[str, object]) -> dict[str, object]:
     cleaned: dict[str, object] = {}
@@ -179,6 +217,7 @@ def _clean_product_attribute_dict(value: dict[str, object]) -> dict[str, object]
         if cleaned_value not in (None, "", [], {}):
             cleaned[str(key)] = cleaned_value
     return cleaned
+
 
 def coerce_availability_dict(value: object) -> str | None:
     if not isinstance(value, dict):
@@ -194,6 +233,7 @@ def coerce_availability_dict(value: object) -> str | None:
             if candidate not in (None, "", [], {}):
                 return coerce_availability_value(candidate)
     return None
+
 
 def coerce_availability_value(value: object) -> str | None:
     if isinstance(value, bool):
@@ -217,6 +257,7 @@ def coerce_availability_value(value: object) -> str | None:
         return normalized_enum
     return None
 
+
 def coerce_rating_value(value: object) -> float | None:
     text = core.coerce_text(value)
     if not text:
@@ -227,6 +268,7 @@ def coerce_rating_value(value: object) -> float | None:
         return float(candidate)
     except (TypeError, ValueError):
         return None
+
 
 def _coerce_named_field(field_name: str, value: object) -> tuple[bool, object | None]:
     coercers = {
@@ -243,13 +285,19 @@ def _coerce_named_field(field_name: str, value: object) -> tuple[bool, object | 
     coercer = coercers.get(field_name)
     return (False, None) if coercer is None else (True, coercer(value))
 
-def _coerce_structured_container(field_name: str, value: object) -> tuple[bool, object | None]:
+
+def _coerce_structured_container(
+    field_name: str, value: object
+) -> tuple[bool, object | None]:
     if field_name in core.STRUCTURED_OBJECT_FIELDS and isinstance(value, dict):
         return True, value
-    if field_name not in core.STRUCTURED_OBJECT_LIST_FIELDS or not isinstance(value, list):
+    if field_name not in core.STRUCTURED_OBJECT_LIST_FIELDS or not isinstance(
+        value, list
+    ):
         return False, None
     rows = [item for item in value if isinstance(item, dict)]
     return True, rows or None
+
 
 def _coerce_currency_text(value: str) -> str | None:
     currency_code = extract_currency_code(value)
@@ -257,6 +305,7 @@ def _coerce_currency_text(value: str) -> str | None:
         return currency_code
     text = core.coerce_text(value)
     return text.upper() if text and re.fullmatch(r"[A-Za-z]{3}", text) else text
+
 
 def _coerce_brand_value(value: object) -> str | None:
     if not isinstance(value, dict):
@@ -267,26 +316,43 @@ def _coerce_brand_value(value: object) -> str | None:
         explicit_value = next(iter(value.values()), None)
     return coerce_brand_text(explicit_value)
 
+
 def _coerce_category_value(value: object) -> str | None:
     if isinstance(value, dict):
         value = next(
-            (value.get(key) for key in ("name", "title", "slug", "value", "en") if value.get(key)),
+            (
+                value.get(key)
+                for key in ("name", "title", "slug", "value", "en")
+                if value.get(key)
+            ),
             None,
         )
     elif isinstance(value, str) and value.strip().startswith(("{", "[")):
-        value = core.coerce_structured_scalar(value, keys=("name", "title", "label", "value", "text", "en"))
+        value = core.coerce_structured_scalar(
+            value, keys=("name", "title", "label", "value", "text", "en")
+        )
     text = core.coerce_text(value)
     return None if text and category_value_is_url_path(text) else text
+
 
 def _coerce_option_value(field_name: str, value: object) -> str | None:
     scalar_input = value
     if field_name == "color" and isinstance(value, list):
-        readable = [item for item in value if not (isinstance(item, str) and core._color_value_is_opaque_code(item))]
+        readable = [
+            item
+            for item in value
+            if not (isinstance(item, str) and core._color_value_is_opaque_code(item))
+        ]
         scalar_input = readable or value
-    scalar = core.coerce_structured_scalar(scalar_input, keys=(field_name, "name", "title", "label", "value", "text"))
+    scalar = core.coerce_structured_scalar(
+        scalar_input, keys=(field_name, "name", "title", "label", "value", "text")
+    )
     return _sanitize_option_scalar(field_name, scalar)
 
-def _coerce_predefined_field(field_name: str, value: object) -> tuple[bool, object | None]:
+
+def _coerce_predefined_field(
+    field_name: str, value: object
+) -> tuple[bool, object | None]:
     for handler in (_coerce_named_field, _coerce_structured_container):
         handled, coerced = handler(field_name, value)
         if handled:
@@ -301,10 +367,13 @@ def _coerce_predefined_field(field_name: str, value: object) -> tuple[bool, obje
         return True, _coerce_option_value(field_name, value)
     return False, None
 
+
 def _coerce_scalar_number(field_name: str, value: object) -> tuple[bool, object | None]:
     if field_name in core._PRICE_FIELD_NAMES and isinstance(value, str):
         text = core.coerce_text(value)
-        valid = not (text and not re.search(r"\d", text)) and not price_text_is_negative(text)
+        valid = not (
+            text and not re.search(r"\d", text)
+        ) and not price_text_is_negative(text)
         return True, text or None if valid else None
     if field_name not in core._INTEGER_FIELD_NAMES:
         return False, None
@@ -320,11 +389,15 @@ def _coerce_scalar_number(field_name: str, value: object) -> tuple[bool, object 
     except (TypeError, ValueError):
         return True, None
 
-def _first_mapping_value(value: dict[object, object], keys: tuple[str, ...]) -> object | None:
+
+def _first_mapping_value(
+    value: dict[object, object], keys: tuple[str, ...]
+) -> object | None:
     return next(
         (value.get(key) for key in keys if value.get(key) not in (None, "", [], {})),
         None,
     )
+
 
 def _coerce_mapping_field(field_name: str, value: object) -> tuple[bool, object | None]:
     if not isinstance(value, dict):
@@ -352,8 +425,11 @@ def _coerce_mapping_field(field_name: str, value: object) -> tuple[bool, object 
     if keys is None:
         return False, None
     item = _first_mapping_value(value, keys)
-    coerced = coerce_rating_value(item) if field_name == "rating" else core.coerce_text(item)
+    coerced = (
+        coerce_rating_value(item) if field_name == "rating" else core.coerce_text(item)
+    )
     return True, coerced
+
 
 def _coerce_availability(field_name: str, value: object) -> tuple[bool, object | None]:
     if field_name != "availability":
@@ -363,6 +439,7 @@ def _coerce_availability(field_name: str, value: object) -> tuple[bool, object |
     if isinstance(value, dict):
         return True, coerce_availability_dict(value)
     return True, coerce_availability_value(value)
+
 
 def _dedupe_structured_rows(field_name: str, value: object) -> list[str] | None:
     rows = core._coerce_structured_multi_rows(field_name, value)
@@ -375,7 +452,10 @@ def _dedupe_structured_rows(field_name: str, value: object) -> list[str] | None:
             deduped.append(row)
     return deduped or None
 
-def _coerce_list_value(field_name: str, value: list[object], page_url: str) -> list[object] | None:
+
+def _coerce_list_value(
+    field_name: str, value: list[object], page_url: str
+) -> list[object] | None:
     rows: list[object] = []
     for item in value:
         normalized = coerce_field_value(field_name, item, page_url)
@@ -383,6 +463,7 @@ def _coerce_list_value(field_name: str, value: list[object], page_url: str) -> l
             continue
         rows.extend(normalized if isinstance(normalized, list) else [normalized])
     return rows or None
+
 
 def coerce_field_value(field_name: str, value: object, page_url: str) -> object | None:
     if value in (None, "", [], {}):
@@ -404,10 +485,19 @@ def coerce_field_value(field_name: str, value: object, page_url: str) -> object 
         return None
     if field_name in LONG_TEXT_FIELDS:
         return coerce_long_text(value)
-    return coerce_rating_value(value) if field_name == "rating" else core.coerce_text(value)
+    return (
+        coerce_rating_value(value)
+        if field_name == "rating"
+        else core.coerce_text(value)
+    )
+
 
 def _coerce_title_text(value: object) -> str | None:
-    is_structured_input = isinstance(value, dict) or (isinstance(value, str) and value.strip().startswith("{") and value.strip().endswith("}"))
+    is_structured_input = isinstance(value, dict) or (
+        isinstance(value, str)
+        and value.strip().startswith("{")
+        and value.strip().endswith("}")
+    )
     if is_structured_input:
         structured = core.coerce_structured_scalar(
             value,
@@ -419,9 +509,12 @@ def _coerce_title_text(value: object) -> str | None:
             return None
     return coerce_identity_token_or_none(value)
 
+
 def _coerce_product_type_clean(value: object) -> str | None:
     if isinstance(value, dict):
-        value = core.coerce_structured_scalar(value, keys=("name", "title", "label", "value", "text", "type"))
+        value = core.coerce_structured_scalar(
+            value, keys=("name", "title", "label", "value", "text", "type")
+        )
     text = core.coerce_text(value)
     if not text:
         return None
@@ -434,6 +527,7 @@ def _coerce_product_type_clean(value: object) -> str | None:
         return None
     return text
 
+
 def finalize_record(
     record: dict[str, Any],
     *,
@@ -443,6 +537,7 @@ def finalize_record(
     cleaned = core.clean_record(record)
     cleaned = strip_record_tracking_params(cleaned, surface=surface)
     return normalize_record_fields(cleaned) if normalize_fields else cleaned
+
 
 def direct_record_to_surface_fields(
     record: dict[str, Any],
@@ -459,9 +554,12 @@ def direct_record_to_surface_fields(
         allow_noncanonical_requested=False,
     )
     for field_name in source_fields:
-        value = coerce_field_value(field_name, dict(record or {}).get(field_name), page_url)
+        value = coerce_field_value(
+            field_name, dict(record or {}).get(field_name), page_url
+        )
         if value not in (None, "", [], {}):
             shaped[field_name] = value
     return finalize_record(shaped, surface=surface)
+
 
 decimal_for_shared_price = core._decimal_for_shared_price

@@ -148,7 +148,9 @@ def _marketplace_edge_variants(
         raw_choice = node.get("choice")
         choice: dict[str, Any] = raw_choice if isinstance(raw_choice, dict) else {}
         raw_selectable = node.get("selectableVariant")
-        selectable: dict[str, Any] = raw_selectable if isinstance(raw_selectable, dict) else {}
+        selectable: dict[str, Any] = (
+            raw_selectable if isinstance(raw_selectable, dict) else {}
+        )
         row = _marketplace_choice_variant_row(
             axis_name=axis_name,
             choice_name=choice.get("name"),

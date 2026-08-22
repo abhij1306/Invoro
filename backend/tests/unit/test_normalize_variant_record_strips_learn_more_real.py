@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .test_normalizers import _reconcile_variant_derived_parent_fields, backfill, coerce_field_value, hydration, normalize_variant_record, pytest, repair_ecommerce_detail_record_quality, sanitization, sanitize_variant_row  # fmt: skip
 
+
 @pytest.mark.unit
 def test_normalize_variant_record_strips_learn_more_from_real_size() -> None:
     record = {
@@ -30,6 +31,7 @@ def test_normalize_variant_record_strips_learn_more_from_real_size() -> None:
         },
     ]
 
+
 @pytest.mark.unit
 def test_normalize_variant_record_drops_quantity_size_controls_preserves_real_rows() -> (
     None
@@ -46,6 +48,7 @@ def test_normalize_variant_record_drops_quantity_size_controls_preserves_real_ro
 
     assert record["variants"] == [{"size": "8 oz Ceramic", "color": "Black"}]
     assert record["variant_count"] == 1
+
 
 @pytest.mark.unit
 def test_normalize_variant_record_preserves_real_short_axes_after_ui_noise_prune() -> (
@@ -66,6 +69,7 @@ def test_normalize_variant_record_preserves_real_short_axes_after_ui_noise_prune
     ]
     assert record["variant_count"] == 2
 
+
 @pytest.mark.unit
 def test_normalize_variant_record_collapses_backmarket_carousel_compare_rows() -> None:
     record = {
@@ -80,6 +84,7 @@ def test_normalize_variant_record_collapses_backmarket_carousel_compare_rows() -
 
     assert record["variants"] == [{"storage": "128 GB"}]
     assert record["variant_count"] == 1
+
 
 @pytest.mark.unit
 def test_normalize_variant_record_promotes_color_values_misfiled_as_size() -> None:
@@ -97,6 +102,7 @@ def test_normalize_variant_record_promotes_color_values_misfiled_as_size() -> No
         {"color": "Matte Black"},
     ]
     assert record["variant_count"] == 2
+
 
 @pytest.mark.unit
 def test_normalize_variant_record_infers_bombas_sizes_from_sku_suffixes() -> None:
@@ -131,6 +137,7 @@ def test_normalize_variant_record_infers_bombas_sizes_from_sku_suffixes() -> Non
     ]
     assert record["variant_count"] == 3
 
+
 @pytest.mark.unit
 def test_normalize_variant_record_prunes_patagonia_cross_product_size_noise() -> None:
     record = {
@@ -155,6 +162,7 @@ def test_normalize_variant_record_prunes_patagonia_cross_product_size_noise() ->
 
     assert [variant["size"] for variant in record["variants"]] == ["XS", "S", "M", "L"]
 
+
 @pytest.mark.unit
 def test_normalize_variant_record_drops_backmarket_condition_tabs() -> None:
     record = {
@@ -174,6 +182,7 @@ def test_normalize_variant_record_drops_backmarket_condition_tabs() -> None:
         {"color": "Blue", "storage": "128 GB", "condition": "Good"},
     ]
     assert record["variant_count"] == 2
+
 
 @pytest.mark.unit
 def test_normalize_variant_record_preserves_separate_suit_sizes_with_dimension_labels() -> (
@@ -199,6 +208,7 @@ def test_normalize_variant_record_preserves_separate_suit_sizes_with_dimension_l
     ]
     assert record["variant_count"] == 4
 
+
 @pytest.mark.unit
 def test_normalize_variant_record_cleans_code_polluted_parent_color() -> None:
     record = {
@@ -213,6 +223,7 @@ def test_normalize_variant_record_cleans_code_polluted_parent_color() -> None:
     normalize_variant_record(record)
 
     assert record["color"] == "White"
+
 
 @pytest.mark.unit
 def test_prune_unrecognized_size_rows_does_not_treat_any_style_as_size_dimension() -> (
@@ -231,6 +242,7 @@ def test_prune_unrecognized_size_rows_does_not_treat_any_style_as_size_dimension
 
     assert record["variants"] == [{"size": "US 8"}, {"size": "US 9"}]
     assert record["variant_count"] == 2
+
 
 @pytest.mark.unit
 def test_enforce_variant_currency_context_keeps_all_mismatched_variants_for_review() -> (
@@ -253,6 +265,7 @@ def test_enforce_variant_currency_context_keeps_all_mismatched_variants_for_revi
     assert record["variant_count"] == 2
     assert len(record["variants_currency_mismatch"]) == 2
 
+
 @pytest.mark.unit
 def test_hydrate_variant_size_from_precompiled_sku_suffix_pattern(
     monkeypatch,
@@ -272,6 +285,7 @@ def test_hydrate_variant_size_from_precompiled_sku_suffix_pattern(
     hydration._hydrate_variant_axes(record)
 
     assert [variant["size"] for variant in record["variants"]] == ["XS", "XL"]
+
 
 @pytest.mark.unit
 def test_record_url_suffix_after_title_rejects_non_color_suffix_tokens() -> None:
@@ -314,6 +328,7 @@ def test_record_url_suffix_after_title_rejects_non_color_suffix_tokens() -> None
         == "Tuke River"
     )
 
+
 @pytest.mark.unit
 def test_infer_shared_variant_color_skips_when_url_suffix_is_not_a_color() -> None:
     """End-to-end: variants without color stay clean when URL suffix is a code."""
@@ -332,6 +347,7 @@ def test_infer_shared_variant_color_skips_when_url_suffix_is_not_a_color() -> No
     for variant in record["variants"]:
         assert "color" not in variant or not variant["color"]
 
+
 @pytest.mark.unit
 def test_sanitize_variant_axes_normalizes_mixed_case_axis_keys() -> None:
     record = {
@@ -347,6 +363,7 @@ def test_sanitize_variant_axes_normalizes_mixed_case_axis_keys() -> None:
         {"sku": "A", "size": "US 8", "color": "Black"},
         {"sku": "B", "size": "US 9", "color": "Black"},
     ]
+
 
 @pytest.mark.unit
 def test_normalize_variant_record_keeps_independent_color_rows_without_selected_parent_color() -> (
@@ -371,6 +388,7 @@ def test_normalize_variant_record_keeps_independent_color_rows_without_selected_
         {"size": "US 9"},
     ]
 
+
 @pytest.mark.unit
 def test_normalize_variant_record_drops_foreign_product_titles_misfiled_as_colors() -> (
     None
@@ -387,6 +405,7 @@ def test_normalize_variant_record_drops_foreign_product_titles_misfiled_as_color
     normalize_variant_record(record)
 
     assert record["variants"] == [{"color": "Black/Red"}]
+
 
 @pytest.mark.unit
 def test_normalize_variant_record_prunes_global_axes_and_collapses_permutations() -> (
@@ -420,6 +439,7 @@ def test_normalize_variant_record_prunes_global_axes_and_collapses_permutations(
 
     assert record["variant_count"] == 2
 
+
 @pytest.mark.unit
 def test_normalize_variant_record_strips_currently_unavailable_suffixes() -> None:
     record = {
@@ -440,6 +460,7 @@ def test_normalize_variant_record_strips_currently_unavailable_suffixes() -> Non
     normalize_variant_record(record)
 
     assert record["variants"][0]["size"] == "12.5"
+
 
 @pytest.mark.unit
 def test_normalize_variant_record_preserves_identity_less_variants_and_drops_selected_variant() -> (
@@ -469,6 +490,7 @@ def test_normalize_variant_record_preserves_identity_less_variants_and_drops_sel
         variant.get("sku") == "sku-2" and variant.get("size") == "XL"
         for variant in record["variants"]
     )
+
 
 @pytest.mark.unit
 def test_normalize_variant_record_merges_semantic_duplicate_rows_and_size_aliases() -> (
@@ -539,6 +561,7 @@ def test_normalize_variant_record_merges_semantic_duplicate_rows_and_size_aliase
 
     assert record["variant_count"] == 3
 
+
 @pytest.mark.unit
 def test_detail_record_quality_repairs_invalid_original_prices_and_selected_variant_availability() -> (
     None
@@ -591,6 +614,7 @@ def test_detail_record_quality_repairs_invalid_original_prices_and_selected_vari
     assert record["original_price"] == "100.00"
     assert all("original_price" not in variant for variant in record["variants"])
 
+
 @pytest.mark.unit
 def test_detail_record_quality_does_not_downgrade_in_stock_parent_from_partial_variants() -> (
     None
@@ -622,6 +646,7 @@ def test_detail_record_quality_does_not_downgrade_in_stock_parent_from_partial_v
 
     assert record["availability"] == "in_stock"
 
+
 @pytest.mark.unit
 def test_reconcile_variant_derived_parent_fields_clears_stale_values_without_variants() -> (
     None
@@ -639,6 +664,7 @@ def test_reconcile_variant_derived_parent_fields_clears_stale_values_without_var
 
     assert "image_url" not in record
     assert "availability" not in record
+
 
 @pytest.mark.unit
 def test_detail_record_quality_does_not_overwrite_structured_color_from_description() -> (
@@ -660,6 +686,7 @@ def test_detail_record_quality_does_not_overwrite_structured_color_from_descript
     assert record["color"] == "Black"
     assert record["_field_sources"]["color"] == ["structured"]
 
+
 @pytest.mark.unit
 def test_detail_record_quality_does_not_assign_numeric_prefix_brand_without_url_match() -> (
     None
@@ -674,6 +701,7 @@ def test_detail_record_quality_does_not_assign_numeric_prefix_brand_without_url_
 
     assert "brand" not in record
 
+
 @pytest.mark.unit
 def test_field_coerce_ignores_non_json_structured_category_text() -> None:
     assert (
@@ -684,6 +712,7 @@ def test_field_coerce_ignores_non_json_structured_category_text() -> None:
         )
         == "{not json but user visible category text"
     )
+
 
 @pytest.mark.unit
 def test_sanitize_variant_row_preserves_relative_image_paths() -> None:

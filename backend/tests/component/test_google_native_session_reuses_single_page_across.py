@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .test_product_intelligence import GOOGLE_NATIVE_HOME_URL, LLMErrorCategory, LLMTaskResult, SearchResult, _build_candidate_intelligence, backfill_candidate_brand, discover_candidates, discovery_module, get_prompt_task, google_native_session, parse_serpapi_immersive_results, parse_serpapi_shopping_results, pytest, resolve_source_snapshot  # fmt: skip
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_google_native_session_reuses_single_page_across_queries(
@@ -97,6 +98,7 @@ async def test_google_native_session_reuses_single_page_across_queries(
     assert first[0].url == "https://shop.example.com/p/widget"
     assert second and third
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_google_native_session_stops_after_google_sorry_page(monkeypatch) -> None:
@@ -177,12 +179,14 @@ async def test_google_native_session_stops_after_google_sorry_page(monkeypatch) 
     assert "fill:blue shoe" in actions
     assert "fill:red shoe" not in actions
 
+
 @pytest.mark.component
 def test_product_intelligence_llm_prompt_registered() -> None:
     task = get_prompt_task("product_intelligence_enrichment")
 
     assert task is not None
     assert task["system_file"] == "product_intelligence_enrichment.system.txt"
+
 
 @pytest.mark.component
 def test_product_intelligence_brand_inference_prompt_registered() -> None:
@@ -191,6 +195,7 @@ def test_product_intelligence_brand_inference_prompt_registered() -> None:
     assert task is not None
     assert task["system_file"] == "product_intelligence_brand_inference.system.txt"
     assert task["user_file"] == "product_intelligence_brand_inference.user.txt"
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -222,6 +227,7 @@ async def test_resolve_source_snapshot_skips_llm_when_brand_present(
     assert snapshot["normalized_brand"] == "levi's"
     assert calls == []
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_resolve_source_snapshot_skips_llm_when_disabled(monkeypatch) -> None:
@@ -244,6 +250,7 @@ async def test_resolve_source_snapshot_skips_llm_when_disabled(monkeypatch) -> N
 
     assert snapshot["brand"] == ""
     assert snapshot["normalized_brand"] == ""
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -287,6 +294,7 @@ async def test_resolve_source_snapshot_uses_llm_brand_when_confident(
     assert captured["variables"]["product_title"] == "Wundermost Bodysuit"
     assert captured["variables"]["source_domain"] == "lululemon.com"
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_resolve_source_snapshot_drops_low_confidence_llm_brand(
@@ -317,6 +325,7 @@ async def test_resolve_source_snapshot_drops_low_confidence_llm_brand(
     assert snapshot["brand"] == ""
     assert snapshot["normalized_brand"] == ""
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_resolve_source_snapshot_swallows_llm_error(monkeypatch) -> None:
@@ -341,6 +350,7 @@ async def test_resolve_source_snapshot_swallows_llm_error(monkeypatch) -> None:
     assert snapshot["brand"] == ""
     assert snapshot["normalized_brand"] == ""
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_resolve_source_snapshot_skips_llm_when_no_inputs(monkeypatch) -> None:
@@ -359,6 +369,7 @@ async def test_resolve_source_snapshot_skips_llm_when_no_inputs(monkeypatch) -> 
     )
 
     assert snapshot["brand"] == ""
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -382,6 +393,7 @@ async def test_backfill_candidate_brand_skips_when_disabled(monkeypatch) -> None
 
     assert result is intelligence
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_backfill_candidate_brand_skips_when_brand_present(monkeypatch) -> None:
@@ -403,6 +415,7 @@ async def test_backfill_candidate_brand_skips_when_brand_present(monkeypatch) ->
     )
 
     assert result is intelligence
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -445,6 +458,7 @@ async def test_backfill_candidate_brand_applies_llm_brand_and_rescores(
     assert result["score_reasons"]["brand_match"] is True
     assert result["confidence_score"] > intelligence["confidence_score"]
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_backfill_candidate_brand_drops_low_confidence(monkeypatch) -> None:
@@ -471,6 +485,7 @@ async def test_backfill_candidate_brand_drops_low_confidence(monkeypatch) -> Non
 
     assert result is intelligence
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_backfill_candidate_brand_handles_llm_error(monkeypatch) -> None:
@@ -496,6 +511,7 @@ async def test_backfill_candidate_brand_handles_llm_error(monkeypatch) -> None:
     )
 
     assert result is intelligence
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -537,6 +553,7 @@ async def test_product_intelligence_discovery_preserves_serpapi_payload(
     assert candidates[0].payload["provider"] == "serpapi"
     assert candidates[0].payload["snippet"] == "Official product page"
 
+
 @pytest.mark.component
 def test_product_intelligence_parses_serpapi_shopping_payload() -> None:
     results = parse_serpapi_shopping_results(
@@ -569,6 +586,7 @@ def test_product_intelligence_parses_serpapi_shopping_payload() -> None:
     assert results[0].payload["product_id"] == "987654321"
     assert results[0].payload["extracted_price"] == pytest.approx(49.99)
     assert results[0].payload["thumbnail"] == "https://example.com/image.jpg"
+
 
 @pytest.mark.component
 def test_product_intelligence_parses_serpapi_immersive_store_links() -> None:
@@ -606,6 +624,7 @@ def test_product_intelligence_parses_serpapi_immersive_store_links() -> None:
         == "https://www.google.com/search?ibp=oshop&q=levi"
     )
     assert results[0].payload["extracted_price"] == pytest.approx(69.5)
+
 
 @pytest.mark.asyncio
 @pytest.mark.component

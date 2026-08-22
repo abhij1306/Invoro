@@ -75,7 +75,10 @@ def test_extract_product_group_variants_without_schema_pollution() -> None:
     assert record["care"] == "Protect from humidity"
     assert isinstance(record["variants"], list)
     assert record["variant_count"] == 1
-    assert record["description"] == "Soft grained leather bag adorned with a chain and rhinestone wing."
+    assert (
+        record["description"]
+        == "Soft grained leather bag adorned with a chain and rhinestone wing."
+    )
     assert "marketing shell" not in record.get("description", "")
 
 
@@ -143,11 +146,15 @@ def test_extract_ecommerce_listing_preserves_functional_query_params() -> None:
 
     assert len(rows) == 1
     assert rows[0]["url"] == "https://example.com/products/widget-prime?variant=blue"
-    assert rows[0]["source_url"] == "https://example.com/collections/widgets?sort=featured"
+    assert (
+        rows[0]["source_url"] == "https://example.com/collections/widgets?sort=featured"
+    )
 
 
 @pytest.mark.regression
-def test_extract_ecommerce_listing_keeps_title_only_detail_candidates_without_detail_markers() -> None:
+def test_extract_ecommerce_listing_keeps_title_only_detail_candidates_without_detail_markers() -> (
+    None
+):
     html = """
     <html>
       <body>
@@ -178,7 +185,9 @@ def test_extract_ecommerce_listing_keeps_title_only_detail_candidates_without_de
 
 
 @pytest.mark.regression
-def test_extract_ecommerce_listing_does_not_treat_supportive_product_paths_as_utility_urls() -> None:
+def test_extract_ecommerce_listing_does_not_treat_supportive_product_paths_as_utility_urls() -> (
+    None
+):
     html = """
     <html>
       <body>
@@ -209,7 +218,9 @@ def test_extract_ecommerce_listing_does_not_treat_supportive_product_paths_as_ut
 
 
 @pytest.mark.regression
-def test_extract_ecommerce_listing_keeps_same_site_cross_subdomain_detail_links() -> None:
+def test_extract_ecommerce_listing_keeps_same_site_cross_subdomain_detail_links() -> (
+    None
+):
     html = """
     <html>
       <body>
@@ -232,7 +243,9 @@ def test_extract_ecommerce_listing_keeps_same_site_cross_subdomain_detail_links(
     )
 
     assert len(rows) == 1
-    assert rows[0]["url"] == "https://www.indiamart.com/proddetail/widget-prime-123.html"
+    assert (
+        rows[0]["url"] == "https://www.indiamart.com/proddetail/widget-prime-123.html"
+    )
     assert rows[0]["title"] == "Widget Prime"
     assert rows[0]["price"] == "71"
 
@@ -259,12 +272,16 @@ def test_extract_ecommerce_listing_treats_proddetail_paths_as_detail_links() -> 
     )
 
     assert len(rows) == 1
-    assert rows[0]["url"] == "https://www.indiamart.com/proddetail/widget-prime-123.html"
+    assert (
+        rows[0]["url"] == "https://www.indiamart.com/proddetail/widget-prime-123.html"
+    )
     assert rows[0]["title"] == "Widget Prime"
 
 
 @pytest.mark.regression
-def test_extract_ecommerce_listing_keeps_id_product_links_over_productlist_facets() -> None:
+def test_extract_ecommerce_listing_keeps_id_product_links_over_productlist_facets() -> (
+    None
+):
     html = """
     <html>
       <body>
@@ -304,23 +321,26 @@ def test_extract_ecommerce_listing_keeps_id_product_links_over_productlist_facet
     assert rows[0]["url"] == (
         "https://www.walgreens.com/store/c/binaxnow-covid-19-antigen-rapid-self-test-at-home-kit/ID=300414527-product"
     )
-    assert rows[0]["title"] == "BinaxNOW COVID-19 Antigen Rapid Self-Test at Home Kit - 2 ea"
+    assert (
+        rows[0]["title"]
+        == "BinaxNOW COVID-19 Antigen Rapid Self-Test at Home Kit - 2 ea"
+    )
     assert rows[0]["price"] == "23.99"
 
 
 @pytest.mark.regression
 def test_listing_identity_rejects_productlist_as_detail_marker() -> None:
     listing_url = "https://www.walgreens.com/store/c/productlist/N=20007318"
-    product_url = (
-        "https://www.walgreens.com/store/c/binaxnow-covid-19-antigen-rapid-self-test-at-home-kit/ID%3D300414527-product"
-    )
+    product_url = "https://www.walgreens.com/store/c/binaxnow-covid-19-antigen-rapid-self-test-at-home-kit/ID%3D300414527-product"
 
     assert listing_detail_like_path(listing_url, is_job=False) is False
     assert listing_detail_like_path(product_url, is_job=False) is True
 
 
 @pytest.mark.regression
-def test_extract_ecommerce_listing_falls_back_to_original_dom_when_cleaned_dom_strips_card_headers() -> None:
+def test_extract_ecommerce_listing_falls_back_to_original_dom_when_cleaned_dom_strips_card_headers() -> (
+    None
+):
     html = """
     <html>
       <body>
@@ -351,14 +371,18 @@ def test_extract_ecommerce_listing_falls_back_to_original_dom_when_cleaned_dom_s
     )
 
     assert len(rows) == 1
-    assert rows[0]["url"] == "https://www.indiamart.com/proddetail/widget-prime-123.html"
+    assert (
+        rows[0]["url"] == "https://www.indiamart.com/proddetail/widget-prime-123.html"
+    )
     assert rows[0]["title"] == "Widget Prime"
     assert rows[0]["price"] == "71"
     assert rows[0]["image_url"] == "https://img.indiamart.com/widget-prime.jpg"
 
 
 @pytest.mark.regression
-def test_extract_ecommerce_listing_does_not_treat_repeated_testimonials_as_products() -> None:
+def test_extract_ecommerce_listing_does_not_treat_repeated_testimonials_as_products() -> (
+    None
+):
     html = """
     <html>
       <body>
@@ -549,7 +573,10 @@ def test_has_surface_field_overlap_short_circuits_after_required_matches(
 ) -> None:
     calls: list[int] = []
     original = extraction_runtime._payload_has_surface_field_overlap
-    items = [{"title": f"Product {index}", "id": index} if index <= 5 else {"id": index} for index in range(1, 21)]
+    items = [
+        {"title": f"Product {index}", "id": index} if index <= 5 else {"id": index}
+        for index in range(1, 21)
+    ]
 
     def _counting_overlap(payload, canonical, *, overlap_cache=None):
         calls.append(int(payload.get("id", 0)))
@@ -654,7 +681,9 @@ def test_extract_records_emits_nested_graphql_listing_items() -> None:
 
 
 @pytest.mark.regression
-def test_extract_records_does_not_synthesize_listing_from_nested_json_without_items() -> None:
+def test_extract_records_does_not_synthesize_listing_from_nested_json_without_items() -> (
+    None
+):
     raw_json = """
     {
       "data": {

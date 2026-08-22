@@ -77,7 +77,9 @@ def test_parallel_url_concurrency_respects_browser_runtime_capacity(
     patch_settings,
 ) -> None:
     patch_settings(url_batch_concurrency=8, browser_runtime_context_capacity=3)
-    settings_view = CrawlRunSettings.from_value({"fetch_profile": {"fetch_mode": "auto"}})
+    settings_view = CrawlRunSettings.from_value(
+        {"fetch_profile": {"fetch_mode": "auto"}}
+    )
 
     assert _parallel_url_concurrency(10, settings_view) == 3
 
@@ -87,9 +89,13 @@ def test_parallel_url_concurrency_does_not_browser_cap_http_only(
     monkeypatch: pytest.MonkeyPatch,
     patch_settings,
 ) -> None:
-    monkeypatch.setattr("app.services.crawl.batch_parallel.settings.system_max_concurrent_urls", 8)
+    monkeypatch.setattr(
+        "app.services.crawl.batch_parallel.settings.system_max_concurrent_urls", 8
+    )
     patch_settings(url_batch_concurrency=8, browser_runtime_context_capacity=3)
-    settings_view = CrawlRunSettings.from_value({"fetch_profile": {"fetch_mode": "http_only"}})
+    settings_view = CrawlRunSettings.from_value(
+        {"fetch_profile": {"fetch_mode": "http_only"}}
+    )
 
     assert _parallel_url_concurrency(10, settings_view) == 8
 
@@ -119,7 +125,11 @@ async def test_persist_url_failure_log_prefixes_url_for_parallel_ui(
         log_message=f"URL processing failed for {url}: RuntimeError: navigation failed",
     )
     logs = (
-        (await db_session.execute(select(CrawlLog).where(CrawlLog.run_id == run.id).order_by(CrawlLog.id)))
+        (
+            await db_session.execute(
+                select(CrawlLog).where(CrawlLog.run_id == run.id).order_by(CrawlLog.id)
+            )
+        )
         .scalars()
         .all()
     )
@@ -504,7 +514,9 @@ async def test_process_run_runs_same_domain_batch_urls_in_parallel(
         bind=db_session.bind,
         expire_on_commit=False,
     )
-    monkeypatch.setattr("app.services.crawl.batch_runtime.SessionLocal", session_factory)
+    monkeypatch.setattr(
+        "app.services.crawl.batch_runtime.SessionLocal", session_factory
+    )
 
     await process_run(db_session, run.id)
 
@@ -546,7 +558,9 @@ async def test_parallel_run_does_not_mislabel_nested_timeout_as_url_deadline(
 
     async def _fake_process_single_url(*args, **kwargs):
         if kwargs["url"] == failing_url:
-            raise TimeoutError("Browser navigation stage exceeded timeout_seconds=45.00")
+            raise TimeoutError(
+                "Browser navigation stage exceeded timeout_seconds=45.00"
+            )
         return URLProcessingResult(
             records=[],
             verdict="success",
@@ -561,11 +575,17 @@ async def test_parallel_run_does_not_mislabel_nested_timeout_as_url_deadline(
         bind=db_session.bind,
         expire_on_commit=False,
     )
-    monkeypatch.setattr("app.services.crawl.batch_runtime.SessionLocal", session_factory)
+    monkeypatch.setattr(
+        "app.services.crawl.batch_runtime.SessionLocal", session_factory
+    )
 
     await process_run(db_session, run.id)
     logs = (
-        (await db_session.execute(select(CrawlLog).where(CrawlLog.run_id == run.id).order_by(CrawlLog.id)))
+        (
+            await db_session.execute(
+                select(CrawlLog).where(CrawlLog.run_id == run.id).order_by(CrawlLog.id)
+            )
+        )
         .scalars()
         .all()
     )
@@ -576,7 +596,9 @@ async def test_parallel_run_does_not_mislabel_nested_timeout_as_url_deadline(
         "Browser navigation stage exceeded timeout_seconds=45.00" in message
         for message in messages
     )
-    assert not any(f"URL processing timed out for {failing_url}" in message for message in messages)
+    assert not any(
+        f"URL processing timed out for {failing_url}" in message for message in messages
+    )
 
 
 @pytest.mark.asyncio
@@ -691,8 +713,12 @@ async def test_process_run_blocks_disallowed_url_before_acquire(
     async def _unexpected_acquire(request):
         raise AssertionError(f"acquire should not run for {request.url}")
 
-    monkeypatch.setattr("app.services.pipeline.extraction_loop.check_url_crawlability", _disallow)
-    monkeypatch.setattr("app.services.pipeline.extraction_loop.acquire", _unexpected_acquire)
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.check_url_crawlability", _disallow
+    )
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.acquire", _unexpected_acquire
+    )
 
     await process_run(db_session, run.id)
     await db_session.refresh(run)

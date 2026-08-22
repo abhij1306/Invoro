@@ -7,19 +7,39 @@ from typing import Any
 from selectolax.lexbor import LexborHTMLParser
 
 from app.services.config.runtime_settings import crawler_runtime_settings
-from app.services.extraction_context import ExtractionContext, collect_structured_source_payloads, prepare_extraction_context
-from app.services.extract.content_listing_handler import has_table_row_intent, table_row_records
-from app.services.extract.detail.identity.core import listing_detail_like_path, listing_url_is_structural
-from app.services.extract.listing_candidate_ranking import best_listing_candidate_set, listing_record_supported
+from app.services.extraction_context import (
+    ExtractionContext,
+    collect_structured_source_payloads,
+    prepare_extraction_context,
+)
+from app.services.extract.content_listing_handler import (
+    has_table_row_intent,
+    table_row_records,
+)
+from app.services.extract.detail.identity.core import (
+    listing_detail_like_path,
+    listing_url_is_structural,
+)
+from app.services.extract.listing_candidate_ranking import (
+    best_listing_candidate_set,
+    listing_record_supported,
+)
 from app.services.extract.listing_card_fragments import listing_card_html_fragments
-from app.services.extract.listing_integrity_gate import IntegrityDecision, evaluate_listing_integrity
+from app.services.extract.listing_integrity_gate import (
+    IntegrityDecision,
+    evaluate_listing_integrity,
+)
 from app.services.extract.listing_signals import select_primary_anchor
 from app.services.extract.listing_visual import visual_listing_records
-from app.services.extract.structured_listing_handler import allow_embedded_json_listing_payloads, extract_structured_listing
+from app.services.extract.structured_listing_handler import (
+    allow_embedded_json_listing_payloads,
+    extract_structured_listing,
+)
 from app.services.listing_card_extraction import listing_record_from_card
 from app.services.shared.field_coerce import is_title_noise
 
 logger = logging.getLogger(__name__)
+
 
 def _detail_anchor_count(
     parser: LexborHTMLParser,
@@ -47,6 +67,7 @@ def _detail_anchor_count(
             count += 1
     return count
 
+
 def _attach_gate_decision_to_artifacts(
     artifacts: dict[str, object] | None,
     decision: IntegrityDecision | None,
@@ -67,6 +88,7 @@ def _attach_gate_decision_to_artifacts(
         "metrics": decision.metrics,
     }
 
+
 def apply_listing_integrity_gate(
     records: list[dict[str, Any]],
     *,
@@ -78,7 +100,9 @@ def apply_listing_integrity_gate(
         _attach_gate_decision_to_artifacts(artifacts, None)
         return []
     try:
-        decision = evaluate_listing_integrity(records, page_url=page_url, surface=surface)
+        decision = evaluate_listing_integrity(
+            records, page_url=page_url, surface=surface
+        )
     except (KeyError, RuntimeError, TypeError, ValueError):
         logger.exception(
             "evaluate_listing_integrity failed for page_url=%s surface=%s records=%d",
@@ -92,12 +116,14 @@ def apply_listing_integrity_gate(
         return []
     return [_strip_listing_integrity_internals(record) for record in records]
 
+
 def _strip_listing_integrity_internals(record: dict[str, Any]) -> dict[str, Any]:
     if "_structural_signature" not in record:
         return record
     cleaned = dict(record)
     cleaned.pop("_structural_signature", None)
     return cleaned
+
 
 def _structured_listing_stage(
     context: Any,
@@ -116,7 +142,9 @@ def _structured_listing_stage(
     ):
         if source_name == "js_state":
             continue
-        payload_list = [payload for payload in source_payloads if isinstance(payload, dict)]
+        payload_list = [
+            payload for payload in source_payloads if isinstance(payload, dict)
+        ]
         if source_name == "embedded_json" and not allow_embedded_json_listing_payloads(
             payload_list,
             listing_min_items=listing_min_items,
@@ -130,6 +158,7 @@ def _structured_listing_stage(
         max_records=max_records,
         listing_min_items=listing_min_items,
     )
+
 
 def _dom_listing_stage(
     parser: LexborHTMLParser,
@@ -177,6 +206,7 @@ def _dom_listing_stage(
         records.append(record)
     return records
 
+
 def extract_listing_records(
     html: str,
     page_url: str,
@@ -188,7 +218,9 @@ def extract_listing_records(
     network_payloads: list[dict[str, object]] | None = None,
     record_dom_observed_selectors: bool = False,
     context: ExtractionContext | None = None,
-    structured_payload_collector: Callable[..., Any] = collect_structured_source_payloads,
+    structured_payload_collector: Callable[
+        ..., Any
+    ] = collect_structured_source_payloads,
 ) -> list[dict[str, Any]]:
     del network_payloads
     if surface == "content_listing":
@@ -202,7 +234,9 @@ def extract_listing_records(
     context = context or prepare_extraction_context(html)
     dom_parser = context.dom_parser
     is_job_surface = surface.startswith("job_")
-    listing_fallback_fragment_limit = int(crawler_runtime_settings.listing_fallback_fragment_limit)
+    listing_fallback_fragment_limit = int(
+        crawler_runtime_settings.listing_fallback_fragment_limit
+    )
     listing_min_items = int(crawler_runtime_settings.listing_min_items)
     dom_parser = _preferred_listing_parser(
         context,
@@ -252,7 +286,9 @@ def extract_listing_records(
         selector_rules,
         record_dom_observed_selectors,
     )
-    visual_records = _supported_visual_listing_records(artifacts, page_url, surface, max_records)
+    visual_records = _supported_visual_listing_records(
+        artifacts, page_url, surface, max_records
+    )
     candidate_sets: list[tuple[str, list[dict[str, Any]]]] = [
         ("structured", structured_records),
         ("dom", dom_records),
@@ -288,6 +324,7 @@ def extract_listing_records(
         artifacts=artifacts,
     )
 
+
 def _preferred_listing_parser(
     context: ExtractionContext,
     parser: LexborHTMLParser,
@@ -296,7 +333,9 @@ def _preferred_listing_parser(
     max_records: int,
     page_url: str,
 ) -> LexborHTMLParser:
-    if listing_card_html_fragments(parser, is_job=is_job, fallback_fragment_limit=fragment_limit, limit=max_records):
+    if listing_card_html_fragments(
+        parser, is_job=is_job, fallback_fragment_limit=fragment_limit, limit=max_records
+    ):
         return parser
     original = context.original_dom_parser
     if listing_card_html_fragments(
@@ -311,6 +350,7 @@ def _preferred_listing_parser(
         )
         return original
     return parser
+
 
 def _original_dom_listing_records(
     context: ExtractionContext,
@@ -355,6 +395,7 @@ def _original_dom_listing_records(
         record_dom_observed_selectors=record_observed,
     )
 
+
 def _rendered_listing_records(
     artifacts: dict[str, object] | None,
     page_url: str,
@@ -365,10 +406,16 @@ def _rendered_listing_records(
     selector_rules: list[dict[str, object]] | None,
     record_observed: bool,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    fragments = artifacts.get("rendered_listing_fragments") if isinstance(artifacts, dict) else None
+    fragments = (
+        artifacts.get("rendered_listing_fragments")
+        if isinstance(artifacts, dict)
+        else None
+    )
     if not isinstance(fragments, list):
         return [], []
-    fragment_html = "\n".join(filter(None, (str(item or "").strip() for item in fragments)))
+    fragment_html = "\n".join(
+        filter(None, (str(item or "").strip() for item in fragments))
+    )
     if not fragment_html:
         return [], []
     context = prepare_extraction_context(f"<html><body>{fragment_html}</body></html>")
@@ -382,7 +429,9 @@ def _rendered_listing_records(
         selector_rules=selector_rules,
         record_dom_observed_selectors=record_observed,
     )
-    if not _rendered_original_is_needed(context, records, page_url, surface, fragment_limit):
+    if not _rendered_original_is_needed(
+        context, records, page_url, surface, fragment_limit
+    ):
         return records, []
     original_records = _dom_listing_stage(
         context.original_dom_parser,
@@ -395,6 +444,7 @@ def _rendered_listing_records(
         record_dom_observed_selectors=record_observed,
     )
     return records, original_records
+
 
 def _rendered_original_is_needed(
     context: ExtractionContext,
@@ -419,8 +469,15 @@ def _rendered_original_is_needed(
     )
     return not records or original >= max(3, cleaned + 2)
 
-def _supported_visual_listing_records(artifacts: dict[str, object] | None, page_url: str, surface: str, max_records: int) -> list[dict[str, Any]]:
-    elements = artifacts.get("listing_visual_elements") if isinstance(artifacts, dict) else None
+
+def _supported_visual_listing_records(
+    artifacts: dict[str, object] | None, page_url: str, surface: str, max_records: int
+) -> list[dict[str, Any]]:
+    elements = (
+        artifacts.get("listing_visual_elements")
+        if isinstance(artifacts, dict)
+        else None
+    )
     records = visual_listing_records(
         elements if isinstance(elements, list) else None,
         page_url=page_url,
@@ -438,6 +495,8 @@ def _supported_visual_listing_records(artifacts: dict[str, object] | None, page_
             surface=surface,
             title_is_noise=is_title_noise,
             url_is_structural=listing_url_is_structural,
-            detail_like_url=lambda url: listing_detail_like_path(url, is_job=surface.startswith("job_")),
+            detail_like_url=lambda url: listing_detail_like_path(
+                url, is_job=surface.startswith("job_")
+            ),
         )
     ]

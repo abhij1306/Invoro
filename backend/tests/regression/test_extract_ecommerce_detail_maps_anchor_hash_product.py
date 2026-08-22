@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .test_detail_extractor_structured_sources import detail_product_type_is_low_signal, detail_redirect_identity_is_mismatched, detail_slug_title_fallback_from_url, detail_title_fallback_looks_like_code, extract_records, pytest, read_optional_artifact_text, reconcile_detail_currency_with_url, repair_ecommerce_detail_record_quality, title_needs_promotion  # fmt: skip
 
+
 @pytest.mark.regression
 def test_extract_ecommerce_detail_maps_anchor_hash_product_description_upstream() -> (
     None
@@ -96,6 +97,7 @@ def test_extract_ecommerce_detail_maps_anchor_hash_product_description_upstream(
     assert record["_field_sources"]["description"] == ["json_ld", "dom_sections"]
     assert "dom_sections" in record["_field_sources"]["product_details"]
 
+
 @pytest.mark.regression
 def test_extract_ecommerce_detail_filters_zara_copy_code_from_dom_variants() -> None:
     html = """
@@ -131,6 +133,7 @@ def test_extract_ecommerce_detail_filters_zara_copy_code_from_dom_variants() -> 
     record = rows[0]
     assert "4493/144/800" not in str(record.get("option1_values") or "")
     assert record["variant_count"] == 6
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_maps_zara_composition_block_to_materials() -> None:
@@ -195,6 +198,7 @@ def test_extract_ecommerce_detail_maps_zara_composition_block_to_materials() -> 
     assert record["_field_sources"]["materials"] == ["dom_sections"]
     assert "dimensions" not in record
 
+
 @pytest.mark.regression
 def test_extract_detail_keeps_requested_custom_dom_sections_live_past_structured_early_exit() -> (
     None
@@ -250,6 +254,7 @@ def test_extract_detail_keeps_requested_custom_dom_sections_live_past_structured
     assert record["_field_sources"]["product_story"] == ["dom_sections"]
     assert record["_extraction_tiers"]["current"] == "dom"
     assert record["_extraction_tiers"]["early_exit"] is None
+
 
 @pytest.mark.regression
 def test_extract_detail_matches_exact_requested_section_label_without_collapsing_it() -> (
@@ -308,6 +313,7 @@ def test_extract_detail_matches_exact_requested_section_label_without_collapsing
     assert record["_extraction_tiers"]["early_exit"] is None
     assert "benefits" not in record
 
+
 @pytest.mark.regression
 def test_extract_detail_keeps_company_details_body_for_requested_custom_field() -> None:
     html = read_optional_artifact_text("artifacts/runs/8/pages/dc80e38b20c25b9b.html")
@@ -334,6 +340,7 @@ def test_extract_detail_keeps_company_details_body_for_requested_custom_field() 
     )
     assert "GST NO 27AAECL9071B1ZK" in record["company_details"]
     assert record["_field_sources"]["company_details"] == ["dom_sections"]
+
 
 @pytest.mark.regression
 def test_extract_detail_keeps_slug_match_when_identity_codes_disagree() -> None:
@@ -373,6 +380,7 @@ def test_extract_detail_keeps_slug_match_when_identity_codes_disagree() -> None:
 
     assert len(rows) == 1
     assert rows[0]["title"] == "Widget Premium"
+
 
 @pytest.mark.regression
 def test_extract_detail_accepts_same_url_with_code_mismatch() -> None:
@@ -417,6 +425,7 @@ def test_extract_detail_accepts_same_url_with_code_mismatch() -> None:
     assert rows[0]["title"] == "Short Sleeve Advantage Polo"
     assert rows[0]["price"] == "44.00"
 
+
 @pytest.mark.regression
 def test_extract_detail_keeps_nike_record_when_canonical_drops_style_code() -> None:
     requested_url = "https://www.nike.com/t/air-force-1-07-mens-shoes-jBrhbr/CW2288-111"
@@ -458,6 +467,7 @@ def test_extract_detail_keeps_nike_record_when_canonical_drops_style_code() -> N
     assert len(rows) == 1
     assert rows[0]["title"] == "Nike Air Force 1 '07 Men's Shoes"
     assert rows[0]["part_number"] == "CW2288-111"
+
 
 @pytest.mark.regression
 def test_extract_detail_keeps_shopify_collection_detail_when_canonical_collapses_path() -> (
@@ -505,6 +515,7 @@ def test_extract_detail_keeps_shopify_collection_detail_when_canonical_collapses
     assert rows[0]["currency"] == "USD"
     assert rows[0]["price"] == "282.00"
 
+
 @pytest.mark.regression
 def test_extract_detail_corrects_host_currency_hint_integer_cent_price() -> None:
     html = """
@@ -533,6 +544,7 @@ def test_extract_detail_corrects_host_currency_hint_integer_cent_price() -> None
     assert len(rows) == 1
     assert rows[0]["currency"] == "USD"
     assert rows[0]["price"] == "282.00"
+
 
 @pytest.mark.regression
 def test_extract_detail_keeps_decimal_price_when_currency_conflicts_with_host_hint() -> (
@@ -564,6 +576,7 @@ def test_extract_detail_keeps_decimal_price_when_currency_conflicts_with_host_hi
     assert len(rows) == 1
     assert rows[0]["currency"] == "INR"
     assert rows[0]["price"] == "260650.21"
+
 
 @pytest.mark.regression
 def test_extract_detail_does_not_backfill_low_signal_price_after_currency_conflict() -> (
@@ -601,6 +614,7 @@ def test_extract_detail_does_not_backfill_low_signal_price_after_currency_confli
     assert rows[0]["currency"] == "INR"
     assert rows[0]["price"] == "2153.05"
 
+
 @pytest.mark.regression
 def test_repair_ecommerce_detail_replaces_mismatched_title_when_slug_evidence_matches() -> (
     None
@@ -627,12 +641,14 @@ def test_repair_ecommerce_detail_replaces_mismatched_title_when_slug_evidence_ma
 
     assert record["title"] == "Rambler Ceramic Stackable 8Oz"
 
+
 @pytest.mark.regression
 def test_detail_title_prime_is_not_promoted_when_supported_by_url() -> None:
     assert not title_needs_promotion(
         "Prime",
         page_url="https://example.com/products/prime",
     )
+
 
 @pytest.mark.regression
 def test_detail_title_prime_is_not_promoted_when_supported_by_terminal_slug_tokens() -> (
@@ -643,6 +659,7 @@ def test_detail_title_prime_is_not_promoted_when_supported_by_terminal_slug_toke
         page_url="https://example.com/products/prime-day-shirt",
     )
 
+
 @pytest.mark.regression
 def test_detail_slug_title_fallback_keeps_semantic_slug_with_model_suffix() -> None:
     assert (
@@ -651,6 +668,7 @@ def test_detail_slug_title_fallback_keeps_semantic_slug_with_model_suffix() -> N
         )
         == "rambler stackable 8oz"
     )
+
 
 @pytest.mark.regression
 def test_detail_title_fallback_code_guard_skips_multi_token_numeric_slug() -> None:
@@ -662,9 +680,11 @@ def test_detail_title_fallback_code_guard_skips_multi_token_numeric_slug() -> No
         == "iphone 16 pro"
     )
 
+
 @pytest.mark.regression
 def test_detail_product_type_low_signal_includes_artifact_values() -> None:
     assert detail_product_type_is_low_signal("promotionalcallout")
+
 
 @pytest.mark.regression
 def test_detail_redirect_identity_detects_model_conflict_without_sku_evidence() -> None:
@@ -673,6 +693,7 @@ def test_detail_redirect_identity_detects_model_conflict_without_sku_evidence() 
         page_url="https://example.com/products/canon-eos-r6-camera",
         requested_page_url="https://example.com/products/canon-eos-r6-camera",
     )
+
 
 @pytest.mark.regression
 def test_currency_reconcile_keeps_adapter_localized_price_over_host_hint() -> None:

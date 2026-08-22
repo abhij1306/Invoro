@@ -203,7 +203,9 @@ def _clean_variant_row_axes(variant: dict[str, Any]) -> dict[str, Any] | None:
     cleaned_variant = dict(variant)
     for field_name in public_variant_axis_fields:
         raw_axis_key = _variant_axis_source_key(cleaned_variant, field_name)
-        raw_value = cleaned_variant.get(raw_axis_key) if raw_axis_key is not None else None
+        raw_value = (
+            cleaned_variant.get(raw_axis_key) if raw_axis_key is not None else None
+        )
         if size_color_extraction._variant_size_axis_value_is_quantity_control(
             field_name, raw_value
         ):

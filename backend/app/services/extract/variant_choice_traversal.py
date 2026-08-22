@@ -66,10 +66,20 @@ from app.services.shared.regex_patterns import compile_regex_patterns
 
 _ALNUM_SPLIT_PATTERN = r"[^a-z0-9]+"
 
-_variant_group_attr_noise_tokens = frozenset(str(token).strip().lower() for token in tuple(VARIANT_GROUP_ATTR_NOISE_TOKENS or ()) if str(token).strip())
-_variant_group_attr_noise_patterns = compile_regex_patterns(VARIANT_GROUP_ATTR_NOISE_PATTERNS or ())
+_variant_group_attr_noise_tokens = frozenset(
+    str(token).strip().lower()
+    for token in tuple(VARIANT_GROUP_ATTR_NOISE_TOKENS or ())
+    if str(token).strip()
+)
+_variant_group_attr_noise_patterns = compile_regex_patterns(
+    VARIANT_GROUP_ATTR_NOISE_PATTERNS or ()
+)
 _variant_size_value_patterns = compile_regex_patterns(VARIANT_SIZE_VALUE_PATTERNS or ())
-_variant_quantity_attr_tokens = frozenset(str(token).strip().lower() for token in tuple(VARIANT_QUANTITY_ATTR_TOKENS or ()) if str(token).strip())
+_variant_quantity_attr_tokens = frozenset(
+    str(token).strip().lower()
+    for token in tuple(VARIANT_QUANTITY_ATTR_TOKENS or ())
+    if str(token).strip()
+)
 _variant_anchor_href_markers = tuple(
     str(marker or "").strip().casefold()
     for marker in (
@@ -82,6 +92,7 @@ _variant_anchor_href_markers = tuple(
 )
 _VARIANT_CHOICE_CACHE_ATTR = "_crawler_variant_choice_cache"
 
+
 def _variant_choice_cache(soup: Any) -> dict[object, object]:
     cache = getattr(soup, _VARIANT_CHOICE_CACHE_ATTR, None)
     if isinstance(cache, dict):
@@ -92,6 +103,7 @@ def _variant_choice_cache(soup: Any) -> dict[object, object]:
     except Exception:
         return {}
     return cache
+
 
 def infer_variant_group_name(node: Any) -> str:
     if not hasattr(node, "get"):
@@ -111,15 +123,22 @@ def infer_variant_group_name(node: Any) -> str:
         elif value not in (None, "", [], {}):
             parts.append(str(value))
     probe = " ".join(parts).replace("_", " ").replace("-", " ").lower()
-    probe_tokens = frozenset(token for token in re.split(_ALNUM_SPLIT_PATTERN, probe) if token)
+    probe_tokens = frozenset(
+        token for token in re.split(_ALNUM_SPLIT_PATTERN, probe) if token
+    )
     if VARIANT_COLOR_AXIS_TOKENS & probe_tokens:
         return "color"
     if VARIANT_SIZE_AXIS_TOKENS & probe_tokens:
         return "size"
     for token in probe_tokens:
-        if token in _variant_axis_allowed_single_tokens and token not in VARIANT_AXIS_EXCLUDED_SINGLE_TOKENS:
+        if (
+            token in _variant_axis_allowed_single_tokens
+            and token not in VARIANT_AXIS_EXCLUDED_SINGLE_TOKENS
+        ):
             return token
     return ""
+
+
 def variant_dom_cues_present(soup: Any) -> bool:
     cache = _variant_choice_cache(soup)
     cache_key = "variant_dom_cues_present"
@@ -129,6 +148,7 @@ def variant_dom_cues_present(soup: Any) -> bool:
     cache[cache_key] = result
     return result
 
+
 def _choice_option_text(node: Any, *, parent: Any | None = None) -> str:
     if node is None or not hasattr(node, "get"):
         return ""
@@ -137,7 +157,9 @@ def _choice_option_text(node: Any, *, parent: Any | None = None) -> str:
         label = variant_input_label(parent or node, node)
         if label is not None:
             label_text = clean_text(label.get_text(" ", strip=True))
-    node_text = clean_text(node.get_text(" ", strip=True)) if hasattr(node, "get_text") else ""
+    node_text = (
+        clean_text(node.get_text(" ", strip=True)) if hasattr(node, "get_text") else ""
+    )
     attribute_value = next(
         (
             node.get(attr)
@@ -152,13 +174,20 @@ def _choice_option_text(node: Any, *, parent: Any | None = None) -> str:
         None,
     )
     fallback_value = next(
-        (node.get(attr) for attr in ("data-value", "data-option-value", "aria-label", "value") if node.get(attr) not in (None, "", [], {})),
+        (
+            node.get(attr)
+            for attr in ("data-value", "data-option-value", "aria-label", "value")
+            if node.get(attr) not in (None, "", [], {})
+        ),
         None,
     )
     return clean_text(attribute_value or label_text or fallback_value or node_text)
 
+
 def variant_input_label(container: Any, input_node: Any) -> Any | None:
-    input_id = text_or_none(input_node.get("id")) if hasattr(input_node, "get") else None
+    input_id = (
+        text_or_none(input_node.get("id")) if hasattr(input_node, "get") else None
+    )
     if input_id:
         label = safe_find(container, "label", attrs={"for": input_id})
         if label is not None:
@@ -174,20 +203,29 @@ def variant_input_label(container: Any, input_node: Any) -> Any | None:
         sibling = getattr(sibling, "next_sibling", None)
     return None
 
+
 def _choice_option_texts(node: Any) -> list[str]:
     if not hasattr(node, "select"):
         return []
     values: list[str] = []
-    for option in node.select(VARIANT_CHOICE_OPTION_SELECTOR)[: int(VARIANT_CHOICE_OPTION_LIMIT)]:
+    for option in node.select(VARIANT_CHOICE_OPTION_SELECTOR)[
+        : int(VARIANT_CHOICE_OPTION_LIMIT)
+    ]:
         value = _choice_option_text(option, parent=node)
         if value:
             values.append(value)
     return values
 
+
 def _descendant_variant_group_name(node: Any) -> str:
     if not hasattr(node, "select"):
         return ""
-    return _direct_descendant_group_name(node) or _label_descendant_group_name(node) or _machine_descendant_group_name(node)
+    return (
+        _direct_descendant_group_name(node)
+        or _label_descendant_group_name(node)
+        or _machine_descendant_group_name(node)
+    )
+
 
 def _direct_descendant_group_name(node: Any) -> str:
     children = node.find_all(
@@ -204,30 +242,44 @@ def _direct_descendant_group_name(node: Any) -> str:
                 return resolved
     return ""
 
+
 def _descendant_group_label_is_control(child: Any) -> bool:
     tag = str(getattr(child, "name", "") or "").strip().lower()
     if tag in {"a", "button", "input", "option"}:
         return True
     if hasattr(child, "get"):
         role = str(child.get("role") or "").strip().lower()
-        selected = any(child.get(attr) not in (None, "", [], {}) for attr in ("data-selected", "aria-selected"))
+        selected = any(
+            child.get(attr) not in (None, "", [], {})
+            for attr in ("data-selected", "aria-selected")
+        )
         if role in {"radio", "option"} or selected:
             return True
     return bool(
         hasattr(child, "select")
-        and child.select("a[href], button, input[type='radio'], input[type='checkbox'], [role='radio'], [role='option'], [data-selected], [aria-selected]")
+        and child.select(
+            "a[href], button, input[type='radio'], input[type='checkbox'], [role='radio'], [role='option'], [data-selected], [aria-selected]"
+        )
     )
+
 
 def _label_descendant_group_name(node: Any) -> str:
     for child in node.select("label")[: int(VARIANT_DESCENDANT_SCAN_LIMIT)]:
         sr_only = child.select_one(".sr-only, .visually-hidden")
-        raw_value = sr_only.get_text(" ", strip=True) if sr_only is not None else child.get_text(" ", strip=True)
+        raw_value = (
+            sr_only.get_text(" ", strip=True)
+            if sr_only is not None
+            else child.get_text(" ", strip=True)
+        )
         if resolved := _resolve_visible_variant_group_name(raw_value):
             return resolved
     return ""
 
+
 def _machine_descendant_group_name(node: Any) -> str:
-    children = node.select("[data-option-name], input[type='radio'], input[type='checkbox'], button")
+    children = node.select(
+        "[data-option-name], input[type='radio'], input[type='checkbox'], button"
+    )
     for child in children[: int(VARIANT_DESCENDANT_SCAN_LIMIT)]:
         for attr in ("data-option-name", "name", "id", "data-testid", "data-qa-action"):
             value = child.get(attr)
@@ -235,6 +287,7 @@ def _machine_descendant_group_name(node: Any) -> str:
                 if resolved := _resolve_machine_variant_group_name(value):
                     return resolved
     return ""
+
 
 def _node_supports_value_only_axis_inference(node: Any) -> bool:
     if not hasattr(node, "find"):
@@ -250,6 +303,7 @@ def _node_supports_value_only_axis_inference(node: Any) -> bool:
             return True
     return False
 
+
 def _descendant_variant_choice_inputs(node: Any, *, limit: int) -> list[Any]:
     if not hasattr(node, "find_all"):
         return []
@@ -260,7 +314,11 @@ def _descendant_variant_choice_inputs(node: Any, *, limit: int) -> list[Any]:
         if tag_name == "button":
             inputs.append(child)
             continue
-        input_type = str(child.get("type") or "").strip().lower() if hasattr(child, "get") else ""
+        input_type = (
+            str(child.get("type") or "").strip().lower()
+            if hasattr(child, "get")
+            else ""
+        )
         if input_type in {"radio", "checkbox"}:
             inputs.append(child)
     remaining = normalized_limit - len(inputs)
@@ -271,6 +329,7 @@ def _descendant_variant_choice_inputs(node: Any, *, limit: int) -> list[Any]:
             inputs.append(child)
     return inputs
 
+
 def _anchor_node_has_variant_signal(node: Any) -> bool:
     href = text_or_none(node.get("href")) if hasattr(node, "get") else None
     if not href:
@@ -278,7 +337,10 @@ def _anchor_node_has_variant_signal(node: Any) -> bool:
     href_lower = href.casefold()
     if any(marker in href_lower for marker in _variant_anchor_href_markers):
         return True
-    if any(node.get(attr) not in (None, "", [], {}) for attr in ("data-selected", "aria-current", "aria-pressed")):
+    if any(
+        node.get(attr) not in (None, "", [], {})
+        for attr in ("data-selected", "aria-current", "aria-pressed")
+    ):
         return True
     probe_parts: list[str] = []
     for attr_name in ("class", "id", "data-testid"):
@@ -288,7 +350,11 @@ def _anchor_node_has_variant_signal(node: Any) -> bool:
         elif value not in (None, "", [], {}):
             probe_parts.append(str(value))
     probe = clean_text(" ".join(probe_parts)).lower()
-    return any(token in probe for token in ("selected", "current", "checked", "variant", "swatch", "option"))
+    return any(
+        token in probe
+        for token in ("selected", "current", "checked", "variant", "swatch", "option")
+    )
+
 
 def _descendant_group_label_nodes(node: Any, *, limit: int) -> list[Any]:
     if not hasattr(node, "find_all"):
@@ -314,36 +380,57 @@ def _descendant_group_label_nodes(node: Any, *, limit: int) -> list[Any]:
             break
     return groups
 
+
 def _normalized_group_name(value: object) -> str:
     text = text_or_none(value)
-    return normalized_variant_axis_key(text) or clean_text(text).casefold() if text else ""
+    return (
+        normalized_variant_axis_key(text) or clean_text(text).casefold() if text else ""
+    )
+
 
 def _input_group_names(node: Any) -> set[str]:
     names: set[str] = set()
-    inputs = _descendant_variant_choice_inputs(node, limit=int(VARIANT_CHOICE_CONTAINER_OPTION_LIMIT))
+    inputs = _descendant_variant_choice_inputs(
+        node, limit=int(VARIANT_CHOICE_CONTAINER_OPTION_LIMIT)
+    )
     for child in inputs:
-        raw = child.get("name") or child.get("data-option-name") or child.get("data-testid")
+        raw = (
+            child.get("name")
+            or child.get("data-option-name")
+            or child.get("data-testid")
+        )
         if name := _normalized_group_name(raw):
             names.add(name)
     return names
 
+
 def _select_group_names(node: Any) -> set[str]:
     names: set[str] = set()
-    for select in node.find_all("select", limit=int(VARIANT_CHOICE_CONTAINER_SELECT_LIMIT)):
-        raw = select.get("name") or select.get("aria-label") or select.get("data-option-name")
+    for select in node.find_all(
+        "select", limit=int(VARIANT_CHOICE_CONTAINER_SELECT_LIMIT)
+    ):
+        raw = (
+            select.get("name")
+            or select.get("aria-label")
+            or select.get("data-option-name")
+        )
         if name := _normalized_group_name(raw):
             names.add(name)
     return names
+
 
 def _aria_group_names(node: Any) -> set[str]:
     names: set[str] = set()
     excluded = {"button", "a", "img", "input", "option"}
-    for group in _descendant_group_label_nodes(node, limit=int(VARIANT_CHOICE_CONTAINER_GROUP_LIMIT)):
+    for group in _descendant_group_label_nodes(
+        node, limit=int(VARIANT_CHOICE_CONTAINER_GROUP_LIMIT)
+    ):
         if str(getattr(group, "name", "") or "").strip().lower() in excluded:
             continue
         if name := _normalized_group_name(group.get("aria-label")):
             names.add(name)
     return names
+
 
 def _variant_choice_container_is_overbroad(node: Any) -> bool:
     if not hasattr(node, "find_all"):
@@ -352,8 +439,11 @@ def _variant_choice_container_is_overbroad(node: Any) -> bool:
         return False
     if len(node.find_all("fieldset", limit=2)) >= 2:
         return True
-    names = _input_group_names(node) | _select_group_names(node) | _aria_group_names(node)
+    names = (
+        _input_group_names(node) | _select_group_names(node) | _aria_group_names(node)
+    )
     return len(names) >= int(VARIANT_CHOICE_CONTAINER_MIN_DISTINCT_NAMES)
+
 
 def resolve_variant_group_name(node: Any) -> str:
     if not hasattr(node, "get"):
@@ -379,13 +469,14 @@ def resolve_variant_group_name(node: Any) -> str:
     if nearby := _nearby_variant_group_name(node):
         return nearby
     if hasattr(node, "select"):
-        for child in node.select("[data-option-name], [aria-label], [data-testid], [data-qa-action], [role='radio'], input, button")[
-            : int(VARIANT_DESCENDANT_SCAN_LIMIT)
-        ]:
+        for child in node.select(
+            "[data-option-name], [aria-label], [data-testid], [data-qa-action], [role='radio'], input, button"
+        )[: int(VARIANT_DESCENDANT_SCAN_LIMIT)]:
             inferred_child = infer_variant_group_name(child)
             if inferred_child:
                 return inferred_child
     return clean_text(inferred_name)
+
 
 def _visible_variant_group_candidates(node: Any, tag_name: str) -> list[object]:
     candidates: list[object] = []
@@ -395,13 +486,21 @@ def _visible_variant_group_candidates(node: Any, tag_name: str) -> list[object]:
         root = node
         while getattr(root, "parent", None) is not None:
             root = root.parent
-        external = root.find("label", attrs={"for": node_id}) if hasattr(root, "find") else None
+        external = (
+            root.find("label", attrs={"for": node_id})
+            if hasattr(root, "find")
+            else None
+        )
         if external is not None:
             candidates.append(external.get_text(" ", strip=True))
     label = node.find_parent("label") if hasattr(node, "find_parent") else None
     if label is not None and accepts_label:
         candidates.append(label.get_text(" ", strip=True))
-    fieldset = node if tag_name == "fieldset" else (node.find_parent("fieldset") if hasattr(node, "find_parent") else None)
+    fieldset = (
+        node
+        if tag_name == "fieldset"
+        else (node.find_parent("fieldset") if hasattr(node, "find_parent") else None)
+    )
     legend = fieldset.find("legend") if fieldset is not None else None
     if legend is not None:
         candidates.append(legend.get_text(" ", strip=True))
@@ -414,8 +513,14 @@ def _visible_variant_group_candidates(node: Any, tag_name: str) -> list[object]:
         candidates.append(node.get("aria-label"))
     return candidates
 
+
 def _machine_variant_group_candidates(node: Any) -> list[object]:
-    return [node.get(attr) for attr in ("data-option-name", "name", "id", "data-testid", "data-qa-action") if node.get(attr) not in (None, "", [], {})]
+    return [
+        node.get(attr)
+        for attr in ("data-option-name", "name", "id", "data-testid", "data-qa-action")
+        if node.get(attr) not in (None, "", [], {})
+    ]
+
 
 def _variant_group_name_from_values(node: Any, tag_name: str) -> str:
     if tag_name == "select":
@@ -425,6 +530,7 @@ def _variant_group_name_from_values(node: Any, tag_name: str) -> str:
         return ""
     return infer_variant_group_name_from_values(_choice_option_texts(node))
 
+
 def infer_variant_group_name_from_values(values: Sequence[object]) -> str:
     cleaned_values = [clean_text(value) for value in values or [] if clean_text(value)]
     if len(cleaned_values) < 2:
@@ -432,7 +538,11 @@ def infer_variant_group_name_from_values(values: Sequence[object]) -> str:
     # Sequential integer runs are quantity selectors, not variant axes.
     if _is_sequential_integer_run(cleaned_values):
         return ""
-    size_hits = sum(1 for value in cleaned_values if any(pattern.fullmatch(value) for pattern in _variant_size_value_patterns))
+    size_hits = sum(
+        1
+        for value in cleaned_values
+        if any(pattern.fullmatch(value) for pattern in _variant_size_value_patterns)
+    )
     if size_hits >= 2 and size_hits / len(cleaned_values) >= 0.5:
         return "size"
     color_hits = sum(1 for value in cleaned_values if _value_looks_like_color(value))
@@ -440,12 +550,14 @@ def infer_variant_group_name_from_values(values: Sequence[object]) -> str:
         return "color"
     return ""
 
+
 def _component_variant_group_name_from_attrs(node: Any) -> str:
     for attr_name in tuple(VARIANT_COMPONENT_TYPE_ATTRIBUTES or ()):
         raw_value = text_or_none(node.get(attr_name))
         if raw_value:
             return clean_text(f"{raw_value} {VARIANT_COMPONENT_TYPE_AXIS_NAME}")
     return ""
+
 
 def _variant_group_node_attrs_are_noise(node: Any) -> bool:
     if not hasattr(node, "get"):
@@ -474,6 +586,7 @@ def _variant_group_node_attrs_are_noise(node: Any) -> bool:
         return True
     return any(pattern.search(probe) for pattern in _variant_group_attr_noise_patterns)
 
+
 def _node_attr_can_hold_group_label(node: Any) -> bool:
     tag_name = str(getattr(node, "name", "") or "").strip().lower()
     role = str(node.get("role") or "").strip().lower()
@@ -488,17 +601,22 @@ def _node_attr_can_hold_group_label(node: Any) -> bool:
     input_count = len(node.select("input[type='radio'], input[type='checkbox']"))
     return input_count >= 2 or tag_name in {"div", "section", "ul", "ol", "form"}
 
+
 def _nearby_variant_group_name(node: Any) -> str:
     current = node
     for _ in range(int(VARIANT_SIBLING_SEARCH_DEPTH)):
         sibling = getattr(current, "previous_sibling", None)
         while sibling is not None:
-            if hasattr(sibling, "select") and sibling.select("a[href], button, input[type='radio'], input[type='checkbox'], [role='radio'], [role='option']"):
+            if hasattr(sibling, "select") and sibling.select(
+                "a[href], button, input[type='radio'], input[type='checkbox'], [role='radio'], [role='option']"
+            ):
                 sibling = getattr(sibling, "previous_sibling", None)
                 continue
             if hasattr(sibling, "get_text"):
                 sibling_text = sibling.get_text(" ", strip=True)
-                extracted = _resolve_visible_variant_group_name(sibling_text) or _semantic_group_label_from_text(sibling_text)
+                extracted = _resolve_visible_variant_group_name(
+                    sibling_text
+                ) or _semantic_group_label_from_text(sibling_text)
                 if extracted:
                     return extracted
             sibling = getattr(sibling, "previous_sibling", None)
@@ -507,6 +625,7 @@ def _nearby_variant_group_name(node: Any) -> str:
             break
         current = parent
     return ""
+
 
 def _variant_group_has_multiple_options(node: Any) -> bool:
     if not hasattr(node, "select"):
@@ -523,6 +642,7 @@ def _variant_group_has_multiple_options(node: Any) -> bool:
     )
     return len(option_nodes) >= 2
 
+
 def _select_is_quantity_node(node: Any) -> bool:
     """Return True when the <select> element is a quantity picker."""
     if not hasattr(node, "get"):
@@ -535,6 +655,7 @@ def _select_is_quantity_node(node: Any) -> bool:
         if any(t in _variant_quantity_attr_tokens for t in tokens):
             return True
     return False
+
 
 def iter_variant_select_groups(soup: Any) -> list[Any]:
     groups: list[Any] = []
@@ -565,12 +686,14 @@ def iter_variant_select_groups(soup: Any) -> list[Any]:
             break
     return groups
 
+
 def _append_choice_group(groups: list[Any], seen: set[Any], node: Any) -> bool:
     if node in seen:
         return False
     groups.append(node)
     seen.add(node)
     return len(groups) >= int(VARIANT_CHOICE_GROUP_MAX)
+
 
 def _add_labeled_role_groups(soup: Any, groups: list[Any], seen: set[Any]) -> bool:
     for container in soup.select("[role='group'][aria-label]"):
@@ -583,16 +706,22 @@ def _add_labeled_role_groups(soup: Any, groups: list[Any], seen: set[Any]) -> bo
                 return True
     return False
 
+
 def _add_configured_choice_groups(soup: Any, groups: list[Any], seen: set[Any]) -> bool:
     for container in _select_variant_nodes(soup, VARIANT_CHOICE_GROUP_SELECTOR):
         if container in seen or _variant_choice_container_is_overbroad(container):
             continue
         name = resolve_variant_group_name(container)
-        inferred = infer_variant_group_name_from_values(_choice_option_texts(container)) if _node_supports_value_only_axis_inference(container) else ""
+        inferred = (
+            infer_variant_group_name_from_values(_choice_option_texts(container))
+            if _node_supports_value_only_axis_inference(container)
+            else ""
+        )
         if _variant_group_has_multiple_options(container) and (name or inferred):
             if _append_choice_group(groups, seen, container):
                 return True
     return False
+
 
 def _add_input_choice_groups(soup: Any, groups: list[Any], seen: set[Any]) -> bool:
     for node in soup.select("input[type='radio'], input[type='checkbox']"):
@@ -605,6 +734,7 @@ def _add_input_choice_groups(soup: Any, groups: list[Any], seen: set[Any]) -> bo
             return True
     return False
 
+
 def _add_button_choice_groups(soup: Any, groups: list[Any], seen: set[Any]) -> bool:
     selector = "button[data-variant], button.variant-option, button.size-option, button.color-option"
     for node in soup.select(selector):
@@ -614,26 +744,44 @@ def _add_button_choice_groups(soup: Any, groups: list[Any], seen: set[Any]) -> b
             return True
     return False
 
+
 def _ordered_swatch_buttons(soup: Any) -> list[Any]:
-    priority = soup.select("[data-testid='swatch' i], [data-testid*='swatch-option' i], [role='button'][aria-label]")
+    priority = soup.select(
+        "[data-testid='swatch' i], [data-testid*='swatch-option' i], [role='button'][aria-label]"
+    )
     priority_ids = {id(node) for node in priority}
     buttons = [
         *priority,
-        *(node for node in soup.select(VARIANT_SWATCH_BUTTON_SELECTOR) if id(node) not in priority_ids),
+        *(
+            node
+            for node in soup.select(VARIANT_SWATCH_BUTTON_SELECTOR)
+            if id(node) not in priority_ids
+        ),
     ]
     return buttons[: int(VARIANT_SWATCH_BUTTON_LIMIT)]
+
 
 def _swatch_parent_metadata(parent: Any) -> tuple[str, str, str]:
     tag = str(getattr(parent, "name", "") or "").lower()
     role = str(parent.get("role") or "").lower() if hasattr(parent, "get") else ""
     classes = parent.get("class") if hasattr(parent, "get") else None
-    class_probe = (" ".join(str(value) for value in classes) if isinstance(classes, list) else str(classes or "")).lower()
+    class_probe = (
+        " ".join(str(value) for value in classes)
+        if isinstance(classes, list)
+        else str(classes or "")
+    ).lower()
     return tag, role, class_probe
+
 
 def _swatch_parent_can_contain_group(tag: str, role: str, classes: str) -> bool:
     container_tags = {"div", "section", "fieldset", "ul", "ol", "nav", "form", "li"}
     hints = ("swatch", "variant", "color", "size", "option")
-    return tag in container_tags or role == "radiogroup" or any(hint in classes for hint in hints)
+    return (
+        tag in container_tags
+        or role == "radiogroup"
+        or any(hint in classes for hint in hints)
+    )
+
 
 def _swatch_parent_has_axis(tag: str, role: str, classes: str, parent: Any) -> bool:
     hints = (
@@ -644,10 +792,20 @@ def _swatch_parent_has_axis(tag: str, role: str, classes: str, parent: Any) -> b
         "option",
         *_variant_axis_allowed_single_tokens,
     )
-    return role == "radiogroup" or tag in {"fieldset", "ul", "ol"} or any(hint in classes for hint in hints) or bool(resolve_variant_group_name(parent))
+    return (
+        role == "radiogroup"
+        or tag in {"fieldset", "ul", "ol"}
+        or any(hint in classes for hint in hints)
+        or bool(resolve_variant_group_name(parent))
+    )
 
-def _swatch_container_for_button(button: Any, seen: set[Any], cache: dict[int, list[Any]]) -> Any | None:
-    if str(getattr(button, "name", "") or "").strip().lower() == "a" and not _anchor_node_has_variant_signal(button):
+
+def _swatch_container_for_button(
+    button: Any, seen: set[Any], cache: dict[int, list[Any]]
+) -> Any | None:
+    if str(
+        getattr(button, "name", "") or ""
+    ).strip().lower() == "a" and not _anchor_node_has_variant_signal(button):
         return None
     parent = getattr(button, "parent", None)
     depth = 0
@@ -663,14 +821,19 @@ def _swatch_container_for_button(button: Any, seen: set[Any], cache: dict[int, l
             parent = getattr(parent, "parent", None)
             depth += 1
             continue
-        siblings = cache.setdefault(id(parent), parent.select(VARIANT_SWATCH_BUTTON_SELECTOR))
+        siblings = cache.setdefault(
+            id(parent), parent.select(VARIANT_SWATCH_BUTTON_SELECTOR)
+        )
         if len(siblings) >= 2:
-            if _swatch_parent_has_axis(tag, role, classes, parent) and _variant_group_has_multiple_options(parent):
+            if _swatch_parent_has_axis(
+                tag, role, classes, parent
+            ) and _variant_group_has_multiple_options(parent):
                 return parent
             return None
         parent = getattr(parent, "parent", None)
         depth += 1
     return None
+
 
 def _add_swatch_choice_groups(soup: Any, groups: list[Any], seen: set[Any]) -> None:
     cache: dict[int, list[Any]] = {}
@@ -678,6 +841,7 @@ def _add_swatch_choice_groups(soup: Any, groups: list[Any], seen: set[Any]) -> N
         candidate = _swatch_container_for_button(button, seen, cache)
         if candidate is not None and _append_choice_group(groups, seen, candidate):
             return
+
 
 def iter_variant_choice_groups(soup: Any) -> list[Any]:
     """Find variant groups in deterministic discovery order."""
@@ -695,10 +859,15 @@ def iter_variant_choice_groups(soup: Any) -> list[Any]:
     _add_swatch_choice_groups(soup, groups, seen)
     return groups
 
-def _variant_choice_container_for_input(node: Any, *, axis_name: str | None = None) -> Any | None:
+
+def _variant_choice_container_for_input(
+    node: Any, *, axis_name: str | None = None
+) -> Any | None:
     if axis_name is None:
         axis_name = resolve_variant_group_name(node)
-    input_type = str(node.get("type") or "").strip().lower() if hasattr(node, "get") else ""
+    input_type = (
+        str(node.get("type") or "").strip().lower() if hasattr(node, "get") else ""
+    )
     parent = getattr(node, "parent", None)
     while parent is not None:
         if not _input_parent_is_eligible(parent):
@@ -709,12 +878,22 @@ def _variant_choice_container_for_input(node: Any, *, axis_name: str | None = No
         parent = getattr(parent, "parent", None)
     return None
 
+
 def _input_parent_is_eligible(parent: Any) -> bool:
-    return hasattr(parent, "find_all") and not variant_node_in_noise_context(parent) and not _variant_choice_container_is_overbroad(parent)
+    return (
+        hasattr(parent, "find_all")
+        and not variant_node_in_noise_context(parent)
+        and not _variant_choice_container_is_overbroad(parent)
+    )
+
 
 def _input_parent_axis_metadata(parent: Any) -> tuple[str, bool, str]:
     class_attr = parent.get("class") if hasattr(parent, "get") else None
-    class_probe = (" ".join(str(value) for value in class_attr) if isinstance(class_attr, list) else str(class_attr or "")).lower()
+    class_probe = (
+        " ".join(str(value) for value in class_attr)
+        if isinstance(class_attr, list)
+        else str(class_attr or "")
+    ).lower()
     tag_name = str(getattr(parent, "name", "") or "").lower()
     role = str(parent.get("role") or "").lower() if hasattr(parent, "get") else ""
     has_hint = (
@@ -733,7 +912,10 @@ def _input_parent_axis_metadata(parent: Any) -> tuple[str, bool, str]:
     )
     return tag_name, has_hint, "" if has_hint else resolve_variant_group_name(parent)
 
-def _input_parent_is_choice_container(parent: Any, axis_name: str | None, input_type: str) -> bool:
+
+def _input_parent_is_choice_container(
+    parent: Any, axis_name: str | None, input_type: str
+) -> bool:
     matching = _matching_parent_inputs(parent, axis_name)
     tag_name, has_hint, group_name = _input_parent_axis_metadata(parent)
     allowed_single_axes = {"color", *_variant_axis_allowed_single_tokens}
@@ -746,7 +928,12 @@ def _input_parent_is_choice_container(parent: Any, axis_name: str | None, input_
     inferred = _input_parent_inferred_axis(parent, input_type)
     if any((has_hint, group_name, inferred)):
         return True
-    return bool(axis_name and len(matching) <= int(VARIANT_MATCHING_INPUT_LIMIT) and tag_name in {"div", "section"})
+    return bool(
+        axis_name
+        and len(matching) <= int(VARIANT_MATCHING_INPUT_LIMIT)
+        and tag_name in {"div", "section"}
+    )
+
 
 def _matching_parent_inputs(parent: Any, axis_name: str | None) -> list[Any]:
     inputs = _descendant_variant_choice_inputs(
@@ -756,7 +943,12 @@ def _matching_parent_inputs(parent: Any, axis_name: str | None) -> list[Any]:
             int(VARIANT_MATCHING_INPUT_LIMIT),
         ),
     )
-    return [item for item in inputs if not axis_name or resolve_variant_group_name(item) == axis_name]
+    return [
+        item
+        for item in inputs
+        if not axis_name or resolve_variant_group_name(item) == axis_name
+    ]
+
 
 def _input_parent_inferred_axis(parent: Any, input_type: str) -> str:
     if input_type != "checkbox" and _node_supports_value_only_axis_inference(parent):

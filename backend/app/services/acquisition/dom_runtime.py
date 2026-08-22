@@ -74,7 +74,9 @@ _MUTATION_SETTLE_SCRIPT = """
 async def get_page_html(page, *, flatten_shadow: bool = True) -> str:
     if flatten_shadow:
         await flatten_shadow_dom(page)
-    retry_budget = max(0, int(crawler_runtime_settings.browser_error_retry_attempts or 0))
+    retry_budget = max(
+        0, int(crawler_runtime_settings.browser_error_retry_attempts or 0)
+    )
     delay_ms = max(0, int(crawler_runtime_settings.browser_error_retry_delay_ms or 0))
     last_exc: Exception | None = None
     for attempt in range(retry_budget + 1):

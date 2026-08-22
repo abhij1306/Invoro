@@ -90,9 +90,12 @@ def _requested_match_priority(
     aria_controls = str(snapshot.get("aria_controls") or "").strip().lower()
     data_qa_action = str(snapshot.get("data_qa_action") or "").strip().lower()
     href = str(snapshot.get("href") or "").strip().lower()
-    requested_keyword_probe = " ".join(part for part in (label, aria_controls, data_qa_action, href) if part).strip()
+    requested_keyword_probe = " ".join(
+        part for part in (label, aria_controls, data_qa_action, href) if part
+    ).strip()
     matches_requested_keywords = bool(
-        requested_keywords and any(keyword in requested_keyword_probe for keyword in requested_keywords)
+        requested_keywords
+        and any(keyword in requested_keyword_probe for keyword in requested_keywords)
     )
     return (0 if matches_requested_keywords else 1, label)
 
@@ -131,7 +134,9 @@ async def expand_detail_content_if_needed_impl(
         "expanded_elements": [],
         "interaction_failures": [],
         "limit": int(crawler_runtime_settings.detail_aom_expand_max_interactions),
-        "max_elapsed_ms": int(crawler_runtime_settings.detail_aom_expand_max_elapsed_ms),
+        "max_elapsed_ms": int(
+            crawler_runtime_settings.detail_aom_expand_max_elapsed_ms
+        ),
         "attempted": False,
     }
     if not current_probe.get("is_ready"):
@@ -139,7 +144,9 @@ async def expand_detail_content_if_needed_impl(
             page,
             surface=surface,
             requested_fields=requested_fields,
-            max_elapsed_ms=int(crawler_runtime_settings.detail_aom_expand_max_elapsed_ms),
+            max_elapsed_ms=int(
+                crawler_runtime_settings.detail_aom_expand_max_elapsed_ms
+            ),
         )
     return {
         "status": DETAIL_EXPANSION_STATUS_EXPANDED
@@ -175,7 +182,10 @@ class _DomExpansionState:
     seen_candidates: set[tuple[str, str, str]] = field(default_factory=set)
 
     def time_budget_reached(self) -> bool:
-        return bool(self.max_elapsed_ms is not None and self.elapsed_ms(self.started_at) >= int(self.max_elapsed_ms))
+        return bool(
+            self.max_elapsed_ms is not None
+            and self.elapsed_ms(self.started_at) >= int(self.max_elapsed_ms)
+        )
 
     def stop_status(self, *, selector_clicks: int | None = None) -> str | None:
         if self.clicked_count >= self.max_interactions:
@@ -238,7 +248,9 @@ def _new_dom_expansion_state(
     return _DomExpansionState(
         started_at=started_at,
         max_interactions=max_interactions,
-        max_per_selector=max(1, int(crawler_runtime_settings.detail_expand_max_per_selector)),
+        max_per_selector=max(
+            1, int(crawler_runtime_settings.detail_expand_max_per_selector)
+        ),
         max_elapsed_ms=max_elapsed_ms,
         elapsed_ms=elapsed_ms,
         diagnostics={
@@ -266,7 +278,9 @@ async def _selector_candidate_rows(
     except Exception as exc:
         state.interaction_failures.append(f"locator_failed:{selector}:{exc}")
         return []
-    state.diagnostics["buttons_found"] = _coerce_int(state.diagnostics["buttons_found"]) + len(candidates)
+    state.diagnostics["buttons_found"] = _coerce_int(
+        state.diagnostics["buttons_found"]
+    ) + len(candidates)
     if not requested_keywords:
         return [(handle, None) for handle in candidates]
     prioritized_rows: list[tuple[tuple[int, str], Any, dict[str, object]]] = []
@@ -321,7 +335,10 @@ def _candidate_action_label(
     if _expansion_candidate_is_blocked(candidate, size_toggle=matches.size_toggle):
         return False, ""
     if requested_fields and not (
-        matches.requested or matches.fallback_requested or matches.generic_requested_toggle or matches.size_toggle
+        matches.requested
+        or matches.fallback_requested
+        or matches.generic_requested_toggle
+        or matches.size_toggle
     ):
         return False, ""
     if not _expansion_candidate_is_expandable(candidate, selector, matches):
@@ -385,10 +402,14 @@ def _expansion_candidate_matches(
         if part
     ).strip()
     size_toggle = any(
-        token in f"{candidate.data_qa_action} {candidate.class_name}" for token in BROWSER_DETAIL_SIZE_TOGGLE_TOKENS
+        token in f"{candidate.data_qa_action} {candidate.class_name}"
+        for token in BROWSER_DETAIL_SIZE_TOGGLE_TOKENS
     )
     return _ExpansionMatches(
-        requested=bool(requested_keywords and any(keyword in requested_probe for keyword in requested_keywords)),
+        requested=bool(
+            requested_keywords
+            and any(keyword in requested_probe for keyword in requested_keywords)
+        ),
         fallback_requested=any(keyword in requested_probe for keyword in keywords),
         generic=any(keyword in generic_probe for keyword in keywords),
         generic_requested_toggle=bool(
@@ -447,7 +468,8 @@ def _expansion_candidate_is_in_safe_context(
     matches: _ExpansionMatches,
 ) -> bool:
     outside_main_chrome = bool(
-        not candidate.inside_main and (candidate.inside_header or candidate.inside_nav or candidate.inside_footer)
+        not candidate.inside_main
+        and (candidate.inside_header or candidate.inside_nav or candidate.inside_footer)
     )
     if outside_main_chrome and not (matches.requested or matches.size_toggle):
         return False
@@ -506,7 +528,9 @@ async def _expand_selector_candidates(
             break
         try:
             snapshot = (
-                prefetched_snapshot if prefetched_snapshot is not None else await interactive_candidate_snapshot(handle)
+                prefetched_snapshot
+                if prefetched_snapshot is not None
+                else await interactive_candidate_snapshot(handle)
             )
             should_click, expanded_label = _candidate_action_label(
                 snapshot,
@@ -519,7 +543,9 @@ async def _expand_selector_candidates(
             if not should_click:
                 continue
             if state.time_budget_reached():
-                state.diagnostics["status"] = DETAIL_EXPANSION_STATUS_TIME_BUDGET_REACHED
+                state.diagnostics["status"] = (
+                    DETAIL_EXPANSION_STATUS_TIME_BUDGET_REACHED
+                )
                 break
             await _execute_expansion_action(
                 page,
@@ -531,7 +557,9 @@ async def _expand_selector_candidates(
             if expanded_label:
                 state.expanded_elements.append(expanded_label)
             if state.time_budget_reached():
-                state.diagnostics["status"] = DETAIL_EXPANSION_STATUS_TIME_BUDGET_REACHED
+                state.diagnostics["status"] = (
+                    DETAIL_EXPANSION_STATUS_TIME_BUDGET_REACHED
+                )
                 break
         except Exception as exc:
             state.interaction_failures.append(str(exc))
@@ -557,7 +585,11 @@ async def expand_all_interactive_elements_impl(
     )
     keywords = detail_expansion_keywords(surface, requested_fields=requested_fields)
     requested_keywords = requested_field_tokens(requested_fields)
-    selectors = [str(selector).strip() for selector in detail_expand_selectors or [] if str(selector).strip()]
+    selectors = [
+        str(selector).strip()
+        for selector in detail_expand_selectors or []
+        if str(selector).strip()
+    ]
     selectors = _ordered_detail_expand_selectors(
         selectors,
         requested_keywords=requested_keywords,
@@ -592,7 +624,9 @@ def requested_field_tokens(requested_fields: list[str] | None) -> tuple[str, ...
     seen: set[str] = set()
     for field_name in requested_fields or []:
         raw_field_name = str(field_name or "")
-        _append_requested_tokens(exact_requested_field_key(raw_field_name), tokens=tokens, seen=seen)
+        _append_requested_tokens(
+            exact_requested_field_key(raw_field_name), tokens=tokens, seen=seen
+        )
         normalized = normalize_requested_field(raw_field_name)
         if not normalized:
             continue
@@ -602,7 +636,9 @@ def requested_field_tokens(requested_fields: list[str] | None) -> tuple[str, ...
     return tuple(tokens)
 
 
-def _append_requested_tokens(value: object, *, tokens: list[str], seen: set[str]) -> None:
+def _append_requested_tokens(
+    value: object, *, tokens: list[str], seen: set[str]
+) -> None:
     for token in re.split(r"[_\W]+", str(value or "")):
         cleaned = token.strip().lower()
         if len(cleaned) < 3 or cleaned in seen:

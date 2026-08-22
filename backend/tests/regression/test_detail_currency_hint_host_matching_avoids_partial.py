@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .test_detail_extractor_structured_sources import build_detail_record, detail_currency_hint_is_host_level, detail_image_matches_primary_family, extract_records, pytest, reconcile_detail_currency_with_url, repair_ecommerce_detail_record_quality, sanitize_variant_row  # fmt: skip
 
+
 @pytest.mark.regression
 def test_detail_currency_hint_host_matching_avoids_partial_word_false_positive() -> (
     None
@@ -21,6 +22,7 @@ def test_detail_currency_hint_host_matching_avoids_partial_word_false_positive()
         is True
     )
 
+
 @pytest.mark.regression
 def test_reconcile_detail_currency_with_url_tracks_nested_currency_sources() -> None:
     record = {
@@ -36,6 +38,7 @@ def test_reconcile_detail_currency_with_url_tracks_nested_currency_sources() -> 
     assert record["variants"][0]["currency"] == "USD"
     assert "url_currency_hint" in record["_field_sources"]["selected_variant.currency"]
     assert "url_currency_hint" in record["_field_sources"]["variants[0].currency"]
+
 
 @pytest.mark.regression
 def test_extract_detail_prefers_visible_price_symbol_over_region_path_currency() -> (
@@ -75,6 +78,7 @@ def test_extract_detail_prefers_visible_price_symbol_over_region_path_currency()
     assert rows[0]["price"] == "13880.00"
     assert rows[0]["currency"] == "USD"
 
+
 @pytest.mark.regression
 def test_extract_ecommerce_detail_jsonld_skips_currency_only_offer() -> None:
     html = """
@@ -107,6 +111,7 @@ def test_extract_ecommerce_detail_jsonld_skips_currency_only_offer() -> None:
     assert rows[0]["price"] == "129.95"
     assert rows[0]["currency"] == "USD"
 
+
 @pytest.mark.regression
 def test_extract_ecommerce_detail_rejects_url_like_structured_brand() -> None:
     html = """
@@ -135,6 +140,7 @@ def test_extract_ecommerce_detail_rejects_url_like_structured_brand() -> None:
 
     assert len(rows) == 1
     assert "brand" not in rows[0]
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_backfills_currency_from_url_hint_when_price_exists() -> (
@@ -167,6 +173,7 @@ def test_extract_ecommerce_detail_backfills_currency_from_url_hint_when_price_ex
     assert rows[0]["price"] == "110.00"
     assert rows[0]["currency"] == "USD"
 
+
 @pytest.mark.regression
 def test_extract_ecommerce_detail_rejects_same_url_wrong_product_title() -> None:
     html = """
@@ -194,6 +201,7 @@ def test_extract_ecommerce_detail_rejects_same_url_wrong_product_title() -> None
 
     assert rows == []
 
+
 @pytest.mark.regression
 def test_extract_ecommerce_detail_rejects_access_denied_shell_title() -> None:
     html = """
@@ -211,6 +219,7 @@ def test_extract_ecommerce_detail_rejects_access_denied_shell_title() -> None:
     )
 
     assert rows == []
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_leaves_missing_availability_unset() -> None:
@@ -241,6 +250,7 @@ def test_extract_ecommerce_detail_leaves_missing_availability_unset() -> None:
     assert len(rows) == 1
     assert "availability" not in rows[0]
 
+
 @pytest.mark.regression
 def test_repair_ecommerce_detail_backfills_parent_image_from_variants() -> None:
     record = {
@@ -267,6 +277,7 @@ def test_repair_ecommerce_detail_backfills_parent_image_from_variants() -> None:
         == "https://cdn.shopify.com/s/files/1/0712/3510/9086/files/0110392834_fen_ins_frt_1_rr.png?v=1742191446"
     )
 
+
 @pytest.mark.regression
 def test_build_detail_record_drops_single_numeric_feature_id() -> None:
     record = build_detail_record(
@@ -285,6 +296,7 @@ def test_build_detail_record_drops_single_numeric_feature_id() -> None:
     )
 
     assert "features" not in record
+
 
 @pytest.mark.regression
 def test_build_detail_record_drops_category_dropdown_additional_images() -> None:
@@ -312,6 +324,7 @@ def test_build_detail_record_drops_category_dropdown_additional_images() -> None
     assert record["additional_images"] == [
         "https://media.endclothing.com/media/catalog/product/b/r/brgw17gws-vn_2.jpg"
     ]
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_from_microdata() -> None:
@@ -348,6 +361,7 @@ def test_extract_ecommerce_detail_from_microdata() -> None:
     assert record["currency"] == "USD"
     assert record["availability"] == "in_stock"
     assert record["_source"] == "microdata"
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_merges_shopify_available_sizes_over_single_jsonld_variant() -> (
@@ -444,6 +458,7 @@ def test_extract_ecommerce_detail_merges_shopify_available_sizes_over_single_jso
         "A2A1M-BBBB-M",
     ]
 
+
 @pytest.mark.regression
 def test_detail_record_runs_dom_tier_when_variant_dom_cues_exist() -> None:
     html = """
@@ -496,6 +511,7 @@ def test_detail_record_runs_dom_tier_when_variant_dom_cues_exist() -> None:
     assert record["_extraction_tiers"]["current"] == "dom"
     assert record["_extraction_tiers"]["early_exit"] is None
 
+
 @pytest.mark.regression
 def test_sanitize_variant_row_keeps_option_label_titles_with_variant_signals() -> None:
     variant = {"title": "Large", "sku": "TRAIL-L", "price": "8.99"}
@@ -505,6 +521,7 @@ def test_sanitize_variant_row_keeps_option_label_titles_with_variant_signals() -
         identity_url="https://example.com/products/trail-mix",
     )
     assert variant["title"] == "Large"
+
 
 @pytest.mark.regression
 def test_sanitize_variant_row_keeps_same_site_variant_url_with_axis_signal() -> None:
@@ -519,6 +536,7 @@ def test_sanitize_variant_row_keeps_same_site_variant_url_with_axis_signal() -> 
     )
     assert variant["color"] == "Deep Pink"
 
+
 @pytest.mark.regression
 def test_detail_image_family_requires_full_media_code_match() -> None:
     assert not detail_image_matches_primary_family(
@@ -526,6 +544,7 @@ def test_detail_image_family_requires_full_media_code_match() -> None:
         primary_image="https://cdn.example.com/a123456/image.jpg",
         title="",
     )
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_from_opengraph() -> None:
@@ -560,6 +579,7 @@ def test_extract_ecommerce_detail_from_opengraph() -> None:
     assert record["image_url"] == "https://example.com/images/og-widget.jpg"
     assert record["url"] == "https://example.com/products/og-widget"
     assert record["_source"] == "opengraph"
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_prefers_localized_jsonld_price_over_state_variants() -> (
@@ -622,6 +642,7 @@ def test_extract_ecommerce_detail_prefers_localized_jsonld_price_over_state_vari
     assert record["currency"] == "INR"
     assert all(row.get("price") in (None, "1400.00") for row in record["variants"])
     assert all(row.get("currency") in (None, "INR") for row in record["variants"])
+
 
 @pytest.mark.regression
 def test_build_detail_record_overrides_default_market_adapter_price_with_visible_local_price() -> (

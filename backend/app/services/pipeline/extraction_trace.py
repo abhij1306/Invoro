@@ -18,7 +18,8 @@ def record_extraction_trace(context, records: list[dict[str, object]]) -> None:
 
 def _record_dom_skip(trace, primary: dict[str, object], *, completed: object) -> None:
     dom_completed = isinstance(completed, list) and any(
-        str(item).strip().lower() == obs_config.EXTRACTION_TIER_DOM for item in completed
+        str(item).strip().lower() == obs_config.EXTRACTION_TIER_DOM
+        for item in completed
     )
     decision = mapping_or_empty(primary.get("_dom_skip_decision"))
     if decision:
@@ -33,7 +34,9 @@ def _record_dom_skip(trace, primary: dict[str, object], *, completed: object) ->
 def _record_winning_sources(trace, primary, field_sources) -> None:
     for field_name, sources in field_sources.items():
         source_list = sources if isinstance(sources, list) else [sources]
-        winner = next((str(item) for item in source_list if str(item or "").strip()), "")
+        winner = next(
+            (str(item) for item in source_list if str(item or "").strip()), ""
+        )
         if not winner:
             continue
         value = primary.get(field_name)
@@ -56,7 +59,9 @@ def _record_field_states(trace, primary, field_sources) -> None:
         trace.record_field_state(
             str(field_name),
             value=primary.get(field_name),
-            candidate_sources=[str(item) for item in source_list if str(item or "").strip()],
+            candidate_sources=[
+                str(item) for item in source_list if str(item or "").strip()
+            ],
         )
 
 

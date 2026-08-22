@@ -142,11 +142,16 @@ def _paginate_inspection_matches(inspection: dict[str, object]) -> bool:
     actionable = present("has_click_handler") or present("is_button_like")
     in_container = present("pagination_container")
     follows_current = present("follows_current_page") and any(
-        present(key) for key in ("arrow_only", "raw_href", "is_button_like", "has_click_handler")
+        present(key)
+        for key in ("arrow_only", "raw_href", "is_button_like", "has_click_handler")
     )
     numbered_arrow = present("sibling_page_numbers") and present("arrow_only")
-    text_evidence = present("pagination_text") and (actionable or present("sibling_page_numbers"))
-    return (in_container and (actionable or follows_current or numbered_arrow)) or text_evidence
+    text_evidence = present("pagination_text") and (
+        actionable or present("sibling_page_numbers")
+    )
+    return (
+        in_container and (actionable or follows_current or numbered_arrow)
+    ) or text_evidence
 
 
 async def _looks_like_next_page_control(locator) -> bool:
@@ -268,7 +273,10 @@ def _is_structured_script(script_id: str, script_type: str, text: str) -> bool:
     return (
         script_type in TRAVERSAL_STRUCTURED_SCRIPT_TYPES
         or script_id in TRAVERSAL_STRUCTURED_SCRIPT_IDS
-        or any(marker in text.lower() for marker in TRAVERSAL_STRUCTURED_SCRIPT_TEXT_MARKERS)
+        or any(
+            marker in text.lower()
+            for marker in TRAVERSAL_STRUCTURED_SCRIPT_TEXT_MARKERS
+        )
     )
 
 
@@ -314,7 +322,9 @@ async def _settle_after_action(
             exc_info=True,
         )
     try:
-        await page.wait_for_load_state("domcontentloaded", timeout=min(1500, wait_ms * 2))
+        await page.wait_for_load_state(
+            "domcontentloaded", timeout=min(1500, wait_ms * 2)
+        )
     except _RECOVERABLE_ERRORS:
         logger.debug(
             "Traversal domcontentloaded settle wait failed url=%s",
@@ -393,7 +403,9 @@ def _deadline_reached(deadline_at: float | None) -> bool:
     return deadline_at is not None and time.monotonic() >= deadline_at
 
 
-def _remaining_timeout_ms(deadline_at: float | None, default_ms: int, *, min_ms: int = 500) -> int:
+def _remaining_timeout_ms(
+    deadline_at: float | None, default_ms: int, *, min_ms: int = 500
+) -> int:
     if deadline_at is None:
         return max(min_ms, int(default_ms))
     remaining_ms = int((deadline_at - time.monotonic()) * 1000)
@@ -429,8 +441,12 @@ def is_same_origin(current_url: str, next_url: str) -> bool:
     # Also compare the first path segment to prevent cross-tenant bleed
     # on path-based multi-tenant architectures (e.g. myworkdayjobs.com/TenantA).
     if _requires_path_tenant_boundary(current_url, next_url):
-        current_first = (str(current.path or "").strip("/").split("/") + [""])[0].lower()
-        next_first = (str(next_value.path or "").strip("/").split("/") + [""])[0].lower()
+        current_first = (str(current.path or "").strip("/").split("/") + [""])[
+            0
+        ].lower()
+        next_first = (str(next_value.path or "").strip("/").split("/") + [""])[
+            0
+        ].lower()
         if current_first and next_first and current_first != next_first:
             return False
     return True

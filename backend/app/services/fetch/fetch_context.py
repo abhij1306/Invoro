@@ -140,7 +140,9 @@ async def reset_fetch_runtime_state() -> None:
 def _build_fetch_runtime_context(call: FetchPageCall) -> FetchRuntimeContext:
     resolved_timeout_source = call.timeout_seconds
     if resolved_timeout_source is None:
-        resolved_timeout_source = crawler_runtime_settings.acquisition_attempt_timeout_seconds
+        resolved_timeout_source = (
+            crawler_runtime_settings.acquisition_attempt_timeout_seconds
+        )
     if resolved_timeout_source is None:
         raise ValueError(
             "fetch_page requires timeout_seconds or crawler_runtime_settings.acquisition_attempt_timeout_seconds"
@@ -160,21 +162,27 @@ def _build_fetch_runtime_context(call: FetchPageCall) -> FetchRuntimeContext:
         requested_fields=list(call.requested_fields or []),
         listing_recovery_mode=str(call.listing_recovery_mode or "").strip() or None,
         capture_screenshot=bool(call.capture_screenshot),
-        host_memory_ttl_seconds=crawler_runtime_settings.coerce_host_memory_ttl_seconds(call.host_memory_ttl_seconds),
+        host_memory_ttl_seconds=crawler_runtime_settings.coerce_host_memory_ttl_seconds(
+            call.host_memory_ttl_seconds
+        ),
         prefer_browser=bool(call.prefer_browser),
         prefer_curl_handoff=bool(call.prefer_curl_handoff),
-        handoff_cookie_engine=str(call.handoff_cookie_engine or "").strip().lower() or None,
+        handoff_cookie_engine=str(call.handoff_cookie_engine or "").strip().lower()
+        or None,
         proxies=_resolve_proxy_attempts(
             call.proxy_list,
             run_id=call.run_id,
             proxy_profile=call.proxy_profile,
         ),
         proxy_profile=_normalize_proxy_profile(call.proxy_profile),
-        locality_profile=dict(call.locality_profile or {}) if isinstance(call.locality_profile, dict) else {},
+        locality_profile=dict(call.locality_profile or {})
+        if isinstance(call.locality_profile, dict)
+        else {},
         traversal_required=should_run_traversal(call.surface, call.traversal_mode),
         fetch_mode=_normalize_fetch_mode(call.fetch_mode),
         runtime_policy=resolve_platform_runtime_policy(call.url, surface=call.surface),
-        forced_browser_engine=str(call.forced_browser_engine or "").strip().lower() or None,
+        forced_browser_engine=str(call.forced_browser_engine or "").strip().lower()
+        or None,
     )
 
 
@@ -272,7 +280,9 @@ async def fetch_page(
     if vendor_block_confirmed and context.last_error is not None:
         raise context.last_error
     if context.last_error is not None:
-        cause = context.last_error if isinstance(context.last_error, Exception) else None
+        cause = (
+            context.last_error if isinstance(context.last_error, Exception) else None
+        )
         logger.info(
             "HTTP fetchers exhausted for %s (%s); attempting browser fallback",
             context.url,
@@ -331,13 +341,19 @@ async def _run_browser_first_if_selected(
     return result
 
 
-async def _handle_browser_first_failure(context: FetchRuntimeContext, *, reason: str, exc: Exception) -> None:
+async def _handle_browser_first_failure(
+    context: FetchRuntimeContext, *, reason: str, exc: Exception
+) -> None:
     context.last_error = exc
     context.browser_first_failed = True
     if not context.last_browser_attempt_diagnostics:
-        context.last_browser_attempt_diagnostics = build_failed_browser_diagnostics(browser_reason=reason, exc=exc)
+        context.last_browser_attempt_diagnostics = build_failed_browser_diagnostics(
+            browser_reason=reason, exc=exc
+        )
     _attach_exception_browser_diagnostics(exc, context.last_browser_attempt_diagnostics)
-    if context.fetch_mode == "browser_only" or _hard_browser_requirement(context=context):
+    if context.fetch_mode == "browser_only" or _hard_browser_requirement(
+        context=context
+    ):
         raise exc
     await _emit_fetch_event(
         context.on_event,
@@ -389,11 +405,17 @@ async def _run_http_fetch_chain(
     )
     if result is not None or vendor_block_confirmed:
         return result, vendor_block_confirmed
-    if primary_fetcher is _curl_fetch and not crawler_runtime_settings.force_httpx and context.last_error is not None:
+    if (
+        primary_fetcher is _curl_fetch
+        and not crawler_runtime_settings.force_httpx
+        and context.last_error is not None
+    ):
         await _emit_fetch_event(
             context.on_event,
             "info",
-            (f"HTTP transport fallback via _http_fetch after curl_fetch failed: {type(context.last_error).__name__}"),
+            (
+                f"HTTP transport fallback via _http_fetch after curl_fetch failed: {type(context.last_error).__name__}"
+            ),
         )
         logger.info(
             "curl_cffi transport failed for %s (%s); retrying via httpx",
@@ -499,10 +521,17 @@ async def _try_browser_http_handoff(
     return None
 
 
-def _browser_http_handoff_eligible(context: FetchRuntimeContext, *, host_policy: HostProtectionPolicy | None) -> bool:
-    if host_policy is None or not bool(crawler_runtime_settings.browser_http_handoff_enabled):
+def _browser_http_handoff_eligible(
+    context: FetchRuntimeContext, *, host_policy: HostProtectionPolicy | None
+) -> bool:
+    if host_policy is None or not bool(
+        crawler_runtime_settings.browser_http_handoff_enabled
+    ):
         return False
-    if _hard_browser_requirement(context=context) or context.fetch_mode == "browser_only":
+    if (
+        _hard_browser_requirement(context=context)
+        or context.fetch_mode == "browser_only"
+    ):
         return False
     if context.prefer_browser and not context.prefer_curl_handoff:
         return False
@@ -562,7 +591,9 @@ async def _attempt_http_fetch(
         await _emit_fetch_event(
             context.on_event,
             "info",
-            (f"HTTP fetch via {fetcher.__name__} (timeout={logged_timeout:.1f}s, proxy={display_proxy(proxy)})"),
+            (
+                f"HTTP fetch via {fetcher.__name__} (timeout={logged_timeout:.1f}s, proxy={display_proxy(proxy)})"
+            ),
         )
         # Event callbacks are awaited and may consume the remaining deadline.
         http_timeout = resolve_http_timeout(context)
@@ -617,9 +648,12 @@ async def _handle_http_result(
     vendor, should_browser_escalate = await _record_http_block_result(
         context, result=result, proxy=proxy, runtime_policy=result_runtime_policy
     )
-    browser_escalation_allowed = should_browser_escalate and _browser_escalation_allowed(
-        context=context,
-        runtime_policy=result_runtime_policy,
+    browser_escalation_allowed = (
+        should_browser_escalate
+        and _browser_escalation_allowed(
+            context=context,
+            runtime_policy=result_runtime_policy,
+        )
     )
     if browser_escalation_allowed:
         if context.browser_first_failed and not (vendor or bool(result.blocked)):
@@ -628,7 +662,9 @@ async def _handle_http_result(
                 diagnostics=context.last_browser_attempt_diagnostics,
             )
             return result, bool(vendor)
-        browser_result = await _escalate_http_result_to_browser(context, result=result, proxy=proxy, vendor=vendor)
+        browser_result = await _escalate_http_result_to_browser(
+            context, result=result, proxy=proxy, vendor=vendor
+        )
         return browser_result, bool(vendor)
     if is_non_retryable_http_status(result.status_code):
         logger.info(
@@ -693,7 +729,9 @@ async def _escalate_http_result_to_browser(
     proxy: str | None,
     vendor: str | None,
 ) -> PageFetchResult:
-    reason = context.browser_reason or (f"vendor-block:{vendor}" if vendor else "http-escalation")
+    reason = context.browser_reason or (
+        f"vendor-block:{vendor}" if vendor else "http-escalation"
+    )
     await _emit_fetch_event(
         context.on_event,
         "info",

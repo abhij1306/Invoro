@@ -5,19 +5,34 @@ from decimal import Decimal
 import re
 from typing import Any
 
-from app.services.config.extraction_price_rules import FIELD_SOURCE_DOM_TEXT, FIELD_SOURCE_JSON_LD
+from app.services.config.extraction_price_rules import (
+    FIELD_SOURCE_DOM_TEXT,
+    FIELD_SOURCE_JSON_LD,
+)
 from app.services.config.extraction_rules import (
-    AVAILABILITY_OUT_OF_STOCK, DETAIL_AUTHORITATIVE_PRICE_SOURCE_SET, DETAIL_CENT_BASED_PRICE_CURRENCY_SET,
-    DETAIL_LOW_SIGNAL_PRICE_VISIBLE_MIN_DELTA, DETAIL_LOW_SIGNAL_PRICE_VISIBLE_RATIO, DETAIL_LOW_SIGNAL_ZERO_PRICE_SOURCE_SET,
-    DETAIL_PARENT_VARIANT_PRICE_RATIO_MAX_DECIMAL, DETAIL_STRICT_PARENT_PRICE_SOURCE_SET,
+    AVAILABILITY_OUT_OF_STOCK,
+    DETAIL_AUTHORITATIVE_PRICE_SOURCE_SET,
+    DETAIL_CENT_BASED_PRICE_CURRENCY_SET,
+    DETAIL_LOW_SIGNAL_PRICE_VISIBLE_MIN_DELTA,
+    DETAIL_LOW_SIGNAL_PRICE_VISIBLE_RATIO,
+    DETAIL_LOW_SIGNAL_ZERO_PRICE_SOURCE_SET,
+    DETAIL_PARENT_VARIANT_PRICE_RATIO_MAX_DECIMAL,
+    DETAIL_STRICT_PARENT_PRICE_SOURCE_SET,
 )
 from app.services.dom.html_parser import BeautifulSoup
 from app.services.extract.detail.price.parsing import (
-    decimal_is_cent_magnitude_copy, detail_original_price_from_html, detail_price_decimal, detail_price_is_visible_magnitude_copy,
-    format_price_decimal, single_decimal_value,
+    decimal_is_cent_magnitude_copy,
+    detail_original_price_from_html,
+    detail_price_decimal,
+    detail_price_is_visible_magnitude_copy,
+    format_price_decimal,
+    single_decimal_value,
 )
 from app.services.normalizers import normalize_decimal_price
-from app.services.shared.currency_hints import currency_hint_from_page_url, detail_currency_hint_is_host_level
+from app.services.shared.currency_hints import (
+    currency_hint_from_page_url,
+    detail_currency_hint_is_host_level,
+)
 from app.services.shared.field_coerce import extract_currency_code, text_or_none
 
 
@@ -43,6 +58,7 @@ class DetailPriceSelection:
     localized_override_applied: bool = False
     blocked: bool = False
 
+
 _DetailPriceEvidence = DetailPriceEvidence
 _DetailPriceSelection = DetailPriceSelection
 
@@ -59,11 +75,18 @@ def _apply_detail_original_price(
         jsonld_price_bundle=(None, None, None),
     )
     original_price = jsonld_original_price or visible_original_price
-    if _localized_override_invalidates_original(record, selection=selection, visible_original_price=visible_original_price):
+    if _localized_override_invalidates_original(
+        record, selection=selection, visible_original_price=visible_original_price
+    ):
         _drop_existing_original_price(record)
         original_price = None
-    if (evidence.html_currency_conflicts_with_host or evidence.visible_currency_conflicts_with_html) and (
-        original_price in (None, "", [], {}) or detail_price_decimal(original_price) == detail_price_decimal(record.get("price"))
+    if (
+        evidence.html_currency_conflicts_with_host
+        or evidence.visible_currency_conflicts_with_html
+    ) and (
+        original_price in (None, "", [], {})
+        or detail_price_decimal(original_price)
+        == detail_price_decimal(record.get("price"))
     ):
         _drop_conflicting_non_authoritative_original_price(record)
     _set_missing_original_price(
@@ -73,8 +96,13 @@ def _apply_detail_original_price(
         jsonld_currency=jsonld_currency,
     )
     selected_variant = record.get("selected_variant")
-    if isinstance(selected_variant, dict) and original_price not in (None, "", [], {}) and selected_variant.get("original_price") in (None, "", [], {}):
+    if (
+        isinstance(selected_variant, dict)
+        and original_price not in (None, "", [], {})
+        and selected_variant.get("original_price") in (None, "", [], {})
+    ):
         selected_variant["original_price"] = original_price
+
 
 def _localized_override_invalidates_original(
     record: dict[str, Any],
@@ -85,8 +113,13 @@ def _localized_override_invalidates_original(
     return bool(
         selection.localized_override_applied
         and selection.source == FIELD_SOURCE_DOM_TEXT
-        and (visible_original_price in (None, "", [], {}) or detail_price_decimal(visible_original_price) == detail_price_decimal(record.get("price")))
+        and (
+            visible_original_price in (None, "", [], {})
+            or detail_price_decimal(visible_original_price)
+            == detail_price_decimal(record.get("price"))
+        )
     )
+
 
 def _set_missing_original_price(
     record: dict[str, Any],
@@ -95,14 +128,24 @@ def _set_missing_original_price(
     jsonld_original_price: object,
     jsonld_currency: str | None,
 ) -> None:
-    if original_price in (None, "", [], {}) or record.get("original_price") not in (None, "", [], {}):
+    if original_price in (None, "", [], {}) or record.get("original_price") not in (
+        None,
+        "",
+        [],
+        {},
+    ):
         return
     source = FIELD_SOURCE_JSON_LD if jsonld_original_price else FIELD_SOURCE_DOM_TEXT
     record["original_price"] = original_price
     append_record_field_source(record, "original_price", source)
-    if source == FIELD_SOURCE_JSON_LD and jsonld_currency and not record.get("currency"):
+    if (
+        source == FIELD_SOURCE_JSON_LD
+        and jsonld_currency
+        and not record.get("currency")
+    ):
         record["currency"] = jsonld_currency
         append_record_field_source(record, "currency", FIELD_SOURCE_JSON_LD)
+
 
 def _localized_visible_or_structured_price_override(
     *,
@@ -117,11 +160,18 @@ def _localized_visible_or_structured_price_override(
     current_sources = record_field_sources(record, "price")
     if not (current_sources & {"adapter", "js_state"}):
         return None, ""
-    if visible_price and _detail_price_is_visible_outlier(record.get("price"), visible_price):
+    if visible_price and _detail_price_is_visible_outlier(
+        record.get("price"), visible_price
+    ):
         return text_or_none(visible_price), FIELD_SOURCE_DOM_TEXT
-    if jsonld_price and jsonld_currency == expected_currency and _detail_price_is_visible_outlier(record.get("price"), jsonld_price):
+    if (
+        jsonld_price
+        and jsonld_currency == expected_currency
+        and _detail_price_is_visible_outlier(record.get("price"), jsonld_price)
+    ):
         return text_or_none(jsonld_price), FIELD_SOURCE_JSON_LD
     return None, ""
+
 
 def _drop_unverified_variant_money(record: dict[str, Any]) -> None:
     selected_variant = record.get("selected_variant")
@@ -137,11 +187,13 @@ def _drop_unverified_variant_money(record: dict[str, Any]) -> None:
         for field_name in ("price", "sale_price", "original_price", "currency"):
             variant.pop(field_name, None)
 
+
 def _drop_existing_original_price(record: dict[str, Any]) -> None:
     record.pop("original_price", None)
     field_sources = record.get("_field_sources")
     if isinstance(field_sources, dict):
         field_sources.pop("original_price", None)
+
 
 def _should_preserve_existing_localized_money(
     record: dict[str, Any],
@@ -154,7 +206,9 @@ def _should_preserve_existing_localized_money(
     if text_or_none(record.get("currency")) != expected_currency:
         return False
     current_price = record.get("price")
-    if current_price in (None, "", [], {}) or _detail_price_value_is_low_signal(current_price):
+    if current_price in (None, "", [], {}) or _detail_price_value_is_low_signal(
+        current_price
+    ):
         return False
     currency_sources = record_field_sources(record, "currency")
     if "url_currency_hint" in currency_sources:
@@ -162,6 +216,7 @@ def _should_preserve_existing_localized_money(
     if jsonld_price in (None, "", [], {}):
         return True
     return _detail_price_is_visible_outlier(jsonld_price, current_price)
+
 
 def _drop_unverified_localized_money(record: dict[str, Any]) -> None:
     for field_name in ("price", "sale_price", "original_price", "currency"):
@@ -182,6 +237,7 @@ def _drop_unverified_localized_money(record: dict[str, Any]) -> None:
             for field_name in ("price", "sale_price", "original_price", "currency"):
                 variant.pop(field_name, None)
 
+
 def _drop_conflicting_non_authoritative_original_price(record: dict[str, Any]) -> None:
     if record.get("original_price") in (None, "", [], {}):
         return
@@ -192,6 +248,7 @@ def _drop_conflicting_non_authoritative_original_price(record: dict[str, Any]) -
     field_sources = record.get("_field_sources")
     if isinstance(field_sources, dict):
         field_sources.pop("original_price", None)
+
 
 def _unavailable_record_blocks_dom_price_backfill(
     record: dict[str, Any],
@@ -207,6 +264,7 @@ def _unavailable_record_blocks_dom_price_backfill(
         return False
     return _price_sources_are_non_authoritative(record)
 
+
 def _drop_unavailable_dom_backfilled_detail_price(record: dict[str, Any]) -> None:
     if text_or_none(record.get("availability")) != AVAILABILITY_OUT_OF_STOCK:
         return
@@ -217,14 +275,20 @@ def _drop_unavailable_dom_backfilled_detail_price(record: dict[str, Any]) -> Non
     if isinstance(field_sources, dict):
         field_sources.pop("price", None)
     currency_sources = record_field_sources(record, "currency")
-    if record.get("original_price") in (None, "", [], {}) and not (currency_sources & DETAIL_AUTHORITATIVE_PRICE_SOURCE_SET):
+    if record.get("original_price") in (None, "", [], {}) and not (
+        currency_sources & DETAIL_AUTHORITATIVE_PRICE_SOURCE_SET
+    ):
         record.pop("currency", None)
         if isinstance(field_sources, dict):
             field_sources.pop("currency", None)
 
+
 def _price_sources_are_non_authoritative(record: dict[str, Any]) -> bool:
     price_sources = record_field_sources(record, "price")
-    return bool(price_sources) and not (price_sources & DETAIL_AUTHORITATIVE_PRICE_SOURCE_SET)
+    return bool(price_sources) and not (
+        price_sources & DETAIL_AUTHORITATIVE_PRICE_SOURCE_SET
+    )
+
 
 def drop_low_signal_zero_detail_price(record: dict[str, Any]) -> None:
     if not _price_value_is_zero(record.get("price")):
@@ -253,9 +317,12 @@ def drop_low_signal_zero_detail_price(record: dict[str, Any]) -> None:
         if isinstance(field_sources, dict):
             field_sources.pop("currency", None)
 
+
 def _drop_zero_variant_money(record: dict[str, Any]) -> None:
     selected_variant = record.get("selected_variant")
-    if isinstance(selected_variant, dict) and _price_value_is_zero(selected_variant.get("price")):
+    if isinstance(selected_variant, dict) and _price_value_is_zero(
+        selected_variant.get("price")
+    ):
         selected_variant.pop("price", None)
         selected_variant.pop("currency", None)
     variants = record.get("variants")
@@ -266,6 +333,7 @@ def _drop_zero_variant_money(record: dict[str, Any]) -> None:
             variant.pop("price", None)
             variant.pop("currency", None)
 
+
 def _zero_detail_price_is_low_signal(
     record: dict[str, Any],
     *,
@@ -273,7 +341,10 @@ def _zero_detail_price_is_low_signal(
 ) -> bool:
     if text_or_none(record.get("availability")) == AVAILABILITY_OUT_OF_STOCK:
         return True
-    return bool(price_sources) and price_sources <= DETAIL_LOW_SIGNAL_ZERO_PRICE_SOURCE_SET
+    return (
+        bool(price_sources) and price_sources <= DETAIL_LOW_SIGNAL_ZERO_PRICE_SOURCE_SET
+    )
+
 
 def reconcile_detail_currency_with_url(
     record: dict[str, Any],
@@ -288,12 +359,21 @@ def reconcile_detail_currency_with_url(
         expected_currency=expected_currency,
     )
     variant_currency = _unanimous_variant_currency(record)
-    if variant_currency and variant_currency != expected_currency and not strong_host_hint:
+    if (
+        variant_currency
+        and variant_currency != expected_currency
+        and not strong_host_hint
+    ):
         expected_currency = variant_currency
     before_currency = text_or_none(record.get("currency"))
 
     adapter_price = "adapter" in record_field_sources(record, "price")
-    if not (strong_host_hint and adapter_price and before_currency is not None and before_currency != expected_currency):
+    if not (
+        strong_host_hint
+        and adapter_price
+        and before_currency is not None
+        and before_currency != expected_currency
+    ):
         _reconcile_container_currency(
             record,
             expected_currency=expected_currency,
@@ -302,19 +382,33 @@ def reconcile_detail_currency_with_url(
     if before_currency != text_or_none(record.get("currency")):
         append_record_field_source(record, "currency", "url_currency_hint")
 
-    _reconcile_selected_variant_currency(record, expected_currency=expected_currency, strong_host_hint=strong_host_hint)
-    _reconcile_variant_currencies(record, expected_currency=expected_currency, strong_host_hint=strong_host_hint)
+    _reconcile_selected_variant_currency(
+        record, expected_currency=expected_currency, strong_host_hint=strong_host_hint
+    )
+    _reconcile_variant_currencies(
+        record, expected_currency=expected_currency, strong_host_hint=strong_host_hint
+    )
 
-def _reconcile_selected_variant_currency(record: dict[str, Any], *, expected_currency: str, strong_host_hint: bool) -> None:
+
+def _reconcile_selected_variant_currency(
+    record: dict[str, Any], *, expected_currency: str, strong_host_hint: bool
+) -> None:
     selected = record.get("selected_variant")
     if not isinstance(selected, dict):
         return
     before = text_or_none(selected.get("currency"))
-    _reconcile_container_currency(selected, expected_currency=expected_currency, strong_host_hint=strong_host_hint)
+    _reconcile_container_currency(
+        selected, expected_currency=expected_currency, strong_host_hint=strong_host_hint
+    )
     if before != text_or_none(selected.get("currency")):
-        append_record_field_source(record, "selected_variant.currency", "url_currency_hint")
+        append_record_field_source(
+            record, "selected_variant.currency", "url_currency_hint"
+        )
 
-def _reconcile_variant_currencies(record: dict[str, Any], *, expected_currency: str, strong_host_hint: bool) -> None:
+
+def _reconcile_variant_currencies(
+    record: dict[str, Any], *, expected_currency: str, strong_host_hint: bool
+) -> None:
     variants = record.get("variants")
     if not isinstance(variants, list):
         return
@@ -323,11 +417,22 @@ def _reconcile_variant_currencies(record: dict[str, Any], *, expected_currency: 
         if not isinstance(variant, dict):
             continue
         before = text_or_none(variant.get("currency"))
-        protected = strong_host_hint and adapter_variants and before not in (None, expected_currency)
+        protected = (
+            strong_host_hint
+            and adapter_variants
+            and before not in (None, expected_currency)
+        )
         if not protected:
-            _reconcile_container_currency(variant, expected_currency=expected_currency, strong_host_hint=strong_host_hint)
+            _reconcile_container_currency(
+                variant,
+                expected_currency=expected_currency,
+                strong_host_hint=strong_host_hint,
+            )
         if before != text_or_none(variant.get("currency")):
-            append_record_field_source(record, f"variants[{index}].currency", "url_currency_hint")
+            append_record_field_source(
+                record, f"variants[{index}].currency", "url_currency_hint"
+            )
+
 
 def _unanimous_variant_currency(record: dict[str, Any]) -> str:
     currencies: set[str] = set()
@@ -338,6 +443,7 @@ def _unanimous_variant_currency(record: dict[str, Any]) -> str:
         if currency:
             currencies.add(currency)
     return next(iter(currencies)) if len(currencies) == 1 else ""
+
 
 def reconcile_detail_price_magnitudes(record: dict[str, Any]) -> None:
     parent_price = detail_price_decimal(record.get("price"))
@@ -360,7 +466,10 @@ def reconcile_detail_price_magnitudes(record: dict[str, Any]) -> None:
         parent_price is not None
         and safe_variant_price is not None
         and decimal_is_cent_magnitude_copy(parent_price, safe_variant_price)
-        and not (record_field_sources(record, "price") & DETAIL_STRICT_PARENT_PRICE_SOURCE_SET)
+        and not (
+            record_field_sources(record, "price")
+            & DETAIL_STRICT_PARENT_PRICE_SOURCE_SET
+        )
     ):
         record["price"] = format_price_decimal(safe_variant_price)
         append_record_field_source(record, "price", "variant_price_magnitude")
@@ -373,7 +482,10 @@ def reconcile_detail_price_magnitudes(record: dict[str, Any]) -> None:
             continue
         if decimal_is_cent_magnitude_copy(row_price, parent_price):
             row["price"] = format_price_decimal(parent_price)
-            append_record_field_source(record, f"{path}.price", "parent_price_magnitude")
+            append_record_field_source(
+                record, f"{path}.price", "parent_price_magnitude"
+            )
+
 
 def reconcile_parent_price_against_variant_range(record: dict[str, Any]) -> None:
     parent_price = detail_price_decimal(record.get("price"))
@@ -388,12 +500,17 @@ def reconcile_parent_price_against_variant_range(record: dict[str, Any]) -> None
     # Lower parent values are safe repair candidates after the cent-magnitude
     # guard because variant unanimity is stronger evidence than a lone parent
     # scrape.
-    if parent_price > unanimous_variant_price and (parent_price / unanimous_variant_price) > DETAIL_PARENT_VARIANT_PRICE_RATIO_MAX_DECIMAL:
+    if (
+        parent_price > unanimous_variant_price
+        and (parent_price / unanimous_variant_price)
+        > DETAIL_PARENT_VARIANT_PRICE_RATIO_MAX_DECIMAL
+    ):
         return
     if record_field_sources(record, "price") & DETAIL_STRICT_PARENT_PRICE_SOURCE_SET:
         return
     record["price"] = format_price_decimal(unanimous_variant_price)
     append_record_field_source(record, "price", "variant_price_range")
+
 
 def _complete_unanimous_variant_price(record: dict[str, Any]) -> Decimal | None:
     variants = record.get("variants")
@@ -407,6 +524,7 @@ def _complete_unanimous_variant_price(record: dict[str, Any]) -> Decimal | None:
         return None
     return single_decimal_value([price for price in prices if price is not None])
 
+
 def record_field_sources(record: dict[str, Any], field_name: str) -> set[str]:
     field_sources = record.get("_field_sources")
     if not isinstance(field_sources, dict):
@@ -415,6 +533,7 @@ def record_field_sources(record: dict[str, Any], field_name: str) -> set[str]:
     if not isinstance(source_values, list):
         return set()
     return {str(source).strip() for source in source_values if str(source).strip()}
+
 
 def append_record_field_source(
     record: dict[str, Any],
@@ -432,6 +551,7 @@ def append_record_field_source(
         return
     if normalized_source not in source_bucket:
         source_bucket.append(normalized_source)
+
 
 def _should_override_record_price_from_dom(
     *,
@@ -451,6 +571,7 @@ def _should_override_record_price_from_dom(
     current_sources = record_field_sources(record, "price")
     return not bool(current_sources & DETAIL_AUTHORITATIVE_PRICE_SOURCE_SET)
 
+
 def normalize_mismatched_host_currency_price(
     value: object,
     *,
@@ -464,11 +585,13 @@ def normalize_mismatched_host_currency_price(
         return None
     normalized = normalize_decimal_price(
         text,
-        interpret_integral_as_cents=expected_currency in DETAIL_CENT_BASED_PRICE_CURRENCY_SET,
+        interpret_integral_as_cents=expected_currency
+        in DETAIL_CENT_BASED_PRICE_CURRENCY_SET,
     )
     if normalized and "." not in normalized:
         return f"{normalized}.00"
     return normalized
+
 
 def _reconcile_container_currency(
     container: dict[str, Any],
@@ -494,6 +617,7 @@ def _reconcile_container_currency(
         container["currency"] = expected_currency
         return
 
+
 def _html_currency_conflicts_with_strong_host_hint(
     *,
     html_currency: str | None,
@@ -510,19 +634,23 @@ def _html_currency_conflicts_with_strong_host_hint(
         )
     )
 
+
 def _price_value_is_zero(value: object) -> bool:
     normalized = detail_price_decimal(value)
     return normalized is not None and normalized == Decimal("0")
 
+
 def _price_value_is_positive(value: object) -> bool:
     normalized = detail_price_decimal(value)
     return normalized is not None and normalized > Decimal("0")
+
 
 def _detail_price_value_is_low_signal(value: object) -> bool:
     price = detail_price_decimal(value)
     if price is None:
         return False
     return Decimal("0") < price <= Decimal("1")
+
 
 def _detail_price_is_visible_outlier(value: object, visible_value: object) -> bool:
     current = detail_price_decimal(value)
@@ -537,21 +665,35 @@ def _detail_price_is_visible_outlier(value: object, visible_value: object) -> bo
         return False
     return current <= visible * Decimal(str(DETAIL_LOW_SIGNAL_PRICE_VISIBLE_RATIO))
 
+
 def _detail_record_has_positive_price_corroboration(record: dict[str, Any]) -> bool:
     if _price_value_is_positive(record.get("original_price")):
         return True
     selected_variant = record.get("selected_variant")
-    if isinstance(selected_variant, dict) and any(_price_value_is_positive(selected_variant.get(field_name)) for field_name in ("price", "original_price")):
+    if isinstance(selected_variant, dict) and any(
+        _price_value_is_positive(selected_variant.get(field_name))
+        for field_name in ("price", "original_price")
+    ):
         return True
     variants = record.get("variants")
     if not isinstance(variants, list):
         return False
     return any(
-        isinstance(variant, dict) and any(_price_value_is_positive(variant.get(field_name)) for field_name in ("price", "original_price"))
+        isinstance(variant, dict)
+        and any(
+            _price_value_is_positive(variant.get(field_name))
+            for field_name in ("price", "original_price")
+        )
         for variant in variants
     )
 
+
 __all__ = [
-    "append_record_field_source", "drop_low_signal_zero_detail_price", "normalize_mismatched_host_currency_price",
-    "reconcile_detail_price_magnitudes", "reconcile_detail_currency_with_url", "reconcile_parent_price_against_variant_range", "record_field_sources",
+    "append_record_field_source",
+    "drop_low_signal_zero_detail_price",
+    "normalize_mismatched_host_currency_price",
+    "reconcile_detail_price_magnitudes",
+    "reconcile_detail_currency_with_url",
+    "reconcile_parent_price_against_variant_range",
+    "record_field_sources",
 ]

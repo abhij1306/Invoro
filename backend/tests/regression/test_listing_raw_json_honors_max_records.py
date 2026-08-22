@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .test_crawl_engine import backfill_detail_price_from_html, detail_url_is_utility, extract_records, pytest, select_variant  # fmt: skip
 
+
 @pytest.mark.regression
 def test_listing_raw_json_honors_max_records() -> None:
     html = (
@@ -27,6 +28,7 @@ def test_listing_raw_json_honors_max_records() -> None:
         "Product 3",
     ]
 
+
 @pytest.mark.regression
 def test_detail_product_url_with_support_slug_is_not_utility() -> None:
     assert (
@@ -35,6 +37,7 @@ def test_detail_product_url_with_support_slug_is_not_utility() -> None:
         )
         is False
     )
+
 
 @pytest.mark.regression
 def test_detail_price_backfill_replaces_visible_outlier_price() -> None:
@@ -65,6 +68,7 @@ def test_detail_price_backfill_replaces_visible_outlier_price() -> None:
     assert record["price"] == "154"
     assert "dom_text" in record["_field_sources"]["price"]
 
+
 @pytest.mark.regression
 def test_detail_price_backfill_replaces_visible_decimal_shift_outlier_price() -> None:
     record = {
@@ -94,6 +98,7 @@ def test_detail_price_backfill_replaces_visible_decimal_shift_outlier_price() ->
     assert record["price"] == "299.50"
     assert "dom_text" in record["_field_sources"]["price"]
 
+
 @pytest.mark.regression
 def test_detail_price_backfill_uses_visible_local_price_when_jsonld_currency_conflicts() -> (
     None
@@ -119,6 +124,7 @@ def test_detail_price_backfill_uses_visible_local_price_when_jsonld_currency_con
 
     assert record["price"] == "1800"
     assert record["currency"] == "INR"
+
 
 @pytest.mark.regression
 def test_detail_price_backfill_reads_local_price_from_add_to_bag_button() -> None:
@@ -150,6 +156,7 @@ def test_detail_price_backfill_reads_local_price_from_add_to_bag_button() -> Non
     assert record["currency"] == "INR"
     assert "original_price" not in record
 
+
 @pytest.mark.regression
 def test_detail_price_backfill_drops_unverified_localized_state_price() -> None:
     record = {
@@ -179,6 +186,7 @@ def test_detail_price_backfill_drops_unverified_localized_state_price() -> None:
     assert "price" not in record["variants"][0]
     assert "currency" not in record["variants"][0]
 
+
 @pytest.mark.regression
 def test_detail_price_backfill_keeps_existing_parent_price_for_variants_when_host_currency_conflicts() -> (
     None
@@ -207,6 +215,7 @@ def test_detail_price_backfill_keeps_existing_parent_price_for_variants_when_hos
     assert record["variants"][0]["price"] == "1800"
     assert record["variants"][0]["currency"] == "INR"
 
+
 @pytest.mark.regression
 def test_detail_price_backfill_reads_data_test_id_price_display() -> None:
     record = {
@@ -233,6 +242,7 @@ def test_detail_price_backfill_reads_data_test_id_price_display() -> None:
     assert record["original_price"] == "930.00"
     assert "dom_text" in record["_field_sources"]["price"]
 
+
 @pytest.mark.regression
 def test_detail_price_backfill_skips_dom_price_when_product_is_out_of_stock() -> None:
     record = {
@@ -257,6 +267,7 @@ def test_detail_price_backfill_skips_dom_price_when_product_is_out_of_stock() ->
     assert "price" not in record
     assert "currency" not in record
     assert "price" not in record.get("_field_sources", {})
+
 
 @pytest.mark.regression
 def test_detail_price_backfill_keeps_original_price_when_out_of_stock_price_blocked() -> (
@@ -285,6 +296,7 @@ def test_detail_price_backfill_keeps_original_price_when_out_of_stock_price_bloc
     assert record["currency"] == "USD"
     assert record["_field_sources"]["original_price"] == ["json_ld"]
 
+
 @pytest.mark.regression
 def test_select_variant_falls_back_to_partial_axis_match() -> None:
     variants = [
@@ -300,6 +312,7 @@ def test_select_variant_falls_back_to_partial_axis_match() -> None:
 
     assert selected == variants[1]
 
+
 @pytest.mark.regression
 def test_select_variant_prefers_highest_ranked_partial_axis_match() -> None:
     variants = [
@@ -314,6 +327,7 @@ def test_select_variant_prefers_highest_ranked_partial_axis_match() -> None:
     )
 
     assert selected == variants[0]
+
 
 @pytest.mark.regression
 def test_extract_detail_keeps_encoded_cdn_image_url() -> None:
@@ -347,6 +361,7 @@ def test_extract_detail_keeps_encoded_cdn_image_url() -> None:
     )
 
     assert rows[0]["image_url"] == image_url
+
 
 @pytest.mark.regression
 def test_extract_records_recovers_flattened_listing_cards_from_visual_artifacts() -> (
@@ -422,6 +437,7 @@ def test_extract_records_recovers_flattened_listing_cards_from_visual_artifacts(
             "url": "https://example.com/products/widget-prime",
         }
     ]
+
 
 @pytest.mark.regression
 def test_extract_records_visual_listing_backfills_brand_from_brand_node_and_url() -> (
@@ -500,6 +516,7 @@ def test_extract_records_visual_listing_backfills_brand_from_brand_node_and_url(
     assert rows[0]["brand"] == "Northside"
     assert rows[1]["brand"] == "Dv Dolce Vita"
 
+
 @pytest.mark.regression
 def test_extract_records_visual_listing_rejects_numeric_product_id_brand_prefix() -> (
     None
@@ -543,6 +560,7 @@ def test_extract_records_visual_listing_rejects_numeric_product_id_brand_prefix(
     assert rows[0]["title"] == "Black Leather Belts for Men"
     assert "brand" not in rows[0]
 
+
 @pytest.mark.regression
 def test_extract_records_reads_desertcart_style_product_anchor_cards() -> None:
     rows = extract_records(
@@ -570,6 +588,7 @@ def test_extract_records_reads_desertcart_style_product_anchor_cards() -> None:
     )
     assert "brand" not in rows[0]
 
+
 @pytest.mark.regression
 def test_extract_records_honors_listing_max_records_above_fragment_default() -> None:
     cards = "\n".join(
@@ -593,6 +612,7 @@ def test_extract_records_honors_listing_max_records_above_fragment_default() -> 
     )
 
     assert len(rows) == 205
+
 
 @pytest.mark.regression
 def test_extract_records_visual_listing_orders_top_grid_before_lower_recommendations() -> (
@@ -664,6 +684,7 @@ def test_extract_records_visual_listing_orders_top_grid_before_lower_recommendat
         "Men's Chambray Sport Coat",
         "Men's Advantage Performance Polo Shirt Classic Fit",
     ]
+
 
 @pytest.mark.regression
 def test_detail_identity_codes_require_exact_match() -> None:

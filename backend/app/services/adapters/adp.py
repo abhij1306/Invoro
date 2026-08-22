@@ -76,7 +76,9 @@ class ADPAdapter(BaseAdapter):
             records.append(record)
         return records
 
-    def _listing_card_record(self, card: Any, *, page_url: str) -> dict[str, str] | None:
+    def _listing_card_record(
+        self, card: Any, *, page_url: str
+    ) -> dict[str, str] | None:
         title_node = card.css_first("[id^='lblTitle_'], sdf-link, a")
         title = clean_text(selectolax_node_text(title_node, separator=" "))
         if len(title) < 3:
@@ -85,12 +87,18 @@ class ADPAdapter(BaseAdapter):
         self._apply_listing_identity(record, card, page_url=page_url)
         location = self._listing_locations(card)
         posted = clean_text(
-            selectolax_node_text(card.css_first(".current-opening-post-date"), separator=" ")
+            selectolax_node_text(
+                card.css_first(".current-opening-post-date"), separator=" "
+            )
         )
-        more_locations = clean_text(" ".join(
-            selectolax_node_text(node, separator=" ")
-            for node in card.css("[id^='job_item_location_'], .mdf-overlay-popover sdf-button")
-        ))
+        more_locations = clean_text(
+            " ".join(
+                selectolax_node_text(node, separator=" ")
+                for node in card.css(
+                    "[id^='job_item_location_'], .mdf-overlay-popover sdf-button"
+                )
+            )
+        )
         if location:
             record["location"] = location
         if more_locations and more_locations not in {location, title}:
@@ -115,7 +123,9 @@ class ADPAdapter(BaseAdapter):
     @staticmethod
     def _listing_locations(card: Any) -> str:
         values: list[str] = []
-        for node in card.css(".current-opening-location-item span, .current-opening-location-item"):
+        for node in card.css(
+            ".current-opening-location-item span, .current-opening-location-item"
+        ):
             value = clean_text(selectolax_node_text(node, separator=" "))
             if value and value not in values:
                 values.append(value)

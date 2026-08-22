@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .test_crawl_engine import BelkAdapter, _rendered_listing_fragment, extract_listing_records, extract_records, extraction_runtime, pytest  # fmt: skip
 
+
 @pytest.mark.regression
 def test_extract_records_prefers_rendered_listing_fragments_over_thin_structured_records() -> (
     None
@@ -60,6 +61,7 @@ def test_extract_records_prefers_rendered_listing_fragments_over_thin_structured
     assert rows[0]["_source"] == "dom_listing"
     assert rows[0]["price"] == "19.99"
     assert rows[0]["image_url"] == "https://example.com/images/widget-prime.jpg"
+
 
 @pytest.mark.regression
 def test_extract_records_prefers_browser_visual_rows_over_weak_promo_dom_rows() -> None:
@@ -146,6 +148,7 @@ def test_extract_records_prefers_browser_visual_rows_over_weak_promo_dom_rows() 
         "Basic Bath Bundle",
     }
 
+
 @pytest.mark.regression
 def test_extract_records_enriches_generic_listing_rows_from_matching_adapter_rows() -> (
     None
@@ -177,6 +180,7 @@ def test_extract_records_enriches_generic_listing_rows_from_matching_adapter_row
     assert rows[0]["_source"] == "dom_listing"
     assert rows[0]["brand"] == "Modern Southern Home"
     assert rows[0]["price"] == "22.50"
+
 
 @pytest.mark.regression
 def test_extract_records_prefers_myntra_adapter_rows_over_promo_category_dom_rows() -> (
@@ -219,6 +223,7 @@ def test_extract_records_prefers_myntra_adapter_rows_over_promo_category_dom_row
         rows[0]["title"] == "StyleCast x Revolte Men Wide Leg Mid-Rise Light Fade Jeans"
     )
 
+
 @pytest.mark.regression
 def test_listing_integrity_gate_sees_cohort_failed_candidate_set(
     monkeypatch: pytest.MonkeyPatch,
@@ -246,6 +251,7 @@ def test_listing_integrity_gate_sees_cohort_failed_candidate_set(
     assert rows == []
     assert artifacts["listing_integrity"]["outcome"] == "promo_only_cluster"
     assert artifacts["listing_integrity"]["reason"] == "cohort_heterogeneous"
+
 
 @pytest.mark.regression
 def test_final_adapter_listing_set_refreshes_listing_integrity_artifact() -> None:
@@ -282,6 +288,7 @@ def test_final_adapter_listing_set_refreshes_listing_integrity_artifact() -> Non
 
     assert [row["title"] for row in rows] == ["Real Product A", "Real Product B"]
     assert artifacts["listing_integrity"]["outcome"] == "product_grid"
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -325,6 +332,7 @@ async def test_belk_adapter_extracts_listing_brand_from_state_and_tiles() -> Non
     assert result.records[0]["brand"] == "Polo Ralph Lauren"
     assert result.records[0]["title"] == "Slim Straight Jeans"
 
+
 @pytest.mark.regression
 async def test_belk_adapter_extracts_detail_sku_upc_without_overwriting_sku() -> None:
     html = """
@@ -364,6 +372,7 @@ async def test_belk_adapter_extracts_detail_sku_upc_without_overwriting_sku() ->
     assert result.records[0]["product_id"] == "32009271204401"
     assert result.records[0].get("sku") != "00194500874886"
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_belk_adapter_extracts_title_brand_from_rendered_card_attrs() -> None:
@@ -394,6 +403,7 @@ async def test_belk_adapter_extracts_title_brand_from_rendered_card_attrs() -> N
     assert result.records[0]["price"] == "22.50"
     assert result.records[0]["product_id"] == "92002171202220"
     assert result.records[1]["brand"] == "Crown & Ivy™"
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -429,6 +439,7 @@ async def test_belk_adapter_dom_card_price_overrides_stale_state_price() -> None
     assert result.records[0]["title"] == "Wrangler Relaxed Bootcut Jeans"
     assert result.records[0]["price"] == "39.95"
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_belk_adapter_infers_brand_from_url_when_title_is_truncated() -> None:
@@ -452,6 +463,7 @@ async def test_belk_adapter_infers_brand_from_url_when_title_is_truncated() -> N
     assert result.records[0]["brand"] == "Beautyrest"
     assert result.records[0]["price"] == "75.50"
 
+
 @pytest.mark.regression
 def test_listing_extractor_extracts_brand_from_product_tile() -> None:
     rows = extract_records(
@@ -473,6 +485,7 @@ def test_listing_extractor_extracts_brand_from_product_tile() -> None:
     )
 
     assert rows[0]["brand"] == "Polo Ralph Lauren"
+
 
 @pytest.mark.regression
 def test_listing_extractor_does_not_infer_belk_brand_from_pdp_slug_when_fragment_lacks_brand() -> (
@@ -496,6 +509,7 @@ def test_listing_extractor_does_not_infer_belk_brand_from_pdp_slug_when_fragment
     )
 
     assert "brand" not in rows[0]
+
 
 @pytest.mark.regression
 def test_extract_records_belk_listing_ignores_purchase_promo_price() -> None:
@@ -523,6 +537,7 @@ def test_extract_records_belk_listing_ignores_purchase_promo_price() -> None:
     )
 
     assert rows[0]["price"] == "22.75"
+
 
 @pytest.mark.regression
 def test_extract_records_returns_sufficient_adapter_listing_without_dom_rescan() -> (
@@ -571,6 +586,7 @@ def test_extract_records_returns_sufficient_adapter_listing_without_dom_rescan()
     assert [row["price"] for row in rows] == ["22.75", "39.95"]
     assert {row["_source"] for row in rows} == {"belk_adapter"}
 
+
 @pytest.mark.regression
 def test_extract_records_prefers_generic_listing_rows_over_thin_adapter_rows() -> None:
     rows = extract_records(
@@ -612,6 +628,7 @@ def test_extract_records_prefers_generic_listing_rows_over_thin_adapter_rows() -
         }
     ]
 
+
 @pytest.mark.regression
 def test_extract_records_drops_rendered_listing_utility_rows_when_real_products_exist() -> (
     None
@@ -645,6 +662,7 @@ def test_extract_records_drops_rendered_listing_utility_rows_when_real_products_
 
     assert [row["title"] for row in rows] == ["Widget Prime", "Widget Pro"]
     assert all("/products/" in row["url"] for row in rows)
+
 
 @pytest.mark.regression
 def test_extract_records_drops_detail_like_category_links_without_product_signals() -> (

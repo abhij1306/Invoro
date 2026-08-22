@@ -117,9 +117,7 @@ class SaaSHRAdapter(PublicEndpointAdapter):
             offset += size
         return records
 
-    async def _request_page(
-        self, endpoint: str, *, proxy: str | None
-    ) -> dict | None:
+    async def _request_page(self, endpoint: str, *, proxy: str | None) -> dict | None:
         try:
             payload = await self._request_json(
                 endpoint,

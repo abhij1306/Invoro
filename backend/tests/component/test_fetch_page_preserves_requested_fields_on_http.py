@@ -4,6 +4,7 @@ from .test_crawl_fetch_runtime import AsyncMock, FetchRuntimeContext, HostProtec
 
 pytest_plugins = ["tests.component.test_crawl_fetch_runtime"]
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_fetch_page_preserves_requested_fields_on_http_to_browser_escalation(
@@ -77,6 +78,7 @@ async def test_fetch_page_preserves_requested_fields_on_http_to_browser_escalati
 
     assert captured_requested_fields == ["product measurements"]
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_fetch_page_preserves_requested_fields_on_browser_first_path(
@@ -128,6 +130,7 @@ async def test_fetch_page_preserves_requested_fields_on_browser_first_path(
 
     assert captured_requested_fields == ["product measurements"]
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_fetch_page_prefer_browser_falls_back_to_http_after_browser_timeout(
@@ -163,6 +166,7 @@ async def test_fetch_page_prefer_browser_falls_back_to_http_after_browser_timeou
 
     assert calls == ["browser", "curl"]
     assert result.method == "curl_cffi"
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -200,6 +204,7 @@ async def test_fetch_page_kitchenaid_prefer_browser_timeout_falls_back_to_http(
 
     assert calls == ["browser", "curl"]
     assert result.method == "curl_cffi"
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -263,6 +268,7 @@ async def test_handle_http_result_retries_browser_after_browser_first_failure_an
     assert vendor_block_confirmed is False
     assert browser_calls == [[]]
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_fetch_page_browser_only_skips_http_fetchers(
@@ -295,6 +301,7 @@ async def test_fetch_page_browser_only_skips_http_fetchers(
     )
 
     assert result.method == "browser"
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -338,6 +345,7 @@ async def test_fetch_page_http_only_disables_browser_escalation(
 
     assert result.method == "curl_cffi"
     assert result.status_code == 403
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -386,6 +394,7 @@ async def test_fetch_page_http_then_browser_escalates_after_http_result(
 
     assert result.method == "browser"
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_fetch_page_prefers_browser_from_learned_host_memory(
@@ -427,6 +436,7 @@ async def test_fetch_page_prefers_browser_from_learned_host_memory(
     )
 
     assert result.method == "browser"
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -479,6 +489,7 @@ async def test_fetch_page_preserves_proxy_list_on_browser_first_path(
 
     assert (captured_proxies or []) == ["http://proxy-one", "http://proxy-two"]
 
+
 @pytest.mark.component
 def test_resolve_proxy_attempts_preserves_order_and_deduplicates() -> None:
     proxies = browser_policy.resolve_proxy_attempts(
@@ -496,6 +507,7 @@ def test_resolve_proxy_attempts_preserves_order_and_deduplicates() -> None:
         "http://proxy-c",
     ]
 
+
 @pytest.mark.component
 def test_attach_proxy_run_session_replaces_existing_session_marker() -> None:
     proxy = "socks5://user-session-oldvalue:pass@rp.scrapegw.com:6060"
@@ -503,6 +515,7 @@ def test_attach_proxy_run_session_replaces_existing_session_marker() -> None:
     resolved = browser_policy.attach_proxy_run_session(proxy, run_id=42)
 
     assert resolved == "socks5://user-session-r42:pass@rp.scrapegw.com:6060"
+
 
 @pytest.mark.component
 def test_resolve_proxy_attempts_does_not_rewrite_proxy_session_by_default() -> None:
@@ -518,6 +531,7 @@ def test_resolve_proxy_attempts_does_not_rewrite_proxy_session_by_default() -> N
         "socks5://user-session-oldvalue:pass@rp.scrapegw.com:6060",
         "socks5://user-session-other:pass@rp.scrapegw.com:6060",
     ]
+
 
 @pytest.mark.component
 def test_resolve_proxy_attempts_rewrites_proxy_session_when_explicitly_enabled() -> (
@@ -535,6 +549,7 @@ def test_resolve_proxy_attempts_rewrites_proxy_session_when_explicitly_enabled()
     assert proxies == [
         "socks5://user-session-r42:pass@rp.scrapegw.com:6060",
     ]
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -578,6 +593,7 @@ async def test_fetch_page_browser_only_retries_proxies_in_user_order_and_stamps_
     assert result.browser_diagnostics["proxy_scheme"] == "socks5"
     assert result.browser_diagnostics["browser_proxy_mode"] == "launch"
     assert result.browser_diagnostics["proxy_attempt_index"] == 2
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -636,6 +652,7 @@ async def test_run_browser_attempts_records_driver_closed_exception(
     assert context.last_browser_attempt_diagnostics["browser_outcome"] == (
         "navigation_failed"
     )
+
 
 @pytest.mark.asyncio
 @pytest.mark.component

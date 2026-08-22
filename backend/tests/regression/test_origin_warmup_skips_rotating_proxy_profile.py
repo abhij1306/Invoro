@@ -21,7 +21,9 @@ async def test_origin_warmup_skips_recovery_after_budget_is_consumed(
         raise AssertionError("challenge recovery must not exceed warmup budget")
 
     monkeypatch.setattr(browser_origin_warmup, "elapsed_ms", lambda _started: 1000)
-    monkeypatch.setattr(browser_origin_warmup, "recover_browser_challenge", _unexpected_recovery)
+    monkeypatch.setattr(
+        browser_origin_warmup, "recover_browser_challenge", _unexpected_recovery
+    )
 
     timings = await browser_origin_warmup._navigate_warmup_page(
         _Page(),
@@ -221,7 +223,10 @@ async def test_origin_warmup_runs_for_real_chrome_despite_vendor_block_memory() 
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_origin_warmup_dedupes_parallel_same_host() -> None:
-    pages = [_FakeExpansionPage(base_html="<html><body><h1>Widget</h1></body></html>") for _index in range(6)]
+    pages = [
+        _FakeExpansionPage(base_html="<html><body><h1>Widget</h1></body></html>")
+        for _index in range(6)
+    ]
 
     await asyncio.gather(
         *(
@@ -245,7 +250,10 @@ async def test_origin_warmup_dedupes_parallel_same_host() -> None:
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_origin_warmup_dedupes_recent_same_host_waves_by_default() -> None:
-    pages = [_FakeExpansionPage(base_html="<html><body><h1>Widget</h1></body></html>") for _index in range(3)]
+    pages = [
+        _FakeExpansionPage(base_html="<html><body><h1>Widget</h1></body></html>")
+        for _index in range(3)
+    ]
 
     for page in pages:
         await browser_runtime._maybe_warm_origin_before_navigation(
@@ -333,8 +341,12 @@ def test_browser_runtime_snapshot_uses_capacity_fallback_for_pooled_runtimes(
             await _async_checkpoint()
             return None
 
-    monkeypatch.setattr(browser_pool._BROWSER_POOL, "direct", {"direct": _FakeRuntime()})
-    monkeypatch.setattr(browser_pool._BROWSER_POOL, "proxied", {"proxy": _FakeRuntime()})
+    monkeypatch.setattr(
+        browser_pool._BROWSER_POOL, "direct", {"direct": _FakeRuntime()}
+    )
+    monkeypatch.setattr(
+        browser_pool._BROWSER_POOL, "proxied", {"proxy": _FakeRuntime()}
+    )
 
     snapshot = browser_runtime.browser_runtime_snapshot()
 
@@ -385,7 +397,9 @@ async def test_browser_fetch_disables_storage_reuse_for_rotating_proxy_profile(
 
 @pytest.mark.asyncio
 @pytest.mark.regression
-async def test_browser_fetch_recovers_when_commit_navigation_is_interrupted_by_same_url_reload() -> None:
+async def test_browser_fetch_recovers_when_commit_navigation_is_interrupted_by_same_url_reload() -> (
+    None
+):
     page = _FakeExpansionPage(
         base_html="<html><body><h1>Widget</h1></body></html>",
         goto_failures={
@@ -736,4 +750,7 @@ async def test_browser_fetch_runs_listing_recovery_when_thin_listing_retry_reque
 
     assert calls["count"] == 1
     assert result.browser_diagnostics["listing_recovery"]["status"] == "recovered"
-    assert result.browser_diagnostics["listing_recovery"]["requested_mode"] == "thin_listing"
+    assert (
+        result.browser_diagnostics["listing_recovery"]["requested_mode"]
+        == "thin_listing"
+    )

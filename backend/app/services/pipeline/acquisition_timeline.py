@@ -8,7 +8,9 @@ def record_acquire_timeline(context, acquisition_result) -> None:
     if trace is None:
         return
     method = str(getattr(acquisition_result, "method", "") or "")
-    diagnostics = mapping_or_empty(getattr(acquisition_result, "browser_diagnostics", {}))
+    diagnostics = mapping_or_empty(
+        getattr(acquisition_result, "browser_diagnostics", {})
+    )
     timings = mapping_or_empty(diagnostics.get("phase_timings_ms"))
     _record_policy_decisions(trace, diagnostics)
     host_outcome = mapping_or_empty(diagnostics.get("host_outcome"))
@@ -86,7 +88,11 @@ def _record_interstitial(trace, diagnostics, *, timings) -> None:
     if not interstitial:
         return
     dismissed = str(interstitial.get("status") or "").strip().lower() == "dismissed"
-    timing_key = obs_config.INTERSTITIAL_DISMISSAL_TIMING_KEY if dismissed else obs_config.INTERSTITIAL_PROBE_TIMING_KEY
+    timing_key = (
+        obs_config.INTERSTITIAL_DISMISSAL_TIMING_KEY
+        if dismissed
+        else obs_config.INTERSTITIAL_PROBE_TIMING_KEY
+    )
     trace.record_acquire_event(
         obs_config.ACQUIRE_EVENT_INTERSTITIAL,
         detail={"status": interstitial.get("status")},

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .test_data_enrichment import AsyncSession, CrawlRecord, DATA_ENRICHMENT_STATUS_DEGRADED, DATA_ENRICHMENT_STATUS_ENRICHED, DATA_ENRICHMENT_STATUS_FAILED, EnrichedProduct, LLMTaskResult, PendingRollbackError, _as_async, ai_discovery_allowed_tags_for_product, create_data_enrichment_job, pytest, run_job, select  # fmt: skip
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_data_enrichment_rolls_back_after_sqlalchemy_product_failure(
@@ -74,6 +75,7 @@ async def test_data_enrichment_rolls_back_after_sqlalchemy_product_failure(
         DATA_ENRICHMENT_STATUS_FAILED,
         DATA_ENRICHMENT_STATUS_ENRICHED,
     ]
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -167,6 +169,7 @@ async def test_data_enrichment_llm_does_not_overwrite_deterministic_fields(
     assert product.audience == ["linen dress shoppers"]
     assert product.suggested_bundles == ["boots"]
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_data_enrichment_llm_filters_ai_discovery_tags_to_allowed_evidence(
@@ -241,6 +244,7 @@ async def test_data_enrichment_llm_filters_ai_discovery_tags_to_allowed_evidence
     assert product.ai_discovery_tags == ["linen-dress"]
     assert "cosmic-made-up-tag" in caplog.text
 
+
 @pytest.mark.regression
 def test_ai_discovery_allowed_tags_prioritizes_source_importance() -> None:
     product = EnrichedProduct(
@@ -257,6 +261,7 @@ def test_ai_discovery_allowed_tags_prioritizes_source_importance() -> None:
     assert len(tags) == 50
     assert tags[:2] == ["seo-0", "seo-1"]
     assert "apparel-accessories-clothing-dresses" not in tags
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression

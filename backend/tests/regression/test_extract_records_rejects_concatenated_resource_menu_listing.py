@@ -7,6 +7,7 @@ from .test_crawl_engine import (
     pytest,
 )
 
+
 @pytest.mark.regression
 def test_extract_records_rejects_concatenated_resource_menu_listing_titles() -> None:
     rows = extract_records(
@@ -33,6 +34,7 @@ def test_extract_records_rejects_concatenated_resource_menu_listing_titles() -> 
     assert [row["title"] for row in rows] == [
         "Independent Trading Midweight Hooded Sweatshirt",
     ]
+
 
 @pytest.mark.regression
 def test_extract_records_drops_shallow_editorial_listing_links_without_product_signals() -> (
@@ -91,6 +93,7 @@ def test_extract_records_drops_shallow_editorial_listing_links_without_product_s
         "Independent Trading Midweight Hooded Sweatshirt",
     ]
 
+
 @pytest.mark.regression
 def test_extract_records_drops_rendered_listing_download_app_cta_rows() -> None:
     rows = extract_records(
@@ -109,6 +112,7 @@ def test_extract_records_drops_rendered_listing_download_app_cta_rows() -> None:
     )
 
     assert rows == []
+
 
 @pytest.mark.regression
 def test_extract_records_drops_rendered_listing_category_hub_rows_without_supporting_signals() -> (
@@ -130,6 +134,7 @@ def test_extract_records_drops_rendered_listing_category_hub_rows_without_suppor
     )
 
     assert rows == []
+
 
 @pytest.mark.regression
 def test_extract_records_rejects_footer_policy_links_on_skeleton_plp() -> None:
@@ -177,6 +182,7 @@ def test_extract_records_rejects_footer_policy_links_on_skeleton_plp() -> None:
         == []
     )
 
+
 @pytest.mark.regression
 def test_extract_records_recovers_rendered_listing_price_from_fragment_text() -> None:
     rows = extract_records(
@@ -207,6 +213,7 @@ def test_extract_records_recovers_rendered_listing_price_from_fragment_text() ->
             "url": "https://www.uniqlo.com/in/en/products/E482443-000/00?colorDisplayCode=38",
         }
     ]
+
 
 @pytest.mark.regression
 def test_extract_records_backfills_listing_price_from_network_payload_candidates() -> (
@@ -259,6 +266,7 @@ def test_extract_records_backfills_listing_price_from_network_payload_candidates
             "image_url": "https://image.uniqlo.com/UQ/ST3/in/imagesgoods/482443/item/ingoods_38_482443_3x4.jpg",
         }
     ]
+
 
 @pytest.mark.regression
 def test_extract_records_uses_network_payload_listing_rows_when_dom_is_empty() -> None:
@@ -316,6 +324,7 @@ def test_extract_records_uses_network_payload_listing_rows_when_dom_is_empty() -
         }
     ]
 
+
 @pytest.mark.regression
 def test_extract_records_backfills_listing_brand_and_range_price_from_network_payload_candidates() -> (
     None
@@ -369,6 +378,7 @@ def test_extract_records_backfills_listing_brand_and_range_price_from_network_pa
         }
     ]
 
+
 @pytest.mark.regression
 def test_extract_records_backfills_listing_brand_from_network_when_dom_price_exists() -> (
     None
@@ -421,6 +431,7 @@ def test_extract_records_backfills_listing_brand_from_network_when_dom_price_exi
         }
     ]
 
+
 @pytest.mark.regression
 def test_extract_records_backfills_listing_brand_from_network_candidate_without_price() -> (
     None
@@ -467,6 +478,7 @@ def test_extract_records_backfills_listing_brand_from_network_candidate_without_
             "brand": "Sealy",
         }
     ]
+
 
 @pytest.mark.regression
 def test_extract_records_backfills_listing_from_network_by_belk_product_id_when_title_differs() -> (
@@ -520,6 +532,7 @@ def test_extract_records_backfills_listing_from_network_by_belk_product_id_when_
         }
     ]
 
+
 @pytest.mark.regression
 def test_extract_records_backfills_adapter_brand_by_belk_product_identity_when_urls_differ() -> (
     None
@@ -562,6 +575,7 @@ def test_extract_records_backfills_adapter_brand_by_belk_product_identity_when_u
         }
     ]
 
+
 @pytest.mark.regression
 def test_extract_records_rejects_external_rendered_listing_utility_links() -> None:
     rows = extract_records(
@@ -602,6 +616,7 @@ def test_extract_records_rejects_external_rendered_listing_utility_links() -> No
             "url": "https://www2.hm.com/en_in/productpage.1309854002.html",
         }
     ]
+
 
 @pytest.mark.regression
 def test_extract_records_prefers_rich_dom_listing_rows_when_structured_rows_fill_limit() -> (

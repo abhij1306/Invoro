@@ -39,6 +39,7 @@ from sqlalchemy.exc import PendingRollbackError
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+
 @pytest_asyncio.fixture(autouse=True)
 async def _use_test_session_local_for_parallel_urls(
     db_session: AsyncSession,
@@ -46,6 +47,7 @@ async def _use_test_session_local_for_parallel_urls(
 ) -> None:
     session_factory = async_sessionmaker(bind=db_session.bind, expire_on_commit=False)
     monkeypatch.setattr(batch_runtime_module, "SessionLocal", session_factory)
+
 
 def _detail_html() -> str:
     return """
@@ -65,6 +67,7 @@ def _detail_html() -> str:
       <body><h1>Widget Prime</h1></body>
     </html>
     """
+
 
 def _listing_shell_html() -> str:
     return "<html><body><h1>Empty category</h1></body></html>"

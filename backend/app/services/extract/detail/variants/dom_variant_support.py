@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-__all__ = ("existing_variant_cluster_has_transport_signal", "primary_dom_context", "record_has_rich_existing_variants")
+__all__ = (
+    "existing_variant_cluster_has_transport_signal",
+    "primary_dom_context",
+    "record_has_rich_existing_variants",
+)
 
 import logging
 from typing import Any
@@ -47,9 +51,13 @@ from app.services.extract.detail.assembly import (
 )
 from app.services.extract.detail.variants import dom_coercion as _variant_coercion
 
-existing_variant_cluster_has_transport_signal = _detail_dom_section_targets.existing_variant_cluster_has_transport_signal
+existing_variant_cluster_has_transport_signal = (
+    _detail_dom_section_targets.existing_variant_cluster_has_transport_signal
+)
 primary_dom_context = _detail_dom_section_targets.primary_dom_context
-record_has_rich_existing_variants = _detail_dom_section_targets.record_has_rich_existing_variants
+record_has_rich_existing_variants = (
+    _detail_dom_section_targets.record_has_rich_existing_variants
+)
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +67,7 @@ _DOM_OPTION_AVAILABILITY_PRIORITY = (
     "in_stock",
 )
 _DOM_VARIANT_CACHE_ATTR = "_crawler_dom_variant_extraction_cache"
+
 
 def _safe_int_config(value: object, default: int, name: str) -> int:
     try:
@@ -73,15 +82,21 @@ def _safe_int_config(value: object, default: int, name: str) -> int:
         )
         return default
 
+
 _coerce_variant_option_value = _variant_coercion._coerce_variant_option_value
 _color_option_value_candidates = _variant_coercion._color_option_value_candidates
-_component_size_style_from_group_name = _variant_coercion._component_size_style_from_group_name
+_component_size_style_from_group_name = (
+    _variant_coercion._component_size_style_from_group_name
+)
 _dom_variant_axis_allowed = _variant_coercion._dom_variant_axis_allowed
 _dom_variant_group_name_allowed = _variant_coercion._dom_variant_group_name_allowed
 _expand_compound_option_group = _variant_coercion._expand_compound_option_group
 _prefer_axis_inferred_from_values = _variant_coercion._prefer_axis_inferred_from_values
 _resolve_dom_variant_group_name = _variant_coercion._resolve_dom_variant_group_name
-_strip_variant_option_value_suffix_noise = _variant_coercion._strip_variant_option_value_suffix_noise
+_strip_variant_option_value_suffix_noise = (
+    _variant_coercion._strip_variant_option_value_suffix_noise
+)
+
 
 def _visible_node_text(
     node: Any | None,
@@ -96,17 +111,26 @@ def _visible_node_text(
         if cached is not None:
             return cached
     parsed = BeautifulSoup(str(node), "html.parser")
-    for hidden in parsed.select(".sr-only, .visually-hidden, [aria-hidden='true'], svg, title, use"):
+    for hidden in parsed.select(
+        ".sr-only, .visually-hidden, [aria-hidden='true'], svg, title, use"
+    ):
         hidden.decompose()
     visible_text = clean_text(parsed.get_text(" ", strip=True))
     if cache is not None:
         cache[cache_key] = visible_text
     return visible_text
 
-def _collect_variant_choice_entries(container: Any, *, page_url: str, title_hint: str = "") -> list[dict[str, object]]:
+
+def _collect_variant_choice_entries(
+    container: Any, *, page_url: str, title_hint: str = ""
+) -> list[dict[str, object]]:
     raw_group_name = _resolve_dom_variant_group_name(container)
     axis_name = normalized_variant_axis_key(raw_group_name)
-    coercion_axis = axis_name if axis_name in option_scalar_fields or axis_name in public_variant_axis_fields else "style"
+    coercion_axis = (
+        axis_name
+        if axis_name in option_scalar_fields or axis_name in public_variant_axis_fields
+        else "style"
+    )
     entries_by_value: dict[str, dict[str, object]] = {}
     visible_text_cache: dict[Any, str] = {}
     option_limit = _safe_int_config(
@@ -176,10 +200,16 @@ def _collect_variant_choice_entries(container: Any, *, page_url: str, title_hint
             node=node,
             page_url=page_url,
         )
-        variant_id = text_or_none(node.get("data-sku") or node.get("data-variant-id") or node.get("data-product-id"))
+        variant_id = text_or_none(
+            node.get("data-sku")
+            or node.get("data-variant-id")
+            or node.get("data-product-id")
+        )
         if variant_id and entry.get("variant_id") in (None, "", [], {}):
             entry["variant_id"] = variant_id
-    for input_node in container.select("input[type='radio'], input[type='checkbox']")[:option_limit]:
+    for input_node in container.select("input[type='radio'], input[type='checkbox']")[
+        :option_limit
+    ]:
         label_node = variant_input_label(container, input_node)
         raw_value = _variant_choice_entry_value(
             container,
@@ -224,6 +254,7 @@ def _collect_variant_choice_entries(container: Any, *, page_url: str, title_hint
         )
     return list(entries_by_value.values())
 
+
 def _variant_choice_entry_value(
     container: Any,
     node: Any,
@@ -237,12 +268,17 @@ def _variant_choice_entry_value(
     node_text = _visible_node_text(node, cache=visible_text_cache)
     aria_label = node.get("aria-label") if hasattr(node, "get") else None
     if axis_name == "color":
-        color = _choice_color_value(node, resolved_label, label_text, node_text, aria_label)
+        color = _choice_color_value(
+            node, resolved_label, label_text, node_text, aria_label
+        )
         if color:
             return color
     return _choice_default_value(node, label_text, node_text, aria_label)
 
-def _choice_color_value(node: Any, resolved_label: Any, label_text: str, node_text: str, aria_label: object) -> str:
+
+def _choice_color_value(
+    node: Any, resolved_label: Any, label_text: str, node_text: str, aria_label: object
+) -> str:
     raw_values = (
         node.get("data-swatch-sr") if hasattr(node, "get") else None,
         aria_label,
@@ -259,7 +295,10 @@ def _choice_color_value(node: Any, resolved_label: Any, label_text: str, node_te
             return candidates[0]
     return ""
 
-def _choice_default_value(node: Any, label_text: str, node_text: str, aria_label: object) -> str:
+
+def _choice_default_value(
+    node: Any, label_text: str, node_text: str, aria_label: object
+) -> str:
     return clean_text(
         node.get("data-attr-displayvalue")
         or node.get("data-displayvalue")
@@ -274,12 +313,17 @@ def _choice_default_value(node: Any, label_text: str, node_text: str, aria_label
         or node_text
     )
 
+
 def _variant_option_value_is_url_like(value: object) -> bool:
     text = text_or_none(value)
     if not text:
         return False
     lowered = text.strip().lower()
-    return lowered.startswith(("http://", "https://", "/")) or "product-variation?" in lowered
+    return (
+        lowered.startswith(("http://", "https://", "/"))
+        or "product-variation?" in lowered
+    )
+
 
 def _variant_axis_value_from_option_url(
     axis_name: str,
@@ -302,11 +346,18 @@ def _variant_axis_value_from_option_url(
             return candidate
     return ""
 
+
 def _option_url_key_matches_size(key: str) -> bool:
-    return key in {"size", "size1", "waist"} or key.endswith(("_size", "_size1", "_waist"))
+    return key in {"size", "size1", "waist"} or key.endswith(
+        ("_size", "_size1", "_waist")
+    )
+
 
 def _option_url_key_matches_length(key: str) -> bool:
-    return key in {"length", "size2", "inseam"} or key.endswith(("_length", "_size2", "_inseam"))
+    return key in {"length", "size2", "inseam"} or key.endswith(
+        ("_length", "_size2", "_inseam")
+    )
+
 
 def _resolved_variant_option_value(
     axis_name: str,
@@ -326,6 +377,7 @@ def _resolved_variant_option_value(
             return ""
     return cleaned
 
+
 def _descendant_image_alt_text(node: Any) -> str:
     if not hasattr(node, "find"):
         return ""
@@ -334,6 +386,7 @@ def _descendant_image_alt_text(node: Any) -> str:
         return ""
     return clean_text(image.get("alt"))
 
+
 def _descendant_aria_label_text(node: Any) -> str:
     if not hasattr(node, "find"):
         return ""
@@ -341,6 +394,7 @@ def _descendant_aria_label_text(node: Any) -> str:
     if child is None or not hasattr(child, "get"):
         return ""
     return clean_text(child.get("aria-label"))
+
 
 def _color_value_from_option_url(
     value: object,
@@ -362,6 +416,7 @@ def _color_value_from_option_url(
         return ""
     return " ".join(token.capitalize() for token in suffix_tokens)
 
+
 def _log_url_color_fallback(
     color: str,
     *,
@@ -376,6 +431,7 @@ def _log_url_color_fallback(
         extra={"color_length": len(color), "color_extracted": bool(color)},
     )
 
+
 def _selected_option_metadata(
     axis_option_metadata: dict[str, dict[str, dict[str, object]]],
     option_values: dict[str, str],
@@ -387,15 +443,21 @@ def _selected_option_metadata(
             selected_metadata.append(metadata)
     return selected_metadata
 
+
 def _availability_from_selected_options(
     selected_metadata: list[dict[str, object]],
 ) -> str:
-    values = {text_or_none(metadata.get("availability")) for metadata in selected_metadata if isinstance(metadata, dict)}
+    values = {
+        text_or_none(metadata.get("availability"))
+        for metadata in selected_metadata
+        if isinstance(metadata, dict)
+    }
     values.discard(None)
     for candidate in _DOM_OPTION_AVAILABILITY_PRIORITY:
         if candidate in values:
             return candidate
     return ""
+
 
 def _stock_quantity_from_selected_options(
     selected_metadata: list[dict[str, object]],

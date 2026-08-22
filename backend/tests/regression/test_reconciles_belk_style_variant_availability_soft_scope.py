@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .test_detail_extractor_structured_sources import build_detail_record, extract_detail_records, extract_records, pytest, read_optional_artifact_text  # fmt: skip
 
+
 @pytest.mark.regression
 def test_reconciles_belk_style_variant_availability_from_soft_scope() -> None:
     html = """
@@ -49,6 +50,7 @@ def test_reconciles_belk_style_variant_availability_from_soft_scope() -> None:
         },
     ]
 
+
 @pytest.mark.regression
 def test_recovers_nike_artifact_available_variant_labels() -> None:
     html = read_optional_artifact_text("artifacts/runs/1/pages/1bcb5c849a75b86f.html")
@@ -64,6 +66,7 @@ def test_recovers_nike_artifact_available_variant_labels() -> None:
     assert len(variants) == 19
     assert {row.get("availability") for row in variants} <= {None, "in_stock"}
     assert variants[0]["size"].startswith("M ")
+
 
 @pytest.mark.regression
 def test_extract_detail_variants_from_plain_buttons_without_data_attributes() -> None:
@@ -93,6 +96,7 @@ def test_extract_detail_variants_from_plain_buttons_without_data_attributes() ->
     record = rows[0]
     assert record["variants"] == [{"size": "S"}, {"size": "M"}, {"size": "L"}]
     assert record["variant_count"] == 3
+
 
 @pytest.mark.regression
 def test_extract_automobile_detail_ignores_irrelevant_video_json_ld_when_dom_title_exists() -> (
@@ -146,6 +150,7 @@ def test_extract_automobile_detail_ignores_irrelevant_video_json_ld_when_dom_tit
     )
     assert record["_source"] == "dom_h1"
 
+
 @pytest.mark.regression
 def test_extract_automobile_detail_accepts_vehicle_json_ld_title_and_image() -> None:
     html = """
@@ -178,6 +183,7 @@ def test_extract_automobile_detail_accepts_vehicle_json_ld_title_and_image() -> 
     assert record["image_url"] == "https://example.com/roadster.jpg"
     assert record["url"] == "https://example.com/cars/roadster-gt"
     assert record["_source"] == "json_ld"
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_allows_dom_variants_to_fill_weak_js_state_variants() -> (
@@ -233,6 +239,7 @@ def test_extract_ecommerce_detail_allows_dom_variants_to_fill_weak_js_state_vari
     assert len(rows) == 1
     record = rows[0]
     assert len(record["variants"]) == 4
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_merges_deduped_additional_images_across_js_state_and_dom() -> (
@@ -291,6 +298,7 @@ def test_extract_ecommerce_detail_merges_deduped_additional_images_across_js_sta
         "https://cdn.example.com/products/trail-runner-3.jpg?width=1200",
     ]
 
+
 @pytest.mark.regression
 def test_build_detail_record_collapses_responsive_cdn_image_duplicates() -> None:
     record = build_detail_record(
@@ -345,6 +353,7 @@ def test_build_detail_record_collapses_responsive_cdn_image_duplicates() -> None
         )
     ]
 
+
 @pytest.mark.regression
 def test_build_detail_record_collapses_semicolon_image_resize_duplicates() -> None:
     record = build_detail_record(
@@ -390,6 +399,7 @@ def test_build_detail_record_collapses_semicolon_image_resize_duplicates() -> No
             "4900/4900964_rd.jpg;maxHeight=1920;maxWidth=900?format=webp"
         )
     ]
+
 
 @pytest.mark.regression
 def test_extract_detail_keeps_dom_images_live_when_structured_data_only_has_primary_image() -> (
@@ -447,6 +457,7 @@ def test_extract_detail_keeps_dom_images_live_when_structured_data_only_has_prim
         "https://cdn.example.com/products/trail-runner-2-thumb.jpg",
         "https://cdn.example.com/products/trail-runner-3-thumb.jpg",
     ]
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_prefers_full_dom_description_and_keeps_product_details_separate() -> (
@@ -516,6 +527,7 @@ def test_extract_ecommerce_detail_prefers_full_dom_description_and_keeps_product
     )
     assert "specifications" not in record
 
+
 @pytest.mark.regression
 def test_extract_ecommerce_detail_keeps_dom_tier_live_for_product_details_without_requested_fields() -> (
     None
@@ -581,6 +593,7 @@ def test_extract_ecommerce_detail_keeps_dom_tier_live_for_product_details_withou
     assert record["_extraction_tiers"]["current"] == "dom"
     assert record["_extraction_tiers"]["early_exit"] is None
 
+
 @pytest.mark.regression
 def test_extract_ecommerce_detail_dedupes_next_image_proxy_duplicates() -> None:
     html = """
@@ -614,6 +627,7 @@ def test_extract_ecommerce_detail_dedupes_next_image_proxy_duplicates() -> None:
         "https://storefront1.saleor.cloud/media/thumbnails/products/saleor-headless-omnichannel-book_thumbnail_1024.webp"
     )
     assert "additional_images" not in record
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_keeps_real_description_when_dom_sections_only_see_tabs() -> (

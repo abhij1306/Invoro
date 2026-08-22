@@ -4,6 +4,7 @@ from .test_browser_context import SimpleNamespace, _context_spec, acquisition_br
 
 pytest_plugins = ["tests.component._cookie_store_test_support"]
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_shared_browser_runtime_bounds_hung_context_cleanup(
@@ -76,6 +77,7 @@ async def test_shared_browser_runtime_bounds_hung_context_cleanup(
         for record in caplog.records
     )
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_shared_browser_runtime_releases_pool_slot_when_cleanup_is_cancelled(
@@ -136,6 +138,7 @@ async def test_shared_browser_runtime_releases_pool_slot_when_cleanup_is_cancell
     await asyncio.wait_for(_acquire_again(), timeout=1.0)
     assert close_calls == 2
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_shared_browser_runtime_close_bounds_hung_shutdown(
@@ -186,6 +189,7 @@ async def test_shared_browser_runtime_close_bounds_hung_shutdown(
         for record in caplog.records
     )
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_persist_context_storage_state_normalizes_domain_before_persist(
@@ -216,6 +220,7 @@ async def test_persist_context_storage_state_normalizes_domain_before_persist(
     )
 
     assert persisted_domains == ["example.com"]
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -259,6 +264,7 @@ async def test_persist_context_storage_state_skips_domain_persist_when_disallowe
 
     assert persisted_domains == []
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_persist_context_storage_state_skips_run_persist_when_disallowed(
@@ -300,6 +306,7 @@ async def test_persist_context_storage_state_skips_run_persist_when_disallowed(
     )
 
     assert persisted_run_ids == []
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -355,6 +362,7 @@ async def test_shared_browser_runtime_snapshot_tracks_queue_without_private_sema
 
     release.set()
     await asyncio.gather(first, second)
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -424,6 +432,7 @@ async def test_shared_browser_runtime_bounds_context_slot_wait(
     assert phase_timings_ms_second["context_slot_wait_ms"] >= 0
     assert "context_open_ms" not in phase_timings_ms_second
     assert "context_close_ms" not in phase_timings_ms_second
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -510,6 +519,7 @@ async def test_shared_browser_runtime_recycles_browser_without_deadlocking(
     assert old_events == ["browser_closed", "playwright_stopped"]
     assert new_events == ["launched", "new_context", "context_closed"]
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_shared_browser_runtime_does_not_recycle_with_active_context(
@@ -576,6 +586,7 @@ async def test_shared_browser_runtime_does_not_recycle_with_active_context(
     _ = await first
 
     assert "browser_closed" not in events
+
 
 @pytest.mark.asyncio
 @pytest.mark.component

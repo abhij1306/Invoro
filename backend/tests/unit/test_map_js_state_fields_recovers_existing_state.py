@@ -7,6 +7,7 @@ from .test_state_mappers import (
 )
 from app.services.js_state.variant_options import variant_option_values
 
+
 @pytest.mark.unit
 def test_variant_option_values_reads_attribute_mapping() -> None:
     assert variant_option_values(
@@ -17,6 +18,7 @@ def test_variant_option_values_reads_attribute_mapping() -> None:
         {"attributes": {}, "traits": {"Size": "M"}},
         option_names=[],
     ) == {"size": "M"}
+
 
 @pytest.mark.unit
 def test_map_js_state_to_fields_recovers_existing_state_product_fields() -> None:
@@ -65,6 +67,7 @@ def test_map_js_state_to_fields_recovers_existing_state_product_fields() -> None
     assert mapped["additional_images"] == [
         "https://store.example.com/images/commuter-2.jpg"
     ]
+
 
 @pytest.mark.unit
 def test_map_js_state_to_fields_ignores_header_payment_state_before_real_product() -> (
@@ -115,6 +118,7 @@ def test_map_js_state_to_fields_ignores_header_payment_state_before_real_product
         "https://store.example.com/images/commuter-2.jpg"
     ]
 
+
 @pytest.mark.unit
 def test_map_js_state_to_fields_does_not_merge_variants_from_different_product_identity() -> (
     None
@@ -158,6 +162,7 @@ def test_map_js_state_to_fields_does_not_merge_variants_from_different_product_i
     assert mapped["product_id"] == "sku-123"
     assert mapped.get("variants") in (None, [])
 
+
 @pytest.mark.unit
 def test_map_network_payloads_to_fields_recovers_workday_job_detail_payload() -> None:
     mapped = map_network_payloads_to_fields(
@@ -197,6 +202,7 @@ def test_map_network_payloads_to_fields_recovers_workday_job_detail_payload() ->
             "description": "Build things.",
         }
     ]
+
 
 @pytest.mark.unit
 def test_map_js_state_to_fields_recovers_generic_nextjs_product_payload_without_schema_bleed() -> (
@@ -239,6 +245,7 @@ def test_map_js_state_to_fields_recovers_generic_nextjs_product_payload_without_
     assert mapped["sku"] == "CB-001"
     assert mapped["image_url"] == "https://store.example.com/images/commuter-1.jpg"
 
+
 @pytest.mark.unit
 def test_map_js_state_to_fields_recovers_nuxt_array_payload_variant() -> None:
     mapped = map_js_state_to_fields(
@@ -275,6 +282,7 @@ def test_map_js_state_to_fields_recovers_nuxt_array_payload_variant() -> None:
     assert mapped["product_type"] == "Backpacks"
     assert mapped["availability"] == "in_stock"
     assert mapped["image_url"] == "https://store.example.com/images/commuter-1.jpg"
+
 
 @pytest.mark.unit
 def test_map_js_state_to_fields_prefers_richer_nested_product_payload_for_variant_recovery() -> (
@@ -333,6 +341,7 @@ def test_map_js_state_to_fields_prefers_richer_nested_product_payload_for_varian
     assert mapped["price"] == "459.00"
     assert mapped["image_url"] == "https://cdn.example.com/iphone-14-front.jpg"
     assert mapped["additional_images"] == ["https://cdn.example.com/iphone-14-back.jpg"]
+
 
 @pytest.mark.unit
 def test_map_js_state_to_fields_backfills_richer_variant_state_from_later_same_product_object() -> (
@@ -399,6 +408,7 @@ def test_map_js_state_to_fields_backfills_richer_variant_state_from_later_same_p
     assert mapped["variants"][1]["availability"] == "in_stock"
     assert mapped["variants"][1]["stock_quantity"] == 6
 
+
 @pytest.mark.unit
 def test_map_js_state_to_fields_preserves_lone_numeric_product_size() -> None:
     mapped = map_js_state_to_fields(
@@ -421,6 +431,7 @@ def test_map_js_state_to_fields_preserves_lone_numeric_product_size() -> None:
     )
 
     assert mapped["size"] == "10"
+
 
 @pytest.mark.unit
 def test_map_js_state_to_fields_merges_same_product_sibling_payloads() -> None:
@@ -465,6 +476,7 @@ def test_map_js_state_to_fields_merges_same_product_sibling_payloads() -> None:
     assert mapped["title"] == "Trail Runner"
     assert mapped["price"] == "129.95"
 
+
 @pytest.mark.unit
 def test_map_js_state_to_fields_backfills_url_matched_variant_payload() -> None:
     mapped = map_js_state_to_fields(
@@ -494,6 +506,7 @@ def test_map_js_state_to_fields_backfills_url_matched_variant_payload() -> None:
 
     assert mapped["title"] == "Trail Runner Black"
     assert mapped["variant_count"] == 2
+
 
 @pytest.mark.unit
 def test_map_js_state_to_fields_prefers_preloaded_state_product_over_app_banner_payload() -> (
@@ -572,6 +585,7 @@ def test_map_js_state_to_fields_prefers_preloaded_state_product_over_app_banner_
         "https://cdn.example.com/products/airism-detail-2.jpg",
     ]
 
+
 @pytest.mark.unit
 def test_map_js_state_to_fields_recovers_direct_grade_and_storage_axes_from_variants() -> (
     None
@@ -608,6 +622,7 @@ def test_map_js_state_to_fields_recovers_direct_grade_and_storage_axes_from_vari
     assert mapped["title"] == "Game Console"
     assert mapped["price"] == "299.00"
 
+
 @pytest.mark.unit
 def test_map_js_state_to_fields_replaces_existing_variant_query_parameter() -> None:
     mapped = map_js_state_to_fields(
@@ -632,6 +647,7 @@ def test_map_js_state_to_fields_replaces_existing_variant_query_parameter() -> N
         "https://store.example.com/products/commuter-backpack?ref=hero&variant=sku-123"
     )
 
+
 @pytest.mark.unit
 def test_map_js_state_to_fields_keeps_ambiguous_availability_neutral() -> None:
     mapped = map_js_state_to_fields(
@@ -654,6 +670,7 @@ def test_map_js_state_to_fields_keeps_ambiguous_availability_neutral() -> None:
 
     assert "availability" not in mapped
     assert "availability" not in mapped["variants"][0]
+
 
 @pytest.mark.unit
 def test_map_js_state_to_fields_drops_transport_only_variant_matrix_rows() -> None:
@@ -708,6 +725,7 @@ def test_map_js_state_to_fields_drops_transport_only_variant_matrix_rows() -> No
     assert mapped["variants"][0]["url"] == "/products/relaxed-tee?size=m"
     assert mapped["variants"][0]["availability"] == "in_stock"
     assert mapped["variants"][0]["stock_quantity"] == 4
+
 
 @pytest.mark.unit
 def test_map_js_state_to_fields_ignores_malformed_variant_matrix_stock_level() -> None:

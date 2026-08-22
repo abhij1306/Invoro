@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .test_shared_variant_logic import BeautifulSoup, SimpleNamespace, _next_f_script, build_detail_record, iter_variant_choice_groups, iter_variant_select_groups, json, normalized_variant_axis_key, pytest, record_assembly, resolve_variant_group_name, resolve_variants, variant_axis_name_is_semantic, variant_option_value_is_noise  # fmt: skip
 
+
 @pytest.mark.unit
 def test_prepared_dom_variants_keeps_first_pass_signals_without_fallback_variants(
     monkeypatch: pytest.MonkeyPatch,
@@ -30,6 +31,7 @@ def test_prepared_dom_variants_keeps_first_pass_signals_without_fallback_variant
     )
 
     assert result == {"variant_axes": {"size": ["S"]}}
+
 
 @pytest.mark.unit
 def test_prepared_dom_variants_merges_first_pass_metadata_into_fallback_variants(
@@ -64,6 +66,7 @@ def test_prepared_dom_variants_merges_first_pass_metadata_into_fallback_variants
         "variants": [{"size": "S"}],
     }
 
+
 @pytest.mark.unit
 def test_resolve_variants_pairs_color_with_size_cartesian() -> None:
     """Two-axis matrix: every color×size combo that exists is emitted
@@ -84,6 +87,7 @@ def test_resolve_variants_pairs_color_with_size_cartesian() -> None:
     assert resolved[1]["variant_id"] == "3"
     assert resolved[2]["variant_id"] == "4"
     assert resolved[3]["variant_id"] == "1"
+
 
 @pytest.mark.parametrize(
     "value",
@@ -115,6 +119,7 @@ def test_resolve_variants_pairs_color_with_size_cartesian() -> None:
 def test_variant_option_value_is_noise_handles_ui_controls(value: str) -> None:
     assert variant_option_value_is_noise(value) is True
 
+
 @pytest.mark.parametrize(
     "value",
     [
@@ -138,6 +143,7 @@ def test_variant_option_value_is_noise_handles_ui_controls(value: str) -> None:
 def test_variant_option_value_is_noise_preserves_real_values(value: str) -> None:
     assert variant_option_value_is_noise(value) is False
 
+
 @pytest.mark.unit
 def test_resolve_variants_skips_missing_combinations() -> None:
     """If a Cartesian cell has no matching variant it is omitted rather
@@ -155,6 +161,7 @@ def test_resolve_variants_skips_missing_combinations() -> None:
     assert len(resolved) == 3
     ids = [v["variant_id"] for v in resolved]
     assert ids == ["1", "2", "3"]
+
 
 @pytest.mark.unit
 def test_resolve_variants_dedupes_by_combo() -> None:
@@ -175,6 +182,7 @@ def test_resolve_variants_dedupes_by_combo() -> None:
     assert len(resolved) == 1
     assert resolved[0].get("price") == "9.99"
 
+
 @pytest.mark.unit
 def test_resolve_variants_appends_variants_without_option_values() -> None:
     """Variants that lack option_values are not lost; they are appended
@@ -190,6 +198,7 @@ def test_resolve_variants_appends_variants_without_option_values() -> None:
     assert len(resolved) == 2
     assert resolved[0]["variant_id"] == "1"
     assert resolved[1]["variant_id"] == "2"
+
 
 @pytest.mark.unit
 def test_resolve_variants_appends_partial_option_values() -> None:
@@ -207,16 +216,19 @@ def test_resolve_variants_appends_partial_option_values() -> None:
     assert resolved[0]["variant_id"] == "1"
     assert resolved[1]["variant_id"] == "2"
 
+
 @pytest.mark.unit
 def test_resolve_variants_returns_original_when_no_axes() -> None:
     """Empty options_matrix → fall back to original variant list."""
     resolved = resolve_variants({}, [{"variant_id": "1"}])
     assert resolved == [{"variant_id": "1"}]
 
+
 @pytest.mark.unit
 def test_resolve_variants_returns_original_when_no_variants() -> None:
     """Empty variant list → return empty list."""
     assert resolve_variants({"color": ["Red"]}, []) == []
+
 
 @pytest.mark.unit
 def test_resolve_variants_single_axis() -> None:
@@ -232,6 +244,7 @@ def test_resolve_variants_single_axis() -> None:
 
     ids = [v["variant_id"] for v in resolved]
     assert ids == ["1", "2", "3"]
+
 
 @pytest.mark.unit
 def test_resolve_variants_three_axis_cartesian() -> None:
@@ -270,6 +283,7 @@ def test_resolve_variants_three_axis_cartesian() -> None:
     assert resolved[2]["variant_id"] == "3"
     assert resolved[3]["variant_id"] == "4"
 
+
 @pytest.mark.unit
 def test_resolve_variants_dedupes_no_option_values_by_id() -> None:
     """When a variant without option_values shares a variant_id with
@@ -284,6 +298,7 @@ def test_resolve_variants_dedupes_no_option_values_by_id() -> None:
 
     assert len(resolved) == 1
     assert resolved[0]["variant_id"] == "1"
+
 
 @pytest.mark.unit
 def test_resolve_variants_dedupes_no_option_values_against_each_other() -> None:
@@ -306,6 +321,7 @@ def test_resolve_variants_dedupes_no_option_values_against_each_other() -> None:
         "SKU-3",
     ]
 
+
 @pytest.mark.unit
 def test_variant_axis_name_is_semantic_accepts_non_generic_axis_labels() -> None:
     assert variant_axis_name_is_semantic("shoe width") is True
@@ -314,6 +330,7 @@ def test_variant_axis_name_is_semantic_accepts_non_generic_axis_labels() -> None
     assert variant_axis_name_is_semantic("Sort By") is False
     assert variant_axis_name_is_semantic("Filter By") is False
     assert variant_axis_name_is_semantic("Availability") is False
+
 
 @pytest.mark.unit
 def test_resolve_variant_group_name_infers_unlabeled_select_size_axis_from_values() -> (
@@ -332,6 +349,7 @@ def test_resolve_variant_group_name_infers_unlabeled_select_size_axis_from_value
     )
 
     assert resolve_variant_group_name(soup.select_one("select")) == "size"
+
 
 @pytest.mark.unit
 def test_resolve_variant_group_name_rejects_shipping_country_select() -> None:
@@ -352,6 +370,7 @@ def test_resolve_variant_group_name_rejects_shipping_country_select() -> None:
 
     assert resolve_variant_group_name(soup.select_one("select")) == ""
 
+
 @pytest.mark.unit
 def test_resolve_variant_group_name_rejects_size_chart_controls() -> None:
     soup = BeautifulSoup(
@@ -362,6 +381,7 @@ def test_resolve_variant_group_name_rejects_size_chart_controls() -> None:
     )
 
     assert resolve_variant_group_name(soup.select_one("button")) == ""
+
 
 @pytest.mark.unit
 def test_resolve_variant_group_name_rejects_report_reason_select() -> None:
@@ -377,6 +397,7 @@ def test_resolve_variant_group_name_rejects_report_reason_select() -> None:
     )
 
     assert resolve_variant_group_name(soup.select_one("select")) == ""
+
 
 @pytest.mark.unit
 def test_build_detail_record_extracts_bhphoto_resolution_and_screen_size_variants() -> (
@@ -447,6 +468,7 @@ def test_build_detail_record_extracts_bhphoto_resolution_and_screen_size_variant
         '24"',
         '32"',
     }
+
 
 @pytest.mark.unit
 def test_build_detail_record_extracts_wayfair_color_variants_from_next_f_state() -> (
@@ -569,6 +591,7 @@ def test_build_detail_record_extracts_wayfair_color_variants_from_next_f_state()
         "Tan",
     }
 
+
 @pytest.mark.unit
 def test_variant_select_groups_reject_cookie_consent_token_selects() -> None:
     soup = BeautifulSoup(
@@ -593,6 +616,7 @@ def test_variant_select_groups_reject_cookie_consent_token_selects() -> None:
         normalized_variant_axis_key(resolve_variant_group_name(group))
         for group in groups
     ] == ["size"]
+
 
 @pytest.mark.unit
 def test_variant_select_groups_reject_style_control_selects() -> None:
@@ -620,6 +644,7 @@ def test_variant_select_groups_reject_style_control_selects() -> None:
 
     assert list(iter_variant_select_groups(soup)) == []
 
+
 @pytest.mark.unit
 def test_resolve_variant_group_name_reads_external_label_for_select() -> None:
     soup = BeautifulSoup(
@@ -634,6 +659,7 @@ def test_resolve_variant_group_name_reads_external_label_for_select() -> None:
     )
 
     assert resolve_variant_group_name(soup.select_one("select")) == "Style & Size"
+
 
 @pytest.mark.unit
 def test_resolve_variant_group_name_ignores_external_option_label_for_radio() -> None:
@@ -654,6 +680,7 @@ def test_resolve_variant_group_name_ignores_external_option_label_for_radio() ->
     )
 
     assert resolve_variant_group_name(soup.select_one("input")) == "size"
+
 
 @pytest.mark.unit
 def test_variant_choice_groups_ignore_single_image_swatches_and_keep_button_grid() -> (

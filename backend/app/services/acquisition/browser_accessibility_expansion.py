@@ -19,10 +19,14 @@ from app.services.config.runtime_settings import crawler_runtime_settings
 
 def accessibility_snapshot_timeout_seconds() -> float:
     try:
-        timeout = float(crawler_runtime_settings.browser_accessibility_snapshot_timeout_seconds)
+        timeout = float(
+            crawler_runtime_settings.browser_accessibility_snapshot_timeout_seconds
+        )
     except (TypeError, ValueError):
         timeout = float(
-            crawler_runtime_settings.__class__.model_fields["browser_accessibility_snapshot_timeout_seconds"].default
+            crawler_runtime_settings.__class__.model_fields[
+                "browser_accessibility_snapshot_timeout_seconds"
+            ].default
         )
     return max(0.0, timeout)
 
@@ -37,7 +41,9 @@ def finish_expansion_diagnostics(
     elapsed_ms: Callable[[float], int],
 ) -> dict[str, object]:
     if diagnostics.get("status") == DETAIL_EXPANSION_STATUS_ATTEMPTED:
-        diagnostics["status"] = _completed_expansion_status(clicked_count, interaction_failures)
+        diagnostics["status"] = _completed_expansion_status(
+            clicked_count, interaction_failures
+        )
     diagnostics.update(
         clicked_count=clicked_count,
         expanded_elements=expanded_elements,
@@ -47,7 +53,9 @@ def finish_expansion_diagnostics(
     return diagnostics
 
 
-def _completed_expansion_status(clicked_count: int, interaction_failures: list[str]) -> str:
+def _completed_expansion_status(
+    clicked_count: int, interaction_failures: list[str]
+) -> str:
     if clicked_count > 0:
         return DETAIL_EXPANSION_STATUS_EXPANDED
     if interaction_failures:
@@ -87,7 +95,9 @@ async def expand_interactive_elements_via_accessibility_impl(
         requested_fields=requested_fields,
     )
     diagnostics["buttons_found"] = len(candidates)
-    max_interactions = max(0, int(crawler_runtime_settings.detail_aom_expand_max_interactions))
+    max_interactions = max(
+        0, int(crawler_runtime_settings.detail_aom_expand_max_interactions)
+    )
     candidates = _prioritize_candidates(
         candidates,
         max_interactions=max_interactions,
@@ -151,9 +161,15 @@ def _prioritize_candidates(
     if len(candidates) <= max_interactions:
         return candidates
     if keywords:
-        prioritized = [item for item in candidates if any(keyword in item[1] for keyword in keywords)]
+        prioritized = [
+            item
+            for item in candidates
+            if any(keyword in item[1] for keyword in keywords)
+        ]
         prioritized_set = set(prioritized)
-        candidates = prioritized + [item for item in candidates if item not in prioritized_set]
+        candidates = prioritized + [
+            item for item in candidates if item not in prioritized_set
+        ]
     diagnostics["skipped_count"] = len(candidates) - max_interactions
     return candidates
 
@@ -176,13 +192,19 @@ async def _expand_candidates(
         if _time_budget_reached(max_elapsed_ms, elapsed):
             diagnostics["status"] = DETAIL_EXPANSION_STATUS_TIME_BUDGET_REACHED
             break
-        remaining_ms = None if max_elapsed_ms is None else max(0, int(max_elapsed_ms) - elapsed)
+        remaining_ms = (
+            None if max_elapsed_ms is None else max(0, int(max_elapsed_ms) - elapsed)
+        )
         try:
             if remaining_ms is None:
-                outcome = await _expand_accessibility_candidate(page, role=role, name=name)
+                outcome = await _expand_accessibility_candidate(
+                    page, role=role, name=name
+                )
             else:
                 async with asyncio.timeout(remaining_ms / 1000):
-                    outcome = await _expand_accessibility_candidate(page, role=role, name=name)
+                    outcome = await _expand_accessibility_candidate(
+                        page, role=role, name=name
+                    )
         except TimeoutError:
             diagnostics["status"] = DETAIL_EXPANSION_STATUS_TIME_BUDGET_REACHED
             break
@@ -215,7 +237,9 @@ async def _expand_accessibility_candidate(page: Any, *, role: str, name: str) ->
             return "skipped"
         if hasattr(locator, "is_disabled") and await locator.is_disabled():
             return "skipped"
-        await locator.click(timeout=int(crawler_runtime_settings.detail_expand_click_timeout_ms))
+        await locator.click(
+            timeout=int(crawler_runtime_settings.detail_expand_click_timeout_ms)
+        )
         wait_ms = int(crawler_runtime_settings.accordion_expand_wait_ms)
         if wait_ms > 0:
             await page.wait_for_timeout(wait_ms)
@@ -230,7 +254,9 @@ async def _locator_is_visible(locator: Any) -> bool:
         try:
             await wait_for(
                 state="visible",
-                timeout=int(crawler_runtime_settings.detail_expand_visibility_timeout_ms),
+                timeout=int(
+                    crawler_runtime_settings.detail_expand_visibility_timeout_ms
+                ),
             )
         except Exception:
             return False
@@ -250,7 +276,9 @@ def accessibility_expand_candidates_impl(
     requested_field_tokens,
 ) -> list[tuple[str, str]]:
     requested_keywords = requested_field_tokens(requested_fields)
-    keywords = requested_keywords or detail_expansion_keywords(surface, requested_fields=requested_fields)
+    keywords = requested_keywords or detail_expansion_keywords(
+        surface, requested_fields=requested_fields
+    )
     if not snapshot:
         return []
     results: list[tuple[str, str]] = []
@@ -372,7 +400,9 @@ async def _interactive_handle_attr(handle: Any, attr_name: str) -> str:
 
 async def _interactive_handle_tag_name(handle: Any) -> str:
     try:
-        value = await handle.evaluate("(node) => node instanceof Element ? node.tagName.toLowerCase() : ''")
+        value = await handle.evaluate(
+            "(node) => node instanceof Element ? node.tagName.toLowerCase() : ''"
+        )
     except Exception:
         return ""
     return " ".join(str(value or "").split()).strip().lower()

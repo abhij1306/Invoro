@@ -4,6 +4,7 @@ from .test_playground_service import AsyncClient, AsyncSession, PlaygroundSessio
 
 pytest_plugins = ["tests.component.test_playground_service"]
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_playground_pipeline_uses_all_extracted_records_and_urls(
@@ -119,6 +120,7 @@ async def test_playground_pipeline_uses_all_extracted_records_and_urls(
         ("_fake_run_product_intelligence_job", 202),
     ]
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_playground_results_aggregate_all_extract_runs(
@@ -167,6 +169,7 @@ async def test_playground_results_aggregate_all_extract_runs(
         "Jean 1",
         "Jean 2",
     ]
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -222,6 +225,7 @@ async def test_get_session_auto_advance_recovers_untracked_extract_run_ids(
     assert refreshed.step_data["extract"]["run_id"] == run_1.id
     assert refreshed.step_data["extract"]["run_ids"] == [run_1.id, run_2.id]
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_get_session_auto_advance_drops_missing_extract_run_ids(
@@ -265,6 +269,7 @@ async def test_get_session_auto_advance_drops_missing_extract_run_ids(
     assert refreshed.step_data["extract"]["status"] == "completed"
     assert refreshed.step_data["extract"]["run_id"] == run.id
     assert refreshed.step_data["extract"]["run_ids"] == [run.id]
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -321,6 +326,7 @@ async def test_select_category_uses_existing_batch_crawl_for_multiple_urls(
         "https://www.wrangler.com/collections/women",
     ]
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_playground_select_category_api_accepts_batch_urls_without_missing_greenlet(
@@ -366,6 +372,7 @@ async def test_playground_select_category_api_accepts_batch_urls_without_missing
         "https://www.wrangler.com/collections/women",
     ]
     assert payload["updated_at"]
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -431,6 +438,7 @@ async def test_select_category_skips_discover_when_sitemap_urls_are_all_pdps(
         },
     ]
 
+
 @pytest.mark.component
 def test_merge_seed_detail_products_keeps_seed_pdps_without_duplicate_discovery() -> (
     None
@@ -454,9 +462,11 @@ def test_merge_seed_detail_products_keeps_seed_pdps_without_duplicate_discovery(
         "https://www.wrangler.com/c/men",
     ]
 
+
 @pytest.mark.component
 def test_classify_input_url_treats_shallow_locale_root_as_sitemap() -> None:
     assert _classify_input_url("https://usa.tommy.com/en") == "sitemap"
+
 
 @pytest.mark.component
 def test_classify_input_url_treats_generic_category_path_as_listing() -> None:
@@ -464,6 +474,7 @@ def test_classify_input_url_treats_generic_category_path_as_listing() -> None:
         _classify_input_url("https://www.balenciaga.com/en-en/gifts/gifts-for-home")
         == "listing"
     )
+
 
 @pytest.mark.component
 def test_classify_input_url_treats_sku_html_product_slug_as_detail() -> None:
@@ -473,6 +484,7 @@ def test_classify_input_url_treats_sku_html_product_slug_as_detail() -> None:
         )
         == "detail"
     )
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -521,6 +533,7 @@ async def test_classify_input_url_treats_non_ecommerce_detail_surfaces_as_detail
     assert result == {"stage": "detail", "run_id": 601}
     assert created_payloads[0]["surface"] == expected_surface
     assert created_payloads[0]["surface"] != "ecommerce_detail"
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -600,6 +613,7 @@ async def test_start_discover_uses_sitemap_stage_for_shallow_locale_root(
         }
     ]
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_create_session_accepts_url_list_without_single_url(
@@ -623,6 +637,7 @@ async def test_create_session_accepts_url_list_without_single_url(
         "https://brand-a.example",
         "https://brand-b.example",
     ]
+
 
 @pytest.mark.asyncio
 @pytest.mark.component

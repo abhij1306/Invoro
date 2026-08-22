@@ -262,7 +262,9 @@ class ICIMSAdapter(BaseAdapter):
         for field_name, selector in selectors.items():
             node = row.select_one(selector)
             value = clean_text(node.get_text(" ", strip=True) if node else "")
-            if value and (field_name not in {"location", "department"} or value != title):
+            if value and (
+                field_name not in {"location", "department"} or value != title
+            ):
                 record[field_name] = value
 
     def _extract_row_from_html(self, row_html: str, base_url: str) -> dict | None:

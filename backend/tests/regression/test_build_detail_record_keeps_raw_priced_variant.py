@@ -7,6 +7,7 @@ from .test_detail_extractor_structured_sources import (
     pytest,
 )
 
+
 @pytest.mark.regression
 def test_build_detail_record_keeps_raw_priced_variant_rows_over_dom_backfill_guess() -> (
     None
@@ -109,6 +110,7 @@ def test_build_detail_record_keeps_raw_priced_variant_rows_over_dom_backfill_gue
         ("Barebone Knob", "Barebone", "94.99"),
     }
 
+
 @pytest.mark.regression
 def test_extract_ecommerce_detail_keeps_ifixit_variant_group_local_and_drops_pdp_chrome() -> (
     None
@@ -179,6 +181,7 @@ def test_extract_ecommerce_detail_keeps_ifixit_variant_group_local_and_drops_pdp
         "return policy" not in str(variant).lower() for variant in record["variants"]
     )
 
+
 @pytest.mark.regression
 def test_extract_ecommerce_detail_recovers_variant_urls_from_dom_choice_links() -> None:
     html = """
@@ -219,6 +222,7 @@ def test_extract_ecommerce_detail_recovers_variant_urls_from_dom_choice_links() 
     assert record["variants"][2]["url"] == (
         "https://www.pepperfry.com/product/norton-velvet-recliner-in-brown-2268528.html"
     )
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_recovers_anchor_only_color_swatches() -> None:
@@ -261,6 +265,7 @@ def test_extract_ecommerce_detail_recovers_anchor_only_color_swatches() -> None:
         ),
     ]
 
+
 @pytest.mark.regression
 def test_extract_ecommerce_detail_recovers_unlabeled_color_swatch_urls() -> None:
     html = """
@@ -300,6 +305,7 @@ def test_extract_ecommerce_detail_recovers_unlabeled_color_swatch_urls() -> None
             "https://www.allbirds.com/products/mens-wool-runners-true-black",
         ),
     ]
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_recovers_hidden_anchor_color_swatch_urls() -> None:
@@ -343,6 +349,7 @@ def test_extract_ecommerce_detail_recovers_hidden_anchor_color_swatch_urls() -> 
             "https://www.fashionnova.com/products/ballpark-tassel-suede-sneakers-black",
         ),
     }
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_recovers_linked_scent_offer_variants() -> None:
@@ -413,6 +420,7 @@ def test_extract_ecommerce_detail_recovers_linked_scent_offer_variants() -> None
         ),
     }
     assert all("color" not in variant for variant in rows[0]["variants"])
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -492,6 +500,7 @@ async def test_shopify_adapter_expands_linked_product_color_handles(
         ("Black", "6", "SPECIALGUEST_Black_6"),
         ("Blush", "6", "SPECIALGUEST_Blush_6"),
     }
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_recovers_variant_urls_from_js_state_option_mapping() -> (
@@ -582,6 +591,7 @@ def test_extract_ecommerce_detail_recovers_variant_urls_from_js_state_option_map
         "https://www.lenskart.com/john-jacobs-jj-s13313-c1-sunglasses.html?productId=208303"
     )
 
+
 @pytest.mark.regression
 def test_extract_ecommerce_detail_skips_unnamed_dom_variant_groups() -> None:
     html = """
@@ -606,6 +616,7 @@ def test_extract_ecommerce_detail_skips_unnamed_dom_variant_groups() -> None:
     assert len(rows) == 1
     record = rows[0]
     assert "variants" not in record
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_ignores_review_qa_controls_and_payment_icons() -> (
@@ -659,6 +670,7 @@ def test_extract_ecommerce_detail_ignores_review_qa_controls_and_payment_icons()
     )
     assert "additional_images" not in record
     assert "variants" not in record
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_does_not_use_bundle_upsell_as_title() -> None:

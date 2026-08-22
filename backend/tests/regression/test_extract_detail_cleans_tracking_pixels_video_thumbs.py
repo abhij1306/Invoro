@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .test_detail_extractor_structured_sources import build_detail_record, extract_records, pytest, repair_ecommerce_detail_record_quality, sanitize_detail_placeholder_scalars  # fmt: skip
 
+
 @pytest.mark.regression
 def test_extract_detail_cleans_tracking_pixels_and_video_thumbs_from_images() -> None:
     html = """
@@ -31,6 +32,7 @@ def test_extract_detail_cleans_tracking_pixels_and_video_thumbs_from_images() ->
     assert len(rows) == 1
     assert rows[0]["image_url"] == "https://www.homedepot.com/images/yellow-pebbles.jpg"
     assert "additional_images" not in rows[0]
+
 
 @pytest.mark.regression
 def test_build_detail_record_runs_dom_tier_when_authoritative_record_has_no_images() -> (
@@ -66,6 +68,7 @@ def test_build_detail_record_runs_dom_tier_when_authoritative_record_has_no_imag
         record["image_url"]
         == "https://cdn.example.com/products/cozyla-calendar-main.jpg"
     )
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_prunes_irrelevant_nested_related_products_from_structured_data() -> (
@@ -118,6 +121,7 @@ def test_extract_ecommerce_detail_prunes_irrelevant_nested_related_products_from
         "ForeverYours" not in image for image in record.get("additional_images", [])
     )
 
+
 @pytest.mark.regression
 def test_build_detail_record_drops_related_rows_and_keeps_canonicalized_variant_axes() -> (
     None
@@ -154,6 +158,7 @@ def test_build_detail_record_drops_related_rows_and_keeps_canonicalized_variant_
     assert record["variants"] == [
         {"color": "Light", "price": "14.00", "currency": "USD"}
     ]
+
 
 @pytest.mark.regression
 def test_build_detail_record_sanitizes_cross_sell_images_placeholder_variants_and_legal_tail() -> (
@@ -236,6 +241,7 @@ def test_build_detail_record_sanitizes_cross_sell_images_placeholder_variants_an
         }
     ]
 
+
 @pytest.mark.regression
 def test_build_detail_record_drops_v6_widget_fulfillment_and_variant_scalar_noise() -> (
     None
@@ -260,6 +266,7 @@ def test_build_detail_record_drops_v6_widget_fulfillment_and_variant_scalar_nois
     assert "description" not in record
     assert "size" not in record
     assert record["color"] == "Black"
+
 
 @pytest.mark.regression
 def test_build_detail_record_drops_v6_generic_title_cross_product_text_and_ad_product_type() -> (
@@ -288,6 +295,7 @@ def test_build_detail_record_drops_v6_generic_title_cross_product_text_and_ad_pr
     assert record["description"] == "Calvin Klein Bernard lace-up oxford."
     assert "product_type" not in record
 
+
 @pytest.mark.regression
 def test_build_detail_record_drops_v6_target_fulfillment_description() -> None:
     record = build_detail_record(
@@ -304,6 +312,7 @@ def test_build_detail_record_drops_v6_target_fulfillment_description() -> None:
     )
 
     assert "description" not in record
+
 
 @pytest.mark.regression
 def test_build_detail_record_rejects_audit_artifact_candidates_before_selection() -> (
@@ -335,6 +344,7 @@ def test_build_detail_record_rejects_audit_artifact_candidates_before_selection(
     assert "description" not in record
     assert "variants" not in record
 
+
 @pytest.mark.regression
 def test_build_detail_record_strips_embedded_home_suffix_from_category_head() -> None:
     record = {
@@ -350,6 +360,7 @@ def test_build_detail_record_strips_embedded_home_suffix_from_category_head() ->
 
     assert record["category"] == "Men > Philipp Plein > Clothing > Leather Jackets"
 
+
 @pytest.mark.regression
 def test_detail_cleanup_parses_stringified_locale_category_dict() -> None:
     record = {
@@ -364,6 +375,7 @@ def test_detail_cleanup_parses_stringified_locale_category_dict() -> None:
     )
 
     assert record["category"] == "LEATHER JACKETS"
+
 
 @pytest.mark.regression
 def test_detail_cleanup_drops_malformed_and_broken_fetch_images() -> None:
@@ -384,6 +396,7 @@ def test_detail_cleanup_drops_malformed_and_broken_fetch_images() -> None:
 
     assert record["image_url"] == "https://cdn.example.com/products/socks/main.jpg"
     assert "additional_images" not in record
+
 
 @pytest.mark.regression
 def test_detail_cleanup_drops_same_url_color_only_variant_noise() -> None:
@@ -411,6 +424,7 @@ def test_detail_cleanup_drops_same_url_color_only_variant_noise() -> None:
     assert "variants" not in record
     assert "variant_count" not in record
 
+
 @pytest.mark.regression
 def test_detail_cleanup_sets_parent_out_of_stock_when_all_variants_out() -> None:
     record = {
@@ -430,6 +444,7 @@ def test_detail_cleanup_sets_parent_out_of_stock_when_all_variants_out() -> None
     )
 
     assert record["availability"] == "out_of_stock"
+
 
 @pytest.mark.regression
 def test_build_detail_record_rejects_structural_identity_artifacts() -> None:
@@ -453,6 +468,7 @@ def test_build_detail_record_rejects_structural_identity_artifacts() -> None:
     assert "product_id" not in record
     assert "product_type" not in record
 
+
 @pytest.mark.regression
 def test_build_detail_record_trims_long_text_ui_tail_when_product_copy_remains() -> (
     None
@@ -474,6 +490,7 @@ def test_build_detail_record_trims_long_text_ui_tail_when_product_copy_remains()
         record["description"]
         == "Soft cotton shirt with relaxed fit and reinforced seams"
     )
+
 
 @pytest.mark.regression
 def test_build_detail_record_drops_duplicate_specifications_and_materials_ui_labels() -> (
@@ -498,6 +515,7 @@ def test_build_detail_record_drops_duplicate_specifications_and_materials_ui_lab
     assert "specifications" not in record
     assert record["materials"] == "Linen shell"
 
+
 @pytest.mark.regression
 def test_build_detail_record_dedupes_repeated_material_weight_tail() -> None:
     record = build_detail_record(
@@ -518,6 +536,7 @@ def test_build_detail_record_dedupes_repeated_material_weight_tail() -> None:
     assert record["materials"] == (
         "78% Cotton, 20% Recycled Cotton, 2% Spandex; 11.25 oz."
     )
+
 
 @pytest.mark.regression
 def test_build_detail_record_drops_global_guide_and_glossary_text() -> None:
@@ -543,6 +562,7 @@ def test_build_detail_record_drops_global_guide_and_glossary_text() -> None:
 
     assert "description" not in record
     assert "materials" not in record
+
 
 @pytest.mark.regression
 def test_build_detail_record_keeps_valid_candidates_after_candidate_gate() -> None:
@@ -570,6 +590,7 @@ def test_build_detail_record_keeps_valid_candidates_after_candidate_gate() -> No
     assert record["product_type"] == "Running Shoes"
     assert record["price"] == "129.95"
     assert record["description"] == "Lightweight trail shoe with grippy outsole."
+
 
 @pytest.mark.regression
 def test_build_detail_record_preserves_integral_price_magnitude_without_cent_context() -> (
@@ -621,6 +642,7 @@ def test_build_detail_record_preserves_integral_price_magnitude_without_cent_con
         assert record["price"] == expected_price
         assert record["variants"][0]["price"] == expected_price
 
+
 @pytest.mark.regression
 def test_extract_detail_preserves_visible_integer_price_magnitude() -> None:
     rows = extract_records(
@@ -638,6 +660,7 @@ def test_extract_detail_preserves_visible_integer_price_magnitude() -> None:
 
     assert len(rows) == 1
     assert rows[0]["price"] == "1012.00"
+
 
 @pytest.mark.regression
 def test_extract_detail_prefers_visible_decimal_shift_price_over_integral_jsonld() -> (
@@ -665,6 +688,7 @@ def test_extract_detail_prefers_visible_decimal_shift_price_over_integral_jsonld
 
     assert len(rows) == 1
     assert rows[0]["price"] == "299.50"
+
 
 @pytest.mark.regression
 def test_build_detail_record_rejects_broken_extensionless_transformed_image_urls() -> (

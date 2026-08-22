@@ -60,11 +60,21 @@ from app.services.extract.detail.identity.jsonld_identity import (
 )
 
 logger = logging.getLogger(__name__)
-_LISTING_CATEGORY_PATH_SEGMENTS = frozenset({str(value).strip().lower() for value in tuple(LISTING_CATEGORY_PATH_SEGMENTS or ()) if str(value).strip()})
-_LISTING_LOCALE_PATH_SEGMENT_RE = re.compile(str(LISTING_LOCALE_PATH_SEGMENT_PATTERN or ""), re.IGNORECASE)
+_LISTING_CATEGORY_PATH_SEGMENTS = frozenset(
+    {
+        str(value).strip().lower()
+        for value in tuple(LISTING_CATEGORY_PATH_SEGMENTS or ())
+        if str(value).strip()
+    }
+)
+_LISTING_LOCALE_PATH_SEGMENT_RE = re.compile(
+    str(LISTING_LOCALE_PATH_SEGMENT_PATTERN or ""), re.IGNORECASE
+)
+
 
 def _listing_url_has_product_detail_identity(url: str) -> bool:
     return LISTING_PRODUCT_DETAIL_ID_RE.search(str(url or "")) is not None
+
 
 def _jsonld_item_matches_requested_identity(
     item: dict[str, object],
@@ -85,6 +95,7 @@ def _jsonld_item_matches_requested_identity(
         requested_page_url=requested_page_url,
     )
 
+
 def prune_irrelevant_detail_dom_nodes(
     soup: BeautifulSoup,
     *,
@@ -102,7 +113,9 @@ def prune_irrelevant_detail_dom_nodes(
             match_found = False
             script_product_name = ""
             for item in items:
-                if not isinstance(item, dict) or not jsonld_item_supports_identity(item):
+                if not isinstance(item, dict) or not jsonld_item_supports_identity(
+                    item
+                ):
                     continue
                 if not script_product_name:
                     script_product_name = jsonld_item_product_name(item)
@@ -140,8 +153,13 @@ def prune_irrelevant_detail_dom_nodes(
         for node in soup.select(str(selector)):
             node.decompose()
 
+
 def _listing_url_has_category_path_segment(path: str) -> bool:
-    segments = [segment.strip().lower() for segment in str(path or "").split("/") if segment.strip()]
+    segments = [
+        segment.strip().lower()
+        for segment in str(path or "").split("/")
+        if segment.strip()
+    ]
     for segment in segments:
         # Broader split is intentional here, unlike path_segment_tokens:
         # _LISTING_CATEGORY_PATH_SEGMENTS may be embedded behind "_" or mixed punctuation.
@@ -151,6 +169,7 @@ def _listing_url_has_category_path_segment(path: str) -> bool:
         if _LISTING_CATEGORY_PATH_SEGMENTS.intersection(segment_tokens):
             return True
     return False
+
 
 def _listing_query_looks_structural(query: str) -> bool:
     pairs = [
@@ -163,7 +182,11 @@ def _listing_query_looks_structural(query: str) -> bool:
     if not pairs:
         return False
     generic_filter_keys = {"f", "filter", "filters", "facet", "facets", "rf"}
-    filter_tokens = tuple(str(token or "").strip().lower().rstrip("=") for token in LISTING_STRUCTURAL_QUERY_FILTER_TOKENS if str(token or "").strip())
+    filter_tokens = tuple(
+        str(token or "").strip().lower().rstrip("=")
+        for token in LISTING_STRUCTURAL_QUERY_FILTER_TOKENS
+        if str(token or "").strip()
+    )
     return any(
         _listing_filter_pair_is_structural(
             key,
@@ -173,6 +196,7 @@ def _listing_query_looks_structural(query: str) -> bool:
         )
         for key, value in pairs
     )
+
 
 def _listing_filter_pair_is_structural(
     key: str,
@@ -184,23 +208,35 @@ def _listing_filter_pair_is_structural(
     if key not in generic_filter_keys:
         return False
     haystack = " ".join(filter(None, (key, value)))
-    has_category = any(token in haystack for token in LISTING_STRUCTURAL_QUERY_CATEGORY_TOKENS)
+    has_category = any(
+        token in haystack for token in LISTING_STRUCTURAL_QUERY_CATEGORY_TOKENS
+    )
     return has_category and any(token in haystack for token in filter_tokens)
+
 
 def _strip_listing_locale_segments(segments: list[str]) -> list[str]:
     index = 0
-    while index < len(segments) and _LISTING_LOCALE_PATH_SEGMENT_RE.fullmatch(segments[index]):
+    while index < len(segments) and _LISTING_LOCALE_PATH_SEGMENT_RE.fullmatch(
+        segments[index]
+    ):
         index += 1
     return segments[index:]
+
 
 def _listing_url_is_sibling_category(
     *,
     candidate_path: str,
     page_path: str,
 ) -> bool:
-    if _listing_url_has_category_path_segment(page_path) and _listing_url_has_category_path_segment(candidate_path):
+    if _listing_url_has_category_path_segment(
+        page_path
+    ) and _listing_url_has_category_path_segment(candidate_path):
         return True
-    return any(page_path.startswith(prefix) and candidate_path.startswith(prefix) for prefix in LISTING_CATEGORY_PATH_PREFIXES)
+    return any(
+        page_path.startswith(prefix) and candidate_path.startswith(prefix)
+        for prefix in LISTING_CATEGORY_PATH_PREFIXES
+    )
+
 
 def _listing_url_is_locale_sibling_category(
     *,
@@ -213,7 +249,9 @@ def _listing_url_is_locale_sibling_category(
         return False
     candidate_remainder_segments = _strip_listing_locale_segments(candidate_segments)
     page_remainder_segments = _strip_listing_locale_segments(page_segments)
-    if len(candidate_remainder_segments) == len(candidate_segments) and len(page_remainder_segments) == len(page_segments):
+    if len(candidate_remainder_segments) == len(candidate_segments) and len(
+        page_remainder_segments
+    ) == len(page_segments):
         return False
     if not candidate_remainder_segments or not page_remainder_segments:
         return False
@@ -222,13 +260,22 @@ def _listing_url_is_locale_sibling_category(
         page_path="/" + "/".join(page_remainder_segments),
     )
 
+
 def _listing_terminal_looks_like_product_slug(
     *,
     terminal_token_list: list[str],
     terminal_raw: str,
 ) -> bool:
-    year_led_terminal = bool(terminal_token_list and re.fullmatch(YEAR_SLUG_PATTERN, terminal_token_list[0]))
-    return len(terminal_token_list) >= PRODUCT_SLUG_MIN_TERMINAL_TOKENS and any(re.search(r"[a-z]", token) for token in terminal_token_list) and "-" in terminal_raw and not year_led_terminal
+    year_led_terminal = bool(
+        terminal_token_list and re.fullmatch(YEAR_SLUG_PATTERN, terminal_token_list[0])
+    )
+    return (
+        len(terminal_token_list) >= PRODUCT_SLUG_MIN_TERMINAL_TOKENS
+        and any(re.search(r"[a-z]", token) for token in terminal_token_list)
+        and "-" in terminal_raw
+        and not year_led_terminal
+    )
+
 
 def _listing_url_has_non_listing_prefix(
     *,
@@ -236,7 +283,10 @@ def _listing_url_has_non_listing_prefix(
     leading_raw: list[str],
     non_listing_tokens: set[str],
 ) -> bool:
-    return any(tokens & non_listing_tokens for tokens in leading_tokens) or any(segment in non_listing_tokens for segment in leading_raw)
+    return any(tokens & non_listing_tokens for tokens in leading_tokens) or any(
+        segment in non_listing_tokens for segment in leading_raw
+    )
+
 
 def listing_url_is_structural(url: str, page_url: str) -> bool:
     lowered = url.lower()
@@ -249,7 +299,9 @@ def listing_url_is_structural(url: str, page_url: str) -> bool:
         page_parsed = urlparse(page_url)
         if parsed.path in ("", "/"):
             return True
-        same_path = parsed.path.rstrip("/").lower() == page_parsed.path.rstrip("/").lower()
+        same_path = (
+            parsed.path.rstrip("/").lower() == page_parsed.path.rstrip("/").lower()
+        )
         if same_path and _job_detail_query_has_identity(parsed.query):
             return False
         if same_path:
@@ -282,8 +334,11 @@ def listing_url_is_structural(url: str, page_url: str) -> bool:
         logger.debug("URL structural check failed for %s", page_url, exc_info=True)
     return False
 
+
 def _listing_path_tail_is_structural(path: str, query: str) -> bool:
-    raw_segments = [segment.strip().lower() for segment in path.split("/") if segment.strip()]
+    raw_segments = [
+        segment.strip().lower() for segment in path.split("/") if segment.strip()
+    ]
     tokenized = [path_segment_tokens(segment) for segment in raw_segments]
     terminal_tokens = tokenized[-1] if tokenized else set()
     terminal_raw = raw_segments[-1] if raw_segments else ""
@@ -291,15 +346,20 @@ def _listing_path_tail_is_structural(path: str, query: str) -> bool:
     if terminal_tokens & non_listing or terminal_raw in non_listing:
         return True
     terminal_list = [token for token in re.split(r"[-.]+", terminal_raw) if token]
-    if _listing_terminal_looks_like_product_slug(terminal_token_list=terminal_list, terminal_raw=terminal_raw):
+    if _listing_terminal_looks_like_product_slug(
+        terminal_token_list=terminal_list, terminal_raw=terminal_raw
+    ):
         return False
     leading_tokens = tokenized[:-1] if len(tokenized) <= 2 else []
     leading_raw = raw_segments[:-1] if len(raw_segments) <= 2 else []
-    return _listing_query_looks_structural(query) or _listing_url_has_non_listing_prefix(
+    return _listing_query_looks_structural(
+        query
+    ) or _listing_url_has_non_listing_prefix(
         leading_tokens=leading_tokens,
         leading_raw=leading_raw,
         non_listing_tokens=non_listing,
     )
+
 
 def listing_detail_like_path(url: str, *, is_job: bool) -> bool:
     lowered = url.lower()
@@ -310,16 +370,26 @@ def listing_detail_like_path(url: str, *, is_job: bool) -> bool:
         return True
     if _listing_url_has_category_path_segment(parsed.path):
         return False
-    segments = [segment.strip().lower() for segment in parsed.path.split("/") if segment.strip()]
+    segments = [
+        segment.strip().lower() for segment in parsed.path.split("/") if segment.strip()
+    ]
     if "products" in segments:
         products_index = segments.index("products")
         tail_segments = segments[products_index + 1 :]
-        if len(tail_segments) > 2 and not parsed.query and not any(re.search(r"\d", segment) for segment in tail_segments[-2:]):
+        if (
+            len(tail_segments) > 2
+            and not parsed.query
+            and not any(re.search(r"\d", segment) for segment in tail_segments[-2:])
+        ):
             return False
-    if any(_detail_marker_matches(lowered, marker) for marker in LISTING_DETAIL_PATH_MARKERS):
+    if any(
+        _detail_marker_matches(lowered, marker)
+        for marker in LISTING_DETAIL_PATH_MARKERS
+    ):
         return True
     hints = detail_path_hints("ecommerce_detail")
     return any(_detail_marker_matches(lowered, marker) for marker in hints)
+
 
 def _detail_marker_matches(url: str, marker: str) -> bool:
     """Check if *marker* matches in *url* at a segment boundary.
@@ -349,6 +419,7 @@ def _detail_marker_matches(url: str, marker: str) -> bool:
         # Continuation character (hyphen, letter, underscore) → not a boundary
         start = end
 
+
 def _job_detail_like_path(url: str) -> bool:
     parsed = urlparse(url)
     segments = [segment for segment in parsed.path.split("/") if segment]
@@ -371,19 +442,38 @@ def _job_detail_like_path(url: str) -> bool:
         if normalized not in JOB_LISTING_DETAIL_ROOT_MARKERS:
             continue
         next_segment = segments[index + 1].strip().lower()
-        if next_segment and not _job_listing_url_is_hub(f"https://example.com/{next_segment}/"):
+        if next_segment and not _job_listing_url_is_hub(
+            f"https://example.com/{next_segment}/"
+        ):
             return True
     return False
 
+
 def _job_detail_query_has_identity(query: str) -> bool:
     lowered = str(query or "").lower()
-    return any(token in lowered for token in ("showjob=", "jobid=", "job_id=", "gh_jid="))
+    return any(
+        token in lowered for token in ("showjob=", "jobid=", "job_id=", "gh_jid=")
+    )
+
 
 from .record_identity import (  # noqa: E402
-    LOWER_NON_ALNUM_RE, path_segment_tokens,
-    detail_identity_codes_match, detail_identity_codes_from_record_fields, detail_identity_codes_from_url, detail_query_identity_codes_from_url,
-    detail_identity_tokens, detail_redirect_identity_is_mismatched, detail_slug_title_fallback_from_url, detail_title_from_url,
-    detail_title_fallback_looks_like_code, detail_url_candidate_is_low_signal, detail_url_is_collection_like, detail_url_is_utility,
-    detail_url_looks_like_product, detail_url_matches_requested_identity, preferred_detail_identity_url, record_matches_requested_detail_identity,
+    LOWER_NON_ALNUM_RE,
+    path_segment_tokens,
+    detail_identity_codes_match,
+    detail_identity_codes_from_record_fields,
+    detail_identity_codes_from_url,
+    detail_query_identity_codes_from_url,
+    detail_identity_tokens,
+    detail_redirect_identity_is_mismatched,
+    detail_slug_title_fallback_from_url,
+    detail_title_from_url,
+    detail_title_fallback_looks_like_code,
+    detail_url_candidate_is_low_signal,
+    detail_url_is_collection_like,
+    detail_url_is_utility,
+    detail_url_looks_like_product,
+    detail_url_matches_requested_identity,
+    preferred_detail_identity_url,
+    record_matches_requested_detail_identity,
     semantic_detail_identity_tokens,
 )

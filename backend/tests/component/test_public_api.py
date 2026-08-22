@@ -57,6 +57,7 @@ from app.services.config.public_api import (
 
 from app.services.config.runtime_settings import crawler_runtime_settings
 
+
 @pytest.fixture
 async def public_api_client(db_session):
     async def _override_db():
@@ -69,9 +70,11 @@ async def public_api_client(db_session):
         yield client
     app.dependency_overrides.clear()
 
+
 @pytest.fixture(autouse=True)
 def reset_runtime_app_env(monkeypatch):
     monkeypatch.setattr(config, "_RUNTIME_APP_ENV", None)
+
 
 def _password_field_name(*, hashed: bool = False) -> str:
     return ("hashed_" if hashed else "") + "pass" + "word"

@@ -49,6 +49,7 @@ from tests.fixtures.fetch_runtime import (
 
 from tests.fixtures.http_mocks import FakeBodyResponse
 
+
 @pytest.fixture(autouse=True)
 async def _reset_fetch_runtime_state_between_tests(
     monkeypatch: pytest.MonkeyPatch,

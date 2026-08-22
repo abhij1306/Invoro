@@ -27,7 +27,11 @@ from app.services.structured_sources import harvest_js_state_objects, parse_json
 _ECOMMERCE_DETAIL_READINESS_HINTS = tuple(
     str(item).strip().lower()
     for item in (
-        (BROWSER_DETAIL_READINESS_HINTS.get("ecommerce") if isinstance(BROWSER_DETAIL_READINESS_HINTS, Mapping) else [])
+        (
+            BROWSER_DETAIL_READINESS_HINTS.get("ecommerce")
+            if isinstance(BROWSER_DETAIL_READINESS_HINTS, Mapping)
+            else []
+        )
         or []
     )
     if str(item).strip()
@@ -44,7 +48,9 @@ def looks_like_js_shell(html: str, *, analysis: HtmlAnalysis | None = None) -> b
     return root is not None and len(parsed.soup.find_all("script")) >= 3
 
 
-def has_extractable_detail_signals(html: str, *, analysis: HtmlAnalysis | None = None) -> bool:
+def has_extractable_detail_signals(
+    html: str, *, analysis: HtmlAnalysis | None = None
+) -> bool:
     parsed = analysis or analyze_html(html)
     if not parsed.html or looks_like_js_required_placeholder(parsed):
         return False
@@ -64,7 +70,9 @@ def _structured_detail_present(parsed: HtmlAnalysis) -> bool:
         if not isinstance(payload, dict):
             continue
         raw_type = payload.get("@type")
-        normalized_type = (" ".join(raw_type) if isinstance(raw_type, list) else str(raw_type or "")).lower()
+        normalized_type = (
+            " ".join(raw_type) if isinstance(raw_type, list) else str(raw_type or "")
+        ).lower()
         if any(
             token in normalized_type
             for token in (
@@ -87,16 +95,18 @@ def _js_state_detail_present(parsed: HtmlAnalysis) -> bool:
 
 
 def _framework_product_data_present(lowered_html: str) -> bool:
-    return any(token in lowered_html for token in DETAIL_SHELL_FRAMEWORK_TOKENS) and any(
-        token in lowered_html for token in DETAIL_SHELL_PRODUCT_DATA_TOKENS
-    )
+    return any(
+        token in lowered_html for token in DETAIL_SHELL_FRAMEWORK_TOKENS
+    ) and any(token in lowered_html for token in DETAIL_SHELL_PRODUCT_DATA_TOKENS)
 
 
 def has_extractable_dom_detail_signals(analysis: HtmlAnalysis) -> bool:
     if not analysis.h1_present:
         return False
     lowered_text = analysis.normalized_text.lower()
-    detail_hint_hits = sum(1 for hint in _ECOMMERCE_DETAIL_READINESS_HINTS if hint in lowered_text)
+    detail_hint_hits = sum(
+        1 for hint in _ECOMMERCE_DETAIL_READINESS_HINTS if hint in lowered_text
+    )
     if ACTION_BUY_NOW.strip().lower() in lowered_text:
         detail_hint_hits += 1
     has_product_anchor = bool(
@@ -170,7 +180,9 @@ def _content_node_is_extractable(node: Any, heading_text: str) -> bool:
     body_text = clean_text(node.get_text(" ", strip=True))
     if not body_text or body_text == heading_text:
         return False
-    body_without_heading = clean_text(re.sub(re.escape(heading_text), " ", body_text, flags=re.I))
+    body_without_heading = clean_text(
+        re.sub(re.escape(heading_text), " ", body_text, flags=re.I)
+    )
     if not body_without_heading or _app_load_shell(body_without_heading.lower()):
         return False
     return bool(
@@ -179,7 +191,9 @@ def _content_node_is_extractable(node: Any, heading_text: str) -> bool:
     )
 
 
-def has_extractable_listing_signals(html: str, *, analysis: HtmlAnalysis | None = None) -> bool:
+def has_extractable_listing_signals(
+    html: str, *, analysis: HtmlAnalysis | None = None
+) -> bool:
     parsed = analysis or analyze_html(html)
     if not parsed.html or looks_like_js_required_placeholder(parsed):
         return False
@@ -195,7 +209,9 @@ def _structured_listing_signal(parsed: HtmlAnalysis) -> bool | None:
         if not isinstance(payload, dict):
             continue
         raw_type = payload.get("@type")
-        normalized_type = (" ".join(raw_type) if isinstance(raw_type, list) else str(raw_type or "")).lower()
+        normalized_type = (
+            " ".join(raw_type) if isinstance(raw_type, list) else str(raw_type or "")
+        ).lower()
         if "itemlist" in normalized_type or "listitem" in normalized_type:
             return True
         if "product" in normalized_type or "jobposting" in normalized_type:
@@ -215,7 +231,9 @@ def _detail_like_anchor_count(parsed: HtmlAnalysis) -> int:
     return count
 
 
-def looks_like_listing_shell(result: Any, *, analysis: HtmlAnalysis | None = None) -> bool:
+def looks_like_listing_shell(
+    result: Any, *, analysis: HtmlAnalysis | None = None
+) -> bool:
     parsed = analysis or analyze_html(result.html)
     if looks_like_js_required_placeholder(parsed):
         return True
@@ -223,7 +241,10 @@ def looks_like_listing_shell(result: Any, *, analysis: HtmlAnalysis | None = Non
     if "#/" in lowered_surface or int(result.status_code or 0) == 202:
         return True
     if len(parsed.visible_text) > 400:
-        return any(token in parsed.lowered_html for token in LISTING_CLIENT_RENDERED_SHELL_HINTS)
+        return any(
+            token in parsed.lowered_html
+            for token in LISTING_CLIENT_RENDERED_SHELL_HINTS
+        )
     root = parsed.soup.find(id=re.compile(r"root|app|__next", re.I))
     if root is None and len(parsed.soup.find_all("script")) < 3:
         return False
@@ -246,9 +267,12 @@ def state_payload_has_content(payload: Any) -> bool:
         meaningful_keys = {
             key
             for key, value in payload.items()
-            if value not in (None, "", [], {}) and str(key or "").strip().lower() not in {"config", "env", "locale"}
+            if value not in (None, "", [], {})
+            and str(key or "").strip().lower() not in {"config", "env", "locale"}
         }
-        return bool(meaningful_keys) or any(state_payload_has_content(value) for value in payload.values())
+        return bool(meaningful_keys) or any(
+            state_payload_has_content(value) for value in payload.values()
+        )
     if isinstance(payload, list):
         return any(state_payload_has_content(item) for item in payload[:10])
     return payload not in (None, "")
@@ -281,12 +305,16 @@ def challenge_element_hits(
         )
     )
     hits.extend(
-        hit for marker, hit in _marker_map(challenge_elements, "html_markers").items() if marker in lowered_html
+        hit
+        for marker, hit in _marker_map(challenge_elements, "html_markers").items()
+        if marker in lowered_html
     )
     return hits
 
 
-def _tag_marker_hits(tags: Iterable[Any], *, attribute: str, markers: dict[str, str]) -> list[str]:
+def _tag_marker_hits(
+    tags: Iterable[Any], *, attribute: str, markers: dict[str, str]
+) -> list[str]:
     hits: list[str] = []
     for tag in tags:
         value = str(tag.get(attribute) or "").strip().lower()

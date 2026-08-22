@@ -4,6 +4,7 @@ from .test_browser_expansion_runtime import Any, PlaywrightError, PlaywrightTime
 
 pytest_plugins = ["tests.regression.test_browser_expansion_runtime"]
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_recover_browser_challenge_runs_for_real_chrome() -> None:
@@ -66,6 +67,7 @@ async def test_recover_browser_challenge_runs_for_real_chrome() -> None:
     assert page.wait_calls == 0
     assert page.goto_calls == 0
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_recover_browser_challenge_waits_on_provider_low_content_shell() -> None:
@@ -119,6 +121,7 @@ async def test_recover_browser_challenge_waits_on_provider_low_content_shell() -
 
     assert result is original_response
     assert page.wait_calls == 1
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -189,6 +192,7 @@ async def test_recover_browser_challenge_clears_akamai_shell_without_cookie() ->
     # re-read clears it in-place. No retry-goto, no escalation.
     assert page.wait_calls == 1
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_recover_browser_challenge_drops_stale_block_status_after_wait_clear() -> (
@@ -237,6 +241,7 @@ async def test_recover_browser_challenge_drops_stale_block_status_after_wait_cle
     assert result is original_response
     assert result.browser_recovered_status == 200
     assert result.headers == original_response.headers
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -287,6 +292,7 @@ async def test_recover_browser_challenge_bounds_slow_activity(
     )
 
     assert time.perf_counter() - started_at < 0.5
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -350,6 +356,7 @@ async def test_recover_browser_challenge_marks_retry_response_without_wrapping()
     assert result.name == "retried"
     assert result.browser_navigation_strategy == "domcontentloaded"
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_get_page_html_falls_back_to_outer_html_after_driver_close(
@@ -378,6 +385,7 @@ async def test_get_page_html_falls_back_to_outer_html_after_driver_close(
 
     assert "Recovered" in html
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_get_page_html_outer_html_fallback_preserves_doctype(
@@ -401,6 +409,7 @@ async def test_get_page_html_outer_html_fallback_preserves_doctype(
     html = await dom_runtime.get_page_html(_Page())
 
     assert html.startswith("<!DOCTYPE html>")
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -426,10 +435,12 @@ async def test_get_page_html_falls_back_after_live_navigation_content_error(
 
     assert "Recovered live DOM" in html
 
+
 @pytest.mark.regression
 def test_shadow_dom_flattener_avoids_inner_html_assignment() -> None:
     assert ".innerHTML" not in dom_runtime._SHADOW_DOM_FLATTENER_SCRIPT
     assert "cloneNode(true)" in dom_runtime._SHADOW_DOM_FLATTENER_SCRIPT
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -446,6 +457,7 @@ async def test_page_might_have_location_interstitial_uses_live_selector_probe() 
     detected = await browser_page_helpers.page_might_have_location_interstitial(_Page())
 
     assert detected is True
+
 
 @pytest.mark.regression
 def test_browser_diagnostics_preserves_existing_retry_reason_and_timings() -> None:
@@ -464,6 +476,7 @@ def test_browser_diagnostics_preserves_existing_retry_reason_and_timings() -> No
         "content_serialization": 20,
     }
 
+
 @pytest.mark.regression
 def test_browser_diagnostics_preserves_existing_retry_reason_when_unspecified() -> None:
     diagnostics = browser_runtime.build_browser_diagnostics_contract(
@@ -472,6 +485,7 @@ def test_browser_diagnostics_preserves_existing_retry_reason_when_unspecified() 
     )
 
     assert diagnostics["retry_reason"] == "empty_extraction"
+
 
 @pytest.mark.regression
 def test_build_failed_browser_diagnostics_rejects_non_mapping_phase_timings() -> None:
@@ -485,6 +499,7 @@ def test_build_failed_browser_diagnostics_rejects_non_mapping_phase_timings() ->
 
     assert diagnostics["phase_timings_ms"] == {}
     assert diagnostics["phase_timings_error"] == "invalid_phase_timings_ms:incoming"
+
 
 @pytest.mark.regression
 def test_build_browser_fetch_result_coerces_bad_status_and_none_content_type() -> None:
@@ -501,6 +516,7 @@ def test_build_browser_fetch_result_coerces_bad_status_and_none_content_type() -
     assert result.status_code == 0
     assert result.content_type == ""
 
+
 @pytest.mark.regression
 def test_browser_diagnostics_marks_invalid_phase_timing_payload() -> None:
     diagnostics = browser_runtime.build_browser_diagnostics_contract(
@@ -510,6 +526,7 @@ def test_browser_diagnostics_marks_invalid_phase_timing_payload() -> None:
 
     assert diagnostics["phase_timings_ms"] == {"navigation": 120}
     assert diagnostics["phase_timings_error"] == "invalid_phase_timings_ms:incoming"
+
 
 @pytest.mark.regression
 def test_browser_diagnostics_contract_clears_stale_nested_outcome_fields() -> None:
@@ -527,6 +544,7 @@ def test_browser_diagnostics_contract_clears_stale_nested_outcome_fields() -> No
     assert diagnostics["browser_reason"] is None
     assert diagnostics["browser_outcome"] is None
     assert diagnostics["failure_reason"] is None
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -550,6 +568,7 @@ async def test_wait_for_listing_readiness_treats_only_playwright_timeout_as_reco
     assert diagnostics["status"] == "timed_out"
     assert diagnostics["attempted_selectors"] == [".listing-card"]
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_wait_for_listing_readiness_propagates_browser_closure() -> None:
@@ -569,6 +588,7 @@ async def test_wait_for_listing_readiness_propagates_browser_closure() -> None:
                 "max_wait_ms": 250,
             },
         )
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -606,6 +626,7 @@ async def test_browser_fetch_records_navigation_timing_when_fallback_navigation_
     assert diagnostics["navigation_strategy"] == "commit"
     assert diagnostics["phase_timings_ms"]["navigation"] >= 0
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_networkidle_navigation_uses_primary_budget_cap(patch_settings) -> None:
@@ -632,6 +653,7 @@ async def test_networkidle_navigation_uses_primary_budget_cap(patch_settings) ->
     assert page.goto_calls == ["networkidle", "domcontentloaded"]
     assert page.goto_timeout_calls[:2] == [2000, 5000]
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_origin_warmup_uses_sibling_page_not_active_page() -> None:
@@ -653,6 +675,7 @@ async def test_origin_warmup_uses_sibling_page_not_active_page() -> None:
     assert page.spawned_pages[0].goto_calls == ["domcontentloaded"]
     assert page.spawned_pages[0].page_close_calls == 1
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_origin_warmup_runs_for_job_detail() -> None:
@@ -671,6 +694,7 @@ async def test_origin_warmup_runs_for_job_detail() -> None:
 
     assert page.goto_calls == []
     assert len(page.spawned_pages) == 1
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression

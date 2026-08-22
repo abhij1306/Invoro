@@ -4,6 +4,7 @@ from .test_crawl_fetch_runtime import AsyncMock, HostProtectionPolicy, PageFetch
 
 pytest_plugins = ["tests.component.test_crawl_fetch_runtime"]
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_real_chrome_success_updates_host_memory(
@@ -40,6 +41,7 @@ async def test_real_chrome_success_updates_host_memory(
         }
     ]
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_patchright_success_updates_host_memory(
@@ -75,6 +77,7 @@ async def test_patchright_success_updates_host_memory(
             ),
         }
     ]
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -117,6 +120,7 @@ async def test_location_required_diagnostics_do_not_write_hard_block_memory(
 
     assert hard_blocks == []
     assert usable_fetches == []
+
 
 @pytest.mark.component
 def test_should_capture_network_payload_skips_noise_and_large_declared_payloads() -> (
@@ -178,6 +182,7 @@ def test_should_capture_network_payload_skips_noise_and_large_declared_payloads(
         surface="ecommerce_detail",
     )
 
+
 @pytest.mark.component
 def test_should_capture_network_payload_accepts_chunked_json_without_content_length() -> (
     None
@@ -188,6 +193,7 @@ def test_should_capture_network_payload_accepts_chunked_json_without_content_len
         headers={"transfer-encoding": "chunked"},
         captured_count=0,
     )
+
 
 @pytest.mark.component
 def test_content_aware_http_blocking_ignores_vendor_headers_when_detail_signals_exist() -> (
@@ -220,12 +226,14 @@ def test_content_aware_http_blocking_ignores_vendor_headers_when_detail_signals_
         200,
     )
 
+
 @pytest.mark.component
 def test_select_http_fetcher_uses_httpx_when_forced(patch_settings) -> None:
     patch_settings(force_httpx=True)
     fetcher = crawl_fetch_runtime._select_http_fetcher(object())
 
     assert fetcher is crawl_fetch_runtime._http_fetch
+
 
 @pytest.mark.component
 def test_should_capture_network_payload_ignores_misleading_content_length_when_chunked() -> (
@@ -241,6 +249,7 @@ def test_should_capture_network_payload_ignores_misleading_content_length_when_c
         captured_count=0,
     )
 
+
 @pytest.mark.component
 def test_should_capture_network_payload_accepts_react_server_component_streams() -> (
     None
@@ -251,6 +260,7 @@ def test_should_capture_network_payload_accepts_react_server_component_streams()
         headers={},
         captured_count=0,
     )
+
 
 @pytest.mark.component
 def test_should_capture_network_payload_accepts_trpc_and_rsc_url_hints() -> None:
@@ -266,6 +276,7 @@ def test_should_capture_network_payload_accepts_trpc_and_rsc_url_hints() -> None
         headers={},
         captured_count=0,
     )
+
 
 @pytest.mark.component
 def test_classify_network_endpoint_uses_platform_config_family_signatures() -> None:
@@ -289,6 +300,7 @@ def test_classify_network_endpoint_uses_platform_config_family_signatures() -> N
         response_url="https://store.example.com/_next/data/build-id/widget.json",
         surface="ecommerce_detail",
     ) == {"type": "generic_json", "family": "nextjs"}
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -332,6 +344,7 @@ async def test_curl_fetch_uses_runtime_owned_default_request_headers(
     assert captured_headers["Upgrade-Insecure-Requests"] == "1"
     assert "sec-ch-ua" in captured_headers
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_curl_fetch_coerces_blank_impersonate_target_to_none(
@@ -362,6 +375,7 @@ async def test_curl_fetch_coerces_blank_impersonate_target_to_none(
     )
 
     assert captured_impersonate == [None]
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -407,6 +421,7 @@ async def test_fetch_page_waits_for_host_slot_before_http_attempt(
     assert result.method == "curl_cffi"
     assert wait_calls == ["https://example.com/collections/widgets"]
 
+
 @pytest.mark.component
 def test_browser_engine_attempts_uses_patchright_by_default() -> None:
     context = _default_fetch_context()
@@ -418,6 +433,7 @@ def test_browser_engine_attempts_uses_patchright_by_default() -> None:
     )
 
     assert attempts == ["patchright"]
+
 
 @pytest.mark.component
 def test_browser_engine_attempts_uses_real_chrome_after_patchright_when_available(
@@ -447,6 +463,7 @@ def test_browser_engine_attempts_uses_real_chrome_after_patchright_when_availabl
     )
 
     assert attempts == ["real_chrome", "patchright"]
+
 
 @pytest.mark.component
 def test_browser_engine_attempts_uses_real_chrome_for_blocked_forum_detail_when_available(
@@ -479,6 +496,7 @@ def test_browser_engine_attempts_uses_real_chrome_for_blocked_forum_detail_when_
 
     assert attempts == ["real_chrome", "patchright"]
 
+
 @pytest.mark.component
 def test_browser_engine_attempts_keeps_forced_patchright_explicit_when_unavailable() -> (
     None
@@ -492,6 +510,7 @@ def test_browser_engine_attempts_keeps_forced_patchright_explicit_when_unavailab
     )
 
     assert attempts == ["patchright"]
+
 
 @pytest.mark.component
 def test_browser_engine_attempts_does_not_escalate_from_patchright_block_memory_alone(
@@ -521,6 +540,7 @@ def test_browser_engine_attempts_does_not_escalate_from_patchright_block_memory_
 
     assert attempts == ["patchright"]
 
+
 @pytest.mark.component
 def test_saved_real_chrome_contract_skips_patchright(
     monkeypatch: pytest.MonkeyPatch,
@@ -542,6 +562,7 @@ def test_saved_real_chrome_contract_skips_patchright(
     )
 
     assert attempts == ["real_chrome"]
+
 
 @pytest.mark.parametrize(
     ("engine_attempts", "vendor", "method", "expected"),
@@ -579,6 +600,7 @@ def test_durable_vendor_block_engine_attempts(
     )
 
     assert attempts == expected
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -638,6 +660,7 @@ async def test_real_chrome_cookie_contract_tries_curl_cffi_handoff_first(
     assert result.method == "curl_cffi"
     assert result.browser_diagnostics["browser_http_handoff"] is True
     assert calls == [{"url": url, "engine": "real_chrome"}]
+
 
 @pytest.mark.asyncio
 @pytest.mark.component

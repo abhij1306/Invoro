@@ -139,7 +139,9 @@ async def resolve_category_urls_with_site_links(
         assert static_result is not None
         return static_result
     if normalized_strategy == "static_only":
-        return _require_static_category_result(static_result, error=static_error, domain=domain)
+        return _require_static_category_result(
+            static_result, error=static_error, domain=domain
+        )
 
     rendered_result, rendered_error = await _resolve_rendered_category_result(
         domain=domain,
@@ -185,8 +187,12 @@ async def resolve_category_urls_with_site_links(
     )
 
 
-def _static_result_is_complete(result: SitemapResolutionResult | None, *, strategy: str) -> bool:
-    return result is not None and (strategy == "static_only" or len(result.urls) >= SITEMAP_THIN_RESULT_THRESHOLD)
+def _static_result_is_complete(
+    result: SitemapResolutionResult | None, *, strategy: str
+) -> bool:
+    return result is not None and (
+        strategy == "static_only" or len(result.urls) >= SITEMAP_THIN_RESULT_THRESHOLD
+    )
 
 
 def _require_static_category_result(
@@ -235,7 +241,9 @@ async def _resolve_rendered_category_result(
     validate_candidates: bool,
 ) -> tuple[SitemapResolutionResult | None, Exception | None]:
     try:
-        discovery = importlib.import_module("app.services.crawl.site_link_discovery").discover_rendered_category_links
+        discovery = importlib.import_module(
+            "app.services.crawl.site_link_discovery"
+        ).discover_rendered_category_links
         result = await discovery(
             _normalize_homepage_url(domain),
             limit=limit,
@@ -255,7 +263,15 @@ async def resolve_category_urls_from_sitemap_result(
     allow_homepage_fallback: bool = False,
     category_only: bool = False,
 ) -> SitemapResolutionResult:
-    keyword = str(filter_keyword if filter_keyword is not None else SITEMAP_DEFAULT_FILTER_KEYWORD).strip().lower()
+    keyword = (
+        str(
+            filter_keyword
+            if filter_keyword is not None
+            else SITEMAP_DEFAULT_FILTER_KEYWORD
+        )
+        .strip()
+        .lower()
+    )
     limit = max(1, int(max_urls or SITEMAP_DEFAULT_MAX_URLS))
     homepage_url = _normalize_homepage_url(domain)
     last_sitemap_error: ValueError | None = None
@@ -276,8 +292,12 @@ async def resolve_category_urls_from_sitemap_result(
                     limit=limit,
                     category_only=category_only,
                 )
-                sitemap_result.diagnostics.setdefault("sitemap_attempts", sitemap_attempts)
-                sitemap_result.diagnostics.setdefault("static_status", "sitemap_success")
+                sitemap_result.diagnostics.setdefault(
+                    "sitemap_attempts", sitemap_attempts
+                )
+                sitemap_result.diagnostics.setdefault(
+                    "static_status", "sitemap_success"
+                )
                 break
             except ValueError as exc:
                 last_sitemap_error = exc
@@ -325,8 +345,12 @@ async def resolve_category_urls_from_sitemap_result(
                     }
                 )
             else:
-                homepage_result.diagnostics.setdefault("sitemap_attempts", sitemap_attempts)
-                homepage_result.diagnostics.setdefault("static_status", "homepage_fallback_success")
+                homepage_result.diagnostics.setdefault(
+                    "sitemap_attempts", sitemap_attempts
+                )
+                homepage_result.diagnostics.setdefault(
+                    "static_status", "homepage_fallback_success"
+                )
                 return homepage_result
 
     if last_sitemap_error is not None:
@@ -360,7 +384,9 @@ async def _merge_thin_sitemap_with_homepage(
         return sitemap_result
     if not sitemap_result.urls:
         homepage_result.diagnostics.setdefault("sitemap_attempts", sitemap_attempts)
-        homepage_result.diagnostics.setdefault("static_status", "homepage_fallback_success")
+        homepage_result.diagnostics.setdefault(
+            "static_status", "homepage_fallback_success"
+        )
         return homepage_result
     merged = _merge_dedupe_urls(sitemap_result.urls, homepage_result.urls, limit=limit)
     labels = _labels_by_url_from_tree(homepage_result.nav_tree or [])
@@ -411,7 +437,9 @@ async def _resolve_sitemap_urls(
         )
 
     if root_tag == "urlset":
-        urls = _filter_urls(await _safe_locs(root_xml), keyword, category_only=category_only)
+        urls = _filter_urls(
+            await _safe_locs(root_xml), keyword, category_only=category_only
+        )
         if not urls:
             if keyword:
                 raise ValueError(f"No URLs matched filter '{keyword}' in {root_url}.")
@@ -454,7 +482,8 @@ async def _resolve_child_sitemap_urls(
             nested_urls = [
                 loc.text.strip()
                 for sitemap in child_xml.findall(f"{{{SITEMAP_NS}}}sitemap")
-                if (loc := sitemap.find(f"{{{SITEMAP_NS}}}loc")) is not None and loc.text
+                if (loc := sitemap.find(f"{{{SITEMAP_NS}}}loc")) is not None
+                and loc.text
             ]
             all_urls.extend(
                 await _resolve_child_sitemap_urls(
@@ -492,7 +521,9 @@ def _filter_urls(
     return filtered
 
 
-def _merge_dedupe_urls(primary: list[str], secondary: list[str], *, limit: int) -> list[str]:
+def _merge_dedupe_urls(
+    primary: list[str], secondary: list[str], *, limit: int
+) -> list[str]:
     """Merge two ranked URL lists preserving primary order, dropping dupes.
 
     Used when a thin sitemap is augmented with homepage-harvested links.
@@ -535,7 +566,9 @@ async def _resolve_homepage_urls(
     if not candidates:
         raise ValueError(f"No candidate links found on homepage {homepage_url}.")
     urls = [candidate.url for candidate in candidates]
-    labels = {candidate.url: candidate.label for candidate in candidates if candidate.label}
+    labels = {
+        candidate.url: candidate.label for candidate in candidates if candidate.label
+    }
     return SitemapResolutionResult(
         urls=urls,
         source="homepage",
@@ -562,7 +595,9 @@ async def _fetch_response(client: httpx.AsyncClient, url: str) -> httpx.Response
         if response.status_code == 200:
             break
         if response.status_code not in retry_status_codes or attempt >= attempts - 1:
-            raise ValueError(f"Sitemap fetch failed: {url} returned HTTP {response.status_code}")
+            raise ValueError(
+                f"Sitemap fetch failed: {url} returned HTTP {response.status_code}"
+            )
         logger.warning(
             "Retrying sitemap fetch for %s after HTTP %s (%s/%s)",
             url,
@@ -632,7 +667,9 @@ async def _extract_homepage_candidate_entries(
     soup = BeautifulSoup(html or "", "html.parser")
     scored_urls: dict[str, tuple[int, str, int, str | None]] = {}
     validations = 0
-    for index, anchor in enumerate(soup.select("a[href]")[:SITEMAP_HOMEPAGE_FALLBACK_MAX_ANCHORS]):
+    for index, anchor in enumerate(
+        soup.select("a[href]")[:SITEMAP_HOMEPAGE_FALLBACK_MAX_ANCHORS]
+    ):
         candidate = _homepage_candidate_score(
             anchor,
             index=index,
@@ -662,7 +699,10 @@ async def _extract_homepage_candidate_entries(
             item[1][2],
         ),
     )
-    return [HomepageCandidate(url=url, label=score_data[3]) for url, score_data in ranked[:limit]]
+    return [
+        HomepageCandidate(url=url, label=score_data[3])
+        for url, score_data in ranked[:limit]
+    ]
 
 
 def _homepage_candidate_score(
@@ -675,13 +715,21 @@ def _homepage_candidate_score(
     keyword: str,
     category_only: bool,
 ) -> tuple[str, int, str, int, str | None] | None:
-    candidate_url = normalize_target_url(_strip_fragment(absolute_url(homepage_url, anchor.get("href"))))
+    candidate_url = normalize_target_url(
+        _strip_fragment(absolute_url(homepage_url, anchor.get("href")))
+    )
     if not candidate_url or candidate_url.rstrip("/") == homepage_normalized:
         return None
-    if _origin_key(candidate_url) != homepage_origin or _reject_homepage_candidate(candidate_url):
+    if _origin_key(candidate_url) != homepage_origin or _reject_homepage_candidate(
+        candidate_url
+    ):
         return None
-    classification, score = _classify_homepage_candidate(candidate_url=candidate_url, keyword=keyword, anchor=anchor)
-    category_signal = category_only and _has_category_homepage_signal(candidate_url, anchor)
+    classification, score = _classify_homepage_candidate(
+        candidate_url=candidate_url, keyword=keyword, anchor=anchor
+    )
+    category_signal = category_only and _has_category_homepage_signal(
+        candidate_url, anchor
+    )
     if not classification and not category_signal:
         return None
     if category_only and classification != "listing" and not category_signal:

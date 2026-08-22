@@ -285,7 +285,9 @@ async def test_load_storage_state_for_domain_filters_existing_challenge_state(
     )
     await db_session.commit()
 
-    loaded = await cookie_store.load_storage_state_for_domain(domain, session=db_session)
+    loaded = await cookie_store.load_storage_state_for_domain(
+        domain, session=db_session
+    )
 
     assert loaded == {
         "cookies": [
@@ -377,7 +379,9 @@ async def test_persist_storage_state_for_domain_rejects_challenge_only_state(
     )
 
     rows = await cookie_store.list_domain_cookie_memory(domain, session=db_session)
-    loaded = await cookie_store.load_storage_state_for_domain(domain, session=db_session)
+    loaded = await cookie_store.load_storage_state_for_domain(
+        domain, session=db_session
+    )
 
     assert saved is False
     assert rows == []
@@ -416,7 +420,9 @@ async def test_load_storage_state_for_domain_drops_origin_shell_when_local_stora
     )
     await db_session.commit()
 
-    loaded = await cookie_store.load_storage_state_for_domain(domain, session=db_session)
+    loaded = await cookie_store.load_storage_state_for_domain(
+        domain, session=db_session
+    )
 
     assert loaded == {
         "cookies": [
@@ -438,13 +444,17 @@ class TestNativeContextContract:
     def test_native_context_deheadlessifies_user_agent(self) -> None:
         # Headless Chromium leaks a "HeadlessChrome" UA token that bot-defense
         # vendors block on sight. The context UA must present as plain Chrome.
-        opts = browser_identity.build_playwright_context_options(browser_major_version=145)
+        opts = browser_identity.build_playwright_context_options(
+            browser_major_version=145
+        )
         user_agent = str(opts.get("user_agent") or "")
         assert "HeadlessChrome" not in user_agent
         assert "Chrome/145" in user_agent
 
     def test_native_context_emits_coherent_client_hints(self) -> None:
-        opts = browser_identity.build_playwright_context_options(browser_major_version=145)
+        opts = browser_identity.build_playwright_context_options(
+            browser_major_version=145
+        )
         headers = opts.get("extra_http_headers") or {}
         assert headers.get("sec-ch-ua-mobile") == "?0"
         assert "Google Chrome" in str(headers.get("sec-ch-ua") or "")
@@ -453,7 +463,11 @@ class TestNativeContextContract:
     def test_native_context_merges_locality_headers_with_client_hints(self) -> None:
         opts = browser_identity.build_playwright_context_options(
             browser_major_version=145,
-            locality_profile={"browser_context_profile": {"extra_http_headers": {"Accept-Language": "en-US"}}},
+            locality_profile={
+                "browser_context_profile": {
+                    "extra_http_headers": {"Accept-Language": "en-US"}
+                }
+            },
         )
         headers = opts.get("extra_http_headers") or {}
         assert headers["Accept-Language"] == "en-US"

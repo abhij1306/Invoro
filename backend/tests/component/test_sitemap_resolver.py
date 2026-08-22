@@ -18,6 +18,7 @@ from app.services.url_safety import SecurityError, ValidatedTarget
 
 SITEMAP_NS = "http://www.sitemaps.org/schemas/sitemap/0.9"
 
+
 class _FakeClient:
     def __init__(self, responses: dict[str, httpx.Response]) -> None:
         self._responses = responses
@@ -33,6 +34,7 @@ class _FakeClient:
         del headers
         self.requested_urls.append(url)
         return self._responses[url]
+
 
 class _SequencedFakeClient:
     def __init__(self, responses: dict[str, list[httpx.Response]]) -> None:
@@ -53,12 +55,14 @@ class _SequencedFakeClient:
             return responses[0]
         return responses.pop(0)
 
+
 def _xml_response(url: str, content: str, status_code: int = 200) -> httpx.Response:
     return httpx.Response(
         status_code,
         content=content.encode(),
         request=httpx.Request("GET", url),
     )
+
 
 async def _valid_target(url: str) -> ValidatedTarget:
     from urllib.parse import urlparse

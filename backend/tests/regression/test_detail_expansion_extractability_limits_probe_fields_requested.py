@@ -4,6 +4,7 @@ from .test_browser_expansion_runtime import Any, BeautifulSoup, CARD_SELECTORS, 
 
 pytest_plugins = ["tests.regression.test_browser_expansion_runtime"]
 
+
 @pytest.mark.regression
 def test_detail_expansion_extractability_limits_probe_fields_to_requested() -> None:
     seen_probe_fields: set[str] | None = None
@@ -27,6 +28,7 @@ def test_detail_expansion_extractability_limits_probe_fields_to_requested() -> N
     )
 
     assert seen_probe_fields == {"materials"}
+
 
 @pytest.mark.regression
 def test_detail_expansion_extractability_uses_default_dom_probe_fields_without_requests() -> (
@@ -55,6 +57,7 @@ def test_detail_expansion_extractability_uses_default_dom_probe_fields_without_r
     assert seen_probe_fields is not None
     assert "description" in seen_probe_fields
     assert "materials" in seen_probe_fields
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -95,6 +98,7 @@ async def test_browser_fetch_deadline_includes_page_acquisition(
     )
 
     assert captured_deadlines == [105.0]
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -150,6 +154,7 @@ async def test_browser_fetch_fast_paths_ready_detail_without_extra_waits() -> No
     assert page.content_calls == 2
     assert "networkidle" not in page.load_state_calls
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_browser_fetch_closes_unexpected_popup_pages() -> None:
@@ -197,6 +202,7 @@ async def test_browser_fetch_closes_unexpected_popup_pages() -> None:
 
     assert result.browser_diagnostics["browser_outcome"] == "usable_content"
     assert popup_page.page_close_calls == 1
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -273,6 +279,7 @@ async def test_browser_fetch_recovers_direct_navigation_challenge(
     assert "Widget Prime" in result.html
     assert page.wait_timeout_calls
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_browser_fetch_does_not_repeat_challenge_recovery_after_navigation(
@@ -327,6 +334,7 @@ async def test_browser_fetch_does_not_repeat_challenge_recovery_after_navigation
     assert result.status_code == 403
     assert result.browser_diagnostics["browser_outcome"] == "challenge_page"
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_browser_fetch_fast_paths_ready_listing_cards_without_networkidle() -> (
@@ -357,6 +365,7 @@ async def test_browser_fetch_fast_paths_ready_listing_cards_without_networkidle(
     )
     assert page.wait_timeout_calls == []
     assert page.load_state_calls == []
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -401,6 +410,7 @@ async def test_browser_fetch_listing_does_not_treat_product_titles_as_extractabl
         result.browser_diagnostics["detail_expansion"]["reason"] == "non_detail_surface"
     )
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_browser_fetch_listing_skips_detail_extractability_probe(
@@ -428,6 +438,7 @@ async def test_browser_fetch_listing_skips_detail_extractability_probe(
     assert (
         result.browser_diagnostics["detail_expansion"]["reason"] == "non_detail_surface"
     )
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -525,6 +536,7 @@ async def test_browser_fetch_attempts_implicit_networkidle_for_unmatched_spa_lis
     assert page.load_state_calls == ["networkidle"]
     assert result.browser_diagnostics["networkidle_skip_reason"] is None
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_probe_browser_readiness_does_not_fast_path_listing_on_visible_text_alone() -> (
@@ -547,6 +559,7 @@ async def test_probe_browser_readiness_does_not_fast_path_listing_on_visible_tex
         int(crawler_runtime_settings.browser_readiness_visible_text_min) * 2
     )
     assert probe["is_ready"] is False
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -590,6 +603,7 @@ async def test_probe_browser_readiness_does_not_fast_path_ecommerce_category_car
     assert probe["listing_card_count"] == 0
     assert probe["is_ready"] is False
 
+
 @pytest.mark.regression
 def test_ecommerce_ready_card_count_rejects_repeated_product_attribute_tokens() -> None:
     soup = BeautifulSoup(
@@ -610,6 +624,7 @@ def test_ecommerce_ready_card_count_rejects_repeated_product_attribute_tokens() 
     )
 
     assert browser_readiness._ecommerce_ready_card_count(soup) == 0
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -651,6 +666,7 @@ async def test_probe_browser_readiness_accepts_ecommerce_product_tiles() -> None
 
     assert probe["listing_card_count"] == 3
     assert probe["is_ready"] is True
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression

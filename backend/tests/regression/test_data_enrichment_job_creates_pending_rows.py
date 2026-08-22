@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .test_data_enrichment import AsyncSession, CrawlRecord, DATA_ENRICHMENT_COLOR_FAMILY_ALIASES, DATA_ENRICHMENT_STATUS_ENRICHED, DATA_ENRICHMENT_STATUS_PENDING, DATA_ENRICHMENT_STATUS_RUNNING, DATA_ENRICHMENT_TAXONOMY_CONTEXT_ONLY_TOKENS, DATA_ENRICHMENT_TAXONOMY_VERSION, DataEnrichmentJobDetailResponse, EnrichedProduct, accessory_path_conflict, async_sessionmaker, asyncio, build_data_enrichment_job_payload, build_deterministic_enrichment, category_match_values, category_url_context, create_data_enrichment_job, get_data_enrichment_job, list_data_enrichment_jobs, normalize_price, normalize_taxonomy_token, percentage_material_parse, plausible_size_value, pytest, run_job, select, shopify_catalog, special_token_conflict, sport_specific_conflict, taxonomy_candidate_conflicts, toys_vs_sports_conflict  # fmt: skip
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_data_enrichment_job_creates_pending_rows(
@@ -49,6 +50,7 @@ async def test_data_enrichment_job_creates_pending_rows(
     assert product.price_normalized is None
     assert product.gender_normalized is None
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_data_enrichment_allows_already_enriched_records(
@@ -86,6 +88,7 @@ async def test_data_enrichment_allows_already_enriched_records(
     assert record.enrichment_status == DATA_ENRICHMENT_STATUS_PENDING
     assert product.source_record_id == record.id
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_data_enrichment_skips_active_records(
@@ -116,6 +119,7 @@ async def test_data_enrichment_skips_active_records(
             payload={"source_record_ids": [record.id]},
         )
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_data_enrichment_rejects_non_ecommerce_detail_records(
@@ -144,6 +148,7 @@ async def test_data_enrichment_rejects_non_ecommerce_detail_records(
             user=test_user,
             payload={"source_record_ids": [record.id]},
         )
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -178,6 +183,7 @@ async def test_data_enrichment_job_detail_payload_serializes(
     assert [row.id for row in jobs] == [job.id]
     assert response.job.id == job.id
     assert len(response.enriched_products) == 1
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -232,6 +238,7 @@ async def test_data_enrichment_job_commits_running_before_product_work(
 
     assert visible_job is not None
     assert visible_job.status == DATA_ENRICHMENT_STATUS_RUNNING
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -313,6 +320,7 @@ async def test_data_enrichment_commits_product_progress_between_records(
         DATA_ENRICHMENT_STATUS_RUNNING,
     }
 
+
 @pytest.mark.regression
 def test_plausible_size_value_accepts_known_numeric_system_before_strong_gate() -> None:
     assert plausible_size_value(
@@ -321,6 +329,7 @@ def test_plausible_size_value_accepts_known_numeric_system_before_strong_gate() 
         systems={"numeric": {"42"}},
         require_strong=False,
     )
+
 
 @pytest.mark.regression
 def test_percentage_material_parse_trims_context_near_percentage() -> None:
@@ -331,9 +340,11 @@ def test_percentage_material_parse_trims_context_near_percentage() -> None:
         "polyester",
     ]
 
+
 @pytest.mark.regression
 def test_category_url_context_returns_none_for_malformed_input() -> None:
     assert category_url_context("http://[bad") is None
+
 
 @pytest.mark.regression
 def test_normalize_taxonomy_token_keeps_size_tokens_and_singularizes() -> None:
@@ -342,6 +353,7 @@ def test_normalize_taxonomy_token_keeps_size_tokens_and_singularizes() -> None:
     assert normalize_taxonomy_token("l") == "l"
     assert normalize_taxonomy_token("handbags") == "bag"
     assert normalize_taxonomy_token("dresses") == "dress"
+
 
 @pytest.mark.regression
 def test_taxonomy_conflict_helpers_keep_accessory_and_sport_rules_explicit() -> None:
@@ -362,6 +374,7 @@ def test_taxonomy_conflict_helpers_keep_accessory_and_sport_rules_explicit() -> 
         "Toys & Games > Games",
     )
 
+
 @pytest.mark.regression
 def test_normalize_price_range_rejects_trailing_noise() -> None:
     assert normalize_price(
@@ -373,6 +386,7 @@ def test_normalize_price_range_rejects_trailing_noise() -> None:
         source_url="https://example.com/products/widget",
     )
     assert noisy == {"amount": 10.0, "currency": "USD"}
+
 
 @pytest.mark.regression
 def test_data_enrichment_variant_fit_does_not_become_size() -> None:
@@ -393,6 +407,7 @@ def test_data_enrichment_variant_fit_does_not_become_size() -> None:
 
     assert enrichment["size_normalized"] == ["M"]
 
+
 @pytest.mark.regression
 def test_data_enrichment_category_uses_primary_category_before_title_noise() -> None:
     enrichment = build_deterministic_enrichment(
@@ -410,6 +425,7 @@ def test_data_enrichment_category_uses_primary_category_before_title_noise() -> 
     )
     assert "Cup Sleeves" not in str(enrichment["category_path"])
 
+
 @pytest.mark.regression
 def test_data_enrichment_exact_shopify_path_match_wins() -> None:
     enrichment = build_deterministic_enrichment(
@@ -422,6 +438,7 @@ def test_data_enrichment_exact_shopify_path_match_wins() -> None:
 
     assert enrichment["category_path"] == "Apparel & Accessories > Clothing > Dresses"
     assert enrichment["_taxonomy_match"]["source"] == "exact_path"
+
 
 @pytest.mark.regression
 def test_data_enrichment_phrase_match_inputs_exclude_bulky_evidence_fields() -> None:
@@ -442,6 +459,7 @@ def test_data_enrichment_phrase_match_inputs_exclude_bulky_evidence_fields() -> 
     assert "Short description says apparel accessory token" not in flattened
     assert "Lamb Skin" not in flattened
     assert "professional clean only" not in flattened
+
 
 @pytest.mark.regression
 def test_data_enrichment_taxonomy_path_phrase_uses_index_lookup() -> None:
@@ -467,6 +485,7 @@ def test_data_enrichment_taxonomy_path_phrase_uses_index_lookup() -> None:
 
     assert match is not None
     assert match["category_path"] == row["category_path"]
+
 
 @pytest.mark.regression
 def test_data_enrichment_taxonomy_path_phrase_allows_token_subset_match() -> None:
@@ -502,6 +521,7 @@ def test_data_enrichment_taxonomy_path_phrase_allows_token_subset_match() -> Non
     assert match is not None
     assert match["category_path"] == row["category_path"]
 
+
 @pytest.mark.regression
 def test_data_enrichment_taxonomy_path_phrase_rejects_generic_subset_match() -> None:
     row = {
@@ -535,6 +555,7 @@ def test_data_enrichment_taxonomy_path_phrase_rejects_generic_subset_match() -> 
 
     assert match is None
 
+
 @pytest.mark.regression
 def test_data_enrichment_taxonomy_path_phrase_does_not_reject_valid_accessory_term() -> (
     None
@@ -563,6 +584,7 @@ def test_data_enrichment_taxonomy_path_phrase_does_not_reject_valid_accessory_te
     assert match is not None
     assert match["category_path"] == row["category_path"]
 
+
 @pytest.mark.regression
 def test_data_enrichment_color_aliases_cover_common_retail_names() -> None:
     enrichment = build_deterministic_enrichment(
@@ -576,17 +598,20 @@ def test_data_enrichment_color_aliases_cover_common_retail_names() -> None:
 
     assert enrichment["color_family"] == "pink"
 
+
 @pytest.mark.regression
 def test_data_enrichment_context_only_tokens_exclude_product_terms() -> None:
     assert not {"s", "single", "star"} & set(
         DATA_ENRICHMENT_TAXONOMY_CONTEXT_ONLY_TOKENS
     )
 
+
 @pytest.mark.regression
 def test_data_enrichment_color_aliases_do_not_mix_blue_green_intermediates() -> None:
     assert "teal" not in DATA_ENRICHMENT_COLOR_FAMILY_ALIASES["blue"]
     assert "turquoise" not in DATA_ENRICHMENT_COLOR_FAMILY_ALIASES["blue"]
     assert "teal" not in DATA_ENRICHMENT_COLOR_FAMILY_ALIASES["green"]
+
 
 @pytest.mark.regression
 def test_data_enrichment_size_split_handles_semicolon_and_middle_dot() -> None:
@@ -602,6 +627,7 @@ def test_data_enrichment_size_split_handles_semicolon_and_middle_dot() -> None:
     assert enrichment["size_normalized"] == ["38", "40", "42"]
     assert enrichment["size_system"] == "numeric"
 
+
 @pytest.mark.regression
 def test_data_enrichment_price_infers_firstcry_currency() -> None:
     enrichment = build_deterministic_enrichment(
@@ -615,6 +641,7 @@ def test_data_enrichment_price_infers_firstcry_currency() -> None:
 
     assert enrichment["price_normalized"] == {"amount": 868.21, "currency": "INR"}
 
+
 @pytest.mark.regression
 def test_data_enrichment_seo_keywords_include_title_bigrams() -> None:
     enrichment = build_deterministic_enrichment(
@@ -627,6 +654,7 @@ def test_data_enrichment_seo_keywords_include_title_bigrams() -> None:
     )
 
     assert "black seascape" in set(enrichment["seo_keywords"] or [])
+
 
 @pytest.mark.regression
 def test_data_enrichment_seo_keywords_preserve_brand_phrase_and_dedupe_stems() -> None:

@@ -127,9 +127,9 @@ def _is_adult_size_variant(variant: object) -> bool:
 
 
 def _is_child_size_variant(variant: object) -> bool:
-    return isinstance(variant, dict) and size_color_extraction._size_value_is_child_specific(
-        variant.get("size")
-    )
+    return isinstance(
+        variant, dict
+    ) and size_color_extraction._size_value_is_child_specific(variant.get("size"))
 
 
 def _dedupe_variant_rows(record: dict[str, Any]) -> None:

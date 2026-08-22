@@ -32,10 +32,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 def validate_cookie_policy_config() -> None:
     if settings.cookie_store_dir.exists() and not settings.cookie_store_dir.is_dir():
-        raise ValueError(f"cookie_store_dir must be a directory: {settings.cookie_store_dir}")
+        raise ValueError(
+            f"cookie_store_dir must be a directory: {settings.cookie_store_dir}"
+        )
     settings.cookie_store_dir.mkdir(parents=True, exist_ok=True)
     if not settings.cookie_store_dir.is_dir():
-        raise ValueError(f"cookie_store_dir must be a directory: {settings.cookie_store_dir}")
+        raise ValueError(
+            f"cookie_store_dir must be a directory: {settings.cookie_store_dir}"
+        )
 
 
 _RUN_STORAGE_STATE_CACHE: dict[str, dict[str, object]] = {}
@@ -301,7 +305,11 @@ async def list_domain_cookie_memory(
         DomainCookieMemory.id.desc(),
     )
     if normalized_domain:
-        statement = statement.where(DomainCookieMemory.domain.in_(_domain_storage_lookup_keys(normalized_domain)))
+        statement = statement.where(
+            DomainCookieMemory.domain.in_(
+                _domain_storage_lookup_keys(normalized_domain)
+            )
+        )
     rows = list((await session.execute(statement)).scalars().all())
     payload: list[dict[str, object]] = []
     for row in rows:
@@ -335,7 +343,8 @@ def _storage_state_fingerprint(
     payload = json.dumps(
         _normalize_storage_state_payload(
             storage_state,
-            browser_engine=browser_engine or _storage_state_browser_engine(storage_state),
+            browser_engine=browser_engine
+            or _storage_state_browser_engine(storage_state),
         ),
         sort_keys=True,
         separators=(",", ":"),
@@ -380,7 +389,9 @@ def _domain_storage_lookup_keys(
     if normalized_engine == DEFAULT_STORAGE_STATE_ENGINE:
         return (normalized_domain,)
     if normalized_engine:
-        return (_domain_storage_key(normalized_domain, browser_engine=normalized_engine),)
+        return (
+            _domain_storage_key(normalized_domain, browser_engine=normalized_engine),
+        )
     return (
         normalized_domain,
         *(
@@ -458,7 +469,11 @@ def _normalize_storage_state(storage_state: Mapping[str, object]) -> dict[str, o
         "cookies": _normalize_cookies(storage_state.get("cookies")),
         # Replaying origin-scoped state causes headful Chrome to wake stale site state
         # before the requested URL. Keep reusable memory cookie-only.
-        "origins": (_object_list(storage_state.get("origins")) if INCLUDE_ORIGIN_STATE_IN_STORAGE else []),
+        "origins": (
+            _object_list(storage_state.get("origins"))
+            if INCLUDE_ORIGIN_STATE_IN_STORAGE
+            else []
+        ),
     }
 
 
@@ -520,7 +535,9 @@ def _normalize_cookies(value: object) -> list[dict[str, object]]:
 
 
 def _iterable_rows(value: object) -> list[object]:
-    if isinstance(value, Iterable) and not isinstance(value, (str, bytes, bytearray, Mapping)):
+    if isinstance(value, Iterable) and not isinstance(
+        value, (str, bytes, bytearray, Mapping)
+    ):
         return list(value)
     return _object_list(value)
 
@@ -623,7 +640,9 @@ def _normalize_origins(value: object) -> list[dict[str, object]]:
             local_storage_rows.append(
                 {
                     "name": name,
-                    "value": str(_sanitize_storage_state_scalar(entry.get("value")) or ""),
+                    "value": str(
+                        _sanitize_storage_state_scalar(entry.get("value")) or ""
+                    ),
                 }
             )
         origins.append({"origin": origin, "localStorage": local_storage_rows})
@@ -713,10 +732,15 @@ def _http_cookie_pairs_for_url(
         existing = selected.get(key)
         if existing is None or (domain_score, path_score) >= existing[:2]:
             selected[key] = (domain_score, path_score, name, value)
-    return [(name, value) for _key, (_domain_score, _path_score, name, value) in selected.items()]
+    return [
+        (name, value)
+        for _key, (_domain_score, _path_score, name, value) in selected.items()
+    ]
 
 
-def _http_cookie_candidate(cookie: object, *, host: str, path: str) -> tuple[int, int, str, str] | None:
+def _http_cookie_candidate(
+    cookie: object, *, host: str, path: str
+) -> tuple[int, int, str, str] | None:
     if not isinstance(cookie, Mapping):
         return None
     name = str(cookie.get("name") or "").strip()
@@ -762,5 +786,8 @@ def _cookie_path_matches(request_path: str, cookie_path: str) -> bool:
         return False
     return (
         normalized_cookie_path.endswith("/")
-        or normalized_request_path[len(normalized_cookie_path) : len(normalized_cookie_path) + 1] == "/"
+        or normalized_request_path[
+            len(normalized_cookie_path) : len(normalized_cookie_path) + 1
+        ]
+        == "/"
     )

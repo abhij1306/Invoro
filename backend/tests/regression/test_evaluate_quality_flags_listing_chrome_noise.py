@@ -3,6 +3,7 @@ from __future__ import annotations
 from .test_harness_support import AcquisitionPlan, SimpleNamespace, classify_failure_mode, evaluate_quality, harness_support, hash_password, pytest, run_test_sites_acceptance, select, site_harness_runner, verify_password  # fmt: skip
 from app.models.user import User
 
+
 @pytest.mark.regression
 def test_evaluate_quality_flags_listing_chrome_noise() -> None:
     site = {
@@ -33,6 +34,7 @@ def test_evaluate_quality_flags_listing_chrome_noise() -> None:
 
     assert quality["quality_verdict"] == "bad_output"
     assert quality["observed_failure_mode"] == "listing_chrome_noise"
+
 
 @pytest.mark.regression
 def test_evaluate_quality_flags_listing_sample_window_without_real_product_rows() -> (
@@ -89,6 +91,7 @@ def test_evaluate_quality_flags_listing_sample_window_without_real_product_rows(
     assert quality["observed_failure_mode"] == "listing_chrome_noise"
     assert quality["quality_checks"]["listing_noise_ok"] is False
 
+
 @pytest.mark.regression
 def test_evaluate_quality_accepts_non_utility_listing_rows_without_price_when_field_coverage_is_strong() -> (
     None
@@ -143,6 +146,7 @@ def test_evaluate_quality_accepts_non_utility_listing_rows_without_price_when_fi
     assert quality["observed_failure_mode"] == "control_good"
     assert quality["quality_checks"]["listing_noise_ok"] is True
 
+
 @pytest.mark.regression
 def test_evaluate_quality_does_not_flag_job_account_slug_as_utility() -> None:
     site = {
@@ -180,6 +184,7 @@ def test_evaluate_quality_does_not_flag_job_account_slug_as_utility() -> None:
     assert quality["observed_failure_mode"] == "bad_output"
     assert quality["quality_checks"]["listing_noise_ok"] is True
 
+
 @pytest.mark.regression
 def test_acceptance_runner_uses_quality_verdict_for_curated_sites() -> None:
     site = {
@@ -195,6 +200,7 @@ def test_acceptance_runner_uses_quality_verdict_for_curated_sites() -> None:
 
     assert run_test_sites_acceptance._expectation_met(site, result) is False
 
+
 @pytest.mark.regression
 def test_acceptance_runner_allows_bucketed_expected_failure_modes() -> None:
     site = {
@@ -209,6 +215,7 @@ def test_acceptance_runner_allows_bucketed_expected_failure_modes() -> None:
     }
 
     assert run_test_sites_acceptance._expectation_met(site, result) is True
+
 
 @pytest.mark.regression
 def test_classify_failure_mode_buckets_spa_shell_failures() -> None:
@@ -238,6 +245,7 @@ def test_classify_failure_mode_buckets_spa_shell_failures() -> None:
     assert classify_failure_mode(shell_low_content) == "spa_shell_low_content"
     assert classify_failure_mode(readiness_timeout) == "spa_readiness_timeout"
 
+
 @pytest.mark.regression
 def test_classify_failure_mode_treats_uppercase_success_verdict_as_success() -> None:
     result = {
@@ -249,6 +257,7 @@ def test_classify_failure_mode_treats_uppercase_success_verdict_as_success() -> 
     }
 
     assert classify_failure_mode(result) == "success"
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -315,6 +324,7 @@ async def test_run_site_harness_supports_acquisition_only_mode(
     assert result["method"] == "curl_cffi"
     assert result["status_code"] == 200
     assert result["records"] == 0
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -396,6 +406,7 @@ async def test_run_site_harness_surfaces_challenge_summary_in_acquisition_only_m
         ],
     }
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_ensure_harness_user_id_reuses_user_by_configured_email(
@@ -411,14 +422,13 @@ async def test_ensure_harness_user_id_reuses_user_by_configured_email(
     second_user_id = await harness_support._ensure_harness_user_id(db_session)
     user = (
         await db_session.execute(
-            select(User).where(
-                User.email == "harness@example.invalid"
-            )
+            select(User).where(User.email == "harness@example.invalid")
         )
     ).scalar_one()
 
     assert first_user_id == second_user_id == user.id
     assert user.role == "harness"
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -434,14 +444,13 @@ async def test_ensure_harness_user_id_uses_local_default_credentials_without_env
     user_id = await harness_support._ensure_harness_user_id(db_session)
     user = (
         await db_session.execute(
-            select(User).where(
-                User.email == harness_support.DEFAULT_HARNESS_EMAIL
-            )
+            select(User).where(User.email == harness_support.DEFAULT_HARNESS_EMAIL)
         )
     ).scalar_one()
 
     assert user_id == user.id
     assert user.role == "harness"
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -458,6 +467,7 @@ async def test_ensure_harness_user_id_rejects_production_environment(
         match="Harness user access is disabled outside local/test environments",
     ):
         await harness_support._ensure_harness_user_id(db_session)
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -484,13 +494,12 @@ async def test_ensure_harness_user_id_rejects_password_sync_without_flag(
 
     persisted = (
         await db_session.execute(
-            select(User).where(
-                User.email == "harness@example.invalid"
-            )
+            select(User).where(User.email == "harness@example.invalid")
         )
     ).scalar_one()
     assert verify_password("OldHarnessSecret123!", persisted.hashed_password)
     assert not verify_password("NewHarnessSecret123!", persisted.hashed_password)
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -515,14 +524,13 @@ async def test_ensure_harness_user_id_allows_password_sync_with_flag(
     user_id = await harness_support._ensure_harness_user_id(db_session)
     persisted = (
         await db_session.execute(
-            select(User).where(
-                User.email == "harness@example.invalid"
-            )
+            select(User).where(User.email == "harness@example.invalid")
         )
     ).scalar_one()
 
     assert user_id == persisted.id
     assert verify_password("NewHarnessSecret123!", persisted.hashed_password)
+
 
 @pytest.mark.regression
 def test_harness_user_module_does_not_export_private_ensure_helper() -> None:

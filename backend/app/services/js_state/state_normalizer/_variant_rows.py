@@ -137,7 +137,11 @@ def _option_group_axis_name(group: dict[str, Any]) -> str | None:
 
 def _option_group_values(group: dict[str, Any]) -> list[Any]:
     return next(
-        (values for key in JS_STATE_OPTION_GROUP_VALUE_KEYS if (values := as_list(group.get(key)))),
+        (
+            values
+            for key in JS_STATE_OPTION_GROUP_VALUE_KEYS
+            if (values := as_list(group.get(key)))
+        ),
         [],
     )
 

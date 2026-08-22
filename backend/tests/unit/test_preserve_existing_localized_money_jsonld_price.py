@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .test_normalizers import BeautifulSoup, backfill, backfill_detail_price_from_html, coerce_field_value, enforce_payload_limits, extract_node_value, hydration, normalize_decimal_price, normalize_value, normalize_variant_record, pytest, repair_ecommerce_detail_record_quality  # fmt: skip
 
+
 @pytest.mark.unit
 def test_preserve_existing_localized_money_without_jsonld_price() -> None:
     record = {
@@ -20,6 +21,7 @@ def test_preserve_existing_localized_money_without_jsonld_price() -> None:
     assert record["currency"] == "INR"
     assert record["price"] == "INR 1,999"
 
+
 @pytest.mark.unit
 def test_coerce_category_reads_locale_dict_string() -> None:
     assert (
@@ -30,6 +32,7 @@ def test_coerce_category_reads_locale_dict_string() -> None:
         )
         == "LEATHER JACKETS"
     )
+
 
 @pytest.mark.unit
 def test_normalize_additional_images_preserves_url_lists_with_commas() -> None:
@@ -46,11 +49,13 @@ def test_normalize_additional_images_preserves_url_lists_with_commas() -> None:
         "https://cdn.example.com/images/f_auto,q_auto,w_1080/widget-3.jpg",
     ]
 
+
 @pytest.mark.unit
 def test_normalize_decimal_price_rejects_ambiguous_integer_text_without_price_context() -> (
     None
 ):
     assert normalize_decimal_price("126") is None
+
 
 @pytest.mark.unit
 def test_normalize_decimal_price_accepts_currency_context_for_integer_text() -> None:
@@ -58,11 +63,13 @@ def test_normalize_decimal_price_accepts_currency_context_for_integer_text() -> 
     assert normalize_decimal_price("Rs. 499") == "499"
     assert normalize_decimal_price("INR 499") == "499"
 
+
 @pytest.mark.unit
 def test_normalize_decimal_price_accepts_price_keyword_context_for_integer_text() -> (
     None
 ):
     assert normalize_decimal_price("price 126") == "126"
+
 
 @pytest.mark.unit
 def test_normalize_decimal_price_preserves_decimal_strings_without_currency_symbol() -> (
@@ -70,13 +77,16 @@ def test_normalize_decimal_price_preserves_decimal_strings_without_currency_symb
 ):
     assert normalize_decimal_price("59.99") == "59.99"
 
+
 @pytest.mark.unit
 def test_normalize_decimal_price_supports_suffix_currency_and_decimal_comma() -> None:
     assert normalize_decimal_price("62,99 €") == "62.99"
 
+
 @pytest.mark.unit
 def test_normalize_decimal_price_treats_dot_thousands_as_grouping() -> None:
     assert normalize_decimal_price("€17.000") == "17000"
+
 
 @pytest.mark.unit
 def test_normalize_decimal_price_rejects_negative_values() -> None:
@@ -90,9 +100,11 @@ def test_normalize_decimal_price_rejects_negative_values() -> None:
     assert normalize_decimal_price("−1") is None
     assert normalize_decimal_price("$−1") is None
 
+
 @pytest.mark.unit
 def test_normalize_integer_field_handles_unicode_minus_as_negative() -> None:
     assert normalize_value("stock_quantity", "−123") == -123
+
 
 @pytest.mark.unit
 def test_normalize_decimal_price_rejects_structured_types() -> None:
@@ -100,6 +112,7 @@ def test_normalize_decimal_price_rejects_structured_types() -> None:
     assert normalize_decimal_price([100, 200]) is None
     assert normalize_decimal_price(("100",)) is None
     assert normalize_decimal_price({100, 200}) is None
+
 
 @pytest.mark.unit
 def test_variant_payload_limit_accepts_explicit_max_rows() -> None:
@@ -120,6 +133,7 @@ def test_variant_payload_limit_accepts_explicit_max_rows() -> None:
     ]
     assert record["variant_count"] == 2
 
+
 @pytest.mark.unit
 def test_normalize_variant_record_drops_geographic_state_dropdown_rows() -> None:
     record: dict[str, object] = {
@@ -137,6 +151,7 @@ def test_normalize_variant_record_drops_geographic_state_dropdown_rows() -> None
 
     assert "variants" not in record
     assert "variant_count" not in record
+
 
 @pytest.mark.unit
 def test_repair_ecommerce_detail_reconciles_parent_price_against_unanimous_variants() -> (
@@ -161,6 +176,7 @@ def test_repair_ecommerce_detail_reconciles_parent_price_against_unanimous_varia
     )
     assert record["price"] == "310.00"
 
+
 @pytest.mark.unit
 def test_repair_ecommerce_detail_skips_variant_range_reconcile_when_magnitudes_differ() -> (
     None
@@ -183,6 +199,7 @@ def test_repair_ecommerce_detail_skips_variant_range_reconcile_when_magnitudes_d
         requested_page_url="https://example.com/p",
     )
     assert record["price"] == "282.00"
+
 
 @pytest.mark.unit
 @pytest.mark.parametrize(
@@ -230,6 +247,7 @@ def test_repair_ecommerce_detail_backfills_missing_brand_from_identity(
 
     assert record["brand"] == expected_brand
 
+
 @pytest.mark.unit
 def test_repair_ecommerce_detail_backfills_game_publisher_brand_from_description() -> (
     None
@@ -249,6 +267,7 @@ def test_repair_ecommerce_detail_backfills_game_publisher_brand_from_description
     )
 
     assert record["brand"] == "Capcom"
+
 
 @pytest.mark.unit
 def test_repair_ecommerce_detail_prunes_child_pdp_variants_from_adult_product() -> None:
@@ -285,6 +304,7 @@ def test_repair_ecommerce_detail_prunes_child_pdp_variants_from_adult_product() 
     assert record["variants"][0]["url"] == f"{url}?variant=adult"
     assert record["variant_count"] == 1
 
+
 @pytest.mark.unit
 def test_infer_shared_variant_color_drops_trailing_style_code_tokens() -> None:
     record = {
@@ -304,6 +324,7 @@ def test_infer_shared_variant_color_drops_trailing_style_code_tokens() -> None:
         "White",
         "White",
     ]
+
 
 @pytest.mark.unit
 def test_repair_ecommerce_detail_drops_color_values_misread_as_sizes() -> None:
@@ -331,6 +352,7 @@ def test_repair_ecommerce_detail_drops_color_values_misread_as_sizes() -> None:
         {"size": "8M", "color": "Black"},
     ]
 
+
 @pytest.mark.unit
 def test_repair_ecommerce_detail_drops_same_url_color_only_variant_cluster() -> None:
     url = "https://colourpop.com/products/going-coconuts-eyeshadow-palette"
@@ -351,6 +373,7 @@ def test_repair_ecommerce_detail_drops_same_url_color_only_variant_cluster() -> 
 
     assert "variants" not in record
     assert "variant_count" not in record
+
 
 @pytest.mark.unit
 def test_repair_ecommerce_detail_filters_related_and_low_res_images() -> None:
@@ -375,6 +398,7 @@ def test_repair_ecommerce_detail_filters_related_and_low_res_images() -> None:
     assert record["additional_images"] == [
         "https://www.aesop.com/dw/image/v2/AANG_PRD/on/demandware.static/-/Sites-aesop-us-master-catalog/default/dw00834621/images/products/HM03/Aesop_Home_Aganice_Aromatique_Candle_Vessel_&_Carton_Front_2000x2000px.jpg?sw=1536&sh=1536"
     ]
+
 
 @pytest.mark.unit
 def test_repair_ecommerce_detail_prefers_active_color_image_and_drops_swatch_thumbs() -> (
@@ -405,6 +429,7 @@ def test_repair_ecommerce_detail_prefers_active_color_image_and_drops_swatch_thu
         for image in record.get("additional_images", [])
     )
 
+
 @pytest.mark.unit
 def test_normalize_variant_record_keeps_url_when_same_axis_value_is_repeated() -> None:
     record = {
@@ -417,6 +442,7 @@ def test_normalize_variant_record_keeps_url_when_same_axis_value_is_repeated() -
     normalize_variant_record(record)
 
     assert all(variant.get("url") for variant in record["variants"])  # nosec B101
+
 
 @pytest.mark.unit
 def test_repair_ecommerce_detail_trims_description_to_url_identity_chunk() -> None:
@@ -442,6 +468,7 @@ def test_repair_ecommerce_detail_trims_description_to_url_identity_chunk() -> No
     assert "Foray" not in str(record["description"])
     assert "Florsheim" not in str(record["description"])
 
+
 @pytest.mark.unit
 def test_coerce_field_value_category_rejects_url_path_strings() -> None:
     # Regression: gemini audit DQ-8 — Vans exposed a joined URL path
@@ -463,18 +490,22 @@ def test_coerce_field_value_category_rejects_url_path_strings() -> None:
         == "Shoes > Icons > Old Skool"
     )
 
+
 @pytest.mark.unit
 def test_normalize_value_price_preserves_semantic_integer_price_fields() -> None:
     assert normalize_value("price", "126") == "126"
+
 
 @pytest.mark.unit
 def test_normalize_value_price_normalizes_clean_decimal_strings() -> None:
     assert normalize_value("price", "0012.50") == "12.50"
 
+
 @pytest.mark.unit
 def test_normalize_value_unwraps_singleton_barcode_list_and_rounds_rating() -> None:
     assert normalize_value("barcode", "['0840424803104']") == "0840424803104"
     assert normalize_value("rating", "2.399113082039911") == pytest.approx(2.4)
+
 
 @pytest.mark.unit
 def test_coerce_text_fields_join_literal_list_strings() -> None:
@@ -487,12 +518,14 @@ def test_coerce_text_fields_join_literal_list_strings() -> None:
         == "Leather upper with perforated toe box; Rubber outsole"
     )
 
+
 @pytest.mark.unit
 def test_normalize_availability_schema_url() -> None:
     assert (
         normalize_value("availability", "https://schema.org/LimitedAvailability")
         == "limited_stock"
     )
+
 
 @pytest.mark.unit
 def test_variant_price_backfill_handles_numeric_string_equivalence() -> None:
@@ -510,6 +543,7 @@ def test_variant_price_backfill_handles_numeric_string_equivalence() -> None:
     assert record["variants"][0]["price"] == pytest.approx(10.0)
     assert record["variants"][1]["price"] == "10.00"
 
+
 @pytest.mark.unit
 def test_variant_price_backfill_treats_numeric_zero_as_distinct() -> None:
     record: dict[str, object] = {
@@ -526,6 +560,7 @@ def test_variant_price_backfill_treats_numeric_zero_as_distinct() -> None:
     assert record["variants"][0]["price"] == 0
     assert "price" not in record["variants"][1]
 
+
 @pytest.mark.unit
 def test_field_coercion_repairs_source_quality_before_enrichment() -> None:
     assert coerce_field_value("brand", {"0": "Apple"}, "") == "Apple"
@@ -539,6 +574,7 @@ def test_field_coercion_repairs_source_quality_before_enrichment() -> None:
     )
     assert coerce_field_value("product_type", {"variationGroup": True}, "") is None
 
+
 @pytest.mark.unit
 def test_variant_option_dom_text_drops_child_price_badges() -> None:
     soup = BeautifulSoup(
@@ -551,6 +587,7 @@ def test_variant_option_dom_text_drops_child_price_badges() -> None:
     )
 
     assert extract_node_value(soup.button, "color", "https://example.com") == "Black"
+
 
 @pytest.mark.unit
 def test_normalize_variant_record_preserves_referenced_single_value_axes() -> None:
@@ -570,6 +607,7 @@ def test_normalize_variant_record_preserves_referenced_single_value_axes() -> No
     ]
     assert record["variant_count"] == 2
 
+
 @pytest.mark.unit
 def test_normalize_variant_record_drops_subset_rows_using_indexed_axis_lookup() -> None:
     record = {
@@ -588,6 +626,7 @@ def test_normalize_variant_record_drops_subset_rows_using_indexed_axis_lookup() 
         {"size": "L", "color": "Black"},
     ]
     assert record["variant_count"] == 2
+
 
 @pytest.mark.unit
 def test_normalize_variant_record_drops_parent_sku_alias_rows_using_indexed_lookup() -> (
@@ -609,6 +648,7 @@ def test_normalize_variant_record_drops_parent_sku_alias_rows_using_indexed_look
     ]
     assert record["variant_count"] == 2
 
+
 @pytest.mark.unit
 def test_normalize_variant_record_drops_axisless_rows_and_rejects_foreign_currency() -> (
     None
@@ -629,6 +669,7 @@ def test_normalize_variant_record_drops_axisless_rows_and_rejects_foreign_curren
     ]
     assert record["variant_count"] == 1
 
+
 @pytest.mark.unit
 def test_normalize_variant_record_drops_ui_control_variant_values() -> None:
     record = {
@@ -648,6 +689,7 @@ def test_normalize_variant_record_drops_ui_control_variant_values() -> None:
     assert "variants" not in record
     assert "variant_count" not in record
 
+
 @pytest.mark.unit
 def test_normalize_variant_record_drops_polluted_parent_scalar_axes() -> None:
     record = {
@@ -661,6 +703,7 @@ def test_normalize_variant_record_drops_polluted_parent_scalar_axes() -> None:
     assert "color" not in record
     assert "size" not in record
     assert record["variant_count"] == 2
+
 
 @pytest.mark.unit
 def test_repair_ecommerce_detail_backfills_dom_variants_before_sanitizing_noise() -> (
@@ -694,6 +737,7 @@ def test_repair_ecommerce_detail_backfills_dom_variants_before_sanitizing_noise(
 
     assert record["variants"] == [{"size": "S"}, {"size": "M"}]
     assert record["variant_count"] == 2
+
 
 @pytest.mark.unit
 def test_normalize_variant_record_drops_ce4_ui_and_cookie_axis_values() -> None:

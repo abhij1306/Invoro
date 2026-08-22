@@ -4,6 +4,7 @@ from .test_browser_expansion_runtime import Any, PlaywrightError, SimpleNamespac
 
 pytest_plugins = ["tests.regression.test_browser_expansion_runtime"]
 
+
 @pytest.mark.regression
 def test_build_failed_browser_diagnostics_marks_timeout_explicitly() -> None:
     diagnostics = browser_runtime.build_failed_browser_diagnostics(
@@ -14,6 +15,7 @@ def test_build_failed_browser_diagnostics_marks_timeout_explicitly() -> None:
     assert diagnostics["browser_outcome"] == "render_timeout"
     assert diagnostics["failure_kind"] == "timeout"
     assert diagnostics["timeout_phase"] == "navigation"
+
 
 @pytest.mark.regression
 def test_build_failed_browser_diagnostics_preserves_failure_stage() -> None:
@@ -30,6 +32,7 @@ def test_build_failed_browser_diagnostics_preserves_failure_stage() -> None:
     assert diagnostics["timeout_phase"] == "settle"
     assert diagnostics["phase_timings_ms"] == {"navigation": 420}
 
+
 @pytest.mark.regression
 def test_build_failed_browser_diagnostics_marks_unsupported_proxy_explicitly() -> None:
     diagnostics = browser_runtime.build_failed_browser_diagnostics(
@@ -39,6 +42,7 @@ def test_build_failed_browser_diagnostics_marks_unsupported_proxy_explicitly() -
 
     assert diagnostics["browser_outcome"] == "navigation_failed"
     assert diagnostics["failure_kind"] == "unsupported_proxy"
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -60,6 +64,7 @@ async def test_browser_fetch_attaches_failure_diagnostics_to_direct_errors() -> 
     assert diagnostics["browser_outcome"] == "navigation_failed"
     assert diagnostics["failure_kind"] == "navigation_error"
 
+
 @pytest.mark.regression
 def test_build_failed_browser_diagnostics_uses_exception_proxy_mode() -> None:
     exc = RuntimeError("proxied page failed")
@@ -72,6 +77,7 @@ def test_build_failed_browser_diagnostics_uses_exception_proxy_mode() -> None:
     )
 
     assert diagnostics["browser_proxy_mode"] == "page"
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -101,6 +107,7 @@ async def test_browser_fetch_logs_non_usable_outcomes(
         in record.message
         for record in caplog.records
     )
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -132,6 +139,7 @@ async def test_browser_fetch_respects_disabled_screenshot_capture(
         in record.message
         for record in caplog.records
     )
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -169,6 +177,7 @@ async def test_browser_fetch_surfaces_rendered_listing_evidence_counts() -> None
         ]
         == 1
     )
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -239,6 +248,7 @@ async def test_browser_fetch_bounds_listing_artifact_capture_time(
         for record in caplog.records
     )
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_capture_listing_artifact_with_timeout_reports_playwright_error(
@@ -265,6 +275,7 @@ async def test_capture_listing_artifact_with_timeout_reports_playwright_error(
         for record in caplog.records
     )
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_capture_rendered_listing_fragments_returns_fragment_html() -> None:
@@ -289,6 +300,7 @@ async def test_capture_rendered_listing_fragments_returns_fragment_html() -> Non
         "<article><a href='https://example.com/products/widget-one'>Widget One</a><span>$19.99</span></article>"
     ]
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_capture_rendered_listing_fragments_ignores_non_listing_surfaces() -> (
@@ -306,6 +318,7 @@ async def test_capture_rendered_listing_fragments_ignores_non_listing_surfaces()
     )
 
     assert rows == []
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -358,6 +371,7 @@ async def test_emit_challenge_activity_randomizes_mouse_targets(
         (0, int(crawler_runtime_settings.challenge_activity_scroll_px))
     ]
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_emit_challenge_activity_ignores_negative_scroll(
@@ -390,6 +404,7 @@ async def test_emit_challenge_activity_ignores_negative_scroll(
     await browser_recovery._emit_challenge_activity(_Page())
 
     assert wheel_calls == []
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -434,6 +449,7 @@ async def test_emit_browser_behavior_activity_adds_scroll_physics(
     )
     assert wait_calls
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_emit_browser_behavior_activity_ignores_scroll_failures(
@@ -466,6 +482,7 @@ async def test_emit_browser_behavior_activity_ignores_scroll_failures(
     assert diagnostics["enabled"] is True
     assert int(diagnostics["scroll_steps"]) == 0
 
+
 @pytest.mark.regression
 def test_should_run_behavior_realism_skips_detail_shell_retry_for_real_chrome() -> None:
     assert (
@@ -476,6 +493,7 @@ def test_should_run_behavior_realism_skips_detail_shell_retry_for_real_chrome() 
         is False
     )
 
+
 @pytest.mark.regression
 def test_should_run_behavior_realism_for_real_chrome_with_vendor_block() -> None:
     assert (
@@ -485,6 +503,7 @@ def test_should_run_behavior_realism_for_real_chrome_with_vendor_block() -> None
         )
         is True
     )
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -513,6 +532,7 @@ async def test_browser_behavior_realism_is_timeout_bounded(
     assert "timeout_seconds" in diagnostics
     assert isinstance(diagnostics["timeout_seconds"], float)
     assert diagnostics["timeout_seconds"] == pytest.approx(0.01)
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -555,6 +575,7 @@ async def test_type_text_like_human_types_one_character_at_a_time(
     assert diagnostics == {"typed_chars": 4}
     assert typed == ["s", "h", "o", "e"]
     assert clicks == [int(crawler_runtime_settings.traversal_click_timeout_ms)]
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -604,6 +625,7 @@ async def test_recover_browser_challenge_keeps_original_response_when_retry_stay
 
     assert result is original_response
     assert page.goto_calls == 1
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression

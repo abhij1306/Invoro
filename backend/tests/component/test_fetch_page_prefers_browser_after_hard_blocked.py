@@ -4,6 +4,7 @@ from .test_crawl_fetch_runtime import HostProtectionPolicy, PageFetchResult, _as
 
 pytest_plugins = ["tests.component.test_crawl_fetch_runtime"]
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_fetch_page_prefers_browser_after_hard_blocked_fetch(
@@ -89,6 +90,7 @@ async def test_fetch_page_prefers_browser_after_hard_blocked_fetch(
     assert curl_calls == [url]
     assert browser_reasons == ["vendor-block:datadome", "host-preference"]
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_http_fetch_surfaces_dns_failure_without_hidden_ipv4_retry(
@@ -111,6 +113,7 @@ async def test_http_fetch_surfaces_dns_failure_without_hidden_ipv4_retry(
 
     with pytest.raises(OSError, match="getaddrinfo failed"):
         await crawl_fetch_runtime._http_fetch("https://example.com/jobs", 10.0)
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -146,6 +149,7 @@ async def test_fetch_page_surfaces_browser_error_when_http_exhausts_and_browser_
     assert excinfo.value.browser_diagnostics["browser_attempted"] is True
     assert excinfo.value.browser_diagnostics["browser_outcome"] == "navigation_failed"
     assert excinfo.value.browser_diagnostics["failure_kind"] == "navigation_error"
+
 
 @pytest.mark.asyncio
 @pytest.mark.component

@@ -63,7 +63,9 @@ class _AttemptRunner:
         if self.last_blocked is not None:
             return self.last_blocked
         if self.last_error is not None:
-            attach_exception_browser_diagnostics(self.last_error, self.context.last_browser_attempt_diagnostics)
+            attach_exception_browser_diagnostics(
+                self.last_error, self.context.last_browser_attempt_diagnostics
+            )
             raise self.last_error
         raise RuntimeError(f"Failed to fetch {self.context.url} in browser")
 
@@ -110,15 +112,21 @@ class _AttemptRunner:
                 return result
             self.last_blocked = result
             await self.record_result(self.context, result=result)
-            self.host_policy = await self._load_policy(result.final_url or result.url or self.context.url)
+            self.host_policy = await self._load_policy(
+                result.final_url or result.url or self.context.url
+            )
             engines[:] = self._extended_engines(engines, engine)
             if engine_index < len(engines):
                 await _post_block_cooldown()
         return None
 
-    async def _fetch_engine(self, proxy, proxy_index, engine, engine_index, engines, lane, snapshot):
+    async def _fetch_engine(
+        self, proxy, proxy_index, engine, engine_index, engines, lane, snapshot
+    ):
         self._budget(engine, engines, "start")
-        await self.wait_for_slot(self.context.url, ttl_seconds=self.context.host_memory_ttl_seconds)
+        await self.wait_for_slot(
+            self.context.url, ttl_seconds=self.context.host_memory_ttl_seconds
+        )
         result = await self.browser_fetcher(
             self.context.url,
             self._budget(engine, engines, "run"),
@@ -160,10 +168,14 @@ class _AttemptRunner:
             host_policy=self.host_policy,
         )
         if remaining <= 0:
-            raise TimeoutError(f"Acquisition browser retry budget exhausted before {engine} could {phase}")
+            raise TimeoutError(
+                f"Acquisition browser retry budget exhausted before {engine} could {phase}"
+            )
         return remaining
 
-    async def _handle_failure(self, exc, proxy, proxy_index, engine, engine_index, engines, lane, snapshot):
+    async def _handle_failure(
+        self, exc, proxy, proxy_index, engine, engine_index, engines, lane, snapshot
+    ):
         diagnostics = build_failed_browser_diagnostics(
             browser_reason=self.reason,
             exc=exc,
@@ -198,7 +210,10 @@ class _AttemptRunner:
                 f"Patchright navigation failed for {self.context.url} with ERR_HTTP2_PROTOCOL_ERROR; retrying real Chrome",
             )
             return
-        if not (isinstance(exc, (TimeoutError, asyncio.TimeoutError)) and is_vendor_block_reason(self.reason)):
+        if not (
+            isinstance(exc, (TimeoutError, asyncio.TimeoutError))
+            and is_vendor_block_reason(self.reason)
+        ):
             return
         await self.record_hard_block(
             self.context.url,
@@ -224,7 +239,9 @@ class _AttemptRunner:
         )
 
     async def _load_policy(self, url):
-        policy = await self.policy_loader(url, ttl_seconds=self.context.host_memory_ttl_seconds)
+        policy = await self.policy_loader(
+            url, ttl_seconds=self.context.host_memory_ttl_seconds
+        )
         self.context.host_policy = policy
         return policy
 
@@ -247,8 +264,14 @@ async def execute_browser_attempts(
     proxies=None,
     host_policy=None,
 ):
-    fields = list(context.requested_fields if requested_fields is None else requested_fields)
-    recovery_source = context.listing_recovery_mode if listing_recovery_mode is None else listing_recovery_mode
+    fields = list(
+        context.requested_fields if requested_fields is None else requested_fields
+    )
+    recovery_source = (
+        context.listing_recovery_mode
+        if listing_recovery_mode is None
+        else listing_recovery_mode
+    )
     runner = _AttemptRunner(
         context,
         reason,
@@ -268,5 +291,9 @@ async def execute_browser_attempts(
 
 
 async def _post_block_cooldown() -> None:
-    if (cooldown_ms := max(0, int(crawler_runtime_settings.browser_post_block_cooldown_ms or 0))) > 0:
+    if (
+        cooldown_ms := max(
+            0, int(crawler_runtime_settings.browser_post_block_cooldown_ms or 0)
+        )
+    ) > 0:
         await asyncio.sleep(cooldown_ms / 1000)

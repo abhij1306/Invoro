@@ -26,7 +26,9 @@ from app.services.config.runtime_settings import (
 
 logger = logging.getLogger(__name__)
 
-ORIGIN_WARMUP_STATE_LOCKS: WeakKeyDictionary[asyncio.AbstractEventLoop, asyncio.Lock] = WeakKeyDictionary()
+ORIGIN_WARMUP_STATE_LOCKS: WeakKeyDictionary[
+    asyncio.AbstractEventLoop, asyncio.Lock
+] = WeakKeyDictionary()
 ORIGIN_WARMUP_IN_FLIGHT: set[tuple[str, str, str, str]] = set()
 ORIGIN_WARMUP_RECENT: dict[tuple[str, str, str, str], float] = {}
 
@@ -146,7 +148,10 @@ def _origin_warmup_is_eligible(
 ) -> bool:
     if "detail" not in str(surface or "").strip().lower():
         return False
-    if proxy_rotation_mode(proxy_profile) == "rotating" or skip_for_reusable_domain_state:
+    if (
+        proxy_rotation_mode(proxy_profile) == "rotating"
+        or skip_for_reusable_domain_state
+    ):
         return False
     if reason in {
         "detail-shell retry",
@@ -154,7 +159,10 @@ def _origin_warmup_is_eligible(
         "low-quality-extraction retry",
     }:
         return False
-    if not (reason in WARMUP_ELIGIBLE_BROWSER_REASONS or reason.startswith(WARMUP_VENDOR_BLOCK_PREFIX)):
+    if not (
+        reason in WARMUP_ELIGIBLE_BROWSER_REASONS
+        or reason.startswith(WARMUP_VENDOR_BLOCK_PREFIX)
+    ):
         return False
     host_policy = dict(host_policy_snapshot or {})
     non_native_vendor_preference = (
@@ -177,7 +185,9 @@ async def _perform_origin_warmup(
     phase_timings_ms: dict[str, int],
 ) -> None:
     started_at = time.perf_counter()
-    use_active_page = normalize_browser_engine(browser_engine) == REAL_CHROME_BROWSER_ENGINE
+    use_active_page = (
+        normalize_browser_engine(browser_engine) == REAL_CHROME_BROWSER_ENGINE
+    )
     warm_page = None
     succeeded = False
     try:
@@ -233,7 +243,9 @@ async def _navigate_warmup_page(
     warm_budget_ms: int,
     started_at: float,
 ) -> dict[str, int]:
-    response = await warm_page.goto(warm_url, wait_until="domcontentloaded", timeout=warm_budget_ms)
+    response = await warm_page.goto(
+        warm_url, wait_until="domcontentloaded", timeout=warm_budget_ms
+    )
     timings: dict[str, int] = {}
     remaining_ms = max(0, warm_budget_ms - elapsed_ms(started_at))
     if remaining_ms <= 0:
@@ -249,7 +261,9 @@ async def _navigate_warmup_page(
             max(0.0, float(crawler_runtime_settings.challenge_wait_max_seconds or 0)),
             remaining_ms / 1000,
         ),
-        challenge_poll_interval_ms=int(crawler_runtime_settings.challenge_poll_interval_ms),
+        challenge_poll_interval_ms=int(
+            crawler_runtime_settings.challenge_poll_interval_ms
+        ),
         navigation_timeout_ms=remaining_ms,
         elapsed_ms=elapsed_ms,
         classify_blocked_page=classify_blocked_page_async,
@@ -259,7 +273,9 @@ async def _navigate_warmup_page(
     return timings
 
 
-def _copy_challenge_timings(phase_timings_ms: dict[str, int], warm_timings: dict[str, int]) -> None:
+def _copy_challenge_timings(
+    phase_timings_ms: dict[str, int], warm_timings: dict[str, int]
+) -> None:
     for source, target in (
         ("challenge_wait", "origin_warmup_challenge_wait"),
         ("challenge_retry", "origin_warmup_challenge_retry"),
@@ -286,7 +302,9 @@ def origin_warmup_key(
 
 async def begin_origin_warmup(key: tuple[str, str, str, str]) -> bool:
     now = time.monotonic()
-    ttl_seconds = max(0.0, float(crawler_runtime_settings.origin_warmup_dedupe_ttl_seconds))
+    ttl_seconds = max(
+        0.0, float(crawler_runtime_settings.origin_warmup_dedupe_ttl_seconds)
+    )
     async with origin_warmup_state_lock():
         _prune_recent_warmups(now=now, ttl_seconds=ttl_seconds)
         if key in ORIGIN_WARMUP_IN_FLIGHT:
@@ -315,10 +333,14 @@ def _prune_recent_warmups(*, now: float, ttl_seconds: float) -> None:
         ORIGIN_WARMUP_RECENT.pop(key, None)
 
 
-async def finish_origin_warmup(key: tuple[str, str, str, str], *, succeeded: bool = False) -> None:
+async def finish_origin_warmup(
+    key: tuple[str, str, str, str], *, succeeded: bool = False
+) -> None:
     async with origin_warmup_state_lock():
         ORIGIN_WARMUP_IN_FLIGHT.discard(key)
-        ttl_seconds = max(0.0, float(crawler_runtime_settings.origin_warmup_dedupe_ttl_seconds))
+        ttl_seconds = max(
+            0.0, float(crawler_runtime_settings.origin_warmup_dedupe_ttl_seconds)
+        )
         if succeeded and ttl_seconds > 0:
             ORIGIN_WARMUP_RECENT[key] = time.monotonic()
 

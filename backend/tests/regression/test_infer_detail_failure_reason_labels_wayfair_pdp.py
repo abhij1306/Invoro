@@ -7,6 +7,7 @@ from .test_crawl_engine import (
     read_optional_artifact_text,
 )
 
+
 @pytest.mark.regression
 def test_infer_detail_failure_reason_labels_wayfair_pdp_shell_as_detail_shell() -> None:
     url = (
@@ -33,6 +34,7 @@ def test_infer_detail_failure_reason_labels_wayfair_pdp_shell_as_detail_shell() 
         )
         == "detail_shell"
     )
+
 
 @pytest.mark.regression
 def test_build_detail_record_keeps_real_wayfair_pdp_title_instead_of_url_slug() -> None:
@@ -80,6 +82,7 @@ def test_build_detail_record_keeps_real_wayfair_pdp_title_instead_of_url_slug() 
     )
     assert "url_slug" not in (record.get("_field_sources", {}).get("title") or [])
 
+
 @pytest.mark.regression
 def test_detail_rejection_keeps_rich_wayfair_pdp_with_promotional_title() -> None:
     requested_url = (
@@ -118,6 +121,7 @@ def test_detail_rejection_keeps_rich_wayfair_pdp_with_promotional_title() -> Non
         is None
     )
 
+
 @pytest.mark.regression
 def test_detail_identity_rejects_wrong_explicit_variant_query_match() -> None:
     requested_url = "https://example.com/products/widget-prime?variant=22222222"
@@ -136,6 +140,7 @@ def test_detail_identity_rejects_wrong_explicit_variant_query_match() -> None:
         )
         == "detail_identity_mismatch"
     )
+
 
 @pytest.mark.regression
 def test_detail_identity_trusts_matching_product_id_when_slug_numbers_differ() -> None:
@@ -163,6 +168,7 @@ def test_detail_identity_trusts_matching_product_id_when_slug_numbers_differ() -
         )
         is None
     )
+
 
 @pytest.mark.regression
 def test_detail_category_sanitization_drops_embedded_title_segments() -> None:
@@ -201,6 +207,7 @@ def test_detail_category_sanitization_drops_embedded_title_segments() -> None:
 
     assert rows[0]["category"] == "iPhone"
 
+
 @pytest.mark.regression
 def test_detail_rejection_keeps_rich_pdp_without_strong_identity_fields() -> None:
     requested_url = (
@@ -234,6 +241,7 @@ def test_detail_rejection_keeps_rich_pdp_without_strong_identity_fields() -> Non
         )
         is None
     )
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_rejects_search_results_shell_with_sort_filter_controls() -> (
@@ -278,6 +286,7 @@ def test_extract_ecommerce_detail_rejects_search_results_shell_with_sort_filter_
 
     assert rows == []
 
+
 @pytest.mark.regression
 def test_extract_ecommerce_detail_rejects_placeholder_not_found_title_without_product_signals() -> (
     None
@@ -300,6 +309,7 @@ def test_extract_ecommerce_detail_rejects_placeholder_not_found_title_without_pr
     )
 
     assert rows == []
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_recovers_firstcry_static_js_state_price() -> None:
@@ -349,6 +359,7 @@ def test_extract_ecommerce_detail_recovers_firstcry_static_js_state_price() -> N
         == "https://cdn.fcglcdn.com/brainbees/images/products/438x531/22346676a.webp"
     )
 
+
 @pytest.mark.regression
 def test_extract_ecommerce_detail_recovers_firstcry_keyed_size_variants_from_artifact() -> (
     None
@@ -367,6 +378,7 @@ def test_extract_ecommerce_detail_recovers_firstcry_keyed_size_variants_from_art
     assert len(rows) == 1
     sizes = {row.get("size") for row in rows[0]["variants"]}
     assert {"2-3Y", "3-4Y", "4-5Y"} <= sizes
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_rejects_brand_shell_with_tracking_pixel_image() -> (
@@ -395,6 +407,7 @@ def test_extract_ecommerce_detail_rejects_brand_shell_with_tracking_pixel_image(
     )
 
     assert rows == []
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_keeps_structured_product_when_title_still_needs_promotion() -> (
@@ -437,6 +450,7 @@ def test_extract_ecommerce_detail_keeps_structured_product_when_title_still_need
     assert record["title"] == "Buy Widget Prime | Example"
     assert record["price"] == "19.99"
     assert record["image_url"] == "https://example.com/widget.jpg"
+
 
 @pytest.mark.regression
 def test_extract_job_detail_returns_requested_sections() -> None:
@@ -509,6 +523,7 @@ def test_extract_job_detail_returns_requested_sections() -> None:
     assert "health cover" in record["benefits"]
     assert "Python, SQL, Airflow." in record["skills"]
 
+
 @pytest.mark.regression
 def test_extract_job_detail_strips_tracking_params_from_output_urls() -> None:
     html = """
@@ -546,6 +561,7 @@ def test_extract_job_detail_strips_tracking_params_from_output_urls() -> None:
     assert (
         record["source_url"] == "https://example.com/jobs/senior-data-engineer?jobId=42"
     )
+
 
 @pytest.mark.regression
 def test_extract_greenhouse_job_detail_from_remix_state() -> None:
@@ -598,6 +614,7 @@ def test_extract_greenhouse_job_detail_from_remix_state() -> None:
     assert "5+ years of engineering experience." in record["qualifications"]
     assert "Remote-first and health cover." in record["benefits"]
     assert record["_source"] == "js_state"
+
 
 @pytest.mark.regression
 def test_extract_job_detail_ignores_cross_surface_requested_image_fields() -> None:

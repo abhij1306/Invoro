@@ -59,9 +59,13 @@ def _merge_profile_section(
     ignore_default_equivalent_values: bool,
 ) -> dict[str, object]:
     explicit_section_raw = explicit_settings.get(key)
-    explicit_section = dict(explicit_section_raw) if isinstance(explicit_section_raw, dict) else {}
+    explicit_section = (
+        dict(explicit_section_raw) if isinstance(explicit_section_raw, dict) else {}
+    )
     default_section_raw = default_settings.get(key)
-    default_section = dict(default_section_raw) if isinstance(default_section_raw, dict) else {}
+    default_section = (
+        dict(default_section_raw) if isinstance(default_section_raw, dict) else {}
+    )
     merged = dict(saved_section)
     if not saved_section and explicit_section:
         return explicit_section
@@ -132,7 +136,9 @@ def merge_saved_run_profile(
     *,
     ignore_default_equivalent_values: bool,
 ) -> dict[str, object]:
-    merged = dict(explicit_settings or {}) if isinstance(explicit_settings, dict) else {}
+    merged = (
+        dict(explicit_settings or {}) if isinstance(explicit_settings, dict) else {}
+    )
     saved = dict(saved_profile or {}) if isinstance(saved_profile, dict) else {}
     if not saved:
         return merged
@@ -175,7 +181,9 @@ def merge_saved_run_profile(
         default_settings=default_settings,
         ignore_default_equivalent_values=ignore_default_equivalent_values,
     )
-    _merge_saved_contract(merged, saved, ignore_default_equivalent_values=ignore_default_equivalent_values)
+    _merge_saved_contract(
+        merged, saved, ignore_default_equivalent_values=ignore_default_equivalent_values
+    )
     _merge_saved_endpoints(merged, saved)
     return merged
 
@@ -197,8 +205,12 @@ def _merge_saved_contract(
 
 
 def _merge_saved_endpoints(merged: dict[str, object], saved: dict[str, object]) -> None:
-    saved_endpoints = normalize_internal_api_endpoints(saved.get(INTERNAL_API_ENDPOINTS_PROFILE_KEY))
-    explicit_endpoints = normalize_internal_api_endpoints(merged.get(INTERNAL_API_ENDPOINTS_PROFILE_KEY))
+    saved_endpoints = normalize_internal_api_endpoints(
+        saved.get(INTERNAL_API_ENDPOINTS_PROFILE_KEY)
+    )
+    explicit_endpoints = normalize_internal_api_endpoints(
+        merged.get(INTERNAL_API_ENDPOINTS_PROFILE_KEY)
+    )
     if not saved_endpoints and not explicit_endpoints:
         return
     endpoints_by_key: dict[tuple[str, str], dict[str, object]] = {}

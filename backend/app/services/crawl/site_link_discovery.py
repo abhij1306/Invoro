@@ -126,7 +126,9 @@ async def discover_rendered_category_links(
         )
     selected = ranked[:bounded_limit]
     urls = [candidate.url for candidate in selected]
-    labels = {candidate.url: candidate.label for candidate in selected if candidate.label}
+    labels = {
+        candidate.url: candidate.label for candidate in selected if candidate.label
+    }
     return SitemapResolutionResult(
         urls=urls,
         source="rendered_site_links",
@@ -256,7 +258,9 @@ def _extract_rendered_candidates(
     page_key = category_url_key(page_url)
     for anchor in anchors:
         raw_href = anchor.get("href")
-        candidate_url = normalize_target_url(strip_url_fragment(absolute_url(page_url, raw_href)))
+        candidate_url = normalize_target_url(
+            strip_url_fragment(absolute_url(page_url, raw_href))
+        )
         if not candidate_url:
             diagnostics.reject("invalid_url")
             continue
@@ -309,7 +313,9 @@ def _score_candidate(url: str, anchor: Tag, label: str | None) -> tuple[int, str
     if anchor.find_parent(("nav", "header", "menu")) is not None:
         score += 25
         reasons.append("nav")
-    if any(text_has_token(text, token) for token in SITEMAP_CATEGORY_ANCHOR_TEXT_TOKENS):
+    if any(
+        text_has_token(text, token) for token in SITEMAP_CATEGORY_ANCHOR_TEXT_TOKENS
+    ):
         score += 40
         reasons.append("category_text")
     if path.count("/") > 4:
@@ -387,11 +393,17 @@ async def _validate_ranked_candidates(
 
 def _html_has_listing_signals(html: str) -> bool:
     soup = BeautifulSoup(html or "", "html.parser")
-    productish_nodes = sum(len(soup.select(selector)) for selector in SITE_LINK_DISCOVERY_CARD_SELECTOR_HINTS)
+    productish_nodes = sum(
+        len(soup.select(selector))
+        for selector in SITE_LINK_DISCOVERY_CARD_SELECTOR_HINTS
+    )
     product_links = [
         anchor
         for anchor in soup.select("a[href]")
-        if any(token in str(anchor.get("href") or "").lower() for token in _listing_detail_path_hints)
+        if any(
+            token in str(anchor.get("href") or "").lower()
+            for token in _listing_detail_path_hints
+        )
     ]
     price_hits = len(_PRICE_RE.findall(soup.get_text(" ", strip=True)[:20_000]))
     return productish_nodes >= 4 or (len(product_links) >= 3 and price_hits >= 2)
@@ -400,7 +412,10 @@ def _html_has_listing_signals(html: str) -> bool:
 def _anchor_text_rejected(text: str) -> bool:
     if not text:
         return False
-    return any(text_has_token(text, token) for token in SITEMAP_CATEGORY_ANCHOR_TEXT_EXCLUDED_TOKENS)
+    return any(
+        text_has_token(text, token)
+        for token in SITEMAP_CATEGORY_ANCHOR_TEXT_EXCLUDED_TOKENS
+    )
 
 
 def _anchor_label(anchor: Tag) -> str | None:

@@ -31,7 +31,10 @@ async def record_fetch_result(
             ttl_seconds=context.host_memory_ttl_seconds,
         )
         return
-    if str(diagnostics.get("browser_outcome") or "").strip().lower() == "location_required":
+    if (
+        str(diagnostics.get("browser_outcome") or "").strip().lower()
+        == "location_required"
+    ):
         return
     ttl_seconds = context.host_memory_ttl_seconds
     await apply_backoff(target_url, ttl_seconds=ttl_seconds)

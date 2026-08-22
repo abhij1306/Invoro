@@ -49,7 +49,11 @@ async def persist_context_storage_state(
         return
     resolved_timeout_seconds = max(
         0.1,
-        float(timeout_seconds if timeout_seconds is not None else _browser_context_timeout_seconds()),
+        float(
+            timeout_seconds
+            if timeout_seconds is not None
+            else _browser_context_timeout_seconds()
+        ),
     )
     storage_state = await _capture_storage_state(
         storage_state_fn,
@@ -62,7 +66,9 @@ async def persist_context_storage_state(
     if run_id is not None and persist_run_storage_state:
         await _persist_run_storage_state(run_id, storage_state, browser_engine)
     if normalized_domain and persist_domain_storage_state:
-        await _persist_domain_storage_state(normalized_domain, storage_state, browser_engine)
+        await _persist_domain_storage_state(
+            normalized_domain, storage_state, browser_engine
+        )
 
 
 async def _capture_storage_state(
@@ -91,9 +97,13 @@ async def _capture_storage_state(
     return None
 
 
-async def _persist_run_storage_state(run_id: int, storage_state: object, browser_engine: str) -> None:
+async def _persist_run_storage_state(
+    run_id: int, storage_state: object, browser_engine: str
+) -> None:
     try:
-        await cookie_store.persist_storage_state_for_run(run_id, storage_state, browser_engine=browser_engine)
+        await cookie_store.persist_storage_state_for_run(
+            run_id, storage_state, browser_engine=browser_engine
+        )
     except Exception:
         logger.error(
             "Failed to persist browser storage state for run_id=%s",
@@ -102,9 +112,13 @@ async def _persist_run_storage_state(run_id: int, storage_state: object, browser
         )
 
 
-async def _persist_domain_storage_state(domain: str, storage_state: object, browser_engine: str) -> None:
+async def _persist_domain_storage_state(
+    domain: str, storage_state: object, browser_engine: str
+) -> None:
     try:
-        await cookie_store.persist_storage_state_for_domain(domain, storage_state, browser_engine=browser_engine)
+        await cookie_store.persist_storage_state_for_domain(
+            domain, storage_state, browser_engine=browser_engine
+        )
     except Exception:
         logger.error(
             "Failed to persist browser storage state for domain=%s",

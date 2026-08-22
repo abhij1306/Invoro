@@ -39,6 +39,7 @@ from app.services.data_enrichment.shopify_catalog import accessory_path_conflict
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 
+
 def _as_async(fn):
     async def _wrapped(*args, **kwargs):
         await asyncio.sleep(0)

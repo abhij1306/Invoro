@@ -120,7 +120,9 @@ def _extract_initial_tiers(
     )
     if xml_records:
         return True, xml_records
-    with logfire_span("extract.tier.raw_json", domain=_safe_domain(page_url), surface=surface) as span:
+    with logfire_span(
+        "extract.tier.raw_json", domain=_safe_domain(page_url), surface=surface
+    ) as span:
         json_records = extract_raw_json_records(
             html,
             page_url,
@@ -131,7 +133,9 @@ def _extract_initial_tiers(
             raw_json_surface_field_overlap_absolute=int(
                 crawler_runtime_settings.raw_json_surface_field_overlap_absolute
             ),
-            raw_json_surface_field_overlap_ratio=float(crawler_runtime_settings.raw_json_surface_field_overlap_ratio),
+            raw_json_surface_field_overlap_ratio=float(
+                crawler_runtime_settings.raw_json_surface_field_overlap_ratio
+            ),
         )
         set_logfire_attributes(span, record_count=len(json_records))
     if json_records:
@@ -150,7 +154,9 @@ def _extract_initial_tiers(
 
 
 def _extract_content_detail(html: str, *, page_url: str, surface: str) -> list[dict]:
-    with logfire_span("extract.tier.content_detail", domain=_safe_domain(page_url), surface=surface) as span:
+    with logfire_span(
+        "extract.tier.content_detail", domain=_safe_domain(page_url), surface=surface
+    ) as span:
         record = extract_content_surface(
             BeautifulSoup(html or "", "html.parser"),
             page_url=page_url,
@@ -159,7 +165,9 @@ def _extract_content_detail(html: str, *, page_url: str, surface: str) -> list[d
         set_logfire_attributes(span, record_count=1 if record else 0)
     if not record:
         return []
-    if _html_is_blocked_extraction_shell(html) and not _content_record_is_useful(record):
+    if _html_is_blocked_extraction_shell(html) and not _content_record_is_useful(
+        record
+    ):
         return []
     finalized = finalize_record(record, surface=surface)
     if record.get("markdown"):
@@ -353,9 +361,13 @@ def _select_listing_candidate_rows(
         max_records=max_records,
         title_is_noise=is_title_noise,
         url_is_structural=listing_url_is_structural,
-        detail_like_url=lambda url: listing_detail_like_path(url, is_job=surface.startswith("job_")),
+        detail_like_url=lambda url: listing_detail_like_path(
+            url, is_job=surface.startswith("job_")
+        ),
     )[:max_records]
-    gated = apply_listing_integrity_gate(selected, page_url=page_url, surface=surface, artifacts=artifacts)
+    gated = apply_listing_integrity_gate(
+        selected, page_url=page_url, surface=surface, artifacts=artifacts
+    )
     propagate_listing_integrity_to_diagnostics(artifacts, browser_diagnostics)
     return gated
 
@@ -421,7 +433,11 @@ def _html_is_blocked_extraction_shell(html: str) -> bool:
         return True
     return bool(
         (classification.active_provider_hits or classification.challenge_element_hits)
-        and (classification.strong_hits or classification.weak_hits or classification.title_matches)
+        and (
+            classification.strong_hits
+            or classification.weak_hits
+            or classification.title_matches
+        )
     )
 
 
@@ -432,7 +448,11 @@ def _content_record_is_useful(record: dict[str, Any]) -> bool:
 
 
 def _finalize_listing_rows(rows: list[dict]) -> list[dict[str, Any]]:
-    return [finalize_listing_price_fields(dict(row)) for row in rows if isinstance(row, dict)]
+    return [
+        finalize_listing_price_fields(dict(row))
+        for row in rows
+        if isinstance(row, dict)
+    ]
 
 
 def _adapter_listing_rows_if_sufficient(
@@ -495,7 +515,9 @@ def _postprocess_detail_records(
                 requested_page_url=requested_page_url,
             )
         drop_low_signal_zero_detail_price(record)
-        rows.append(finalize_record(record, surface=surface) if finalize_rows else record)
+        rows.append(
+            finalize_record(record, surface=surface) if finalize_rows else record
+        )
     return rows
 
 
@@ -532,7 +554,11 @@ def _adapter_row_indexes(
         for row in rows
         if isinstance(row, dict) and str(row.get("url") or "").strip()
     }
-    by_identity = {identity: row for row in rows if isinstance(row, dict) and (identity := _listing_row_identity(row))}
+    by_identity = {
+        identity: row
+        for row in rows
+        if isinstance(row, dict) and (identity := _listing_row_identity(row))
+    }
     return by_url, by_identity
 
 
@@ -551,7 +577,9 @@ def _overlay_adapter_row(
 
 
 def _listing_row_identity(row: dict[str, Any]) -> str:
-    product_id = clean_text(row.get("product_id") or row.get("productId") or row.get("sku"))
+    product_id = clean_text(
+        row.get("product_id") or row.get("productId") or row.get("sku")
+    )
     if product_id:
         return product_id.lower()
     return listing_identity_from_url(str(row.get("url") or ""))

@@ -7,6 +7,7 @@ from app.services.crawl.crud import create_crawl_run, get_run_logs, get_run_reco
 from app.services.pipeline.extraction_loop import process_single_url  # fmt: skip
 from sqlalchemy.ext.asyncio import AsyncSession  # fmt: skip
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_process_single_url_does_not_duplicate_block_warning_after_browser_event(
@@ -85,6 +86,7 @@ async def test_process_single_url_does_not_duplicate_block_warning_after_browser
     assert warning_messages == [
         "Acquisition detected rate limiting or bot protection for https://example.com/category/widgets"
     ]
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -184,6 +186,7 @@ async def test_process_single_url_persists_detail_records_after_self_heal_and_ll
     assert rows[0].data == {"title": "Widget Prime (self-healed)", "price": "19.99"}
     assert rows[0].raw_html_path == "artifacts/widget-prime.html"
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_process_single_url_retries_with_browser_after_empty_non_browser_extraction(
@@ -270,6 +273,7 @@ async def test_process_single_url_retries_with_browser_after_empty_non_browser_e
     assert total == 1
     assert rows[0].data["title"] == "Widget Prime"
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_process_single_url_does_not_auto_scroll_after_empty_browser_listing(
@@ -346,6 +350,7 @@ async def test_process_single_url_does_not_auto_scroll_after_empty_browser_listi
     assert acquire_calls[1][1] is None
     assert result.verdict == "listing_detection_failed"
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_process_single_url_persists_listing_page_source_separately_from_record_url(
@@ -419,6 +424,7 @@ async def test_process_single_url_persists_listing_page_source_separately_from_r
     assert rows[0].data["url"] == "https://example.com/products/widget-prime"
     assert "page_markdown" not in (rows[0].raw_data or {})
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_process_single_url_log_uses_generic_extraction_label_when_no_adapter_matches(
@@ -490,6 +496,7 @@ async def test_process_single_url_log_uses_generic_extraction_label_when_no_adap
         log.message == "Extracted 1 records using generic extraction path"
         for log in logs
     )
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -575,6 +582,7 @@ async def test_process_single_url_upserts_duplicate_run_identity_records(
     assert rows[0].content_fingerprint
     assert rows[0].data["price"] == "24.99"
     assert rows[0].data["url"] == "https://example.com/products/widget-prime"
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression

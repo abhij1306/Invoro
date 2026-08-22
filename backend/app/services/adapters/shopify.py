@@ -18,6 +18,7 @@ _SHOPIFY_CDN_URL_RE = re.compile(r"https?://cdn\.shopify\.com(?:[/:?#]|$)", re.I
 
 from . import shopify_products as _split_owner  # noqa: E402
 
+
 class ShopifyAdapter(_split_owner.ShopifyProductMixin, BaseAdapter):
     name = "shopify"
     domains: list[str] = []  # any domain can be Shopify; detected by signals
@@ -76,7 +77,9 @@ class ShopifyAdapter(_split_owner.ShopifyProductMixin, BaseAdapter):
         """
         parsed = urlparse(url)
         if surface == "ecommerce_detail":
-            return await self._fetch_detail_products(url, html=html, parsed=parsed, surface=surface, proxy=proxy)
+            return await self._fetch_detail_products(
+                url, html=html, parsed=parsed, surface=surface, proxy=proxy
+            )
         products = await self._fetch_listing_products(parsed, proxy=proxy)
         return [
             self._build_product_record(product, page_url=url, surface=surface)
@@ -84,14 +87,24 @@ class ShopifyAdapter(_split_owner.ShopifyProductMixin, BaseAdapter):
             if isinstance(product, dict)
         ]
 
-    async def _fetch_detail_products(self, url: str, *, html: str, parsed: ParseResult, surface: str, proxy: str | None) -> list[dict]:
+    async def _fetch_detail_products(
+        self,
+        url: str,
+        *,
+        html: str,
+        parsed: ParseResult,
+        surface: str,
+        proxy: str | None,
+    ) -> list[dict]:
         handle = self._extract_product_handle(parsed.path)
         if not handle:
             return []
         linked = self._linked_variant_product_handles(html, url, current_handle=handle)
         linked = linked or [(handle, "", "")]
         records: list[dict] = []
-        for linked_handle, axis_value, axis_key in linked[: adapter_runtime_settings.shopify_linked_variant_max_handles]:
+        for linked_handle, axis_value, axis_key in linked[
+            : adapter_runtime_settings.shopify_linked_variant_max_handles
+        ]:
             api_url = f"{parsed.scheme}://{parsed.netloc}/products/{linked_handle}.js"
             try:
                 data = await self._request_json(
@@ -103,17 +116,35 @@ class ShopifyAdapter(_split_owner.ShopifyProductMixin, BaseAdapter):
                 continue
             if not isinstance(data, dict):
                 continue
-            page_url = urljoin(url, self._localized_product_path(parsed.path, linked_handle))
-            record = self._build_product_record(data, page_url=page_url, surface=surface)
-            axis_value = axis_value or self._linked_axis_value_from_product(data, axis_key=axis_key, current_handle=handle)
+            page_url = urljoin(
+                url, self._localized_product_path(parsed.path, linked_handle)
+            )
+            record = self._build_product_record(
+                data, page_url=page_url, surface=surface
+            )
+            axis_value = axis_value or self._linked_axis_value_from_product(
+                data, axis_key=axis_key, current_handle=handle
+            )
             self._apply_linked_axis(record, axis_key=axis_key, axis_value=axis_value)
             records.append(record)
         return self._merge_linked_product_records(records)
 
-    async def _fetch_listing_products(self, parsed: ParseResult, *, proxy: str | None) -> list[dict]:
+    async def _fetch_listing_products(
+        self, parsed: ParseResult, *, proxy: str | None
+    ) -> list[dict]:
         collection = self._extract_collection_handle(parsed.path)
-        api_path = f"/collections/{collection}/products.json" if collection else "/products.json"
-        max_pages = max(1, math.ceil(adapter_runtime_settings.shopify_max_products / adapter_runtime_settings.shopify_catalog_limit))
+        api_path = (
+            f"/collections/{collection}/products.json"
+            if collection
+            else "/products.json"
+        )
+        max_pages = max(
+            1,
+            math.ceil(
+                adapter_runtime_settings.shopify_max_products
+                / adapter_runtime_settings.shopify_catalog_limit
+            ),
+        )
         products: list[dict] = []
         for page in range(1, max_pages + 1):
             api_url = f"{parsed.scheme}://{parsed.netloc}{api_path}?limit={adapter_runtime_settings.shopify_catalog_limit}&page={page}"
@@ -129,7 +160,10 @@ class ShopifyAdapter(_split_owner.ShopifyProductMixin, BaseAdapter):
             if not isinstance(batch, list) or not batch:
                 break
             products.extend(product for product in batch if isinstance(product, dict))
-            if len(products) >= adapter_runtime_settings.shopify_max_products or len(batch) < adapter_runtime_settings.shopify_catalog_limit:
+            if (
+                len(products) >= adapter_runtime_settings.shopify_max_products
+                or len(batch) < adapter_runtime_settings.shopify_catalog_limit
+            ):
                 break
         return products
 
@@ -194,9 +228,20 @@ class ShopifyAdapter(_split_owner.ShopifyProductMixin, BaseAdapter):
             href = text_or_none(anchor.get("href"))
             linked = urlparse(urljoin(page_url, href or ""))
             handle = self._extract_product_handle(linked.path)
-            if not href or linked.netloc.lower() != current_host or not handle or handle in seen:
+            if (
+                not href
+                or linked.netloc.lower() != current_host
+                or not handle
+                or handle in seen
+            ):
                 continue
-            rows.append((handle, self._linked_axis_value(anchor, handle, current_handle), axis_key))
+            rows.append(
+                (
+                    handle,
+                    self._linked_axis_value(anchor, handle, current_handle),
+                    axis_key,
+                )
+            )
             seen.add(handle)
             if len(rows) >= adapter_runtime_settings.shopify_linked_variant_max_handles:
                 return
@@ -212,7 +257,11 @@ class ShopifyAdapter(_split_owner.ShopifyProductMixin, BaseAdapter):
         family_prefix = self._linked_handle_family_prefix(current_handle, handles)
         if not family_prefix:
             return []
-        axis_key = "scent" if any(token in family_prefix for token in ("mist", "fragrance", "scent")) else "color"
+        axis_key = (
+            "scent"
+            if any(token in family_prefix for token in ("mist", "fragrance", "scent"))
+            else "color"
+        )
         rows: list[tuple[str, str, str]] = []
         seen: set[str] = set()
         for handle in handles:
@@ -244,12 +293,19 @@ class ShopifyAdapter(_split_owner.ShopifyProductMixin, BaseAdapter):
         tokens = [token for token in str(current_handle or "").split("-") if token]
         if len(tokens) < 3:
             return ""
-        handle_set = {cleaned for handle in handles or [] if (cleaned := str(handle or "").strip())}
+        handle_set = {
+            cleaned
+            for handle in handles or []
+            if (cleaned := str(handle or "").strip())
+        }
         for prefix_len in range(len(tokens) - 1, 2, -1):
             prefix = "-".join(tokens[:prefix_len])
             if self._handle_family_match_count(handle_set, current_handle, prefix) >= 2:
                 return prefix
-        if any(token in tokens for token in ("mist", "fragrance", "scent")) and len(tokens) > 3:
+        if (
+            any(token in tokens for token in ("mist", "fragrance", "scent"))
+            and len(tokens) > 3
+        ):
             return "-".join(tokens[:-2])
         # Without at least one true sibling handle on the page, the last
         # handle token is most likely a SKU/style code or a category word,
@@ -260,7 +316,9 @@ class ShopifyAdapter(_split_owner.ShopifyProductMixin, BaseAdapter):
 
     @staticmethod
     def _handle_family_match_count(handles: set[str], current: str, prefix: str) -> int:
-        return sum(handle == current or handle.startswith(f"{prefix}-") for handle in handles)
+        return sum(
+            handle == current or handle.startswith(f"{prefix}-") for handle in handles
+        )
 
     def _linked_group_axis(self, group: object) -> str:
         if not hasattr(group, "get"):
@@ -298,7 +356,9 @@ class ShopifyAdapter(_split_owner.ShopifyProductMixin, BaseAdapter):
                     anchor.get("title"),
                     anchor.get("data-value"),
                     anchor.get("data-option-value"),
-                    anchor.get_text(" ", strip=True) if hasattr(anchor, "get_text") else "",
+                    anchor.get_text(" ", strip=True)
+                    if hasattr(anchor, "get_text")
+                    else "",
                 ]
             )
             if hasattr(anchor, "find_parent"):
@@ -368,7 +428,9 @@ class ShopifyAdapter(_split_owner.ShopifyProductMixin, BaseAdapter):
 
     def _axis_value_from_handle(self, handle: str, current_handle: str) -> str:
         handle_tokens = [token for token in str(handle or "").split("-") if token]
-        current_tokens = [token for token in str(current_handle or "").split("-") if token]
+        current_tokens = [
+            token for token in str(current_handle or "").split("-") if token
+        ]
         common_prefix = 0
         for left, right in zip(handle_tokens, current_tokens):
             if left != right:

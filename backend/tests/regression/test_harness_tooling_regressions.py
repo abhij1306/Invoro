@@ -26,9 +26,7 @@ def test_repair_diagnostics_requires_truthy_self_heal_trigger() -> None:
             "price": None,
             "image_url": "image.jpg",
         },
-        "sample_source_trace": {
-            "extraction": {"self_heal": {"triggered": False}}
-        }
+        "sample_source_trace": {"extraction": {"self_heal": {"triggered": False}}},
     }
     expectations = {"require_repair_diagnostics": True}
 

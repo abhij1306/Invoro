@@ -4,12 +4,14 @@ from .test_browser_context import Path, SimpleNamespace, _context_spec, _credent
 
 pytest_plugins = ["tests.component._cookie_store_test_support"]
 
+
 @pytest.mark.component
 def test_chromium_browser_binary_is_labeled_chromium() -> None:
     assert acquisition_browser_pool._resolve_browser_binary("chromium") == (
         None,
         "chromium",
     )
+
 
 @pytest.mark.component
 def test_content_detail_signals_accept_meaningful_body_without_paragraph() -> None:
@@ -24,6 +26,7 @@ def test_content_detail_signals_accept_meaningful_body_without_paragraph() -> No
 
     assert has_extractable_dom_content_detail_signals(analysis) is True
 
+
 @pytest.mark.component
 def test_content_detail_signals_reject_empty_and_heading_only_body() -> None:
     empty_analysis = analyze_html(
@@ -35,6 +38,7 @@ def test_content_detail_signals_reject_empty_and_heading_only_body() -> None:
 
     assert has_extractable_dom_content_detail_signals(empty_analysis) is False
     assert has_extractable_dom_content_detail_signals(heading_only_analysis) is False
+
 
 @pytest.mark.component
 def test_content_detail_signals_accept_common_content_descendant() -> None:
@@ -48,6 +52,7 @@ def test_content_detail_signals_accept_common_content_descendant() -> None:
     )
 
     assert has_extractable_dom_content_detail_signals(analysis) is True
+
 
 @pytest.mark.component
 def test_listing_signals_detect_item_list_and_ignore_non_list_type() -> None:
@@ -65,6 +70,7 @@ def test_listing_signals_detect_item_list_and_ignore_non_list_type() -> None:
     assert has_extractable_listing_signals(item_list_html) is True
     assert has_extractable_listing_signals(non_list_html) is False
 
+
 @pytest.mark.component
 def test_listing_signals_respect_typed_item_threshold(monkeypatch) -> None:
     monkeypatch.setattr(crawler_runtime_settings, "listing_min_items", 3)
@@ -80,6 +86,7 @@ def test_listing_signals_respect_typed_item_threshold(monkeypatch) -> None:
     assert has_extractable_listing_signals(typed_products(3)) is True
     assert has_extractable_listing_signals(typed_products(4)) is True
 
+
 @pytest.mark.component
 def test_listing_signals_detect_list_item_type() -> None:
     html = """
@@ -90,6 +97,7 @@ def test_listing_signals_detect_list_item_type() -> None:
 
     assert has_extractable_listing_signals(html) is True
 
+
 @pytest.mark.component
 def test_acquisition_package_exports_runtime_expand_function() -> None:
     from app.services import acquisition
@@ -99,14 +107,17 @@ def test_acquisition_package_exports_runtime_expand_function() -> None:
         is acquisition_browser_runtime.expand_all_interactive_elements
     )
 
+
 @pytest.mark.component
 def test_is_special_use_domain_ignores_ports() -> None:
     assert is_special_use_domain("localhost:3000") is True
     assert is_special_use_domain("http://localhost:3000/products/widget") is True
 
+
 @pytest.mark.component
 def test_is_special_use_domain_treats_test_suffix_as_special_use() -> None:
     assert is_special_use_domain("https://api.example.test/path") is True
+
 
 @pytest.mark.component
 def test_normalize_domain_strips_credentials() -> None:
@@ -123,21 +134,26 @@ def test_normalize_domain_strips_credentials() -> None:
         == "example.com"
     )
 
+
 @pytest.mark.component
 def test_normalize_domain_preserves_non_standard_port() -> None:
     assert normalize_domain("https://example.com:8443/path") == "example.com:8443"
+
 
 @pytest.mark.component
 def test_normalize_domain_strips_standard_https_port() -> None:
     assert normalize_domain("https://example.com:443/path") == "example.com"
 
+
 @pytest.mark.component
 def test_normalize_domain_handles_domain_only_input() -> None:
     assert normalize_domain("example.com") == "example.com"
 
+
 @pytest.mark.component
 def test_normalize_domain_strips_credentials_without_password() -> None:
     assert normalize_domain("https://user@example.com/path") == "example.com"
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -148,6 +164,7 @@ async def test_read_socks5_response_rejects_unexpected_upstream_version() -> Non
 
     with pytest.raises(ValueError, match="Unexpected upstream SOCKS response version"):
         await browser_proxy_bridge._read_socks5_response(reader)
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -172,6 +189,7 @@ async def test_read_client_request_rejects_missing_no_auth_method() -> None:
 
     assert bytes(writer.data) == bytes([5, 0xFF])
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_read_client_request_rebuilds_validated_connect_request() -> None:
@@ -190,6 +208,7 @@ async def test_read_client_request_rebuilds_validated_connect_request() -> None:
     request = await browser_proxy_bridge._read_client_request(reader, _Writer())
 
     assert request.to_upstream_bytes() == raw_request[3:]
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -236,6 +255,7 @@ async def test_socks5_auth_bridge_start_is_singleflight(
     assert first == second == "socks5://127.0.0.1:41001"
     assert start_calls == 1
 
+
 @pytest.mark.component
 def test_browser_storage_state_persist_policy_rejects_challenge_shell_without_ready_probe() -> (
     None
@@ -256,10 +276,12 @@ def test_browser_storage_state_persist_policy_rejects_challenge_shell_without_re
         is False
     )
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_load_storage_state_for_run_ignores_invalid_run_id() -> None:
     assert await cookie_store.load_storage_state_for_run("invalid") is None
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -333,6 +355,7 @@ async def test_load_storage_state_for_run_scopes_by_browser_engine(
         "origins": [],
     }
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_persist_storage_state_for_run_replaces_existing_state(
@@ -393,6 +416,7 @@ async def test_persist_storage_state_for_run_replaces_existing_state(
         "origins": [],
     }
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_persist_storage_state_for_run_keeps_cache_clean_when_write_fails(
@@ -426,6 +450,7 @@ async def test_persist_storage_state_for_run_keeps_cache_clean_when_write_fails(
 
     assert await cookie_store.load_storage_state_for_run(77) is None
 
+
 @pytest.mark.component
 def test_write_storage_state_file_retries_permission_error(
     monkeypatch: pytest.MonkeyPatch,
@@ -451,6 +476,7 @@ def test_write_storage_state_file_retries_permission_error(
 
     assert path.exists()
     assert len(attempts) == 2
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -519,6 +545,7 @@ async def test_shared_browser_runtime_passes_generated_context_options(
     ]
     assert routed_patterns == []
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_shared_browser_runtime_uses_native_context_for_real_chrome(
@@ -572,6 +599,7 @@ async def test_shared_browser_runtime_uses_native_context_for_real_chrome(
 
     assert captured_kwargs == [{"no_viewport": True}]
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_shared_browser_runtime_skips_init_script_by_default(
@@ -611,6 +639,7 @@ async def test_shared_browser_runtime_skips_init_script_by_default(
         pass
 
     assert init_scripts == []
+
 
 @pytest.mark.asyncio
 @pytest.mark.component

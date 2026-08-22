@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .test_detail_extractor_structured_sources import backfill_detail_price_from_html, extract_records, normalize_variant_record, pytest, read_optional_artifact_text  # fmt: skip
 
+
 @pytest.mark.regression
 def test_normalize_variant_record_infers_single_variant_size_from_title_tokens() -> (
     None
@@ -24,6 +25,7 @@ def test_normalize_variant_record_infers_single_variant_size_from_title_tokens()
             "size": "EU 42",
         }
     ]
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_reads_scalar_size_from_two_span_label_value_row() -> (
@@ -56,6 +58,7 @@ def test_extract_ecommerce_detail_reads_scalar_size_from_two_span_label_value_ro
     assert rows[0]["color"] == "209 Mocha Latte - soft mocha brown matte"
     assert rows[0]["size"] == "0.035 oz / 0.99 g"
 
+
 @pytest.mark.regression
 def test_extract_detail_ignores_nordstrom_sold_out_gift_option_price_from_artifact() -> (
     None
@@ -75,6 +78,7 @@ def test_extract_detail_ignores_nordstrom_sold_out_gift_option_price_from_artifa
     assert "price" not in record
     assert "currency" not in record
     assert "variant_count" not in record
+
 
 @pytest.mark.regression
 def test_out_of_stock_record_allows_dom_variant_price_repair() -> None:
@@ -99,6 +103,7 @@ def test_out_of_stock_record_allows_dom_variant_price_repair() -> None:
     assert record["variants"][0]["price"] == "19.99"
     assert record["variants"][0]["currency"] == "USD"
 
+
 @pytest.mark.regression
 def test_extract_detail_recovers_end_option_variants_from_artifact() -> None:
     html = read_optional_artifact_text("artifacts/runs/1/pages/3b8d6be40db29760.html")
@@ -117,6 +122,7 @@ def test_extract_detail_recovers_end_option_variants_from_artifact() -> None:
     assert record["variant_count"] == 1
     assert record["variants"][0]["size"] == "One Size"
     assert record["availability"] == "in_stock"
+
 
 @pytest.mark.regression
 def test_extract_detail_recovers_asos_stock_price_and_size_variants_from_artifact() -> (
@@ -147,6 +153,7 @@ def test_extract_detail_recovers_asos_stock_price_and_size_variants_from_artifac
         variant.get("availability") == "in_stock" for variant in record["variants"]
     )
 
+
 @pytest.mark.regression
 def test_extract_detail_recovers_ssense_next_f_size_variants_from_artifact() -> None:
     html = read_optional_artifact_text("artifacts/runs/1/pages/99f37e207742af7a.html")
@@ -169,6 +176,7 @@ def test_extract_detail_recovers_ssense_next_f_size_variants_from_artifact() -> 
     assert all(
         variant.get("availability") == "out_of_stock" for variant in record["variants"]
     )
+
 
 @pytest.mark.regression
 def test_extract_detail_recovers_carhartt_ng_state_variant_matrix_rows_from_artifact() -> (
@@ -202,6 +210,7 @@ def test_extract_detail_recovers_carhartt_ng_state_variant_matrix_rows_from_arti
         for variant in record["variants"]
     )
 
+
 @pytest.mark.regression
 def test_extract_detail_recovers_llbean_dom_size_variants_from_artifact() -> None:
     html = read_optional_artifact_text("artifacts/runs/13/pages/0e49fd0d4e316b84.html")
@@ -228,6 +237,7 @@ def test_extract_detail_recovers_llbean_dom_size_variants_from_artifact() -> Non
         for variant in record["variants"]
     )
 
+
 @pytest.mark.regression
 def test_extract_detail_recovers_patagonia_boldmetrics_variants_from_artifact() -> None:
     html = read_optional_artifact_text("artifacts/runs/1/pages/72d532d622b8051e.html")
@@ -245,6 +255,7 @@ def test_extract_detail_recovers_patagonia_boldmetrics_variants_from_artifact() 
     assert record["variant_count"] == 7
     assert {variant.get("size") for variant in record["variants"]} >= {"XS", "3XL"}
 
+
 @pytest.mark.regression
 def test_extract_detail_recovers_bh_primary_image_from_artifact() -> None:
     html = read_optional_artifact_text("artifacts/runs/1/pages/6c0655481681f545.html")
@@ -259,6 +270,7 @@ def test_extract_detail_recovers_bh_primary_image_from_artifact() -> None:
     assert rows[0]["image_url"].endswith(
         "cozyla_cd_8v543f0_white_us_32_4k_calendar_gen2_white_1882297.jpg"
     )
+
 
 @pytest.mark.regression
 def test_extract_detail_rejects_amazon_adding_to_cart_title_from_artifact() -> None:

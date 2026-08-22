@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .test_detail_extractor_structured_sources import BeautifulSoup, build_detail_record, extract_records, pytest, reconcile_variant_availability_from_dom, variant_option_availability  # fmt: skip
 
+
 @pytest.mark.regression
 def test_extract_ecommerce_detail_ignores_sort_filter_and_availability_controls_as_variants() -> (
     None
@@ -42,6 +43,7 @@ def test_extract_ecommerce_detail_ignores_sort_filter_and_availability_controls_
     assert len(rows) == 1
     record = rows[0]
     assert "variants" not in record
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_does_not_treat_etsy_report_radios_as_variants() -> (
@@ -88,6 +90,7 @@ def test_extract_ecommerce_detail_does_not_treat_etsy_report_radios_as_variants(
     assert "variants" not in record
     assert "variant_count" not in record
 
+
 @pytest.mark.regression
 def test_extract_ecommerce_detail_does_not_treat_shipping_country_selector_as_variant_axis() -> (
     None
@@ -133,6 +136,7 @@ def test_extract_ecommerce_detail_does_not_treat_shipping_country_selector_as_va
     assert record["variant_count"] == 2
     assert "choose_country" not in str(record.get("variants") or "")
 
+
 @pytest.mark.regression
 def test_extract_ecommerce_detail_splits_style_and_size_from_compound_select_before_color() -> (
     None
@@ -173,6 +177,7 @@ def test_extract_ecommerce_detail_splits_style_and_size_from_compound_select_bef
     record = rows[0]
     assert record["variant_count"] == 8
 
+
 @pytest.mark.regression
 def test_extract_ecommerce_detail_does_not_treat_question_radiogroup_as_size_variants() -> (
     None
@@ -203,6 +208,7 @@ def test_extract_ecommerce_detail_does_not_treat_question_radiogroup_as_size_var
     assert len(rows) == 1
     record = rows[0]
     assert "variants" not in record
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_keeps_stronger_js_state_variants_over_dom_fallback() -> (
@@ -238,6 +244,7 @@ def test_extract_ecommerce_detail_keeps_stronger_js_state_variants_over_dom_fall
     )
 
     assert len(rows) == 1
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_skips_dom_variant_scan_for_rich_structured_variants() -> (
@@ -295,6 +302,7 @@ def test_extract_ecommerce_detail_skips_dom_variant_scan_for_rich_structured_var
         {"size": "M", "sku": "TRAIL-M", "image_url": "https://example.com/m.jpg"},
     ]
 
+
 @pytest.mark.regression
 def test_extract_ecommerce_detail_backfills_selected_variant_price_from_record_when_dom_variants_are_sparse() -> (
     None
@@ -327,6 +335,7 @@ def test_extract_ecommerce_detail_backfills_selected_variant_price_from_record_w
     assert len(rows) == 1
     record = rows[0]
     assert record["price"] == "99.00"
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_prunes_single_value_marketing_axes_from_final_variant_record() -> (
@@ -390,6 +399,7 @@ def test_extract_ecommerce_detail_prunes_single_value_marketing_axes_from_final_
     }
     assert "soft_fabric" not in option_names
     assert "high_waisted" not in option_names
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_does_not_duplicate_parent_price_into_variants_when_uniform() -> (
@@ -456,6 +466,7 @@ def test_extract_ecommerce_detail_does_not_duplicate_parent_price_into_variants_
     assert record["price"] == "100.00"
     assert "price" not in record["variants"][0]
 
+
 @pytest.mark.regression
 def test_extract_ecommerce_detail_ignores_generic_selector_axis_names_without_semantic_labels() -> (
     None
@@ -485,6 +496,7 @@ def test_extract_ecommerce_detail_ignores_generic_selector_axis_names_without_se
 
     assert len(rows) == 1
     assert "variation_selector_0" not in rows[0].get("variant_axes", {})
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_infers_unlabeled_select_variants_and_ignores_translate_widget() -> (
@@ -528,6 +540,7 @@ def test_extract_ecommerce_detail_infers_unlabeled_select_variants_and_ignores_t
     assert len(rows) == 1
     record = rows[0]
     assert "language_translate_widget" not in str(record.get("variant_axes") or "")
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_keeps_size_axis_when_bad_dom_label_says_color() -> (
@@ -579,6 +592,7 @@ def test_extract_ecommerce_detail_keeps_size_axis_when_bad_dom_label_says_color(
     assert "GTIN14" not in record.get("product_attributes", {})
     assert "AVAILABILITY" not in record.get("product_attributes", {})
 
+
 @pytest.mark.regression
 def test_variant_option_availability_does_not_treat_disabled_control_as_out_of_stock() -> (
     None
@@ -604,6 +618,7 @@ def test_variant_option_availability_does_not_treat_disabled_control_as_out_of_s
 
     assert availability is None
     assert stock_quantity is None
+
 
 @pytest.mark.regression
 def test_variant_option_availability_treats_unselected_disabled_control_as_out_of_stock() -> (
@@ -646,6 +661,7 @@ def test_variant_option_availability_treats_unselected_disabled_control_as_out_o
         None,
     )
 
+
 @pytest.mark.regression
 def test_dom_availability_appends_disabled_select_option_with_label() -> None:
     record = {
@@ -676,6 +692,7 @@ def test_dom_availability_appends_disabled_select_option_with_label() -> None:
         "availability": "out_of_stock",
         "stock_quantity": 0,
     }
+
 
 @pytest.mark.regression
 def test_variant_option_availability_reads_data_available_flag() -> None:

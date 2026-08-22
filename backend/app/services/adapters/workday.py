@@ -69,7 +69,9 @@ class WorkdayAdapter(BaseAdapter):
             if not isinstance(rows, list) or not rows:
                 break
             pages_processed += 1
-            self._append_listing_rows(records, rows, context=context, seen_urls=seen_urls)
+            self._append_listing_rows(
+                records, rows, context=context, seen_urls=seen_urls
+            )
             offset += len(rows)
             if len(rows) < limit or (total is not None and offset >= total):
                 break

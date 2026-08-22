@@ -33,6 +33,7 @@ from app.services.llm.types import LLMTaskResult
 
 from app.services.product_intelligence.service import backfill_candidate_brand, poll_candidate_and_score, resolve_source_snapshot, create_product_intelligence_job, discover_product_intelligence_candidates  # fmt: skip
 
+
 def _build_candidate_intelligence(
     *, brand: str = "", title: str = "Wundermost Bodysuit"
 ) -> dict[str, object]:

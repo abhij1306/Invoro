@@ -159,10 +159,14 @@ async def navigate_browser_page_impl(
     elapsed_ms,
 ):
     navigation_wait_until = (
-        str((readiness_policy or {}).get("navigation_wait_until") or "domcontentloaded").strip().lower()
+        str((readiness_policy or {}).get("navigation_wait_until") or "domcontentloaded")
+        .strip()
+        .lower()
     )
     total_timeout_ms = int(timeout_seconds * 1000)
-    primary_timeout_cap_ms = int(crawler_runtime_settings.browser_navigation_domcontentloaded_timeout_ms)
+    primary_timeout_cap_ms = int(
+        crawler_runtime_settings.browser_navigation_domcontentloaded_timeout_ms
+    )
     if navigation_wait_until == "networkidle":
         primary_timeout_cap_ms = min(
             int(crawler_runtime_settings.browser_navigation_networkidle_timeout_ms),
@@ -170,7 +174,9 @@ async def navigate_browser_page_impl(
                 1,
                 int(
                     total_timeout_ms
-                    * float(crawler_runtime_settings.browser_navigation_networkidle_primary_budget_ratio)
+                    * float(
+                        crawler_runtime_settings.browser_navigation_networkidle_primary_budget_ratio
+                    )
                 ),
             ),
         )
@@ -189,13 +195,17 @@ async def navigate_browser_page_impl(
             timeout_ms=goto_timeout_ms,
         )
     except (PlaywrightTimeoutError, PlaywrightError):
-        fallback_strategy = "domcontentloaded" if navigation_wait_until == "networkidle" else "commit"
+        fallback_strategy = (
+            "domcontentloaded" if navigation_wait_until == "networkidle" else "commit"
+        )
         navigation_strategy = fallback_strategy
         try:
             fallback_timeout = (
                 min(
                     total_timeout_ms,
-                    int(crawler_runtime_settings.browser_navigation_domcontentloaded_timeout_ms),
+                    int(
+                        crawler_runtime_settings.browser_navigation_domcontentloaded_timeout_ms
+                    ),
                 )
                 if fallback_strategy == "domcontentloaded"
                 else fallback_timeout_ms
@@ -218,8 +228,12 @@ async def navigate_browser_page_impl(
                     )
                 except Exception as final_exc:
                     phase_timings_ms["navigation"] = elapsed_ms(navigation_started_at)
-                    setattr(final_exc, "browser_phase_timings_ms", dict(phase_timings_ms))
-                    setattr(final_exc, "browser_navigation_strategy", navigation_strategy)
+                    setattr(
+                        final_exc, "browser_phase_timings_ms", dict(phase_timings_ms)
+                    )
+                    setattr(
+                        final_exc, "browser_navigation_strategy", navigation_strategy
+                    )
                     raise
             else:
                 phase_timings_ms["navigation"] = elapsed_ms(navigation_started_at)
@@ -235,9 +249,15 @@ async def navigate_browser_page_impl(
         browser_engine=browser_engine,
         timeout_seconds=timeout_seconds,
         phase_timings_ms=phase_timings_ms,
-        challenge_wait_max_seconds=float(crawler_runtime_settings.challenge_wait_max_seconds or 0),
-        challenge_poll_interval_ms=int(crawler_runtime_settings.challenge_poll_interval_ms),
-        navigation_timeout_ms=int(crawler_runtime_settings.browser_navigation_domcontentloaded_timeout_ms),
+        challenge_wait_max_seconds=float(
+            crawler_runtime_settings.challenge_wait_max_seconds or 0
+        ),
+        challenge_poll_interval_ms=int(
+            crawler_runtime_settings.challenge_poll_interval_ms
+        ),
+        navigation_timeout_ms=int(
+            crawler_runtime_settings.browser_navigation_domcontentloaded_timeout_ms
+        ),
         elapsed_ms=elapsed_ms,
         classify_blocked_page=classify_blocked_page_async,
         get_page_html=get_page_html,
@@ -289,7 +309,9 @@ async def settle_browser_page_impl(
         )
 
     current_probe = await _cached_probe(refresh_html=True)
-    append_readiness_probe(readiness_probes, stage="after_navigation", probe=current_probe)
+    append_readiness_probe(
+        readiness_probes, stage="after_navigation", probe=current_probe
+    )
     is_listing_surface = "listing" in str(surface or "").lower()
     is_detail_surface = "detail" in str(surface or "").lower()
     current_probe = await _run_optimistic_readiness_wait(
@@ -427,7 +449,9 @@ async def _run_networkidle_settle(
             else settings.browser_spa_implicit_networkidle_timeout_ms
         )
         started_at = time.perf_counter()
-        timed_out = await _wait_for_networkidle(page, timeout_ms=min(int(timeout_seconds * 1000), timeout_cap_ms))
+        timed_out = await _wait_for_networkidle(
+            page, timeout_ms=min(int(timeout_seconds * 1000), timeout_cap_ms)
+        )
         phase_timings_ms["networkidle_wait"] = elapsed_ms(started_at)
         probe = await cached_probe(refresh_html=True)
         append_readiness_probe(readiness_probes, stage="after_networkidle", probe=probe)
@@ -476,7 +500,9 @@ async def _settle_detail_payloads_if_needed(
     if not is_detail_surface or settle_ms <= 0 or skip_reason == "fast_path_ready":
         return
     started_at = time.perf_counter()
-    await _wait_for_networkidle(page, timeout_ms=min(int(timeout_seconds * 1000), settle_ms))
+    await _wait_for_networkidle(
+        page, timeout_ms=min(int(timeout_seconds * 1000), settle_ms)
+    )
     phase_timings_ms["detail_payload_settle"] = elapsed_ms(started_at)
 
 
@@ -606,7 +632,9 @@ async def _wait_for_generic_detail_readiness(
             pass  # The final readiness probe owns the outcome.
     phase_timings_ms["readiness_wait"] = elapsed_ms(started_at)
     probe = await cached_probe(refresh_html=True)
-    append_readiness_probe(readiness_probes, stage="after_generic_detail_readiness", probe=probe)
+    append_readiness_probe(
+        readiness_probes, stage="after_generic_detail_readiness", probe=probe
+    )
     return probe, {
         "status": "ready" if probe["is_ready"] else "timeout",
         "reason": "generic_detail_readiness",
@@ -643,17 +671,25 @@ async def serialize_browser_page_content_impl(
         "actions_taken": [],
     }
     recovery_started_at = time.perf_counter()
-    normalized_listing_recovery_mode = _normalize_listing_recovery_mode(listing_recovery_mode)
+    normalized_listing_recovery_mode = _normalize_listing_recovery_mode(
+        listing_recovery_mode
+    )
     if normalized_listing_recovery_mode is not None:
-        listing_recovery_diagnostics["requested_mode"] = normalized_listing_recovery_mode
+        listing_recovery_diagnostics["requested_mode"] = (
+            normalized_listing_recovery_mode
+        )
     if traversal_active and normalized_listing_recovery_mode == "thin_listing":
         listing_recovery_diagnostics = await recover_listing_page_content(
             page,
             on_event=on_event,
         )
-        listing_recovery_diagnostics["requested_mode"] = normalized_listing_recovery_mode
+        listing_recovery_diagnostics["requested_mode"] = (
+            normalized_listing_recovery_mode
+        )
     elif normalized_listing_recovery_mode is not None:
-        listing_recovery_diagnostics["reason"] = "traversal_inactive" if not traversal_active else "unsupported_mode"
+        listing_recovery_diagnostics["reason"] = (
+            "traversal_inactive" if not traversal_active else "unsupported_mode"
+        )
     phase_timings_ms["listing_recovery"] = elapsed_ms(recovery_started_at)
     traversal_started_at = time.perf_counter()
     if traversal_active:

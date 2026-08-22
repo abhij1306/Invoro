@@ -446,7 +446,9 @@ class AmazonAdapter(BaseAdapter):
             if not isinstance(raw_entries, list):
                 continue
             axis_name = _axis_key(raw_dim)
-            entries = self._twister_axis_values(raw_entries, axis_name=axis_name, selected=selected)
+            entries = self._twister_axis_values(
+                raw_entries, axis_name=axis_name, selected=selected
+            )
             if entries:
                 axes[axis_name] = entries
         return axes, selected
@@ -463,7 +465,10 @@ class AmazonAdapter(BaseAdapter):
             if not value:
                 continue
             entries.append({**entry, "value": value})
-            if str(entry.get("dimensionValueState") or "").strip().upper() == "SELECTED":
+            if (
+                str(entry.get("dimensionValueState") or "").strip().upper()
+                == "SELECTED"
+            ):
                 selected[axis_name] = value
         return entries
 

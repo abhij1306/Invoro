@@ -7,6 +7,7 @@ from .test_detail_extractor_structured_sources import (
     read_optional_artifact_text,
 )
 
+
 @pytest.mark.regression
 def test_build_detail_record_backfills_shared_variant_image_and_availability() -> None:
     record = build_detail_record(
@@ -40,6 +41,7 @@ def test_build_detail_record_backfills_shared_variant_image_and_availability() -
     assert "image_url" not in record["variants"][0]
     assert record["variants"][1]["availability"] == "out_of_stock"
 
+
 @pytest.mark.regression
 def test_build_detail_record_repairs_nike_uuid_variant_skus_and_empty_prices() -> None:
     record = build_detail_record(
@@ -71,6 +73,7 @@ def test_build_detail_record_repairs_nike_uuid_variant_skus_and_empty_prices() -
     assert record["variants"][0]["price"] == "115.00"
     assert "sku" not in record["variants"][0]
     assert record["sku"] == "CW2288-111"
+
 
 @pytest.mark.regression
 def test_build_detail_record_replaces_feature_duplicate_description_with_details() -> (
@@ -110,6 +113,7 @@ def test_build_detail_record_replaces_feature_duplicate_description_with_details
         == "Now even the heaviest packages can withstand rough handling. This packaging tape holds strong on recycled boxes."
     )
 
+
 @pytest.mark.regression
 def test_build_detail_record_backfills_price_from_buy_button_aria_label() -> None:
     record = build_detail_record(
@@ -137,6 +141,7 @@ def test_build_detail_record_backfills_price_from_buy_button_aria_label() -> Non
     assert record["price"] == "99.00"
     assert record["currency"] == "USD"
     assert record["_field_sources"]["price"] == ["dom_text"]
+
 
 @pytest.mark.regression
 def test_build_detail_record_repairs_shopify_cent_variant_prices_and_numeric_titles() -> (
@@ -176,6 +181,7 @@ def test_build_detail_record_repairs_shopify_cent_variant_prices_and_numeric_tit
 
     assert record["variants"][0]["price"] == "282.00"
 
+
 @pytest.mark.regression
 def test_build_detail_record_drops_shopify_internal_numeric_variant_weight() -> None:
     record = build_detail_record(
@@ -209,6 +215,7 @@ def test_build_detail_record_drops_shopify_internal_numeric_variant_weight() -> 
     assert len(record["variants"]) == 2
     assert all("weight" not in variant for variant in record["variants"])
 
+
 @pytest.mark.regression
 def test_build_detail_record_replaces_ai_outfit_title_from_url() -> None:
     record = build_detail_record(
@@ -226,6 +233,7 @@ def test_build_detail_record_replaces_ai_outfit_title_from_url() -> None:
     )
 
     assert record["title"] == "Treasure And Bond Blouson Twill Utility Jacket"
+
 
 @pytest.mark.regression
 def test_build_detail_record_drops_low_signal_numeric_only_variants() -> None:
@@ -268,6 +276,7 @@ def test_build_detail_record_drops_low_signal_numeric_only_variants() -> None:
     )
 
     assert "variants" not in record
+
 
 @pytest.mark.regression
 def test_extract_hm_productgroup_detail_from_code_only_url() -> None:
@@ -341,6 +350,7 @@ def test_extract_hm_productgroup_detail_from_code_only_url() -> None:
     assert record["url"] == "https://www2.hm.com/en_in/productpage.1317259001.html"
     assert record["image_url"] == "https://image.hm.com/assets/hm/9e/92/main.jpg"
     assert "size" not in record
+
 
 @pytest.mark.regression
 def test_extract_detail_ignores_variant_leaf_jsonld_scalars_for_base_request() -> None:
@@ -430,6 +440,7 @@ def test_extract_detail_ignores_variant_leaf_jsonld_scalars_for_base_request() -
     assert record["currency"] == "USD"
     assert "sku" not in record
 
+
 @pytest.mark.regression
 def test_extract_detail_backfills_current_price_variants_and_strips_unavailable_suffixes() -> (
     None
@@ -486,6 +497,7 @@ def test_extract_detail_backfills_current_price_variants_and_strips_unavailable_
     assert record["variants"][0]["size"] == "12.5"
     assert "price" not in record["variants"][0]
 
+
 @pytest.mark.regression
 def test_extract_detail_rejects_asos_mixed_product_identity_record() -> None:
     html = """
@@ -512,6 +524,7 @@ def test_extract_detail_rejects_asos_mixed_product_identity_record() -> None:
 
     assert rows == []
 
+
 @pytest.mark.regression
 def test_extract_detail_rejects_known_error_page_titles() -> None:
     html = """
@@ -530,6 +543,7 @@ def test_extract_detail_rejects_known_error_page_titles() -> None:
     )
 
     assert rows == []
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_recovers_ulta_swatch_variants_from_artifact() -> None:
@@ -552,6 +566,7 @@ def test_extract_ecommerce_detail_recovers_ulta_swatch_variants_from_artifact() 
         for row in variants
     )
 
+
 @pytest.mark.regression
 def test_extract_ecommerce_detail_recovers_jd_size_button_variants_from_artifact() -> (
     None
@@ -570,6 +585,7 @@ def test_extract_ecommerce_detail_recovers_jd_size_button_variants_from_artifact
     sizes = [row.get("size") for row in rows[0]["variants"] if row.get("size")]
     assert sizes[:5] == ["XS", "S", "M", "L", "XL"]
 
+
 @pytest.mark.regression
 def test_extract_ecommerce_detail_preserves_zadig_js_state_variants_from_artifact() -> (
     None
@@ -587,6 +603,7 @@ def test_extract_ecommerce_detail_preserves_zadig_js_state_variants_from_artifac
     assert len(rows) == 1
     sizes = [row.get("size") for row in rows[0]["variants"] if row.get("size")]
     assert sizes[:5] == ["XS", "S", "M", "L", "XL"]
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_preserves_toddsnyder_suit_component_variants() -> (
@@ -612,6 +629,7 @@ def test_extract_ecommerce_detail_preserves_toddsnyder_suit_component_variants()
         variant.get("style") == "Trouser" and variant.get("size") == "28/32"
         for variant in variants
     )
+
 
 @pytest.mark.regression
 def test_build_detail_record_prefers_dom_description_over_truncated_og_copy() -> None:
@@ -663,6 +681,7 @@ def test_build_detail_record_prefers_dom_description_over_truncated_og_copy() ->
 
     assert record["description"].endswith("restore deeply discharged batteries.")
     assert record["description"].endswith(("...", "…")) is False
+
 
 @pytest.mark.regression
 def test_build_detail_record_prefers_dom_description_over_cut_off_meta_copy() -> None:

@@ -4,6 +4,7 @@ from .test_browser_context import AsyncSession, SimpleNamespace, _context_spec, 
 
 pytest_plugins = ["tests.component._cookie_store_test_support"]
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_shared_browser_runtime_bounds_hung_browser_launch(
@@ -52,6 +53,7 @@ async def test_shared_browser_runtime_bounds_hung_browser_launch(
     assert runtime._browser is None
     assert runtime._playwright is None
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_shared_browser_runtime_bounds_hung_new_context(
@@ -85,6 +87,7 @@ async def test_shared_browser_runtime_bounds_hung_new_context(
                 pass
 
     assert runtime._active_contexts == 0
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -129,12 +132,14 @@ async def test_shared_browser_runtime_bounds_hung_new_page_and_closes_context(
     assert closed == ["context_closed"]
     assert runtime._active_contexts == 0
 
+
 @pytest.mark.component
 def test_browser_runtime_snapshot_reports_runtime_capacity_without_host_cache() -> None:
     snapshot = crawl_fetch_runtime.browser_runtime_snapshot()
 
     assert "preferred_hosts" not in snapshot
     assert "capacity" in snapshot
+
 
 @pytest.mark.component
 def test_real_chrome_candidate_paths_include_common_platform_defaults(
@@ -152,6 +157,7 @@ def test_real_chrome_candidate_paths_include_common_platform_defaults(
     assert "/opt/google/chrome/chrome" in candidates
     assert "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" in candidates
 
+
 @pytest.mark.component
 def test_real_chrome_browser_available_requires_enabled_flag(
     monkeypatch: pytest.MonkeyPatch,
@@ -163,6 +169,7 @@ def test_real_chrome_browser_available_requires_enabled_flag(
     )
 
     assert acquisition_browser_runtime.real_chrome_browser_available() is False
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -245,6 +252,7 @@ async def test_get_browser_runtime_evicts_idle_proxied_runtime_when_pool_is_full
     assert closed == [("http://proxy-one", "chromium")]
     await acquisition_browser_runtime.shutdown_browser_runtime()
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_get_browser_runtime_uses_context_capacity_for_runtime_capacity(
@@ -275,6 +283,7 @@ async def test_get_browser_runtime_uses_context_capacity_for_runtime_capacity(
         assert "contexts_per_instance" not in snapshot
     finally:
         await acquisition_browser_runtime.shutdown_browser_runtime()
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -349,6 +358,7 @@ async def test_get_browser_runtime_evicts_idle_direct_runtime_when_pool_is_full(
     assert closed == [(None, "chromium")]
     await acquisition_browser_runtime.shutdown_browser_runtime()
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_browser_pool_skip_evicts_runtime_reused_after_candidate_snapshot(
@@ -404,6 +414,7 @@ async def test_browser_pool_skip_evicts_runtime_reused_after_candidate_snapshot(
     finally:
         await acquisition_browser_runtime.shutdown_browser_runtime()
 
+
 @pytest.mark.component
 def test_browser_launch_args_exclude_detectable_flags() -> None:
     assert (
@@ -413,6 +424,7 @@ def test_browser_launch_args_exclude_detectable_flags() -> None:
         "--disable-blink-features=AutomationControlled"
         not in crawler_runtime_settings.browser_launch_args
     )
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -448,6 +460,7 @@ async def test_persist_storage_state_for_domain_commits_owned_session(
     assert len(rows) == 1
     assert rows[0]["domain"] == domain
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_persist_storage_state_for_domain_persists_test_domains(
@@ -480,6 +493,7 @@ async def test_persist_storage_state_for_domain_persists_test_domains(
     assert len(rows) == 1
     assert rows[0]["domain"] == domain
     assert loaded is not None
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -517,6 +531,7 @@ async def test_persist_storage_state_for_domain_strips_null_bytes(db_session) ->
     assert loaded is not None
     assert loaded["cookies"][0]["value"] == "abcdef"
     assert loaded["origins"] == []
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -597,6 +612,7 @@ async def test_persist_storage_state_for_domain_keeps_engine_specific_rows(
         "origins": [],
     }
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_persist_storage_state_for_domain_persists_localhost_with_port(
@@ -633,6 +649,7 @@ async def test_persist_storage_state_for_domain_persists_localhost_with_port(
     assert rows[0]["domain"] == "localhost:3000"
     assert any(row["domain"] == "localhost:3000" for row in all_rows)
     assert loaded is not None
+
 
 @pytest.mark.asyncio
 @pytest.mark.component

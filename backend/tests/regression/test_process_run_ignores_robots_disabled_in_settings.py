@@ -4,6 +4,7 @@ from .test_batch_runtime import AcquisitionResult, AsyncSession, CrawlLog, Crawl
 
 pytest_plugins = ["tests.regression.test_batch_runtime"]
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_process_run_ignores_robots_when_disabled_in_settings(
@@ -55,6 +56,7 @@ async def test_process_run_ignores_robots_when_disabled_in_settings(
     assert run.result_summary["extraction_verdict"] == "success"
     assert total == 1
     assert rows[0].data["title"] == "Widget Prime"
+
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
@@ -112,6 +114,7 @@ async def test_process_run_continues_when_robots_allows_or_fails_open(
     assert total == 1
     assert rows[0].data["title"] == "Widget Prime"
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_process_run_enforces_url_timeout_from_settings(
@@ -146,6 +149,7 @@ async def test_process_run_enforces_url_timeout_from_settings(
     assert run.status == "completed"
     assert run.result_summary["extraction_verdict"] == "error"
     assert run.result_summary["url_verdicts"] == ["error"]
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -192,6 +196,7 @@ async def test_process_run_default_timeout_includes_acquisition_slack(
     assert run.result_summary["extraction_verdict"] == "success"
     assert run.result_summary["url_verdicts"] == ["success"]
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_process_batch_run_preserves_requested_fields_for_every_url(
@@ -231,6 +236,7 @@ async def test_process_batch_run_preserves_requested_fields_for_every_url(
     await process_run(db_session, run.id)
 
     assert captured_requested_fields == [["materials"], ["materials"]]
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -282,6 +288,7 @@ async def test_process_batch_run_preserves_proxy_list_for_every_url(
         ["http://proxy-a", "http://proxy-b"],
     ]
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_process_batch_run_preserves_exact_requested_section_labels_for_every_url(
@@ -324,6 +331,7 @@ async def test_process_batch_run_preserves_exact_requested_section_labels_for_ev
         ["Features & Benefits"],
         ["Features & Benefits"],
     ]
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -396,6 +404,7 @@ async def test_process_batch_run_resolves_urls_from_sitemap_settings(
     assert run.result_summary["url_count"] == 2
     assert run.result_summary["resolved_url_list"] == processed_urls
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_process_batch_run_defaults_bad_sitemap_max_urls(
@@ -445,6 +454,7 @@ async def test_process_batch_run_defaults_bad_sitemap_max_urls(
     await process_run(db_session, run.id)
 
     assert resolved_inputs == [SITEMAP_DEFAULT_MAX_URLS]
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -506,6 +516,7 @@ async def test_process_batch_run_marks_failed_when_sitemap_resolution_fails(
         "ValueError: Sitemap fetch failed: https://example.com/sitemap.xml returned HTTP 503"
     ]
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_process_batch_run_enables_homepage_fallback_for_auto_surface(
@@ -554,6 +565,7 @@ async def test_process_batch_run_enables_homepage_fallback_for_auto_surface(
     await process_run(db_session, run.id)
 
     assert resolved_flags == [True]
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -616,6 +628,7 @@ async def test_process_run_continues_after_sqlalchemy_url_error(
     assert run.result_summary["url_verdicts"] == ["error", "success"]
     assert total == 1
     assert rows[0].data["title"] == "Widget Prime"
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression

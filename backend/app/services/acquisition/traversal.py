@@ -62,7 +62,9 @@ def _format_traversal_detection_message(
     max_iterations: int,
     max_records: int | None,
 ) -> str:
-    target_suffix = f", target_records={int(max_records)}" if max_records is not None else ""
+    target_suffix = (
+        f", target_records={int(max_records)}" if max_records is not None else ""
+    )
     safety_suffix = f", safety_cap={max_iterations}"
     return f"Detected listing layout, traversal={mode}{target_suffix}{safety_suffix}"
 
@@ -77,7 +79,9 @@ def _format_traversal_progress_message(
     max_records: int | None,
 ) -> str:
     _ = step_limit
-    target_suffix = f", target_records={int(max_records)}" if max_records is not None else ""
+    target_suffix = (
+        f", target_records={int(max_records)}" if max_records is not None else ""
+    )
     return f"{label} {step} - page_cards={current_count} (prev_page_cards={previous_count}){target_suffix}"
 
 
@@ -123,11 +127,17 @@ async def execute_listing_traversal(
     if not should_run_traversal(surface, normalized_mode):
         _set_stop_reason(
             result,
-            ("unsupported_mode" if "listing" in normalized_surface and normalized_mode else "not_listing_or_disabled"),
+            (
+                "unsupported_mode"
+                if "listing" in normalized_surface and normalized_mode
+                else "not_listing_or_disabled"
+            ),
             surface=surface,
             traversal_mode=normalized_mode,
         )
-        result.html_fragments = [(await get_page_html(page, flatten_shadow=False), True)]
+        result.html_fragments = [
+            (await get_page_html(page, flatten_shadow=False), True)
+        ]
         return result
 
     selected_mode = normalized_mode
@@ -139,7 +149,11 @@ async def execute_listing_traversal(
             timeout_value = float(timeout_seconds)
         except (TypeError, ValueError):
             timeout_value = None
-    deadline_at = time.monotonic() + timeout_value if timeout_value is not None and timeout_value > 0 else None
+    deadline_at = (
+        time.monotonic() + timeout_value
+        if timeout_value is not None and timeout_value > 0
+        else None
+    )
     result.activated = True
     if selected_mode == "scroll":
         await _run_scroll_traversal(
@@ -172,7 +186,9 @@ async def execute_listing_traversal(
             on_event=on_event,
         )
     else:
-        _set_stop_reason(result, "unsupported_mode", surface=surface, traversal_mode=normalized_mode)
+        _set_stop_reason(
+            result, "unsupported_mode", surface=surface, traversal_mode=normalized_mode
+        )
 
     if not result.html_fragments:
         await _append_html_fragment(page, result, surface=surface)
@@ -212,7 +228,9 @@ async def _run_scroll_traversal(
             max_records=max_records,
         ),
     )
-    if _target_record_limit_reached(max_records=max_records, current_count=result.card_count):
+    if _target_record_limit_reached(
+        max_records=max_records, current_count=result.card_count
+    ):
         _set_stop_reason(result, "target_records_reached", surface=surface)
         return
     for _ in range(effective_max):
@@ -273,13 +291,19 @@ async def _run_scroll_traversal(
             marginal_gain_streak = 0
         previous = current
         result.card_count = current["card_count"]
-        if _target_record_limit_reached(max_records=max_records, current_count=result.card_count):
+        if _target_record_limit_reached(
+            max_records=max_records, current_count=result.card_count
+        ):
             _set_stop_reason(result, "target_records_reached", surface=surface)
             break
-        if marginal_gain_streak > int(crawler_runtime_settings.traversal_weak_progress_streak_max):
+        if marginal_gain_streak > int(
+            crawler_runtime_settings.traversal_weak_progress_streak_max
+        ):
             _set_stop_reason(result, "marginal_scroll_gain", surface=surface)
             break
-        if weak_progress_streak > int(crawler_runtime_settings.traversal_weak_progress_streak_max):
+        if weak_progress_streak > int(
+            crawler_runtime_settings.traversal_weak_progress_streak_max
+        ):
             _set_stop_reason(result, "no_scroll_progress", surface=surface)
             break
     else:
@@ -313,7 +337,9 @@ async def _run_load_more_traversal(
             max_records=max_records,
         ),
     )
-    if _target_record_limit_reached(max_records=max_records, current_count=result.card_count):
+    if _target_record_limit_reached(
+        max_records=max_records, current_count=result.card_count
+    ):
         _set_stop_reason(result, "target_records_reached", surface=surface)
         return
     for _ in range(max_iterations):
@@ -438,7 +464,9 @@ async def _record_load_more_result(
     result.events.append(("info", message))
     await _emit_event(on_event, "info", message)
     await _append_html_fragment(page, result, surface=surface)
-    if _target_record_limit_reached(max_records=max_records, current_count=current_count):
+    if _target_record_limit_reached(
+        max_records=max_records, current_count=current_count
+    ):
         _set_stop_reason(result, "target_records_reached", surface=surface)
         return True, best_card_gain, marginal_gain_streak
     if _is_marginal_card_gain(
@@ -449,7 +477,9 @@ async def _record_load_more_result(
         marginal_gain_streak += 1
     else:
         marginal_gain_streak = 0
-    if marginal_gain_streak > int(crawler_runtime_settings.traversal_weak_progress_streak_max):
+    if marginal_gain_streak > int(
+        crawler_runtime_settings.traversal_weak_progress_streak_max
+    ):
         _set_stop_reason(result, "marginal_load_more_gain", surface=surface)
         return True, best_card_gain, marginal_gain_streak
     return False, best_card_gain, marginal_gain_streak
@@ -479,7 +509,9 @@ async def wait_for_load_more_card_gain(
         waited_ms += step_ms
         current = await _page_snapshot(page, surface=surface)
         current_count = int(current.get("card_count", 0))
-        if current_count > previous_count and (best is None or current_count > int(best.get("card_count", 0))):
+        if current_count > previous_count and (
+            best is None or current_count > int(best.get("card_count", 0))
+        ):
             best = current
             if _target_record_limit_reached(
                 max_records=max_records,
@@ -516,7 +548,9 @@ async def _run_paginate_traversal(
         ),
     )
     visited_urls: set[str] = {page.url}
-    if _target_record_limit_reached(max_records=max_records, current_count=result.card_count):
+    if _target_record_limit_reached(
+        max_records=max_records, current_count=result.card_count
+    ):
         _set_stop_reason(result, "target_records_reached", surface=surface)
         return
     for _ in range(max(0, page_limit - 1)):
@@ -606,7 +640,9 @@ async def _navigate_to_next_page(
     href = await locator.get_attribute("href")
     normalized_href = str(href or "").strip().lower()
     if not href or normalized_href.startswith(("#", "javascript:")):
-        clicked = await click_with_retry(page, locator, result=result, deadline_at=deadline_at)
+        clicked = await click_with_retry(
+            page, locator, result=result, deadline_at=deadline_at
+        )
         if not clicked:
             _set_stop_reason(result, "paginate_click_failed", surface=surface)
             return False, None
@@ -614,7 +650,9 @@ async def _navigate_to_next_page(
             page,
             previous_url=current_url,
             deadline_at=deadline_at,
-            timeout_ms=int(crawler_runtime_settings.traversal_settle_networkidle_timeout_ms),
+            timeout_ms=int(
+                crawler_runtime_settings.traversal_settle_networkidle_timeout_ms
+            ),
         )
         return True, None
     next_url = urljoin(current_url, href)
@@ -701,11 +739,17 @@ def _paginate_progress_stop_reason(
     max_records: int | None,
     marginal_gain_streak: int,
 ) -> str | None:
-    if _target_record_limit_reached(max_records=max_records, current_count=result.card_count):
+    if _target_record_limit_reached(
+        max_records=max_records, current_count=result.card_count
+    ):
         return "target_records_reached"
-    if _paginate_fragment_budget_reached(result, target_records=max_records, current_count=result.card_count):
+    if _paginate_fragment_budget_reached(
+        result, target_records=max_records, current_count=result.card_count
+    ):
         return "paginate_fragment_budget_reached"
-    if marginal_gain_streak > int(crawler_runtime_settings.traversal_weak_progress_streak_max):
+    if marginal_gain_streak > int(
+        crawler_runtime_settings.traversal_weak_progress_streak_max
+    ):
         return "marginal_paginate_gain"
     return None
 
@@ -727,7 +771,9 @@ async def _settle_thin_initial_listing(
     await _settle_after_action(
         page,
         deadline_at=deadline_at,
-        timeout_ms=int(crawler_runtime_settings.traversal_settle_networkidle_timeout_ms),
+        timeout_ms=int(
+            crawler_runtime_settings.traversal_settle_networkidle_timeout_ms
+        ),
     )
     current = await _page_snapshot(page, surface=surface)
     if not _snapshot_progressed(previous, current):

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .test_crawl_engine import dom_variants_add_missing_existing_axis, extract_records, map_js_state_to_fields, normalize_variant_record, pytest, sanitize_variant_row  # fmt: skip
 
+
 @pytest.mark.regression
 def test_extract_records_limits_xml_sitemap_listing_records() -> None:
     xml = """
@@ -21,6 +22,7 @@ def test_extract_records_limits_xml_sitemap_listing_records() -> None:
     )
 
     assert [row["url"] for row in rows] == ["https://example.com/products/widget-prime"]
+
 
 @pytest.mark.regression
 def test_extract_records_emits_rss_listing_records_from_link_nodes() -> None:
@@ -53,6 +55,7 @@ def test_extract_records_emits_rss_listing_records_from_link_nodes() -> None:
     assert rows[0]["url"] == "https://example.com/products/widget-prime"
     assert rows[1]["title"] == "widget pro"
 
+
 @pytest.mark.regression
 def test_extract_records_emits_atom_listing_records_from_link_href() -> None:
     atom = """
@@ -81,6 +84,7 @@ def test_extract_records_emits_atom_listing_records_from_link_href() -> None:
     assert rows[0]["_source"] == "xml_sitemap"
     assert rows[0]["url"] == "https://example.com/products/widget-prime"
     assert rows[1]["title"] == "widget pro"
+
 
 @pytest.mark.regression
 def test_extract_detail_keeps_dom_stage_for_high_scoring_js_state_when_long_text_missing() -> (
@@ -131,6 +135,7 @@ def test_extract_detail_keeps_dom_stage_for_high_scoring_js_state_when_long_text
     assert "Rubber outsole" in record["specifications"]
     assert record["_extraction_tiers"]["current"] == "dom"
     assert record["_extraction_tiers"]["early_exit"] is None
+
 
 @pytest.mark.regression
 def test_extract_detail_uses_requested_custom_fields_from_network_payloads() -> None:
@@ -191,6 +196,7 @@ def test_extract_detail_uses_requested_custom_fields_from_network_payloads() -> 
     assert record["energy_rating"] == "3 Star"
     assert record["_field_sources"]["title"][0] == "network_payload"
 
+
 @pytest.mark.regression
 def test_extract_detail_keeps_long_product_titles_that_include_star_ratings() -> None:
     html = """
@@ -228,6 +234,7 @@ def test_extract_detail_keeps_long_product_titles_that_include_star_ratings() ->
 
     assert len(rows) == 1
     assert rows[0]["title"] == "Vitamagic Pro 192L 3 Star Radiant Steel Refrigerator"
+
 
 @pytest.mark.regression
 def test_extract_detail_allows_safe_early_exit_before_dom_when_pre_dom_record_is_complete() -> (
@@ -272,6 +279,7 @@ def test_extract_detail_allows_safe_early_exit_before_dom_when_pre_dom_record_is
     record = rows[0]
     assert record["_extraction_tiers"]["early_exit"] == "js_state"
     assert record["_extraction_tiers"]["current"] == "js_state"
+
 
 @pytest.mark.regression
 def test_extract_detail_records_preserves_selector_trace_for_selected_rule() -> None:
@@ -328,6 +336,7 @@ def test_extract_detail_records_preserves_selector_trace_for_selected_rule() -> 
         "page_url": "https://example.com/products/selector-widget",
     }
 
+
 @pytest.mark.regression
 def test_extract_listing_records_preserves_selector_trace_for_selected_rule() -> None:
     html = """
@@ -367,6 +376,7 @@ def test_extract_listing_records_preserves_selector_trace_for_selected_rule() ->
         "sample_value": "$19.99",
         "page_url": "https://example.com/collections/widgets",
     }
+
 
 @pytest.mark.regression
 def test_extract_detail_rejects_non_variant_options_object_from_structured_payload() -> (
@@ -415,6 +425,7 @@ def test_extract_detail_rejects_non_variant_options_object_from_structured_paylo
     )
     assert "availability" not in record
 
+
 @pytest.mark.regression
 def test_extract_detail_keeps_valid_variant_axes_from_structured_options_alias() -> (
     None
@@ -448,6 +459,7 @@ def test_extract_detail_keeps_valid_variant_axes_from_structured_options_alias()
 
     assert len(rows) == 1
 
+
 @pytest.mark.regression
 def test_normalize_variant_record_drops_scalar_legacy_variant_axes() -> None:
     record = {
@@ -463,6 +475,7 @@ def test_normalize_variant_record_drops_scalar_legacy_variant_axes() -> None:
     assert "stock" not in record
     assert "variant_axes" not in record
 
+
 @pytest.mark.regression
 def test_dom_variant_axis_detection_ignores_unknown_option_value_axes() -> None:
     existing = [
@@ -475,6 +488,7 @@ def test_dom_variant_axis_detection_ignores_unknown_option_value_axes() -> None:
     dom_rows = [{"option_values": {"material": "Linen"}}]
 
     assert dom_variants_add_missing_existing_axis(existing, dom_rows) is False
+
 
 @pytest.mark.regression
 def test_variant_sanitizer_rejects_unrelated_amazon_cross_asin_url() -> None:
@@ -492,12 +506,14 @@ def test_variant_sanitizer_rejects_unrelated_amazon_cross_asin_url() -> None:
         is False
     )
 
+
 @pytest.mark.regression
 def test_variant_numeric_noise_keeps_decimal_size() -> None:
     variant = {"option_values": {"size": "3.5"}}
 
     assert sanitize_variant_row(variant, identity_url="https://example.com/p/shoe")
     assert variant["option_values"] == {"size": "3.5"}
+
 
 @pytest.mark.regression
 def test_normalize_variant_record_strips_legacy_option_summaries_and_selected_variant() -> (
@@ -542,6 +558,7 @@ def test_normalize_variant_record_strips_legacy_option_summaries_and_selected_va
     assert "option2_values" not in record
     assert record["variants"] == [{"flavor": "Rich Chocolate"}]
 
+
 @pytest.mark.regression
 def test_normalize_variant_record_drops_parent_shared_variant_prices_and_axes() -> None:
     record = {
@@ -557,6 +574,7 @@ def test_normalize_variant_record_drops_parent_shared_variant_prices_and_axes() 
     normalize_variant_record(record)
 
     assert record["variants"] == [{"size": "S"}, {"size": "M"}]
+
 
 @pytest.mark.regression
 def test_map_js_state_variant_axes_coerces_dict_values_to_labels() -> None:
@@ -591,6 +609,7 @@ def test_map_js_state_variant_axes_coerces_dict_values_to_labels() -> None:
     assert mapped["variants"][0]["color"] == "black onyx"
     assert not mapped["variants"][0]["color"].startswith("{")
 
+
 @pytest.mark.regression
 def test_normalize_variant_record_coerces_dict_like_axis_strings_to_labels() -> None:
     record = {
@@ -605,6 +624,7 @@ def test_normalize_variant_record_coerces_dict_like_axis_strings_to_labels() -> 
     normalize_variant_record(record)
 
     assert record["variants"] == [{"sku": "SOCK-BLK", "color": "black onyx"}]
+
 
 @pytest.mark.regression
 def test_extract_dom_variants_rejects_payment_button_text_as_size() -> None:
@@ -636,6 +656,7 @@ def test_extract_dom_variants_rejects_payment_button_text_as_size() -> None:
 
     assert rows[0]["variants"] == [{"size": "S"}, {"size": "M"}]
 
+
 @pytest.mark.regression
 def test_variant_axis_headers_do_not_pollute_size_or_available_sizes() -> None:
     record = {
@@ -663,6 +684,7 @@ def test_variant_axis_headers_do_not_pollute_size_or_available_sizes() -> None:
     assert [variant["size"] for variant in record["variants"]] == ["XS", "M"]
     assert "available_sizes" not in record
     assert "selected_variant" not in record
+
 
 @pytest.mark.regression
 def test_normalize_variant_record_infers_size_from_variant_titles() -> None:

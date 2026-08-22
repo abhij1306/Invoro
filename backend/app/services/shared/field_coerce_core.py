@@ -104,30 +104,62 @@ __all__ = (
 PRODUCT_URL_HINTS = detail_path_hints("ecommerce_detail")
 JOB_URL_HINTS = detail_path_hints("job_detail")
 _FIELD_ALIASES = FIELD_ALIASES
-_OPTION_VALUE_SUFFIX_NOISE_RE = compile_regex_patterns(VARIANT_OPTION_VALUE_SUFFIX_NOISE_PATTERNS or ())
-_OPTION_VALUE_NOISE_WORD_PATTERN = "|".join(re.escape(str(word)) for word in tuple(OPTION_VALUE_NOISE_WORDS or ()) if str(word).strip())
-ALL_CANONICAL_FIELDS = sorted({field_name for fields in CANONICAL_SCHEMAS.values() for field_name in fields or [] if field_name})
+_OPTION_VALUE_SUFFIX_NOISE_RE = compile_regex_patterns(
+    VARIANT_OPTION_VALUE_SUFFIX_NOISE_PATTERNS or ()
+)
+_OPTION_VALUE_NOISE_WORD_PATTERN = "|".join(
+    re.escape(str(word))
+    for word in tuple(OPTION_VALUE_NOISE_WORDS or ())
+    if str(word).strip()
+)
+ALL_CANONICAL_FIELDS = sorted(
+    {
+        field_name
+        for fields in CANONICAL_SCHEMAS.values()
+        for field_name in fields or []
+        if field_name
+    }
+)
 _PRICE_FIELD_NAMES = PRICE_VALUE_FIELDS
 _INTEGER_FIELD_NAMES = INTEGER_VALUE_FIELDS
-_NOISY_PRODUCT_ATTRIBUTE_KEYS = frozenset(normalize_field_key(str(key or "")) for key in tuple(NOISY_PRODUCT_ATTRIBUTE_KEYS or ()) if str(key or "").strip())
+_NOISY_PRODUCT_ATTRIBUTE_KEYS = frozenset(
+    normalize_field_key(str(key or ""))
+    for key in tuple(NOISY_PRODUCT_ATTRIBUTE_KEYS or ())
+    if str(key or "").strip()
+)
 _SMALL_NUMERIC_RE = re.compile(str(SMALL_NUMERIC_PATTERN), re.I)
 _TRACKING_PIXEL_RE = re.compile(str(TRACKING_PIXEL_PATTERN), re.I)
 _COLOR_KEYWORD_RE = re.compile(str(COLOR_KEYWORD_PATTERN), re.I)
-_variant_color_codelike_token_re = re.compile(str(VARIANT_COLOR_CODELIKE_TOKEN_PATTERN), re.I)
-size_reject_tokens_normalized: frozenset[str] = frozenset(str(token).strip().lower() for token in tuple(SIZE_REJECT_TOKENS or ()) if str(token).strip())
+_variant_color_codelike_token_re = re.compile(
+    str(VARIANT_COLOR_CODELIKE_TOKEN_PATTERN), re.I
+)
+size_reject_tokens_normalized: frozenset[str] = frozenset(
+    str(token).strip().lower()
+    for token in tuple(SIZE_REJECT_TOKENS or ())
+    if str(token).strip()
+)
 
 object_list = _object_list
 object_dict = _object_dict
 safe_int = _safe_int
 coerce_int = _coerce_int
 
-LISTING_UTILITY_TITLE_REGEXES = tuple(re.compile(pattern, re.I) for pattern in LISTING_UTILITY_TITLE_PATTERNS)
-_AVAILABILITY_CANONICAL_ENUM = frozenset(str(v) for v in dict(AVAILABILITY_URL_MAP or {}).values() if v)
+LISTING_UTILITY_TITLE_REGEXES = tuple(
+    re.compile(pattern, re.I) for pattern in LISTING_UTILITY_TITLE_PATTERNS
+)
+_AVAILABILITY_CANONICAL_ENUM = frozenset(
+    str(v) for v in dict(AVAILABILITY_URL_MAP or {}).values() if v
+)
 _HTML_ENTITY_RE = re.compile(r"&(?:#\d+|#x[0-9a-fA-F]+|[A-Za-z][A-Za-z0-9]+);")
-_product_type_noise_tokens = frozenset(str(token).casefold() for token in tuple(PUBLIC_RECORD_PRODUCT_TYPE_NOISE_TOKENS or ()))
+_product_type_noise_tokens = frozenset(
+    str(token).casefold()
+    for token in tuple(PUBLIC_RECORD_PRODUCT_TYPE_NOISE_TOKENS or ())
+)
+
 
 def clean_record(record: dict[str, Any]) -> dict[str, Any]:
     return {str(key): value for key, value in record.items() if not is_blank(value)}
+
 
 def _surface_field_type_error(
     *,
@@ -136,7 +168,9 @@ def _surface_field_type_error(
     value: object,
     scalar_list_fields: set[str],
 ) -> str | None:
-    if normalized_field in STRUCTURED_OBJECT_LIST_FIELDS and not isinstance(value, list):
+    if normalized_field in STRUCTURED_OBJECT_LIST_FIELDS and not isinstance(
+        value, list
+    ):
         return f"{field_name} expected list"
     if normalized_field in STRUCTURED_OBJECT_FIELDS and not isinstance(value, dict):
         return f"{field_name} expected object"
@@ -149,6 +183,7 @@ def _surface_field_type_error(
         return f"{field_name} expected scalar"
     return None
 
+
 def validate_record_for_surface(
     record: dict[str, Any],
     surface: str,
@@ -158,7 +193,11 @@ def validate_record_for_surface(
 ) -> tuple[dict[str, Any], list[str]]:
     if str(surface or "").strip().lower() == DESIGN_SYSTEM_SURFACE:
         allowed = set(DESIGN_SYSTEM_PUBLIC_FIELDS)
-        return {key: value for key, value in dict(record or {}).items() if str(key).startswith("_") or (key in allowed and not is_blank(value))}, []
+        return {
+            key: value
+            for key, value in dict(record or {}).items()
+            if str(key).startswith("_") or (key in allowed and not is_blank(value))
+        }, []
     logical_fields, internal_fields = _partition_record_fields(record)
     allowed_fields = {
         normalize_field_key(field_name)
@@ -168,7 +207,9 @@ def validate_record_for_surface(
             allow_noncanonical_requested=False,
         )
     }
-    validated_fields, validation_errors = _validated_surface_fields(logical_fields, allowed_fields=allowed_fields, strict_types=strict_types)
+    validated_fields, validation_errors = _validated_surface_fields(
+        logical_fields, allowed_fields=allowed_fields, strict_types=strict_types
+    )
     if str(surface or "").strip().lower().startswith("ecommerce_"):
         for field_name in (
             *tuple(PUBLIC_RECORD_ECOMMERCE_DROPPED_FIELDS or ()),
@@ -180,6 +221,7 @@ def validate_record_for_surface(
         **internal_fields,
     }, validation_errors
 
+
 def _partition_record_fields(
     record: dict[str, Any],
 ) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -188,6 +230,7 @@ def _partition_record_fields(
     for key, value in dict(record).items():
         (internal if str(key).startswith("_") else logical)[key] = value
     return logical, internal
+
 
 def _validated_surface_fields(
     logical_fields: dict[str, Any],
@@ -218,6 +261,7 @@ def _validated_surface_fields(
             validated[field_name] = value
     return validated, errors
 
+
 def surface_fields(
     surface: str,
     requested_fields: list[str] | None,
@@ -231,12 +275,21 @@ def surface_fields(
         fields.append(URL_FIELD)
     for field_name in requested_fields or []:
         exact_field = exact_requested_field_key(field_name)
-        if exact_field and (allow_noncanonical_requested or exact_field in allowed_fields) and exact_field not in fields:
+        if (
+            exact_field
+            and (allow_noncanonical_requested or exact_field in allowed_fields)
+            and exact_field not in fields
+        ):
             fields.append(exact_field)
     for field_name in expand_requested_fields(requested_fields or []):
-        if field_name and (allow_noncanonical_requested or field_name in allowed_fields) and field_name not in fields:
+        if (
+            field_name
+            and (allow_noncanonical_requested or field_name in allowed_fields)
+            and field_name not in fields
+        ):
             fields.append(field_name)
     return fields
+
 
 def surface_alias_lookup(
     surface: str,
@@ -268,9 +321,15 @@ def surface_alias_lookup(
                 lookup.setdefault(normalized_alias, canonical)
     return lookup
 
+
 def _split_multivalue_text_rows(value: str) -> list[str]:
-    rows = [clean_text(part) for part in re.split(r"(?:\r?\n|[•]+)", str(value or "")) if clean_text(part)]
+    rows = [
+        clean_text(part)
+        for part in re.split(r"(?:\r?\n|[•]+)", str(value or ""))
+        if clean_text(part)
+    ]
     return rows
+
 
 def _iter_structured_multi_values(value: object) -> list[object]:
     if isinstance(value, dict):
@@ -278,6 +337,7 @@ def _iter_structured_multi_values(value: object) -> list[object]:
     if isinstance(value, (list, tuple, set)):
         return list(value)
     return []
+
 
 def _coerce_structured_multi_rows(field_name: str, value: object) -> list[str]:
     if value in (None, "", [], {}):
@@ -294,12 +354,17 @@ def _coerce_structured_multi_rows(field_name: str, value: object) -> list[str]:
         literal_rows = coerce_literal_text_list(value)
         if literal_rows:
             return literal_rows
-        text = html_to_text(value, preserve_block_breaks=True) if ("<" in value or _HTML_ENTITY_RE.search(value)) else str(value)
+        text = (
+            html_to_text(value, preserve_block_breaks=True)
+            if ("<" in value or _HTML_ENTITY_RE.search(value))
+            else str(value)
+        )
         rows = _split_multivalue_text_rows(text)
         if rows:
             return rows
     coerced_text = coerce_text(value)
     return [coerced_text] if coerced_text is not None else []
+
 
 def coerce_structured_scalar(
     value: object,
@@ -339,6 +404,7 @@ def coerce_structured_scalar(
         return None
     return coerce_text(value)
 
+
 def _coerce_simple_string_dict_scalar(
     value: str,
     *,
@@ -362,6 +428,7 @@ def _coerce_simple_string_dict_scalar(
             return candidate
     return None
 
+
 def _unquote_simple_string_dict_token(value: str) -> str | None:
     if len(value) < 2 or value[0] != value[-1] or value[0] not in {"'", '"'}:
         return None
@@ -370,9 +437,11 @@ def _unquote_simple_string_dict_token(value: str) -> str | None:
         return None
     return inner
 
+
 def _join_text_parts(parts: list[str | None], *, separator: str) -> str | None:
     cleaned_parts = [part for part in parts if part]
     return separator.join(cleaned_parts) if cleaned_parts else None
+
 
 def _color_value_is_opaque_code(value: str) -> bool:
     """Reject internal swatch/style codes that masquerade as colors.
@@ -398,27 +467,46 @@ def _color_value_is_opaque_code(value: str) -> bool:
         return False
     return True
 
+
 def _strip_color_value_code_pollution(value: str) -> str:
     if not value or not any(char.isdigit() for char in value):
         return value
     tokens = re.findall(r"[A-Za-z0-9]+", value)
     if len(tokens) < 2:
         return value
-    color_indexes = [index for index, token in enumerate(tokens) if _COLOR_KEYWORD_RE.fullmatch(token)]
+    color_indexes = [
+        index
+        for index, token in enumerate(tokens)
+        if _COLOR_KEYWORD_RE.fullmatch(token)
+    ]
     if not color_indexes:
         return value
     tail = tokens[color_indexes[-1] + 1 :]
     if not tail:
         return value
-    if not all(token.isdigit() or _variant_color_codelike_token_re.fullmatch(token) for token in tail):
+    if not all(
+        token.isdigit() or _variant_color_codelike_token_re.fullmatch(token)
+        for token in tail
+    ):
         return value
-    color_prefix = [token for token in tokens[: color_indexes[0]] if not _color_prefix_token_is_code_like(token)]
+    color_prefix = [
+        token
+        for token in tokens[: color_indexes[0]]
+        if not _color_prefix_token_is_code_like(token)
+    ]
     color_tokens = tokens[color_indexes[0] : color_indexes[-1] + 1]
     return clean_text(" ".join([*color_prefix, *color_tokens]))
 
+
 def _color_prefix_token_is_code_like(token: str) -> bool:
     text = token.strip()
-    return 1 < len(text) <= 3 and not text.islower() and text.casefold() not in _SHORT_COLOR_ALLOWLIST and _COLOR_KEYWORD_RE.fullmatch(text) is None
+    return (
+        1 < len(text) <= 3
+        and not text.islower()
+        and text.casefold() not in _SHORT_COLOR_ALLOWLIST
+        and _COLOR_KEYWORD_RE.fullmatch(text) is None
+    )
+
 
 _SHORT_COLOR_ALLOWLIST = frozenset(
     {
@@ -463,12 +551,15 @@ _SHORT_COLOR_ALLOWLIST = frozenset(
     }
 )
 
+
 def _strip_option_suffix_noise(value: str) -> str:
     cleaned = value
     for pattern in _OPTION_VALUE_SUFFIX_NOISE_RE:
         cleaned = clean_text(pattern.sub("", cleaned))
     cleaned = re.sub(rf"\s+(?:{CURRENCY_SYMBOL_PATTERN})\s*\d[\d.,]*.*$", "", cleaned)
-    cleaned = re.sub(rf"\s+\d[\d.,]*\s*(?:{CURRENCY_CODE_PATTERN})\b.*$", "", cleaned, flags=re.I)
+    cleaned = re.sub(
+        rf"\s+\d[\d.,]*\s*(?:{CURRENCY_CODE_PATTERN})\b.*$", "", cleaned, flags=re.I
+    )
     if _OPTION_VALUE_NOISE_WORD_PATTERN:
         cleaned = re.sub(
             rf"\s+\b(?:{_OPTION_VALUE_NOISE_WORD_PATTERN})\b.*$",

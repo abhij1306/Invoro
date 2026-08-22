@@ -77,14 +77,17 @@ def _network_capture_summary() -> SimpleNamespace:
         payloads=[],
     )
 
+
 class _StaticPayloadCapture:
     async def close(self, _page):
         await _async_checkpoint()
         return _network_capture_summary()
 
+
 async def _emit_browser_event_noop(*_args, **_kwargs):
     await _async_checkpoint()
     return None
+
 
 async def _classify_browser_page_ok(_html: str, _status_code: int):
     await _async_checkpoint()
@@ -93,6 +96,7 @@ async def _classify_browser_page_ok(_html: str, _status_code: int):
         evidence=[],
         outcome="ok",
     )
+
 
 @pytest.fixture
 def browser_finalize_support() -> SimpleNamespace:
@@ -147,6 +151,7 @@ def browser_finalize_support() -> SimpleNamespace:
         visual_calls=visual_calls,
     )
 
+
 @dataclass
 class _FakeHandle:
     label: str
@@ -200,6 +205,7 @@ class _FakeHandle:
     async def click(self, **_kwargs) -> None:
         await _async_checkpoint()
         self.page.expanded = True
+
 
 class _FakeLocator:
     def __init__(self, page: "_FakeExpansionPage", selector: str) -> None:
@@ -294,6 +300,7 @@ class _FakeLocator:
         await _async_checkpoint()
         self._page.expanded = True
 
+
 class _FakeRoleLocator:
     def __init__(self, page: "_FakeExpansionPage", role: str, name: object) -> None:
         self._page = page
@@ -333,9 +340,11 @@ class _FakeRoleLocator:
             return bool(self._name_pattern.search(name))
         return name == self._name
 
+
 class _NoTimeoutRoleLocator(_FakeRoleLocator):
     async def is_visible(self, **_kwargs) -> bool:
         return await self.count() > 0
+
 
 class _WaitingRoleLocator(_FakeRoleLocator):
     def __init__(self, page: "_FakeExpansionPage", role: str, name: str) -> None:
@@ -351,6 +360,7 @@ class _WaitingRoleLocator(_FakeRoleLocator):
         self.wait_for_calls.append((state, kwargs.get("timeout")))
         if await self.count() == 0:
             raise PlaywrightTimeoutError("not visible")
+
 
 class _FakePageContext:
     def __init__(self, page: "_FakeExpansionPage") -> None:
@@ -379,6 +389,7 @@ class _FakePageContext:
         self._page.listeners[key] = [
             listener for listener in listeners if listener is not callback
         ]
+
 
 class _FakeExpansionPage:
     def __init__(
@@ -591,6 +602,7 @@ class _FakeExpansionPage:
         if path is not None:
             Path(path).write_bytes(payload)
         return payload
+
 
 class _FakeRuntime:
     def __init__(self, page: _FakeExpansionPage) -> None:

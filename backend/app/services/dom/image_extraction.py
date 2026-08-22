@@ -177,7 +177,13 @@ def image_candidate_score(url: str) -> tuple[int, int, int, int]:
     numeric_params = _image_numeric_params(parsed.query, parsed.params)
     width = _first_int_param(
         numeric_params,
-        "width", "w", "wid", "sw", "imwidth", "odnwidth", "maxwidth",
+        "width",
+        "w",
+        "wid",
+        "sw",
+        "imwidth",
+        "odnwidth",
+        "maxwidth",
     )
     height = _first_int_param(
         numeric_params, "height", "h", "hei", "sh", "odnheight", "maxheight"
@@ -198,8 +204,7 @@ def _image_numeric_params(query: str, params: str) -> dict[str, str]:
     pairs = parse_qsl(query, keep_blank_values=True)
     pairs += parse_qsl(str(params or "").replace(";", "&"), keep_blank_values=True)
     return {
-        str(key or "").strip().lower(): str(value or "").strip()
-        for key, value in pairs
+        str(key or "").strip().lower(): str(value or "").strip() for key, value in pairs
     }
 
 
@@ -416,7 +421,9 @@ def gallery_image_score(node: Tag, candidate_url: str) -> int:
 def _gallery_context_score(node: Tag, candidate_url: str, context: str) -> int:
     if any(hint in context for hint in PRODUCT_GALLERY_CONTEXT_HINTS):
         return 4
-    if node.find_parent(["main"]) is not None and looks_like_image_asset_url(candidate_url):
+    if node.find_parent(["main"]) is not None and looks_like_image_asset_url(
+        candidate_url
+    ):
         return 2
     return 0
 

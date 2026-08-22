@@ -4,6 +4,7 @@ from .test_public_api import ASGITransport, ApiKey, AsyncClient, CrawlerAppState
 
 pytest_plugins = ["tests.component.test_public_api"]
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_login_returns_user_only_and_sets_cookie_for_test_env(
@@ -36,6 +37,7 @@ async def test_login_returns_user_only_and_sets_cookie_for_test_env(
     assert f"Max-Age={int(settings.jwt_expire_hours * 3600)}" in cookie_header
     assert "Secure" not in cookie_header
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_login_sets_secure_cookie_outside_dev_and_test(
@@ -56,6 +58,7 @@ async def test_login_sets_secure_cookie_outside_dev_and_test(
     assert response.status_code == 200
     assert "Secure" in response.headers["set-cookie"]
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_login_uses_runtime_app_env_override_for_secure_cookie(
@@ -73,6 +76,7 @@ async def test_login_uses_runtime_app_env_override_for_secure_cookie(
 
     assert response.status_code == 200
     assert "Secure" in response.headers["set-cookie"]
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -98,6 +102,7 @@ async def test_login_rehashes_legacy_pbkdf2_hash_on_success(
     assert refreshed is not None
     assert "argon2" in refreshed.hashed_password
     assert "pbkdf2-sha256" not in refreshed.hashed_password
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -136,6 +141,7 @@ async def test_auth_specific_rate_limit_rejects_before_generic_limit(
         restore_rate_limit_buckets_for_testing(previous_global)
         restore_auth_rate_limit_buckets_for_testing(previous_auth)
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_failed_login_logs_structured_event_without_secrets(
@@ -164,6 +170,7 @@ async def test_failed_login_logs_structured_event_without_secrets(
     assert "password" not in event.__dict__
     assert "token" not in event.__dict__
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_live_health_endpoint_is_lightweight() -> None:
@@ -175,6 +182,7 @@ async def test_live_health_endpoint_is_lightweight() -> None:
 
     assert response.status_code == 200
     assert response.json() == {"status": "live"}
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -205,6 +213,7 @@ async def test_ready_health_endpoint_reports_dependency_failure(monkeypatch) -> 
         },
     }
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_http_rate_limit_rejects_excess_requests(monkeypatch) -> None:
@@ -233,6 +242,7 @@ async def test_http_rate_limit_rejects_excess_requests(monkeypatch) -> None:
     finally:
         restore_rate_limit_buckets_for_testing(previous_buckets)
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_health_and_metrics_skip_http_rate_limit(monkeypatch) -> None:
@@ -255,6 +265,7 @@ async def test_health_and_metrics_skip_http_rate_limit(monkeypatch) -> None:
             assert (await client.get("/api/metrics")).status_code == 200
     finally:
         restore_rate_limit_buckets_for_testing(previous_buckets)
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -345,6 +356,7 @@ async def test_render_prometheus_metrics_continues_on_crawl_run_query_failure(
     assert database_connections_active.values == [4]
     assert redis_failures_total_metric.values == [5]
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_api_responses_include_security_headers() -> None:
@@ -363,6 +375,7 @@ async def test_api_responses_include_security_headers() -> None:
         == "camera=(), microphone=(), geolocation=()"
     )
     assert "strict-transport-security" not in response.headers
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -391,6 +404,7 @@ async def test_cors_preflight_uses_narrow_allowlists() -> None:
     assert "authorization" in allow_headers
     assert "x-request-id" in allow_headers
 
+
 @pytest.mark.component
 def test_client_rate_limit_key_ignores_forwarded_for_from_untrusted_peer(
     monkeypatch,
@@ -407,6 +421,7 @@ def test_client_rate_limit_key_ignores_forwarded_for_from_untrusted_peer(
     )
 
     assert client_rate_limit_key(request) == "198.51.100.2"
+
 
 @pytest.mark.component
 def test_client_rate_limit_key_honors_forwarded_for_from_trusted_peer(
@@ -427,6 +442,7 @@ def test_client_rate_limit_key_honors_forwarded_for_from_trusted_peer(
 
     assert client_rate_limit_key(request) == "203.0.113.10"
 
+
 @pytest.mark.component
 def test_rate_limit_buckets_view_tracks_replaced_app_state() -> None:
     previous_state = app.state.crawler
@@ -442,10 +458,12 @@ def test_rate_limit_buckets_view_tracks_replaced_app_state() -> None:
     finally:
         app.state.crawler = previous_state
 
+
 @pytest.mark.component
 def test_crawler_app_state_rejects_explicit_app_without_crawler_state() -> None:
     with pytest.raises(RuntimeError, match="state.crawler"):
         _crawler_app_state(FastAPI())
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -456,6 +474,7 @@ async def test_public_api_requires_api_key(public_api_client: AsyncClient) -> No
     payload = response.json()
     assert payload["status"] == "error"
     assert payload["error"]["code"] == PUBLIC_API_ERROR_API_KEY_REQUIRED
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -486,6 +505,7 @@ async def test_api_key_crud_returns_plaintext_once(db_session, test_user) -> Non
     stored = await db_session.scalar(select(ApiKey).where(ApiKey.id == payload["id"]))
     assert stored is not None
     assert stored.key_hash == hash_api_key(payload["api_key"])
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -522,6 +542,7 @@ async def test_public_capabilities_uses_api_key_envelope(
     assert "alert_product" in payload["data"]["tools"]
     assert "watches" not in payload["data"]["deferred"]
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_authenticate_public_api_key_rejects_legacy_unkeyed_hash(
@@ -542,6 +563,7 @@ async def test_authenticate_public_api_key_rejects_legacy_unkeyed_hash(
 
     with pytest.raises(HTTPException):
         await authenticate_public_api_key(db_session, f"Bearer {raw_key}", touch=False)
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -586,6 +608,7 @@ async def test_authenticate_public_api_key_fails_when_touch_commit_fails() -> No
     assert exc_info.value.detail["code"] == PUBLIC_API_ERROR_AUTH_UNAVAILABLE
     assert session.rolled_back is True
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_public_auth_session_closes_async_generator_override() -> None:
@@ -615,6 +638,7 @@ async def test_public_auth_session_closes_async_generator_override() -> None:
         assert resolved is session
 
     assert cleaned is True
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -660,6 +684,7 @@ async def test_public_rate_limit_is_keyed_by_api_key(
     assert third.status_code == 429
     assert third.json()["error"]["code"] == "RATE_LIMITED"
 
+
 @pytest.mark.component
 def test_trim_keeps_boundary_timestamp() -> None:
     bucket = deque([10.0, 11.0, 12.0])
@@ -668,9 +693,11 @@ def test_trim_keeps_boundary_timestamp() -> None:
 
     assert list(bucket) == [11.0, 12.0]
 
+
 @pytest.mark.component
 def test_retry_after_rounds_up_remaining_window() -> None:
     assert _retry_after(deque([10.0]), now=68.1, window_seconds=60) == 2
+
 
 @pytest.mark.asyncio
 @pytest.mark.component

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .test_product_intelligence import SearchResult, discover_candidates, discovery_module, parse_serpapi_immersive_results, product_intelligence_settings, pytest  # fmt: skip
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_product_intelligence_serpapi_expands_immersive_store_links(
@@ -63,6 +64,7 @@ async def test_product_intelligence_serpapi_expands_immersive_store_links(
     assert results[0].payload["provider"] == "serpapi_immersive"
     assert results[0].payload["product_id"] == "immersive-product-id"
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_product_intelligence_serpapi_runs_identifier_organic_without_immersive(
@@ -112,6 +114,7 @@ async def test_product_intelligence_serpapi_runs_identifier_organic_without_imme
         "serpapi_shopping",
     ]
     assert results[0].url == "https://www.wrangler.com/shop/relaxed-bootcut-jeans.html"
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -167,6 +170,7 @@ async def test_product_intelligence_serpapi_keeps_brand_site_lookup_when_shoppin
     assert results[0].url == "https://www.levi.com/p/04511.html"
     assert results[0].payload["provider"] == "serpapi"
 
+
 @pytest.mark.component
 def test_product_intelligence_serpapi_shopping_query_strips_site_filters() -> None:
     assert (
@@ -175,6 +179,7 @@ def test_product_intelligence_serpapi_shopping_query_strips_site_filters() -> No
         )
         == "wrangler relaxed bootcut jeans"
     )
+
 
 @pytest.mark.component
 def test_product_intelligence_parses_serpapi_immersive_limit_before_about_link() -> (
@@ -206,6 +211,7 @@ def test_product_intelligence_parses_serpapi_immersive_limit_before_about_link()
     assert len(results) == 1
     assert results[0].url == "https://www.levi.com/p/04511.html"
 
+
 @pytest.mark.component
 def test_product_intelligence_parses_serpapi_immersive_when_about_payload_is_not_a_dict() -> (
     None
@@ -231,6 +237,7 @@ def test_product_intelligence_parses_serpapi_immersive_when_about_payload_is_not
 
     assert len(results) == 1
     assert results[0].payload["raw"]["product"]["description"] == ""
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -266,6 +273,7 @@ async def test_product_intelligence_discovery_passes_pool_limit_to_search(
 
     assert limits
     assert set(limits) == {20}
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -313,6 +321,7 @@ async def test_product_intelligence_discovery_keeps_multiple_listings_per_domain
     urls = {candidate.url for candidate in candidates}
     assert "https://www.ebay.com/itm/1" in urls
     assert "https://www.ebay.com/itm/2" in urls
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -367,6 +376,7 @@ async def test_product_intelligence_discovery_prioritizes_brand_site_over_aggreg
 
     assert [candidate.domain for candidate in candidates] == ["levi.com", "macys.com"]
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_product_intelligence_discovery_skips_invalid_result_urls(
@@ -406,6 +416,7 @@ async def test_product_intelligence_discovery_skips_invalid_result_urls(
 
     assert len(candidates) == 1
     assert candidates[0].domain == "levi.com"
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -451,6 +462,7 @@ async def test_product_intelligence_discovery_rejects_listing_urls_from_serpapi(
         "https://www.ralphlauren.com/men-clothing-jeans/varick-slim-straight-garment-dyed-jean/123.html"
     ]
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_product_intelligence_discovery_rejects_html_listing_urls() -> None:
@@ -493,6 +505,7 @@ async def test_product_intelligence_discovery_rejects_html_listing_urls() -> Non
         "https://www.ralphlauren.com/men-clothing-jeans/varick-slim-straight-garment-dyed-jean/123.html"
     ]
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_product_intelligence_discovery_keeps_matching_slug_without_detail_marker() -> (
@@ -528,6 +541,7 @@ async def test_product_intelligence_discovery_keeps_matching_slug_without_detail
     assert [candidate.url for candidate in candidates] == [
         "https://www.levi.com/men/jeans/511-slim-fit-stretch-denim"
     ]
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -566,6 +580,7 @@ async def test_product_intelligence_discovery_allows_marketplace_item_ids_when_t
     assert [candidate.url for candidate in candidates] == [
         "https://www.ebay.com/itm/188098451561"
     ]
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -608,6 +623,7 @@ async def test_product_intelligence_discovery_rejects_editorial_brand_pages() ->
     assert [candidate.url for candidate in candidates] == [
         "https://www.wrangler.com/browse/relaxed-fit-bootcut-jeans.html"
     ]
+
 
 @pytest.mark.asyncio
 @pytest.mark.component

@@ -23,7 +23,8 @@ from app.services.shared.text_coerce import slug_tokens
 
 
 _DETAIL_READINESS_HINTS: dict[str, tuple[str, ...]] = {
-    str(key): tuple(map(str, value or ())) for key, value in (BROWSER_DETAIL_READINESS_HINTS or {}).items()
+    str(key): tuple(map(str, value or ()))
+    for key, value in (BROWSER_DETAIL_READINESS_HINTS or {}).items()
 }
 _ECOMMERCE_READY_CARD_SELECTORS = (
     "[data-product-id]",
@@ -85,7 +86,9 @@ def _analyze_html_cached(text: str) -> HtmlAnalysis:
         soup=soup,
         visible_text=visible_text,
         normalized_text=" ".join(visible_text.split()),
-        title_text=clean_text(soup.title.get_text(" ", strip=True) if soup.title else ""),
+        title_text=clean_text(
+            soup.title.get_text(" ", strip=True) if soup.title else ""
+        ),
         h1_present=bool(soup.find("h1")),
     )
 
@@ -138,10 +141,18 @@ def _listing_readiness_settings(
     if not override:
         return None
     raw_selectors = override.get("selectors")
-    if not isinstance(raw_selectors, Iterable) or isinstance(raw_selectors, (str, bytes)):
+    if not isinstance(raw_selectors, Iterable) or isinstance(
+        raw_selectors, (str, bytes)
+    ):
         return None
-    selectors = [str(selector or "").strip() for selector in raw_selectors if str(selector or "").strip()]
-    fallback = _coerce_int(crawler_runtime_settings.listing_readiness_max_wait_ms, default=0)
+    selectors = [
+        str(selector or "").strip()
+        for selector in raw_selectors
+        if str(selector or "").strip()
+    ]
+    fallback = _coerce_int(
+        crawler_runtime_settings.listing_readiness_max_wait_ms, default=0
+    )
     max_wait_ms = _coerce_int(override.get("max_wait_ms"), default=fallback)
     if not selectors or max_wait_ms <= 0:
         return None
@@ -163,14 +174,23 @@ async def probe_browser_readiness_impl(
         analysis = analyze_html(html_text or "")
     visible_text_length = len(analysis.normalized_text)
     is_detail, is_listing = "detail" in surface, "listing" in surface
-    structured_data_present = _structured_data_present(analysis.lowered_html, is_detail=is_detail)
+    structured_data_present = _structured_data_present(
+        analysis.lowered_html, is_detail=is_detail
+    )
     detail_hints = detail_readiness_hint_count(surface, analysis.visible_text.lower())
     detail_title_matches_url = _detail_title_matches_url(
         url,
         analysis.title_text,
-        min_matches=int(crawler_runtime_settings.browser_detail_title_url_token_min_count),
+        min_matches=int(
+            crawler_runtime_settings.browser_detail_title_url_token_min_count
+        ),
     )
-    detail_like = analysis.h1_present or structured_data_present or detail_hints > 0 or detail_title_matches_url
+    detail_like = (
+        analysis.h1_present
+        or structured_data_present
+        or detail_hints > 0
+        or detail_title_matches_url
+    )
     listing_card_count, matched_listing_selectors = await _listing_signal_counts(
         page,
         surface=surface,
@@ -205,7 +225,9 @@ async def probe_browser_readiness_impl(
 
 
 def _structured_data_present(lowered_html: str, *, is_detail: bool) -> bool:
-    has_detail_token = bool(re.search(r'"@type"\s*:\s*"(product|jobposting)"', lowered_html))
+    has_detail_token = bool(
+        re.search(r'"@type"\s*:\s*"(product|jobposting)"', lowered_html)
+    )
     if is_detail:
         return has_detail_token
     return has_detail_token or any(
@@ -229,10 +251,15 @@ async def _listing_signal_counts(
     if not enabled:
         return 0, 0
     card_count = await listing_card_signal_count_impl(page, surface=surface)
-    raw_selectors = listing_override.get("selectors") if isinstance(listing_override, dict) else None
+    raw_selectors = (
+        listing_override.get("selectors")
+        if isinstance(listing_override, dict)
+        else None
+    )
     selectors = (
         [str(item or "").strip() for item in raw_selectors if str(item or "").strip()]
-        if isinstance(raw_selectors, Iterable) and not isinstance(raw_selectors, (str, bytes))
+        if isinstance(raw_selectors, Iterable)
+        and not isinstance(raw_selectors, (str, bytes))
         else []
     )
     return card_count, await count_matching_selectors(page, selectors=selectors)
@@ -253,7 +280,9 @@ def _readiness_decision(
 ) -> bool:
     min_visible_text = int(crawler_runtime_settings.browser_readiness_visible_text_min)
     if is_listing:
-        return max(listing_card_count, matched_listing_selectors) >= int(crawler_runtime_settings.listing_min_items)
+        return max(listing_card_count, matched_listing_selectors) >= int(
+            crawler_runtime_settings.listing_min_items
+        )
     if not is_detail:
         return visible_text_length >= min_visible_text
     enough_text = visible_text_length >= min_visible_text
@@ -262,7 +291,9 @@ def _readiness_decision(
         or detail_hints >= int(crawler_runtime_settings.detail_field_signal_min_count)
         or detail_title_matches_url
     )
-    return enough_text and (structured_data_present or (detail_like and identity_signal))
+    return enough_text and (
+        structured_data_present or (detail_like and identity_signal)
+    )
 
 
 async def listing_card_signal_count_impl(page: Any, *, surface: str) -> int:
@@ -293,11 +324,17 @@ def _detail_title_matches_url(
     if min_matches <= 0:
         return False
     parsed = urlparse(str(url or ""))
-    title_tokens = {token for token in slug_tokens(title) if len(token) >= 3 and not token.isdigit()}
+    title_tokens = {
+        token for token in slug_tokens(title) if len(token) >= 3 and not token.isdigit()
+    }
     if not title_tokens:
         return False
     for segment in reversed([part for part in parsed.path.split("/") if part]):
-        segment_tokens = [token for token in slug_tokens(segment) if len(token) >= 3 and not token.isdigit()]
+        segment_tokens = [
+            token
+            for token in slug_tokens(segment)
+            if len(token) >= 3 and not token.isdigit()
+        ]
         if not segment_tokens:
             continue
         if len(set(segment_tokens) & title_tokens) >= min_matches:
@@ -336,7 +373,9 @@ def _ecommerce_ready_card_candidates_present(soup: BeautifulSoup) -> bool:
 
 def _ecommerce_node_has_product_evidence(node: Any) -> bool:
     attrs = getattr(node, "attrs", {}) or {}
-    text = clean_text(node.get_text(" ", strip=True) if hasattr(node, "get_text") else "")
+    text = clean_text(
+        node.get_text(" ", strip=True) if hasattr(node, "get_text") else ""
+    )
     signature = " ".join(
         str(attrs.get(key) or "")
         for key in (
@@ -354,7 +393,9 @@ def _ecommerce_node_has_product_evidence(node: Any) -> bool:
     has_product_id, has_product_itemtype = _product_identity_evidence(node, attrs)
     has_price = bool(_ECOMMERCE_READY_PRICE_RE.search(text))
     select_one = getattr(node, "select_one", None)
-    has_media = bool(select_one("img, picture, source")) if callable(select_one) else False
+    has_media = (
+        bool(select_one("img, picture, source")) if callable(select_one) else False
+    )
     has_link, has_detail_link = _product_link_evidence(node)
     return _product_evidence_is_sufficient(
         has_product_id=has_product_id,
@@ -388,10 +429,16 @@ def _product_evidence_is_sufficient(
     return bool(has_detail_link and (has_price or product_signature or has_media))
 
 
-def _product_identity_evidence(node: Any, attrs: dict[str, object]) -> tuple[bool, bool]:
+def _product_identity_evidence(
+    node: Any, attrs: dict[str, object]
+) -> tuple[bool, bool]:
     select_one = getattr(node, "select_one", None)
-    nested_product_id = select_one("[data-product-id]") if callable(select_one) else None
-    nested_itemtype = select_one("[itemscope][itemtype*='Product']") if callable(select_one) else None
+    nested_product_id = (
+        select_one("[data-product-id]") if callable(select_one) else None
+    )
+    nested_itemtype = (
+        select_one("[itemscope][itemtype*='Product']") if callable(select_one) else None
+    )
     return (
         bool(attrs.get("data-product-id") or nested_product_id),
         "product" in str(attrs.get("itemtype") or "").lower() or bool(nested_itemtype),
@@ -439,7 +486,9 @@ def classify_browser_outcome_impl(
     if block_classification.blocked or blocked:
         return "challenge_page"
     low_content_shell = looks_like_low_content_shell(html, html_bytes=html_bytes)
-    if traversal_result is not None and bool(getattr(traversal_result, "activated", False)):
+    if traversal_result is not None and bool(
+        getattr(traversal_result, "activated", False)
+    ):
         progress_events = int(getattr(traversal_result, "progress_events", 0) or 0)
         card_count = int(getattr(traversal_result, "card_count", 0) or 0)
         stop_reason = str(getattr(traversal_result, "stop_reason", "") or "").strip()
@@ -488,7 +537,9 @@ def visible_text_from_soup(soup: BeautifulSoup) -> str:
     for node in soup.find_all(string=True):
         if isinstance(node, Comment):
             continue
-        parent_name = str(getattr(getattr(node, "parent", None), "name", "") or "").lower()
+        parent_name = str(
+            getattr(getattr(node, "parent", None), "name", "") or ""
+        ).lower()
         if parent_name in {"script", "style", "noscript"}:
             continue
         text = clean_text(str(node))

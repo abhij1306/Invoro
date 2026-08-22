@@ -171,7 +171,11 @@ def browser_first_decision(
         return False
     if context.fetch_mode == "http_only":
         return hard_browser_requirement(context=context)
-    return prefer_browser or host_preference_enabled or hard_browser_requirement(context=context)
+    return (
+        prefer_browser
+        or host_preference_enabled
+        or hard_browser_requirement(context=context)
+    )
 
 
 def browser_escalation_allowed(
@@ -286,7 +290,10 @@ def browser_engine_attempts(
             context.url,
         )
     engines = [PATCHRIGHT_BROWSER_ENGINE]
-    if not bool(crawler_runtime_settings.browser_real_chrome_enabled) or not real_chrome_available:
+    if (
+        not bool(crawler_runtime_settings.browser_real_chrome_enabled)
+        or not real_chrome_available
+    ):
         return engines
     if host_policy.patchright_blocked and host_policy.prefer_browser:
         return _prefer_engine_first(
@@ -298,7 +305,11 @@ def browser_engine_attempts(
             _append_engine_once(engines, REAL_CHROME_BROWSER_ENGINE),
             REAL_CHROME_BROWSER_ENGINE,
         )
-    if host_policy.request_blocked or host_policy.prefer_browser or host_policy.last_block_vendor:
+    if (
+        host_policy.request_blocked
+        or host_policy.prefer_browser
+        or host_policy.last_block_vendor
+    ):
         return _append_engine_once(engines, REAL_CHROME_BROWSER_ENGINE)
     return engines
 
@@ -331,15 +342,25 @@ def durable_vendor_block_engine_attempts(
     host_policy: HostProtectionPolicy,
     forced_engine: str | None,
 ) -> list[str]:
-    if forced_engine or not host_policy.prefer_browser or not host_policy.last_block_vendor:
+    if (
+        forced_engine
+        or not host_policy.prefer_browser
+        or not host_policy.last_block_vendor
+    ):
         return list(engine_attempts)
     prioritized = list(engine_attempts)
     last_block_method = str(host_policy.last_block_method or "").strip().lower()
-    blocked_engine = last_block_method.split(":", 1)[1] if last_block_method.startswith("browser:") else None
+    blocked_engine = (
+        last_block_method.split(":", 1)[1]
+        if last_block_method.startswith("browser:")
+        else None
+    )
     if not blocked_engine:
         return prioritized
     if blocked_engine and blocked_engine in prioritized and len(prioritized) > 1:
-        prioritized = [candidate for candidate in prioritized if candidate != blocked_engine] + [blocked_engine]
+        prioritized = [
+            candidate for candidate in prioritized if candidate != blocked_engine
+        ] + [blocked_engine]
     return prioritized[:1]
 
 
@@ -432,7 +453,9 @@ def patchright_probe_cap_applies(
     expected_vendor = extract_vendor_from_reason(reason) or ""
     if REAL_CHROME_BROWSER_ENGINE in engine_attempts:
         return bool(expected_vendor) or bool(
-            host_policy is not None and host_policy.request_blocked and host_policy.prefer_browser
+            host_policy is not None
+            and host_policy.request_blocked
+            and host_policy.prefer_browser
         )
     if not expected_vendor:
         return False
@@ -465,7 +488,9 @@ def should_retry_patchright_with_real_chrome(
 def handoff_cookie_engines(*, preferred_engine: str | None = None) -> tuple[str, ...]:
     configured = tuple(
         str(engine or "").strip().lower()
-        for engine in tuple(crawler_runtime_settings.browser_http_handoff_cookie_engines or ())
+        for engine in tuple(
+            crawler_runtime_settings.browser_http_handoff_cookie_engines or ()
+        )
         if str(engine or "").strip()
     )
     preferred: list[str] = []

@@ -4,6 +4,7 @@ from .test_crawl_fetch_runtime import AsyncMock, HostProtectionPolicy, PageFetch
 
 pytest_plugins = ["tests.component.test_crawl_fetch_runtime"]
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_detail_shell_copy_with_detail_words_still_escalates_to_browser() -> None:
@@ -27,6 +28,7 @@ async def test_detail_shell_copy_with_detail_words_still_escalates_to_browser() 
         is True
     )
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_js_disabled_placeholder_shell_escalates_to_browser() -> None:
@@ -47,6 +49,7 @@ async def test_js_disabled_placeholder_shell_escalates_to_browser() -> None:
         await should_escalate_to_browser_async(result, surface="ecommerce_detail")
         is True
     )
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -102,6 +105,7 @@ async def test_fetch_page_uses_browser_for_js_disabled_placeholder_shell(
     assert result.method == "browser"
     assert browser_calls == ["https://example.com/for-sale/mixer-truck"]
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_fetch_page_falls_back_to_httpx_after_curl_transport_errors(
@@ -148,6 +152,7 @@ async def test_fetch_page_falls_back_to_httpx_after_curl_transport_errors(
 
     assert result.method == "httpx"
     assert http_calls == ["https://ar.puma.com/pd/widget.html"]
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -201,6 +206,7 @@ async def test_fetch_page_attempts_curl_once_before_httpx_fallback(
     assert len(curl_calls) == 1
     assert http_calls == ["https://example.com/products/widget"]
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_fetch_page_falls_back_to_browser_after_curl_and_httpx_transport_errors(
@@ -243,6 +249,7 @@ async def test_fetch_page_falls_back_to_browser_after_curl_and_httpx_transport_e
     assert result.method == "browser"
     assert browser_calls == ["https://example.com/products/widget"]
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_fetch_page_returns_non_retryable_404_without_browser_fallback(
@@ -276,6 +283,7 @@ async def test_fetch_page_returns_non_retryable_404_without_browser_fallback(
 
     assert result.status_code == 404
     assert result.method == "curl_cffi"
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -317,6 +325,7 @@ async def test_fetch_page_returns_non_retryable_404_shell_without_browser_fallba
     assert result.status_code == 404
     assert result.method == "curl_cffi"
     assert browser_calls == []
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -368,6 +377,7 @@ async def test_fetch_page_retries_406_detail_shell_with_browser(
     assert result.method == "browser"
     assert result.status_code == 200
     assert browser_calls == ["https://example.com/products/pragmata-switch-2"]
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -422,6 +432,7 @@ async def test_fetch_page_stops_http_waterfall_after_vendor_confirmed_block(
     assert len(curl_proxies) == 1
     assert browser_proxies == ["http://proxy-b"]
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_fetch_page_requires_a_timeout_source(
@@ -435,6 +446,7 @@ async def test_fetch_page_requires_a_timeout_source(
 
     with pytest.raises(ValueError, match="fetch_page requires timeout_seconds"):
         await crawl_fetch_runtime.fetch_page("https://example.com/products/widget")
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -517,6 +529,7 @@ async def test_fetch_page_learns_browser_first_after_vendor_blocked_http_recover
     assert policy_loads == [url, url, url]
     assert browser_reasons == ["vendor-block:datadome", "host-preference"]
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_fetch_page_learns_browser_first_after_rate_limit_http_recovery(
@@ -597,6 +610,7 @@ async def test_fetch_page_learns_browser_first_after_rate_limit_http_recovery(
     assert second.method == "browser"
     assert curl_calls == [url]
     assert browser_reasons == ["http-escalation", "host-preference"]
+
 
 @pytest.mark.asyncio
 @pytest.mark.component

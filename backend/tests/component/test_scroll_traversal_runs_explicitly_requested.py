@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .test_traversal_runtime import Any, TraversalResult, _FakePage, _OverlayTestLocator, _OverlayTestPage, _State, count_listing_cards, dismiss_overlays_if_needed, execute_listing_traversal, listing_selector_is_weak, pytest, traversal_helpers, traversal_module, wait_for_load_more_card_gain  # fmt: skip
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_scroll_traversal_runs_when_explicitly_requested() -> None:
@@ -55,6 +56,7 @@ async def test_scroll_traversal_runs_when_explicitly_requested() -> None:
         "<div>jobs</div>",
         "<div>jobs more</div>",
     ]
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -110,6 +112,7 @@ async def test_scroll_traversal_stops_at_user_max_records() -> None:
         "<div>jobs more</div>",
     ]
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_scroll_traversal_respects_max_scrolls_cap() -> None:
@@ -163,6 +166,7 @@ async def test_scroll_traversal_respects_max_scrolls_cap() -> None:
         "<div>jobs more</div>",
     ]
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_execute_listing_traversal_ignores_invalid_timeout_value() -> None:
@@ -206,6 +210,7 @@ async def test_execute_listing_traversal_ignores_invalid_timeout_value() -> None
     assert result.scroll_iterations == 1
     assert result.card_count == 6
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_execute_listing_traversal_rejects_unsupported_mode() -> None:
@@ -248,6 +253,7 @@ async def test_execute_listing_traversal_rejects_unsupported_mode() -> None:
     assert result.activated is False
     assert result.stop_reason == "unsupported_mode"
     assert result.scroll_iterations == 0
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -323,6 +329,7 @@ async def test_paginate_click_transition_uses_networkidle_settle_timeout(
         traversal_module.crawler_runtime_settings.traversal_settle_networkidle_timeout_ms
     )
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_scroll_traversal_emits_live_events() -> None:
@@ -378,6 +385,7 @@ async def test_scroll_traversal_emits_live_events() -> None:
         ("info", "Scroll 1 - page_cards=6 (prev_page_cards=2)"),
     ]
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_paginate_traversal_detects_cycle_on_redirect_loop() -> None:
@@ -432,6 +440,7 @@ async def test_paginate_traversal_detects_cycle_on_redirect_loop() -> None:
     assert result.stop_reason == "paginate_cycle_detected"
     assert result.pages_advanced == 0
 
+
 @pytest.mark.component
 def test_is_same_origin_blocks_cross_tenant_paths() -> None:
     """Pagination must not bleed across path-based multi-tenant boundaries."""
@@ -446,6 +455,7 @@ def test_is_same_origin_blocks_cross_tenant_paths() -> None:
         "https://myworkdayjobs.com/TenantB/jobs?page=1",
     )
 
+
 @pytest.mark.component
 def test_is_same_origin_blocks_cross_tenant_paths_for_workday_subdomains() -> None:
     is_same_origin = traversal_module.is_same_origin
@@ -458,6 +468,7 @@ def test_is_same_origin_blocks_cross_tenant_paths_for_workday_subdomains() -> No
         "https://smithnephew.wd5.myworkdayjobs.com/TenantA/jobs?page=1",
         "https://smithnephew.wd5.myworkdayjobs.com/TenantB/jobs?page=1",
     )
+
 
 @pytest.mark.component
 def test_is_same_origin_allows_same_tenant_different_pages() -> None:
@@ -472,6 +483,7 @@ def test_is_same_origin_allows_same_tenant_different_pages() -> None:
         "https://other.com/listing?page=2",
     )
 
+
 @pytest.mark.component
 def test_is_same_origin_allows_same_host_path_changes_outside_tenant_hosts() -> None:
     is_same_origin = traversal_module.is_same_origin
@@ -480,6 +492,7 @@ def test_is_same_origin_allows_same_host_path_changes_outside_tenant_hosts() -> 
         "https://example.com/careers?page=1",
         "https://example.com/jobs?page=2",
     )
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -495,6 +508,7 @@ async def test_dismiss_overlays_targets_interceptors_not_structural_tags() -> No
     script = locator.evaluate_calls[0]
     assert "elementsFromPoint" in script
     assert "const tags = ['header', 'footer', 'nav']" not in script
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -519,6 +533,7 @@ async def test_count_listing_cards_uses_myntra_card_selector() -> None:
 
     assert count == 3
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_count_listing_cards_uses_zara_product_grid_selector() -> None:
@@ -540,6 +555,7 @@ async def test_count_listing_cards_uses_zara_product_grid_selector() -> None:
     count = await count_listing_cards(page, surface="ecommerce_listing")
 
     assert count == 12
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -601,6 +617,7 @@ async def test_count_listing_cards_falls_back_to_heuristics_when_selectors_miss(
 
     assert count == 7
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_count_listing_cards_ignores_weak_product_selector_chrome() -> None:
@@ -635,6 +652,7 @@ async def test_count_listing_cards_ignores_weak_product_selector_chrome() -> Non
 
     assert count == 0
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_count_listing_cards_prefers_product_anchor_count_over_productcard_substring() -> (
@@ -660,6 +678,7 @@ async def test_count_listing_cards_prefers_product_anchor_count_over_productcard
     )
 
     assert count == 4
+
 
 @pytest.mark.asyncio
 @pytest.mark.component

@@ -7,6 +7,7 @@ from .test_detail_extractor_structured_sources import (
     pytest,
 )
 
+
 @pytest.mark.regression
 def test_build_detail_record_keeps_product_image_when_identity_code_is_in_url() -> None:
     record = build_detail_record(
@@ -23,6 +24,7 @@ def test_build_detail_record_keeps_product_image_when_identity_code_is_in_url() 
     )
 
     assert "VN000E9TBPG-HERO" in record["image_url"]
+
 
 @pytest.mark.regression
 def test_build_detail_record_rejects_cross_sell_images_by_filename_identity() -> None:
@@ -53,6 +55,7 @@ def test_build_detail_record_rejects_cross_sell_images_by_filename_identity() ->
         "https://images.stockx.com/360/Nike-Dunk-Low-Retro-White-Black-2021/Images/Nike-Dunk-Low-Retro-White-Black-2021/Lv2/img01.jpg"
     ]
 
+
 @pytest.mark.regression
 def test_build_detail_record_rejects_same_cdn_different_product_image() -> None:
     record = build_detail_record(
@@ -75,6 +78,7 @@ def test_build_detail_record_rejects_same_cdn_different_product_image() -> None:
     assert record["additional_images"] == [
         "https://static.zara.net/assets/public/c95f/04424306104-a1/04424306104-a1.jpg"
     ]
+
 
 @pytest.mark.regression
 def test_build_detail_record_formats_currency_prices_and_drops_bad_discounts() -> None:
@@ -100,6 +104,7 @@ def test_build_detail_record_formats_currency_prices_and_drops_bad_discounts() -
     assert "discount_amount" not in record
     assert "discount_percentage" not in record
 
+
 @pytest.mark.regression
 def test_build_detail_record_drops_sale_price_when_not_below_current_price() -> None:
     record = build_detail_record(
@@ -122,6 +127,7 @@ def test_build_detail_record_drops_sale_price_when_not_below_current_price() -> 
     assert record["original_price"] == "28.00"
     assert "sale_price" not in record
 
+
 @pytest.mark.regression
 def test_build_detail_record_drops_polluted_parent_size_option_list() -> None:
     record = build_detail_record(
@@ -140,6 +146,7 @@ def test_build_detail_record_drops_polluted_parent_size_option_list() -> None:
     )
 
     assert "size" not in record
+
 
 @pytest.mark.regression
 def test_build_detail_record_drops_numeric_parent_color_when_variants_have_labels() -> (
@@ -166,6 +173,7 @@ def test_build_detail_record_drops_numeric_parent_color_when_variants_have_label
     assert record["variants"][0]["size"] == "7M"
     assert record["variants"][0]["color"] == "Dark Brown"
 
+
 @pytest.mark.regression
 def test_extract_detail_rejects_same_url_model_number_title_mismatch() -> None:
     rows = extract_detail_records(
@@ -184,6 +192,7 @@ def test_extract_detail_rejects_same_url_model_number_title_mismatch() -> None:
     )
 
     assert rows == []
+
 
 @pytest.mark.regression
 def test_extract_detail_accepts_same_url_model_code_when_record_identity_matches() -> (
@@ -214,6 +223,7 @@ def test_extract_detail_accepts_same_url_model_code_when_record_identity_matches
     assert len(rows) == 1
     assert rows[0]["sku"] == "KFP1318CU"
 
+
 @pytest.mark.regression
 def test_extract_detail_accepts_same_url_bare_size_number_difference() -> None:
     rows = extract_detail_records(
@@ -233,6 +243,7 @@ def test_extract_detail_accepts_same_url_bare_size_number_difference() -> None:
     assert len(rows) == 1
     assert rows[0]["title"] == "Cloud Runner Size 12"
 
+
 @pytest.mark.regression
 def test_extract_detail_accepts_same_url_generic_numeric_path_difference() -> None:
     rows = extract_detail_records(
@@ -251,6 +262,7 @@ def test_extract_detail_accepts_same_url_generic_numeric_path_difference() -> No
 
     assert len(rows) == 1
     assert rows[0]["title"] == "Product 2 Pack"
+
 
 @pytest.mark.regression
 def test_build_detail_record_replaces_low_signal_prime_title_from_identity() -> None:
@@ -272,6 +284,7 @@ def test_build_detail_record_replaces_low_signal_prime_title_from_identity() -> 
     assert record["title"] != "prime"
     assert "Stan Smith Shoes" in record["title"]
 
+
 @pytest.mark.regression
 def test_missing_detail_title_does_not_fall_back_to_parent_category_segment() -> None:
     record = build_detail_record(
@@ -282,6 +295,7 @@ def test_missing_detail_title_does_not_fall_back_to_parent_category_segment() ->
     )
 
     assert "title" not in record
+
 
 @pytest.mark.regression
 def test_build_detail_record_drops_redundant_product_details() -> None:
@@ -303,6 +317,7 @@ def test_build_detail_record_drops_redundant_product_details() -> None:
 
     assert record["description"] == "A lightweight Italian seersucker suit."
     assert "product_details" not in record
+
 
 @pytest.mark.regression
 def test_build_detail_record_backfills_low_signal_one_dollar_prices_from_dom() -> None:
@@ -346,6 +361,7 @@ def test_build_detail_record_backfills_low_signal_one_dollar_prices_from_dom() -
     assert record["price"] == "100.00"
     assert record["variants"][0]["price"] == "100.00"
 
+
 @pytest.mark.regression
 def test_extract_detail_corrects_100x_structured_price_from_visible_dom_price() -> None:
     html = """
@@ -379,6 +395,7 @@ def test_extract_detail_corrects_100x_structured_price_from_visible_dom_price() 
     assert len(rows) == 1
     assert rows[0]["price"] == "229.99"
 
+
 @pytest.mark.regression
 def test_build_detail_record_corrects_parent_price_from_variant_magnitude_match() -> (
     None
@@ -408,6 +425,7 @@ def test_build_detail_record_corrects_parent_price_from_variant_magnitude_match(
     assert record["price"] == "99.99"
     assert record["variants"][0]["price"] == "99.99"
 
+
 @pytest.mark.regression
 def test_extract_detail_skips_installment_price_when_total_price_exists() -> None:
     html = """
@@ -428,6 +446,7 @@ def test_extract_detail_skips_installment_price_when_total_price_exists() -> Non
     assert len(rows) == 1
     assert rows[0]["price"] == "200.00"
 
+
 @pytest.mark.regression
 def test_build_detail_record_replaces_uuid_sku_with_merch_code() -> None:
     record = build_detail_record(
@@ -446,6 +465,7 @@ def test_build_detail_record_replaces_uuid_sku_with_merch_code() -> None:
 
     assert record["sku"] == "DD1391-100"
     assert record["part_number"] == "DD1391-100"
+
 
 @pytest.mark.regression
 def test_build_detail_record_drops_stockx_market_cta_variant_labels() -> None:
@@ -478,6 +498,7 @@ def test_build_detail_record_drops_stockx_market_cta_variant_labels() -> None:
     assert "variants" not in record
     assert "variant_count" not in record
 
+
 @pytest.mark.regression
 def test_build_detail_record_strips_numeric_size_tail_from_stockx_description() -> None:
     record = build_detail_record(
@@ -501,6 +522,7 @@ def test_build_detail_record_strips_numeric_size_tail_from_stockx_description() 
 
     assert record["description"].endswith("To shop all Nike Dunks, click here.")
     assert " 5 6 6.5" not in record["description"]
+
 
 @pytest.mark.regression
 def test_build_detail_record_drops_costco_shell_long_text_labels() -> None:
@@ -526,6 +548,7 @@ def test_build_detail_record_drops_costco_shell_long_text_labels() -> None:
     assert "specifications" not in record
     assert "product_details" not in record
 
+
 @pytest.mark.regression
 def test_raw_json_detail_postprocess_drops_costco_shell_long_text_labels() -> None:
     rows = extract_records(
@@ -548,6 +571,7 @@ def test_raw_json_detail_postprocess_drops_costco_shell_long_text_labels() -> No
     assert "description" not in rows[0]
     assert "specifications" not in rows[0]
     assert "product_details" not in rows[0]
+
 
 @pytest.mark.regression
 def test_extract_detail_infers_costco_textual_variant_sizes_from_titles() -> None:
@@ -593,6 +617,7 @@ def test_extract_detail_infers_costco_textual_variant_sizes_from_titles() -> Non
     assert detail["variants"][0]["sku"] == "1981348"
     assert {variant["size"] for variant in detail["variants"]} == {"Queen", "King"}
 
+
 @pytest.mark.regression
 def test_build_detail_record_strips_review_copy_from_color_scalar() -> None:
     record = build_detail_record(
@@ -609,6 +634,7 @@ def test_build_detail_record_strips_review_copy_from_color_scalar() -> None:
     )
 
     assert record["color"] == "Ivory Dove"
+
 
 @pytest.mark.regression
 def test_build_detail_record_drops_polluted_parent_color_dump_when_variants_are_cleaner() -> (
@@ -641,6 +667,7 @@ def test_build_detail_record_drops_polluted_parent_color_dump_when_variants_are_
         "Rescue Red/White/Navy",
         "Big Sky Blue",
     }
+
 
 @pytest.mark.regression
 def test_build_detail_record_prefers_dom_sizes_over_existing_color_only_variants() -> (
@@ -691,6 +718,7 @@ def test_build_detail_record_prefers_dom_sizes_over_existing_color_only_variants
         {"size": "UK 9"},
     ]
     assert record["color"] == "For All Time Red-PUMA White"
+
 
 @pytest.mark.regression
 def test_build_detail_record_drops_document_link_only_description() -> None:

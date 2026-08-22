@@ -31,6 +31,7 @@ dismiss_overlays_if_needed = traversal_module.dismiss_overlays_if_needed
 
 execute_listing_traversal = traversal_module.execute_listing_traversal
 
+
 @dataclass
 class _State:
     html: str
@@ -42,6 +43,7 @@ class _State:
     role_controls: list[dict[str, Any]] | None = None
     next_href: str | None = None
     next_control_state: dict[str, Any] | None = None
+
 
 class _FakeLocator:
     def __init__(self, page: "_FakePage", selector: str) -> None:
@@ -98,6 +100,7 @@ class _FakeLocator:
             return dict(self._page.state.next_control_state or {})
         return {}
 
+
 class _EmptyRoleLocator:
     async def count(self) -> int:
         return 0
@@ -111,6 +114,7 @@ class _EmptyRoleLocator:
 
     async def is_disabled(self) -> bool:
         return False
+
 
 class _RoleLocator:
     def __init__(self, page: "_FakePage", matches: list[dict[str, Any]]) -> None:
@@ -147,6 +151,7 @@ class _RoleLocator:
         if not self._matches:
             return
         self._page.role_clicks.append(str(self._matches[0].get("name") or ""))
+
 
 class _FakePage:
     def __init__(
@@ -234,6 +239,7 @@ class _FakePage:
         self.page_index = min(self.page_index + 1, len(self.paginated_states) - 1)
         self.state = self.paginated_states[self.page_index]
 
+
 class _OverlayTestLocator:
     def __init__(self) -> None:
         self.evaluate_calls: list[str] = []
@@ -242,6 +248,7 @@ class _OverlayTestLocator:
         self.evaluate_calls.append(script)
         return 1
 
+
 class _OverlayTestPage:
     def locator(self, selector: str) -> "_OverlayCookieLocator":
         del selector
@@ -249,6 +256,7 @@ class _OverlayTestPage:
 
     async def wait_for_timeout(self, timeout_ms: int) -> None:
         return None
+
 
 class _OverlayCookieLocator:
     @property
@@ -261,11 +269,13 @@ class _OverlayCookieLocator:
     async def is_visible(self, timeout: int | None = None) -> bool:
         return False
 
+
 def _selector_group(selector: str) -> str:
     for group, selectors in PAGINATION_SELECTORS.items():
         if selector in selectors:
             return str(group)
     return ""
+
 
 def _card_selectors(surface: str) -> list[str]:
     group = "jobs" if surface.startswith("job_") else "ecommerce"

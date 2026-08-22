@@ -30,7 +30,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 
 ResolveRunConfigFn = Callable[..., Awaitable[dict[str, object] | None]]
-ExtractRecordsFn = Callable[..., Awaitable[tuple[list[dict[str, object]] | None, str | None]]]
+ExtractRecordsFn = Callable[
+    ..., Awaitable[tuple[list[dict[str, object]] | None, str | None]]
+]
 
 
 def _sanitize_llm_existing_values(record: dict[str, object]) -> dict[str, object]:
@@ -93,7 +95,8 @@ async def apply_direct_record_llm_fallback(
         run.requested_fields or [],
     )
     missing_by_record = [
-        _missing_record_fields(record, surface=run.surface, fields=requested_fields) for record in records
+        _missing_record_fields(record, surface=run.surface, fields=requested_fields)
+        for record in records
     ]
     if not any(missing_by_record):
         return records
@@ -130,11 +133,14 @@ async def apply_direct_record_llm_fallback(
     return updated_records
 
 
-def _missing_record_fields(record: dict[str, object], *, surface: str, fields: list[str]) -> list[str]:
+def _missing_record_fields(
+    record: dict[str, object], *, surface: str, fields: list[str]
+) -> list[str]:
     return [
         field_name
         for field_name in fields
-        if field_allowed_for_surface(surface, field_name) and record.get(field_name) in (None, "", [], {})
+        if field_allowed_for_surface(surface, field_name)
+        and record.get(field_name) in (None, "", [], {})
     ]
 
 
@@ -150,7 +156,9 @@ def _overlay_direct_candidate(
         return updated
     for field_name in missing_fields:
         value = candidate.get(field_name)
-        if value in (None, "", [], {}) or not _validate_llm_field_type(field_name, value):
+        if value in (None, "", [], {}) or not _validate_llm_field_type(
+            field_name, value
+        ):
             continue
         updated[field_name] = coerce_field_value(field_name, value, page_url)
     return updated
@@ -196,7 +204,9 @@ async def _apply_llm_to_record(
     requested_fields: list[str],
 ) -> dict[str, object]:
     updated = dict(record)
-    missing_fields = _missing_record_fields(updated, surface=run.surface, fields=requested_fields)
+    missing_fields = _missing_record_fields(
+        updated, surface=run.surface, fields=requested_fields
+    )
     if not missing_fields:
         return updated
     payload, error_message = await extract_missing_fields(
@@ -217,10 +227,14 @@ async def _apply_llm_to_record(
         page_url=page_url,
     )
     if applied:
-        canonical = {key: value for key, value in updated.items() if not str(key).startswith("_")}
+        canonical = {
+            key: value for key, value in updated.items() if not str(key).startswith("_")
+        }
         updated.update(finalize_record(canonical, surface=run.surface))
     updated["_field_sources"] = field_sources
-    updated["_confidence"] = score_record_confidence(updated, surface=run.surface, requested_fields=requested_fields)
+    updated["_confidence"] = score_record_confidence(
+        updated, surface=run.surface, requested_fields=requested_fields
+    )
     if applied and not str(updated.get("_source") or "").strip():
         updated["_source"] = "llm_missing_field_extraction"
     updated["_self_heal"] = {

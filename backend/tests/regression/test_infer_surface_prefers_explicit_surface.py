@@ -2,12 +2,14 @@ from __future__ import annotations
 
 from .test_harness_support import Path, build_explicit_sites, classify_failure_mode, evaluate_quality, harness_support, infer_surface, load_site_set, parse_test_sites_markdown, pytest, run_test_sites_acceptance  # fmt: skip
 
+
 @pytest.mark.regression
 def test_infer_surface_prefers_explicit_surface() -> None:
     assert (
         infer_surface("https://example.com/collections", explicit_surface="job_listing")
         == "job_listing"
     )
+
 
 @pytest.mark.regression
 def test_infer_surface_classifies_job_and_commerce_urls() -> None:
@@ -19,6 +21,7 @@ def test_infer_surface_classifies_job_and_commerce_urls() -> None:
         )
         == "job_detail"
     )
+
 
 @pytest.mark.regression
 def test_infer_surface_handles_acceptance_critical_hosts() -> None:
@@ -51,6 +54,7 @@ def test_infer_surface_handles_acceptance_critical_hosts() -> None:
         == "ecommerce_detail"
     )
 
+
 @pytest.mark.regression
 def test_parse_test_sites_markdown_reads_urls_from_tail(tmp_path: Path) -> None:
     path = tmp_path / "TEST_SITES.md"
@@ -72,6 +76,7 @@ def test_parse_test_sites_markdown_reads_urls_from_tail(tmp_path: Path) -> None:
             "surface": "ecommerce_listing",
         },
     ]
+
 
 @pytest.mark.regression
 def test_parse_test_sites_markdown_reads_urls_from_markdown_tables(
@@ -109,6 +114,7 @@ def test_parse_test_sites_markdown_reads_urls_from_markdown_tables(
         for row in rows
     )
 
+
 @pytest.mark.regression
 def test_build_explicit_sites_preserves_explicit_surface_order() -> None:
     rows = build_explicit_sites(
@@ -132,6 +138,7 @@ def test_build_explicit_sites_preserves_explicit_surface_order() -> None:
         },
     ]
 
+
 @pytest.mark.regression
 def test_build_explicit_sites_rejects_mismatched_surface_count() -> None:
     with pytest.raises(ValueError, match="surface counts must match"):
@@ -139,6 +146,7 @@ def test_build_explicit_sites_rejects_mismatched_surface_count() -> None:
             ["https://example.com/products/widget-prime"],
             explicit_surfaces=["ecommerce_detail", "ecommerce_listing"],
         )
+
 
 @pytest.mark.regression
 def test_load_site_set_preserves_curated_surface_and_bucket(tmp_path: Path) -> None:
@@ -182,6 +190,7 @@ def test_load_site_set_preserves_curated_surface_and_bucket(tmp_path: Path) -> N
         }
     ]
 
+
 @pytest.mark.regression
 def test_load_site_set_reports_json_path_on_decode_error(tmp_path: Path) -> None:
     manifest = tmp_path / "bad-sites.json"
@@ -189,6 +198,7 @@ def test_load_site_set_reports_json_path_on_decode_error(tmp_path: Path) -> None
 
     with pytest.raises(ValueError, match="bad-sites.json"):
         load_site_set(manifest, site_set_name="commerce")
+
 
 @pytest.mark.regression
 def test_load_site_set_merges_defaults(tmp_path: Path) -> None:
@@ -234,6 +244,7 @@ def test_load_site_set_merges_defaults(tmp_path: Path) -> None:
         }
     ]
 
+
 @pytest.mark.regression
 def test_classify_failure_mode_flags_missing_adapter_registration() -> None:
     result = {
@@ -246,6 +257,7 @@ def test_classify_failure_mode_flags_missing_adapter_registration() -> None:
     }
 
     assert classify_failure_mode(result) == "adapter_not_matched"
+
 
 @pytest.mark.regression
 def test_classify_failure_mode_treats_browser_challenge_diagnostics_as_blocked() -> (
@@ -268,6 +280,7 @@ def test_classify_failure_mode_treats_browser_challenge_diagnostics_as_blocked()
     }
 
     assert classify_failure_mode(result) == "blocked"
+
 
 @pytest.mark.regression
 def test_challenge_summary_extracts_provider_and_evidence() -> None:
@@ -294,6 +307,7 @@ def test_challenge_summary_extracts_provider_and_evidence() -> None:
         ],
     }
 
+
 @pytest.mark.regression
 def test_classify_failure_mode_rejects_placeholder_success_titles() -> None:
     result = {
@@ -306,6 +320,7 @@ def test_classify_failure_mode_rejects_placeholder_success_titles() -> None:
 
     assert classify_failure_mode(result) == "wrong_content_or_placeholder"
 
+
 @pytest.mark.regression
 def test_classify_failure_mode_rejects_oops_not_found_titles() -> None:
     result = {
@@ -317,6 +332,7 @@ def test_classify_failure_mode_rejects_oops_not_found_titles() -> None:
     }
 
     assert classify_failure_mode(result) == "wrong_content_or_placeholder"
+
 
 @pytest.mark.regression
 def test_classify_failure_mode_reports_utility_chrome_as_success_reporting_only() -> (
@@ -333,6 +349,7 @@ def test_classify_failure_mode_reports_utility_chrome_as_success_reporting_only(
 
     assert classify_failure_mode(result) == "success"
 
+
 @pytest.mark.regression
 def test_classify_failure_mode_rejects_detail_identity_mismatches() -> None:
     result = {
@@ -346,6 +363,7 @@ def test_classify_failure_mode_rejects_detail_identity_mismatches() -> None:
     }
 
     assert classify_failure_mode(result) == "detail_identity_mismatch"
+
 
 @pytest.mark.regression
 def test_classify_failure_mode_rejects_fragment_backed_detail_identity_mismatches() -> (
@@ -363,6 +381,7 @@ def test_classify_failure_mode_rejects_fragment_backed_detail_identity_mismatche
 
     assert classify_failure_mode(result) == "detail_identity_mismatch"
 
+
 @pytest.mark.regression
 def test_classify_failure_mode_rejects_same_site_wrong_product_slug() -> None:
     result = {
@@ -376,6 +395,7 @@ def test_classify_failure_mode_rejects_same_site_wrong_product_slug() -> None:
     }
 
     assert classify_failure_mode(result) == "detail_identity_mismatch"
+
 
 @pytest.mark.regression
 def test_classify_failure_mode_does_not_infer_detail_identity_mismatch_without_requested_url() -> (
@@ -392,6 +412,7 @@ def test_classify_failure_mode_does_not_infer_detail_identity_mismatch_without_r
 
     assert classify_failure_mode(result) == "success"
 
+
 @pytest.mark.regression
 def test_acceptance_runner_requires_unbucketed_runs_to_succeed() -> None:
     site = {
@@ -404,6 +425,7 @@ def test_acceptance_runner_requires_unbucketed_runs_to_succeed() -> None:
     }
 
     assert run_test_sites_acceptance._expectation_met(site, result) is False
+
 
 @pytest.mark.regression
 def test_evaluate_quality_flags_shell_false_success() -> None:
@@ -441,6 +463,7 @@ def test_evaluate_quality_flags_shell_false_success() -> None:
     assert quality["quality_verdict"] == "bad_output"
     assert quality["observed_failure_mode"] == "shell_false_success"
     assert quality["quality_checks"]["identity_ok"] is False
+
 
 @pytest.mark.regression
 def test_evaluate_quality_flags_axis_pollution_as_gap() -> None:
@@ -480,6 +503,7 @@ def test_evaluate_quality_flags_axis_pollution_as_gap() -> None:
     assert quality["quality_checks"]["identity_ok"] is True
     assert quality["quality_checks"]["variant_labels_ok"] is False
 
+
 @pytest.mark.regression
 def test_evaluate_quality_flags_audit_price_magnitude_anomaly() -> None:
     site = {
@@ -512,6 +536,7 @@ def test_evaluate_quality_flags_audit_price_magnitude_anomaly() -> None:
     assert quality["observed_failure_mode"] == "price_magnitude_anomaly"
     assert quality["quality_checks"]["price_sane_ok"] is False
 
+
 @pytest.mark.regression
 def test_evaluate_quality_flags_audit_category_pollution() -> None:
     site = {
@@ -540,6 +565,7 @@ def test_evaluate_quality_flags_audit_category_pollution() -> None:
     assert quality["observed_failure_mode"] == "category_pollution"
     assert quality["quality_checks"]["category_clean_ok"] is False
 
+
 @pytest.mark.regression
 def test_evaluate_quality_flags_audit_long_text_pollution() -> None:
     site = {
@@ -567,6 +593,7 @@ def test_evaluate_quality_flags_audit_long_text_pollution() -> None:
     assert quality["quality_verdict"] == "bad_output"
     assert quality["observed_failure_mode"] == "long_text_pollution"
     assert quality["quality_checks"]["long_text_clean_ok"] is False
+
 
 @pytest.mark.regression
 def test_evaluate_quality_flags_audit_variant_and_system_artifacts() -> None:
@@ -609,6 +636,7 @@ def test_evaluate_quality_flags_audit_variant_and_system_artifacts() -> None:
     assert quality["observed_failure_mode"] == "variant_artifact_pollution"
     assert quality["quality_checks"]["variant_artifacts_ok"] is False
     assert quality["quality_checks"]["system_artifacts_ok"] is False
+
 
 @pytest.mark.regression
 def test_evaluate_quality_flags_cross_cutting_detail_invariants() -> None:
@@ -654,6 +682,7 @@ def test_evaluate_quality_flags_cross_cutting_detail_invariants() -> None:
     assert quality["quality_checks"]["title_token_ok"] is False
     assert quality["observed_failure_mode"] == "category_pollution"
 
+
 @pytest.mark.regression
 def test_evaluate_quality_flags_missing_repair_diagnostics() -> None:
     site = {
@@ -675,6 +704,7 @@ def test_evaluate_quality_flags_missing_repair_diagnostics() -> None:
     assert quality["quality_verdict"] == "bad_output"
     assert quality["observed_failure_mode"] == "repair_diagnostic_missing"
     assert quality["quality_checks"]["repair_diagnostics_ok"] is False
+
 
 @pytest.mark.regression
 def test_evaluate_quality_accepts_visible_repair_diagnostics() -> None:

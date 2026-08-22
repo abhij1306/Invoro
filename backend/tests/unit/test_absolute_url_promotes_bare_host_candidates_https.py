@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .test_field_value_core import Decimal, absolute_url, coerce_field_value, decimal_for_shared_price, direct_record_to_surface_fields, extract_currency_code, is_title_noise, public_record_data_for_surface, pytest, registrable_host, same_site, strip_tracking_query_params, surface_alias_lookup, validate_record_for_surface  # fmt: skip
 
+
 @pytest.mark.unit
 def test_absolute_url_promotes_bare_host_candidates_to_https() -> None:
     assert (
@@ -12,6 +13,7 @@ def test_absolute_url_promotes_bare_host_candidates_to_https() -> None:
         == "https://images.asos-media.com/products/widget/image-1.jpg"
     )
 
+
 @pytest.mark.unit
 def test_absolute_url_does_not_promote_hosts_with_edge_hyphen_labels() -> None:
     assert absolute_url("https://example.com/base/", "-bad.example/path") == (
@@ -20,6 +22,7 @@ def test_absolute_url_does_not_promote_hosts_with_edge_hyphen_labels() -> None:
     assert absolute_url("https://example.com/base/", "bad-.example/path") == (
         "https://example.com/base/bad-.example/path"
     )
+
 
 @pytest.mark.unit
 def test_coerce_brand_rejects_url_like_values() -> None:
@@ -44,6 +47,7 @@ def test_coerce_brand_rejects_url_like_values() -> None:
         == "Acme"
     )
 
+
 @pytest.mark.unit
 def test_coerce_title_supports_structured_values_key() -> None:
     assert (
@@ -55,6 +59,7 @@ def test_coerce_title_supports_structured_values_key() -> None:
         == "Widget Prime"
     )
 
+
 @pytest.mark.unit
 def test_coerce_brand_keeps_non_url_scheme_text_but_rejects_full_bare_host() -> None:
     assert (
@@ -65,9 +70,11 @@ def test_coerce_brand_keeps_non_url_scheme_text_but_rejects_full_bare_host() -> 
         is None
     )
 
+
 @pytest.mark.unit
 def test_frequently_bought_together_is_title_noise() -> None:
     assert is_title_noise("Frequently Bought Together") is True
+
 
 @pytest.mark.unit
 def test_validate_record_for_surface_drops_unknown_fields_but_keeps_canonical_fields() -> (
@@ -85,6 +92,7 @@ def test_validate_record_for_surface_drops_unknown_fields_but_keeps_canonical_fi
     assert cleaned == {"title": "Widget Prime", "price": {"amount": "19.99"}}
     assert errors == []
 
+
 @pytest.mark.unit
 def test_ecommerce_aliases_keep_product_id_distinct_from_sku() -> None:
     aliases = surface_alias_lookup("ecommerce_detail", None)
@@ -92,11 +100,13 @@ def test_ecommerce_aliases_keep_product_id_distinct_from_sku() -> None:
     assert aliases["product_id"] == "product_id"
     assert aliases["sku"] == "sku"
 
+
 @pytest.mark.unit
 def test_ecommerce_price_original_aliases_to_original_price() -> None:
     aliases = surface_alias_lookup("ecommerce_detail", None)
 
     assert aliases["price_original"] == "original_price"
+
 
 @pytest.mark.unit
 def test_direct_record_to_surface_fields_rejects_unknown_requested_fields() -> None:
@@ -112,11 +122,13 @@ def test_direct_record_to_surface_fields_rejects_unknown_requested_fields() -> N
 
     assert shaped == {"title": "Widget Prime"}
 
+
 @pytest.mark.unit
 def test_decimal_for_shared_price_supports_european_decimal_format() -> None:
     assert decimal_for_shared_price("1.234,56") == Decimal("1234.56")
     assert decimal_for_shared_price("234,56") == Decimal("234.56")
     assert decimal_for_shared_price("1.234.567,89") == Decimal("1234567.89")
+
 
 @pytest.mark.unit
 def test_coerce_price_rejects_negative_currency_fallbacks() -> None:
@@ -126,6 +138,7 @@ def test_coerce_price_rejects_negative_currency_fallbacks() -> None:
     assert coerce_field_value("price", "$-1", url) is None
     assert coerce_field_value("price", "−1", url) is None
     assert coerce_field_value("price", {"amount": "$-1"}, url) is None
+
 
 @pytest.mark.unit
 def test_persistence_schema_firewall_drops_unknown_and_internal_fields() -> None:
@@ -143,6 +156,7 @@ def test_persistence_schema_firewall_drops_unknown_and_internal_fields() -> None
     assert data == {"title": "Widget Prime", "price": "19.99"}
     assert rejected == {"debug_payload": "field_not_allowed_for_surface"}
 
+
 @pytest.mark.unit
 def test_persistence_schema_firewall_keeps_ecommerce_gender() -> None:
     data, rejected = public_record_data_for_surface(
@@ -156,6 +170,7 @@ def test_persistence_schema_firewall_keeps_ecommerce_gender() -> None:
 
     assert data == {"title": "Linen Dress", "gender": "Women"}
     assert rejected == {}
+
 
 @pytest.mark.unit
 def test_public_record_firewall_validates_identity_shapes() -> None:
@@ -180,6 +195,7 @@ def test_public_record_firewall_validates_identity_shapes() -> None:
         "product_type": "empty_after_coercion",
     }
 
+
 @pytest.mark.unit
 def test_coerce_sku_drops_draft_prefixed_numeric_artifacts() -> None:
     assert (
@@ -190,6 +206,7 @@ def test_coerce_sku_drops_draft_prefixed_numeric_artifacts() -> None:
         )
         is None
     )
+
 
 @pytest.mark.unit
 def test_public_record_firewall_flattens_variants_to_public_shape() -> None:
@@ -241,6 +258,7 @@ def test_public_record_firewall_flattens_variants_to_public_shape() -> None:
         "option1_values": "public_contract_excluded",
     }
 
+
 @pytest.mark.unit
 def test_public_record_firewall_preserves_url_query_currency_param() -> None:
     data, _rejected = public_record_data_for_surface(
@@ -271,6 +289,7 @@ def test_public_record_firewall_preserves_url_query_currency_param() -> None:
             "url": "https://example.com/products/widget?country=IN&currency%3DINR&variant=2",
         },
     ]
+
 
 @pytest.mark.unit
 def test_public_record_firewall_normalizes_variant_axis_aliases() -> None:
@@ -306,6 +325,7 @@ def test_public_record_firewall_normalizes_variant_axis_aliases() -> None:
         "variant_count": 1,
     }
 
+
 @pytest.mark.unit
 def test_public_record_firewall_preserves_flat_variant_style_axis() -> None:
     data, rejected = public_record_data_for_surface(
@@ -336,6 +356,7 @@ def test_public_record_firewall_preserves_flat_variant_style_axis() -> None:
         "variant_count": 2,
     }
     assert rejected == {}
+
 
 @pytest.mark.unit
 def test_public_record_firewall_preserves_type_switches_fit_and_length_axes() -> None:
@@ -383,6 +404,7 @@ def test_public_record_firewall_preserves_type_switches_fit_and_length_axes() ->
         "variant_count": 2,
     }
     assert rejected == {}
+
 
 @pytest.mark.unit
 def test_public_record_firewall_drops_parent_shared_variant_fields_but_keeps_price_currency() -> (
@@ -443,6 +465,7 @@ def test_public_record_firewall_drops_parent_shared_variant_fields_but_keeps_pri
     }
     assert rejected == {}
 
+
 @pytest.mark.unit
 def test_public_record_firewall_drops_ecommerce_tags_even_when_allowed() -> None:
     data, rejected = public_record_data_for_surface(
@@ -457,6 +480,7 @@ def test_public_record_firewall_drops_ecommerce_tags_even_when_allowed() -> None
 
     assert data == {"title": "Widget"}
     assert rejected == {"tags": "public_contract_excluded"}
+
 
 @pytest.mark.unit
 def test_persistence_schema_firewall_drops_default_ecommerce_schema_pollution() -> None:
@@ -494,6 +518,7 @@ def test_persistence_schema_firewall_drops_default_ecommerce_schema_pollution() 
         "published_at": "default_public_field_excluded",
     }
 
+
 @pytest.mark.unit
 def test_persistence_schema_firewall_keeps_explicitly_requested_pollution_field() -> (
     None
@@ -516,6 +541,7 @@ def test_persistence_schema_firewall_keeps_explicitly_requested_pollution_field(
     }
     assert rejected == {}
 
+
 @pytest.mark.unit
 def test_persistence_schema_firewall_canonicalizes_detail_url_query_params() -> None:
     data, rejected = public_record_data_for_surface(
@@ -536,6 +562,7 @@ def test_persistence_schema_firewall_canonicalizes_detail_url_query_params() -> 
     }
     assert rejected == {}
 
+
 @pytest.mark.unit
 def test_persistence_schema_firewall_normalizes_availability_enum_values() -> None:
     data, rejected = public_record_data_for_surface(
@@ -550,6 +577,7 @@ def test_persistence_schema_firewall_normalizes_availability_enum_values() -> No
     assert data["availability"] == "out_of_stock"
     assert rejected == {}
 
+
 @pytest.mark.unit
 def test_persistence_schema_firewall_strips_size_cta_suffixes() -> None:
     data, rejected = public_record_data_for_surface(
@@ -563,6 +591,7 @@ def test_persistence_schema_firewall_strips_size_cta_suffixes() -> None:
 
     assert data["size"] == "0.33 oz"
     assert rejected == {}
+
 
 @pytest.mark.unit
 def test_listing_url_firewall_preserves_functional_variant_query_params() -> None:
@@ -581,6 +610,7 @@ def test_listing_url_firewall_preserves_functional_variant_query_params() -> Non
     }
     assert rejected == {}
 
+
 @pytest.mark.unit
 def test_listing_url_firewall_rejects_api_event_click_urls() -> None:
     data, rejected = public_record_data_for_surface(
@@ -595,6 +625,7 @@ def test_listing_url_firewall_rejects_api_event_click_urls() -> None:
 
     assert data == {"title": "Tracked card", "price": "12.50"}
     assert rejected == {"url": "unsafe_navigation_url"}
+
 
 @pytest.mark.unit
 def test_llm_outputs_pass_same_schema_firewall() -> None:
@@ -614,6 +645,7 @@ def test_llm_outputs_pass_same_schema_firewall() -> None:
         "url": "unsafe_navigation_url",
         "unknown_llm_field": "field_not_allowed_for_surface",
     }
+
 
 @pytest.mark.unit
 def test_strip_tracking_query_params_removes_etsy_style_click_tracking_but_keeps_functional_values() -> (
@@ -636,6 +668,7 @@ def test_strip_tracking_query_params_removes_etsy_style_click_tracking_but_keeps
 
     assert cleaned == "https://example.com/products/widget-prime?variant=blue"
 
+
 @pytest.mark.unit
 def test_strip_tracking_query_params_keeps_short_flags_without_detail_context_tracking() -> (
     None
@@ -646,26 +679,32 @@ def test_strip_tracking_query_params_keeps_short_flags_without_detail_context_tr
 
     assert cleaned == "https://example.com/products/widget-prime?ls=r&variant=blue"
 
+
 @pytest.mark.unit
 def test_registrable_host_returns_ipv4_address() -> None:
     assert registrable_host("http://192.168.1.1/product") == "192.168.1.1"
+
 
 @pytest.mark.unit
 def test_same_site_ipv4_same_host_is_true() -> None:
     assert same_site("http://192.168.1.1/product", "http://192.168.1.1/cart")
 
+
 @pytest.mark.unit
 def test_same_site_ipv4_different_host_is_false() -> None:
     assert not same_site("http://192.168.1.1/product", "http://192.168.1.2/cart")
+
 
 @pytest.mark.unit
 def test_extract_currency_code_supports_rs_price_prefixes() -> None:
     assert extract_currency_code("Rs. 3,990.00") == "INR"
     assert extract_currency_code("INR 499") == "INR"
 
+
 @pytest.mark.unit
 def test_extract_currency_code_ignores_non_currency_uppercase_acronyms() -> None:
     assert extract_currency_code("SKU 499") is None
+
 
 @pytest.mark.unit
 def test_literal_list_text_uses_readable_delimiters() -> None:
@@ -677,6 +716,7 @@ def test_literal_list_text_uses_readable_delimiters() -> None:
         )
         == "Digital max resolution; Real boost clock: 1800 MHz"
     )
+
 
 @pytest.mark.unit
 def test_price_dict_prefers_formatted_money_over_low_signal_scalar() -> None:
@@ -693,6 +733,7 @@ def test_price_dict_prefers_formatted_money_over_low_signal_scalar() -> None:
         == "2299.99"
     )
 
+
 @pytest.mark.unit
 def test_price_dict_prefers_formatted_money_when_value_is_close() -> None:
     assert (
@@ -704,6 +745,7 @@ def test_price_dict_prefers_formatted_money_when_value_is_close() -> None:
         == "$100.00"
     )
 
+
 @pytest.mark.unit
 def test_price_dict_uses_value_when_formatted_missing() -> None:
     assert (
@@ -714,6 +756,7 @@ def test_price_dict_uses_value_when_formatted_missing() -> None:
         )
         == "100"
     )
+
 
 @pytest.mark.unit
 def test_price_dict_handles_missing_currency() -> None:

@@ -4,6 +4,7 @@ from .test_crawl_fetch_runtime import AsyncMock, FakeBodyResponse, FetchRuntimeC
 
 pytest_plugins = ["tests.component.test_crawl_fetch_runtime"]
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_fetch_page_browser_only_escalates_to_real_chrome_for_forum_detail(
@@ -64,6 +65,7 @@ async def test_fetch_page_browser_only_escalates_to_real_chrome_for_forum_detail
     assert (
         result.browser_diagnostics["host_policy_snapshot"]["patchright_blocked"] is True
     )
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -143,6 +145,7 @@ async def test_run_browser_attempts_replans_to_real_chrome_after_same_proxy_patc
     assert attempted_engines == ["patchright", "real_chrome"]
     assert result.browser_diagnostics["browser_engine"] == "real_chrome"
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_run_browser_attempts_lets_browser_runtime_own_stage_timeouts(
@@ -203,6 +206,7 @@ async def test_run_browser_attempts_lets_browser_runtime_own_stage_timeouts(
     assert result.browser_diagnostics["browser_engine"] == "patchright"
     assert context.last_browser_attempt_diagnostics == {}
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_fetch_page_browser_only_stamps_engine_and_lane_diagnostics(
@@ -257,6 +261,7 @@ async def test_fetch_page_browser_only_stamps_engine_and_lane_diagnostics(
     assert result.browser_diagnostics["escalation_lane"] == "browser_only_proxy"
     assert result.browser_diagnostics["host_policy_snapshot"]["prefer_browser"] is True
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_fetch_page_forwards_proxy_profile_to_browser_fetch(
@@ -290,6 +295,7 @@ async def test_fetch_page_forwards_proxy_profile_to_browser_fetch(
 
     assert result.method == "browser"
     assert captured_proxy_profile == {"enabled": True, "rotation": "rotating"}
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -363,6 +369,7 @@ async def test_run_browser_attempts_treats_none_cooldown_as_zero(
     assert result.method == "browser"
     assert result.blocked is False
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_read_network_payload_body_rejects_oversized_body_before_decode() -> None:
@@ -373,6 +380,7 @@ async def test_read_network_payload_body_rejects_oversized_body_before_decode() 
     assert body.outcome == "too_large"
     assert body.body is None
     assert response.body_calls == 1
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -390,6 +398,7 @@ async def test_read_network_payload_body_accepts_small_body_when_content_length_
     assert body.body == b"x"
     assert response.body_calls == 1
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_read_network_payload_body_accepts_large_but_in_budget_body() -> None:
@@ -400,6 +409,7 @@ async def test_read_network_payload_body_accepts_large_but_in_budget_body() -> N
     assert body.outcome == "read"
     assert body.body == b"x" * 600_000
     assert response.body_calls == 1
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -417,6 +427,7 @@ async def test_read_network_payload_body_accepts_high_value_large_body_with_scal
     assert body.body == b"x" * 3_500_000
     assert response.body_calls == 1
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_read_network_payload_body_marks_closed_page_failures_explicitly() -> (
@@ -430,6 +441,7 @@ async def test_read_network_payload_body_marks_closed_page_failures_explicitly()
     assert result.body is None
     assert "RuntimeError" in str(result.error)
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_read_network_payload_body_marks_generic_read_failures_explicitly() -> (
@@ -442,6 +454,7 @@ async def test_read_network_payload_body_marks_generic_read_failures_explicitly(
     assert result.outcome == "read_error"
     assert result.body is None
     assert "socket reset" in str(result.error)
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -463,6 +476,7 @@ async def test_read_network_payload_body_maps_read_timeouts_to_timeout(
     assert result.outcome == "timeout"
     assert result.body is None
     assert response.body_calls == 0
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -493,6 +507,7 @@ async def test_should_escalate_to_browser_async_uses_thread_offload(
 
     assert result is True
     assert calls == ["should_escalate_to_browser"]
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -526,6 +541,7 @@ async def test_http_fetch_populates_platform_family_from_response_url() -> None:
 
     assert result.platform_family == "greenhouse"
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_http_fetch_accepts_legacy_client_builder_keyword() -> None:
@@ -558,6 +574,7 @@ async def test_http_fetch_accepts_legacy_client_builder_keyword() -> None:
 
     assert result.final_url == "https://example.com/products/widget"
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_detail_surface_without_signals_escalates_even_when_html_is_not_a_js_shell() -> (
@@ -586,6 +603,7 @@ async def test_detail_surface_without_signals_escalates_even_when_html_is_not_a_
     assert (
         await should_escalate_to_browser_async(result, surface="job_listing") is False
     )
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -625,6 +643,7 @@ async def test_should_escalate_to_browser_async_uses_runtime_policy_for_missing_
 
     assert await should_escalate_to_browser_async(result, surface="job_detail") is False
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_listing_hash_router_shell_escalates_to_browser() -> None:
@@ -645,6 +664,7 @@ async def test_listing_hash_router_shell_escalates_to_browser() -> None:
         await should_escalate_to_browser_async(result, surface="ecommerce_listing")
         is True
     )
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -667,6 +687,7 @@ async def test_listing_202_shell_escalates_to_browser() -> None:
         await should_escalate_to_browser_async(result, surface="ecommerce_listing")
         is True
     )
+
 
 @pytest.mark.asyncio
 @pytest.mark.component

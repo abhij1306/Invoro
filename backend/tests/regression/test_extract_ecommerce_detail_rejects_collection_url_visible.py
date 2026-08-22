@@ -7,6 +7,7 @@ from .test_detail_extractor_structured_sources import (
     pytest,
 )
 
+
 @pytest.mark.regression
 def test_extract_ecommerce_detail_rejects_collection_url_with_visible_tile_prices() -> (
     None
@@ -33,6 +34,7 @@ def test_extract_ecommerce_detail_rejects_collection_url_with_visible_tile_price
     )
 
     assert rows == []
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -126,6 +128,7 @@ async def test_myntra_adapter_extracts_detail_media_and_variants() -> None:
     ]
     assert record["variant_count"] == 2
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_myntra_adapter_keeps_numeric_size_variants_from_related_urls() -> None:
@@ -183,6 +186,7 @@ async def test_myntra_adapter_keeps_numeric_size_variants_from_related_urls() ->
     assert rows[0]["variant_count"] == 2
     assert [variant["size"] for variant in rows[0]["variants"]] == ["6", "7"]
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_myntra_adapter_allows_dom_description_fill_when_detail_payload_is_sparse() -> (
@@ -235,6 +239,7 @@ async def test_myntra_adapter_allows_dom_description_fill_when_detail_payload_is
         record["description"] == "Soft cotton fabric with embroidered floral detailing."
     )
 
+
 @pytest.mark.regression
 def test_extract_ecommerce_detail_recovers_variant_axes_from_dom_controls_when_js_state_is_absent() -> (
     None
@@ -274,6 +279,7 @@ def test_extract_ecommerce_detail_recovers_variant_axes_from_dom_controls_when_j
     assert len(record["variants"]) == 6
     assert record["variants"][0]["size"] == "S"
     assert record["variants"][0]["color"] == "Black"
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_recovers_dicks_like_size_variants_from_button_grid() -> (
@@ -338,6 +344,7 @@ def test_extract_ecommerce_detail_recovers_dicks_like_size_variants_from_button_
         "7.0/7.5 US (38 EU)",
     ]
 
+
 @pytest.mark.regression
 def test_extract_ecommerce_detail_requires_cartesian_color_size_dom_variants() -> None:
     html = """
@@ -373,6 +380,7 @@ def test_extract_ecommerce_detail_requires_cartesian_color_size_dom_variants() -
     record = rows[0]
     assert record["variant_count"] == 6
     assert all(row.get("size") and row.get("color") for row in record["variants"])
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_expands_rich_color_variants_with_dom_sizes() -> None:
@@ -450,6 +458,7 @@ def test_extract_ecommerce_detail_expands_rich_color_variants_with_dom_sizes() -
     assert {row["size"] for row in record["variants"]} == {"36", "37"}
     assert all(row.get("image_url") for row in record["variants"])
 
+
 @pytest.mark.regression
 def test_extract_ecommerce_detail_recovers_labeled_image_color_swatches() -> None:
     html = """
@@ -500,6 +509,7 @@ def test_extract_ecommerce_detail_recovers_labeled_image_color_swatches() -> Non
         "Brown / Gold",
     ]
     assert all(row.get("image_url") for row in record["variants"])
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_guarded_dom_cartesian_keeps_axis_rows(
@@ -554,6 +564,7 @@ def test_extract_ecommerce_detail_guarded_dom_cartesian_keeps_axis_rows(
     assert all(not row.get("color") for row in size_rows)
     assert all(not row.get("size") for row in color_rows)
 
+
 @pytest.mark.regression
 def test_extract_ecommerce_detail_ignores_related_product_carousel_variants() -> None:
     html = """
@@ -582,6 +593,7 @@ def test_extract_ecommerce_detail_ignores_related_product_carousel_variants() ->
 
     assert len(rows) == 1
     assert "variants" not in rows[0]
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_prunes_js_state_related_product_variants() -> None:
@@ -641,6 +653,7 @@ def test_extract_ecommerce_detail_prunes_js_state_related_product_variants() -> 
     assert "variants" not in record
     assert "variant_count" not in record
     assert "size" not in record
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_recovers_structured_variants_with_axes() -> None:

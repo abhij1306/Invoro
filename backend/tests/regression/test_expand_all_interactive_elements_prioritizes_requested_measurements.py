@@ -4,6 +4,7 @@ from .test_browser_expansion_runtime import SimpleNamespace, _FakeExpansionPage,
 
 pytest_plugins = ["tests.regression.test_browser_expansion_runtime"]
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_expand_all_interactive_elements_prioritizes_requested_measurements_over_media_zoom() -> (
@@ -41,6 +42,7 @@ async def test_expand_all_interactive_elements_prioritizes_requested_measurement
     assert diagnostics["clicked_count"] == 1
     assert diagnostics["expanded_elements"] == ["product measurements"]
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_expand_all_interactive_elements_allows_visible_generic_detail_toggle_for_requested_fields() -> (
@@ -65,6 +67,7 @@ async def test_expand_all_interactive_elements_allows_visible_generic_detail_tog
 
     assert diagnostics["clicked_count"] == 1
     assert diagnostics["expanded_elements"] == ["details"]
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -91,6 +94,7 @@ async def test_expand_detail_content_if_needed_attempts_generic_ecommerce_expans
     assert diagnostics["clicked_count"] == 1
     assert page.expanded is True
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_expand_detail_content_if_needed_attempts_ready_job_detail_without_requested_fields() -> (
@@ -115,6 +119,7 @@ async def test_expand_detail_content_if_needed_attempts_ready_job_detail_without
 
     assert diagnostics["clicked_count"] == 1
     assert page.expanded is True
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -153,6 +158,7 @@ async def test_browser_fetch_records_extractable_sections_after_detail_expansion
 
     assert extractability["verified"] is True
     assert extractability["matched_requested_fields"] == ["materials"]
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -201,6 +207,7 @@ async def test_browser_fetch_does_not_skip_requested_dom_pattern_when_selector_i
 
     assert result.browser_diagnostics["detail_expansion"]["clicked_count"] == 1
     assert "Weight: 2kg" in result.html
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -282,6 +289,7 @@ async def test_browser_fetch_extracts_requested_features_from_dell_like_tab() ->
         "27-inch FHD Infinity display",
     ]
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_expand_detail_content_uses_data_qa_action_to_open_size_selector() -> (
@@ -310,6 +318,7 @@ async def test_expand_detail_content_uses_data_qa_action_to_open_size_selector()
     assert diagnostics["clicked_count"] == 1
     assert page.expanded is True
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_expand_detail_content_skips_menu_toggles() -> None:
@@ -334,6 +343,7 @@ async def test_expand_detail_content_skips_menu_toggles() -> None:
 
     assert diagnostics["clicked_count"] == 0
     assert page.expanded is False
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -377,6 +387,7 @@ async def test_expand_detail_content_prefers_requested_section_labels_over_unrel
     assert diagnostics["expanded_elements"] == ["details"]
     assert page.expanded is True
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_expand_detail_content_skips_navigation_anchors_that_match_generic_keywords() -> (
@@ -418,6 +429,7 @@ async def test_expand_detail_content_skips_navigation_anchors_that_match_generic
     assert diagnostics["clicked_count"] == 0
     assert page.expanded is False
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_expand_detail_content_skips_header_controls_outside_main_content() -> (
@@ -456,6 +468,7 @@ async def test_expand_detail_content_skips_header_controls_outside_main_content(
     assert diagnostics["expanded_elements"] == ["details"]
     assert page.expanded is True
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_expand_detail_content_does_not_match_requested_keywords_from_hidden_probe_only() -> (
@@ -481,6 +494,7 @@ async def test_expand_detail_content_does_not_match_requested_keywords_from_hidd
 
     assert diagnostics["clicked_count"] == 0
     assert page.expanded is False
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -531,6 +545,7 @@ async def test_browser_fetch_waits_for_challenge_recovery_before_settling(
     assert page.wait_function_calls
     assert page.goto_calls == ["domcontentloaded"]
     assert page.load_state_calls == ["networkidle"]
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -609,6 +624,7 @@ async def test_finalize_browser_fetch_keeps_blocked_html_checker_fallback(
     assert result["blocked"] is True
     assert result["diagnostics"]["challenge_evidence"] == ["blocked_html_checker"]
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_browser_fetch_uses_aom_expansion_when_dom_keyword_scan_misses() -> None:
@@ -651,6 +667,7 @@ async def test_browser_fetch_uses_aom_expansion_when_dom_keyword_scan_misses() -
         result.browser_diagnostics["detail_expansion"]["reason"]
         == "missing_detail_content"
     )
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression

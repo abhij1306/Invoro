@@ -8,6 +8,7 @@ from app.services.crawl.crud import create_crawl_run  # fmt: skip
 from app.services.pipeline.extraction_loop import process_single_url  # fmt: skip
 from sqlalchemy.ext.asyncio import AsyncSession  # fmt: skip
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_extract_records_for_acquisition_recovers_from_zero_record_traversal_using_full_rendered_html(

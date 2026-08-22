@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .test_crawl_service import AsyncSession, CONTROL_REQUEST_KILL, CONTROL_REQUEST_PAUSE, CrawlRecord, UTC, _create_running_run, asyncio, celery_dispatch_module, commit_selected_fields, crawl_service, create_crawl_run, database_module, datetime, delete_run, get_control_request, load_domain_run_profile, local_dispatch_module, logging, pytest, save_domain_run_profile, settings, timedelta, update_run_status  # fmt: skip
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_save_domain_run_profile_commit_persists_changes(
@@ -52,6 +53,7 @@ async def test_save_domain_run_profile_commit_persists_changes(
     assert loaded is not None
     assert dict(loaded.profile or {})["fetch_profile"]["fetch_mode"] == "browser_only"
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_delete_run_rejects_active_runs(
@@ -70,6 +72,7 @@ async def test_delete_run_rejects_active_runs(
 
     with pytest.raises(ValueError, match="Cannot delete run"):
         await delete_run(db_session, run)
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -124,6 +127,7 @@ async def test_commit_selected_fields_updates_requested_field_metadata(
     assert coverage["found"] >= 1
     assert "description" not in coverage["missing"]
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_pause_run_preserves_live_local_task_bookkeeping(
@@ -147,6 +151,7 @@ async def test_pause_run_preserves_live_local_task_bookkeeping(
     local_dispatch_module._local_run_tasks.pop(run.id, None)
     local_task.cancel()
     await asyncio.gather(local_task, return_exceptions=True)
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -180,6 +185,7 @@ async def test_kill_run_clears_local_task_bookkeeping(
     assert local_task.cancelled()
     assert browser_shutdowns == 1
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_shutdown_browser_runtime_after_kill_skips_concurrent_calls(
@@ -208,6 +214,7 @@ async def test_shutdown_browser_runtime_after_kill_skips_concurrent_calls(
     await asyncio.gather(first, second)
 
     assert browser_shutdowns == 1
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -271,6 +278,7 @@ async def test_recover_stale_local_runs_clears_task_entries_and_task_ids(
     assert pending_run.id not in local_dispatch_module._local_run_tasks
     assert running_run.id not in local_dispatch_module._local_run_tasks
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_recover_stale_local_runs_skips_fresh_active_runs(
@@ -308,6 +316,7 @@ async def test_recover_stale_local_runs_skips_fresh_active_runs(
     assert recovered == 0
     assert pending_run.status == "pending"
     assert running_run.status == "running"
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -365,6 +374,7 @@ async def test_dispatch_run_locally_recovers_stale_runs_before_launch(
     if local_task is not None:
         await asyncio.gather(local_task, return_exceptions=True)
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_local_dispatch_commits_task_id_before_launching_task(
@@ -404,6 +414,7 @@ async def test_local_dispatch_commits_task_id_before_launching_task(
 
     assert events[-2:] == ["commit", "track"]
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_celery_dispatch_commits_task_id_before_enqueue(
@@ -438,6 +449,7 @@ async def test_celery_dispatch_commits_task_id_before_enqueue(
     await celery_dispatch_module.CeleryRunDispatcher().dispatch(db_session, run)
 
     assert events[-2:] == ["commit", "enqueue"]
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -485,6 +497,7 @@ async def test_run_with_local_session_preserves_original_process_run_error(
         "Failed to persist failed status for run 17 after process_run error"
         in caplog.text
     )
+
 
 @pytest.mark.asyncio
 @pytest.mark.component

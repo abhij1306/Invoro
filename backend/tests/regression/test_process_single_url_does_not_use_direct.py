@@ -8,6 +8,7 @@ from app.services.pipeline.extraction_loop import process_single_url  # fmt: ski
 from pathlib import Path  # fmt: skip
 from sqlalchemy.ext.asyncio import AsyncSession  # fmt: skip
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_process_single_url_does_not_use_direct_llm_as_primary_listing_extractor(
@@ -85,6 +86,7 @@ async def test_process_single_url_does_not_use_direct_llm_as_primary_listing_ext
     assert total == 0
     assert rows == []
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_process_single_url_ignores_extracted_placeholder_records_from_low_content_browser_page(
@@ -158,6 +160,7 @@ async def test_process_single_url_ignores_extracted_placeholder_records_from_low
     assert total == 0
     assert rows == []
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_process_single_url_does_not_retry_browser_after_prior_challenge_attempt(
@@ -230,6 +233,7 @@ async def test_process_single_url_does_not_retry_browser_after_prior_challenge_a
     assert result.url_metrics["browser_outcome"] == "challenge_page"
     assert result.verdict == "blocked"
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_process_single_url_marks_low_content_listing_with_challenge_signals_as_blocked(
@@ -300,6 +304,7 @@ async def test_process_single_url_marks_low_content_listing_with_challenge_signa
     assert result.url_metrics["blocked"] is True
     assert result.url_metrics["browser_outcome"] == "low_content_shell"
     assert result.verdict == "blocked"
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -375,6 +380,7 @@ async def test_process_single_url_rejects_detail_non_detail_seed_with_failure_re
     assert result.verdict == "empty"
     assert result.url_metrics["failure_reason"] == "non_detail_seed"
     assert result.url_metrics["record_count"] == 0
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -458,6 +464,7 @@ async def test_process_single_url_rejects_detail_challenge_shell_and_marks_block
         "Rejected detail extraction for https://example.com/products/widget-prime: challenge_shell",
     ]
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_challenge_shell_budget_skip_logs_once(
@@ -531,6 +538,7 @@ async def test_challenge_shell_budget_skip_logs_once(
     assert result.url_metrics["failure_reason"] == "challenge_shell"
     assert len(skip_logs) == 1
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_process_single_url_raises_when_browser_retry_fails(
@@ -600,6 +608,7 @@ async def test_process_single_url_raises_when_browser_retry_fails(
         "Browser retry failed for https://example.com/category/widgets: TimeoutError: browser retry timed out",
     ]
     assert len(diagnostics_files) == 0
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression

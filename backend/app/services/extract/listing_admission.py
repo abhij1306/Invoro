@@ -13,6 +13,7 @@ from .listing_candidate_ranking import (
     unsupported_non_detail_ecommerce_merchandise_hint,
     utility_url_token_matches,
 )
+
 __all__ = (
     "job_listing_title_is_hub",
     "job_listing_url_is_hub",

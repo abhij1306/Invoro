@@ -7,7 +7,9 @@ from urllib.parse import parse_qsl, urljoin, urlparse, urlsplit
 from app.services.config.adapter_runtime_settings import adapter_runtime_settings
 from app.services.extract.variant_axis import normalized_variant_axis_key
 from app.services.extract.variant_identity_merge import split_variant_axes
-from app.services.extract.variant_normalization.contract import flatten_variants_for_public_output
+from app.services.extract.variant_normalization.contract import (
+    flatten_variants_for_public_output,
+)
 from app.services.normalizers import normalize_decimal_price
 
 _SHOPIFY_META_ASSIGNMENT_RE = re.compile(
@@ -47,7 +49,11 @@ class ShopifyProductMixin:
             # Only the single-value attributes are needed on this branch; discard
             # the selectable-axes half of the tuple.
             _, single_value_attributes = self._split_selectable_axes(axes)
-            selected_price = active_variant.get("price") if isinstance(active_variant, dict) else product.get("price")
+            selected_price = (
+                active_variant.get("price")
+                if isinstance(active_variant, dict)
+                else product.get("price")
+            )
             flat_variants = flatten_variants_for_public_output(
                 normalized_variants,
                 page_url=url,
@@ -63,7 +69,9 @@ class ShopifyProductMixin:
                     ),
                     "category": product.get("type"),
                     "product_type": product.get("type"),
-                    "product_id": str(product.get("id")) if product.get("id") not in (None, "", [], {}) else None,
+                    "product_id": str(product.get("id"))
+                    if product.get("id") not in (None, "", [], {})
+                    else None,
                     "variants": flat_variants,
                     "variant_count": len(flat_variants or []) or None,
                     "product_attributes": single_value_attributes or None,
@@ -108,7 +116,9 @@ class ShopifyProductMixin:
         row: dict[str, object] = {}
         self._apply_variant_identity_and_money(row, variant, base_url=base_url)
         self._apply_variant_availability(row, variant.get("available"))
-        featured = self._normalize_url(self._image_src(variant.get("featured_image")), scheme)
+        featured = self._normalize_url(
+            self._image_src(variant.get("featured_image")), scheme
+        )
         if featured:
             row["image_url"] = featured
         option_values = self._variant_option_values(variant, option_names=option_names)
@@ -120,15 +130,24 @@ class ShopifyProductMixin:
         return row or None
 
     @staticmethod
-    def _apply_variant_identity_and_money(row: dict[str, object], variant: dict, *, base_url: str) -> None:
+    def _apply_variant_identity_and_money(
+        row: dict[str, object], variant: dict, *, base_url: str
+    ) -> None:
         if variant.get("id") not in (None, "", [], {}):
             row["variant_id"] = str(variant["id"])
-            row["url"] = f"{base_url}{'&' if '?' in base_url else '?'}variant={row['variant_id']}"
+            row["url"] = (
+                f"{base_url}{'&' if '?' in base_url else '?'}variant={row['variant_id']}"
+            )
         for field in ("sku", "barcode"):
             if variant.get(field):
                 row[field] = variant[field]
-        for source, target in (("price", "price"), ("compare_at_price", "original_price")):
-            value = normalize_decimal_price(variant.get(source), interpret_integral_as_cents=True)
+        for source, target in (
+            ("price", "price"),
+            ("compare_at_price", "original_price"),
+        ):
+            value = normalize_decimal_price(
+                variant.get(source), interpret_integral_as_cents=True
+            )
             if value is not None:
                 row[target] = value
 
@@ -145,7 +164,9 @@ class ShopifyProductMixin:
         row["available"] = available
         row["availability"] = "in_stock" if available else "out_of_stock"
 
-    def _variant_option_values(self, variant: dict, *, option_names: list[str]) -> dict[str, str]:
+    def _variant_option_values(
+        self, variant: dict, *, option_names: list[str]
+    ) -> dict[str, str]:
         option_values: dict[str, str] = {}
         raw_payload = variant.get("options")
         raw_options = raw_payload if isinstance(raw_payload, list) else []
@@ -153,8 +174,14 @@ class ShopifyProductMixin:
             1,
             adapter_runtime_settings.shopify_max_option_axis_count + 1,
         ):
-            axis_name = option_names[index - 1] if index - 1 < len(option_names) else f"option_{index}"
-            axis_key = normalized_variant_axis_key(axis_name) or self._normalize_axis(axis_name)
+            axis_name = (
+                option_names[index - 1]
+                if index - 1 < len(option_names)
+                else f"option_{index}"
+            )
+            axis_key = normalized_variant_axis_key(axis_name) or self._normalize_axis(
+                axis_name
+            )
             value = variant.get(f"option{index}")
             if value in (None, "", [], {}) and index - 1 < len(raw_options):
                 value = raw_options[index - 1]
@@ -175,8 +202,12 @@ class ShopifyProductMixin:
             page_url,
             self._localized_product_path(parsed.path, product.get("handle")),
         )
-        normalized_variants = self._normalized_product_variants(product, scheme=parsed.scheme, product_url=product_url)
-        active_variant = self._select_shopify_variant(normalized_variants, base_url=page_url) or {}
+        normalized_variants = self._normalized_product_variants(
+            product, scheme=parsed.scheme, product_url=product_url
+        )
+        active_variant = (
+            self._select_shopify_variant(normalized_variants, base_url=page_url) or {}
+        )
         axes = self._variant_axes(normalized_variants)
         # Only the single-value attributes are needed here; discard the
         # selectable-axes half of the tuple.
@@ -211,20 +242,34 @@ class ShopifyProductMixin:
             record.update(self._detail_product_fields(product, image_count=len(images)))
         return record
 
-    def _normalized_product_variants(self, product: dict, *, scheme: str, product_url: str) -> list[dict]:
+    def _normalized_product_variants(
+        self, product: dict, *, scheme: str, product_url: str
+    ) -> list[dict]:
         raw = product.get("variants")
         variants = raw if isinstance(raw, list) else []
         option_names = self._option_names(product.get("options"))
         normalized = [
             row
             for variant in variants
-            if isinstance(variant, dict) and (row := self._normalize_variant(variant, option_names=option_names, scheme=scheme, base_url=product_url))
+            if isinstance(variant, dict)
+            and (
+                row := self._normalize_variant(
+                    variant,
+                    option_names=option_names,
+                    scheme=scheme,
+                    base_url=product_url,
+                )
+            )
         ]
         return self._dedupe_variants(normalized)
 
     def _product_images(self, product: dict, *, scheme: str) -> list[str]:
         raw_images = product.get("images")
-        return [url for image in (raw_images if isinstance(raw_images, list) else []) if (url := self._normalize_url(self._image_src(image), scheme))]
+        return [
+            url
+            for image in (raw_images if isinstance(raw_images, list) else [])
+            if (url := self._normalize_url(self._image_src(image), scheme))
+        ]
 
     @staticmethod
     def _detail_product_fields(product: dict, *, image_count: int) -> dict:
@@ -232,7 +277,9 @@ class ShopifyProductMixin:
         return {
             "vendor": product.get("vendor"),
             "product_type": product.get("product_type"),
-            "product_id": str(product_id) if product_id not in (None, "", [], {}) else None,
+            "product_id": str(product_id)
+            if product_id not in (None, "", [], {})
+            else None,
             "handle": product.get("handle"),
             "created_at": product.get("created_at"),
             "updated_at": product.get("updated_at"),
@@ -254,7 +301,13 @@ class ShopifyProductMixin:
                 continue
             if isinstance(merged.get(key), dict) and isinstance(value, dict) and value:
                 nested = dict(value)
-                nested.update({nested_key: nested_value for nested_key, nested_value in merged[key].items() if nested_value not in (None, "", [], {})})
+                nested.update(
+                    {
+                        nested_key: nested_value
+                        for nested_key, nested_value in merged[key].items()
+                        if nested_value not in (None, "", [], {})
+                    }
+                )
                 merged[key] = nested
         return merged
 
@@ -284,7 +337,9 @@ class ShopifyProductMixin:
         marker_index = raw_path.find(marker)
         prefix = raw_path[:marker_index] if marker_index >= 0 else ""
         if marker_index < 0:
-            locale_match = re.match(r"^/([a-z]{2}(?:-[a-z]{2})?)(?:/|$)", raw_path, re.I)
+            locale_match = re.match(
+                r"^/([a-z]{2}(?:-[a-z]{2})?)(?:/|$)", raw_path, re.I
+            )
             if locale_match is not None:
                 prefix = f"/{locale_match.group(1)}"
         return f"{prefix}/products/{product_handle}"
@@ -332,14 +387,18 @@ class ShopifyProductMixin:
         sku = str(variant.get("sku") or "").strip()
         option_values = variant.get("option_values")
         if sku and isinstance(option_values, dict) and option_values:
-            return json.dumps({"sku": sku, "option_values": option_values}, sort_keys=True)
+            return json.dumps(
+                {"sku": sku, "option_values": option_values}, sort_keys=True
+            )
         if sku:
             return f"sku:{sku}"
         if isinstance(option_values, dict) and option_values:
             return json.dumps({"option_values": option_values}, sort_keys=True)
         return None
 
-    def _split_selectable_axes(self, axes: dict[str, list[str]]) -> tuple[dict[str, list[str]], dict[str, str]]:
+    def _split_selectable_axes(
+        self, axes: dict[str, list[str]]
+    ) -> tuple[dict[str, list[str]], dict[str, str]]:
         return split_variant_axes(
             axes,
             always_selectable_axes=frozenset({"size"}),
@@ -355,17 +414,28 @@ class ShopifyProductMixin:
             return None
         parsed = urlsplit(str(base_url or "").strip())
         variant_id = next(
-            (str(value).strip() for key, value in parse_qsl(parsed.query, keep_blank_values=False) if key == "variant" and str(value).strip()),
+            (
+                str(value).strip()
+                for key, value in parse_qsl(parsed.query, keep_blank_values=False)
+                if key == "variant" and str(value).strip()
+            ),
             "",
         )
         if variant_id:
             matched_variant = next(
-                (row for row in variants if str(row.get("variant_id") or "").strip() == variant_id),
+                (
+                    row
+                    for row in variants
+                    if str(row.get("variant_id") or "").strip() == variant_id
+                ),
                 None,
             )
             if matched_variant is not None:
                 return matched_variant
-        return next((row for row in variants if row.get("available") is True), None) or variants[0]
+        return (
+            next((row for row in variants if row.get("available") is True), None)
+            or variants[0]
+        )
 
     def _normalize_axis(self, value: object) -> str:
         normalized = normalized_variant_axis_key(value)
@@ -374,6 +444,7 @@ class ShopifyProductMixin:
         text = str(value or "").strip().lower().replace("&", " ")
         text = re.sub(r"[^a-z0-9]+", "_", text).strip("_")
         return text or "option"
+
 
 def _shopify_meta_payloads(html: str) -> list[dict]:
     source = str(html or "")
@@ -386,6 +457,7 @@ def _shopify_meta_payloads(html: str) -> list[dict]:
         if isinstance(payload, dict):
             payloads.append(payload)
     return payloads
+
 
 def _loads_shopify_meta(fragment: str) -> dict | None:
     try:
@@ -400,9 +472,11 @@ def _loads_shopify_meta(fragment: str) -> dict | None:
             return None
     return payload if isinstance(payload, dict) else None
 
+
 def _balanced_object_property_fragment(text: str, property_name: str) -> str:
     match = re.search(rf"(?:^|[{{,])\s*{re.escape(property_name)}\s*:\s*", text, re.S)
     return _balanced_json_fragment(text[match.end() :]) if match else ""
+
 
 def _balanced_json_fragment(text: str) -> str:
     source = str(text or "")

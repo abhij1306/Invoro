@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .test_shared_variant_logic import BeautifulSoup, axis_values_are_mislabeled_duplicate, backfill_variants_from_dom_if_missing, extract_variants_from_dom, infer_variant_group_name_from_values, iter_variant_choice_groups, normalized_variant_axis_key, pytest, resolve_variant_group_name, resolve_variants, variant_choice_container_for_input, variant_choice_container_is_overbroad  # fmt: skip
 
+
 @pytest.mark.unit
 def test_variant_choice_groups_skip_overbroad_parent_and_keep_fieldsets() -> None:
     soup = BeautifulSoup(
@@ -77,6 +78,7 @@ def test_variant_choice_groups_skip_overbroad_parent_and_keep_fieldsets() -> Non
     ]
     assert not any(group.get("id") == "attribute-accordion" for group in groups)
 
+
 @pytest.mark.unit
 def test_variant_choice_groups_ignore_navigation_link_lists() -> None:
     soup = BeautifulSoup(
@@ -103,6 +105,7 @@ def test_variant_choice_groups_ignore_navigation_link_lists() -> None:
 
     assert len(groups) == 1
     assert resolve_variant_group_name(groups[0]) == "Size"
+
 
 @pytest.mark.unit
 def test_dom_variant_extraction_trusts_size_values_over_color_container_label() -> None:
@@ -134,6 +137,7 @@ def test_dom_variant_extraction_trusts_size_values_over_color_container_label() 
     ]
     assert all("color" not in row for row in record["variants"])
 
+
 @pytest.mark.unit
 def test_dom_variant_extraction_filters_fulfillment_noise_from_color_group() -> None:
     soup = BeautifulSoup(
@@ -164,6 +168,7 @@ def test_dom_variant_extraction_filters_fulfillment_noise_from_color_group() -> 
     ]
     assert all(set(row) <= {"color", "_validated"} for row in record["variants"])
 
+
 def testvariant_choice_container_is_overbroad_avoids_css_select_scans() -> None:
     class FakeNode:
         name = "div"
@@ -177,6 +182,7 @@ def testvariant_choice_container_is_overbroad_avoids_css_select_scans() -> None:
             raise AssertionError("slow CSS select path should not run")
 
     assert variant_choice_container_is_overbroad(FakeNode()) is True
+
 
 def testvariant_choice_container_for_input_avoids_css_select_scans() -> None:
     class FakeInput:
@@ -227,6 +233,7 @@ def testvariant_choice_container_for_input_avoids_css_select_scans() -> None:
 
     assert variant_choice_container_for_input(node, axis_name="size") is parent
 
+
 @pytest.mark.parametrize(
     "value",
     ["10M", "8.5M", "7.5M", "11.5XW", "9W", "9N", "7D", "32A", "34DD", "32x30"],
@@ -237,6 +244,7 @@ def test_unlabeled_numeric_size_values_infer_size_not_color(value: str) -> None:
     waist x inseam) classify as size, never color."""
     values = [value, "10M", "11M", "12M"]
     assert infer_variant_group_name_from_values(values) == "size"
+
 
 @pytest.mark.unit
 def test_unlabeled_shoe_size_group_classifies_as_size_not_color() -> None:
@@ -272,6 +280,7 @@ def test_unlabeled_shoe_size_group_classifies_as_size_not_color() -> None:
     assert {row.get("size") for row in variants if row.get("size")} == set(sizes)
     assert all("color" not in row for row in variants)
 
+
 @pytest.mark.unit
 def test_axis_values_are_mislabeled_duplicate_detects_same_axis() -> None:
     """The same value set under two axis names is a mislabeled duplicate."""
@@ -283,6 +292,7 @@ def test_axis_values_are_mislabeled_duplicate_detects_same_axis() -> None:
     )
     # Empty axes are never duplicates.
     assert axis_values_are_mislabeled_duplicate([], ["S"]) is False
+
 
 @pytest.mark.unit
 def test_resolve_variants_does_not_explode_mislabeled_duplicate_axis() -> None:
@@ -299,6 +309,7 @@ def test_resolve_variants_does_not_explode_mislabeled_duplicate_axis() -> None:
     assert len(resolved) == len(sizes)
     assert {row.get("size") for row in resolved} == set(sizes)
     assert all(not row.get("color") for row in resolved)
+
 
 @pytest.mark.unit
 def test_single_axis_source_not_exploded_by_mislabeled_dom_axis() -> None:

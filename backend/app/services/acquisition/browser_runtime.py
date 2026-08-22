@@ -109,7 +109,9 @@ from app.services.domain_utils import normalize_domain
 
 logger = logging.getLogger(__name__)
 
-_maybe_warm_origin_before_navigation = _origin_warmup.maybe_warm_origin_before_navigation
+_maybe_warm_origin_before_navigation = (
+    _origin_warmup.maybe_warm_origin_before_navigation
+)
 
 
 get_browser_runtime = _get_browser_runtime_impl
@@ -137,7 +139,9 @@ def _should_run_behavior_realism(engine: str, *, browser_reason: str | None) -> 
     reason = str(browser_reason or "").strip().lower()
     if not reason:
         return False
-    return reason in BEHAVIOR_REALISM_ELIGIBLE_BROWSER_REASONS or reason.startswith(WARMUP_VENDOR_BLOCK_PREFIX)
+    return reason in BEHAVIOR_REALISM_ELIGIBLE_BROWSER_REASONS or reason.startswith(
+        WARMUP_VENDOR_BLOCK_PREFIX
+    )
 
 
 async def _emit_browser_behavior_activity_bounded(page: Any) -> dict[str, object]:
@@ -217,7 +221,10 @@ def _browser_storage_state_is_persistable(
     readiness_probes = diagnostics.get("readiness_probes")
     if not isinstance(readiness_probes, list):
         return False
-    return any(isinstance(probe, dict) and bool(probe.get("is_ready")) for probe in readiness_probes)
+    return any(
+        isinstance(probe, dict) and bool(probe.get("is_ready"))
+        for probe in readiness_probes
+    )
 
 
 async def _resolve_runtime_provider(
@@ -239,7 +246,8 @@ def _callable_accepts_keyword(candidate: Any, keyword: str) -> bool:
     return any(
         parameter.kind is inspect.Parameter.VAR_KEYWORD
         or (
-            parameter.kind in {inspect.Parameter.KEYWORD_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD}
+            parameter.kind
+            in {inspect.Parameter.KEYWORD_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD}
             and parameter.name == keyword
         )
         for parameter in parameters
@@ -354,13 +362,17 @@ async def browser_fetch(
                     # acquisition gate. A route-install hiccup must not abort the fetch.
                     with suppress(Exception):
                         await page.route("**/*", _block_unneeded_route)
-                traversal_active, readiness_policy, readiness_override = resolve_browser_fetch_policy_impl(
-                    url=url,
-                    surface=normalized_surface,
-                    traversal_mode=traversal_mode,
-                    should_run_traversal=should_run_traversal,
+                traversal_active, readiness_policy, readiness_override = (
+                    resolve_browser_fetch_policy_impl(
+                        url=url,
+                        surface=normalized_surface,
+                        traversal_mode=traversal_mode,
+                        should_run_traversal=should_run_traversal,
+                    )
                 )
-                pre_nav_pause_ms = max(0, int(crawler_runtime_settings.browser_first_nav_pause_ms))
+                pre_nav_pause_ms = max(
+                    0, int(crawler_runtime_settings.browser_first_nav_pause_ms)
+                )
                 if pre_nav_pause_ms > 0 and normalized_surface.startswith("ecommerce_"):
                     await page.wait_for_timeout(pre_nav_pause_ms)
                 await _maybe_warm_origin_before_navigation(
@@ -376,7 +388,9 @@ async def browser_fetch(
                     timeout_seconds=_remaining(),
                     phase_timings_ms=phase_timings_ms,
                 )
-                popup_guard_registrations = _install_popup_guard(page, on_event=on_event)
+                popup_guard_registrations = _install_popup_guard(
+                    page, on_event=on_event
+                )
                 response, navigation_strategy = await _run_browser_stage(
                     stage="navigation",
                     page=page,
@@ -402,7 +416,10 @@ async def browser_fetch(
                     on_event=on_event,
                     emit_browser_event=_emit_browser_event,
                 )
-                navigation_strategy = str(getattr(response, "browser_navigation_strategy", None) or navigation_strategy)
+                navigation_strategy = str(
+                    getattr(response, "browser_navigation_strategy", None)
+                    or navigation_strategy
+                )
                 interstitial_diagnostics = await dismiss_browser_interstitial(
                     page,
                     phase_timings_ms=phase_timings_ms,
@@ -416,8 +433,12 @@ async def browser_fetch(
                     browser_reason=browser_reason,
                 ):
                     behavior_started_at = time.perf_counter()
-                    behavior_diagnostics = await _emit_browser_behavior_activity_bounded(page)
-                    phase_timings_ms["behavior_realism"] = _elapsed_ms(behavior_started_at)
+                    behavior_diagnostics = (
+                        await _emit_browser_behavior_activity_bounded(page)
+                    )
+                    phase_timings_ms["behavior_realism"] = _elapsed_ms(
+                        behavior_started_at
+                    )
                 (
                     current_probe,
                     readiness_probes,
@@ -453,7 +474,9 @@ async def browser_fetch(
                     page=page,
                     timeout_seconds=max(
                         _remaining(),
-                        float(crawler_runtime_settings.browser_capture_read_timeout_seconds),
+                        float(
+                            crawler_runtime_settings.browser_capture_read_timeout_seconds
+                        ),
                     ),
                     phase_timings_ms=phase_timings_ms,
                     operation=lambda: serialize_browser_page_content_impl(
@@ -480,7 +503,9 @@ async def browser_fetch(
                     page=page,
                     timeout_seconds=max(
                         _remaining(),
-                        float(crawler_runtime_settings.browser_capture_read_timeout_seconds),
+                        float(
+                            crawler_runtime_settings.browser_capture_read_timeout_seconds
+                        ),
                     ),
                     phase_timings_ms=phase_timings_ms,
                     operation=lambda: finalize_browser_fetch(
@@ -501,7 +526,9 @@ async def browser_fetch(
                             listing_recovery_diagnostics=listing_recovery_diagnostics,
                             payload_capture=payload_capture,
                             html=html,
-                            html_analysis=prefetched_analysis if html == prefetched_html else None,
+                            html_analysis=prefetched_analysis
+                            if html == prefetched_html
+                            else None,
                             traversal_result=traversal_result,
                             rendered_html=rendered_html,
                             interstitial_diagnostics=interstitial_diagnostics,
@@ -519,7 +546,9 @@ async def browser_fetch(
                     ),
                 )
                 finalized_status_code = finalized.get("status_code", 0)
-                finalized_platform_family = str(finalized.get("platform_family") or "").strip() or None
+                finalized_platform_family = (
+                    str(finalized.get("platform_family") or "").strip() or None
+                )
                 finalized_diagnostics = _mapping_value(finalized.get("diagnostics"))
                 diagnostics = build_browser_fetch_diagnostics(
                     finalized_diagnostics=finalized_diagnostics,
@@ -540,8 +569,10 @@ async def browser_fetch(
                 )
                 mark_storage_state_persist_policy(
                     page,
-                    persist_run_storage_state=allow_storage_state and persist_storage_state,
-                    persist_domain_storage_state=allow_storage_state and persist_storage_state,
+                    persist_run_storage_state=allow_storage_state
+                    and persist_storage_state,
+                    persist_domain_storage_state=allow_storage_state
+                    and persist_storage_state,
                 )
                 return build_browser_fetch_result(
                     url=url,

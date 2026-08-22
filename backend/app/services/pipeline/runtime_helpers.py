@@ -85,8 +85,13 @@ def browser_outcome(acquisition_result: AcquisitionResult) -> str:
 
 
 def browser_launch_log_message(acquisition_result: AcquisitionResult) -> str:
-    diagnostics = mapping_or_empty(getattr(acquisition_result, "browser_diagnostics", {}))
-    engine = str(diagnostics.get("browser_engine") or "chromium").strip().lower() or "chromium"
+    diagnostics = mapping_or_empty(
+        getattr(acquisition_result, "browser_diagnostics", {})
+    )
+    engine = (
+        str(diagnostics.get("browser_engine") or "chromium").strip().lower()
+        or "chromium"
+    )
     launch_mode = str(diagnostics.get("browser_launch_mode") or "").strip().lower()
     if not launch_mode:
         launch_mode = "headless"
@@ -140,10 +145,17 @@ def record_detail_expansion_extraction_outcome(
     *,
     requested_fields: list[str],
 ) -> None:
-    if str(getattr(acquisition_result, "method", "") or "").strip().lower() != "browser":
+    if (
+        str(getattr(acquisition_result, "method", "") or "").strip().lower()
+        != "browser"
+    ):
         return
-    browser_diagnostics = mapping_or_empty(getattr(acquisition_result, "browser_diagnostics", {}))
-    detail_expansion = dict(mapping_or_empty(browser_diagnostics.get("detail_expansion")))
+    browser_diagnostics = mapping_or_empty(
+        getattr(acquisition_result, "browser_diagnostics", {})
+    )
+    detail_expansion = dict(
+        mapping_or_empty(browser_diagnostics.get("detail_expansion"))
+    )
     try:
         clicked_count = int(str(detail_expansion.get("clicked_count", 0) or 0))
     except (TypeError, ValueError):
@@ -159,10 +171,16 @@ def record_detail_expansion_extraction_outcome(
 
 
 def _normalized_requested_fields(values: list[str]) -> set[str]:
-    return {normalized for value in values if (normalized := normalize_requested_field(value))}
+    return {
+        normalized
+        for value in values
+        if (normalized := normalize_requested_field(value))
+    }
 
 
-def _consumed_expansion_fields(records: list[dict[str, object]], *, requested: set[str]) -> list[str]:
+def _consumed_expansion_fields(
+    records: list[dict[str, object]], *, requested: set[str]
+) -> list[str]:
     extracted: set[str] = set()
     for record in records:
         if not isinstance(record, dict):
@@ -171,7 +189,11 @@ def _consumed_expansion_fields(records: list[dict[str, object]], *, requested: s
             normalized = str(field_name).strip().lower()
             if str(field_name).startswith("_") or value in (None, "", [], {}):
                 continue
-            if not requested or normalized in requested or normalized in LONG_TEXT_FIELDS:
+            if (
+                not requested
+                or normalized in requested
+                or normalized in LONG_TEXT_FIELDS
+            ):
                 extracted.add(normalized)
     return sorted(extracted)
 
@@ -180,7 +202,9 @@ async def mark_run_failed(session: AsyncSession, run_id: int, error_msg: str) ->
     try:
         await session.rollback()
     except SQLAlchemyError:
-        logger.debug("Session rollback failed before failure persistence", exc_info=True)
+        logger.debug(
+            "Session rollback failed before failure persistence", exc_info=True
+        )
     try:
         await persist_failure_state(session, run_id, error_msg)
         return

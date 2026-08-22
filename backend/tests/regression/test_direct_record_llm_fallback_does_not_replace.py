@@ -12,6 +12,7 @@ from app.services.pipeline.extraction_retry_decision import low_quality_extracti
 from app.services.pipeline.types import URLProcessingConfig  # fmt: skip
 from sqlalchemy.ext.asyncio import AsyncSession  # fmt: skip
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_direct_record_llm_fallback_does_not_replace_deterministic_records(
@@ -60,6 +61,7 @@ async def test_direct_record_llm_fallback_does_not_replace_deterministic_records
 
     assert rows == deterministic_records
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_direct_record_llm_fallback_does_not_create_primary_records(
@@ -98,6 +100,7 @@ async def test_direct_record_llm_fallback_does_not_create_primary_records(
     )
 
     assert rows == []
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -142,6 +145,7 @@ async def test_direct_record_llm_fallback_backfills_missing_listing_fields(
     assert rows[0]["price"] == "19.99"
     assert rows[0]["image_url"] == "https://example.com/widget.jpg"
 
+
 @pytest.mark.regression
 def test_best_adapter_result_deduplicates_unsourced_records() -> None:
     result = best_adapter_result(
@@ -161,6 +165,7 @@ def test_best_adapter_result_deduplicates_unsourced_records() -> None:
 
     assert result is not None
     assert result.records == [{"title": "Widget", "price": "$10"}]
+
 
 @pytest.mark.regression
 def test_empty_extraction_retry_skips_static_detail_price_html() -> None:
@@ -199,6 +204,7 @@ def test_empty_extraction_retry_skips_static_detail_price_html() -> None:
         "reason": "static_detail_extractable",
     }
 
+
 @pytest.mark.regression
 def test_empty_detail_extraction_retry_skips_collection_seed() -> None:
     request = AcquisitionRequest(
@@ -226,6 +232,7 @@ def test_empty_detail_extraction_retry_skips_collection_seed() -> None:
         "should_retry": False,
         "reason": "non_detail_seed",
     }
+
 
 @pytest.mark.regression
 def test_empty_detail_extraction_retry_skips_non_retryable_http_status() -> None:
@@ -255,6 +262,7 @@ def test_empty_detail_extraction_retry_skips_non_retryable_http_status() -> None
         "reason": "non_retryable_http_status",
         "status_code": 404,
     }
+
 
 @pytest.mark.regression
 def test_empty_detail_extraction_retries_retryable_http_status() -> None:
@@ -287,6 +295,7 @@ def test_empty_detail_extraction_retries_retryable_http_status() -> None:
         "reason": "retryable_http_status",
         "status_code": 406,
     }
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -337,6 +346,7 @@ async def test_process_single_url_marks_non_retryable_http_status_as_error(
     assert result.url_metrics["status_code"] == 404
     assert result.url_metrics["failure_reason"] == "non_retryable_http_status"
     assert len(acquire_calls) == 1
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -410,6 +420,7 @@ async def test_process_single_url_retries_406_empty_detail_with_browser(
         for log in logs
     )
 
+
 @pytest.mark.regression
 def test_low_quality_detail_retry_targets_real_non_browser_fetches() -> None:
     request = AcquisitionRequest(
@@ -453,6 +464,7 @@ def test_low_quality_detail_retry_targets_real_non_browser_fetches() -> None:
         requested_fields=[],
     ) == {"should_retry": False, "reason": "method_not_retryable"}
 
+
 @pytest.mark.regression
 def test_low_quality_detail_retry_skips_when_limited_canonical_fields_complete() -> (
     None
@@ -487,6 +499,7 @@ def test_low_quality_detail_retry_skips_when_limited_canonical_fields_complete()
         "should_retry": False,
         "reason": "repair_fields_complete",
     }
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -523,6 +536,7 @@ async def test_missing_repair_fields_uses_default_ecommerce_targets(
 
     assert "price" not in missing
     assert missing == ["image_url"]
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -590,6 +604,7 @@ async def test_process_single_url_skips_low_quality_browser_retry_when_budget_lo
     assert result.records
     assert len(acquire_calls) == 1
     assert any("Skipping low-quality browser retry" in log.message for log in logs)
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression

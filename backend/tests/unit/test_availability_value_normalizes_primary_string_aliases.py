@@ -6,11 +6,13 @@ from .test_state_mappers import (
     pytest,
 )
 
+
 @pytest.mark.unit
 def test_availability_value_normalizes_primary_string_aliases() -> None:
     assert availability_value({"availability": "out-of-stock"}) == "out_of_stock"
     assert availability_value({"inventory_status": "unavailable"}) == "out_of_stock"
     assert availability_value({"stock_status": "0"}) == "out_of_stock"
+
 
 @pytest.mark.unit
 def test_map_js_state_to_fields_recovers_next_data_shopify_product_fields() -> None:
@@ -104,6 +106,7 @@ def test_map_js_state_to_fields_recovers_next_data_shopify_product_fields() -> N
         == "https://store.example.com/products/trail-runner?variant=102"
     )
 
+
 @pytest.mark.unit
 def test_map_js_state_to_fields_recovers_axis_keyed_variant_dict_rows() -> None:
     mapped = map_js_state_to_fields(
@@ -151,6 +154,7 @@ def test_map_js_state_to_fields_recovers_axis_keyed_variant_dict_rows() -> None:
         "in_stock",
     ]
 
+
 @pytest.mark.unit
 def test_map_js_state_to_fields_drops_geographic_state_dropdown_variants() -> None:
     mapped = map_js_state_to_fields(
@@ -186,6 +190,7 @@ def test_map_js_state_to_fields_drops_geographic_state_dropdown_variants() -> No
     assert "variants" not in mapped
     assert "variant_count" not in mapped
 
+
 @pytest.mark.unit
 def test_map_js_state_to_fields_keeps_bridge_variants_with_primary_rows() -> None:
     mapped = map_js_state_to_fields(
@@ -211,6 +216,7 @@ def test_map_js_state_to_fields_keeps_bridge_variants_with_primary_rows() -> Non
         "Black",
         "White",
     }
+
 
 @pytest.mark.unit
 def test_map_js_state_to_fields_treats_shopify_product_level_prices_as_cents() -> None:
@@ -251,6 +257,7 @@ def test_map_js_state_to_fields_treats_shopify_product_level_prices_as_cents() -
     assert mapped["price"] == "USD 196.50"
     assert mapped["original_price"] == "USD 220.00"
 
+
 @pytest.mark.unit
 def test_map_js_state_to_fields_handles_null_product_type() -> None:
     mapped = map_js_state_to_fields(
@@ -277,6 +284,7 @@ def test_map_js_state_to_fields_handles_null_product_type() -> None:
     )
 
     assert mapped["title"] == "Trail Runner"
+
 
 @pytest.mark.unit
 def test_map_js_state_to_fields_recovers_shopify_available_sizes_rows() -> None:
@@ -334,6 +342,7 @@ def test_map_js_state_to_fields_recovers_shopify_available_sizes_rows() -> None:
     assert mapped["variants"][0]["stock_quantity"] == 9170
     assert mapped["variants"][1]["availability"] == "out_of_stock"
     assert mapped["variants"][1]["stock_quantity"] == 0
+
 
 @pytest.mark.unit
 def test_map_js_state_to_fields_merges_same_family_sibling_product_urls() -> None:
@@ -436,6 +445,7 @@ def test_map_js_state_to_fields_merges_same_family_sibling_product_urls() -> Non
         ),
     }
 
+
 @pytest.mark.unit
 def test_map_js_state_to_fields_reads_variant_attributes_axes() -> None:
     mapped = map_js_state_to_fields(
@@ -489,6 +499,7 @@ def test_map_js_state_to_fields_reads_variant_attributes_axes() -> None:
     assert mapped["color"] == "True White"
     assert mapped["size"] == "M8.5 / W10"
 
+
 @pytest.mark.unit
 def test_map_js_state_to_fields_reads_variant_traits_axes() -> None:
     mapped = map_js_state_to_fields(
@@ -527,6 +538,7 @@ def test_map_js_state_to_fields_reads_variant_traits_axes() -> None:
         "https://stockx.com/nike-dunk-low-retro-white-black-2021?variant=size-35",
         "https://stockx.com/nike-dunk-low-retro-white-black-2021?variant=size-4",
     ]
+
 
 @pytest.mark.unit
 def test_map_js_state_to_fields_reads_target_variation_hierarchy() -> None:
@@ -590,6 +602,7 @@ def test_map_js_state_to_fields_reads_target_variation_hierarchy() -> None:
         "https://www.target.com/p/tobago-twin/-/A-1002150742",
     ]
 
+
 @pytest.mark.unit
 def test_map_js_state_to_fields_uses_variation_attribute_display_names() -> None:
     mapped = map_js_state_to_fields(
@@ -640,6 +653,7 @@ def test_map_js_state_to_fields_uses_variation_attribute_display_names() -> None
 
     assert mapped["color"] == "Cool Grey"
     assert mapped["size"] == "S"
+
 
 @pytest.mark.unit
 def test_map_js_state_to_fields_does_not_pick_arbitrary_parent_size_without_explicit_selection() -> (

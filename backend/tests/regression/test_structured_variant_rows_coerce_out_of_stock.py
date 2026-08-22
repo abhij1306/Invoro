@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .test_detail_extractor_structured_sources import _structured_variants_from_product_payload, detail_dom_completion, extract_records, json, pytest  # fmt: skip
 
+
 @pytest.mark.regression
 def test_structured_variant_rows_coerce_is_out_of_stock_flags_strictly() -> None:
     rows = _structured_variants_from_product_payload(
@@ -19,6 +20,7 @@ def test_structured_variant_rows_coerce_is_out_of_stock_flags_strictly() -> None
     assert variants_by_size["8"]["availability"] == "in_stock"
     assert variants_by_size["9"]["availability"] == "out_of_stock"
     assert variants_by_size["10"]["availability"] == "in_stock"
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_rejects_foreign_currency_variants() -> None:
@@ -44,6 +46,7 @@ def test_extract_ecommerce_detail_rejects_foreign_currency_variants() -> None:
     assert rows[0]["variants"] == [
         {"color": "Black", "price": "420.00", "currency": "GBP"}
     ]
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_ignores_newsletter_fields_inside_size_container() -> (
@@ -77,6 +80,7 @@ def test_extract_ecommerce_detail_ignores_newsletter_fields_inside_size_containe
     assert record["title"] == "Soft Rock Crewneck"
     assert "Email" not in str(record.get("size", ""))
     assert "Sign up" not in json.dumps(record)
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_rejects_promo_and_hex_only_dom_variant_values() -> (
@@ -118,6 +122,7 @@ def test_extract_ecommerce_detail_rejects_promo_and_hex_only_dom_variant_values(
         {"color": "White"},
     ]
 
+
 @pytest.mark.regression
 def test_extract_ecommerce_detail_rejects_cookie_disclosure_title_and_description() -> (
     None
@@ -158,6 +163,7 @@ def test_extract_ecommerce_detail_rejects_cookie_disclosure_title_and_descriptio
     assert record.get("description") in (None, "")
     assert "_clck" not in json.dumps(record)
     assert "Microsoft Clarity" not in json.dumps(record)
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_recovers_radio_size_variants_with_stock_availability() -> (
@@ -205,6 +211,7 @@ def test_extract_ecommerce_detail_recovers_radio_size_variants_with_stock_availa
     assert record["variants"][0]["stock_quantity"] == 0
     assert record["variants"][1]["availability"] == "in_stock"
     assert record["variants"][1]["stock_quantity"] == 17
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_keeps_supported_dom_variant_axes_and_drops_unknown_axes() -> (
@@ -256,6 +263,7 @@ def test_extract_ecommerce_detail_keeps_supported_dom_variant_axes_and_drops_unk
     assert all("color" not in variant for variant in record["variants"])
     assert all("shipping" not in variant for variant in record["variants"])
 
+
 @pytest.mark.regression
 def test_extract_ecommerce_detail_keeps_fit_dom_variants() -> None:
     html = """
@@ -286,6 +294,7 @@ def test_extract_ecommerce_detail_keeps_fit_dom_variants() -> None:
     record = rows[0]
     assert record["variant_count"] == 3
     assert [row["fit"] for row in record["variants"]] == ["Short", "Regular", "Long"]
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_drops_addon_variant_noise_and_keeps_real_axes() -> (
@@ -350,6 +359,7 @@ def test_extract_ecommerce_detail_drops_addon_variant_noise_and_keeps_real_axes(
         "Gateron Jupiter Banana",
     }
     assert all("Palm Rest" not in str(row) for row in record["variants"])
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_prefers_priced_adapter_variants_over_dom_cartesian_guess() -> (
@@ -446,6 +456,7 @@ def test_extract_ecommerce_detail_prefers_priced_adapter_variants_over_dom_carte
         ("Fully Assembled Knob", "Gateron Jupiter Banana", "104.99"),
         ("Barebone Knob", "Barebone", "94.99"),
     }
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_prefers_structured_shopify_variants_over_dom_guess() -> (
@@ -563,6 +574,7 @@ def test_extract_ecommerce_detail_prefers_structured_shopify_variants_over_dom_g
         ("Fully Assembled Knob", "Gateron Jupiter Banana", "104.99"),
         ("Barebone Knob", "Barebone", "94.99"),
     }
+
 
 @pytest.mark.regression
 def test_should_collect_dom_variants_keeps_priced_shopify_rows_over_unpriced_dom_guess() -> (

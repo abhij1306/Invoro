@@ -101,7 +101,11 @@ def _append_myntra_listing_record(
     if state_record := state_index.get(url):
         record = {
             **state_record,
-            **{key: value for key, value in record.items() if value not in (None, "", [], {})},
+            **{
+                key: value
+                for key, value in record.items()
+                if value not in (None, "", [], {})
+            },
         }
     record["_source"] = "myntra_adapter"
     finalized = finalize_record(record, surface="ecommerce_listing")

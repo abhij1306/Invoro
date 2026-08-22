@@ -33,7 +33,9 @@ _BROWSER_ENGINE_VALUES = {"auto", "patchright", "real_chrome"}
 _LEGACY_HANDOFF_ELIGIBLE_KEY = "prefer_curl_handoff"
 
 
-def _coerce_int_clamped(value: object, default: int, minimum: int, maximum: int | None = None) -> int:
+def _coerce_int_clamped(
+    value: object, default: int, minimum: int, maximum: int | None = None
+) -> int:
     try:
         result = max(minimum, int(float(str(value))))
         if maximum is not None:
@@ -143,7 +145,9 @@ def normalize_internal_api_endpoints(value: object) -> list[dict[str, object]]:
         if not isinstance(item, Mapping):
             continue
         url = _clean_str(item.get(INTERNAL_API_ENDPOINT_URL_KEY))
-        method = str(item.get(INTERNAL_API_ENDPOINT_METHOD_KEY) or "GET").strip().upper()
+        method = (
+            str(item.get(INTERNAL_API_ENDPOINT_METHOD_KEY) or "GET").strip().upper()
+        )
         if not url or method not in INTERNAL_API_ENDPOINT_ALLOWED_METHODS:
             continue
         key = (method, url)
@@ -180,7 +184,11 @@ def _coerce_country(value: object) -> str:
 
 def normalize_acquisition_contract(value: object) -> dict[str, object]:
     payload = dict(value or {}) if isinstance(value, Mapping) else {}
-    handoff_eligible = bool(payload.get("handoff_eligible", payload.get(_LEGACY_HANDOFF_ELIGIBLE_KEY, False)))
+    handoff_eligible = bool(
+        payload.get(
+            "handoff_eligible", payload.get(_LEGACY_HANDOFF_ELIGIBLE_KEY, False)
+        )
+    )
     last_quality_success = payload.get("last_quality_success")
     if isinstance(last_quality_success, Mapping):
         normalized_success: dict[str, object] | None = {
@@ -227,7 +235,9 @@ def normalize_acquisition_contract(value: object) -> dict[str, object]:
         ),
         "required_rendering": bool(payload.get("required_rendering", False)),
         "required_traversal": bool(payload.get("required_traversal", False)),
-        "required_network_payloads": bool(payload.get("required_network_payloads", False)),
+        "required_network_payloads": bool(
+            payload.get("required_network_payloads", False)
+        ),
         "last_quality_success": normalized_success,
         "stale_after_failures": {
             "failure_count": _coerce_int_clamped(
@@ -304,21 +314,33 @@ def normalize_domain_run_profile(
         },
         "locality_profile": {
             "geo_country": _coerce_country(locality_profile.get("geo_country")),
-            "language_hint": _coerce_nullable_text(locality_profile.get("language_hint")),
-            "currency_hint": _coerce_nullable_text(locality_profile.get("currency_hint")),
+            "language_hint": _coerce_nullable_text(
+                locality_profile.get("language_hint")
+            ),
+            "currency_hint": _coerce_nullable_text(
+                locality_profile.get("currency_hint")
+            ),
         },
         "diagnostics_profile": {
             "capture_html": bool(diagnostics_profile.get("capture_html", True)),
-            "capture_screenshot": bool(diagnostics_profile.get("capture_screenshot", False)),
+            "capture_screenshot": bool(
+                diagnostics_profile.get("capture_screenshot", False)
+            ),
             "capture_network": _coerce_choice(
                 diagnostics_profile.get("capture_network"),
                 _CAPTURE_NETWORK_VALUES,
                 default="off",
             ),
-            "capture_response_headers": bool(diagnostics_profile.get("capture_response_headers", True)),
-            "capture_browser_diagnostics": bool(diagnostics_profile.get("capture_browser_diagnostics", True)),
+            "capture_response_headers": bool(
+                diagnostics_profile.get("capture_response_headers", True)
+            ),
+            "capture_browser_diagnostics": bool(
+                diagnostics_profile.get("capture_browser_diagnostics", True)
+            ),
         },
-        "acquisition_contract": normalize_acquisition_contract(payload.get("acquisition_contract")),
+        "acquisition_contract": normalize_acquisition_contract(
+            payload.get("acquisition_contract")
+        ),
         INTERNAL_API_ENDPOINTS_PROFILE_KEY: normalize_internal_api_endpoints(
             payload.get(INTERNAL_API_ENDPOINTS_PROFILE_KEY)
         ),

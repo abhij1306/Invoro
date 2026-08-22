@@ -30,7 +30,9 @@ __all__ = [
 class FetchProfile(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    fetch_mode: Literal["auto", "http_only", "browser_only", "http_then_browser"] = "auto"
+    fetch_mode: Literal["auto", "http_only", "browser_only", "http_then_browser"] = (
+        "auto"
+    )
     extraction_source: Literal[
         "raw_html",
         "rendered_dom",
@@ -95,7 +97,9 @@ class DomainProfileV2(BaseModel):
     profile_stale_after_days: int = Field(default=SELECTOR_RULE_STALE_AFTER_DAYS, ge=1)
     selector_rules: list[SelectorRule] = Field(default_factory=list)
     fetch_profile: FetchProfile = Field(default_factory=FetchProfile)
-    acquisition_contract: AcquisitionContract = Field(default_factory=AcquisitionContract)
+    acquisition_contract: AcquisitionContract = Field(
+        default_factory=AcquisitionContract
+    )
 
     @field_validator("domain", "surface")
     @classmethod

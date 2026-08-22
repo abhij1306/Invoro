@@ -102,7 +102,9 @@ async def _poll_for_challenge_clearance(
 
     async def check_cleared() -> Any | None:
         html = await get_page_html(page)
-        classification = await classify_blocked_page(html, _recovered_html_status_code(status_code))
+        classification = await classify_blocked_page(
+            html, _recovered_html_status_code(status_code)
+        )
         if _challenge_has_cleared(
             html,
             status_code=_recovered_html_status_code(status_code),
@@ -119,7 +121,9 @@ async def _poll_for_challenge_clearance(
         if recovered is not None or state["terminal"]:
             phase_timings_ms["challenge_wait"] = elapsed_ms(started_at)
             return recovered, state["terminal"], deadline
-        await _run_before_deadline(lambda: _emit_challenge_activity(page), deadline=deadline)
+        await _run_before_deadline(
+            lambda: _emit_challenge_activity(page), deadline=deadline
+        )
         recovered = await _run_before_deadline(check_cleared, deadline=deadline)
         if recovered is not None or state["terminal"]:
             phase_timings_ms["challenge_wait"] = elapsed_ms(started_at)
@@ -127,12 +131,16 @@ async def _poll_for_challenge_clearance(
         remaining_ms = max(0, int((deadline - time.perf_counter()) * 1000))
         if remaining_ms <= 0:
             break
-        await page.wait_for_timeout(min(max(100, int(challenge_poll_interval_ms)), remaining_ms))
+        await page.wait_for_timeout(
+            min(max(100, int(challenge_poll_interval_ms)), remaining_ms)
+        )
     phase_timings_ms["challenge_wait"] = elapsed_ms(started_at)
     return None, state["terminal"], deadline
 
 
-async def _run_before_deadline(awaitable_factory: Callable[[], Any], *, deadline: float) -> Any | None:
+async def _run_before_deadline(
+    awaitable_factory: Callable[[], Any], *, deadline: float
+) -> Any | None:
     remaining_seconds = deadline - time.perf_counter()
     if remaining_seconds <= 0:
         return None
@@ -178,7 +186,9 @@ async def _retry_challenge_navigation(
         phase_timings_ms["challenge_retry"] = elapsed_ms(retry_started_at)
         return response
     phase_timings_ms["challenge_retry"] = elapsed_ms(retry_started_at)
-    retry_status_code = int(getattr(retried_response, "status", status_code) or status_code)
+    retry_status_code = int(
+        getattr(retried_response, "status", status_code) or status_code
+    )
     try:
         retry_html = await get_page_html(page)
         retry_classification = await classify_blocked_page(
@@ -241,10 +251,12 @@ def _is_terminal_hard_block(classification: Any) -> bool:
     if not bool(getattr(classification, "blocked", False)):
         return False
     has_terminal_evidence = bool(
-        getattr(classification, "title_matches", None) or getattr(classification, "strong_hits", None)
+        getattr(classification, "title_matches", None)
+        or getattr(classification, "strong_hits", None)
     )
     has_active_challenge = bool(
-        getattr(classification, "active_provider_hits", None) or getattr(classification, "challenge_element_hits", None)
+        getattr(classification, "active_provider_hits", None)
+        or getattr(classification, "challenge_element_hits", None)
     )
     return has_terminal_evidence and not has_active_challenge
 
@@ -358,13 +370,21 @@ async def _emit_challenge_mouse_moves(
     if not callable(move):
         return True
     try:
-        current_x = _clamp_mouse_coordinate((width // 2) + secrets.randbelow(400) - 200, width, edge_padding)
-        current_y = _clamp_mouse_coordinate((height // 2) + secrets.randbelow(300) - 150, height, edge_padding)
+        current_x = _clamp_mouse_coordinate(
+            (width // 2) + secrets.randbelow(400) - 200, width, edge_padding
+        )
+        current_y = _clamp_mouse_coordinate(
+            (height // 2) + secrets.randbelow(300) - 150, height, edge_padding
+        )
         await move(current_x, current_y)
         _mark_mouse_move(mouse)
         for _ in range(jitter_moves):
-            target_x = _jitter_coordinate(current_x, jitter_delta_px, width, edge_padding)
-            target_y = _jitter_coordinate(current_y, jitter_delta_px, height, edge_padding)
+            target_x = _jitter_coordinate(
+                current_x, jitter_delta_px, width, edge_padding
+            )
+            target_y = _jitter_coordinate(
+                current_y, jitter_delta_px, height, edge_padding
+            )
             await _move_mouse_path(
                 page,
                 mouse,
@@ -377,7 +397,9 @@ async def _emit_challenge_mouse_moves(
                 edge_padding=edge_padding,
             )
             current_x, current_y = target_x, target_y
-            pause_ms = pause_min_ms + (secrets.randbelow(pause_jitter_ms) if pause_jitter_ms else 0)
+            pause_ms = pause_min_ms + (
+                secrets.randbelow(pause_jitter_ms) if pause_jitter_ms else 0
+            )
             if pause_ms > 0:
                 await page.wait_for_timeout(pause_ms)
     except Exception:
@@ -386,7 +408,9 @@ async def _emit_challenge_mouse_moves(
 
 
 def _jitter_coordinate(current: int, delta: int, limit: int, padding: int) -> int:
-    return _clamp_mouse_coordinate(current + secrets.randbelow(delta * 2) - delta, limit, padding)
+    return _clamp_mouse_coordinate(
+        current + secrets.randbelow(delta * 2) - delta, limit, padding
+    )
 
 
 async def _move_mouse_path(
@@ -403,8 +427,12 @@ async def _move_mouse_path(
 ) -> None:
     for step_index in range(1, steps + 1):
         progress = step_index / steps
-        x = round(start[0] + (target[0] - start[0]) * progress + secrets.randbelow(7) - 3)
-        y = round(start[1] + (target[1] - start[1]) * progress + secrets.randbelow(7) - 3)
+        x = round(
+            start[0] + (target[0] - start[0]) * progress + secrets.randbelow(7) - 3
+        )
+        y = round(
+            start[1] + (target[1] - start[1]) * progress + secrets.randbelow(7) - 3
+        )
         await move(
             _clamp_mouse_coordinate(x, width, edge_padding),
             _clamp_mouse_coordinate(y, height, edge_padding),
@@ -441,7 +469,9 @@ async def emit_browser_behavior_activity(page: Any) -> dict[str, object]:
     }
 
 
-async def type_text_like_human(page: Any, selector: str, text: str) -> dict[str, object]:
+async def type_text_like_human(
+    page: Any, selector: str, text: str
+) -> dict[str, object]:
     target_selector = str(selector or "").strip()
     target_text = str(text or "")
     if not target_selector or not target_text:
@@ -455,7 +485,9 @@ async def type_text_like_human(page: Any, selector: str, text: str) -> dict[str,
         locator = locator_factory(target_selector)
         click = getattr(locator, "click", None)
         if callable(click):
-            await click(timeout=int(crawler_runtime_settings.traversal_click_timeout_ms))
+            await click(
+                timeout=int(crawler_runtime_settings.traversal_click_timeout_ms)
+            )
         for character in target_text:
             type_fn = getattr(keyboard, "type", None)
             if not callable(type_fn):
@@ -478,7 +510,9 @@ async def _emit_scroll_physics(page: Any) -> int:
         return 0
     steps = max(0, int(crawler_runtime_settings.browser_behavior_scroll_steps or 0))
     min_px = max(0, int(crawler_runtime_settings.browser_behavior_scroll_min_px or 0))
-    max_px = max(min_px, int(crawler_runtime_settings.browser_behavior_scroll_max_px or 0))
+    max_px = max(
+        min_px, int(crawler_runtime_settings.browser_behavior_scroll_max_px or 0)
+    )
     if steps <= 0 or max_px <= 0:
         return 0
     emitted = 0
@@ -498,15 +532,21 @@ async def _emit_scroll_physics(page: Any) -> int:
 
 def _behavior_pause_ms() -> int:
     pause_ms = max(0, int(crawler_runtime_settings.browser_behavior_pause_min_ms or 0))
-    jitter_ms = max(0, int(crawler_runtime_settings.browser_behavior_pause_jitter_ms or 0))
+    jitter_ms = max(
+        0, int(crawler_runtime_settings.browser_behavior_pause_jitter_ms or 0)
+    )
     if jitter_ms:
         pause_ms += secrets.randbelow(jitter_ms)
     return pause_ms
 
 
 def _typing_delay_ms() -> int:
-    delay_ms = max(0, int(crawler_runtime_settings.browser_behavior_typing_min_delay_ms or 0))
-    jitter_ms = max(0, int(crawler_runtime_settings.browser_behavior_typing_jitter_ms or 0))
+    delay_ms = max(
+        0, int(crawler_runtime_settings.browser_behavior_typing_min_delay_ms or 0)
+    )
+    jitter_ms = max(
+        0, int(crawler_runtime_settings.browser_behavior_typing_jitter_ms or 0)
+    )
     if jitter_ms:
         delay_ms += secrets.randbelow(jitter_ms)
     return delay_ms
@@ -576,11 +616,15 @@ async def capture_rendered_listing_fragments(
                 "limit": int(limit),
                 "anchorSelector": ANCHOR_SELECTOR,
                 "selectors": listing_capture_selectors(str(surface or "")),
-                "structuralAncestorSelectors": list(LISTING_CAPTURE_STRUCTURAL_ANCESTOR_SELECTORS),
+                "structuralAncestorSelectors": list(
+                    LISTING_CAPTURE_STRUCTURAL_ANCESTOR_SELECTORS
+                ),
             },
         )
     except Exception:
         return []
     if not isinstance(snapshot, list):
         return []
-    return [str(item).strip() for item in snapshot[: int(limit)] if str(item or "").strip()]
+    return [
+        str(item).strip() for item in snapshot[: int(limit)] if str(item or "").strip()
+    ]

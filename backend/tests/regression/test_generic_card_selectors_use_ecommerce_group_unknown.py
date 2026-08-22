@@ -16,14 +16,18 @@ def test_generic_card_selectors_use_ecommerce_group_for_unknown_listing_surface(
         {"ecommerce": [".product-card"], "jobs": [".job-card", ".product-card"]},
     )
 
-    selectors = browser_page_flow._generic_card_selectors_for_surface("automobile_listing")
+    selectors = browser_page_flow._generic_card_selectors_for_surface(
+        "automobile_listing"
+    )
 
     # Non-job surfaces route to ecommerce group only, matching listing_selector_group.
     assert selectors == [".product-card"]
 
 
 @pytest.mark.regression
-def test_select_primary_browser_html_prefers_full_rendered_when_traversal_fragment_is_capped() -> None:
+def test_select_primary_browser_html_prefers_full_rendered_when_traversal_fragment_is_capped() -> (
+    None
+):
     traversal_result = SimpleNamespace(
         activated=True,
         progress_events=1,
@@ -35,7 +39,9 @@ def test_select_primary_browser_html_prefers_full_rendered_when_traversal_fragme
         surface="ecommerce_listing",
         traversal_result=traversal_result,
         traversal_html="<html><body><a href='/products/a'>A</a></body></html>",
-        rendered_html=("<html><body><a href='/products/a'>A</a><a href='/products/b'>B</a></body></html>"),
+        rendered_html=(
+            "<html><body><a href='/products/a'>A</a><a href='/products/b'>B</a></body></html>"
+        ),
         listing_min_items=2,
     )
 
@@ -231,7 +237,10 @@ async def test_probe_browser_readiness_detects_spaced_jsonld_detail_type() -> No
         surface="ecommerce_detail",
         html=html.replace(
             "</body>",
-            ("<h1>Widget</h1><p>Detailed rendered product content. " * 12 + "</p></body>"),
+            (
+                "<h1>Widget</h1><p>Detailed rendered product content. " * 12
+                + "</p></body>"
+            ),
         ),
         detail_readiness_hint_count=lambda *_args, **_kwargs: 0,
     )
@@ -429,7 +438,9 @@ async def test_fast_finalize_still_runs_block_classification(
         blocked_html_checker=lambda *_args, **_kwargs: False,
         classify_blocked_page_async=_classify,
         classify_low_content_reason=lambda *_args, **_kwargs: None,
-        classify_browser_outcome=lambda **kwargs: "blocked" if kwargs["blocked"] else "usable_content",
+        classify_browser_outcome=lambda **kwargs: (
+            "blocked" if kwargs["blocked"] else "usable_content"
+        ),
         capture_browser_screenshot=lambda _page: "",
         emit_browser_event=browser_finalize_support.emit_browser_event,
         elapsed_ms=lambda _started_at: 0,
@@ -589,17 +600,23 @@ async def test_location_interstitial_dismissal_skips_when_no_signal_present() ->
         url = "https://example.com/products/widget"
 
         def locator(self, _selector: str):
-            raise AssertionError("locator probe should be skipped when no signal exists")
+            raise AssertionError(
+                "locator probe should be skipped when no signal exists"
+            )
 
         async def evaluate(self, script: str, payload: dict[str, object]):
             await _async_checkpoint()
             if "selectors" in payload:
                 return False
-            raise AssertionError("dismiss-by-text should be skipped when no signal exists")
+            raise AssertionError(
+                "dismiss-by-text should be skipped when no signal exists"
+            )
 
         async def wait_for_timeout(self, *_args, **_kwargs) -> None:
             await _async_checkpoint()
-            raise AssertionError("wait_for_timeout should be skipped when no signal exists")
+            raise AssertionError(
+                "wait_for_timeout should be skipped when no signal exists"
+            )
 
         async def content(self) -> str:
             await _async_checkpoint()
@@ -657,7 +674,9 @@ async def test_serialize_browser_page_content_reuses_prefetched_html_without_pag
 
 @pytest.mark.asyncio
 @pytest.mark.regression
-async def test_settle_browser_page_skips_platform_selector_when_probe_is_ready() -> None:
+async def test_settle_browser_page_skips_platform_selector_when_probe_is_ready() -> (
+    None
+):
     probe_analyses: list[object] = []
     current_html = "<html><body>Searching...</body></html>"
 
@@ -701,9 +720,10 @@ async def test_settle_browser_page_skips_platform_selector_when_probe_is_ready()
 
     _current_probe, readiness_probes, *_rest = result
 
-    assert [(analysis.html, analysis.lowered_html, analysis.normalized_text) for analysis in probe_analyses] == [
-        (current_html, current_html.lower(), "Searching...")
-    ]
+    assert [
+        (analysis.html, analysis.lowered_html, analysis.normalized_text)
+        for analysis in probe_analyses
+    ] == [(current_html, current_html.lower(), "Searching...")]
     assert [probe["stage"] for probe in readiness_probes] == ["after_navigation"]
 
 

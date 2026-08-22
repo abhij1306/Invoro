@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .test_state_mappers import js_state_mapper, map_configured_state_payload, map_js_state_to_fields, map_network_payloads_to_fields, pytest  # fmt: skip
 
+
 @pytest.mark.unit
 def test_job_detail_mappers_keep_shared_html_section_behavior() -> None:
     description_html = (
@@ -78,6 +79,7 @@ def test_job_detail_mappers_keep_shared_html_section_behavior() -> None:
         }
     ]
 
+
 @pytest.mark.unit
 def test_map_js_state_to_fields_uses_platform_owned_job_detail_selector_config() -> (
     None
@@ -124,6 +126,7 @@ def test_map_js_state_to_fields_uses_platform_owned_job_detail_selector_config()
         == "https://job-boards.greenhouse.io/greenhouse/jobs/7704699?gh_jid=7704699"
     )
 
+
 @pytest.mark.unit
 def test_configured_state_payload_merges_later_root_fields() -> None:
     mapped = map_configured_state_payload(
@@ -139,6 +142,7 @@ def test_configured_state_payload_merges_later_root_fields() -> None:
     )
 
     assert mapped == {"title": "Platform Engineer", "company": "Acme"}
+
 
 @pytest.mark.unit
 def test_map_js_state_to_fields_rejects_dict_tags_from_promotional_ui() -> None:
@@ -191,6 +195,7 @@ def test_map_js_state_to_fields_rejects_dict_tags_from_promotional_ui() -> None:
     assert mapped.get("title") == "Maternity Jean"
     assert mapped.get("tags") is None
 
+
 @pytest.mark.unit
 def test_map_product_payload_tolerates_product_glom_failures(
     monkeypatch,
@@ -211,6 +216,7 @@ def test_map_product_payload_tolerates_product_glom_failures(
     )
 
     assert mapped == {}
+
 
 @pytest.mark.unit
 def test_map_product_payload_uses_configured_jmespaths_when_glom_fails(
@@ -247,6 +253,7 @@ def test_map_product_payload_uses_configured_jmespaths_when_glom_fails(
         "price": "89.50",
     }
 
+
 @pytest.mark.unit
 def test_map_product_payload_normalizes_raw_price_fallbacks() -> None:
     mapped = js_state_mapper._map_product_payload(
@@ -264,6 +271,7 @@ def test_map_product_payload_normalizes_raw_price_fallbacks() -> None:
 
     assert mapped["price"] == "129.50"
     assert mapped["original_price"] == "149"
+
 
 @pytest.mark.unit
 def test_normalize_variant_tolerates_non_dict_glom_result(
@@ -290,6 +298,7 @@ def test_normalize_variant_tolerates_non_dict_glom_result(
         "url": "https://store.example.com/products/commuter-backpack?variant=sku-123",
     }
 
+
 @pytest.mark.unit
 def test_normalize_variant_does_not_use_product_id_as_variant_id() -> None:
     mapped = js_state_mapper._normalize_variant(
@@ -300,6 +309,7 @@ def test_normalize_variant_does_not_use_product_id_as_variant_id() -> None:
     )
 
     assert mapped is None
+
 
 @pytest.mark.unit
 def test_map_js_state_to_fields_uses_selected_options_and_skips_marketing_axis_names() -> (
@@ -352,6 +362,7 @@ def test_map_js_state_to_fields_uses_selected_options_and_skips_marketing_axis_n
     assert mapped["variants"][1]["option_values"] == {"color": "Black", "size": "M"}
     assert "soft_fabric" not in mapped["variants"][0]["option_values"]
     assert "high_waisted" not in mapped["variants"][0]["option_values"]
+
 
 @pytest.mark.unit
 def test_map_js_state_to_fields_reads_nested_variant_price_objects() -> None:
@@ -407,6 +418,7 @@ def test_map_js_state_to_fields_reads_nested_variant_price_objects() -> None:
     assert mapped["price"] == "100.00"
     assert mapped["variants"][0]["price"] == "100.00"
     assert mapped["variants"][1]["price"] == "100.00"
+
 
 @pytest.mark.unit
 def test_map_js_state_to_fields_recovers_nested_choice_item_variants() -> None:
@@ -520,6 +532,7 @@ def test_map_js_state_to_fields_recovers_nested_choice_item_variants() -> None:
     assert mapped["variants"][1]["color"] == "WHITE/ BLACK"
     assert mapped["variants"][1]["availability"] == "out_of_stock"
 
+
 @pytest.mark.unit
 def test_map_js_state_to_fields_reads_nested_variant_original_price_objects() -> None:
     mapped = map_js_state_to_fields(
@@ -560,6 +573,7 @@ def test_map_js_state_to_fields_reads_nested_variant_original_price_objects() ->
 
     assert mapped["original_price"] == "130.00"
     assert [row["original_price"] for row in mapped["variants"]] == ["120.00", "130.00"]
+
 
 @pytest.mark.unit
 def test_map_js_state_to_fields_reads_current_price_style_product_fields() -> None:

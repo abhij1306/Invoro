@@ -31,7 +31,9 @@ def extract_selector_value(
 ) -> tuple[str | None, int, str | None]:
     if xpath_result := _extract_xpath_value(html_text, xpath=xpath, regex=regex):
         return xpath_result
-    if css_result := _extract_css_value(html_text, css_selector=css_selector, regex=regex):
+    if css_result := _extract_css_value(
+        html_text, css_selector=css_selector, regex=regex
+    ):
         return css_result
     if regex and not xpath and not css_selector:
         filtered_values = _apply_regex_filter(regex, [html_text])
@@ -64,7 +66,9 @@ def _extract_css_value(
     if not css_selector:
         return None
     normalized = _normalize_css_selector(css_selector)
-    matches = BeautifulSoup(html_text, "html.parser").select(normalized) if normalized else []
+    matches = (
+        BeautifulSoup(html_text, "html.parser").select(normalized) if normalized else []
+    )
     values = [value for node in matches[:12] if (value := _node_value(node))]
     filtered = _apply_regex_filter(regex, values)
     if filtered:

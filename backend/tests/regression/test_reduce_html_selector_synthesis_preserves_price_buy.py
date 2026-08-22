@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .test_detail_extractor_priority_and_selector_self_heal import Path, extract_records, load_export_data, pytest, reduce_html_for_selector_synthesis, selector_heal_improved_record, validated_xpath_rules  # fmt: skip
 
+
 @pytest.mark.regression
 def test_reduce_html_for_selector_synthesis_preserves_price_and_buy_box_controls() -> (
     None
@@ -27,6 +28,7 @@ def test_reduce_html_for_selector_synthesis_preserves_price_and_buy_box_controls
     assert 'data-sku="sku-1"' in reduced
     assert 'value="sku-1"' in reduced
 
+
 @pytest.mark.regression
 def test_selector_synthesis_keep_worthy_tags_are_code_owned() -> None:
     from app.services.config.selectors import SELECTOR_SYNTHESIS_KEEP_WORTHY_TAGS
@@ -45,6 +47,7 @@ def test_selector_synthesis_keep_worthy_tags_are_code_owned() -> None:
     assert SELECTOR_SYNTHESIS_KEEP_WORTHY_TAGS == frozenset(
         {"button", "input", "select"}
     )
+
 
 @pytest.mark.regression
 def test_extract_records_deep_merges_structured_variant_fields_across_tiers() -> None:
@@ -81,6 +84,7 @@ def test_extract_records_deep_merges_structured_variant_fields_across_tiers() ->
         ],
     )[0]
 
+
 @pytest.mark.regression
 def test_selector_self_heal_requires_field_level_improvement_before_persisting() -> (
     None
@@ -101,6 +105,7 @@ def test_selector_self_heal_requires_field_level_improvement_before_persisting()
         )
         is False
     )
+
 
 @pytest.mark.regression
 def test_selector_self_heal_converts_css_candidates_before_persisting_xpath() -> None:
@@ -124,6 +129,7 @@ def test_selector_self_heal_converts_css_candidates_before_persisting_xpath() ->
     assert len(rules) == 1
     assert rules[0]["sample_value"] == "Rubber outsole, reinforced toe cap."
     assert str(rules[0]["xpath"]).startswith("//div")
+
 
 @pytest.mark.regression
 def test_selector_self_heal_persists_valid_css_candidates_as_css_rules() -> None:
@@ -156,6 +162,7 @@ def test_selector_self_heal_persists_valid_css_candidates_as_css_rules() -> None
             "is_active": True,
         }
     ]
+
 
 @pytest.mark.regression
 def test_extract_records_tracks_dom_observed_selector_traces_for_final_dom_fields() -> (

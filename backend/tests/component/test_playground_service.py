@@ -24,6 +24,7 @@ from app.schemas.playground import PlaygroundSessionCreate
 
 from app.services.playground_service import _classify_input_url, _merge_seed_detail_products, create_session, get_session, get_results, select_category, start_discover, start_pipeline  # fmt: skip
 
+
 async def _seed_extract_run(
     db_session: AsyncSession,
     create_test_run,
@@ -47,6 +48,7 @@ async def _seed_extract_run(
     await db_session.flush()
     return int(run.id), int(record.id)
 
+
 def _playground_session(
     test_user,
     *,
@@ -67,6 +69,7 @@ def _playground_session(
             },
         },
     )
+
 
 @pytest_asyncio.fixture
 async def playground_api_client(db_session: AsyncSession, test_user):

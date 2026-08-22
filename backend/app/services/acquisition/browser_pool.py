@@ -114,7 +114,9 @@ def _async_playwright_manager_for_engine(engine: str):
         playwright_factory = _patchright_async_playwright_factory
         return playwright_factory()
     except Exception as exc:
-        raise RuntimeError(f"Patchright package is not available for {normalized_engine} browser runtime") from exc
+        raise RuntimeError(
+            f"Patchright package is not available for {normalized_engine} browser runtime"
+        ) from exc
 
 
 class SharedBrowserRuntime:
@@ -131,14 +133,17 @@ class SharedBrowserRuntime:
         self.executable_path, self.browser_binary = resolve_binary(self.browser_engine)
         self.engine_available = bool(
             (
-                self.browser_engine in {_PATCHRIGHT_BROWSER_ENGINE, _CHROMIUM_BROWSER_ENGINE}
+                self.browser_engine
+                in {_PATCHRIGHT_BROWSER_ENGINE, _CHROMIUM_BROWSER_ENGINE}
                 and patchright_browser_available()
             )
             or self.executable_path
         )
         self.launch_proxy = _normalized_proxy_value(launch_proxy)
         self.launch_proxy_config = _build_browser_proxy_config(self.launch_proxy)
-        self._authenticated_socks5_proxy = parse_socks5_upstream_proxy(self.launch_proxy)
+        self._authenticated_socks5_proxy = parse_socks5_upstream_proxy(
+            self.launch_proxy
+        )
         self._socks5_auth_bridge: Socks5AuthBridge | None = None
         self._playwright: Playwright | None = None
         self._browser: Browser | None = None
@@ -170,18 +175,26 @@ class SharedBrowserRuntime:
         return max_contexts > 0 and self._total_contexts_created >= max_contexts
 
     async def _yield_slot_until_recycle_window(self, timeout_seconds: float) -> bool:
-        if self._browser is None or not self._context_recycle_threshold_reached() or self._active_contexts > 0:
+        if (
+            self._browser is None
+            or not self._context_recycle_threshold_reached()
+            or self._active_contexts > 0
+        ):
             return False
         deadline = time.monotonic() + max(0.0, timeout_seconds)
         self._semaphore.release()
         while self._active_contexts > 0 and self._context_recycle_threshold_reached():
             remaining = deadline - time.monotonic()
             if remaining <= 0:
-                raise asyncio.TimeoutError(f"Timed out waiting for browser context slot after {timeout_seconds:.1f}s")
+                raise asyncio.TimeoutError(
+                    f"Timed out waiting for browser context slot after {timeout_seconds:.1f}s"
+                )
             await asyncio.sleep(min(0.05, remaining))
         remaining = deadline - time.monotonic()
         if remaining <= 0:
-            raise asyncio.TimeoutError(f"Timed out waiting for browser context slot after {timeout_seconds:.1f}s")
+            raise asyncio.TimeoutError(
+                f"Timed out waiting for browser context slot after {timeout_seconds:.1f}s"
+            )
         await asyncio.wait_for(self._semaphore.acquire(), timeout=remaining)
         return True
 
@@ -193,13 +206,17 @@ class SharedBrowserRuntime:
                 logger.info(
                     "Recycling browser instance (contexts=%d, lifetime=%.0fs)",
                     self._total_contexts_created,
-                    time.monotonic() - self._browser_launched_at if self._browser_launched_at else 0,
+                    time.monotonic() - self._browser_launched_at
+                    if self._browser_launched_at
+                    else 0,
                 )
                 await self._close_locked()
             if self._browser is not None:
                 return
             try:
-                async_playwright = _async_playwright_manager_for_engine(self.browser_engine)
+                async_playwright = _async_playwright_manager_for_engine(
+                    self.browser_engine
+                )
                 self._playwright = await _wait_for_browser_step(
                     async_playwright().start(),
                     timeout_seconds=_browser_launch_timeout_seconds(),
@@ -222,7 +239,9 @@ class SharedBrowserRuntime:
 
     def _browser_launch_kwargs(self) -> dict[str, Any]:
         launch_args = [
-            str(value).strip() for value in crawler_runtime_settings.browser_launch_args or () if str(value).strip()
+            str(value).strip()
+            for value in crawler_runtime_settings.browser_launch_args or ()
+            if str(value).strip()
         ]
         launch_headless = _launch_headless_for_engine(self.browser_engine)
         if (
@@ -241,9 +260,15 @@ class SharedBrowserRuntime:
 
     def _apply_real_chrome_launch_options(self, kwargs: dict[str, Any]) -> None:
         if not self.executable_path:
-            raise RuntimeError("Real Chrome executable is not available for browser runtime")
+            raise RuntimeError(
+                "Real Chrome executable is not available for browser runtime"
+            )
         kwargs["executable_path"] = self.executable_path
-        ignore_default_args = [str(arg).strip() for arg in REAL_CHROME_IGNORE_DEFAULT_ARGS or () if str(arg).strip()]
+        ignore_default_args = [
+            str(arg).strip()
+            for arg in REAL_CHROME_IGNORE_DEFAULT_ARGS or ()
+            if str(arg).strip()
+        ]
         if ignore_default_args:
             kwargs["ignore_default_args"] = ignore_default_args
 
@@ -288,7 +313,9 @@ class SharedBrowserRuntime:
                     "page_closed",
                 }:
                     raise
-                logger.warning("Browser runtime disconnected during context bootstrap; recycling runtime")
+                logger.warning(
+                    "Browser runtime disconnected during context bootstrap; recycling runtime"
+                )
                 await self._recycle_after_driver_disconnect()
         if last_error is not None:
             raise last_error
@@ -332,7 +359,9 @@ class SharedBrowserRuntime:
     ) -> PlaywrightContextSpec:
         native_real_chrome = _use_native_real_chrome_context(self.browser_engine)
         if native_real_chrome:
-            return build_native_real_chrome_context_spec(locality_profile=locality_profile)
+            return build_native_real_chrome_context_spec(
+                locality_profile=locality_profile
+            )
         browser_major_version = None
         if self._browser is not None:
             raw_version = str(getattr(self._browser, "version", "") or "")
@@ -379,7 +408,12 @@ class SharedBrowserRuntime:
             )
             allow_domain_storage_state = bool(
                 allow_storage_state
-                and (self.launch_proxy is None or bool(crawler_runtime_settings.browser_proxy_domain_storage_enabled))
+                and (
+                    self.launch_proxy is None
+                    or bool(
+                        crawler_runtime_settings.browser_proxy_domain_storage_enabled
+                    )
+                )
             )
             context_options = await self._context_options_with_storage(
                 context_spec,
@@ -418,21 +452,27 @@ class SharedBrowserRuntime:
     def _validate_page_proxy(self, proxy: str | None) -> None:
         normalized_proxy = _normalized_proxy_value(proxy)
         if self.launch_proxy is None and normalized_proxy is not None:
-            raise RuntimeError("Proxied browser pages require a launch-owned browser runtime")
+            raise RuntimeError(
+                "Proxied browser pages require a launch-owned browser runtime"
+            )
         if self.launch_proxy is not None and normalized_proxy not in {
             None,
             self.launch_proxy,
         }:
             raise RuntimeError("Browser runtime proxy does not match requested proxy")
 
-    async def _acquire_context_slot(self, phase_timings_ms: dict[str, int] | None) -> None:
+    async def _acquire_context_slot(
+        self, phase_timings_ms: dict[str, int] | None
+    ) -> None:
         self._update_queue_count(1)
         timeout_seconds = _browser_context_slot_timeout_seconds()
         started_at = time.perf_counter()
         deadline = time.monotonic() + timeout_seconds
         try:
             await asyncio.wait_for(self._semaphore.acquire(), timeout=timeout_seconds)
-            await self._yield_slot_until_recycle_window(max(0.0, deadline - time.monotonic()))
+            await self._yield_slot_until_recycle_window(
+                max(0.0, deadline - time.monotonic())
+            )
         except asyncio.TimeoutError as exc:
             raise asyncio.TimeoutError(
                 f"Timed out waiting for browser context slot after {timeout_seconds:.1f}s"
@@ -466,9 +506,13 @@ class SharedBrowserRuntime:
         if not allow_storage_state:
             return options
         started_at = time.perf_counter()
-        storage_state = await cookie_store.load_storage_state_for_run(run_id, browser_engine=self.browser_engine)
+        storage_state = await cookie_store.load_storage_state_for_run(
+            run_id, browser_engine=self.browser_engine
+        )
         if not storage_state and allow_domain_storage_state:
-            storage_state = await cookie_store.load_storage_state_for_domain(domain, browser_engine=self.browser_engine)
+            storage_state = await cookie_store.load_storage_state_for_domain(
+                domain, browser_engine=self.browser_engine
+            )
         if storage_state:
             options["storage_state"] = storage_state
         _record_timing(phase_timings_ms, "storage_state_load_ms", started_at)
@@ -490,14 +534,19 @@ class SharedBrowserRuntime:
                 run_id=run_id,
                 domain=domain,
                 browser_engine=self.browser_engine,
-                persist_run_storage_state=bool(getattr(context, _RUN_STORAGE_PERSIST_ATTR, True)),
+                persist_run_storage_state=bool(
+                    getattr(context, _RUN_STORAGE_PERSIST_ATTR, True)
+                ),
                 persist_domain_storage_state=bool(
-                    allow_domain_storage_state and getattr(context, _DOMAIN_STORAGE_PERSIST_ATTR, True)
+                    allow_domain_storage_state
+                    and getattr(context, _DOMAIN_STORAGE_PERSIST_ATTR, True)
                 ),
                 timeout_seconds=_browser_context_timeout_seconds(),
             )
         finally:
-            _record_timing(phase_timings_ms, "storage_state_persist_ms", persist_started_at)
+            _record_timing(
+                phase_timings_ms, "storage_state_persist_ms", persist_started_at
+            )
             close_started_at = time.perf_counter()
             await _close_browser_context_safely(context)
             _record_timing(phase_timings_ms, "context_close_ms", close_started_at)
@@ -566,7 +615,9 @@ class SharedBrowserRuntime:
             "queued": self._queued_count,
             "capacity": self.max_contexts,
             "total_contexts_created": self._total_contexts_created,
-            "browser_lifetime_seconds": int(time.monotonic() - self._browser_launched_at)
+            "browser_lifetime_seconds": int(
+                time.monotonic() - self._browser_launched_at
+            )
             if self._browser_launched_at
             else 0,
             "browser_engine": self.browser_engine,
@@ -720,7 +771,9 @@ def browser_runtime_snapshot() -> dict[str, int | bool]:
         )
         if runtime is not None
     ]
-    return _aggregate_runtime_snapshots(runtimes, default_capacity=_browser_runtime_context_capacity())
+    return _aggregate_runtime_snapshots(
+        runtimes, default_capacity=_browser_runtime_context_capacity()
+    )
 
 
 def _log_shutdown_task_result(task: asyncio.Task[None]) -> None:

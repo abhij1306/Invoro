@@ -12,6 +12,7 @@ from app.services.pipeline.persistence import persist_acquisition_artifacts  # f
 from pathlib import Path  # fmt: skip
 from sqlalchemy.ext.asyncio import AsyncSession  # fmt: skip
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_process_single_url_keeps_platform_family_separate_from_adapter_provenance(
@@ -76,6 +77,7 @@ async def test_process_single_url_keeps_platform_family_separate_from_adapter_pr
     assert result.url_metrics["adapter_name"] is None
     assert result.url_metrics["platform_family"] == "shopify"
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_apply_llm_fallback_re_normalizes_llm_values_before_return(
@@ -137,6 +139,7 @@ async def test_apply_llm_fallback_re_normalizes_llm_values_before_return(
     assert rows[0]["_field_sources"]["review_count"] == ["llm_missing_field_extraction"]
     assert rows[0]["_self_heal"]["mode"] == "missing_field_extraction"
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_apply_llm_fallback_skips_when_contract_fields_complete(
@@ -183,6 +186,7 @@ async def test_apply_llm_fallback_skips_when_contract_fields_complete(
     )
 
     assert rows[0]["title"] == "Widget Prime"
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -263,6 +267,7 @@ async def test_process_single_url_applies_llm_fallback_when_confidence_score_is_
     assert total == 1
     assert rows[0].data["price"] == "19.99"
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_process_single_url_strips_schema_type_mismatches_during_normalization(
@@ -333,6 +338,7 @@ async def test_process_single_url_strips_schema_type_mismatches_during_normaliza
     assert total == 1
     assert rows[0].data == {"title": "Widget Prime"}
     assert any("Schema validation cleaned record 1" in log.message for log in logs)
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -413,6 +419,7 @@ async def test_process_single_url_persists_browser_diagnostics_and_screenshot_ar
     assert diagnostics_payload["artifact_paths"]["html"].endswith(".html")
     assert diagnostics_payload["artifact_paths"]["screenshot"].endswith(".png")
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_persist_acquisition_artifacts_treats_none_artifacts_as_empty_mapping(
@@ -449,6 +456,7 @@ async def test_persist_acquisition_artifacts_treats_none_artifacts_as_empty_mapp
     assert (
         acquisition_result.browser_diagnostics["artifact_paths"]["screenshot"] is None
     )
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -490,6 +498,7 @@ async def test_persist_acquisition_artifacts_does_not_mutate_source_artifacts(
 
     assert acquisition_result.artifacts == expected_artifacts
     assert artifacts == expected_artifacts
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -560,6 +569,7 @@ async def test_process_single_url_does_not_retry_browser_after_empty_browser_acq
     assert result.url_metrics["browser_attempted"] is True
     assert result.url_metrics["browser_outcome"] == "low_content_shell"
     assert result.verdict == "listing_detection_failed"
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression

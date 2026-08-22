@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .test_detail_extractor_structured_sources import build_detail_record, extract_records, json, normalize_variant_record, pytest, read_optional_artifact_text  # fmt: skip
 
+
 @pytest.mark.regression
 def test_build_detail_record_drops_cut_off_description_without_complete_source() -> (
     None
@@ -26,6 +27,7 @@ def test_build_detail_record_drops_cut_off_description_without_complete_source()
         "Montreal-based streetwear and skatewear brand Dime pays homage to one "
         "of its favorite music subgenres with this Soft Rock Crewneck."
     )
+
 
 @pytest.mark.regression
 def test_build_detail_record_prefers_js_state_html_description_over_truncated_json_ld() -> (
@@ -92,6 +94,7 @@ def test_build_detail_record_prefers_js_state_html_description_over_truncated_js
     assert record["_field_sources"]["description"] == ["json_ld", "js_state"]
     assert record["features"] == ["Coreless Direct-Drive Motor"]
 
+
 @pytest.mark.regression
 def test_extract_ecommerce_detail_uses_dom_description_when_authoritative_copy_is_thin() -> (
     None
@@ -135,6 +138,7 @@ def test_extract_ecommerce_detail_uses_dom_description_when_authoritative_copy_i
     )
     assert "Warpstreme fabric feels sleek and dries fast." in record["description"]
     assert record["_extraction_tiers"]["current"] == "dom"
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_prefers_displayvalue_for_variant_sizes() -> None:
@@ -200,6 +204,7 @@ def test_extract_ecommerce_detail_prefers_displayvalue_for_variant_sizes() -> No
     ]
     assert "View this product in" not in json.dumps(rows[0]["variants"])
     assert "disable-danger" not in json.dumps(rows[0]["variants"])
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_derives_wrangler_size_length_from_variant_urls() -> (
@@ -302,6 +307,7 @@ def test_extract_ecommerce_detail_derives_wrangler_size_length_from_variant_urls
     assert "Product-Variation" not in serialized
     assert "attribute details" not in serialized
 
+
 @pytest.mark.regression
 def test_extract_ecommerce_detail_drops_unresolved_url_like_size_values() -> None:
     html = """
@@ -373,6 +379,7 @@ def test_extract_ecommerce_detail_drops_unresolved_url_like_size_values() -> Non
         ("Jennings", "30"),
     }
     assert "Product-Variation" not in json.dumps(record["variants"])
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_propagates_multi_axis_dom_option_availability() -> (
@@ -472,6 +479,7 @@ def test_extract_ecommerce_detail_propagates_multi_axis_dom_option_availability(
     assert availability_by_variant[("Huxley", "30", "30")] == "in_stock"
     assert availability_by_variant[("Jennings", "30", "32")] == "in_stock"
 
+
 @pytest.mark.regression
 def test_extract_ecommerce_detail_captures_nautica_swatchanchor_variants() -> None:
     html = """
@@ -522,6 +530,7 @@ def test_extract_ecommerce_detail_captures_nautica_swatchanchor_variants() -> No
         ("Chino", "M"),
     }
 
+
 @pytest.mark.regression
 def test_extract_ecommerce_detail_keeps_public_size_color_axes_only_for_herman_style_fieldsets() -> (
     None
@@ -549,6 +558,7 @@ def test_extract_ecommerce_detail_keeps_public_size_color_axes_only_for_herman_s
     assert "Basic Back Support" not in serialized
     assert "Height-Adjustable Arms" not in serialized
     assert "Leather" not in serialized
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_ignores_embedded_json_feature_flags_and_size_rows() -> (
@@ -623,6 +633,7 @@ def test_extract_ecommerce_detail_ignores_embedded_json_feature_flags_and_size_r
     assert "features" not in record
     assert "size" not in record
 
+
 @pytest.mark.regression
 def test_normalize_variant_record_infers_single_variant_color_from_title_slug() -> None:
     record = {
@@ -643,6 +654,7 @@ def test_normalize_variant_record_infers_single_variant_color_from_title_slug() 
             "color": "Natural Black",
         }
     ]
+
 
 @pytest.mark.regression
 def test_normalize_variant_record_infers_shared_color_slug_for_size_variants() -> None:
@@ -671,6 +683,7 @@ def test_normalize_variant_record_infers_shared_color_slug_for_size_variants() -
         ("9", "Tuke River"),
         ("10", "Tuke River"),
     ]
+
 
 @pytest.mark.regression
 def test_normalize_variant_record_does_not_fold_size_token_into_color() -> None:

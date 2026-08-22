@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .test_sitemap_resolver import SITEMAP_NS, SecurityError, ValidatedTarget, _FakeClient, _valid_target, _xml_response, httpx, pytest, resolve_category_urls_from_sitemap, sitemap_resolver  # fmt: skip
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_resolver_homepage_fallback_does_not_hard_filter_by_keyword(
@@ -49,6 +50,7 @@ async def test_resolver_homepage_fallback_does_not_hard_filter_by_keyword(
         "https://example.com/products/widget-123",
     ]
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_homepage_fallback_caps_anchor_scan_and_validations(
@@ -85,6 +87,7 @@ async def test_homepage_fallback_caps_anchor_scan_and_validations(
     assert urls == ["https://example.com/women", "https://example.com/men"]
     assert validated == ["https://example.com/women", "https://example.com/men"]
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_homepage_fallback_requires_exact_same_origin(
@@ -109,6 +112,7 @@ async def test_homepage_fallback_requires_exact_same_origin(
     )
 
     assert urls == ["https://example.com/collections/all"]
+
 
 @pytest.mark.asyncio
 @pytest.mark.component

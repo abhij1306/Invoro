@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .test_field_value_core import clean_text, coerce_field_value, extract_urls, infer_brand_from_product_url, infer_brand_from_title_marker, is_title_noise, merge_variant_rows, public_record_data_for_surface, pytest  # fmt: skip
 
+
 @pytest.mark.unit
 def test_option_scalars_coerce_dict_like_labels_and_reject_null_tokens() -> None:
     assert (
@@ -23,6 +24,7 @@ def test_option_scalars_coerce_dict_like_labels_and_reject_null_tokens() -> None
         is None
     )
 
+
 @pytest.mark.unit
 def test_title_coerces_nested_dict_like_label_instead_of_stringifying_object() -> None:
     assert (
@@ -40,6 +42,7 @@ def test_title_coerces_nested_dict_like_label_instead_of_stringifying_object() -
         )
         == "Emperor 100% Arctic Duck Down Duvet (8.5 Tog)"
     )
+
 
 @pytest.mark.unit
 def test_color_scalar_extracts_value_from_prefixed_product_copy() -> None:
@@ -60,6 +63,7 @@ def test_color_scalar_extracts_value_from_prefixed_product_copy() -> None:
         == "Black/Red"
     )
 
+
 @pytest.mark.unit
 def test_clean_text_strips_leading_css_in_js_noise() -> None:
     assert (
@@ -67,11 +71,13 @@ def test_clean_text_strips_leading_css_in_js_noise() -> None:
         == "The Legend of Zelda"
     )
 
+
 @pytest.mark.unit
 def test_is_title_noise_keeps_short_non_numeric_product_titles() -> None:
     assert is_title_noise("Hat") is False
     assert is_title_noise("UGG") is False
     assert is_title_noise("Tie") is False
+
 
 @pytest.mark.unit
 def test_extract_urls_trims_trailing_punctuation_from_embedded_urls() -> None:
@@ -85,6 +91,7 @@ def test_extract_urls_trims_trailing_punctuation_from_embedded_urls() -> None:
         "https://example.com/beta",
     ]
 
+
 @pytest.mark.unit
 def test_extract_urls_rejects_concatenated_absolute_urls() -> None:
     # Concatenated URLs are corrupted data (two products merged into one string),
@@ -95,6 +102,7 @@ def test_extract_urls_rejects_concatenated_absolute_urls() -> None:
     )
 
     assert urls == []
+
 
 @pytest.mark.unit
 def test_extract_urls_preserves_balanced_parentheses_and_brackets() -> None:
@@ -107,6 +115,7 @@ def test_extract_urls_preserves_balanced_parentheses_and_brackets() -> None:
         "https://example.com/release_(2026)",
         "https://example.com/archive/[spring]",
     ]
+
 
 @pytest.mark.unit
 def test_extract_urls_rejects_malformed_relative_image_fragments() -> None:
@@ -125,9 +134,11 @@ def test_extract_urls_rejects_malformed_relative_image_fragments() -> None:
         == []
     )
 
+
 @pytest.mark.unit
 def test_infer_brand_from_title_marker_keeps_leading_trademark_brand_token() -> None:
     assert infer_brand_from_title_marker("®Nike Court Vision Low") == "®Nike"
+
 
 @pytest.mark.unit
 def test_infer_brand_from_product_url_skips_overlong_slug_and_keeps_valid_match() -> (
@@ -144,6 +155,7 @@ def test_infer_brand_from_product_url_skips_overlong_slug_and_keeps_valid_match(
         == "Acme"
     )
 
+
 @pytest.mark.unit
 def test_infer_brand_from_product_url_rejects_numeric_product_id_prefix() -> None:
     assert (
@@ -154,11 +166,13 @@ def test_infer_brand_from_product_url_rejects_numeric_product_id_prefix() -> Non
         is None
     )
 
+
 @pytest.mark.unit
 def test_coerce_color_rejects_single_digit_from_quantity_input() -> None:
     assert coerce_field_value("color", "1", "https://example.com/p") is None
     assert coerce_field_value("color", "2", "https://example.com/p") is None
     assert coerce_field_value("color", "99", "https://example.com/p") is None
+
 
 @pytest.mark.unit
 def test_coerce_color_keeps_valid_color_names() -> None:
@@ -170,12 +184,14 @@ def test_coerce_color_keeps_valid_color_names() -> None:
         coerce_field_value("color", "Navy Blue", "https://example.com/p") == "Navy Blue"
     )
 
+
 @pytest.mark.unit
 def test_coerce_color_strips_color_details_suffix() -> None:
     assert (
         coerce_field_value("color", "Huxley Color Details", "https://example.com/p")
         == "Huxley"
     )
+
 
 @pytest.mark.unit
 def test_coerce_color_strips_trailing_style_codes() -> None:
@@ -188,6 +204,7 @@ def test_coerce_color_strips_trailing_style_codes() -> None:
         == "White"
     )
 
+
 @pytest.mark.unit
 def test_coerce_color_strips_code_tail_without_dropping_prefix() -> None:
     assert (
@@ -195,10 +212,12 @@ def test_coerce_color_strips_code_tail_without_dropping_prefix() -> None:
         == "Nike White"
     )
 
+
 @pytest.mark.unit
 def test_coerce_color_rejects_tracking_pixel_classes() -> None:
     assert coerce_field_value("color", "_clck", "https://example.com/p") is None
     assert coerce_field_value("color", "_fbp", "https://example.com/p") is None
+
 
 @pytest.mark.unit
 def test_coerce_color_rejects_internal_swatch_codes() -> None:
@@ -225,6 +244,7 @@ def test_coerce_color_rejects_internal_swatch_codes() -> None:
         == "Aquatic Blue"
     )
 
+
 @pytest.mark.unit
 def test_coerce_color_list_skips_opaque_codes_for_real_value() -> None:
     """When JSON-LD payload exposes a list of color codes mixed with real
@@ -248,6 +268,7 @@ def test_coerce_color_list_skips_opaque_codes_for_real_value() -> None:
         is None
     )
 
+
 @pytest.mark.parametrize(
     "label",
     ["Photos", "Verified Purchases", "Reviews", "Description", "Specifications"],
@@ -256,11 +277,13 @@ def test_coerce_color_list_skips_opaque_codes_for_real_value() -> None:
 def test_coerce_size_rejects_ui_tab_labels(label: str) -> None:
     assert coerce_field_value("size", label, "https://example.com/p") is None
 
+
 @pytest.mark.unit
 def test_coerce_size_keeps_valid_sizes() -> None:
     assert coerce_field_value("size", "M", "https://example.com/p") == "M"
     assert coerce_field_value("size", "10", "https://example.com/p") == "10"
     assert coerce_field_value("size", "XL", "https://example.com/p") == "XL"
+
 
 @pytest.mark.unit
 def test_extract_urls_filters_placeholder_images() -> None:
@@ -270,6 +293,7 @@ def test_extract_urls_filters_placeholder_images() -> None:
     assert (
         extract_urls("https://cdn.example.com/pixel.gif", "https://example.com/p") == []
     )
+
 
 @pytest.mark.unit
 def test_extract_urls_filters_concatenated_urls() -> None:
@@ -281,6 +305,7 @@ def test_extract_urls_filters_concatenated_urls() -> None:
         == []
     )
 
+
 @pytest.mark.unit
 def test_extract_urls_keeps_normal_urls() -> None:
     urls = extract_urls(
@@ -288,6 +313,7 @@ def test_extract_urls_keeps_normal_urls() -> None:
     )
     assert len(urls) == 1
     assert "product/image.jpg" in urls[0]
+
 
 @pytest.mark.unit
 def test_public_firewall_rejects_concatenated_url() -> None:
@@ -301,6 +327,7 @@ def test_public_firewall_rejects_concatenated_url() -> None:
     assert "url" not in data
     assert rejected.get("url") == "empty_after_coercion"
 
+
 @pytest.mark.unit
 def test_integer_fields_reject_embedded_numeric_junk() -> None:
     assert (
@@ -309,6 +336,7 @@ def test_integer_fields_reject_embedded_numeric_junk() -> None:
     assert (
         coerce_field_value("stock_quantity", "1,234", "https://example.com/p") == 1234
     )
+
 
 @pytest.mark.unit
 def test_public_firewall_does_not_route_invalid_barcode_to_sku() -> None:
@@ -320,6 +348,7 @@ def test_public_firewall_does_not_route_invalid_barcode_to_sku() -> None:
 
     assert "sku" not in data
     assert rejected["barcode"] == "empty_after_coercion"
+
 
 @pytest.mark.unit
 def test_merge_variant_rows_keeps_axis_only_rows_without_url_identity() -> None:

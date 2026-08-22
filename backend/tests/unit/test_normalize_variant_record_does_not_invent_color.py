@@ -5,6 +5,7 @@ from .test_normalizers import (
     pytest,
 )
 
+
 @pytest.mark.unit
 def test_normalize_variant_record_does_not_invent_color_size_cross_product() -> None:
     record = {
@@ -56,6 +57,7 @@ def test_normalize_variant_record_does_not_invent_color_size_cross_product() -> 
         "Cloud White / Core Black / Green",
     }
 
+
 @pytest.mark.unit
 def test_normalize_variant_record_drops_numeric_shade_code_size_duplicate() -> None:
     record = {
@@ -84,6 +86,7 @@ def test_normalize_variant_record_drops_numeric_shade_code_size_duplicate() -> N
         "601 Silver Storm",
     ]
     assert all("size" not in variant for variant in record["variants"])
+
 
 @pytest.mark.unit
 def test_normalize_variant_record_keeps_parent_scalar_size_without_variants() -> None:

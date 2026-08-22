@@ -42,7 +42,9 @@ def extract_raw_json_records(
     items = _raw_json_items(
         payload,
         surface=surface,
-        raw_json_surface_field_overlap_absolute=(raw_json_surface_field_overlap_absolute),
+        raw_json_surface_field_overlap_absolute=(
+            raw_json_surface_field_overlap_absolute
+        ),
         raw_json_surface_field_overlap_ratio=raw_json_surface_field_overlap_ratio,
     )
     if not items:
@@ -143,7 +145,10 @@ def _has_surface_field_overlap_for_runtime(
     raw_json_surface_field_overlap_absolute: int | None,
     raw_json_surface_field_overlap_ratio: float | None,
 ) -> bool:
-    if raw_json_surface_field_overlap_absolute is None and raw_json_surface_field_overlap_ratio is None:
+    if (
+        raw_json_surface_field_overlap_absolute is None
+        and raw_json_surface_field_overlap_ratio is None
+    ):
         return _has_surface_field_overlap(items, surface=surface)
     return _has_surface_field_overlap(
         items,
@@ -192,7 +197,9 @@ def _raw_json_items(
         if is_listing_surface and not _has_surface_field_overlap_for_runtime(
             payload,
             surface=surface,
-            raw_json_surface_field_overlap_absolute=(raw_json_surface_field_overlap_absolute),
+            raw_json_surface_field_overlap_absolute=(
+                raw_json_surface_field_overlap_absolute
+            ),
             raw_json_surface_field_overlap_ratio=raw_json_surface_field_overlap_ratio,
         ):
             _log_raw_json_overlap_warning(
@@ -210,7 +217,9 @@ def _raw_json_items(
             if is_listing_surface and not _has_surface_field_overlap_for_runtime(
                 value,
                 surface=surface,
-                raw_json_surface_field_overlap_absolute=(raw_json_surface_field_overlap_absolute),
+                raw_json_surface_field_overlap_absolute=(
+                    raw_json_surface_field_overlap_absolute
+                ),
                 raw_json_surface_field_overlap_ratio=raw_json_surface_field_overlap_ratio,
             ):
                 _log_raw_json_overlap_warning(
@@ -224,7 +233,9 @@ def _raw_json_items(
         return _best_nested_listing_items(
             payload,
             surface=surface,
-            raw_json_surface_field_overlap_absolute=(raw_json_surface_field_overlap_absolute),
+            raw_json_surface_field_overlap_absolute=(
+                raw_json_surface_field_overlap_absolute
+            ),
             raw_json_surface_field_overlap_ratio=raw_json_surface_field_overlap_ratio,
         )
     return [payload]
@@ -403,7 +414,8 @@ def _listing_items_score(key: str, items: list[object]) -> int:
     if lowered_key in {"edges", "nodes"}:
         score += 10
     if any(
-        isinstance(item, dict) and any(token in item for token in ("node", "url", "title", "name"))
+        isinstance(item, dict)
+        and any(token in item for token in ("node", "url", "title", "name"))
         for item in items[:10]
     ):
         score += 5
@@ -443,7 +455,9 @@ def _raw_json_record(
                 surface_fields(surface, requested_fields),
             )
         )
-        preferred_title = coerce_text(payload.get("title") or payload.get("name") or payload.get("label"))
+        preferred_title = coerce_text(
+            payload.get("title") or payload.get("name") or payload.get("label")
+        )
         if preferred_title:
             record["title"] = preferred_title
         if not record.get("description"):
@@ -451,7 +465,9 @@ def _raw_json_record(
             if description:
                 record["description"] = description
         if not record.get("url"):
-            record["url"] = _raw_json_url(payload, page_url, fallback_index=fallback_index)
+            record["url"] = _raw_json_url(
+                payload, page_url, fallback_index=fallback_index
+            )
         cleaned = finalize_record(record, surface=surface)
         if "listing" in surface:
             cleaned = finalize_listing_price_fields(cleaned)
@@ -488,7 +504,9 @@ def _raw_json_url(
         resolved = absolute_url(page_url, author_url)
         if resolved:
             return resolved
-    identifier = clean_text(payload.get("id") or payload.get("slug") or payload.get("handle"))
+    identifier = clean_text(
+        payload.get("id") or payload.get("slug") or payload.get("handle")
+    )
     base_url = page_url.split("#", 1)[0]
     if identifier:
         return f"{base_url}#item-{identifier}"

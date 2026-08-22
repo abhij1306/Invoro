@@ -95,12 +95,25 @@ __all__ = [
     "upgrade_low_resolution_image_url",
 ]
 
-_cross_product_container_tokens = tuple(clean_text(token).lower() for token in tuple(DETAIL_CROSS_PRODUCT_CONTAINER_TOKENS or ()) if clean_text(token))
-_scope_product_context_tokens = tuple(clean_text(token).lower() for token in tuple(SCOPE_PRODUCT_CONTEXT_TOKENS or ()) if clean_text(token))
+_cross_product_container_tokens = tuple(
+    clean_text(token).lower()
+    for token in tuple(DETAIL_CROSS_PRODUCT_CONTAINER_TOKENS or ())
+    if clean_text(token)
+)
+_scope_product_context_tokens = tuple(
+    clean_text(token).lower()
+    for token in tuple(SCOPE_PRODUCT_CONTEXT_TOKENS or ())
+    if clean_text(token)
+)
 _max_selector_matches = _safe_int(MAX_SELECTOR_MATCHES, default=12) or 12
 _scope_score_main_weight = _safe_int(SCOPE_SCORE_MAIN_WEIGHT, default=4000) or 4000
-_scope_score_priority_weight = _safe_int(SCOPE_SCORE_PRIORITY_WEIGHT, default=2000) or 2000
-_scope_score_product_context_weight = _safe_int(SCOPE_SCORE_PRODUCT_CONTEXT_WEIGHT, default=1000) or 1000
+_scope_score_priority_weight = (
+    _safe_int(SCOPE_SCORE_PRIORITY_WEIGHT, default=2000) or 2000
+)
+_scope_score_product_context_weight = (
+    _safe_int(SCOPE_SCORE_PRODUCT_CONTEXT_WEIGHT, default=1000) or 1000
+)
+
 
 def _compile_variant_option_child_drop_patterns() -> tuple[re.Pattern[str], ...]:
     return compile_regex_patterns(
@@ -109,9 +122,11 @@ def _compile_variant_option_child_drop_patterns() -> tuple[re.Pattern[str], ...]
         warning_message="Skipping invalid variant option child-drop pattern: %r",
     )
 
+
 _VARIANT_OPTION_CHILD_DROP_RE = _compile_variant_option_child_drop_patterns()
 
 _PAGE_FILE_EXTENSIONS = (".asp", ".aspx", ".htm", ".html", ".jsp", ".php")
+
 
 def _selector_regex_timeout_seconds() -> float | None:
     try:
@@ -124,10 +139,28 @@ def _selector_regex_timeout_seconds() -> float | None:
         return None
     return timeout if timeout > 0 else None
 
-_detail_text_scope_selectors = tuple(selector for selector in tuple(DETAIL_TEXT_SCOPE_SELECTORS or ()) if str(selector).strip())
-_detail_text_scope_priority_tokens = tuple(str(token).lower() for token in tuple(DETAIL_TEXT_SCOPE_PRIORITY_TOKENS or ()) if str(token).strip())
-_detail_text_scope_exclude_tokens = tuple(str(token).lower() for token in tuple(DETAIL_TEXT_SCOPE_EXCLUDE_TOKENS or ()) if str(token).strip())
-_detail_text_hidden_style_tokens = tuple(str(token).lower() for token in tuple(DETAIL_TEXT_HIDDEN_STYLE_TOKENS or ()) if str(token).strip())
+
+_detail_text_scope_selectors = tuple(
+    selector
+    for selector in tuple(DETAIL_TEXT_SCOPE_SELECTORS or ())
+    if str(selector).strip()
+)
+_detail_text_scope_priority_tokens = tuple(
+    str(token).lower()
+    for token in tuple(DETAIL_TEXT_SCOPE_PRIORITY_TOKENS or ())
+    if str(token).strip()
+)
+_detail_text_scope_exclude_tokens = tuple(
+    str(token).lower()
+    for token in tuple(DETAIL_TEXT_SCOPE_EXCLUDE_TOKENS or ())
+    if str(token).strip()
+)
+_detail_text_hidden_style_tokens = tuple(
+    str(token).lower()
+    for token in tuple(DETAIL_TEXT_HIDDEN_STYLE_TOKENS or ())
+    if str(token).strip()
+)
+
 
 def _node_attr_text(node: Tag, *, max_depth: int = 6) -> str:
     parts: list[str] = []
@@ -155,8 +188,10 @@ def _node_attr_text(node: Tag, *, max_depth: int = 6) -> str:
         depth += 1
     return " ".join(parts).lower()
 
+
 def _field_uses_scoped_text(field_name: str) -> bool:
     return field_name in DETAIL_LONG_TEXT_RANK_FIELDS
+
 
 def _node_within_scope(node: Tag, scope: Tag) -> bool:
     current: Tag | None = node
@@ -167,9 +202,13 @@ def _node_within_scope(node: Tag, scope: Tag) -> bool:
         current = parent if isinstance(parent, Tag) else None
     return False
 
+
 def _node_style_is_hidden(node: Tag) -> bool:
     style = str(node.get("style") or "").strip().lower()
-    return bool(style) and any(token in style for token in _detail_text_hidden_style_tokens)
+    return bool(style) and any(
+        token in style for token in _detail_text_hidden_style_tokens
+    )
+
 
 def _node_is_hidden_or_auxiliary(node: Tag) -> bool:
     current: Tag | None = node
@@ -191,6 +230,7 @@ def _node_is_hidden_or_auxiliary(node: Tag) -> bool:
         depth += 1
     return False
 
+
 def _node_attributes_are_hidden(node: Tag, attrs: dict[object, object]) -> bool:
     if "hidden" in attrs:
         return True
@@ -200,6 +240,7 @@ def _node_attributes_are_hidden(node: Tag, attrs: dict[object, object]) -> bool:
         return True
     role = str(attrs.get("role") or "").strip().lower()
     return role in {"dialog", "alertdialog"} or _node_style_is_hidden(node)
+
 
 def _node_has_cross_product_cluster(node: Tag, *, page_url: str = "") -> bool:
     if not isinstance(getattr(node, "attrs", None), dict):
@@ -212,11 +253,19 @@ def _node_has_cross_product_cluster(node: Tag, *, page_url: str = "") -> bool:
         resolved = absolute_url(page_url, str(link.get("href") or ""))
         if resolved:
             links.append(resolved)
-    product_links = [link for link in links if any(marker in urlparse(link).path.lower() for marker in detail_path_hints("ecommerce_detail"))]
+    product_links = [
+        link
+        for link in links
+        if any(
+            marker in urlparse(link).path.lower()
+            for marker in detail_path_hints("ecommerce_detail")
+        )
+    ]
     if len(set(product_links)) >= 2:
         return True
     context = _node_attr_text(node, max_depth=1)
     return any(token in context for token in _cross_product_container_tokens)
+
 
 def _candidate_text_scope_nodes(root: BeautifulSoup | Tag) -> list[Tag]:
     candidates: list[Tag] = []
@@ -229,25 +278,35 @@ def _candidate_text_scope_nodes(root: BeautifulSoup | Tag) -> list[Tag]:
             candidates.append(node)
     return candidates
 
+
 def _scope_score(node: Tag) -> tuple[int, int]:
     context = _node_attr_text(node, max_depth=2)
     text_len = len(clean_text(node.get_text(" ", strip=True)))
     score = text_len
-    if node.name in {"main", "article"} or str(node.get("role") or "").strip().lower() == "main":
+    if (
+        node.name in {"main", "article"}
+        or str(node.get("role") or "").strip().lower() == "main"
+    ):
         score += _scope_score_main_weight
     if any(token in context for token in _detail_text_scope_priority_tokens):
         score += _scope_score_priority_weight
     if DETAIL_PRIMARY_DOM_CONTEXT_SELECTOR and (
-        node.select_one(DETAIL_PRIMARY_DOM_CONTEXT_SELECTOR) is not None or any(token in context for token in _scope_product_context_tokens)
+        node.select_one(DETAIL_PRIMARY_DOM_CONTEXT_SELECTOR) is not None
+        or any(token in context for token in _scope_product_context_tokens)
     ):
         score += _scope_score_product_context_weight
     return score, text_len
+
 
 def _scope_is_product_like(node: Tag) -> bool:
     context = _node_attr_text(node, max_depth=2)
     if any(token in context for token in _scope_product_context_tokens):
         return True
-    return bool(DETAIL_PRIMARY_DOM_CONTEXT_SELECTOR and node.select_one(DETAIL_PRIMARY_DOM_CONTEXT_SELECTOR) is not None)
+    return bool(
+        DETAIL_PRIMARY_DOM_CONTEXT_SELECTOR
+        and node.select_one(DETAIL_PRIMARY_DOM_CONTEXT_SELECTOR) is not None
+    )
+
 
 def _best_text_scope(root: BeautifulSoup | Tag) -> Tag | None:
     candidates = _candidate_text_scope_nodes(root)
@@ -255,6 +314,7 @@ def _best_text_scope(root: BeautifulSoup | Tag) -> Tag | None:
         return None
     best = max(candidates, key=_scope_score)
     return best if _scope_is_product_like(best) else None
+
 
 def _clone_visible_only(
     node: Tag | NavigableString,
@@ -281,12 +341,14 @@ def _clone_visible_only(
             clone.append(child_clone)
     return clone
 
+
 def _pruned_text_scope_root(root: BeautifulSoup | Tag) -> BeautifulSoup | Tag:
     scope = _best_text_scope(root)
     if scope is None:
         return root
     cloned_scope = _clone_visible_only(scope)
     return cloned_scope if isinstance(cloned_scope, Tag) else root
+
 
 def _is_other_detail_link(
     url: str,
@@ -317,18 +379,32 @@ def _is_other_detail_link(
         link_node,
     )
 
+
 def _detail_link_candidate_is_ignored(candidate: str) -> bool:
-    return candidate.lower().startswith(("#", "javascript:", "mailto:")) or looks_like_image_asset_url(candidate)
+    return candidate.lower().startswith(
+        ("#", "javascript:", "mailto:")
+    ) or looks_like_image_asset_url(candidate)
 
-def _detail_link_is_gallery_media(is_detail_surface: bool, link_node: Tag | None) -> bool:
-    return bool(is_detail_surface and link_node is not None and is_in_product_gallery_context(link_node))
 
-def _url_host_path_matches(page_parts: object, candidate_parts: object) -> tuple[bool, bool]:
+def _detail_link_is_gallery_media(
+    is_detail_surface: bool, link_node: Tag | None
+) -> bool:
+    return bool(
+        is_detail_surface
+        and link_node is not None
+        and is_in_product_gallery_context(link_node)
+    )
+
+
+def _url_host_path_matches(
+    page_parts: object, candidate_parts: object
+) -> tuple[bool, bool]:
     page_host = str(getattr(page_parts, "hostname", "") or "").lower()
     candidate_host = str(getattr(candidate_parts, "hostname", "") or "").lower()
     page_path = str(getattr(page_parts, "path", "") or "").rstrip("/") or "/"
     candidate_path = str(getattr(candidate_parts, "path", "") or "").rstrip("/") or "/"
     return page_host == candidate_host, page_path == candidate_path
+
 
 def _different_detail_link_signal(
     raw_path: str,
@@ -347,15 +423,19 @@ def _different_detail_link_signal(
         return True
     return link_node is not None and _is_in_cross_link_container(link_node)
 
+
 def _is_in_cross_link_container(node: Tag, *, max_depth: int = 6) -> bool:
     return (
         walk_ancestors(
             node,
-            lambda current, _depth: any(hint in _node_attr_text(current) for hint in CROSS_LINK_CONTAINER_HINTS),
+            lambda current, _depth: any(
+                hint in _node_attr_text(current) for hint in CROSS_LINK_CONTAINER_HINTS
+            ),
             max_depth=max_depth,
         )
         is not None
     )
+
 
 def extract_node_value(node: Tag, field_name: str, page_url: str) -> object | None:
     if field_name in IMAGE_FIELDS:
@@ -379,26 +459,40 @@ def extract_node_value(node: Tag, field_name: str, page_url: str) -> object | No
         return None
     return text_value
 
+
 def _image_node_value(node: Tag, field_name: str, page_url: str) -> object | None:
     srcset = node.get("srcset")
-    image_candidates: object = srcset_urls(srcset) if srcset not in (None, "", [], {}) else _fallback_image_candidate(node)
+    image_candidates: object = (
+        srcset_urls(srcset)
+        if srcset not in (None, "", [], {})
+        else _fallback_image_candidate(node)
+    )
     urls = extract_urls(image_candidates, page_url)
-    if node.name not in {"img", "source"} and str(node.get("as") or "").lower() != "image":
+    if (
+        node.name not in {"img", "source"}
+        and str(node.get("as") or "").lower() != "image"
+    ):
         urls = [url for url in urls if looks_like_image_asset_url(url)]
     if field_name == ADDITIONAL_IMAGES_FIELD:
         return urls or None
     return urls[0] if urls else None
 
+
 def _fallback_image_candidate(node: Tag) -> object:
     return (
         node.get("content")
         or next(
-            (node.get(str(attr_name)) for attr_name in tuple(DETAIL_IMAGE_URL_ATTRS or ()) if node.get(str(attr_name)) not in (None, "", [], {})),
+            (
+                node.get(str(attr_name))
+                for attr_name in tuple(DETAIL_IMAGE_URL_ATTRS or ())
+                if node.get(str(attr_name)) not in (None, "", [], {})
+            ),
             None,
         )
         or node.get("href")
         or ""
     )
+
 
 def _node_scalar_attribute(node: Tag) -> tuple[bool, object | None]:
     if node.name == "meta":
@@ -416,6 +510,7 @@ def _node_scalar_attribute(node: Tag) -> tuple[bool, object | None]:
             return True, value
     return False, None
 
+
 def _node_raw_text(node: Tag, field_name: str) -> str:
     if _looks_like_variant_option_node(node, field_name):
         return _variant_option_node_text(node, field_name)
@@ -423,6 +518,7 @@ def _node_raw_text(node: Tag, field_name: str) -> str:
     if _field_uses_scoped_text(field_name):
         return html_to_text(str(visible), preserve_block_breaks=True)
     return visible.get_text(" ", strip=True)
+
 
 def _looks_like_variant_option_node(node: Tag, field_name: str) -> bool:
     if field_name not in VARIANT_OPTION_TEXT_FIELDS:
@@ -443,12 +539,16 @@ def _looks_like_variant_option_node(node: Tag, field_name: str) -> bool:
             node.get("name"),
         )
     ).lower()
-    return any(token in context for token in ("option", "swatch", "variant", field_name))
+    return any(
+        token in context for token in ("option", "swatch", "variant", field_name)
+    )
+
 
 def _attribute_text(value: object) -> str:
     if isinstance(value, (list, tuple, set)):
         return " ".join(str(item or "") for item in value)
     return str(value or "")
+
 
 def _variant_option_node_text(node: Tag, _field_name: str) -> str:
     if not node.find(True):
@@ -468,6 +568,7 @@ def _variant_option_node_text(node: Tag, _field_name: str) -> str:
         kept.append(text)
     return " ".join(kept)
 
+
 def extract_selector_values(
     root: BeautifulSoup | Tag,
     selector: str,
@@ -475,18 +576,23 @@ def extract_selector_values(
     page_url: str,
 ) -> list[object]:
     values: list[object] = []
-    scoped_text_root = _best_text_scope(root) if _field_uses_scoped_text(field_name) else None
+    scoped_text_root = (
+        _best_text_scope(root) if _field_uses_scoped_text(field_name) else None
+    )
     for node in safe_select(root, selector)[:_max_selector_matches]:
         if _field_uses_scoped_text(field_name):
             if _node_is_hidden_or_auxiliary(node):
                 continue
-            if scoped_text_root is not None and not _node_within_scope(node, scoped_text_root):
+            if scoped_text_root is not None and not _node_within_scope(
+                node, scoped_text_root
+            ):
                 continue
         value = extract_node_value(node, field_name, page_url)
         if value in (None, "", [], {}):
             continue
         values.append(value)
     return values
+
 
 def extract_xpath_values(
     root: BeautifulSoup | Tag,
@@ -505,7 +611,9 @@ def extract_xpath_values(
     try:
         matches = tree.xpath(xpath)
     except etree.XPathError:
-        logger.warning("Failed to evaluate xpath selector for %s: %s", field_name, xpath)
+        logger.warning(
+            "Failed to evaluate xpath selector for %s: %s", field_name, xpath
+        )
         return []
     values: list[object] = []
     limited_matches: list[object]
@@ -530,6 +638,7 @@ def extract_xpath_values(
             continue
         values.append(value)
     return values
+
 
 def extract_regex_values(
     root: BeautifulSoup | Tag,
@@ -562,6 +671,7 @@ def extract_regex_values(
     except regex_lib.error:
         logger.warning("Failed to evaluate selector regex for %s", field_name)
     return values
+
 
 def filter_values_by_regex(
     values: list[object],
@@ -596,6 +706,7 @@ def filter_values_by_regex(
         logger.warning("Failed to evaluate selector regex for %s", field_name)
     return filtered
 
+
 def extract_page_images(
     root: BeautifulSoup | Tag,
     page_url: str,
@@ -610,6 +721,7 @@ def extract_page_images(
         surface=surface,
         other_detail_link_checker=_is_other_detail_link,
     )
+
 
 def requested_content_extractability(
     root: BeautifulSoup | Tag,
@@ -629,6 +741,7 @@ def requested_content_extractability(
         safe_select=safe_select,
         max_selector_matches=_max_selector_matches,
     )
+
 
 def apply_selector_fallbacks(
     root: BeautifulSoup | Tag,
@@ -681,7 +794,9 @@ def apply_selector_fallbacks(
 
     fields = surface_fields(surface, requested_fields)
     alias_lookup = surface_alias_lookup(surface, requested_fields)
-    selector_hit_fields = _apply_selector_rules(root, page_url, fields, selector_rules, _add, _record_selector_trace)
+    selector_hit_fields = _apply_selector_rules(
+        root, page_url, fields, selector_rules, _add, _record_selector_trace
+    )
     _apply_dom_patterns(
         root,
         page_url,
@@ -692,6 +807,7 @@ def apply_selector_fallbacks(
         record_dom_observed_selectors,
     )
     _apply_label_pairs(root, page_url, alias_lookup, _add)
+
 
 def _apply_selector_rules(
     root: BeautifulSoup | Tag,
@@ -711,9 +827,15 @@ def _apply_selector_rules(
         xpath = str(row.get("xpath") or "").strip()
         css_selector = str(row.get("css_selector") or "").strip()
         regex = str(row.get("regex") or "").strip()
-        values, selector_kind, selector_value = _selector_rule_values(root, page_url, field_name, xpath, css_selector, regex)
+        values, selector_kind, selector_value = _selector_rule_values(
+            root, page_url, field_name, xpath, css_selector, regex
+        )
         for value in values:
-            if add(field_name, value, "selector_rule") > 0 and selector_kind and selector_value:
+            if (
+                add(field_name, value, "selector_rule") > 0
+                and selector_kind
+                and selector_value
+            ):
                 record_trace(
                     field_name,
                     value,
@@ -724,6 +846,7 @@ def _apply_selector_rules(
         if values:
             hit_fields.add(field_name)
     return hit_fields
+
 
 def _selector_rule_values(
     root: BeautifulSoup | Tag,
@@ -749,6 +872,7 @@ def _selector_rule_values(
         selector_kind, selector_value = "regex", regex
     return values, selector_kind, selector_value
 
+
 def _apply_dom_patterns(
     root: BeautifulSoup | Tag,
     page_url: str,
@@ -767,7 +891,10 @@ def _apply_dom_patterns(
         if not selector:
             continue
         for value in extract_selector_values(root, selector, field_name, page_url):
-            if add(field_name, value, "dom_selector") > 0 and record_dom_observed_selectors:
+            if (
+                add(field_name, value, "dom_selector") > 0
+                and record_dom_observed_selectors
+            ):
                 record_trace(
                     field_name,
                     value,
@@ -775,6 +902,7 @@ def _apply_dom_patterns(
                     selector_kind="css_selector",
                     selector_value=selector,
                 )
+
 
 def _apply_label_pairs(
     root: BeautifulSoup | Tag,

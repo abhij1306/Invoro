@@ -53,7 +53,9 @@ async def run_browser_stage(
             stage=stage,
             reason="timeout",
         )
-        timeout_exc = TimeoutError(f"Browser {stage} stage exceeded timeout_seconds={bounded_timeout_seconds:.2f}")
+        timeout_exc = TimeoutError(
+            f"Browser {stage} stage exceeded timeout_seconds={bounded_timeout_seconds:.2f}"
+        )
         annotate_browser_failure(
             timeout_exc,
             phase_timings_ms=phase_timings_ms,

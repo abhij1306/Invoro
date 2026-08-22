@@ -56,7 +56,9 @@ class BrowserNetworkCapture:
         read_payload_body: Any | None = None,
     ) -> None:
         self._surface = surface
-        self._should_capture_payload = should_capture_payload or should_capture_network_payload
+        self._should_capture_payload = (
+            should_capture_payload or should_capture_network_payload
+        )
         self._classify_endpoint = classify_endpoint or classify_network_endpoint
         self._read_payload_body = read_payload_body or read_network_payload_body
         self._lock = asyncio.Lock()
@@ -81,10 +83,18 @@ class BrowserNetworkCapture:
             1,
             browser_capture_total_network_payload_bytes(),
         )
-        self._queue: asyncio.Queue[Any | None] = asyncio.Queue(maxsize=max(1, browser_capture_queue_size()))
+        self._queue: asyncio.Queue[Any | None] = asyncio.Queue(
+            maxsize=max(1, browser_capture_queue_size())
+        )
 
     def attach(self, page: Any) -> None:
-        if self._listener_attached or self._closing or self._closed or self._summary is not None or self._workers:
+        if (
+            self._listener_attached
+            or self._closing
+            or self._closed
+            or self._summary is not None
+            or self._workers
+        ):
             return
         self._workers = {
             asyncio.create_task(self._capture_worker())
@@ -120,7 +130,9 @@ class BrowserNetworkCapture:
                 remove_listener("response", self._schedule_capture)
             except Exception as exc:
                 if is_response_closed_error(exc):
-                    logger.debug("Browser response listener detach skipped (page already closed)")
+                    logger.debug(
+                        "Browser response listener detach skipped (page already closed)"
+                    )
                 else:
                     logger.warning(
                         "Failed to detach browser response listener: %s: %s",
@@ -154,7 +166,9 @@ class BrowserNetworkCapture:
         queue_empty = getattr(self._queue, "empty", None)
         queue_get_nowait = getattr(self._queue, "get_nowait", None)
         queue_task_done = getattr(self._queue, "task_done", None)
-        while callable(queue_empty) and callable(queue_get_nowait) and not queue_empty():
+        while (
+            callable(queue_empty) and callable(queue_get_nowait) and not queue_empty()
+        ):
             try:
                 queue_get_nowait()
                 if callable(queue_task_done):
@@ -345,10 +359,17 @@ def should_capture_network_payload(
         surface=surface,
         endpoint_info=endpoint_info,
     )
-    content_length = None if has_chunked_transfer_encoding(headers) else coerce_content_length(headers)
+    content_length = (
+        None
+        if has_chunked_transfer_encoding(headers)
+        else coerce_content_length(headers)
+    )
     if content_length is not None and content_length > payload_budget:
         return False
-    if content_length is not None and captured_bytes + content_length > total_payload_bytes:
+    if (
+        content_length is not None
+        and captured_bytes + content_length > total_payload_bytes
+    ):
         return False
     if captured_bytes >= total_payload_bytes:
         return False
@@ -363,11 +384,17 @@ def _is_supported_network_payload_content_type(
     normalized_content_type = str(content_type or "").strip().lower()
     if "json" in normalized_content_type:
         return True
-    if any(token in normalized_content_type for token in NETWORK_PAYLOAD_JSON_CONTENT_TYPE_HINTS):
+    if any(
+        token in normalized_content_type
+        for token in NETWORK_PAYLOAD_JSON_CONTENT_TYPE_HINTS
+    ):
         return True
     if any(token in lowered_url for token in NETWORK_PAYLOAD_URL_HINTS):
         return True
-    return any(token in normalized_content_type for token in NETWORK_PAYLOAD_STREAMING_CONTENT_TYPES)
+    return any(
+        token in normalized_content_type
+        for token in NETWORK_PAYLOAD_STREAMING_CONTENT_TYPES
+    )
 
 
 def _decode_network_payload(
@@ -377,7 +404,10 @@ def _decode_network_payload(
 ) -> object | None:
     text = body_bytes.decode("utf-8", errors="replace")
     normalized_content_type = str(content_type or "").strip().lower()
-    if any(token in normalized_content_type for token in NETWORK_PAYLOAD_STREAMING_CONTENT_TYPES):
+    if any(
+        token in normalized_content_type
+        for token in NETWORK_PAYLOAD_STREAMING_CONTENT_TYPES
+    ):
         return _decode_rsc_payload(text)
     try:
         return json.loads(text)

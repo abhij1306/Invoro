@@ -31,7 +31,11 @@ def apply_acquisition_contract_to_profile(
     acquisition_profile: object,
     contract: object,
 ) -> dict[str, object]:
-    profile = dict(acquisition_profile or {}) if isinstance(acquisition_profile, Mapping) else {}
+    profile = (
+        dict(acquisition_profile or {})
+        if isinstance(acquisition_profile, Mapping)
+        else {}
+    )
     normalized = normalize_acquisition_contract(contract)
     fetch_mode = str(profile.get("fetch_mode") or "").strip().lower()
     browser_only = fetch_mode == "browser_only"
@@ -41,16 +45,22 @@ def apply_acquisition_contract_to_profile(
         profile["acquisition_contract_stale"] = True
         return profile
     engine = str(normalized.get("preferred_browser_engine") or "auto").strip().lower()
-    cookie_engine = str(normalized.get("handoff_cookie_engine") or "auto").strip().lower()
+    cookie_engine = (
+        str(normalized.get("handoff_cookie_engine") or "auto").strip().lower()
+    )
     if bool(normalized.get("prefer_browser")) or browser_only:
         profile["prefer_browser"] = True
         profile.setdefault("browser_reason", "acquisition-contract")
-    if engine in {"patchright", "real_chrome"} and not profile.get("forced_browser_engine"):
+    if engine in {"patchright", "real_chrome"} and not profile.get(
+        "forced_browser_engine"
+    ):
         profile["forced_browser_engine"] = engine
     if bool(normalized.get("handoff_eligible")) and not browser_only:
         profile["prefer_curl_handoff"] = True
         profile["handoff_eligible"] = True
-    _apply_handoff_engine(profile, browser_only=browser_only, cookie_engine=cookie_engine, engine=engine)
+    _apply_handoff_engine(
+        profile, browser_only=browser_only, cookie_engine=cookie_engine, engine=engine
+    )
     return profile
 
 
@@ -65,7 +75,9 @@ def _apply_handoff_engine(
         for key in ("prefer_curl_handoff", "handoff_eligible", "handoff_cookie_engine"):
             profile.pop(key, None)
         return
-    selected = cookie_engine if cookie_engine in {"patchright", "real_chrome"} else engine
+    selected = (
+        cookie_engine if cookie_engine in {"patchright", "real_chrome"} else engine
+    )
     if selected in {"patchright", "real_chrome"}:
         profile["handoff_cookie_engine"] = selected
 
@@ -84,7 +96,11 @@ def build_success_acquisition_contract(
     diagnostics = dict(browser_diagnostics or {})
     normalized_method = str(method or "").strip().lower()
     normalized_engine = _coerce_optional_choice(browser_engine, _BROWSER_ENGINE_VALUES)
-    preferred_engine = normalized_engine if normalized_engine in {"patchright", "real_chrome"} else "auto"
+    preferred_engine = (
+        normalized_engine
+        if normalized_engine in {"patchright", "real_chrome"}
+        else "auto"
+    )
     extraction_source = str(diagnostics.get("extraction_source") or "").strip().lower()
     required_rendering = extraction_source in {"rendered_dom", "rendered_dom_visual"}
     required_traversal = bool(diagnostics.get("traversal_activated"))
@@ -136,7 +152,9 @@ def _handoff_is_eligible(
     )
 
 
-def _field_coverage(requested_fields: list[str], found_fields: list[str]) -> dict[str, list[str]]:
+def _field_coverage(
+    requested_fields: list[str], found_fields: list[str]
+) -> dict[str, list[str]]:
     requested = list(requested_fields or [])
     requested_set = set(requested)
     found = [field for field in list(found_fields or []) if field in requested_set]
@@ -242,13 +260,21 @@ async def record_acquisition_contract_outcome(
     page_url: str | None = None,
     network_payloads: list[dict[str, object]] | None = None,
 ) -> None:
-    stale_threshold = int(crawler_runtime_settings.acquisition_contract_stale_failure_threshold)
+    stale_threshold = int(
+        crawler_runtime_settings.acquisition_contract_stale_failure_threshold
+    )
     quality_success = (
-        persisted_count > 0 and not blocked and verdict not in {VERDICT_BLOCKED, VERDICT_EMPTY, VERDICT_LISTING_FAILED}
+        persisted_count > 0
+        and not blocked
+        and verdict not in {VERDICT_BLOCKED, VERDICT_EMPTY, VERDICT_LISTING_FAILED}
     )
     count_failure = not blocked and (
         verdict == VERDICT_LISTING_FAILED
-        or (verdict == VERDICT_EMPTY and "detail" in str(surface or "") and persisted_count == 0)
+        or (
+            verdict == VERDICT_EMPTY
+            and "detail" in str(surface or "")
+            and persisted_count == 0
+        )
     )
     if quality_success:
         await _record_successful_acquisition_contract(

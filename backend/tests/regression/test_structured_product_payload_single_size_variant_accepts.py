@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .test_selectolax_css_migration import ADPAdapter, BullhornAdapter, EbayAdapter, IndeedAdapter, LinkedInAdapter, NikeAdapter, _structured_variants_from_product_payload, extract_detail_records, extract_job_sections, extract_records, pytest  # fmt: skip
 
+
 @pytest.mark.regression
 def test_structured_product_payload_single_size_variant_accepts_snake_case() -> None:
     rows = _structured_variants_from_product_payload(
@@ -22,6 +23,7 @@ def test_structured_product_payload_single_size_variant_accepts_snake_case() -> 
             "size": "One Size",
         }
     ]
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -76,6 +78,7 @@ async def test_nike_adapter_maps_preloaded_state_product() -> None:
     assert record["original_price"] == "2495"
     assert record["color"] == "Green"
     assert "size" not in record
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -142,6 +145,7 @@ async def test_nike_detail_extraction_uses_adapter_and_rejects_shell_json_ld() -
     assert record["variant_count"] == 2
     assert "size" not in record
     assert "Bill Bowerman" not in record.values()
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -219,6 +223,7 @@ async def test_nike_adapter_maps_next_data_selected_product_payload() -> None:
     assert record["variants"][0]["price"] == "115"
     assert record["variants"][1]["availability"] == "out_of_stock"
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_nike_adapter_maps_nested_next_data_price_objects() -> None:
@@ -268,6 +273,7 @@ async def test_nike_adapter_maps_nested_next_data_price_objects() -> None:
     assert record["variants"][0]["price"] == "115"
     assert "original_price" not in record["variants"][0]
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_nike_adapter_does_not_infer_empty_sizes_as_out_of_stock() -> None:
@@ -312,6 +318,7 @@ async def test_nike_adapter_does_not_infer_empty_sizes_as_out_of_stock() -> None
     assert record["currency"] == "EUR"
     assert len(record.get("variants", [])) == 0
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_ebay_adapter_preserves_css_listing_output() -> None:
@@ -344,6 +351,7 @@ async def test_ebay_adapter_preserves_css_listing_output() -> None:
         }
     ]
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_indeed_adapter_preserves_css_listing_output() -> None:
@@ -374,6 +382,7 @@ async def test_indeed_adapter_preserves_css_listing_output() -> None:
         }
     ]
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_indeed_adapter_uses_source_origin_for_relative_listing_urls() -> None:
@@ -394,6 +403,7 @@ async def test_indeed_adapter_uses_source_origin_for_relative_listing_urls() -> 
 
     assert result.records[0]["apply_url"] == "https://ca.indeed.com/viewjob?jk=123"
 
+
 @pytest.mark.regression
 def test_extract_job_sections_stops_collecting_at_strong_headings() -> None:
     sections = extract_job_sections(
@@ -409,6 +419,7 @@ def test_extract_job_sections_stops_collecting_at_strong_headings() -> None:
 
     assert sections["benefits"] == "Remote-first."
     assert sections["skills"] == "Python."
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -444,6 +455,7 @@ async def test_linkedin_adapter_preserves_css_detail_output() -> None:
         }
     ]
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_adp_adapter_preserves_css_listing_output() -> None:
@@ -470,6 +482,7 @@ async def test_adp_adapter_preserves_css_listing_output() -> None:
     assert record["location"] == "Bengaluru"
     assert record["posted_date"] == "2 days ago"
     assert record["apply_url"].endswith("jobId=123456#123456")
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -506,6 +519,7 @@ async def test_job_listing_pipeline_preserves_adp_adapter_rows_with_query_job_id
     assert [row["title"] for row in rows] == ["ORAL SURGEON", "PHARMACIST"]
     assert [("jobId=9202786317663_1" in row["url"]) for row in rows] == [True, False]
     assert [("jobId=9202786030399_1" in row["url"]) for row in rows] == [False, True]
+
 
 @pytest.mark.regression
 def test_job_listing_pipeline_prefers_icims_adapter_rows_over_career_nav_chrome() -> (
@@ -559,6 +573,7 @@ def test_job_listing_pipeline_prefers_icims_adapter_rows_over_career_nav_chrome(
         "Blood Bank Medical Lab Scientist",
         "Director, Enterprise Sterile Processing",
     ]
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression

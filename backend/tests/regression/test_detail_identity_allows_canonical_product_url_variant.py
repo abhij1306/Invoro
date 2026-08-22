@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .test_crawl_engine import detail_extractor, detail_identity_codes_from_url, detail_title_from_url, extract_records, pytest, read_optional_artifact_text  # fmt: skip
 
+
 @pytest.mark.regression
 def test_detail_identity_allows_canonical_product_url_with_variant_sku_suffix() -> None:
     requested_url = (
@@ -26,6 +27,7 @@ def test_detail_identity_allows_canonical_product_url_with_variant_sku_suffix() 
         )
         is None
     )
+
 
 @pytest.mark.regression
 def test_detail_identity_allows_canonical_url_with_reordered_query_after_redirect() -> (
@@ -59,12 +61,14 @@ def test_detail_identity_allows_canonical_url_with_reordered_query_after_redirec
         is None
     )
 
+
 @pytest.mark.regression
 def test_detail_identity_extracts_numeric_hm_product_codes_from_url() -> None:
     url = "https://www2.hm.com/en_in/productpage.1317259001.html"
 
     assert detail_identity_codes_from_url(url) == {"1317259001"}
     assert detail_title_from_url(url) is None
+
 
 @pytest.mark.regression
 def test_extract_records_rejects_visual_artifact_cta_and_footer_clusters() -> None:
@@ -144,6 +148,7 @@ def test_extract_records_rejects_visual_artifact_cta_and_footer_clusters() -> No
 
     assert rows == []
 
+
 @pytest.mark.regression
 def test_extract_records_keeps_visual_artifact_product_without_price_when_title_matches_url() -> (
     None
@@ -196,6 +201,7 @@ def test_extract_records_keeps_visual_artifact_product_without_price_when_title_
         }
     ]
 
+
 @pytest.mark.regression
 def test_extract_records_reads_listing_card_data_url_and_rejects_chrome_rows() -> None:
     rows = extract_records(
@@ -241,6 +247,7 @@ def test_extract_records_reads_listing_card_data_url_and_rejects_chrome_rows() -
         "https://www.dyson.in/hair-care/hair-straighteners/airstrait-blue-copper"
     )
     assert rows[0]["price"] == "34900.00"
+
 
 @pytest.mark.regression
 def test_extract_records_keeps_adjacent_visual_product_cards_separate() -> None:
@@ -309,6 +316,7 @@ def test_extract_records_keeps_adjacent_visual_product_cards_separate() -> None:
         "https://www.belk.com/p/brand-beta-concealer/222.html",
         "https://www.belk.com/p/brand-gamma-powder/333.html",
     ]
+
 
 @pytest.mark.regression
 def test_extract_records_rejects_visual_artifact_auth_links_without_dropping_product() -> (
@@ -388,6 +396,7 @@ def test_extract_records_rejects_visual_artifact_auth_links_without_dropping_pro
         }
     ]
 
+
 @pytest.mark.regression
 def test_extract_records_prefers_image_hint_over_brand_or_review_title_noise() -> None:
     html = """
@@ -432,6 +441,7 @@ def test_extract_records_prefers_image_hint_over_brand_or_review_title_noise() -
         }
     ]
 
+
 @pytest.mark.regression
 def test_extract_records_filters_blocked_detail_artifact_html() -> None:
     html = read_optional_artifact_text(
@@ -447,6 +457,7 @@ def test_extract_records_filters_blocked_detail_artifact_html() -> None:
     )
 
     assert rows == []
+
 
 @pytest.mark.regression
 def test_extract_records_cleans_titles_from_belk_listing_artifact() -> None:
@@ -469,6 +480,7 @@ def test_extract_records_cleans_titles_from_belk_listing_artifact() -> None:
     assert all("review" not in str(row.get("title") or "").lower() for row in rows[:12])
     assert "Dooney & Bourke" not in titles
 
+
 @pytest.mark.regression
 def test_extract_records_belk_listing_artifact_does_not_emit_currency_without_price() -> (
     None
@@ -487,6 +499,7 @@ def test_extract_records_belk_listing_artifact_does_not_emit_currency_without_pr
 
     assert rows
     assert all(row.get("price") or not row.get("currency") for row in rows)
+
 
 @pytest.mark.regression
 def test_extract_records_drops_orphan_listing_currency_without_price() -> None:
@@ -539,6 +552,7 @@ def test_extract_records_drops_orphan_listing_currency_without_price() -> None:
         }
     ]
 
+
 @pytest.mark.regression
 def test_extract_records_rejects_redirected_belk_detail_artifact_identity_mismatch() -> (
     None
@@ -563,6 +577,7 @@ def test_extract_records_rejects_redirected_belk_detail_artifact_identity_mismat
 
     assert rows == []
 
+
 @pytest.mark.regression
 def test_extract_records_recovers_variants_and_cleans_color_from_belk_detail_artifact() -> (
     None
@@ -585,6 +600,7 @@ def test_extract_records_recovers_variants_and_cleans_color_from_belk_detail_art
     assert "color" not in record
     assert record["variants"][0]["color"] == "HTR GREY"
     assert record["variant_count"] == 6
+
 
 @pytest.mark.regression
 def test_extract_records_normalizes_belk_run_26_detail_variants_without_duplicate_axes() -> (
@@ -624,6 +640,7 @@ def test_extract_records_normalizes_belk_run_26_detail_variants_without_duplicat
         )
 
     assert all(_has_axis(variant) for variant in record["variants"])
+
 
 @pytest.mark.regression
 def test_extract_records_normalizes_boolean_availability_and_shared_variant_price_from_json() -> (

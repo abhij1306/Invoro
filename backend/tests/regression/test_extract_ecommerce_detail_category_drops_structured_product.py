@@ -7,6 +7,7 @@ from .test_detail_extractor_structured_sources import (
     structured_feature_rows,
 )
 
+
 @pytest.mark.regression
 def test_extract_ecommerce_detail_category_drops_structured_product_crumb() -> None:
     html = """
@@ -63,6 +64,7 @@ def test_extract_ecommerce_detail_category_drops_structured_product_crumb() -> N
 
     assert record["category"] == "Products > Analytical Chromatography"
 
+
 @pytest.mark.regression
 def test_extract_ecommerce_detail_keeps_structured_subscript_feature_label() -> None:
     features = structured_feature_rows(
@@ -94,6 +96,7 @@ def test_extract_ecommerce_detail_keeps_structured_subscript_feature_label() -> 
     assert "d" not in features
     assert "f" not in features
     assert ": ['0.20 μm'" not in features
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_prefers_visible_description_panel_without_inference() -> (
@@ -175,6 +178,7 @@ def test_extract_ecommerce_detail_prefers_visible_description_panel_without_infe
     assert "Compare Similar Items" not in record["description"]
     assert "product_details" not in record
 
+
 @pytest.mark.regression
 def test_extract_ecommerce_detail_from_nuxt_payload_with_self_referential_wrapper() -> (
     None
@@ -212,6 +216,7 @@ def test_extract_ecommerce_detail_from_nuxt_payload_with_self_referential_wrappe
     assert record["title"] == "Nuxt Payload Widget"
     assert record["brand"] == "Acme"
     assert record["_source"] == "js_state"
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_resolves_json_ld_graph_node_references() -> None:
@@ -265,6 +270,7 @@ def test_extract_ecommerce_detail_resolves_json_ld_graph_node_references() -> No
     assert record["availability"] == "in_stock"
     assert record["_source"] == "json_ld"
 
+
 @pytest.mark.regression
 def test_extract_ecommerce_detail_prefers_json_ld_title_over_noisy_dom_h1() -> None:
     html = """
@@ -304,6 +310,7 @@ def test_extract_ecommerce_detail_prefers_json_ld_title_over_noisy_dom_h1() -> N
     assert record["title"] == "Graph Widget"
     assert record["_source"] == "json_ld"
 
+
 @pytest.mark.regression
 def test_extract_ecommerce_detail_keeps_adapter_title_over_longer_dom_h1() -> None:
     html = """
@@ -332,6 +339,7 @@ def test_extract_ecommerce_detail_keeps_adapter_title_over_longer_dom_h1() -> No
     assert len(rows) == 1
     assert rows[0]["title"] == "Widget Prime"
     assert "SEO Edition" not in rows[0]["title"]
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_resolves_top_level_json_ld_array_references() -> None:
@@ -384,6 +392,7 @@ def test_extract_ecommerce_detail_resolves_top_level_json_ld_array_references() 
     assert record["currency"] == "USD"
     assert record["availability"] == "in_stock"
     assert record["_source"] == "json_ld"
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_flattens_json_ld_size_specifications() -> None:
@@ -454,6 +463,7 @@ def test_extract_ecommerce_detail_flattens_json_ld_size_specifications() -> None
     assert record["variants"][1]["size"] == "XL"
     assert record["variants"][1]["availability"] == "out_of_stock"
 
+
 @pytest.mark.regression
 def test_extract_ecommerce_detail_backfills_visible_display_price() -> None:
     html = """
@@ -491,6 +501,7 @@ def test_extract_ecommerce_detail_backfills_visible_display_price() -> None:
     assert len(rows) == 1
     assert rows[0]["price"] == "42.00"
     assert rows[0]["original_price"] == "60.00"
+
 
 @pytest.mark.regression
 def test_extract_detail_json_ld_offer_price_beats_bad_dom_price() -> None:
@@ -530,6 +541,7 @@ def test_extract_detail_json_ld_offer_price_beats_bad_dom_price() -> None:
     assert rows[0]["price"] == "49.00"
     assert rows[0]["currency"] == "USD"
 
+
 @pytest.mark.regression
 def test_extract_detail_json_ld_sale_and_regular_prices() -> None:
     html = """
@@ -564,6 +576,7 @@ def test_extract_detail_json_ld_sale_and_regular_prices() -> None:
     assert rows[0]["price"] == "249.99"
     assert rows[0]["original_price"] == "329.99"
 
+
 @pytest.mark.regression
 def test_extract_detail_parses_locale_decimal_price_text() -> None:
     html = """
@@ -587,6 +600,7 @@ def test_extract_detail_parses_locale_decimal_price_text() -> None:
     assert len(rows) == 1
     assert rows[0]["price"] == "1234.56"
     assert rows[0]["currency"] == "EUR"
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_drops_low_signal_zero_display_price() -> None:
@@ -623,6 +637,7 @@ def test_extract_ecommerce_detail_drops_low_signal_zero_display_price() -> None:
     assert len(rows) == 1
     record = rows[0]
     assert "price" not in record
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_keeps_structured_zero_price_with_authoritative_offer() -> (
@@ -665,6 +680,7 @@ def test_extract_ecommerce_detail_keeps_structured_zero_price_with_authoritative
     assert record["price"] == "0.00"
     assert record["currency"] == "USD"
     assert record["_source"] == "json_ld"
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_keeps_raw_json_zero_price() -> None:

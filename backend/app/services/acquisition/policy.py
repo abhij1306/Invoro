@@ -49,7 +49,9 @@ class AcquisitionPolicy:
     internal_api_endpoints: tuple[dict[str, object], ...] = ()
 
     @classmethod
-    def from_profile(cls, profile: Mapping[str, object] | object | None) -> "AcquisitionPolicy":
+    def from_profile(
+        cls, profile: Mapping[str, object] | object | None
+    ) -> "AcquisitionPolicy":
         payload = _coerce_profile(profile)
         prefer_browser = bool(payload.get("prefer_browser"))
         return cls(
@@ -68,15 +70,21 @@ class AcquisitionPolicy:
                 field_name="locality_profile",
             ),
             capture_screenshot=bool(payload.get("capture_screenshot", False)),
-            host_memory_ttl_seconds=_optional_positive_int(payload.get("host_memory_ttl_seconds")),
+            host_memory_ttl_seconds=_optional_positive_int(
+                payload.get("host_memory_ttl_seconds")
+            ),
             prefer_curl_handoff=bool(payload.get("prefer_curl_handoff", False)),
             handoff_cookie_engine=_optional_text(payload.get("handoff_cookie_engine")),
             forced_browser_engine=_optional_text(payload.get("forced_browser_engine")),
             requires_browser=bool(payload.get("requires_browser", False)),
-            internal_api_endpoints=tuple(_endpoint_list(payload.get(INTERNAL_API_ENDPOINTS_PROFILE_KEY))),
+            internal_api_endpoints=tuple(
+                _endpoint_list(payload.get(INTERNAL_API_ENDPOINTS_PROFILE_KEY))
+            ),
         )
 
-    def with_updates(self, **updates: Unpack[AcquisitionPolicyUpdates]) -> "AcquisitionPolicy":
+    def with_updates(
+        self, **updates: Unpack[AcquisitionPolicyUpdates]
+    ) -> "AcquisitionPolicy":
         if not updates:
             return self
         # Keep the profile round-trip so updates still use from_profile validation.
@@ -133,7 +141,9 @@ class AcquisitionPolicy:
         if self.requires_browser:
             profile["requires_browser"] = self.requires_browser
         if self.internal_api_endpoints:
-            profile[INTERNAL_API_ENDPOINTS_PROFILE_KEY] = [dict(endpoint) for endpoint in self.internal_api_endpoints]
+            profile[INTERNAL_API_ENDPOINTS_PROFILE_KEY] = [
+                dict(endpoint) for endpoint in self.internal_api_endpoints
+            ]
         return profile
 
     def __post_init__(self) -> None:
@@ -200,7 +210,9 @@ def _endpoint_list(value: object) -> list[dict[str, object]]:
         if not isinstance(item, Mapping):
             continue
         url = str(item.get(INTERNAL_API_ENDPOINT_URL_KEY) or "").strip()
-        method = str(item.get(INTERNAL_API_ENDPOINT_METHOD_KEY) or "GET").strip().upper()
+        method = (
+            str(item.get(INTERNAL_API_ENDPOINT_METHOD_KEY) or "GET").strip().upper()
+        )
         if not url or method not in INTERNAL_API_ENDPOINT_ALLOWED_METHODS:
             continue
         key = (method, url)

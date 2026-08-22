@@ -94,12 +94,14 @@ def _partition_variants_by_currency(
         variant_currency = _currency_code(variant.get("currency"))
         if variant_currency and variant_currency != parent_currency:
             logger.warning("Dropping variant with mismatched currency")
-            mismatched.append({
-                **variant,
-                "currency_mismatch": True,
-                "parent_currency": parent_currency,
-                "variant_currency": variant_currency,
-            })
+            mismatched.append(
+                {
+                    **variant,
+                    "currency_mismatch": True,
+                    "parent_currency": parent_currency,
+                    "variant_currency": variant_currency,
+                }
+            )
             continue
         variant["currency"] = parent_currency
         kept.append(variant)
@@ -107,7 +109,10 @@ def _partition_variants_by_currency(
 
 
 def _store_currency_partition(
-    record: dict[str, Any], *, kept: list[dict[str, Any]], mismatched: list[dict[str, Any]]
+    record: dict[str, Any],
+    *,
+    kept: list[dict[str, Any]],
+    mismatched: list[dict[str, Any]],
 ) -> None:
     if mismatched:
         record["variants_currency_mismatch"] = mismatched
@@ -226,13 +231,24 @@ def _backfill_variant_image(
 ) -> None:
     variant_color = clean_text(variant.get("color"))
     different_color = bool(
-        record_color and variant_color and variant_color.casefold() != record_color.casefold()
+        record_color
+        and variant_color
+        and variant_color.casefold() != record_color.casefold()
     )
     existing = variant.get("image_url")
-    if existing and fallback_image_key and _image_url_normalize_key(existing) == fallback_image_key and different_color:
+    if (
+        existing
+        and fallback_image_key
+        and _image_url_normalize_key(existing) == fallback_image_key
+        and different_color
+    ):
         variant.pop("image_url", None)
         existing = None
-    if fallback_image not in (None, "", [], {}) and existing in (None, "", [], {}) and not different_color:
+    if (
+        fallback_image not in (None, "", [], {})
+        and existing in (None, "", [], {})
+        and not different_color
+    ):
         variant["image_url"] = fallback_image
 
 

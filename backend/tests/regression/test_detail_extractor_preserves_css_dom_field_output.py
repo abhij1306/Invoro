@@ -7,6 +7,7 @@ from .test_selectolax_css_migration import (
     read_optional_artifact_text,
 )
 
+
 @pytest.mark.regression
 def test_detail_extractor_preserves_css_dom_field_output() -> None:
     html = """
@@ -39,6 +40,7 @@ def test_detail_extractor_preserves_css_dom_field_output() -> None:
     assert record["price"] == "19.99"
     assert record["rating"] == pytest.approx(4.8)
     assert record["review_count"] == 128
+
 
 @pytest.mark.regression
 def test_listing_extractor_preserves_css_card_field_output() -> None:
@@ -81,6 +83,7 @@ def test_listing_extractor_preserves_css_card_field_output() -> None:
     assert rows[0]["image_url"] == "https://example.com/images/widget-prime.jpg"
     assert rows[0]["rating"] == pytest.approx(4.7)
     assert rows[0]["review_count"] == 128
+
 
 @pytest.mark.regression
 def test_listing_extractor_prefers_row_detail_link_and_name_over_breadcrumb_links() -> (
@@ -172,6 +175,7 @@ def test_listing_extractor_prefers_row_detail_link_and_name_over_breadcrumb_link
         },
     ]
 
+
 @pytest.mark.regression
 def test_listing_extractor_does_not_remove_body_for_sidebar_layouts() -> None:
     html = """
@@ -210,6 +214,7 @@ def test_listing_extractor_does_not_remove_body_for_sidebar_layouts() -> None:
             "url": "https://www.scrapingcourse.com/ecommerce/product/abominable-hoodie/",
         }
     ]
+
 
 @pytest.mark.regression
 def test_listing_extractor_preserves_faceted_grid_results() -> None:
@@ -250,6 +255,7 @@ def test_listing_extractor_preserves_faceted_grid_results() -> None:
         }
     ]
 
+
 @pytest.mark.regression
 def test_listing_extractor_accepts_image_link_cards_with_separate_title_text() -> None:
     html = """
@@ -288,6 +294,7 @@ def test_listing_extractor_accepts_image_link_cards_with_separate_title_text() -
         }
     ]
 
+
 @pytest.mark.regression
 def test_listing_extractor_does_not_emit_additional_images() -> None:
     html = """
@@ -323,6 +330,7 @@ def test_listing_extractor_does_not_emit_additional_images() -> None:
             "url": "https://example.com/products/widget-prime",
         }
     ]
+
 
 @pytest.mark.regression
 def test_listing_extractor_prefers_explicit_price_node_over_description_mentions_and_keeps_currency() -> (
@@ -364,6 +372,7 @@ def test_listing_extractor_prefers_explicit_price_node_over_description_mentions
         }
     ]
 
+
 @pytest.mark.regression
 def test_listing_extractor_avoids_numeric_title_nodes_when_real_title_exists() -> None:
     html = """
@@ -399,6 +408,7 @@ def test_listing_extractor_avoids_numeric_title_nodes_when_real_title_exists() -
             "url": "https://example.com/products/widget-prime",
         }
     ]
+
 
 @pytest.mark.regression
 def test_listing_extractor_filters_category_cloud_links_when_supported_product_tiles_exist() -> (
@@ -439,6 +449,7 @@ def test_listing_extractor_filters_category_cloud_links_when_supported_product_t
     assert len(rows) == 12
     assert all("/regular-fit-shirt-p44" in row["url"] for row in rows)
     assert all("Men Shirts" not in row["title"] for row in rows)
+
 
 @pytest.mark.parametrize(
     ("artifact_path", "url", "surface", "blocked_terms"),
@@ -487,6 +498,7 @@ def test_listing_extractor_filters_acceptance_artifact_noise(
         assert all(term not in lowered_title for term in blocked_terms)
         assert all(term not in lowered_url for term in blocked_terms)
 
+
 @pytest.mark.regression
 def test_job_listing_extractor_accepts_careerdetail_id_cards() -> None:
     html = """
@@ -531,6 +543,7 @@ def test_job_listing_extractor_accepts_careerdetail_id_cards() -> None:
         == "https://careers.clarkassociatesinc.biz/careerdetail/?id=100901"
     )
 
+
 @pytest.mark.regression
 def test_job_listing_extractor_rejects_footer_document_asset_rows() -> None:
     html = """
@@ -561,6 +574,7 @@ def test_job_listing_extractor_rejects_footer_document_asset_rows() -> None:
     )
 
     assert rows == []
+
 
 @pytest.mark.regression
 def test_listing_extractor_ignores_none_embedded_json_payloads(
@@ -614,6 +628,7 @@ def test_listing_extractor_ignores_none_embedded_json_payloads(
         }
     ]
 
+
 @pytest.mark.regression
 def test_detail_extractor_ignores_js_state_inside_removed_noise_containers() -> None:
     html = """
@@ -653,6 +668,7 @@ def test_detail_extractor_ignores_js_state_inside_removed_noise_containers() -> 
     assert record["title"] == "Widget Prime"
     assert record["price"] == "19.99"
     assert record["_source"] != "js_state"
+
 
 @pytest.mark.regression
 def test_listing_extractor_ignores_structured_payloads_inside_removed_noise_containers() -> (

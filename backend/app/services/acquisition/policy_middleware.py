@@ -30,7 +30,9 @@ class PolicyMiddleware:
     async def before_fetch(self, request: Any) -> None:
         await wait_for_host_slot(
             request.url,
-            ttl_seconds=request.policy.host_memory_ttl_seconds if request.policy else None,
+            ttl_seconds=request.policy.host_memory_ttl_seconds
+            if request.policy
+            else None,
         )
         self._record("pre_fetch", "paced", "domain_rate_limiter", request.url)
 
@@ -39,7 +41,9 @@ class PolicyMiddleware:
             result.final_url or result.request.url,
             status_code=result.status_code,
             blocked=result.blocked,
-            ttl_seconds=result.request.policy.host_memory_ttl_seconds if result.request.policy else None,
+            ttl_seconds=result.request.policy.host_memory_ttl_seconds
+            if result.request.policy
+            else None,
         )
         if backoff_applied:
             self._record(
@@ -54,4 +58,6 @@ class PolicyMiddleware:
         }
 
     def _record(self, stage: str, action: str, reason: str, url: str) -> None:
-        self.decisions.append(PolicyDecision(stage=stage, action=action, reason=reason, url=url))
+        self.decisions.append(
+            PolicyDecision(stage=stage, action=action, reason=reason, url=url)
+        )

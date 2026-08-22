@@ -30,13 +30,21 @@ if TYPE_CHECKING:
 
 
 async def _find_actionable_locator(page, selector_group: str):
-    selectors = PAGINATION_SELECTORS.get(selector_group) if isinstance(PAGINATION_SELECTORS, dict) else []
+    selectors = (
+        PAGINATION_SELECTORS.get(selector_group)
+        if isinstance(PAGINATION_SELECTORS, dict)
+        else []
+    )
     for selector in selectors or []:
         locator = page.locator(str(selector)).first
         try:
             if await locator.count() == 0:
                 continue
-            if not await locator.is_visible(timeout=int(crawler_runtime_settings.traversal_locator_visible_timeout_ms)):
+            if not await locator.is_visible(
+                timeout=int(
+                    crawler_runtime_settings.traversal_locator_visible_timeout_ms
+                )
+            ):
                 continue
             if await locator.is_disabled():
                 continue
@@ -89,13 +97,22 @@ async def _find_generic_next_page_locator(page):
                 continue
             if selector == "link[rel='next']":
                 continue
-            if not await locator.is_visible(timeout=int(crawler_runtime_settings.traversal_locator_visible_timeout_ms)):
+            if not await locator.is_visible(
+                timeout=int(
+                    crawler_runtime_settings.traversal_locator_visible_timeout_ms
+                )
+            ):
                 continue
             if await locator.is_disabled():
                 continue
-            if not (await looks_like_paginate_control(locator) or await _looks_like_next_page_control(locator)):
+            if not (
+                await looks_like_paginate_control(locator)
+                or await _looks_like_next_page_control(locator)
+            ):
                 continue
-            logger.info("Traversal generic next-page selector=%s url=%s", selector, page.url)
+            logger.info(
+                "Traversal generic next-page selector=%s url=%s", selector, page.url
+            )
             return locator
         except _RECOVERABLE_ERRORS:
             logger.debug(
@@ -155,7 +172,9 @@ async def recover_listing_page_content(
         try:
             await page.wait_for_load_state(
                 "networkidle",
-                timeout=int(crawler_runtime_settings.traversal_settle_networkidle_timeout_ms),
+                timeout=int(
+                    crawler_runtime_settings.traversal_settle_networkidle_timeout_ms
+                ),
             )
         except _RECOVERABLE_ERRORS:
             logger.debug(
@@ -165,7 +184,9 @@ async def recover_listing_page_content(
                 exc_info=True,
             )
     if diagnostics["status"] == "attempted":
-        diagnostics["status"] = "recovered" if clicked_count > 0 else "no_actionable_elements"
+        diagnostics["status"] = (
+            "recovered" if clicked_count > 0 else "no_actionable_elements"
+        )
     diagnostics["clicked_count"] = clicked_count
     diagnostics["actions_taken"] = actions_taken
     diagnostics["click_retries"] = helper_result.click_retries
@@ -196,7 +217,9 @@ async def _find_aom_actionable_locator(
             candidate = locator.nth(index)
             try:
                 if not await candidate.is_visible(
-                    timeout=int(crawler_runtime_settings.traversal_locator_visible_timeout_ms)
+                    timeout=int(
+                        crawler_runtime_settings.traversal_locator_visible_timeout_ms
+                    )
                 ):
                     continue
                 if await candidate.is_disabled():
@@ -246,7 +269,9 @@ async def click_with_retry(
     if not await _prepare_locator_for_click(page, locator):
         return False
 
-    first_exc = await _try_locator_click(locator, timeout_ms=click_timeout_ms, force=False)
+    first_exc = await _try_locator_click(
+        locator, timeout_ms=click_timeout_ms, force=False
+    )
     if first_exc is None:
         return True
     if not await locator_still_resolves(locator):
@@ -258,14 +283,18 @@ async def click_with_retry(
     result.click_retries += 1
 
     await dismiss_overlays_if_needed(page, locator=locator, result=result)
-    force_exc = await _try_locator_click(locator, timeout_ms=click_timeout_ms, force=True)
+    force_exc = await _try_locator_click(
+        locator, timeout_ms=click_timeout_ms, force=True
+    )
     if force_exc is None:
         await _restore_overlays(page)
         return True
     if not await locator_still_resolves(locator):
         await _restore_overlays(page)
         return False
-    logger.debug("Traversal force click failed (%s); trying JS click", type(force_exc).__name__)
+    logger.debug(
+        "Traversal force click failed (%s); trying JS click", type(force_exc).__name__
+    )
     result.click_retries += 1
     await _restore_overlays(page)
     return await _try_javascript_click(
@@ -309,9 +338,13 @@ async def _prepare_locator_for_click(page, locator) -> bool:
     return True
 
 
-async def _try_locator_click(locator, *, timeout_ms: int, force: bool) -> Exception | None:
+async def _try_locator_click(
+    locator, *, timeout_ms: int, force: bool
+) -> Exception | None:
     try:
-        await locator.click(timeout=timeout_ms, force=True) if force else await locator.click(timeout=timeout_ms)
+        await locator.click(
+            timeout=timeout_ms, force=True
+        ) if force else await locator.click(timeout=timeout_ms)
         return None
     except _POTENTIALLY_RECOVERABLE_ERRORS as exc:
         if not is_recoverable_playwright_error(exc):
@@ -442,15 +475,23 @@ async def dismiss_overlays_if_needed(
         dismissed_any = int(muted_count or 0) > 0
     except _RECOVERABLE_ERRORS:
         logger.debug("Traversal overlay dismissal JS failed", exc_info=True)
-    consent_selectors = list(COOKIE_CONSENT_SELECTORS) if isinstance(COOKIE_CONSENT_SELECTORS, (list, tuple)) else []
+    consent_selectors = (
+        list(COOKIE_CONSENT_SELECTORS)
+        if isinstance(COOKIE_CONSENT_SELECTORS, (list, tuple))
+        else []
+    )
     for selector in consent_selectors[:5]:
         try:
             btn = page.locator(str(selector)).first
             if await btn.count() > 0 and await btn.is_visible(
-                timeout=int(crawler_runtime_settings.traversal_cookie_consent_visible_timeout_ms)
+                timeout=int(
+                    crawler_runtime_settings.traversal_cookie_consent_visible_timeout_ms
+                )
             ):
                 await btn.click(
-                    timeout=int(crawler_runtime_settings.traversal_cookie_consent_click_timeout_ms),
+                    timeout=int(
+                        crawler_runtime_settings.traversal_cookie_consent_click_timeout_ms
+                    ),
                     force=True,
                 )
                 await _wait_for_dom_mutation_settle(

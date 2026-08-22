@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .test_selectolax_css_migration import AmazonAdapter, amazon, build_detail_record, crawler_runtime_settings, extract_listing_records, extract_selector_value, pytest  # fmt: skip
 
+
 @pytest.mark.regression
 def test_detail_extractor_normalizes_category_objects_from_network_payloads() -> None:
     record = build_detail_record(
@@ -29,6 +30,7 @@ def test_detail_extractor_normalizes_category_objects_from_network_payloads() ->
     assert record["title"] == "Combination Pliers"
     assert record["category"] == "Pliers"
 
+
 @pytest.mark.regression
 def test_detail_extractor_reads_category_from_dom_breadcrumbs() -> None:
     record = build_detail_record(
@@ -53,6 +55,7 @@ def test_detail_extractor_reads_category_from_dom_breadcrumbs() -> None:
     assert record["title"] == "Linen Midi Dress"
     assert record["category"] == "Women > Dresses"
     assert record["gender"] == "women"
+
 
 @pytest.mark.regression
 def test_detail_extractor_prefers_visible_breadcrumb_category_over_structured_category() -> (
@@ -94,6 +97,7 @@ def test_detail_extractor_prefers_visible_breadcrumb_category_over_structured_ca
 
     assert record["category"] == "Women > Matching Sets"
     assert record["gender"] == "women"
+
 
 @pytest.mark.regression
 def test_listing_extractor_prefers_structured_name_over_item_position_for_title() -> (
@@ -146,6 +150,7 @@ def test_listing_extractor_prefers_structured_name_over_item_position_for_title(
             "url": "https://www.dyson.in/vacuum-cleaners/cord-free/dyson-v12-detect-slim",
         }
     ]
+
 
 @pytest.mark.regression
 def test_listing_extractor_uses_json_ld_product_id_as_url_with_offer_fields() -> None:
@@ -211,6 +216,7 @@ def test_listing_extractor_uses_json_ld_product_id_as_url_with_offer_fields() ->
         }
     ]
 
+
 @pytest.mark.regression
 def test_xpath_selector_extraction_remains_unchanged() -> None:
     html = """
@@ -231,6 +237,7 @@ def test_xpath_selector_extraction_remains_unchanged() -> None:
     assert value == "$150,000"
     assert count == 1
     assert selector_used == "//span[@data-testid='salary']/text()"
+
 
 @pytest.mark.regression
 def test_xpath_selector_extraction_applies_regex_to_xpath_result() -> None:
@@ -253,6 +260,7 @@ def test_xpath_selector_extraction_applies_regex_to_xpath_result() -> None:
     assert count == 1
     assert selector_used == "//span[@class='rating']/text()"
 
+
 @pytest.mark.regression
 def test_xpath_regex_invalid_timeout_falls_back_without_timeout(
     monkeypatch: pytest.MonkeyPatch,
@@ -268,6 +276,7 @@ def test_xpath_regex_invalid_timeout_falls_back_without_timeout(
             xpath="//span[@class='rating']/text()",
             regex=r"star-rating\s+(\w+)",
         )
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -300,6 +309,7 @@ async def test_amazon_adapter_preserves_css_field_output() -> None:
     assert record["review_count"] == 128
     assert record["image_url"] == "https://example.com/widget.jpg"
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_amazon_adapter_preserves_currency_code_in_price_text() -> None:
@@ -319,6 +329,7 @@ async def test_amazon_adapter_preserves_currency_code_in_price_text() -> None:
     record = result.records[0]
     assert record["price"] == "USD 19.99"
     assert record["currency"] == "USD"
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -344,6 +355,7 @@ async def test_amazon_adapter_combines_visible_whole_and_fraction_price() -> Non
     record = result.records[0]
     assert record["price"] == "$1,359.96"
     assert record["currency"] == "USD"
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -371,6 +383,7 @@ async def test_amazon_adapter_uses_currency_decimal_places_for_zero_decimal_mark
     record = result.records[0]
     assert record["price"] == "JPY 1,359"
     assert record["currency"] == "JPY"
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -401,6 +414,7 @@ async def test_amazon_adapter_preserves_configured_three_decimal_price(
     assert record["price"] == "BHD 1,359.968"
     assert record["currency"] == "BHD"
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_amazon_adapter_preserves_store_brand_suffix() -> None:
@@ -418,6 +432,7 @@ async def test_amazon_adapter_preserves_store_brand_suffix() -> None:
     )
 
     assert result.records[0]["brand"] == "Under Armour"
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -459,6 +474,7 @@ async def test_amazon_adapter_extracts_inline_twister_variants() -> None:
     assert record["color"] == "Pitch Gray-black"
     assert record["size"] == "Large"
     assert record["variant_count"] == 4
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -520,6 +536,7 @@ async def test_amazon_adapter_variants_survive_full_detail_materialization() -> 
         "X-Small",
     ]
 
+
 @pytest.mark.regression
 def test_amazon_detail_sanitization_rejects_media_and_related_product_variants() -> (
     None
@@ -568,6 +585,7 @@ def test_amazon_detail_sanitization_rejects_media_and_related_product_variants()
 
     assert "variants" not in record
     assert "variant_count" not in record
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression

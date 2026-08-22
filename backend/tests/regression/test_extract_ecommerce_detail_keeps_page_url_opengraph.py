@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .test_detail_extractor_structured_sources import BeautifulSoup, detail_raw_signals, extract_records, harvest_js_state_objects, pytest, reconcile_parent_price_against_variant_range  # fmt: skip
 
+
 @pytest.mark.regression
 def test_extract_ecommerce_detail_keeps_page_url_when_opengraph_url_is_site_root() -> (
     None
@@ -36,6 +37,7 @@ def test_extract_ecommerce_detail_keeps_page_url_when_opengraph_url_is_site_root
         == "https://demo.spreecommerce.org/us/en/products/personal-blender"
     )
     assert record["_source"] == "opengraph"
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_ignores_placeholder_same_site_json_ld_url() -> None:
@@ -75,6 +77,7 @@ def test_extract_ecommerce_detail_ignores_placeholder_same_site_json_ld_url() ->
         rows[0]["url"]
         == "https://www.joinhoney.com/it/shop/belk/p/7367171691114074156_8bce8b8cc8892988fb42b26670ceaa09_7121c9215dcc3274f45b6a172cf8e8a8"
     )
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_ignores_review_json_ld_title_description_and_images() -> (
@@ -122,6 +125,7 @@ def test_extract_ecommerce_detail_ignores_review_json_ld_title_description_and_i
     assert record["title"] == "Commuter Backpack"
     assert record["description"] == "Weather resistant pack for daily commuting."
     assert record["image_url"] == "https://example.com/images/product.jpg"
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_ignores_nested_person_name_inside_product_json_ld() -> (
@@ -175,6 +179,7 @@ def test_extract_ecommerce_detail_ignores_nested_person_name_inside_product_json
     assert record["brand"] == "Skechers"
     assert "Robert Greenberg" not in record.values()
 
+
 @pytest.mark.regression
 def test_extract_ecommerce_detail_ignores_noisy_h1_and_uses_page_title() -> None:
     html = """
@@ -202,6 +207,7 @@ def test_extract_ecommerce_detail_ignores_noisy_h1_and_uses_page_title() -> None
     record = rows[0]
     assert record["title"] == "Widget Prime"
     assert record["price"] == "19.99"
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_from_array_style_nuxt_payload() -> None:
@@ -241,6 +247,7 @@ def test_extract_ecommerce_detail_from_array_style_nuxt_payload() -> None:
     assert record["product_id"] == "4242"
     assert record["category"] == "Gadgets"
     assert record["_source"] == "js_state"
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_ignores_js_state_gift_option_price() -> None:
@@ -299,6 +306,7 @@ def test_extract_ecommerce_detail_ignores_js_state_gift_option_price() -> None:
     assert "price" not in record
     assert "currency" not in record
 
+
 @pytest.mark.regression
 def test_extract_ecommerce_detail_reads_plain_initial_state_variants() -> None:
     html = """
@@ -343,6 +351,7 @@ def test_extract_ecommerce_detail_reads_plain_initial_state_variants() -> None:
         variant.get("availability") == "out_of_stock" for variant in record["variants"]
     )
 
+
 @pytest.mark.regression
 def test_plain_initial_state_requires_global_assignment() -> None:
     html = """
@@ -359,6 +368,7 @@ def test_plain_initial_state_requires_global_assignment() -> None:
     state_objects = harvest_js_state_objects(None, html)
 
     assert "INITIAL_STATE" not in state_objects
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_gender_from_explicit_structured_attribute() -> None:
@@ -389,6 +399,7 @@ def test_extract_ecommerce_detail_gender_from_explicit_structured_attribute() ->
 
     assert len(rows) == 1
     assert rows[0]["gender"] == "Women"
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_uses_breadcrumblist_json_ld_category() -> None:
@@ -425,6 +436,7 @@ def test_extract_ecommerce_detail_uses_breadcrumblist_json_ld_category() -> None
     assert len(rows) == 1
     assert rows[0]["category"] == "Women > Dresses"
 
+
 @pytest.mark.regression
 def test_extract_ecommerce_detail_category_drops_collection_branch_noise() -> None:
     html = """
@@ -458,6 +470,7 @@ def test_extract_ecommerce_detail_category_drops_collection_branch_noise() -> No
     )
 
     assert rows[0]["category"] == "Sports > Padel"
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_category_from_dom_breadcrumb() -> None:
@@ -493,6 +506,7 @@ def test_extract_ecommerce_detail_category_from_dom_breadcrumb() -> None:
     assert rows[0]["category"] == "Women > Dresses"
     assert rows[0]["gender"] == "women"
 
+
 @pytest.mark.regression
 def test_extract_ecommerce_detail_dom_breadcrumb_drops_ui_tokens_and_title_suffix() -> (
     None
@@ -526,6 +540,7 @@ def test_extract_ecommerce_detail_dom_breadcrumb_drops_ui_tokens_and_title_suffi
 
     assert len(rows) == 1
     assert rows[0]["category"] == "Men > Shoes"
+
 
 @pytest.mark.regression
 def test_breadcrumb_noise_icon_regex_logs_once_when_invalid(
@@ -571,6 +586,7 @@ def test_breadcrumb_noise_icon_regex_logs_once_when_invalid(
         == 1
     )
 
+
 @pytest.mark.regression
 def test_extract_ecommerce_detail_json_ld_breadcrumb_beats_noisy_dom() -> None:
     html = """
@@ -611,6 +627,7 @@ def test_extract_ecommerce_detail_json_ld_breadcrumb_beats_noisy_dom() -> None:
     assert len(rows) == 1
     assert rows[0]["category"] == "Women > Dresses"
 
+
 @pytest.mark.regression
 def test_reconcile_parent_price_against_variant_range_repairs_lower_parent_price() -> (
     None
@@ -628,6 +645,7 @@ def test_reconcile_parent_price_against_variant_range_repairs_lower_parent_price
 
     assert record["price"] == "310.00"
     assert "variant_price_range" in record["_field_sources"]["price"]
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_category_drops_terminal_sku() -> None:

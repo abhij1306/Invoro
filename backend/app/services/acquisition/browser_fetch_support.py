@@ -206,7 +206,9 @@ async def prepare_browser_fetch_launch_context(
     skip_origin_warmup = bool(
         allow_storage_state
         and normalized_domain
-        and await cookie_store.load_storage_state_for_domain(normalized_domain, browser_engine=runtime_engine)
+        and await cookie_store.load_storage_state_for_domain(
+            normalized_domain, browser_engine=runtime_engine
+        )
     )
     await emit_browser_event(
         on_event,

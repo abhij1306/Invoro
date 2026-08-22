@@ -158,7 +158,9 @@ class OracleHCMAdapter(PublicEndpointAdapter):
     ) -> list[dict]:
         records: list[dict] = []
         for item in items:
-            requisitions = item.get("requisitionList") if isinstance(item, dict) else None
+            requisitions = (
+                item.get("requisitionList") if isinstance(item, dict) else None
+            )
             if not isinstance(requisitions, list):
                 requisitions = [item] if isinstance(item, dict) else []
             for requisition in requisitions:
@@ -248,7 +250,9 @@ class OracleHCMAdapter(PublicEndpointAdapter):
 
     @staticmethod
     def _first_requisition_text(requisition: dict, *keys: str) -> str:
-        return clean_text(next((requisition.get(key) for key in keys if requisition.get(key)), ""))
+        return clean_text(
+            next((requisition.get(key) for key in keys if requisition.get(key)), "")
+        )
 
     def _extract_site_number(self, url: str, html: Optional[str]) -> str:
         path_match = ORACLE_HCM_SITE_PATH_RE.search(urlparse(str(url or "")).path)

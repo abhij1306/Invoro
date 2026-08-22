@@ -145,9 +145,14 @@ async def _retry_patchright_detail_rejection_with_real_chrome(
     if str(context.surface or "").strip().lower() != "ecommerce_detail":
         return None
     acquisition_result = fetched.acquisition_result
-    diagnostics = mapping_or_empty(getattr(acquisition_result, "browser_diagnostics", {}))
+    diagnostics = mapping_or_empty(
+        getattr(acquisition_result, "browser_diagnostics", {})
+    )
     browser_engine = str(diagnostics.get("browser_engine") or "").strip().lower()
-    if getattr(acquisition_result, "method", "") != "browser" or browser_engine != "patchright":
+    if (
+        getattr(acquisition_result, "method", "") != "browser"
+        or browser_engine != "patchright"
+    ):
         return None
     from app.services.pipeline import extraction_loop
 
@@ -191,7 +196,9 @@ async def _retry_patchright_detail_rejection_with_real_chrome(
     await _log_pipeline_event(
         context,
         "info",
-        (f"Patchright detail rejected as {rejection_reason}; escalating real Chrome for {context.url}"),
+        (
+            f"Patchright detail rejected as {rejection_reason}; escalating real Chrome for {context.url}"
+        ),
     )
 
     retry_result = await _acquire_browser_retry_result(
@@ -233,7 +240,9 @@ async def _retry_patchright_detail_rejection_with_real_chrome(
 
 
 def _challenge_shell_reason(acquisition_result: AcquisitionResult) -> str | None:
-    return PageEvidence.from_acquisition_result(acquisition_result).challenge_shell_reason
+    return PageEvidence.from_acquisition_result(
+        acquisition_result
+    ).challenge_shell_reason
 
 
 def _apply_detail_rejection_guard(
@@ -309,7 +318,9 @@ async def _log_extraction_outcome(
     records: list[dict[str, object]],
 ) -> None:
     adapter_name = str(getattr(acquisition_result, "adapter_name", "") or "").strip()
-    extraction_label = f"{adapter_name} adapter" if adapter_name else "generic extraction path"
+    extraction_label = (
+        f"{adapter_name} adapter" if adapter_name else "generic extraction path"
+    )
     if records:
         await _log_pipeline_event(
             context,
@@ -357,9 +368,13 @@ async def _retry_empty_extraction_with_browser(
         "info",
         f"No records via {acquisition_result.method}; retrying browser render for {context.url}",
     )
-    browser_result = await _acquire_browser_retry_result(context, fetched, retry_reason="empty_extraction")
+    browser_result = await _acquire_browser_retry_result(
+        context, fetched, retry_reason="empty_extraction"
+    )
     fetched.acquisition_result = browser_result
-    retry_records, retry_selector_rules = await _extract_records_for_acquisition(context, fetched)
+    retry_records, retry_selector_rules = await _extract_records_for_acquisition(
+        context, fetched
+    )
     return retry_records, retry_selector_rules
 
 
@@ -386,8 +401,14 @@ async def _retry_low_quality_extraction_with_browser(
     if not retry_decision["should_retry"]:
         return records, selector_rules
     raw_missing_fields = retry_decision.get("missing_fields")
-    missing_field_values = raw_missing_fields if isinstance(raw_missing_fields, list) else []
-    missing_fields = [str(field_name) for field_name in missing_field_values if str(field_name).strip()]
+    missing_field_values = (
+        raw_missing_fields if isinstance(raw_missing_fields, list) else []
+    )
+    missing_fields = [
+        str(field_name)
+        for field_name in missing_field_values
+        if str(field_name).strip()
+    ]
     if not missing_fields:
         return records, selector_rules
     remaining_budget_seconds = _remaining_url_budget_seconds(context)
@@ -530,7 +551,9 @@ async def _retry_listing_integrity_with_stronger_tier(
     # --- Increment retry count AFTER successful acquisition (at-most-one enforcement) ---
 
     next_tier = str(escalation.get("next_tier") or "")
-    forced_engine = next_tier.replace("browser:", "") if next_tier.startswith("browser:") else None
+    forced_engine = (
+        next_tier.replace("browser:", "") if next_tier.startswith("browser:") else None
+    )
 
     await _log_pipeline_event(
         context,
@@ -609,7 +632,9 @@ def _build_escalation_policy_snapshot(acquisition_result) -> object:
     Exposes challenge_state, escalation_disabled, and host_hard_block
     derived from the acquisition result and runtime settings.
     """
-    diagnostics = mapping_or_empty(getattr(acquisition_result, "browser_diagnostics", {}))
+    diagnostics = mapping_or_empty(
+        getattr(acquisition_result, "browser_diagnostics", {})
+    )
     challenge_state = bool(diagnostics.get("challenge_detected"))
     host_hard_block = bool(diagnostics.get("host_hard_block"))
     # escalation_disabled is read from runtime settings inside the decision
@@ -646,7 +671,8 @@ def _remaining_url_budget_seconds(context: _URLProcessingContext) -> float:
         return float(facade_func(context))
     return max(
         0.0,
-        float(context.url_timeout_seconds) - max(0.0, time.monotonic() - float(context.started_at_monotonic)),
+        float(context.url_timeout_seconds)
+        - max(0.0, time.monotonic() - float(context.started_at_monotonic)),
     )
 
 
@@ -683,7 +709,9 @@ async def _acquire_browser_retry_result(
     }
     if forced_browser_engine:
         profile_updates["forced_browser_engine"] = forced_browser_engine
-    retry_request = (await _build_acquisition_request(context)).with_profile_updates(**profile_updates)
+    retry_request = (await _build_acquisition_request(context)).with_profile_updates(
+        **profile_updates
+    )
     try:
         from app.services.pipeline import extraction_loop
 
@@ -692,9 +720,13 @@ async def _acquire_browser_retry_result(
     except (RuntimeError, ValueError, TypeError, OSError) as exc:
         _merge_browser_diagnostics(
             acquisition_result,
-            build_failed_browser_diagnostics(browser_reason=f"{retry_reason.replace('_', '-')} retry", exc=exc),
+            build_failed_browser_diagnostics(
+                browser_reason=f"{retry_reason.replace('_', '-')} retry", exc=exc
+            ),
         )
-        fetched.url_metrics = build_url_metrics(acquisition_result, requested_fields=list(context.requested_fields))
+        fetched.url_metrics = build_url_metrics(
+            acquisition_result, requested_fields=list(context.requested_fields)
+        )
         await _log_pipeline_event(
             context,
             "warning",

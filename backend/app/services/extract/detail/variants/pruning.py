@@ -720,7 +720,10 @@ def _drop_variant_derived_parent_axis_scalars(record: dict[str, Any]) -> None:
     sources = field_sources if isinstance(field_sources, dict) else {}
     for field_name in ("size", "color"):
         if _should_drop_variant_derived_parent_axis(
-            record, variants, field_name=field_name, has_sources=bool(sources.get(field_name))
+            record,
+            variants,
+            field_name=field_name,
+            has_sources=bool(sources.get(field_name)),
         ):
             record.pop(field_name, None)
 
@@ -736,7 +739,9 @@ def _should_drop_variant_derived_parent_axis(
     if not parent_value:
         return False
     variant_values = {
-        value.casefold() for row in variants if (value := clean_text(row.get(field_name)))
+        value.casefold()
+        for row in variants
+        if (value := clean_text(row.get(field_name)))
     }
     numeric_size_mismatch = (
         field_name == "size"

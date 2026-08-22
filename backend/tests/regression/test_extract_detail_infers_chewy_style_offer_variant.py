@@ -5,6 +5,7 @@ from .test_crawl_engine import (
     pytest,
 )
 
+
 @pytest.mark.regression
 def test_extract_detail_infers_chewy_style_offer_variant_sizes() -> None:
     html = """
@@ -47,6 +48,7 @@ def test_extract_detail_infers_chewy_style_offer_variant_sizes() -> None:
     record = rows[0]
     assert [row["price"] for row in record["variants"]] == ["18.99", "42.99"]
 
+
 @pytest.mark.regression
 def test_extract_ecommerce_detail_does_not_infer_price_from_shell_chrome_text() -> None:
     html = """
@@ -80,6 +82,7 @@ def test_extract_ecommerce_detail_does_not_infer_price_from_shell_chrome_text() 
     assert "price" not in record
     assert "currency" not in record
 
+
 @pytest.mark.regression
 def test_extract_ecommerce_detail_does_not_infer_price_from_404_body_text() -> None:
     html = """
@@ -110,6 +113,7 @@ def test_extract_ecommerce_detail_does_not_infer_price_from_404_body_text() -> N
     assert "price" not in record
     assert "currency" not in record
 
+
 @pytest.mark.regression
 def test_extract_ecommerce_detail_rejects_404_record_with_filter_variants() -> None:
     html = """
@@ -137,6 +141,7 @@ def test_extract_ecommerce_detail_rejects_404_record_with_filter_variants() -> N
     )
 
     assert rows == []
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_reads_books_table_price_currency() -> None:
@@ -166,6 +171,7 @@ def test_extract_ecommerce_detail_reads_books_table_price_currency() -> None:
     record = rows[0]
     assert record["price"] == "51.77"
     assert record["currency"] == "GBP"
+
 
 @pytest.mark.regression
 def test_extract_detail_normalizes_shopify_embedded_compare_at_price_from_cents() -> (
@@ -226,6 +232,7 @@ def test_extract_detail_normalizes_shopify_embedded_compare_at_price_from_cents(
     assert record["price"] == "939.00"
     assert record["original_price"] == "1565.00"
 
+
 @pytest.mark.regression
 def test_extract_detail_keeps_shopify_variant_record_when_requested_url_has_product_code_prefix() -> (
     None
@@ -269,6 +276,7 @@ def test_extract_detail_keeps_shopify_variant_record_when_requested_url_has_prod
     assert len(rows) == 1
     assert rows[0]["title"] == "Phoenix dark brown leather boots"
 
+
 @pytest.mark.regression
 def test_extract_detail_strips_variant_availability_suffix_from_option_values() -> None:
     html = """
@@ -295,6 +303,7 @@ def test_extract_detail_strips_variant_availability_suffix_from_option_values() 
 
     assert len(rows) == 1
     assert [variant["size"] for variant in rows[0]["variants"]] == ["36", "37"]
+
 
 @pytest.mark.regression
 def test_extract_detail_dom_images_excludes_related_product_cards() -> None:
@@ -332,6 +341,7 @@ def test_extract_detail_dom_images_excludes_related_product_cards() -> None:
         "https://example.com/images/trail-runner-2.jpg"
     ]
 
+
 @pytest.mark.regression
 def test_extract_detail_dom_images_excludes_compare_model_assets() -> None:
     html = """
@@ -365,6 +375,7 @@ def test_extract_detail_dom_images_excludes_compare_model_assets() -> None:
     assert record["additional_images"] == [
         "https://example.com/images/iphone-16-side.jpg"
     ]
+
 
 @pytest.mark.regression
 def test_extract_detail_scopes_text_away_from_customers_also_viewed_products() -> None:
@@ -401,6 +412,7 @@ def test_extract_detail_scopes_text_away_from_customers_also_viewed_products() -
     assert "Tommy Hilfiger" not in record["description"]
     assert "Cole Haan" not in record["description"]
 
+
 @pytest.mark.regression
 def test_extract_detail_rejects_placeholder_and_ui_asset_images() -> None:
     html = """
@@ -427,6 +439,7 @@ def test_extract_detail_rejects_placeholder_and_ui_asset_images() -> None:
 
     assert len(rows) == 1
     assert rows[0]["image_url"] == "https://example.com/images/vans-old-skool.jpg"
+
 
 @pytest.mark.regression
 def test_extract_detail_generic_original_price_from_del_or_was_price() -> None:

@@ -39,6 +39,7 @@ from app.services.listing_extractor import extract_listing_records
 
 from tests.fixtures.loader import read_optional_artifact_text
 
+
 def _js_shell_html() -> str:
     return """
     <html>
@@ -50,6 +51,7 @@ def _js_shell_html() -> str:
       </body>
     </html>
     """
+
 
 def _rendered_listing_fragment(
     *,

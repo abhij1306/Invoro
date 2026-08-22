@@ -23,11 +23,17 @@ class TraversalResult:
     _seen_structured_fragments: set[str] = field(default_factory=set, repr=False)
 
     def html_bytes(self) -> int:
-        return sum(len(fragment.encode("utf-8")) for fragment, _is_fallback in self.html_fragments if fragment)
+        return sum(
+            len(fragment.encode("utf-8"))
+            for fragment, _is_fallback in self.html_fragments
+            if fragment
+        )
 
     def compose_html(self) -> str:
         texts = [
-            str(fragment or "").strip() for fragment, _is_fallback in self.html_fragments if str(fragment or "").strip()
+            str(fragment or "").strip()
+            for fragment, _is_fallback in self.html_fragments
+            if str(fragment or "").strip()
         ]
         if not texts:
             return ""

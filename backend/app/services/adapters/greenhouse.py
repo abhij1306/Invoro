@@ -184,9 +184,12 @@ class GreenhouseAdapter(BaseAdapter):
     @staticmethod
     def _html_opening_record(opening: Tag, *, page_url: str) -> dict | None:
         anchor = opening.select_one("a[href]")
-        title_el = opening.select_one(
-            ".opening-title, td.cell-title a, a .body--medium, a [class*='title'], a p"
-        ) or anchor
+        title_el = (
+            opening.select_one(
+                ".opening-title, td.cell-title a, a .body--medium, a [class*='title'], a p"
+            )
+            or anchor
+        )
         if not title_el and not anchor:
             return None
         if anchor is None and title_el is not None:
@@ -203,7 +206,9 @@ class GreenhouseAdapter(BaseAdapter):
             ".body__secondary.body--metadata, .body--metadata, "
             "a [class*='location'], a p + p"
         )
-        location = clean_text(location_el.get_text(" ", strip=True) if location_el else "")
+        location = clean_text(
+            location_el.get_text(" ", strip=True) if location_el else ""
+        )
         return {"title": title, "url": href, "location": location}
 
     def _normalize_detail_record(self, payload: dict, *, page_url: str) -> dict | None:

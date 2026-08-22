@@ -13,7 +13,11 @@ from .normalization import normalize_domain_run_profile
 
 async def _has_domain_run_profiles_table(session: AsyncSession) -> bool:
     return bool(
-        await session.run_sync(lambda sync_session: inspect(sync_session.connection()).has_table("domain_run_profiles"))
+        await session.run_sync(
+            lambda sync_session: inspect(sync_session.connection()).has_table(
+                "domain_run_profiles"
+            )
+        )
     )
 
 

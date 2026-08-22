@@ -4,6 +4,7 @@ from .test_batch_runtime import AsyncSession, URLProcessingResult, create_crawl_
 
 pytest_plugins = ["tests.regression.test_batch_runtime"]
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_process_run_continues_when_failure_log_persistence_raises_non_sql_exception(
@@ -56,6 +57,7 @@ async def test_process_run_continues_when_failure_log_persistence_raises_non_sql
     assert run.status == "completed"
     assert run.result_summary["extraction_verdict"] == "partial"
     assert run.result_summary["url_verdicts"] == ["error", "success"]
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -110,6 +112,7 @@ async def test_process_run_records_browser_exception_diagnostics_and_continues(
     assert run.result_summary["acquisition_summary"]["failure_reasons"] == {
         "location_required": 1,
     }
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression

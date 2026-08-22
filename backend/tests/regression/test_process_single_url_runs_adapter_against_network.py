@@ -11,6 +11,7 @@ from app.services.pipeline.extraction_loop import process_single_url, resolved_u
 from app.services.pipeline.types import URLProcessingConfig  # fmt: skip
 from sqlalchemy.ext.asyncio import AsyncSession  # fmt: skip
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_process_single_url_runs_adapter_against_network_payloads(
@@ -126,6 +127,7 @@ async def test_process_single_url_runs_adapter_against_network_payloads(
         {"sku": "0438651111111", "barcode": "0019783000001"}
     ]
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_process_single_url_skips_redundant_adapter_artifacts_when_main_html_sufficient(
@@ -221,6 +223,7 @@ async def test_process_single_url_skips_redundant_adapter_artifacts_when_main_ht
     assert adapter_calls == 1
     assert [row["price"] for row in result.records] == ["22.75", "39.95"]
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_process_single_url_prefers_richer_adapter_artifact_rows(
@@ -307,6 +310,7 @@ async def test_process_single_url_prefers_richer_adapter_artifact_rows(
 
     assert [record["title"] for record in result.records] == ["Rich One", "Rich Two"]
 
+
 @pytest.mark.regression
 def test_url_processing_config_syncs_compatibility_fields_from_acquisition_plan() -> (
     None
@@ -331,6 +335,7 @@ def test_url_processing_config_syncs_compatibility_fields_from_acquisition_plan(
     assert config.max_records == 11
     assert config.sleep_ms == 900
     assert config.persist_logs is False
+
 
 @pytest.mark.regression
 def test_resolved_url_processing_config_handles_none_plan_limits() -> None:
@@ -362,6 +367,7 @@ def test_resolved_url_processing_config_handles_none_plan_limits() -> None:
     assert resolved.max_records == 6
     assert resolved.sleep_ms == 7
 
+
 @pytest.mark.regression
 def test_resolved_url_processing_config_preserves_explicit_zero_sleep_ms() -> None:
     config = URLProcessingConfig.from_acquisition_plan(
@@ -385,6 +391,7 @@ def test_resolved_url_processing_config_preserves_explicit_zero_sleep_ms() -> No
     )
 
     assert resolved.sleep_ms == 0
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -431,6 +438,7 @@ async def test_acquire_normalizes_retry_reason_aliases(
 
     assert captured["browser_reason"] == "thin-listing retry"
     assert captured["listing_recovery_mode"] == "thin_listing"
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -483,6 +491,7 @@ async def test_process_single_url_marks_empty_listing_as_listing_detection_faile
     assert result.url_metrics["record_count"] == 0
     assert total == 0
     assert rows == []
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -555,6 +564,7 @@ async def test_process_single_url_preserves_proxy_list_for_detail_surface(
 
     assert captured_proxy_lists == [["http://proxy-1"]]
     assert result.verdict == "success"
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression

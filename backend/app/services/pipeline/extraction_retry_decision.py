@@ -90,10 +90,14 @@ def _detail_request_url_is_non_detail_seed(
 ) -> bool:
     if "detail" not in str(surface or "").strip().lower():
         return False
-    request_url = str(getattr(getattr(acquisition_result, "request", None), "url", "") or "")
+    request_url = str(
+        getattr(getattr(acquisition_result, "request", None), "url", "") or ""
+    )
     final_url = str(getattr(acquisition_result, "final_url", "") or "")
     for candidate_url in (request_url, final_url):
-        if detail_url_is_collection_like(candidate_url) or detail_url_is_utility(candidate_url):
+        if detail_url_is_collection_like(candidate_url) or detail_url_is_utility(
+            candidate_url
+        ):
             return True
     return False
 
@@ -108,7 +112,9 @@ def records_missing_repair_fields(
     missing: list[str] = []
     for field_name in targets:
         if records and all(
-            isinstance(record, dict) and record.get(field_name) not in (None, "", [], {}) for record in records
+            isinstance(record, dict)
+            and record.get(field_name) not in (None, "", [], {})
+            for record in records
         ):
             continue
         missing.append(field_name)
@@ -140,8 +146,12 @@ def low_quality_extraction_browser_retry_decision(
     )
     if not missing_fields:
         return {"should_retry": False, "reason": "repair_fields_complete"}
-    retry_targets = set(browser_retry_target_fields_for_surface(surface, requested_fields or []))
-    retry_missing_fields = [field_name for field_name in missing_fields if field_name in retry_targets]
+    retry_targets = set(
+        browser_retry_target_fields_for_surface(surface, requested_fields or [])
+    )
+    retry_missing_fields = [
+        field_name for field_name in missing_fields if field_name in retry_targets
+    ]
     if not retry_missing_fields:
         return {
             "should_retry": False,
@@ -184,7 +194,11 @@ def annotate_field_repair(
     for record in records:
         if not isinstance(record, dict):
             continue
-        missing = [field_name for field_name in targets if record.get(field_name) in (None, "", [], {})]
+        missing = [
+            field_name
+            for field_name in targets
+            if record.get(field_name) in (None, "", [], {})
+        ]
         if not missing:
             record.pop("_field_repair", None)
             continue
@@ -224,21 +238,33 @@ def _empty_detail_extraction_has_static_evidence(
         ),
     )
     raw_extractable_fields = extractability.get("extractable_fields")
-    extractable_field_values = list(raw_extractable_fields) if isinstance(raw_extractable_fields, list) else []
-    extractable_fields = {str(field_name).strip() for field_name in extractable_field_values if str(field_name).strip()}
+    extractable_field_values = (
+        list(raw_extractable_fields) if isinstance(raw_extractable_fields, list) else []
+    )
+    extractable_fields = {
+        str(field_name).strip()
+        for field_name in extractable_field_values
+        if str(field_name).strip()
+    }
     raw_matched_requested_fields = extractability.get("matched_requested_fields")
     matched_requested_values = (
-        list(raw_matched_requested_fields) if isinstance(raw_matched_requested_fields, list) else []
+        list(raw_matched_requested_fields)
+        if isinstance(raw_matched_requested_fields, list)
+        else []
     )
     matched_requested_fields = {
-        str(field_name).strip() for field_name in matched_requested_values if str(field_name).strip()
+        str(field_name).strip()
+        for field_name in matched_requested_values
+        if str(field_name).strip()
     }
     # If we have matched requested fields, that's strong evidence
     if matched_requested_fields:
         return True
 
     # If static HTML exposes configured price and identity fields, browser retry is a waste.
-    has_price = bool(extractable_fields & set(PRICE_FIELDS)) or _html_has_configured_detail_price(soup)
+    has_price = bool(
+        extractable_fields & set(PRICE_FIELDS)
+    ) or _html_has_configured_detail_price(soup)
     has_identity = bool(set(DETAIL_IDENTITY_FIELDS) & extractable_fields)
 
     return bool(has_price and has_identity)
@@ -272,14 +298,16 @@ def _low_quality_detail_html_suggests_browser_retry(
         missing_fields=missing_fields,
     ):
         return False
-    if _html_looks_like_js_required_placeholder(analysis.title_text, analysis.visible_text, soup):
+    if _html_looks_like_js_required_placeholder(
+        analysis.title_text, analysis.visible_text, soup
+    ):
         return True
     lowered_html = analysis.lowered_html
     if any(token in lowered_html for token in DETAIL_SHELL_STATE_TOKENS):
         return True
-    return any(token in lowered_html for token in DETAIL_SHELL_FRAMEWORK_TOKENS) and any(
-        token in lowered_html for token in DETAIL_SHELL_PRODUCT_DATA_TOKENS
-    )
+    return any(
+        token in lowered_html for token in DETAIL_SHELL_FRAMEWORK_TOKENS
+    ) and any(token in lowered_html for token in DETAIL_SHELL_PRODUCT_DATA_TOKENS)
 
 
 def _missing_fields_have_static_html_evidence(
@@ -302,12 +330,20 @@ def _missing_fields_have_static_html_evidence(
         ),
     )
     raw_matched_requested = extractability.get("matched_requested_fields")
-    matched_requested_values = list(raw_matched_requested) if isinstance(raw_matched_requested, list) else []
-    matched_requested = {str(field_name).strip() for field_name in matched_requested_values if str(field_name).strip()}
+    matched_requested_values = (
+        list(raw_matched_requested) if isinstance(raw_matched_requested, list) else []
+    )
+    matched_requested = {
+        str(field_name).strip()
+        for field_name in matched_requested_values
+        if str(field_name).strip()
+    }
     if matched_requested:
         return True
     normalized_missing = {str(field_name).strip() for field_name in missing_fields}
-    if normalized_missing & set(PRICE_FIELDS) and _html_has_configured_detail_price(soup):
+    if normalized_missing & set(PRICE_FIELDS) and _html_has_configured_detail_price(
+        soup
+    ):
         return True
     if normalized_missing & set(VARIANT_FIELDS) and variant_dom_cues_present(soup):
         return True

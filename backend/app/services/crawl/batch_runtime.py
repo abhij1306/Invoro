@@ -75,7 +75,9 @@ async def _run_url_processing_with_timeout(operation, timeout_seconds: float):
     task.cancel()
     with suppress(asyncio.CancelledError):
         _ = await task
-    raise _URLProcessingDeadlineExceeded(f"URL processing exceeded timeout_seconds={timeout_seconds}")
+    raise _URLProcessingDeadlineExceeded(
+        f"URL processing exceeded timeout_seconds={timeout_seconds}"
+    )
 
 
 async def resolve_category_urls_from_sitemap(
@@ -122,7 +124,9 @@ def _allow_sitemap_homepage_fallback(run: CrawlRun, settings_view) -> bool:
     evidence = resolution.get("evidence")
     if not isinstance(evidence, list):
         return False
-    return "requested_surface:auto" in {str(item).strip().lower() for item in evidence if item}
+    return "requested_surface:auto" in {
+        str(item).strip().lower() for item in evidence if item
+    }
 
 
 async def _resolve_run_urls(run: CrawlRun, settings_view) -> list[str]:
@@ -134,15 +138,20 @@ async def _resolve_run_urls(run: CrawlRun, settings_view) -> list[str]:
     elif settings_view.get("sitemap_domain"):
         url_list = await resolve_category_urls_from_sitemap(
             domain=settings_view.get("sitemap_domain"),
-            filter_keyword=settings_view.get("sitemap_filter_keyword") or SITEMAP_DEFAULT_FILTER_KEYWORD,
+            filter_keyword=settings_view.get("sitemap_filter_keyword")
+            or SITEMAP_DEFAULT_FILTER_KEYWORD,
             max_urls=_safe_sitemap_max_urls(settings_view.get("sitemap_max_urls")),
-            allow_homepage_fallback=_allow_sitemap_homepage_fallback(run, settings_view),
+            allow_homepage_fallback=_allow_sitemap_homepage_fallback(
+                run, settings_view
+            ),
         )
     elif run.url:
         url_list = [run.url]
     else:
         raise ValueError("No URL provided")
-    return [value for value in (normalize_target_url(item) for item in url_list) if value]
+    return [
+        value for value in (normalize_target_url(item) for item in url_list) if value
+    ]
 
 
 def _current_duration_ms(run: CrawlRun) -> int:
@@ -172,7 +181,9 @@ def _url_timeout_seconds(settings_view) -> float:
         # Allow ~30s per traversal page on top of the base timeout, capped at max.
         traversal_budget = traversal_pages * 30.0
         extended = base_timeout + traversal_budget
-        return min(extended, float(crawler_runtime_settings.max_url_process_timeout_seconds))
+        return min(
+            extended, float(crawler_runtime_settings.max_url_process_timeout_seconds)
+        )
     return base_timeout
 
 
@@ -270,7 +281,9 @@ async def _recover_url_failure(
         raise RuntimeError(f"Run {run_id} disappeared after URL failure") from exc
     metrics = _url_failure_metrics(exc)
     if recovery_error is not None:
-        metrics["failure_log_persistence_error"] = f"{type(recovery_error).__name__}: {recovery_error}"
+        metrics["failure_log_persistence_error"] = (
+            f"{type(recovery_error).__name__}: {recovery_error}"
+        )
         metrics["failure_log_persisted"] = False
     return run, URLProcessingResult(
         records=[],
@@ -290,7 +303,9 @@ async def _persist_url_failure_log(
     run = await session.get(CrawlRun, run_id, populate_existing=True)
     if run is None:
         raise RuntimeError(f"Run {run_id} disappeared after URL failure") from exc
-    logger.warning("URL processing failed for run=%s url=%s", run_id, url, exc_info=True)
+    logger.warning(
+        "URL processing failed for run=%s url=%s", run_id, url, exc_info=True
+    )
     event_message = log_message
     if not event_message.startswith("[url:"):
         event_message = f"[url:{url}] {event_message}"
@@ -375,9 +390,13 @@ async def _process_url_in_parallel(
                 run_id=run.id,
                 url=url,
                 exc=exc,
-                log_message=(f"URL processing timed out for {url} (timeout_seconds={url_timeout_seconds})"),
+                log_message=(
+                    f"URL processing timed out for {url} (timeout_seconds={url_timeout_seconds})"
+                ),
             )
-            url_result.url_metrics["error"] = f"TimeoutError: url exceeded timeout_seconds={url_timeout_seconds}"
+            url_result.url_metrics["error"] = (
+                f"TimeoutError: url exceeded timeout_seconds={url_timeout_seconds}"
+            )
         except Exception as exc:
             run, url_result = await _recover_url_failure(
                 url_session,
@@ -434,7 +453,9 @@ async def _process_urls_sequential(
         _touch_run_heartbeat(run)
         if await _apply_sequential_control_request(session, run):
             return run, verdicts, record_count
-        await _log_sequential_url_start(session, run, url=url, idx=idx, total_urls=total_urls)
+        await _log_sequential_url_start(
+            session, run, url=url, idx=idx, total_urls=total_urls
+        )
         remaining_records = max(max_records - record_count, 1)
         run, result = await _process_sequential_url(
             session,
@@ -462,7 +483,9 @@ async def _process_urls_sequential(
         )
         _touch_run_heartbeat(run)
         run.update_summary(
-            **progress_state.build_progress_patch(current_url=url, current_url_index=idx),
+            **progress_state.build_progress_patch(
+                current_url=url, current_url_index=idx
+            ),
             duration_ms=_current_duration_ms(run),
         )
         await session.commit()
@@ -480,7 +503,9 @@ async def _process_urls_sequential(
     return run, verdicts, record_count
 
 
-async def _apply_sequential_control_request(session: AsyncSession, run: CrawlRun) -> bool:
+async def _apply_sequential_control_request(
+    session: AsyncSession, run: CrawlRun
+) -> bool:
     control_request = get_control_request(run)
     if control_request not in (CONTROL_REQUEST_PAUSE, CONTROL_REQUEST_KILL):
         return False
@@ -540,7 +565,9 @@ async def _process_sequential_url(
     url_timeout_seconds: float,
 ) -> tuple[CrawlRun, URLProcessingResult]:
     config = URLProcessingConfig.from_acquisition_plan(
-        run.settings_view.acquisition_plan(surface=run.surface, max_records=remaining_records),
+        run.settings_view.acquisition_plan(
+            surface=run.surface, max_records=remaining_records
+        ),
         update_run_state=True,
         persist_logs=True,
     )
@@ -582,9 +609,13 @@ async def _process_sequential_url(
             run_id=run.id,
             url=url,
             exc=exc,
-            log_message=(f"URL processing timed out for {url} (timeout_seconds={url_timeout_seconds})"),
+            log_message=(
+                f"URL processing timed out for {url} (timeout_seconds={url_timeout_seconds})"
+            ),
         )
-        result.url_metrics["error"] = f"TimeoutError: url exceeded timeout_seconds={url_timeout_seconds}"
+        result.url_metrics["error"] = (
+            f"TimeoutError: url exceeded timeout_seconds={url_timeout_seconds}"
+        )
         return recovered_run, result
     except Exception as exc:
         recovered_run, result = await _recover_url_failure(
@@ -670,7 +701,10 @@ async def _process_run_with_span(
         record_count = as_int(run.get_summary("record_count", 0))
 
         try:
-            if total_urls > 1 and parallel_url_concurrency(total_urls, settings_view) > 1:
+            if (
+                total_urls > 1
+                and parallel_url_concurrency(total_urls, settings_view) > 1
+            ):
                 verdicts, record_count = await _process_urls_in_parallel(
                     session,
                     run=run,

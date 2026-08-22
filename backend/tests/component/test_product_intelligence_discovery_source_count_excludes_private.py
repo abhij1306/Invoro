@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .test_product_intelligence import AsyncSession, PRODUCT_INTELLIGENCE_CANDIDATE_STATUS_CRAWL_QUEUED, PRODUCT_INTELLIGENCE_CANDIDATE_STATUS_CRAWL_TIMEOUT, ProductIntelligenceCandidate, ProductIntelligenceJob, ProductIntelligenceSourceProduct, SOURCE_TYPE_BRAND_DTC, SearchResult, build_search_queries, discover_product_intelligence_candidates, extract_product_snapshot, extract_search_result_snapshot, poll_candidate_and_score, product_intelligence_settings, pytest, score_candidate  # fmt: skip
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_product_intelligence_discovery_source_count_excludes_private_label(
@@ -60,6 +61,7 @@ async def test_product_intelligence_discovery_source_count_excludes_private_labe
     assert response["candidate_count"] == 1
     assert response["candidates"][0]["source_index"] == 1
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_product_intelligence_discovery_defaults_private_label_mode_to_exclude(
@@ -116,6 +118,7 @@ async def test_product_intelligence_discovery_defaults_private_label_mode_to_exc
     assert response["source_count"] == 1
     assert response["candidate_count"] == 1
     assert response["candidates"][0]["source_index"] == 1
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -182,6 +185,7 @@ async def test_product_intelligence_discovery_searches_title_only_sources(
     assert response["candidate_count"] == 6
     assert {candidate["source_index"] for candidate in response["candidates"]} == {0, 1}
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_product_intelligence_candidate_poll_marks_timeout(
@@ -217,6 +221,7 @@ async def test_product_intelligence_candidate_poll_marks_timeout(
 
     assert candidate.status == PRODUCT_INTELLIGENCE_CANDIDATE_STATUS_CRAWL_TIMEOUT
 
+
 @pytest.mark.component
 def test_manufacturer_style_code_decomposes_composite_sku() -> None:
     from app.services.product_intelligence.matching import manufacturer_style_code
@@ -229,6 +234,7 @@ def test_manufacturer_style_code_decomposes_composite_sku() -> None:
     assert manufacturer_style_code("3900462") == ""
     # The GTIN must never be mistaken for a style code.
     assert manufacturer_style_code("0197600670150", gtin_value="0197600670150") == ""
+
 
 @pytest.mark.component
 def test_score_candidate_style_code_match_reaches_auto_accept() -> None:
@@ -261,6 +267,7 @@ def test_score_candidate_style_code_match_reaches_auto_accept() -> None:
     assert result["score"] >= 0.90
     assert result["label"] == "high"
 
+
 @pytest.mark.component
 def test_score_candidate_model_token_brand_is_model_level_match() -> None:
     # Terse source vs verbose candidate: raw title overlap is low, but brand-exact plus the
@@ -287,6 +294,7 @@ def test_score_candidate_model_token_brand_is_model_level_match() -> None:
     assert result["reasons"]["model_token_match"] is True
     assert result["reasons"]["match_basis"] == "model+brand"
     assert result["score"] >= 0.82
+
 
 @pytest.mark.component
 def test_score_candidate_same_brand_different_model_not_promoted() -> None:
@@ -315,6 +323,7 @@ def test_score_candidate_same_brand_different_model_not_promoted() -> None:
     assert result["reasons"]["model_token_match"] is False
     assert result["score"] < 0.82
 
+
 @pytest.mark.component
 def test_score_candidate_truncated_candidate_does_not_self_promote() -> None:
     # Directional containment: a truncated generic candidate must not match a more specific
@@ -327,6 +336,7 @@ def test_score_candidate_truncated_candidate_does_not_self_promote() -> None:
 
     assert result["reasons"]["model_token_match"] is False
     assert result["score"] < 0.82
+
 
 @pytest.mark.component
 def test_score_candidate_brand_resolved_from_candidate_evidence() -> None:
@@ -348,6 +358,7 @@ def test_score_candidate_brand_resolved_from_candidate_evidence() -> None:
     assert result["reasons"]["brand_match"] is True
     assert result["reasons"].get("brand_from_candidate_evidence") is True
 
+
 @pytest.mark.component
 def test_candidate_dedupe_key_collapses_size_and_color_variants() -> None:
     from app.services.product_intelligence.candidate_urls import candidate_dedupe_key
@@ -365,6 +376,7 @@ def test_candidate_dedupe_key_collapses_size_and_color_variants() -> None:
     )
     key_d = candidate_dedupe_key("https://www.lyst.com/shoes/x/?product=OTHER&size=11")
     assert key_c != key_d
+
 
 @pytest.mark.component
 def test_build_search_queries_uses_decomposed_style_core_not_composite_sku() -> None:

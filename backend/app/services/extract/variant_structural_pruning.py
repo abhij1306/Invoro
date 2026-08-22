@@ -180,11 +180,7 @@ def _varying_variant_axes(rows: list[dict[str, Any]]) -> set[str]:
         axis
         for axis in _PUBLIC_VARIANT_AXIS_FIELDS
         if len(
-            {
-                value.casefold()
-                for row in rows
-                if (value := clean_text(row.get(axis)))
-            }
+            {value.casefold() for row in rows if (value := clean_text(row.get(axis)))}
         )
         >= 2
     }
@@ -304,9 +300,7 @@ def drop_parent_sku_alias_variant_rows(record: dict[str, Any]) -> None:
             children_by_terminal_size.setdefault(terminal, []).append((index, variant))
     dropped_indexes: set[int] = set()
     for index, variant in enumerate(variant_rows):
-        if _variant_has_richer_sku_child(
-            index, variant, children_by_terminal_size
-        ):
+        if _variant_has_richer_sku_child(index, variant, children_by_terminal_size):
             dropped_indexes.add(index)
     if dropped_indexes:
         _replace_or_drop_variants(

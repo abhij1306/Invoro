@@ -10,6 +10,7 @@ from app.services.pipeline.types import URLProcessingConfig  # fmt: skip
 from app.services.robots_policy import RobotsPolicyResult  # fmt: skip
 from sqlalchemy.ext.asyncio import AsyncSession  # fmt: skip
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_process_single_url_skips_empty_browser_retry_when_budget_low(
@@ -70,6 +71,7 @@ async def test_process_single_url_skips_empty_browser_retry_when_budget_low(
     assert len(acquire_calls) == 1
     assert any("Skipping empty-extraction browser retry" in log.message for log in logs)
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_process_single_url_blocks_before_acquire_when_robots_disallows(
@@ -119,6 +121,7 @@ async def test_process_single_url_blocks_before_acquire_when_robots_disallows(
         "[ROBOTS] Blocked by robots.txt: https://example.com/private/widget-prime"
     ]
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_process_single_url_prefetch_only_returns_metrics_without_persisting_records(
@@ -156,6 +159,7 @@ async def test_process_single_url_prefetch_only_returns_metrics_without_persisti
     assert result.url_metrics["record_count"] == 0
     assert total == 0
     assert rows == []
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -240,6 +244,7 @@ async def test_post_extraction_challenge_shell_retries_real_chrome(
     assert total == 1
     assert rows[0].data["title"] == "Nike Widget"
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_post_extraction_detail_shell_escalates_real_chrome(
@@ -320,6 +325,7 @@ async def test_post_extraction_detail_shell_escalates_real_chrome(
         in log.message
         for log in logs
     )
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -409,6 +415,7 @@ async def test_post_extraction_identity_mismatch_escalates_real_chrome(
         for log in logs
     )
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_usable_detail_with_active_provider_evidence_does_not_retry_real_chrome(
@@ -474,6 +481,7 @@ async def test_usable_detail_with_active_provider_evidence_does_not_retry_real_c
     assert result.url_metrics["blocked"] is False
     assert result.url_metrics.get("failure_reason") is None
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_patchright_challenge_shell_updates_host_memory(
@@ -534,6 +542,7 @@ async def test_patchright_challenge_shell_updates_host_memory(
 
     assert hard_blocks
     assert hard_blocks[0]["method"] == "browser:patchright"
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression

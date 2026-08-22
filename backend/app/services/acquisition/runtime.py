@@ -47,7 +47,11 @@ _SHARED_HTTP_CLIENT_LOCK = asyncio.Lock()
 _ECOMMERCE_DETAIL_READINESS_HINTS = tuple(
     str(item).strip().lower()
     for item in (
-        (BROWSER_DETAIL_READINESS_HINTS.get("ecommerce") if isinstance(BROWSER_DETAIL_READINESS_HINTS, Mapping) else [])
+        (
+            BROWSER_DETAIL_READINESS_HINTS.get("ecommerce")
+            if isinstance(BROWSER_DETAIL_READINESS_HINTS, Mapping)
+            else []
+        )
         or []
     )
     if str(item).strip()
@@ -117,7 +121,10 @@ _BOT_VENDOR_HEADER_MARKERS: tuple[tuple[str, str, str], ...] = (
 
 def is_retryable_http_status(status_code: int) -> bool:
     code = int(status_code or 0)
-    configured_retry_statuses = {int(item) for item in list(crawler_runtime_settings.http_retry_status_codes or [])}
+    configured_retry_statuses = {
+        int(item)
+        for item in list(crawler_runtime_settings.http_retry_status_codes or [])
+    }
     return code in configured_retry_statuses or 500 <= code <= 599
 
 
@@ -125,7 +132,10 @@ def is_non_retryable_http_status(status_code: int) -> bool:
     code = int(status_code or 0)
     if code == 401:
         return True
-    configured_retry_statuses = {int(item) for item in list(crawler_runtime_settings.http_retry_status_codes or [])}
+    configured_retry_statuses = {
+        int(item)
+        for item in list(crawler_runtime_settings.http_retry_status_codes or [])
+    }
     return 400 <= code <= 499 and code not in configured_retry_statuses
 
 
@@ -214,12 +224,22 @@ def _collect_block_page_evidence(
     strong_markers = _normalized_mapping_keys("browser_challenge_strong_markers")
     weak_markers = _normalized_mapping_keys("browser_challenge_weak_markers")
     provider_markers = _normalized_signature_strings("provider_markers")
-    content_tolerant_strong_markers = set(_normalized_signature_strings("content_tolerant_strong_markers"))
-    strong_hits = {marker for marker in strong_markers if marker in visible_text or marker in title_text}
+    content_tolerant_strong_markers = set(
+        _normalized_signature_strings("content_tolerant_strong_markers")
+    )
+    strong_hits = {
+        marker
+        for marker in strong_markers
+        if marker in visible_text or marker in title_text
+    }
     return _BlockPageEvidence(
         title_matches=_block_title_matches(title_text),
         strong_hits=strong_hits,
-        weak_hits={marker for marker in weak_markers if marker in visible_text or marker in title_text},
+        weak_hits={
+            marker
+            for marker in weak_markers
+            if marker in visible_text or marker in title_text
+        },
         provider_hits={marker for marker in provider_markers if marker in lowered},
         active_provider_hits=_active_provider_hits(lowered),
         challenge_element_hits=set(_challenge_element_hits(analysis.soup, lowered)),
@@ -243,7 +263,8 @@ def _active_provider_hits(lowered: str) -> set[str]:
     return {
         marker
         for item in _mapping_sequence(BLOCK_SIGNATURES.get("active_provider_markers"))
-        if (marker := str(item.get("marker") or "").strip().lower()) and marker in lowered
+        if (marker := str(item.get("marker") or "").strip().lower())
+        and marker in lowered
     }
 
 
@@ -286,7 +307,15 @@ def _strong_block_evidence(evidence: _BlockPageEvidence) -> bool:
     title_matches = evidence.title_matches
     return bool(
         len(hard_strong_hits) >= 2
-        or (hard_strong_hits and (provider_hits or active_provider_hits or challenge_element_hits or title_matches))
+        or (
+            hard_strong_hits
+            and (
+                provider_hits
+                or active_provider_hits
+                or challenge_element_hits
+                or title_matches
+            )
+        )
         or "access denied" in strong_hits
         or (
             "just a moment" in strong_hits
@@ -301,7 +330,10 @@ def _strong_block_evidence(evidence: _BlockPageEvidence) -> bool:
 
 def _combined_block_evidence(evidence: _BlockPageEvidence) -> bool:
     return bool(
-        (evidence.challenge_element_hits and (evidence.provider_hits or evidence.active_provider_hits))
+        (
+            evidence.challenge_element_hits
+            and (evidence.provider_hits or evidence.active_provider_hits)
+        )
         or (evidence.title_matches and evidence.challenge_element_hits)
         or (evidence.hard_strong_hits and evidence.weak_hits and evidence.provider_hits)
         or (
@@ -317,7 +349,10 @@ def _usable_content_overrides_block(
     evidence: _BlockPageEvidence,
 ) -> bool:
     return bool(
-        blocked and evidence.has_extractable_content and not evidence.title_matches and not evidence.hard_strong_hits
+        blocked
+        and evidence.has_extractable_content
+        and not evidence.title_matches
+        and not evidence.hard_strong_hits
     )
 
 
@@ -335,10 +370,22 @@ def _build_block_page_classification(
         *sorted(f"strong:{marker}" for marker in block_evidence.strong_hits),
         *sorted(f"weak:{marker}" for marker in block_evidence.weak_hits),
         *sorted(f"provider:{marker}" for marker in block_evidence.provider_hits),
-        *sorted(f"active_provider:{marker}" for marker in block_evidence.active_provider_hits),
-        *sorted(f"challenge_element:{marker}" for marker in block_evidence.challenge_element_hits),
+        *sorted(
+            f"active_provider:{marker}"
+            for marker in block_evidence.active_provider_hits
+        ),
+        *sorted(
+            f"challenge_element:{marker}"
+            for marker in block_evidence.challenge_element_hits
+        ),
     ]
-    outcome = forced_outcome if blocked and forced_blocked else "challenge_page" if blocked else "ok"
+    outcome = (
+        forced_outcome
+        if blocked and forced_blocked
+        else "challenge_page"
+        if blocked
+        else "ok"
+    )
     return BlockPageClassification(
         blocked=blocked,
         outcome=outcome,
@@ -413,7 +460,9 @@ def should_escalate_to_browser(
         escalation_policy = {}
     analysis = analyze_html(result.html)
     has_detail_signals = _has_extractable_detail_signals(result.html, analysis=analysis)
-    has_listing_signals = _has_extractable_listing_signals(result.html, analysis=analysis)
+    has_listing_signals = _has_extractable_listing_signals(
+        result.html, analysis=analysis
+    )
     if (
         bool(escalation_policy.get("js_shell_without_detail_signals", True))
         and _looks_like_js_shell(result.html, analysis=analysis)

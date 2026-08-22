@@ -43,6 +43,7 @@ from app.services.domain_utils import is_special_use_domain, normalize_domain
 
 _PASSWORD_KEY = "pass" + "word"
 
+
 def _credential_url(
     *,
     scheme: str,
@@ -56,16 +57,20 @@ def _credential_url(
     path_suffix = path if not path or path.startswith("/") else f"/{path}"
     return f"{scheme}://{username}:{secret}@{host}{port_suffix}{path_suffix}"
 
+
 def _authority_with_credentials(
     *, username: str, secret: str, host: str, port: int
 ) -> str:
     return f"{username}:{secret}@{host}:{port}"
 
+
 def _masked_proxy_display(*, scheme: str, host: str, port: int) -> str:
     return f"{scheme}://***:***@{host}:{port}"
 
+
 def _secret_mapping(secret: str) -> dict[str, str]:
     return {_PASSWORD_KEY: secret}
+
 
 def _context_spec(
     context_options: dict[str, object] | None = None,

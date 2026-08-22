@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .test_detail_extractor_priority_and_selector_self_heal import BeautifulSoup, ExtractionContext, LexborHTMLParser, collect_structured_source_payloads, detail_dom_completion, extract_records, materialize_image_fields, prepare_extraction_context, prune_irrelevant_detail_structured_payload, pytest, reduce_html_for_selector_synthesis, requires_dom_completion, selector_self_heal_targets  # fmt: skip
 
+
 @pytest.mark.regression
 def test_extract_records_prefers_higher_priority_adapter_value_even_when_dom_value_exists() -> (
     None
@@ -31,6 +32,7 @@ def test_extract_records_prefers_higher_priority_adapter_value_even_when_dom_val
     assert "dom_selector" in str(record["_field_sources"]["price"])
     assert record["_source"] == "adapter"
 
+
 def testrequires_dom_completion_uses_raw_variant_cues_after_pruning() -> None:
     soup = BeautifulSoup("<main><h1>Widget</h1></main>", "html.parser")
     raw_soup = BeautifulSoup(
@@ -53,6 +55,7 @@ def testrequires_dom_completion_uses_raw_variant_cues_after_pruning() -> None:
         breadcrumb_soup=raw_soup,
     )
 
+
 def testrequires_dom_completion_ignores_logo_only_image_cue() -> None:
     """Generic page images should not force detail DOM completion."""
     soup = BeautifulSoup("<main><h1>Widget</h1></main>", "html.parser")
@@ -73,6 +76,7 @@ def testrequires_dom_completion_ignores_logo_only_image_cue() -> None:
         soup=soup,
         breadcrumb_soup=raw_soup,
     )
+
 
 @pytest.mark.regression
 def test_requires_dom_completion_when_structured_category_conflicts_with_dom_breadcrumb() -> (
@@ -104,6 +108,7 @@ def test_requires_dom_completion_when_structured_category_conflicts_with_dom_bre
         soup=soup,
         breadcrumb_soup=soup,
     )
+
 
 @pytest.mark.regression
 def test_requires_dom_completion_skips_unrequested_variant_probe_for_complete_record(
@@ -160,6 +165,7 @@ def test_requires_dom_completion_skips_unrequested_variant_probe_for_complete_re
         breadcrumb_soup=raw_soup,
     )
 
+
 @pytest.mark.regression
 def test_prepare_extraction_context_caches_original_dom_objects() -> None:
     context = prepare_extraction_context(
@@ -170,6 +176,7 @@ def test_prepare_extraction_context_caches_original_dom_objects() -> None:
     cached_dom_parser = context.original_dom_parser
     assert context.original_soup is cached_soup
     assert context.original_dom_parser is cached_dom_parser
+
 
 @pytest.mark.regression
 def test_collect_structured_source_payloads_extracts_vtex_string_price_from_id_ref() -> (
@@ -233,6 +240,7 @@ def test_collect_structured_source_payloads_extracts_vtex_string_price_from_id_r
     assert first_item["offers"]["price"] == pytest.approx(21.0)
     assert first_item["image"] == "https://cdn.example.com/widget-one.jpg"
 
+
 @pytest.mark.regression
 def test_collect_structured_source_payloads_extracts_vtex_string_price_from_fallbacks() -> (
     None
@@ -281,6 +289,7 @@ def test_collect_structured_source_payloads_extracts_vtex_string_price_from_fall
     assert item_list[0]["item"]["offers"]["price"] == pytest.approx(41.5)
     assert item_list[1]["item"]["offers"]["price"] == pytest.approx(55.25)
 
+
 @pytest.mark.regression
 def test_apply_dom_fallbacks_limits_heading_section_targets_to_section_like_fields(
     monkeypatch: pytest.MonkeyPatch,
@@ -325,6 +334,7 @@ def test_apply_dom_fallbacks_limits_heading_section_targets_to_section_like_fiel
     assert "materials" in captured["allowed_fields"]
     assert "product_story" in captured["allowed_fields"]
     assert "brand" not in captured["allowed_fields"]
+
 
 def testprune_irrelevant_detail_structured_payload_reuses_requested_identity(
     monkeypatch: pytest.MonkeyPatch,
@@ -383,6 +393,7 @@ def testprune_irrelevant_detail_structured_payload_reuses_requested_identity(
     assert pruned is not None
     assert calls == {"title": 1, "tokens": 1, "codes": 1}
 
+
 def testmaterialize_image_fields_merges_raw_soup_gallery_when_structured_is_single() -> (
     None
 ):
@@ -414,6 +425,7 @@ def testmaterialize_image_fields_merges_raw_soup_gallery_when_structured_is_sing
     ]
     assert source == "json_ld"
 
+
 @pytest.mark.regression
 def test_extract_records_does_not_fabricate_discount_percentage_from_unrelated_body_text() -> (
     None
@@ -439,6 +451,7 @@ def test_extract_records_does_not_fabricate_discount_percentage_from_unrelated_b
 
     assert "discount_percentage" not in record
     assert "discount_percentage" not in record.get("_field_sources", {})
+
 
 @pytest.mark.regression
 def test_extract_records_applies_selector_rules_and_tracks_selector_source() -> None:
@@ -469,6 +482,7 @@ def test_extract_records_applies_selector_rules_and_tracks_selector_source() -> 
 
     assert record["description"] == "Built for long mileage."
     assert record["_field_sources"]["description"] == ["dom_selector"]
+
 
 @pytest.mark.regression
 def test_extract_records_keeps_first_match_for_long_text_fields() -> None:
@@ -503,6 +517,7 @@ def test_extract_records_keeps_first_match_for_long_text_fields() -> None:
     assert "dom_selector" in str(record["_field_sources"]["description"])
     assert record["_source"] == "adapter"
 
+
 @pytest.mark.regression
 def test_extract_records_uses_accordion_dom_sections_for_long_text_fields() -> None:
     html = """
@@ -528,6 +543,7 @@ def test_extract_records_uses_accordion_dom_sections_for_long_text_fields() -> N
 
     assert record["description"] == "Built for long mileage with a reinforced toe cap."
     assert record["_field_sources"]["description"] == ["dom_sections"]
+
 
 @pytest.mark.regression
 def test_extract_records_uses_nested_wrapped_dom_sections_for_long_text_fields() -> (
@@ -561,6 +577,7 @@ def test_extract_records_uses_nested_wrapped_dom_sections_for_long_text_fields()
     assert record["specifications"] == "Rubber outsole with a reinforced toe cap."
     assert record["_field_sources"]["specifications"] == ["dom_sections"]
 
+
 @pytest.mark.regression
 def test_extract_records_applies_regex_as_post_filter_to_xpath_result() -> None:
     html = """
@@ -592,6 +609,7 @@ def test_extract_records_applies_regex_as_post_filter_to_xpath_result() -> None:
     assert record["sku"] == "12345"
     assert record["_field_sources"]["sku"] == ["dom_selector"]
 
+
 @pytest.mark.regression
 def test_selector_self_heal_config_falls_back_to_runtime_enabled_when_missing(
     patch_settings,
@@ -616,6 +634,7 @@ def test_selector_self_heal_config_falls_back_to_runtime_enabled_when_missing(
         "threshold": 0.77,
     }
 
+
 @pytest.mark.regression
 def test_selector_self_heal_targets_default_ecommerce_fields_when_requested_empty() -> (
     None
@@ -632,6 +651,7 @@ def test_selector_self_heal_targets_default_ecommerce_fields_when_requested_empt
     assert "price" in targets
     assert "image_url" in targets
     assert "variants" not in targets
+
 
 @pytest.mark.regression
 def test_reduce_html_for_selector_synthesis_keeps_valid_content_focused_html() -> None:
@@ -665,6 +685,7 @@ def test_reduce_html_for_selector_synthesis_keeps_valid_content_focused_html() -
     assert main.find("article", attrs={"class": "product"}) is not None
     assert "Widget Prime" in main.get_text(" ", strip=True)
     assert "Rubber outsole, reinforced toe cap." in main.get_text(" ", strip=True)
+
 
 @pytest.mark.regression
 def test_reduce_html_for_selector_synthesis_preserves_shadow_root_boundaries() -> None:

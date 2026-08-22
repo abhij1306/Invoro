@@ -4,6 +4,7 @@ from .test_public_api import ASGITransport, ApiKey, AsyncClient, CrawlRecord, Do
 
 pytest_plugins = ["tests.component.test_public_api"]
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_public_domain_info_reads_domain_memory(db_session, test_user) -> None:
@@ -62,6 +63,7 @@ async def test_public_domain_info_reads_domain_memory(db_session, test_user) -> 
     assert data["known"] is True
     assert data["has_cached_selectors"] is True
     assert data["acquisition_profile"] == "http_preferred"
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -147,6 +149,7 @@ async def test_public_extract_runs_http_only_and_shapes_record(
         "llm_enabled": False,
     }
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_public_extract_rejects_unsupported_surface(
@@ -182,6 +185,7 @@ async def test_public_extract_rejects_unsupported_surface(
 
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "INVALID_SURFACE"
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -255,6 +259,7 @@ async def test_public_extract_accepts_auto_surface(
     }
     assert seen["surface"] == "content_detail"
     assert seen["surface_resolution"]["surface"] == "content_detail"
+
 
 @pytest.mark.asyncio
 @pytest.mark.component

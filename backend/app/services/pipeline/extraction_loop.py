@@ -158,11 +158,19 @@ async def process_single_url(
         config=_resolved_url_processing_config(
             config,
             surface=run.surface,
-            proxy_list=proxy_list if proxy_list is not None else settings_view.proxy_list(),
-            traversal_mode=traversal_mode if traversal_mode is not None else settings_view.traversal_mode(),
+            proxy_list=proxy_list
+            if proxy_list is not None
+            else settings_view.proxy_list(),
+            traversal_mode=traversal_mode
+            if traversal_mode is not None
+            else settings_view.traversal_mode(),
             max_pages=max_pages if max_pages is not None else settings_view.max_pages(),
-            max_scrolls=max_scrolls if max_scrolls is not None else settings_view.max_scrolls(),
-            max_records=max_records if max_records is not None else settings_view.max_records(),
+            max_scrolls=max_scrolls
+            if max_scrolls is not None
+            else settings_view.max_scrolls(),
+            max_records=max_records
+            if max_records is not None
+            else settings_view.max_records(),
             sleep_ms=sleep_ms if sleep_ms is not None else settings_view.sleep_ms(),
             update_run_state=update_run_state,
             persist_logs=persist_logs,
@@ -295,8 +303,12 @@ async def _run_acquisition_stage(
         prefetched=bool(prefetched_acquisition),
     ) as span:
         acquisition_request = await _build_acquisition_request(context)
-        acquisition_result = prefetched_acquisition or await acquire(acquisition_request)
-        diagnostics = mapping_or_empty(getattr(acquisition_result, "browser_diagnostics", {}))
+        acquisition_result = prefetched_acquisition or await acquire(
+            acquisition_request
+        )
+        diagnostics = mapping_or_empty(
+            getattr(acquisition_result, "browser_diagnostics", {})
+        )
         timings = mapping_or_empty(diagnostics.get("phase_timings_ms", {}))
         set_logfire_attributes(
             span,
@@ -308,12 +320,16 @@ async def _run_acquisition_stage(
             browser_engine=diagnostics.get("browser_engine"),
             total_ms=timings.get("total"),
             navigation_ms=timings.get("navigation"),
-            final_domain=normalize_domain(str(getattr(acquisition_result, "final_url", "") or context.url)),
+            final_domain=normalize_domain(
+                str(getattr(acquisition_result, "final_url", "") or context.url)
+            ),
         )
     method = getattr(acquisition_result, "method", "unknown")
     if method == "browser":
         if getattr(acquisition_request, "on_event", None) is None:
-            diagnostics = mapping_or_empty(getattr(acquisition_result, "browser_diagnostics", {}))
+            diagnostics = mapping_or_empty(
+                getattr(acquisition_result, "browser_diagnostics", {})
+            )
             timings = mapping_or_empty(diagnostics.get("phase_timings_ms", {}))
             load_ms = timings.get("navigation", 0) or timings.get("total", 0)
             await _log_pipeline_event(
@@ -609,7 +625,9 @@ async def _run_persistence_stage(
             run_id=context.run.id,
             acquisition_result=acquisition_result,
             browser_attempted=_browser_attempted(acquisition_result),
-            screenshot_required=_screenshot_required(_browser_outcome(acquisition_result)),
+            screenshot_required=_screenshot_required(
+                _browser_outcome(acquisition_result)
+            ),
             surface=context.surface,
             blocked=_effective_blocked(acquisition_result),
         )
@@ -651,7 +669,9 @@ async def _run_persistence_stage(
             f"Persisted {persisted_count} record(s) for {acquisition_result.final_url}",
             commit=False,
         )
-    await _persist_url_trace(context, extracted, acquisition_result=acquisition_result, verdict=verdict)
+    await _persist_url_trace(
+        context, extracted, acquisition_result=acquisition_result, verdict=verdict
+    )
     await update_acquisition_contract_memory(
         context,
         acquisition_result=acquisition_result,
@@ -688,7 +708,11 @@ def _persistence_verdict(
         metrics["failure_reason"] = NON_RETRYABLE_HTTP_STATUS_REASON
         extracted.fetched.url_metrics = metrics
         return VERDICT_ERROR
-    if verdict == VERDICT_EMPTY and "listing" in context.surface and persisted_count == 0:
+    if (
+        verdict == VERDICT_EMPTY
+        and "listing" in context.surface
+        and persisted_count == 0
+    ):
         return VERDICT_LISTING_FAILED
     return verdict
 
@@ -703,10 +727,12 @@ async def _persist_url_trace(
     trace = context.trace
     if trace is None:
         return
-    diagnostics = mapping_or_empty(getattr(acquisition_result, "browser_diagnostics", {}))
-    failure_reason = mapping_or_empty(extracted.fetched.url_metrics).get("failure_reason") or diagnostics.get(
-        "failure_reason"
+    diagnostics = mapping_or_empty(
+        getattr(acquisition_result, "browser_diagnostics", {})
     )
+    failure_reason = mapping_or_empty(extracted.fetched.url_metrics).get(
+        "failure_reason"
+    ) or diagnostics.get("failure_reason")
     trace.record_extraction_rejection(str(failure_reason or "").strip() or None)
     trace.record_verdict(verdict)
     await persist_run_trace(

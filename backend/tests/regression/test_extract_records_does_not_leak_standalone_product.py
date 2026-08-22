@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .test_crawl_engine import HostProtectionPolicy, _js_shell_html, crawl_fetch_runtime, detail_extractor, extract_records, pytest  # fmt: skip
 
+
 @pytest.mark.regression
 def test_extract_records_does_not_leak_standalone_product_payloads_when_itemlist_exists() -> (
     None
@@ -62,6 +63,7 @@ def test_extract_records_does_not_leak_standalone_product_payloads_when_itemlist
         "https://example.com/products/widget-two",
     ]
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_fetch_page_uses_browser_after_js_shell_detection(
@@ -109,6 +111,7 @@ async def test_fetch_page_uses_browser_after_js_shell_detection(
         "https://example.com/listing",
         "https://example.com/detail",
     ]
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -170,6 +173,7 @@ async def test_fetch_page_keeps_http_for_structured_shopify_detail(
 
     assert result.method == "curl_cffi"
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_fetch_page_uses_browser_first_for_requires_browser_platform(
@@ -207,6 +211,7 @@ async def test_fetch_page_uses_browser_first_for_requires_browser_platform(
 
     assert result.method == "browser"
 
+
 @pytest.mark.regression
 def test_browser_runtime_snapshot_exposes_capacity_shape() -> None:
     snapshot = crawl_fetch_runtime.browser_runtime_snapshot()
@@ -215,6 +220,7 @@ def test_browser_runtime_snapshot_exposes_capacity_shape() -> None:
         snapshot
     )
     assert int(snapshot["max_size"]) >= 1
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_returns_normalized_record() -> None:
@@ -308,6 +314,7 @@ def test_extract_ecommerce_detail_returns_normalized_record() -> None:
     assert isinstance(record["_confidence"], dict)
     assert record["_confidence"]["level"] in {"medium", "high"}
 
+
 @pytest.mark.regression
 def test_extract_ecommerce_detail_rejects_site_shell_with_listing_payload_pollution() -> (
     None
@@ -379,6 +386,7 @@ def test_extract_ecommerce_detail_rejects_site_shell_with_listing_payload_pollut
 
     assert rows == []
 
+
 @pytest.mark.regression
 def test_extract_ecommerce_detail_rejects_brand_shell_with_app_prompt_copy() -> None:
     html = """
@@ -411,6 +419,7 @@ def test_extract_ecommerce_detail_rejects_brand_shell_with_app_prompt_copy() -> 
     )
 
     assert rows == []
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_prefers_requested_identity_on_same_site_utility_redirect() -> (
@@ -476,6 +485,7 @@ def test_extract_ecommerce_detail_prefers_requested_identity_on_same_site_utilit
     )
     assert record["sku"] == "305537"
 
+
 @pytest.mark.regression
 def test_extract_ecommerce_detail_rejects_same_site_utility_redirect_with_mismatched_product_payload() -> (
     None
@@ -522,6 +532,7 @@ def test_extract_ecommerce_detail_rejects_same_site_utility_redirect_with_mismat
 
     assert rows == []
 
+
 @pytest.mark.regression
 def test_extract_ecommerce_detail_rejects_same_site_wrong_product_payload_without_utility_redirect() -> (
     None
@@ -555,6 +566,7 @@ def test_extract_ecommerce_detail_rejects_same_site_wrong_product_payload_withou
     )
 
     assert rows == []
+
 
 @pytest.mark.regression
 def test_extract_ecommerce_detail_keeps_same_url_color_variant_product_path() -> None:
@@ -607,6 +619,7 @@ def test_extract_ecommerce_detail_keeps_same_url_color_variant_product_path() ->
     assert len(rows) == 1
     assert rows[0]["title"] == "Bondi 9"
 
+
 @pytest.mark.regression
 def test_extract_ecommerce_detail_rejects_fragment_backed_shell_payload_from_spa_root() -> (
     None
@@ -641,6 +654,7 @@ def test_extract_ecommerce_detail_rejects_fragment_backed_shell_payload_from_spa
 
     assert rows == []
 
+
 @pytest.mark.regression
 def test_detail_rejection_does_not_claim_identity_mismatch_when_same_url_never_redirected() -> (
     None
@@ -661,6 +675,7 @@ def test_detail_rejection_does_not_claim_identity_mismatch_when_same_url_never_r
         )
         is None
     )
+
 
 @pytest.mark.regression
 def test_detail_rejection_labels_product_shell_as_detail_shell_not_non_detail_seed() -> (

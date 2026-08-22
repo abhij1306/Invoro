@@ -51,6 +51,7 @@ variant_choice_container_is_overbroad = (
     variant_choice_traversal._variant_choice_container_is_overbroad
 )
 
+
 def _next_f_script(fragment: str) -> str:
     return f"<script>self.__next_f.push([1,{json.dumps(fragment)}])</script>"
 

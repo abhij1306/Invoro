@@ -64,8 +64,10 @@ from app.services.dom.selector_engine import apply_selector_fallbacks
 logger = logging.getLogger(__name__)
 _alnum_word_pattern = re.compile(r"[a-z0-9]+", re.I)
 
+
 def _alnum_token_count(text: str) -> int:
     return len(_alnum_word_pattern.findall(text))
+
 
 def _resolve_selector_trace(
     field_name: str,
@@ -77,11 +79,16 @@ def _resolve_selector_trace(
         if not isinstance(trace, dict):
             continue
         if trace.get("_candidate_value") == finalized_value:
-            return {key: value for key, value in trace.items() if not str(key).startswith("_")}
+            return {
+                key: value
+                for key, value in trace.items()
+                if not str(key).startswith("_")
+            }
     trace = next((row for row in traces if isinstance(row, dict)), {})
     if not isinstance(trace, dict):
         return None
     return {key: value for key, value in trace.items() if not str(key).startswith("_")}
+
 
 def _is_title_only_candidate_allowed(
     *,
@@ -102,7 +109,9 @@ def _is_title_only_candidate_allowed(
             title=cleaned_title,
             url=cleaned_url,
         )
-        and not re.match(r"^(?:article|flyer|guide|manual|resource)\s*:", cleaned_title, flags=re.I)
+        and not re.match(
+            r"^(?:article|flyer|guide|manual|resource)\s*:", cleaned_title, flags=re.I
+        )
         and not re.search(r"\.(?:pdf|docx?|pptx?)(?:$|[?#])", cleaned_url, flags=re.I)
         and not any(
             token in cleaned_url.lower()
@@ -118,10 +127,15 @@ def _is_title_only_candidate_allowed(
         and title_token_overlap(cleaned_title, title_from_url(cleaned_url) or "") >= 2
     )
 
+
 def _surface_has_dom_fallback_patterns(surface: str) -> bool:
     dom_patterns_raw = EXTRACTION_RULES.get("dom_patterns")
     dom_patterns = dict(dom_patterns_raw) if isinstance(dom_patterns_raw, dict) else {}
-    return any(str(dom_patterns.get(field_name) or "").strip() for field_name in surface_fields(surface, None))
+    return any(
+        str(dom_patterns.get(field_name) or "").strip()
+        for field_name in surface_fields(surface, None)
+    )
+
 
 def _build_card_candidates(
     card,
@@ -142,7 +156,11 @@ def _build_card_candidates(
     candidates: dict[str, list[object]] = {"title": [title], "url": [url]}
     selector_trace_candidates: dict[str, list[dict[str, object]]] = {}
     card_soup: BeautifulSoup | None = None
-    needs_card_soup = bool(selector_rules) or surface in {"article_listing", "content_listing"} or _surface_has_dom_fallback_patterns(surface)
+    needs_card_soup = (
+        bool(selector_rules)
+        or surface in {"article_listing", "content_listing"}
+        or _surface_has_dom_fallback_patterns(surface)
+    )
     if needs_card_soup:
         card_soup = BeautifulSoup(str(getattr(card, "html", "") or ""), "html.parser")
     if card_soup is not None:
@@ -164,6 +182,7 @@ def _build_card_candidates(
     _add_card_text_metrics(candidates, card_text, is_job)
     return candidates, selector_trace_candidates
 
+
 def _add_card_content_fields(
     candidates: dict[str, list[object]],
     surface: str,
@@ -171,7 +190,9 @@ def _add_card_content_fields(
     title: str,
 ) -> None:
     if surface == "article_listing" and card_soup is not None:
-        author = article_card_text(card_soup, [".author", ".byline", "[rel='author']", "[itemprop='author']"])
+        author = article_card_text(
+            card_soup, [".author", ".byline", "[rel='author']", "[itemprop='author']"]
+        )
         if author:
             add_candidate(candidates, "author", author)
         publication_date = article_card_date(card_soup)
@@ -184,6 +205,7 @@ def _add_card_content_fields(
         summary = article_card_summary(card_soup, title)
         if summary:
             add_candidate(candidates, "summary", summary)
+
 
 def _add_card_identity_fields(
     candidates: dict[str, list[object]],
@@ -198,6 +220,7 @@ def _add_card_identity_fields(
             add_candidate(candidates, "brand", brand_text)
     if image_urls and not candidates.get("image_url"):
         add_candidate(candidates, "image_url", image_urls[0])
+
 
 def _add_card_description(
     candidates: dict[str, list[object]],
@@ -215,12 +238,16 @@ def _add_card_description(
                 and _alnum_token_count(text) >= 3
                 and not PRICE_RE.search(text)
                 and not is_title_noise(text)
-                and (title_token_overlap(text, title) >= 2 or _alnum_token_count(text) >= 5)
+                and (
+                    title_token_overlap(text, title) >= 2
+                    or _alnum_token_count(text) >= 5
+                )
             ),
             None,
         )
         if description_text:
             add_candidate(candidates, "description", description_text)
+
 
 def _add_card_label_values(
     candidates: dict[str, list[object]],
@@ -240,7 +267,10 @@ def _add_card_label_values(
                 coerce_field_value(canonical, value, page_url),
             )
 
-def _add_card_commerce_fields(candidates: dict[str, list[object]], card, page_url: str, is_job: bool) -> None:
+
+def _add_card_commerce_fields(
+    candidates: dict[str, list[object]], card, page_url: str, is_job: bool
+) -> None:
     if not is_job and not candidates.get("price"):
         price_text = extract_price_signal_from_card(card)
         if price_text:
@@ -256,7 +286,10 @@ def _add_card_commerce_fields(candidates: dict[str, list[object]], card, page_ur
             if inferred_currency and candidates.get("price"):
                 add_candidate(candidates, "currency", inferred_currency)
 
-def _add_card_text_metrics(candidates: dict[str, list[object]], card_text: str, is_job: bool) -> None:
+
+def _add_card_text_metrics(
+    candidates: dict[str, list[object]], card_text: str, is_job: bool
+) -> None:
     if is_job and not candidates.get("salary"):
         salary_match = PRICE_RE.search(card_text)
         if salary_match:
@@ -269,6 +302,7 @@ def _add_card_text_metrics(candidates: dict[str, list[object]], card_text: str, 
         review_match = REVIEW_COUNT_RE.search(card_text)
         if review_match:
             add_candidate(candidates, "review_count", review_match.group(1))
+
 
 def listing_record_from_card(
     card,
@@ -287,7 +321,9 @@ def listing_record_from_card(
     title_node = title_node or anchor_node
     title_score = card_title_score(title_node)
     same_url_texts = same_url_anchor_text_candidates(card, url)
-    title, best_same_url_text = _resolve_card_title(card, title_node, anchor_text, same_url_texts, page_url)
+    title, best_same_url_text = _resolve_card_title(
+        card, title_node, anchor_text, same_url_texts, page_url
+    )
     if len(title) < 4 or is_title_noise(title):
         return None
     if anchor_score < 4 and title_score < 8:
@@ -345,11 +381,16 @@ def listing_record_from_card(
     )
     if not supported and not allow_title_only_dom_candidate:
         return None
-    cleaned["_structural_signature"] = listing_fragment_structural_signature(card, url=cleaned_url)
+    cleaned["_structural_signature"] = listing_fragment_structural_signature(
+        card, url=cleaned_url
+    )
     return cleaned
 
+
 def _resolve_card_anchor(card, page_url: str, surface: str, title_node):
-    primary = select_primary_anchor(card, page_url, surface=surface, title_node=title_node)
+    primary = select_primary_anchor(
+        card, page_url, surface=surface, title_node=title_node
+    )
     if primary is not None:
         return primary
     fallback_url = select_primary_card_url(card, page_url)
@@ -362,13 +403,23 @@ def _resolve_card_anchor(card, page_url: str, surface: str, title_node):
         max(10, card_title_score(title_node) + 4),
     )
 
-def _resolve_card_title(card, title_node, anchor_text: str, same_url_texts: list[str], page_url: str) -> tuple[str, str | None]:
-    title = clean_text(listing_node_attr(title_node, "title") or listing_node_attr(title_node, "alt") or listing_node_text(title_node) or anchor_text)
+
+def _resolve_card_title(
+    card, title_node, anchor_text: str, same_url_texts: list[str], page_url: str
+) -> tuple[str, str | None]:
+    title = clean_text(
+        listing_node_attr(title_node, "title")
+        or listing_node_attr(title_node, "alt")
+        or listing_node_text(title_node)
+        or anchor_text
+    )
     best_same_url_text = next(
         (
             text
             for text in sorted(same_url_texts, key=len, reverse=True)
-            if _alnum_token_count(text) >= 3 and not PRICE_RE.search(text) and not is_title_noise(text)
+            if _alnum_token_count(text) >= 3
+            and not PRICE_RE.search(text)
+            and not is_title_noise(text)
         ),
         None,
     )
@@ -378,6 +429,7 @@ def _resolve_card_title(card, title_node, anchor_text: str, same_url_texts: list
     if should_replace_title_with_image_hint(title, image_hint):
         title = clean_text(image_hint)
     return normalize_listing_title(title), best_same_url_text
+
 
 def _card_path_is_supported(
     *,
@@ -391,7 +443,10 @@ def _card_path_is_supported(
     if listing_detail_like_path(url, is_job=is_job):
         return True
     if is_job:
-        job_signal = any(token in card_text.lower() for token in ("salary", "remote", "location", "apply"))
+        job_signal = any(
+            token in card_text.lower()
+            for token in ("salary", "remote", "location", "apply")
+        )
         return anchor_score >= 8 or job_signal
     supporting = any(
         (
@@ -402,6 +457,7 @@ def _card_path_is_supported(
         )
     )
     return anchor_score >= 8 or supporting or title_score >= 8
+
 
 def _materialize_card_record(
     candidates: dict[str, list[object]],
@@ -429,5 +485,3 @@ def _materialize_card_record(
     if not cleaned.get("url") or not cleaned.get("title"):
         return None
     return cleaned
-
-

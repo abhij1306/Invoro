@@ -6,6 +6,7 @@ from .test_crawl_engine import (
     pytest,
 )
 
+
 @pytest.mark.regression
 def test_extract_records_prefers_firstcry_style_dom_cards_over_menu_chrome() -> None:
     html = """
@@ -76,6 +77,7 @@ def test_extract_records_prefers_firstcry_style_dom_cards_over_menu_chrome() -> 
         }
     ]
 
+
 @pytest.mark.regression
 def test_extract_records_prefers_sigma_style_product_rows_over_editorial_links() -> (
     None
@@ -134,6 +136,7 @@ def test_extract_records_prefers_sigma_style_product_rows_over_editorial_links()
         }
     ]
 
+
 @pytest.mark.regression
 def test_extract_records_recovers_listing_price_when_card_uses_currency_code_text() -> (
     None
@@ -173,6 +176,7 @@ def test_extract_records_recovers_listing_price_when_card_uses_currency_code_tex
         }
     ]
 
+
 @pytest.mark.regression
 def test_extract_records_replaces_generic_item_listing_title_with_product_text() -> (
     None
@@ -202,6 +206,7 @@ def test_extract_records_replaces_generic_item_listing_title_with_product_text()
     assert len(rows) == 1
     assert rows[0]["title"] == "Lenovo ThinkPad X1 Carbon"
 
+
 @pytest.mark.regression
 def test_extract_records_infers_listing_currency_from_locale_path_for_bare_price() -> (
     None
@@ -227,6 +232,7 @@ def test_extract_records_infers_listing_currency_from_locale_path_for_bare_price
     assert len(rows) == 1
     assert rows[0]["price"] == "24.99"
     assert rows[0]["currency"] == "GBP"
+
 
 @pytest.mark.regression
 def test_extract_records_ignores_discount_badge_images_inside_listing_cards() -> None:
@@ -274,6 +280,7 @@ def test_extract_records_ignores_discount_badge_images_inside_listing_cards() ->
         }
     ]
 
+
 @pytest.mark.regression
 def test_extract_records_replaces_review_only_listing_titles_with_product_image_title() -> (
     None
@@ -320,6 +327,7 @@ def test_extract_records_replaces_review_only_listing_titles_with_product_image_
             "review_count": 1,
         }
     ]
+
 
 @pytest.mark.regression
 def test_extract_records_replaces_review_only_titles_from_lazy_loaded_product_images() -> (
@@ -369,6 +377,7 @@ def test_extract_records_replaces_review_only_titles_from_lazy_loaded_product_im
         }
     ]
 
+
 @pytest.mark.regression
 def test_extract_records_rejects_dom_listing_rows_that_only_have_doc_titles_and_urls() -> (
     None
@@ -401,6 +410,7 @@ def test_extract_records_rejects_dom_listing_rows_that_only_have_doc_titles_and_
 
     assert rows == []
 
+
 @pytest.mark.regression
 def test_extract_records_rejects_product_name_placeholder_listing_rows() -> None:
     html = """
@@ -425,6 +435,7 @@ def test_extract_records_rejects_product_name_placeholder_listing_rows() -> None
 
     assert rows == []
 
+
 @pytest.mark.regression
 def test_extract_records_rejects_shipping_only_rendered_listing_rows() -> None:
     rows = extract_records(
@@ -443,6 +454,7 @@ def test_extract_records_rejects_shipping_only_rendered_listing_rows() -> None:
     )
 
     assert rows == []
+
 
 @pytest.mark.regression
 def test_extract_records_rejects_rendered_listing_cta_only_titles() -> None:
@@ -478,6 +490,7 @@ def test_extract_records_rejects_rendered_listing_cta_only_titles() -> None:
             "url": "https://www.discogs.com/products/widget-prime",
         }
     ]
+
 
 @pytest.mark.regression
 def test_extract_records_rejects_job_listing_hub_links_when_structured_job_rows_exist() -> (
@@ -540,6 +553,7 @@ def test_extract_records_rejects_job_listing_hub_links_when_structured_job_rows_
         == "https://jobs.example.com/job-456-data-engineer-at-example-remote/"
     )
 
+
 @pytest.mark.regression
 def test_extract_records_keeps_job_detail_like_titles_even_when_they_start_with_hub_text() -> (
     None
@@ -569,6 +583,7 @@ def test_extract_records_keeps_job_detail_like_titles_even_when_they_start_with_
             "url": "https://jobs.example.com/jobs/backend-engineer-123456",
         }
     ]
+
 
 @pytest.mark.regression
 def test_extract_records_keeps_job_listing_slug_records_with_numeric_terminal_ids() -> (
@@ -607,6 +622,7 @@ def test_extract_records_keeps_job_listing_slug_records_with_numeric_terminal_id
         == "https://startup.jobs/founding-engineer-with-equity-miru-technology-inc-7933051"
     )
 
+
 @pytest.mark.regression
 def test_extract_records_rejects_numeric_non_job_links_on_careers_hosts() -> None:
     html = """
@@ -634,6 +650,7 @@ def test_extract_records_rejects_numeric_non_job_links_on_careers_hosts() -> Non
     )
 
     assert rows == []
+
 
 @pytest.mark.regression
 def test_extract_records_ignores_single_page_level_product_payload_on_listing_pages() -> (
