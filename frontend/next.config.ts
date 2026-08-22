@@ -18,6 +18,7 @@ export function buildSecurityHeaders(isProduction: boolean) {
 
 const nextConfig: NextConfig = {
   allowedDevOrigins: ['127.0.0.1', 'localhost'],
+  output: 'standalone',
   typedRoutes: true,
   headers() {
     return [

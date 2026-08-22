@@ -18,13 +18,13 @@ jobs:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_DB: crawlerai_smoke
+          POSTGRES_DB: invoro_smoke
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U postgres -d crawlerai_smoke"
+          --health-cmd "pg_isready -U postgres -d invoro_smoke"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -32,7 +32,7 @@ jobs:
       APP_ENV: test
       JWT_SECRET_KEY: ci-jwt-secret-key-change-me-32-bytes
       ENCRYPTION_KEY: ci-encryption-key-change-me-32b
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/crawlerai_smoke
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/invoro_smoke
       REDIS_STATE_ENABLED: false
       CELERY_DISPATCH_ENABLED: false
       BOOTSTRAP_ADMIN_ONCE: false
@@ -101,12 +101,12 @@ jobs:
       - name: Start backend API server
         working-directory: backend
         run: |
-          nohup python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 > /tmp/backend.log 2>&1 &
+          nohup python -m uvicorn app.main:app --host 127.0.0.1 --port 9000 > /tmp/backend.log 2>&1 &
 
       - name: Wait for backend healthcheck
         run: |
           for i in {1..60}; do
-            if curl -fsS "http://127.0.0.1:8000/api/health" >/dev/null; then
+            if curl -fsS "http://127.0.0.1:9000/api/health" >/dev/null; then
               exit 0
             fi
             sleep 2
@@ -117,14 +117,14 @@ jobs:
 
       - name: Start frontend dev server
         env:
-          NEXT_PUBLIC_API_BASE_URL: http://127.0.0.1:8000
+          NEXT_PUBLIC_API_BASE_URL: http://127.0.0.1:9000
         run: |
           nohup pnpm run dev > /tmp/frontend.log 2>&1 &
 
       - name: Wait for frontend root URL
         run: |
           for i in {1..60}; do
-            if curl -fsS "http://127.0.0.1:3000/" >/dev/null; then
+            if curl -fsS "http://127.0.0.1:4000/" >/dev/null; then
               exit 0
             fi
             sleep 2
@@ -136,5 +136,5 @@ jobs:
       - name: Run Playwright smoke suite
         env:
           CI: true
-          NEXT_PUBLIC_API_BASE_URL: http://127.0.0.1:8000
+          NEXT_PUBLIC_API_BASE_URL: http://127.0.0.1:9000
         run: pnpm run test:e2e -- smoke.spec.ts

@@ -7,7 +7,7 @@ import { cn } from '../../lib/utils';
 
 /**
  * Field — wraps a control with a label, optional hint, and an inline
- * error. Supports both standard nested child elements (for CrawlerAI backwards
+ * error. Supports both standard nested child elements (for Invoro backwards
  * compatibility) and the modern accessible render-prop pattern.
  */
 export function Field({ label, hint, error, required, className, children }: Readonly<FieldProps>) {

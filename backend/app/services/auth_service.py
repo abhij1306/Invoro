@@ -14,7 +14,7 @@ from app.core.security import (
     verify_password,
 )
 from app.models.user import User
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.orm.attributes import set_committed_value
 
@@ -106,6 +106,15 @@ async def authenticate_user(
         await _upgrade_password_hash(session, user, password)
         logger.info("auth.password_hash_upgraded", extra={"user_id": str(user.id)})
     return create_access_token(str(user.id), token_version=user.token_version), user
+
+
+async def revoke_user_sessions(session: AsyncSession, user_id: int) -> None:
+    await session.execute(
+        update(User)
+        .where(User.id == user_id)
+        .values(token_version=func.coalesce(User.token_version, 0) + 1)
+    )
+    await session.commit()
 
 
 async def _upgrade_password_hash(

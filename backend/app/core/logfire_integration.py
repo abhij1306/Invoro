@@ -21,6 +21,8 @@ class _LogfireState:
     configured = False
     fastapi_instrumented = False
     celery_instrumented = False
+    system_metrics_instrumented = False
+    logging_handler: logging.Handler | None = None
 
 
 def configure_logfire() -> bool:
@@ -39,20 +41,64 @@ def configure_logfire() -> bool:
         return False
 
     token = settings.logfire_token.strip() or None
-    logfire.configure(
-        send_to_logfire=settings.logfire_send_to_logfire,
-        token=token,
-        service_name=settings.logfire_service_name,
-        environment=settings.logfire_environment or settings.app_env,
-        console=False,
-        inspect_arguments=False,
-    )
+    try:
+        logfire.configure(
+            send_to_logfire=settings.logfire_send_to_logfire,
+            token=token,
+            service_name=settings.logfire_service_name,
+            environment=settings.logfire_environment or settings.app_env,
+            console=False,
+            inspect_arguments=False,
+            advanced=logfire.AdvancedOptions(base_url=settings.logfire_base_url),
+        )
+    except Exception:
+        logger.warning(
+            "Logfire configuration failed; telemetry remains disabled", exc_info=True
+        )
+        return False
     _LogfireState.configured = True
+    _instrument_system_metrics(logfire)
+    _install_logging_handler(logfire)
     if token is None and settings.logfire_send_to_logfire is not False:
         logger.warning(
             "Logfire enabled without LOGFIRE_TOKEN; cloud export is disabled"
         )
     return True
+
+
+def _instrument_system_metrics(logfire: Any) -> None:
+    if _LogfireState.system_metrics_instrumented:
+        return
+    try:
+        logfire.instrument_system_metrics()
+    except Exception:
+        logger.warning("Logfire system metrics instrumentation failed", exc_info=True)
+        return
+    _LogfireState.system_metrics_instrumented = True
+
+
+def _install_logging_handler(logfire: Any) -> None:
+    if _LogfireState.logging_handler is not None:
+        return
+    try:
+        handler = logfire.LogfireLoggingHandler(
+            level=logging.INFO,
+            fallback=logging.NullHandler(),
+        )
+    except Exception:
+        logger.warning("Logfire logging bridge setup failed", exc_info=True)
+        return
+    logging.getLogger().addHandler(handler)
+    _LogfireState.logging_handler = handler
+
+
+def _redact_fastapi_request_attributes(
+    _request: object,
+    attributes: dict[str, Any],
+) -> dict[str, Any]:
+    """Keep validation diagnostics while excluding endpoint argument values."""
+    errors = attributes.get("errors")
+    return {"errors": errors} if errors else {}
 
 
 def instrument_fastapi(app: FastAPI) -> bool:
@@ -65,6 +111,7 @@ def instrument_fastapi(app: FastAPI) -> bool:
     logfire.instrument_fastapi(
         app,
         capture_headers=bool(settings.logfire_capture_headers),
+        request_attributes_mapper=_redact_fastapi_request_attributes,
     )
     _LogfireState.fastapi_instrumented = True
     return True
@@ -156,9 +203,13 @@ def set_logfire_attributes(span: Any, **attributes: object) -> None:
 
 
 def reset_logfire_state_for_tests() -> None:
+    if _LogfireState.logging_handler is not None:
+        logging.getLogger().removeHandler(_LogfireState.logging_handler)
     _LogfireState.configured = False
     _LogfireState.fastapi_instrumented = False
     _LogfireState.celery_instrumented = False
+    _LogfireState.system_metrics_instrumented = False
+    _LogfireState.logging_handler = None
 
 
 __all__ = [

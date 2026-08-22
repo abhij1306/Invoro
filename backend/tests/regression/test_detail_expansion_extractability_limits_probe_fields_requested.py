@@ -285,11 +285,6 @@ async def test_browser_fetch_recovers_direct_navigation_challenge(
 async def test_browser_fetch_does_not_repeat_challenge_recovery_after_navigation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(
-        browser_runtime.crawler_runtime_settings,
-        "origin_warm_pause_ms",
-        0,
-    )
     page = _FakeExpansionPage(
         base_html="<html><head><title>Access Denied</title></head><body>Access Denied</body></html>",
         goto_status=403,

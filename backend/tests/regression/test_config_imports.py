@@ -212,8 +212,22 @@ def test_parallel_runtime_defaults_stay_bounded_without_env(
 
     assert runtime.url_batch_concurrency <= 8
     assert runtime.browser_runtime_pool_max_entries <= 8
-    assert runtime.origin_warmup_dedupe_ttl_seconds >= 30
     assert app_settings.system_max_concurrent_urls <= 8
+
+
+@pytest.mark.regression
+def test_database_url_defaults_to_canonical_invoro_database(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    for env_name in ("DATABASE_URL", "database_url"):
+        monkeypatch.delenv(env_name, raising=False)
+    dummy_secret = "0" * 32
+    monkeypatch.setenv("JWT_SECRET_" + "KEY", dummy_secret)
+    monkeypatch.setenv("ENCRYPTION_" + "KEY", dummy_secret)
+
+    app_settings = Settings(_env_file=None)
+
+    assert app_settings.database_url.endswith("/invoro")
 
 
 @pytest.mark.regression

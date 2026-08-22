@@ -2,7 +2,7 @@
 version: "4.1"
 name: "Invoro Design System v4.1"
 description: >
-  CrawlerAI v4 refined-minimal operator design system adapted to Invoro's
+  Invoro v4 refined-minimal operator design system for the
   Next.js shell, with local Switzer body, Satoshi display, and Geist Mono.
 fonts:
   body: "Switzer Variable"
@@ -36,7 +36,7 @@ geometry:
 
 # Invoro Design System v4.1
 
-`frontend/app/globals.css` is the canonical token and global-style source. This document records its intended use. CrawlerAI v4 is the visual authority; Invoro keeps its Next.js routing, product workflows, copy, and API contracts.
+`frontend/app/globals.css` is the canonical token and global-style source. This document records its intended use. Invoro v4 is the visual authority for the Next.js routing, product workflows, copy, and API contracts.
 
 ## Visual Language
 

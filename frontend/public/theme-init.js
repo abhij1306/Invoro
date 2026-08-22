@@ -2,7 +2,7 @@
   let dark = false;
 
   try {
-    const storedTheme = localStorage.getItem('crawlerai-theme');
+    const storedTheme = localStorage.getItem('invoro-theme');
     if (storedTheme) {
       dark = storedTheme === 'dark';
     } else {

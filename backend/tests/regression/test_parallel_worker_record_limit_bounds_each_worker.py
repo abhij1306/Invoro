@@ -352,9 +352,11 @@ async def test_process_run_defaults_to_sequential_batch_url_processing(
         },
     )
     seen: list[tuple[str, int]] = []
+    owned_sessions: list[AsyncSession] = []
 
     async def _fake_process_single_url(*args, **kwargs):
         del args
+        owned_sessions.append(kwargs["session"])
         seen.append((str(kwargs.get("url") or ""), id(kwargs["session"])))
         return URLProcessingResult(
             records=[],
@@ -374,7 +376,9 @@ async def test_process_run_defaults_to_sequential_batch_url_processing(
         "https://example-two.com/products/two",
         "https://example-three.com/products/three",
     ]
-    assert {session_id for _url, session_id in seen} == {id(db_session)}
+    assert len({session_id for _url, session_id in seen}) == 3
+    assert all(session_id != id(db_session) for _url, session_id in seen)
+    assert len(owned_sessions) == 3
 
 
 @pytest.mark.asyncio

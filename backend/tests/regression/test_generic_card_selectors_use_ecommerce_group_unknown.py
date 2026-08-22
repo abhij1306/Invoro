@@ -277,7 +277,7 @@ async def test_browser_fetch_closes_payload_capture_after_policy_resolution_erro
         return None, _page_context()
 
     async def _fake_prepare_context(**_kwargs):
-        return "chromium", "chromium", False, True
+        return "chromium", "chromium", False
 
     def _raise_policy_error(**_kwargs):
         raise RuntimeError("policy failed")

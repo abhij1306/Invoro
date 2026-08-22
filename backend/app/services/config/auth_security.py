@@ -4,6 +4,7 @@ AUTH_RATE_LIMIT_WINDOW_SECONDS = 60
 AUTH_RATE_LIMIT_MAX_BUCKETS = 1024
 AUTH_LOGIN_RATE_LIMIT = 10
 AUTH_REGISTER_RATE_LIMIT = 5
+AUTH_LOGOUT_RATE_LIMIT = 20
 
 SECURITY_HEADER_CONTENT_TYPE_OPTIONS = "nosniff"
 SECURITY_HEADER_FRAME_OPTIONS = "DENY"
@@ -28,7 +29,11 @@ def cors_allowed_headers(request_id_header: str) -> list[str]:
 
 
 def auth_rate_limit(identifier: str) -> int:
-    return AUTH_LOGIN_RATE_LIMIT if identifier == "login" else AUTH_REGISTER_RATE_LIMIT
+    return {
+        "login": AUTH_LOGIN_RATE_LIMIT,
+        "logout": AUTH_LOGOUT_RATE_LIMIT,
+        "register": AUTH_REGISTER_RATE_LIMIT,
+    }.get(identifier, AUTH_REGISTER_RATE_LIMIT)
 
 
 def auth_rate_limit_key(client_identifier: str, route_group: str) -> str:

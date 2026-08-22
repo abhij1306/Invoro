@@ -387,7 +387,7 @@ async def test_cors_preflight_uses_narrow_allowlists() -> None:
         response = await client.options(
             "/api/auth/login",
             headers={
-                "Origin": "http://127.0.0.1:3000",
+                "Origin": "http://127.0.0.1:4000",
                 "Access-Control-Request-Method": "POST",
                 "Access-Control-Request-Headers": "content-type,authorization,x-request-id",
             },
@@ -514,12 +514,12 @@ async def test_public_capabilities_uses_api_key_envelope(
     db_session,
     test_user,
 ) -> None:
-    raw_key = "crawlerai_public_test_key"
+    raw_key = "invoro_public_test_key"
     db_session.add(
         ApiKey(
             user_id=test_user.id,
             name="test",
-            key_prefix="crawlerai",
+            key_prefix="invoro",
             key_hash=hash_api_key(raw_key),
             is_active=True,
         )
@@ -549,12 +549,12 @@ async def test_authenticate_public_api_key_rejects_legacy_unkeyed_hash(
     db_session,
     test_user,
 ) -> None:
-    raw_key = "crawlerai_legacy_public_test_key"
+    raw_key = "invoro_legacy_public_test_key"
     db_session.add(
         ApiKey(
             user_id=test_user.id,
             name="legacy",
-            key_prefix="crawlerai",
+            key_prefix="invoro",
             key_hash="legacy-unkeyed-hash-placeholder",
             is_active=True,
         )
@@ -574,7 +574,7 @@ async def test_authenticate_public_api_key_fails_when_touch_commit_fails() -> No
                 id=7,
                 user_id=11,
                 name="test",
-                key_prefix="crawlerai",
+                key_prefix="invoro",
                 key_hash=hash_api_key("secret"),
                 is_active=True,
             )
@@ -651,12 +651,12 @@ async def test_public_rate_limit_is_keyed_by_api_key(
     monkeypatch.setattr("app.api.public.rate_limit.PUBLIC_API_READ_BURST_LIMIT", 2)
     previous_public_buckets = public_rate_limit_buckets_snapshot()
     clear_public_rate_limit_buckets_for_testing()
-    raw_key = "crawlerai_rate_key"
+    raw_key = "invoro_rate_key"
     db_session.add(
         ApiKey(
             user_id=test_user.id,
             name="rate",
-            key_prefix="crawlerai",
+            key_prefix="invoro",
             key_hash=hash_api_key(raw_key),
             is_active=True,
         )
@@ -702,12 +702,12 @@ def test_retry_after_rounds_up_remaining_window() -> None:
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_public_batch_extract_is_deferred(db_session, test_user) -> None:
-    raw_key = "crawlerai_batch_key"
+    raw_key = "invoro_batch_key"
     db_session.add(
         ApiKey(
             user_id=test_user.id,
             name="batch",
-            key_prefix="crawlerai",
+            key_prefix="invoro",
             key_hash=hash_api_key(raw_key),
             is_active=True,
         )

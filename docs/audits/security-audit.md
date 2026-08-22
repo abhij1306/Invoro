@@ -1,6 +1,6 @@
- CrawlerAI Security Audit Report
+ Invoro Security Audit Report
 
-**Repository:** [abhij1306/CrawlerAI](https://github.com/abhij1306/CrawlerAI)
+**Repository:** [abhij1306/Invoro](https://github.com/abhij1306/Invoro)
 **Audit Date:** May 21, 2026
 **Auditor:** Perplexity AI (OWASP Top 10 + STRIDE framework)
 **Scope:** Backend (FastAPI/Python), Frontend (Next.js), CI/CD pipelines, secrets management, auth flows
@@ -9,7 +9,7 @@
 
 ## Executive Summary
 
-CrawlerAI has a well-structured codebase with several security-forward design decisions already in place — including a dedicated SSRF guard (`url_safety.py`), Gitleaks secret scanning in CI, token versioning for session invalidation, and proper use of `httponly` cookies. However, several significant gaps remain that need attention before this application handles production traffic with real user data. The most critical are: the missing `Secure` flag on the session cookie, use of PBKDF2 instead of bcrypt/argon2id for password hashing, no rate limiting on the `/api/auth/login` and `/api/auth/register` endpoints, and absence of security response headers across the API.
+Invoro has a well-structured codebase with several security-forward design decisions already in place — including a dedicated SSRF guard (`url_safety.py`), Gitleaks secret scanning in CI, token versioning for session invalidation, and proper use of `httponly` cookies. However, several significant gaps remain that need attention before this application handles production traffic with real user data. The most critical are: the missing `Secure` flag on the session cookie, use of PBKDF2 instead of bcrypt/argon2id for password hashing, no rate limiting on the `/api/auth/login` and `/api/auth/register` endpoints, and absence of security response headers across the API.
 
 **Overall Risk Level: MEDIUM-HIGH**
 

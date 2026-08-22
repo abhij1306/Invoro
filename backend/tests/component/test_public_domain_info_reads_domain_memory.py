@@ -8,12 +8,12 @@ pytest_plugins = ["tests.component.test_public_api"]
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_public_domain_info_reads_domain_memory(db_session, test_user) -> None:
-    raw_key = "crawlerai_domain_key"
+    raw_key = "invoro_domain_key"
     db_session.add(
         ApiKey(
             user_id=test_user.id,
             name="domain",
-            key_prefix="crawlerai",
+            key_prefix="invoro",
             key_hash=hash_api_key(raw_key),
             is_active=True,
         )
@@ -72,12 +72,12 @@ async def test_public_extract_runs_http_only_and_shapes_record(
     test_user,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    raw_key = "crawlerai_extract_key"
+    raw_key = "invoro_extract_key"
     db_session.add(
         ApiKey(
             user_id=test_user.id,
             name="extract",
-            key_prefix="crawlerai",
+            key_prefix="invoro",
             key_hash=hash_api_key(raw_key),
             is_active=True,
         )
@@ -155,12 +155,12 @@ async def test_public_extract_runs_http_only_and_shapes_record(
 async def test_public_extract_rejects_unsupported_surface(
     db_session, test_user
 ) -> None:
-    raw_key = "crawlerai_extract_surface_key"
+    raw_key = "invoro_extract_surface_key"
     db_session.add(
         ApiKey(
             user_id=test_user.id,
             name="extract",
-            key_prefix="crawlerai",
+            key_prefix="invoro",
             key_hash=hash_api_key(raw_key),
             is_active=True,
         )
@@ -194,12 +194,12 @@ async def test_public_extract_accepts_auto_surface(
     test_user,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    raw_key = "crawlerai_extract_auto_key"
+    raw_key = "invoro_extract_auto_key"
     db_session.add(
         ApiKey(
             user_id=test_user.id,
             name="extract",
-            key_prefix="crawlerai",
+            key_prefix="invoro",
             key_hash=hash_api_key(raw_key),
             is_active=True,
         )
@@ -266,12 +266,12 @@ async def test_public_extract_accepts_auto_surface(
 async def test_public_watches_route_is_not_registered_after_alert_rename(
     db_session, test_user
 ) -> None:
-    raw_key = "crawlerai_watch_key"
+    raw_key = "invoro_watch_key"
     db_session.add(
         ApiKey(
             user_id=test_user.id,
             name="watch",
-            key_prefix="crawlerai",
+            key_prefix="invoro",
             key_hash=hash_api_key(raw_key),
             is_active=True,
         )

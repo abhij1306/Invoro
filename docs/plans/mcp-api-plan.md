@@ -46,7 +46,7 @@ Expose a lightweight public HTTP API and HTTP MCP surface that can run on one sm
 - [x] Batch extraction endpoints are deferred or return structured `WORKER_REQUIRED`; they do not create workers in the lightweight launch.
 - [x] `GET /api/v1/domains/{domain}` returns known/surface/last crawled/selector/acquisition-profile metadata from existing domain memory and crawl records.
 - [x] Public watch endpoints are deferred until the active Agentic Delta Engine plan is verified.
-- [x] HTTP MCP server is stateless: it reads `CRAWLERAI_API_KEY` and `CRAWLERAI_API_BASE_URL`, calls `/api/v1`, and returns structured tool results/errors for `extract_product`, `check_domain`, and `list_capabilities`.
+- [x] HTTP MCP server is stateless: it reads `INVORO_API_KEY` and `INVORO_API_BASE_URL`, calls `/api/v1`, and returns structured tool results/errors for `extract_product`, `check_domain`, and `list_capabilities`.
 - [x] OpenAPI exposes `/api/v1` schemas and documents machine error codes.
 - [x] Focused required tests passed; full suite intentionally skipped by user request.
 
@@ -114,7 +114,7 @@ Expose a lightweight public HTTP API and HTTP MCP surface that can run on one sm
 **Status:** DONE
 **Files:** `backend/app/mcp_server/__init__.py`, `backend/app/mcp_server/config.py`, `backend/app/mcp_server/client.py`, `backend/app/mcp_server/server.py`, `backend/app/mcp_server/tools.py`, `backend/pyproject.toml`, `backend/tests/services/test_mcp_server.py`
 **What:** Add a stateless hosted HTTP MCP server that exposes only lightweight launch tools and calls `/api/v1` through an authenticated HTTP client. Use `fastmcp` as the MCP server framework; it is built on the official Python `mcp` SDK and provides HTTP+SSE transport without hand-rolled JSON-RPC. Do not implement a custom JSON-RPC transport unless `fastmcp` proves unusable and that blocker is documented first.
-**Details:** Env config: `CRAWLERAI_API_KEY` required, `CRAWLERAI_API_BASE_URL` default `https://api.crawlerai.com/api/v1`. Active tool mapping: `extract_product -> POST /extract`; `check_domain -> GET /domains/{domain}`; `list_capabilities -> local static capability response from config`. Deferred tools must be absent or return `WORKER_REQUIRED`, not silently pretend watches are available. MCP errors must carry API `code` and `message`; never return Python tracebacks. Add the dependency in `backend/pyproject.toml` during this slice rather than vendoring or copying protocol code.
+**Details:** Env config: `INVORO_API_KEY` required, `INVORO_API_BASE_URL` default `https://api.invoro.ai/api/v1`. Active tool mapping: `extract_product -> POST /extract`; `check_domain -> GET /domains/{domain}`; `list_capabilities -> local static capability response from config`. Deferred tools must be absent or return `WORKER_REQUIRED`, not silently pretend watches are available. MCP errors must carry API `code` and `message`; never return Python tracebacks. Add the dependency in `backend/pyproject.toml` during this slice rather than vendoring or copying protocol code.
 **Verify:** `cd backend; $env:PYTHONPATH='.'; .\.venv\Scripts\python.exe -m pytest tests/services/test_mcp_server.py -q`
 
 ### Slice 9: OpenAPI And Docs

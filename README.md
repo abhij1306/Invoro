@@ -8,11 +8,19 @@
 [![Next.js](https://img.shields.io/badge/Next.js-16%2B-black?logo=next.js)](https://nextjs.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15%2B-4169E1?logo=postgresql)](https://www.postgresql.org/)
 [![Redis](https://img.shields.io/badge/Redis-7%2B-DC382D?logo=redis)](https://redis.io/)
+[![Logfire](https://img.shields.io/badge/Observability-Logfire-F97316)](https://logfire.pydantic.dev/)
 [![License](https://img.shields.io/badge/License-AGPLv3-blue.svg)](LICENSE)
 
-</div>
-
 Invoro extracts structured data from ecommerce, job, content, article, forum-thread, and tabular targets. It prefers deterministic evidence first: platform adapters, structured sources, JS state, network payloads, and DOM selectors. LLM calls are optional backfill only.
+
+## 🔗 Contents
+
+- [Features](#features)
+- [Architecture](#architecture)
+- [Docker quickstart](#docker-quickstart)
+- [Public API and MCP](#public-api-and-mcp)
+- [Development](#development)
+- [Project layout](#project-layout)
 
 ## Features
 
@@ -20,7 +28,7 @@ Invoro extracts structured data from ecommerce, job, content, article, forum-thr
 | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | HTTP-first acquisition | Starts with `curl-cffi`, escalates to Patchright/Playwright only when blocking, hydration, or browser-only content requires it.                     |
 | Tiered extraction      | Runs `adapter -> structured source -> JS state -> DOM -> confidence scoring -> optional LLM gap fill`.                                              |
-| Surface-aware crawling | Supports ecommerce, jobs, content pages, article feeds/pages, forum threads, and tabular surfaces.                                     |
+| Surface-aware crawling | Supports ecommerce, jobs, content pages, article feeds/pages, forum threads, and tabular surfaces.                                                  |
 | Domain memory          | Stores reusable run profiles, cookie state, learned selectors, acquisition evidence, and field feedback by normalized `(domain, surface)`.          |
 | Review workflow        | Lets operators inspect crawl records, artifact HTML, selector candidates, field winners, and promote domain selectors.                              |
 | Exports                | Produces JSON, CSV, artifact bundles, and Discoverist-style exports from persisted crawl records.                                                   |
@@ -31,7 +39,7 @@ Invoro extracts structured data from ecommerce, job, content, article, forum-thr
 | Public API v1          | Exposes API-key authenticated extraction with auto/content/article/forum routing, domain lookup, capabilities, and alert endpoints under `/api/v1`. |
 | MCP wrappers           | Provides a hosted FastMCP server for product extraction tools and a stdio alert wrapper over public alert endpoints.                                |
 | Orchestration          | Groups projects and workflows around normal crawl runs; current workflow supports competitive pricing snapshots and monitor promotion.              |
-| Observability          | Uses structured logs, correlation IDs, health checks, Prometheus metrics, run logs, and artifact capture.                                           |
+| Observability          | Uses structured logs, correlation IDs, health checks, Prometheus metrics, Logfire traces/system metrics, run logs, and artifact capture.            |
 
 ## Architecture
 
@@ -63,38 +71,50 @@ User/API request
 | Extraction    | BeautifulSoup4, selectolax, lxml, extruct, JMESPath, glom                          |
 | Frontend      | Next.js 16, React 19, Tailwind CSS v4, Radix UI, TanStack Query, Recharts, Zustand |
 | Testing       | pytest, Vitest, Playwright, MSW                                                    |
-| Observability | structlog, prometheus-client                                                       |
+| Observability | Pydantic Logfire, structlog, prometheus-client                                     |
 
 ## Prerequisites
 
-- Python 3.12
-- uv 0.11.28
-- Node.js 20+
-- Corepack with pnpm 11.9.0
-- PostgreSQL 15+
-- Redis 7+
+- Docker Desktop with Docker Compose v2 (recommended)
+- For manual fallback only: Python 3.12, uv 0.11.28, Node.js 24 LTS, pnpm 11.9.0, PostgreSQL 15+, and Redis 7+
 
-## Quickstart
+## Docker Quickstart
 
 ```powershell
-cp .env.example .env
+Copy-Item .env.example .env
 ```
 
-Edit `.env` before first run. Minimum local values:
+Edit `.env` before first run. Set secure local values for `POSTGRES_PASSWORD`, `JWT_SECRET_KEY`, `ENCRYPTION_KEY`, and `DEFAULT_ADMIN_PASSWORD`. Then build and start the full stack:
 
-| Variable                                              | Required | Default/example                                                   | Notes                                              |
-| ----------------------------------------------------- | -------- | ----------------------------------------------------------------- | -------------------------------------------------- |
-| `DATABASE_URL`                                        | Yes      | `postgresql+asyncpg://postgres:postgres@localhost:5432/invoro`    | PostgreSQL database.                               |
-| `REDIS_URL`                                           | Yes      | `redis://localhost:6379/0`                                        | Queue, scheduler, and cache dependency.            |
-| `JWT_SECRET_KEY`                                      | Yes      | `replace-with-64-byte-random-secret`                              | Replace for real use.                              |
-| `ENCRYPTION_KEY`                                      | Yes      | `replace-with-32-byte-minimum-secret`                             | Replace for real use.                              |
-| `DEFAULT_ADMIN_EMAIL`                                 | Yes      | `admin@example.com`                                               | Bootstrap admin identity.                          |
-| `DEFAULT_ADMIN_PASSWORD`                              | Yes      | `replace-with-strong-admin-password`                              | Replace before login.                              |
-| `CELERY_DISPATCH_ENABLED`                             | No       | `false`                                                           | Keep `false` for simple local in-process runs.     |
-| `LEGACY_INPROCESS_RUNNER_ENABLED`                     | No       | `true`                                                            | Lets local crawls run without Celery worker setup. |
-| `ANTHROPIC_API_KEY`, `GROQ_API_KEY`, `NVIDIA_API_KEY` | No       | empty                                                             | Only needed for enabled LLM backfill tasks.        |
+```powershell
+docker compose up --build -d
+docker compose ps
+```
 
-### Backend
+Compose starts PostgreSQL, Redis, the one-shot Alembic migration service, FastAPI, Celery worker and beat, and the Next.js frontend. First build is slower because the backend image installs a Chromium runtime.
+
+- UI: `http://127.0.0.1:4000`
+- API: `http://127.0.0.1:9000`
+- API docs: `http://127.0.0.1:9000/docs`
+- Readiness: `http://127.0.0.1:9000/health/ready`
+
+Useful commands:
+
+```powershell
+docker compose logs -f api worker frontend
+docker compose down
+```
+
+To intentionally erase Docker-managed PostgreSQL and Redis data, then rebuild from the canonical migration:
+
+```powershell
+docker compose down --volumes
+docker compose up --build -d
+```
+
+On first local startup, the backend bootstraps the configured `DEFAULT_ADMIN_EMAIL` when `BOOTSTRAP_ADMIN_ONCE=true`. Sign in with that server-side `.env` account. Use **Log out** in the sidebar before signing in as another account; credentials are never sent to the frontend except through the login form.
+
+### Manual fallback: backend
 
 ```powershell
 cd backend
@@ -103,9 +123,9 @@ uv run --frozen --extra dev python init_db.py
 uv run --frozen --extra dev python run_dev_server.py
 ```
 
-API: `http://127.0.0.1:8000`
+API: `http://127.0.0.1:9000`
 
-### Frontend
+### Manual fallback: frontend
 
 ```powershell
 cd frontend
@@ -115,13 +135,7 @@ pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-UI: `http://127.0.0.1:3000`
-
-### One-Shot Windows Start
-
-```powershell
-.\start.bat
-```
+UI: `http://127.0.0.1:4000`
 
 ## Main Routes
 
@@ -157,15 +171,15 @@ UI: `http://127.0.0.1:3000`
 Create API keys in the UI or through `/api/api-keys`. Public routes use bearer auth:
 
 ```powershell
-curl -H "Authorization: Bearer <api-key>" http://127.0.0.1:8000/api/v1/capabilities
+curl -H "Authorization: Bearer <api-key>" http://127.0.0.1:9000/api/v1/capabilities
 ```
 
 Hosted MCP server:
 
 ```powershell
 cd backend
-$env:CRAWLERAI_API_KEY='<set-api-key-in-shell>'
-$env:CRAWLERAI_API_BASE_URL='http://127.0.0.1:8000/api/v1'
+$env:INVORO_API_KEY='<set-api-key-in-shell>'
+$env:INVORO_API_BASE_URL='http://127.0.0.1:9000/api/v1'
 .\.venv\Scripts\python.exe -m app.mcp_server.server
 ```
 
@@ -173,8 +187,8 @@ Alert stdio wrapper:
 
 ```powershell
 cd backend
-$env:CRAWLERAI_API_KEY='<set-api-key-in-shell>'
-$env:CRAWLERAI_API_BASE_URL='http://127.0.0.1:8000/api/v1'
+$env:INVORO_API_KEY='<set-api-key-in-shell>'
+$env:INVORO_API_BASE_URL='http://127.0.0.1:9000/api/v1'
 .\.venv\Scripts\python.exe -m app.mcp.alert_server
 ```
 
@@ -234,6 +248,8 @@ frontend/
   components/         shared UI and domain components
   lib/                API clients, types, utilities, state
   e2e/                Playwright tests
+
+docker-compose.yml     complete local stack
 
 docs/
   INVARIANTS.md       hard runtime contracts

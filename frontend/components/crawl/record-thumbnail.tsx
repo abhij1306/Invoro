@@ -2,8 +2,8 @@
 
 import Image from 'next/image';
 import { useState } from 'react';
-const BROKEN_THUMBNAIL_STORAGE_KEY = 'crawlerai-broken-thumb-urls-v1';
-const BROKEN_THUMBNAIL_HOSTS_KEY = 'crawlerai-broken-thumb-hosts-v1';
+const BROKEN_THUMBNAIL_STORAGE_KEY = 'invoro-broken-thumb-urls-v1';
+const BROKEN_THUMBNAIL_HOSTS_KEY = 'invoro-broken-thumb-hosts-v1';
 const BROKEN_THUMBNAIL_URLS = new Set<string>();
 const BROKEN_THUMBNAIL_HOSTS = new Set<string>();
 

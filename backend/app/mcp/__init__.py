@@ -1,1 +1,1 @@
-"""CrawlerAI MCP stdio entrypoints."""
+"""Invoro MCP stdio entrypoints."""

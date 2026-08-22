@@ -103,9 +103,9 @@ ALERT_ALLOWED_FIELDS = frozenset(
 )
 ALERT_CONDITION_FIELDS = frozenset({"price", "availability"})
 ALERT_CONDITION_OPERATORS = frozenset({"<", ">", "<=", ">=", "==", "!="})
-MCP_API_KEY_ENV = "CRAWLERAI_API_KEY"
-MCP_API_BASE_URL_ENV = "CRAWLERAI_API_BASE_URL"
-MCP_DEFAULT_API_BASE_URL = "http://127.0.0.1:8000/api/v1"
+MCP_API_KEY_ENV = "INVORO_API_KEY"
+MCP_API_BASE_URL_ENV = "INVORO_API_BASE_URL"
+MCP_DEFAULT_API_BASE_URL = "http://127.0.0.1:9000/api/v1"
 
 # Surfaces where HEAD pre-check should be skipped by default (CDN ETags unreliable)
 ECOMMERCE_SURFACES = frozenset(

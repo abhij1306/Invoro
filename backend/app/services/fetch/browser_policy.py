@@ -10,6 +10,7 @@ from urllib.parse import quote, unquote, urlparse, urlunparse
 
 from app.services.acquisition.host_protection_memory import HostProtectionPolicy
 from app.services.acquisition.runtime import classify_block_from_headers
+from app.services.config.browser_fingerprint_profiles import VENDOR_BLOCK_REASON_PREFIX
 from app.services.config.runtime_settings import (
     PATCHRIGHT_BROWSER_ENGINE,
     PATCHRIGHT_HTTP2_PROTOCOL_ERROR_TOKEN,
@@ -20,8 +21,6 @@ from app.services.config.runtime_settings import (
 from app.services.fetch.types import BrowserAttemptPlan, FetchRuntimeContext
 
 logger = logging.getLogger(__name__)
-
-_VENDOR_BLOCK_REASON_PREFIX = "vendor-block:"
 
 
 def acquisition_strategy_message(
@@ -241,14 +240,14 @@ def host_policy_snapshot(policy: HostProtectionPolicy) -> dict[str, object]:
 
 
 def is_vendor_block_reason(reason: str) -> bool:
-    return str(reason or "").strip().lower().startswith(_VENDOR_BLOCK_REASON_PREFIX)
+    return str(reason or "").strip().lower().startswith(VENDOR_BLOCK_REASON_PREFIX)
 
 
 def extract_vendor_from_reason(reason: str) -> str | None:
     normalized = str(reason or "").strip().lower()
-    if not normalized.startswith(_VENDOR_BLOCK_REASON_PREFIX):
+    if not normalized.startswith(VENDOR_BLOCK_REASON_PREFIX):
         return None
-    vendor = normalized[len(_VENDOR_BLOCK_REASON_PREFIX) :].strip()
+    vendor = normalized[len(VENDOR_BLOCK_REASON_PREFIX) :].strip()
     return vendor or None
 
 
