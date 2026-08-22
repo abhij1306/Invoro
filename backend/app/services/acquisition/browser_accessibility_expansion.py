@@ -172,10 +172,20 @@ async def _expand_candidates(
     expanded_elements: list[str] = []
     failures: list[str] = []
     for role, name in candidates[:max_interactions]:
-        if _time_budget_reached(max_elapsed_ms, elapsed_ms(started_at)):
+        elapsed = elapsed_ms(started_at)
+        if _time_budget_reached(max_elapsed_ms, elapsed):
             diagnostics["status"] = DETAIL_EXPANSION_STATUS_TIME_BUDGET_REACHED
             break
-        outcome = await _expand_accessibility_candidate(page, role=role, name=name)
+        remaining_ms = None if max_elapsed_ms is None else max(0, int(max_elapsed_ms) - elapsed)
+        try:
+            if remaining_ms is None:
+                outcome = await _expand_accessibility_candidate(page, role=role, name=name)
+            else:
+                async with asyncio.timeout(remaining_ms / 1000):
+                    outcome = await _expand_accessibility_candidate(page, role=role, name=name)
+        except TimeoutError:
+            diagnostics["status"] = DETAIL_EXPANSION_STATUS_TIME_BUDGET_REACHED
+            break
         if outcome == "clicked":
             clicked_count += 1
             expanded_elements.append(name)

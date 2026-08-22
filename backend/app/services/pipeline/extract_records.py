@@ -142,6 +142,7 @@ def _extract_initial_tiers(
             html=html,
             page_url=page_url,
             requested_page_url=requested_page_url,
+            surface=surface,
         )
     if surface in CONTENT_DETAIL_SURFACES:
         return True, _extract_content_detail(html, page_url=page_url, surface=surface)

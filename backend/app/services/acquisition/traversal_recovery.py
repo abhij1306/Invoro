@@ -263,6 +263,7 @@ async def click_with_retry(
         await _restore_overlays(page)
         return True
     if not await locator_still_resolves(locator):
+        await _restore_overlays(page)
         return False
     logger.debug("Traversal force click failed (%s); trying JS click", type(force_exc).__name__)
     result.click_retries += 1

@@ -2,6 +2,14 @@ from __future__ import annotations
 
 NATIVE_REAL_CHROME_CONTEXT_OPTIONS: dict[str, object] = {"no_viewport": True}
 REAL_CHROME_IGNORE_DEFAULT_ARGS: tuple[str, ...] = ("--enable-automation",)
+REAL_CHROME_FALLBACK_EXECUTABLE_PATHS: tuple[str, ...] = (
+    r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+    r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+    "/usr/bin/google-chrome",
+    "/usr/bin/google-chrome-stable",
+    "/opt/google/chrome/chrome",
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+)
 
 # Headless bundled Chromium advertises a "HeadlessChrome" UA token and ships no
 # sec-ch-ua client hints. Bot-defense vendors (PerimeterX, Akamai, DataDome) block
@@ -31,8 +39,7 @@ DEHEADLESS_UA_TEMPLATE_BY_HOST_OS: dict[str, str] = {
         "(KHTML, like Gecko) Chrome/{major}.0.0.0 Safari/537.36"
     ),
     "linux": (
-        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
-        "(KHTML, like Gecko) Chrome/{major}.0.0.0 Safari/537.36"
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{major}.0.0.0 Safari/537.36"
     ),
 }
 CHROME_CLIENT_HINT_PLATFORM_BY_HOST_OS: dict[str, str] = {
@@ -86,6 +93,7 @@ __all__ = [
     "HEADFUL_UA_TOKEN",
     "HEADLESS_UA_TOKEN",
     "NATIVE_REAL_CHROME_CONTEXT_OPTIONS",
+    "REAL_CHROME_FALLBACK_EXECUTABLE_PATHS",
     "REAL_CHROME_IGNORE_DEFAULT_ARGS",
     "RETRY_REASON_BROWSER_LABELS",
     "WARMUP_ELIGIBLE_BROWSER_REASONS",

@@ -21,6 +21,7 @@ from app.services.artifact_store import (
 )
 from app.services.publish.metadata import refresh_record_commit_metadata
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -234,15 +235,18 @@ async def persist_extracted_records(
     raw_html_path: str | None = None,
 ) -> int:
     persisted = 0
-    identity_keys = _candidate_identity_keys(records, acquisition_result=acquisition_result)
+    prepared_records = [
+        (record, prepared)
+        for record in records
+        if (prepared := _prepare_record(record, run=run, acquisition_result=acquisition_result)) is not None
+    ]
+    identity_keys = {
+        prepared.identity_key for _record, prepared in prepared_records if prepared.identity_key is not None
+    }
     existing_records_by_identity = await _existing_records_by_identity(session, run=run, identity_keys=identity_keys)
-    seen_identities: set[str] = set(existing_records_by_identity)
-    for record in records:
-        prepared = _prepare_record(record, run=run, acquisition_result=acquisition_result)
-        if prepared is None:
-            continue
+    for record, prepared in prepared_records:
         existing_record = existing_records_by_identity.get(prepared.identity_key or "")
-        if prepared.identity_key and prepared.identity_key in seen_identities:
+        if existing_record is not None:
             persisted += await _update_existing_record_if_changed(
                 session,
                 run=run,
@@ -252,23 +256,26 @@ async def persist_extracted_records(
                 raw_html_path=raw_html_path,
             )
             continue
-        if prepared.identity_key is not None:
-            seen_identities.add(prepared.identity_key)
-        crawl_record = CrawlRecord(
-            run_id=run.id,
-            source_url=prepared.source_url,
-            url_identity_key=prepared.identity_key,
-            content_fingerprint=prepared.content_fingerprint,
-            data=prepared.data,
-            raw_data=prepared.raw_data,
-            discovered_data=prepared.discovered_data,
-            source_trace=prepared.source_trace,
+        crawl_record, inserted = await _insert_prepared_record(
+            session,
+            run=run,
+            record=record,
+            prepared=prepared,
             raw_html_path=raw_html_path,
         )
-        session.add(crawl_record)
-        await session.flush()
-        _refresh_record_metadata(crawl_record, run=run, record=record, data=prepared.data)
-        persisted += 1
+        if prepared.identity_key is not None:
+            existing_records_by_identity[prepared.identity_key] = crawl_record
+        if inserted:
+            persisted += 1
+        else:
+            persisted += await _update_existing_record_if_changed(
+                session,
+                run=run,
+                record=record,
+                prepared=prepared,
+                existing_record=crawl_record,
+                raw_html_path=raw_html_path,
+            )
     return persisted
 
 
@@ -283,16 +290,6 @@ class _PreparedRecord:
     source_trace: dict[str, object]
 
 
-def _candidate_identity_keys(records: list[dict[str, object]], *, acquisition_result) -> set[str]:
-    keys: set[str] = set()
-    for record in records:
-        value = dict(record).get("url") or dict(record).get("source_url") or acquisition_result.final_url
-        identity_key = _record_identity_key(str(value))
-        if identity_key:
-            keys.add(identity_key)
-    return keys
-
-
 async def _existing_records_by_identity(
     session: AsyncSession, *, run: CrawlRun, identity_keys: set[str]
 ) -> dict[str, CrawlRecord]:
@@ -305,6 +302,47 @@ async def _existing_records_by_identity(
         )
     )
     return {str(row.url_identity_key): row for row in rows if row.url_identity_key}
+
+
+async def _insert_prepared_record(
+    session: AsyncSession,
+    *,
+    run: CrawlRun,
+    record: dict[str, object],
+    prepared: _PreparedRecord,
+    raw_html_path: str | None,
+) -> tuple[CrawlRecord, bool]:
+    crawl_record = CrawlRecord(
+        run_id=run.id,
+        source_url=prepared.source_url,
+        url_identity_key=prepared.identity_key,
+        content_fingerprint=prepared.content_fingerprint,
+        data=prepared.data,
+        raw_data=prepared.raw_data,
+        discovered_data=prepared.discovered_data,
+        source_trace=prepared.source_trace,
+        raw_html_path=raw_html_path,
+    )
+    _refresh_record_metadata(crawl_record, run=run, record=record, data=prepared.data)
+    if prepared.identity_key is None:
+        session.add(crawl_record)
+        await session.flush()
+        return crawl_record, True
+    try:
+        async with session.begin_nested():
+            session.add(crawl_record)
+            await session.flush()
+    except IntegrityError:
+        existing_record = await session.scalar(
+            select(CrawlRecord).where(
+                CrawlRecord.run_id == run.id,
+                CrawlRecord.url_identity_key == prepared.identity_key,
+            )
+        )
+        if existing_record is None:
+            raise
+        return existing_record, False
+    return crawl_record, True
 
 
 def _prepare_record(record: dict[str, object], *, run: CrawlRun, acquisition_result) -> _PreparedRecord | None:

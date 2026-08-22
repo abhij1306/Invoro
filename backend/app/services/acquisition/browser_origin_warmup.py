@@ -29,7 +29,6 @@ logger = logging.getLogger(__name__)
 ORIGIN_WARMUP_STATE_LOCKS: WeakKeyDictionary[asyncio.AbstractEventLoop, asyncio.Lock] = WeakKeyDictionary()
 ORIGIN_WARMUP_IN_FLIGHT: set[tuple[str, str, str, str]] = set()
 ORIGIN_WARMUP_RECENT: dict[tuple[str, str, str, str], float] = {}
-ORIGIN_WARMUP_RECENT_MAX_ENTRIES = 512
 
 
 def origin_warmup_state_lock() -> asyncio.Lock:
@@ -77,7 +76,9 @@ async def maybe_warm_origin_before_navigation(
     if not await begin_origin_warmup(warmup_key):
         phase_timings_ms["origin_warmup"] = 0
         return
-    if warm_budget_ms < 750:
+    minimum_budget_ms = int(crawler_runtime_settings.origin_warmup_min_budget_ms)
+    if warm_budget_ms < minimum_budget_ms:
+        phase_timings_ms["origin_warmup"] = 0
         await asyncio.shield(finish_origin_warmup(warmup_key))
         return
     await _perform_origin_warmup(
@@ -125,7 +126,10 @@ def _origin_warmup_request(
         return None
     ratio = max(0.0, float(crawler_runtime_settings.origin_warmup_max_budget_ratio))
     budget_ms = min(
-        max(750, int(max(0.1, float(timeout_seconds)) * 1000 * ratio)),
+        max(
+            int(crawler_runtime_settings.origin_warmup_min_budget_ms),
+            int(max(0.1, float(timeout_seconds)) * 1000 * ratio),
+        ),
         int(crawler_runtime_settings.browser_navigation_domcontentloaded_timeout_ms),
     )
     return warm_url, warm_pause_ms, budget_ms
@@ -230,18 +234,20 @@ async def _navigate_warmup_page(
     started_at: float,
 ) -> dict[str, int]:
     response = await warm_page.goto(warm_url, wait_until="domcontentloaded", timeout=warm_budget_ms)
-    remaining_ms = max(750, warm_budget_ms - elapsed_ms(started_at))
     timings: dict[str, int] = {}
+    remaining_ms = max(0, warm_budget_ms - elapsed_ms(started_at))
+    if remaining_ms <= 0:
+        return timings
     await recover_browser_challenge(
         warm_page,
         url=warm_url,
         response=response,
         browser_engine=browser_engine,
-        timeout_seconds=max(1.0, remaining_ms / 1000),
+        timeout_seconds=remaining_ms / 1000,
         phase_timings_ms=timings,
         challenge_wait_max_seconds=min(
             max(0.0, float(crawler_runtime_settings.challenge_wait_max_seconds or 0)),
-            max(1.0, remaining_ms / 1000),
+            remaining_ms / 1000,
         ),
         challenge_poll_interval_ms=int(crawler_runtime_settings.challenge_poll_interval_ms),
         navigation_timeout_ms=remaining_ms,
@@ -300,9 +306,10 @@ def _prune_recent_warmups(*, now: float, ttl_seconds: float) -> None:
     for key, completed_at in tuple(ORIGIN_WARMUP_RECENT.items()):
         if now - completed_at >= ttl_seconds:
             ORIGIN_WARMUP_RECENT.pop(key, None)
-    if len(ORIGIN_WARMUP_RECENT) <= ORIGIN_WARMUP_RECENT_MAX_ENTRIES:
+    max_entries = int(crawler_runtime_settings.origin_warmup_recent_max_entries)
+    if len(ORIGIN_WARMUP_RECENT) <= max_entries:
         return
-    keep_count = ORIGIN_WARMUP_RECENT_MAX_ENTRIES // 2
+    keep_count = max_entries // 2
     excess = len(ORIGIN_WARMUP_RECENT) - keep_count
     for key in list(ORIGIN_WARMUP_RECENT.keys())[:excess]:
         ORIGIN_WARMUP_RECENT.pop(key, None)

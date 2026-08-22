@@ -41,7 +41,7 @@ def _record_winning_sources(trace, primary, field_sources) -> None:
             str(field_name),
             source=winner,
             won=True,
-            value_preview="" if value in (None, "", [], {}) else str(value),
+            value_preview=_field_value_preview(str(field_name), value),
         )
 
 
@@ -65,3 +65,12 @@ def _as_float(value: object) -> float | None:
         return None if value in (None, "") else float(value)  # type: ignore[arg-type]
     except (TypeError, ValueError):
         return None
+
+
+def _field_value_preview(field_name: str, value: object) -> str:
+    if value in (None, "", [], {}):
+        return ""
+    normalized = str(field_name or "").strip().lower()
+    if any(token in normalized for token in obs_config.TRACE_REDACTED_FIELD_TOKENS):
+        return obs_config.TRACE_REDACTED_VALUE
+    return str(value)

@@ -397,12 +397,13 @@ async def _run_load_more_traversal(
             surface=surface,
             on_event=on_event,
         )
-        previous = current
+        if current_count >= previous_count:
+            previous = current
         if should_stop:
             break
     else:
         _set_stop_reason(result, "load_more_limit_reached", surface=surface)
-    result.card_count = previous["card_count"]
+    result.card_count = max(result.card_count, int(previous["card_count"]))
 
 
 async def _record_load_more_result(

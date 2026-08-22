@@ -9,6 +9,7 @@ from app.services.acquisition.browser_identity import build_playwright_context_s
 from app.services.acquisition.browser_proxy_bridge import Socks5AuthBridge
 from app.services.acquisition.browser_storage_state import persist_context_storage_state
 from app.services.config.browser_fingerprint_profiles import (
+    REAL_CHROME_FALLBACK_EXECUTABLE_PATHS,
     REAL_CHROME_IGNORE_DEFAULT_ARGS,
 )
 from app.services.config.runtime_settings import crawler_runtime_settings
@@ -79,14 +80,7 @@ def real_chrome_candidate_paths() -> tuple[str, ...]:
     configured = str(crawler_runtime_settings.browser_real_chrome_executable_path or "").strip()
     if configured:
         return (configured,)
-    return (
-        r"C:\Program Files\Google\Chrome\Application\chrome.exe",
-        r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
-        "/usr/bin/google-chrome",
-        "/usr/bin/google-chrome-stable",
-        "/opt/google/chrome/chrome",
-        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-    )
+    return REAL_CHROME_FALLBACK_EXECUTABLE_PATHS
 
 
 def browser_context_timeout_seconds() -> float:

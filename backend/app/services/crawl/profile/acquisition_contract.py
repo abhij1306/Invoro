@@ -65,7 +65,7 @@ def _apply_handoff_engine(
         for key in ("prefer_curl_handoff", "handoff_eligible", "handoff_cookie_engine"):
             profile.pop(key, None)
         return
-    selected = cookie_engine if cookie_engine in _BROWSER_ENGINE_VALUES else engine
+    selected = cookie_engine if cookie_engine in {"patchright", "real_chrome"} else engine
     if selected in {"patchright", "real_chrome"}:
         profile["handoff_cookie_engine"] = selected
 

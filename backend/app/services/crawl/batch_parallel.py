@@ -1,5 +1,4 @@
 import asyncio
-from contextlib import suppress
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -74,12 +73,32 @@ def parallel_worker_record_limit(max_records: int, concurrency: int) -> int:
     return max(1, (total_budget + worker_count - 1) // worker_count)
 
 
+class ParallelRecordBudget:
+    def __init__(self, *, total: int, per_worker: int) -> None:
+        self._available = max(0, int(total))
+        self._per_worker = max(1, int(per_worker))
+        self._condition = asyncio.Condition()
+
+    async def claim(self) -> int:
+        async with self._condition:
+            await self._condition.wait_for(lambda: self._available > 0)
+            claimed = min(self._available, self._per_worker)
+            self._available -= claimed
+            return claimed
+
+    async def release(self, amount: int) -> None:
+        if amount <= 0:
+            return
+        async with self._condition:
+            self._available += int(amount)
+            self._condition.notify_all()
+
+
 async def cancel_pending_tasks(tasks: list[asyncio.Task]) -> None:
     for task in tasks:
         if not task.done():
             task.cancel()
-    with suppress(BaseException):
-        await asyncio.gather(*tasks, return_exceptions=True)
+    await asyncio.gather(*tasks, return_exceptions=True)
 
 
 async def process_urls_in_parallel(
@@ -98,7 +117,12 @@ async def process_urls_in_parallel(
 ) -> tuple[list[str], int]:
     total_urls = len(url_list)
     concurrency = parallel_url_concurrency(total_urls, settings_view)
+    record_count = as_int(run.get_summary("record_count", 0))
     record_limit = parallel_worker_record_limit(max_records, concurrency)
+    record_budget = ParallelRecordBudget(
+        total=max(0, max_records - record_count),
+        per_worker=record_limit,
+    )
     await log_event(
         session,
         run.id,
@@ -106,32 +130,40 @@ async def process_urls_in_parallel(
         f"Processing {total_urls} URL(s) with concurrency={concurrency}",
     )
     await session.commit()
+    if record_count >= max_records:
+        return [], record_count
     semaphore = asyncio.Semaphore(concurrency)
 
-    async def guarded(idx: int, url: str) -> tuple[int, str, URLProcessingResult]:
+    async def guarded(idx: int, url: str) -> tuple[int, str, URLProcessingResult, int]:
         async with semaphore:
-            return await process_url(
-                run_id=int(run.id),
-                idx=idx,
-                total_urls=total_urls,
-                url=url,
-                max_records=record_limit,
-                url_timeout_seconds=url_timeout_seconds,
-            )
+            claimed = await record_budget.claim()
+            try:
+                result_idx, result_url, result = await process_url(
+                    run_id=int(run.id),
+                    idx=idx,
+                    total_urls=total_urls,
+                    url=url,
+                    max_records=claimed,
+                    url_timeout_seconds=url_timeout_seconds,
+                )
+                count = as_int(url_metric(result, "record_count", len(result.records)))
+                await record_budget.release(max(0, claimed - count))
+                return result_idx, result_url, result, count
+            except BaseException:
+                await record_budget.release(claimed)
+                raise
 
     tasks = [
         asyncio.create_task(guarded(idx, url), name=f"crawl-run-{run.id}-url-{idx}")
         for idx, url in enumerate(url_list, start=1)
     ]
     verdicts: list[str] = []
-    record_count = as_int(run.get_summary("record_count", 0))
 
     async def record_task(task: asyncio.Task) -> None:
         nonlocal record_count
-        idx, url, result = await task
+        idx, url, result, count = await task
         verdict = str(result.verdict or VERDICT_ERROR)
         verdicts.append(verdict)
-        count = as_int(url_metric(result, "record_count", len(result.records)))
         record_count += count
         progress_state.record_url_result(
             idx=idx - 1,

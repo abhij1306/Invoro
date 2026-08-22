@@ -10,8 +10,34 @@ from app.services.extract.content_listing_handler import validate_table_rows_qua
 from app.services.extract.table_extractor import extract_tables
 from app.services.pipeline.retry.stage import _apply_detail_rejection_guard
 from app.services.pipeline.extract_records import extract_records
+from app.services.pipeline import extract_records as extract_records_module
 from app.services.normalizers import normalize_value
 from app.services.public_record_firewall import public_record_data_for_surface
+
+
+@pytest.mark.unit
+def test_raw_json_detail_postprocessing_receives_requested_surface(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    def _capture(records, **kwargs):
+        captured.update(kwargs)
+        return records
+
+    monkeypatch.setattr(extract_records_module, "_postprocess_detail_records", _capture)
+
+    rows = extract_records_module.extract_records(
+        '{"title":"Platform Engineer","url":"/jobs/123"}',
+        "https://example.com/jobs/123",
+        "job_detail",
+        max_records=1,
+        requested_fields=["title", "url"],
+        content_type="application/json",
+    )
+
+    assert rows
+    assert captured["surface"] == "job_detail"
 
 
 @pytest.mark.unit
@@ -89,22 +115,10 @@ def test_content_detail_uses_largest_page_content_region() -> None:
 
     assert len(rows) == 1
     assert "Short first card only" not in rows[0]["markdown"]
-    assert (
-        "[First announcement](https://codeforces.com/blog/entry/1)"
-        in rows[0]["markdown"]
-    )
-    assert (
-        "[First announcement](https://codeforces.com/blog/entry/1)\n\nBy"
-        in rows[0]["markdown"]
-    )
-    assert (
-        "By [Author](https://codeforces.com/profile/author), 7 days ago,"
-        in rows[0]["markdown"]
-    )
-    assert (
-        "[Second announcement](https://codeforces.com/blog/entry/2)"
-        in rows[0]["markdown"]
-    )
+    assert "[First announcement](https://codeforces.com/blog/entry/1)" in rows[0]["markdown"]
+    assert "[First announcement](https://codeforces.com/blog/entry/1)\n\nBy" in rows[0]["markdown"]
+    assert "By [Author](https://codeforces.com/profile/author), 7 days ago," in rows[0]["markdown"]
+    assert "[Second announcement](https://codeforces.com/blog/entry/2)" in rows[0]["markdown"]
 
 
 @pytest.mark.unit
@@ -255,9 +269,7 @@ async def test_content_detail_skips_detail_repair_pipeline(
 
     extracted = await extraction_loop._run_extraction_stage(context, fetched)
 
-    assert extracted.records == [
-        {"title": "Docs", "content": "Body", "markdown": "# Docs"}
-    ]
+    assert extracted.records == [{"title": "Docs", "content": "Body", "markdown": "# Docs"}]
 
 
 @pytest.mark.unit
@@ -421,10 +433,7 @@ def test_ecommerce_detail_prefers_product_json_ld_over_faq_question_title() -> N
     )
 
     assert len(rows) == 1
-    assert (
-        rows[0]["title"]
-        == "Yamaha R-N800A Network Receiver with Phono and Built-in DAC - Black"
-    )
+    assert rows[0]["title"] == "Yamaha R-N800A Network Receiver with Phono and Built-in DAC - Black"
     assert rows[0]["sku"] == "0ZK-01A6-00390"
 
 
@@ -513,10 +522,7 @@ def test_article_listing_requires_article_signal() -> None:
     )
 
     assert {row["title"] for row in rows} >= {"Launch Notes", "Crawler Patterns"}
-    assert all(
-        row.get("publication_date") or row.get("summary") or row.get("author")
-        for row in rows
-    )
+    assert all(row.get("publication_date") or row.get("summary") or row.get("author") for row in rows)
 
 
 @pytest.mark.unit

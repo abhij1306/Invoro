@@ -14,6 +14,7 @@ import pytest
 
 from app.services.observability.run_trace import RunTrace
 from app.services.pipeline.extraction_loop import _record_extraction_trace
+from app.services.pipeline.extraction_trace import _field_value_preview
 
 pytestmark = pytest.mark.unit
 
@@ -62,10 +63,7 @@ def test_projects_completed_tiers_and_skip_decision():
         "dom",
     ]
     assert payload["dom_skipped"] is False
-    assert (
-        payload["skip_decision"]["dom_completion_reason"]
-        == "confidence_below_threshold"
-    )
+    assert payload["skip_decision"]["dom_completion_reason"] == "confidence_below_threshold"
     assert payload["skip_decision"]["confidence"] == pytest.approx(0.55)
 
 
@@ -77,15 +75,18 @@ def test_projects_high_value_field_winning_sources_only():
         requested_fields=["price", "variants"],
     )
     _record_extraction_trace(_context(trace), [_detail_record()])
-    provenance = {
-        entry["field"]: entry
-        for entry in trace.to_dict(flagged=True)["extraction"]["field_provenance"]
-    }
+    provenance = {entry["field"]: entry for entry in trace.to_dict(flagged=True)["extraction"]["field_provenance"]}
     # high-value fields recorded with their winning source
     assert provenance["price"]["winning_source"] == "js_state"
     assert provenance["variants"]["winning_source"] == "dom_selector"
     # title is a default canonical high-value field for ecommerce detail
     assert "title" in provenance
+
+
+def test_sensitive_field_candidate_preview_is_redacted():
+    assert _field_value_preview("email", "person@example.com") == "[redacted]"
+    assert _field_value_preview("auth_token", "secret-value") == "[redacted]"
+    assert _field_value_preview("title", "Widget") == "Widget"
 
 
 def test_projects_missing_variant_candidate_state():
@@ -100,10 +101,7 @@ def test_projects_missing_variant_candidate_state():
 
     _record_extraction_trace(_context(trace), [record])
 
-    provenance = {
-        entry["field"]: entry
-        for entry in trace.to_dict()["extraction"]["field_provenance"]
-    }
+    provenance = {entry["field"]: entry for entry in trace.to_dict()["extraction"]["field_provenance"]}
     assert provenance["variants"]["winning_source"] == "dom_selector"
     assert provenance["variants"]["present"] is False
     assert provenance["variants"]["note"] == "candidate_source_without_public_value"

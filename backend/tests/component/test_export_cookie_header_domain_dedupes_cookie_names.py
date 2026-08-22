@@ -4,6 +4,7 @@ from .test_browser_context import DomainCookieMemory, browser_identity, cookie_s
 
 pytest_plugins = ["tests.component._cookie_store_test_support"]
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_export_cookie_header_for_domain_dedupes_cookie_names(
@@ -60,6 +61,7 @@ async def test_export_cookie_header_for_domain_dedupes_cookie_names(
     assert saved is True
     assert header == "session=product; consent=yes"
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_export_cookie_header_for_domain_does_not_match_path_prefixes(
@@ -95,6 +97,7 @@ async def test_export_cookie_header_for_domain_does_not_match_path_prefixes(
     )
 
     assert header is None
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -175,6 +178,7 @@ async def test_persist_storage_state_for_domain_keeps_patchright_isolated(
         "origins": [],
     }
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_load_host_protection_policy_tracks_patchright_as_browser_lane(
@@ -198,6 +202,7 @@ async def test_load_host_protection_policy_tracks_patchright_as_browser_lane(
     assert blocked_policy.last_block_method == "browser:patchright"
     assert success_policy.patchright_success is True
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_load_host_protection_policy_maps_legacy_browser_block_to_patchright(
@@ -214,6 +219,7 @@ async def test_load_host_protection_policy_maps_legacy_browser_block_to_patchrig
     assert blocked_policy.request_blocked is False
     assert blocked_policy.patchright_blocked is True
     assert blocked_policy.last_block_method == "browser"
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -279,9 +285,7 @@ async def test_load_storage_state_for_domain_filters_existing_challenge_state(
     )
     await db_session.commit()
 
-    loaded = await cookie_store.load_storage_state_for_domain(
-        domain, session=db_session
-    )
+    loaded = await cookie_store.load_storage_state_for_domain(domain, session=db_session)
 
     assert loaded == {
         "cookies": [
@@ -294,6 +298,7 @@ async def test_load_storage_state_for_domain_filters_existing_challenge_state(
         ],
         "origins": [],
     }
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -326,6 +331,7 @@ async def test_list_domain_cookie_memory_counts_stored_entries(db_session) -> No
 
     assert rows[0]["cookie_count"] == 2
     assert rows[0]["origin_count"] == 2
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -371,13 +377,12 @@ async def test_persist_storage_state_for_domain_rejects_challenge_only_state(
     )
 
     rows = await cookie_store.list_domain_cookie_memory(domain, session=db_session)
-    loaded = await cookie_store.load_storage_state_for_domain(
-        domain, session=db_session
-    )
+    loaded = await cookie_store.load_storage_state_for_domain(domain, session=db_session)
 
     assert saved is False
     assert rows == []
     assert loaded is None
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -411,9 +416,7 @@ async def test_load_storage_state_for_domain_drops_origin_shell_when_local_stora
     )
     await db_session.commit()
 
-    loaded = await cookie_store.load_storage_state_for_domain(
-        domain, session=db_session
-    )
+    loaded = await cookie_store.load_storage_state_for_domain(domain, session=db_session)
 
     assert loaded == {
         "cookies": [
@@ -427,6 +430,7 @@ async def test_load_storage_state_for_domain_drops_origin_shell_when_local_stora
         "origins": [],
     }
 
+
 @pytest.mark.component
 class TestNativeContextContract:
     """Verify that the native browser identity emits a clean Playwright context."""
@@ -434,17 +438,13 @@ class TestNativeContextContract:
     def test_native_context_deheadlessifies_user_agent(self) -> None:
         # Headless Chromium leaks a "HeadlessChrome" UA token that bot-defense
         # vendors block on sight. The context UA must present as plain Chrome.
-        opts = browser_identity.build_playwright_context_options(
-            browser_major_version=145
-        )
+        opts = browser_identity.build_playwright_context_options(browser_major_version=145)
         user_agent = str(opts.get("user_agent") or "")
         assert "HeadlessChrome" not in user_agent
         assert "Chrome/145" in user_agent
 
     def test_native_context_emits_coherent_client_hints(self) -> None:
-        opts = browser_identity.build_playwright_context_options(
-            browser_major_version=145
-        )
+        opts = browser_identity.build_playwright_context_options(browser_major_version=145)
         headers = opts.get("extra_http_headers") or {}
         assert headers.get("sec-ch-ua-mobile") == "?0"
         assert "Google Chrome" in str(headers.get("sec-ch-ua") or "")
@@ -453,11 +453,7 @@ class TestNativeContextContract:
     def test_native_context_merges_locality_headers_with_client_hints(self) -> None:
         opts = browser_identity.build_playwright_context_options(
             browser_major_version=145,
-            locality_profile={
-                "browser_context_profile": {
-                    "extra_http_headers": {"Accept-Language": "en-US"}
-                }
-            },
+            locality_profile={"browser_context_profile": {"extra_http_headers": {"Accept-Language": "en-US"}}},
         )
         headers = opts.get("extra_http_headers") or {}
         assert headers["Accept-Language"] == "en-US"
@@ -474,3 +470,53 @@ class TestNativeContextContract:
 
     def test_clear_browser_identity_cache_is_noop(self) -> None:
         browser_identity.clear_browser_identity_cache()
+
+    def test_invalid_geolocation_is_ignored(self) -> None:
+        opts = browser_identity.build_playwright_context_options(
+            locality_profile={
+                "geolocation": {"latitude": "invalid", "longitude": 20},
+            }
+        )
+
+        assert "geolocation" not in opts
+
+    def test_profile_permissions_merge_with_geolocation(self) -> None:
+        opts = browser_identity.build_playwright_context_options(
+            locality_profile={
+                "browser_context_profile": {"permissions": ("notifications",)},
+                "geolocation": {"latitude": 10, "longitude": 20},
+            }
+        )
+
+        assert opts["permissions"] == ["notifications", "geolocation"]
+
+    def test_profile_permission_scalar_is_normalized_without_geolocation(self) -> None:
+        opts = browser_identity.build_playwright_context_options(
+            locality_profile={
+                "browser_context_profile": {"permissions": "notifications"},
+            }
+        )
+
+        assert opts["permissions"] == ["notifications"]
+
+    def test_explicit_user_agent_removes_default_client_hints(self) -> None:
+        opts = browser_identity.build_playwright_context_options(
+            locality_profile={
+                "browser_context_profile": {"user_agent": "Custom Browser"},
+            }
+        )
+
+        assert opts["user_agent"] == "Custom Browser"
+        assert opts["extra_http_headers"] == {}
+
+    def test_native_real_chrome_spec_keeps_locality_without_identity_defaults(
+        self,
+    ) -> None:
+        spec = browser_identity.build_playwright_context_spec(
+            locality_profile={"locale": "en-IN", "timezone_id": "Asia/Kolkata"},
+            apply_identity_defaults=False,
+        )
+
+        assert spec.context_options["locale"] == "en-IN"
+        assert spec.context_options["timezone_id"] == "Asia/Kolkata"
+        assert "user_agent" not in spec.context_options

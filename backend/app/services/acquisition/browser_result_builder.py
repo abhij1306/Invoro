@@ -224,8 +224,7 @@ class BrowserAcquisitionResultBuilder:
         self, *, status_code: int, html_bytes: int, fast_finalize: bool
     ) -> tuple[BlockPageClassification, bool, list[str], str | None, bool]:
         payload = self.payload
-        if fast_finalize:
-            return BlockPageClassification(False, "ok"), False, [], None, False
+        _ = fast_finalize
         classification = await self.classify_blocked_page_async(payload.html, status_code)
         blocked_result = self.blocked_html_checker(payload.html, status_code)
         if inspect.isawaitable(blocked_result):

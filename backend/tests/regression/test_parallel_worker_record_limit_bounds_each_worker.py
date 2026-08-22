@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 from .test_batch_runtime import AcquisitionResult, AsyncSession, CrawlLog, CrawlRunSettings, RobotsPolicyResult, URLProcessingResult, _detail_html, _listing_shell_html, _parallel_url_concurrency, _parallel_worker_record_limit, async_sessionmaker, asyncio, batch_runtime_module, create_crawl_run, get_run_records, process_run, pytest, select  # fmt: skip
+from app.services.crawl.batch_parallel import ParallelRecordBudget
+from app.services.pipeline.persistence import persist_extracted_records
+from types import SimpleNamespace
 
 pytest_plugins = ["tests.regression.test_batch_runtime"]
 
@@ -12,14 +15,69 @@ def test_parallel_worker_record_limit_bounds_each_worker_budget() -> None:
     assert _parallel_worker_record_limit(1, 2) == 1
 
 
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_parallel_record_budget_never_over_reserves_global_limit() -> None:
+    budget = ParallelRecordBudget(total=10, per_worker=4)
+
+    claims = await asyncio.gather(budget.claim(), budget.claim(), budget.claim())
+
+    assert claims == [4, 4, 2]
+    assert sum(claims) == 10
+
+
+@pytest.mark.asyncio
+@pytest.mark.regression
+async def test_persistence_prefetch_uses_prepared_absolute_identity(
+    db_session: AsyncSession,
+    test_user,
+) -> None:
+    run = await create_crawl_run(
+        db_session,
+        test_user.id,
+        {
+            "run_type": "crawl",
+            "url": "https://example.com/catalog/page",
+            "surface": "ecommerce_detail",
+        },
+    )
+    acquisition = AcquisitionResult(
+        request=SimpleNamespace(url=run.url),
+        final_url=run.url,
+        html="<html></html>",
+        method="test",
+        status_code=200,
+    )
+    record = {"title": "Widget", "url": "../products/widget"}
+
+    first = await persist_extracted_records(
+        db_session,
+        run,
+        [record, dict(record)],
+        acquisition_result=acquisition,
+    )
+    await db_session.commit()
+    second = await persist_extracted_records(
+        db_session,
+        run,
+        [dict(record)],
+        acquisition_result=acquisition,
+    )
+    await db_session.commit()
+    rows, total = await get_run_records(db_session, run.id, 1, 20)
+
+    assert first == 2
+    assert second == 1
+    assert total == 1
+    assert rows[0].data["url"] == "https://example.com/products/widget"
+
+
 @pytest.mark.unit
 def test_parallel_url_concurrency_respects_browser_runtime_capacity(
     patch_settings,
 ) -> None:
     patch_settings(url_batch_concurrency=8, browser_runtime_context_capacity=3)
-    settings_view = CrawlRunSettings.from_value(
-        {"fetch_profile": {"fetch_mode": "auto"}}
-    )
+    settings_view = CrawlRunSettings.from_value({"fetch_profile": {"fetch_mode": "auto"}})
 
     assert _parallel_url_concurrency(10, settings_view) == 3
 
@@ -29,13 +87,9 @@ def test_parallel_url_concurrency_does_not_browser_cap_http_only(
     monkeypatch: pytest.MonkeyPatch,
     patch_settings,
 ) -> None:
-    monkeypatch.setattr(
-        "app.services.crawl.batch_parallel.settings.system_max_concurrent_urls", 8
-    )
+    monkeypatch.setattr("app.services.crawl.batch_parallel.settings.system_max_concurrent_urls", 8)
     patch_settings(url_batch_concurrency=8, browser_runtime_context_capacity=3)
-    settings_view = CrawlRunSettings.from_value(
-        {"fetch_profile": {"fetch_mode": "http_only"}}
-    )
+    settings_view = CrawlRunSettings.from_value({"fetch_profile": {"fetch_mode": "http_only"}})
 
     assert _parallel_url_concurrency(10, settings_view) == 8
 
@@ -65,11 +119,7 @@ async def test_persist_url_failure_log_prefixes_url_for_parallel_ui(
         log_message=f"URL processing failed for {url}: RuntimeError: navigation failed",
     )
     logs = (
-        (
-            await db_session.execute(
-                select(CrawlLog).where(CrawlLog.run_id == run.id).order_by(CrawlLog.id)
-            )
-        )
+        (await db_session.execute(select(CrawlLog).where(CrawlLog.run_id == run.id).order_by(CrawlLog.id)))
         .scalars()
         .all()
     )
@@ -454,9 +504,7 @@ async def test_process_run_runs_same_domain_batch_urls_in_parallel(
         bind=db_session.bind,
         expire_on_commit=False,
     )
-    monkeypatch.setattr(
-        "app.services.crawl.batch_runtime.SessionLocal", session_factory
-    )
+    monkeypatch.setattr("app.services.crawl.batch_runtime.SessionLocal", session_factory)
 
     await process_run(db_session, run.id)
 
@@ -498,9 +546,7 @@ async def test_parallel_run_does_not_mislabel_nested_timeout_as_url_deadline(
 
     async def _fake_process_single_url(*args, **kwargs):
         if kwargs["url"] == failing_url:
-            raise TimeoutError(
-                "Browser navigation stage exceeded timeout_seconds=45.00"
-            )
+            raise TimeoutError("Browser navigation stage exceeded timeout_seconds=45.00")
         return URLProcessingResult(
             records=[],
             verdict="success",
@@ -515,17 +561,11 @@ async def test_parallel_run_does_not_mislabel_nested_timeout_as_url_deadline(
         bind=db_session.bind,
         expire_on_commit=False,
     )
-    monkeypatch.setattr(
-        "app.services.crawl.batch_runtime.SessionLocal", session_factory
-    )
+    monkeypatch.setattr("app.services.crawl.batch_runtime.SessionLocal", session_factory)
 
     await process_run(db_session, run.id)
     logs = (
-        (
-            await db_session.execute(
-                select(CrawlLog).where(CrawlLog.run_id == run.id).order_by(CrawlLog.id)
-            )
-        )
+        (await db_session.execute(select(CrawlLog).where(CrawlLog.run_id == run.id).order_by(CrawlLog.id)))
         .scalars()
         .all()
     )
@@ -536,9 +576,7 @@ async def test_parallel_run_does_not_mislabel_nested_timeout_as_url_deadline(
         "Browser navigation stage exceeded timeout_seconds=45.00" in message
         for message in messages
     )
-    assert not any(
-        f"URL processing timed out for {failing_url}" in message for message in messages
-    )
+    assert not any(f"URL processing timed out for {failing_url}" in message for message in messages)
 
 
 @pytest.mark.asyncio
@@ -653,12 +691,8 @@ async def test_process_run_blocks_disallowed_url_before_acquire(
     async def _unexpected_acquire(request):
         raise AssertionError(f"acquire should not run for {request.url}")
 
-    monkeypatch.setattr(
-        "app.services.pipeline.extraction_loop.check_url_crawlability", _disallow
-    )
-    monkeypatch.setattr(
-        "app.services.pipeline.extraction_loop.acquire", _unexpected_acquire
-    )
+    monkeypatch.setattr("app.services.pipeline.extraction_loop.check_url_crawlability", _disallow)
+    monkeypatch.setattr("app.services.pipeline.extraction_loop.acquire", _unexpected_acquire)
 
     await process_run(db_session, run.id)
     await db_session.refresh(run)

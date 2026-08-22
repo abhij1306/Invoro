@@ -285,7 +285,7 @@ def _nested_dict_candidates(
             )
             if score > 0:
                 candidates.append((score, value))
-            if score > 0 and _list_candidate_owns_descendants(key_text):
+            if _list_candidate_owns_descendants(key_text):
                 continue
             candidates.extend(
                 _nested_child_candidates(

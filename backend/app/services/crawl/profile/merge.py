@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.crawl_settings import normalize_crawl_settings
 from app.services.config.domain_profiles import INTERNAL_API_ENDPOINTS_PROFILE_KEY
+from app.services.config.runtime_settings import crawler_runtime_settings
 from app.services.domain_utils import normalize_domain
 
 from .normalization import (
@@ -200,11 +201,12 @@ def _merge_saved_endpoints(merged: dict[str, object], saved: dict[str, object]) 
     explicit_endpoints = normalize_internal_api_endpoints(merged.get(INTERNAL_API_ENDPOINTS_PROFILE_KEY))
     if not saved_endpoints and not explicit_endpoints:
         return
-    endpoints_by_key = {
-        (str(endpoint.get("method") or ""), str(endpoint.get("url") or "")): endpoint
-        for endpoint in [*saved_endpoints, *explicit_endpoints]
-    }
-    merged[INTERNAL_API_ENDPOINTS_PROFILE_KEY] = list(endpoints_by_key.values())
+    endpoints_by_key: dict[tuple[str, str], dict[str, object]] = {}
+    for endpoint in [*explicit_endpoints, *saved_endpoints]:
+        key = (str(endpoint.get("method") or ""), str(endpoint.get("url") or ""))
+        endpoints_by_key.setdefault(key, endpoint)
+    limit = max(1, int(crawler_runtime_settings.internal_api_replay_max_endpoints))
+    merged[INTERNAL_API_ENDPOINTS_PROFILE_KEY] = list(endpoints_by_key.values())[:limit]
 
 
 async def resolve_url_acquisition_recipe(

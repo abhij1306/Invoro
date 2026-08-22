@@ -47,16 +47,12 @@ _PROFILE_CONTROLLED_FIELDS = (
     "surface_readiness_max_wait_ms",
 )
 _DEFAULT_CHROME_MAJOR_VERSION = 131
-VALID_FETCH_MODES = frozenset(
-    {"auto", "http_only", "browser_only", "http_then_browser"}
-)
+VALID_FETCH_MODES = frozenset({"auto", "http_only", "browser_only", "http_then_browser"})
 BROWSER_CONCURRENCY_EXEMPT_FETCH_MODES = frozenset({"http_only"})
 CELERY_TASK_ID_KEY = "celery_task_id"
 PATCHRIGHT_BROWSER_ENGINE = "patchright"
 REAL_CHROME_BROWSER_ENGINE = "real_chrome"
-SUPPORTED_FORCED_BROWSER_ENGINES = frozenset(
-    {PATCHRIGHT_BROWSER_ENGINE, REAL_CHROME_BROWSER_ENGINE}
-)
+SUPPORTED_FORCED_BROWSER_ENGINES = frozenset({PATCHRIGHT_BROWSER_ENGINE, REAL_CHROME_BROWSER_ENGINE})
 PATCHRIGHT_HTTP2_PROTOCOL_ERROR_TOKEN = "ERR_HTTP2_PROTOCOL_ERROR"
 
 
@@ -104,9 +100,7 @@ class CrawlerRuntimeSettings(BaseSettings):
     browser_fallback_visible_text_min: int | None = 500
     browser_fallback_visible_text_ratio_max: float = 0.02
     browser_fallback_html_size_threshold: int = 200000
-    js_gate_phrases: list[str] = Field(
-        default_factory=lambda: ["enable javascript", "<noscript>"]
-    )
+    js_gate_phrases: list[str] = Field(default_factory=lambda: ["enable javascript", "<noscript>"])
     default_max_records: int = 100
     default_max_pages: int = 5
     min_max_pages: int = 1
@@ -157,9 +151,7 @@ class CrawlerRuntimeSettings(BaseSettings):
     network_payload_signature_min_match: int = 3
     structured_source_generic_assignment_max_script_chars: int = 250000
     structured_source_generic_assignment_max_matches_per_script: int = 24
-    http_retry_status_codes: list[int] = Field(
-        default_factory=lambda: [403, 406, 429, 502, 503, 504]
-    )
+    http_retry_status_codes: list[int] = Field(default_factory=lambda: [403, 406, 429, 502, 503, 504])
     proxy_failure_cooldown_base_ms: int = 1000
     proxy_failure_cooldown_max_ms: int = 15000
     proxy_failure_backoff_max_exponent: int = 8
@@ -206,6 +198,8 @@ class CrawlerRuntimeSettings(BaseSettings):
     origin_warm_pause_ms: int | None = 500
     origin_warmup_max_budget_ratio: float = 0.4
     origin_warmup_dedupe_ttl_seconds: float = 60.0
+    origin_warmup_min_budget_ms: int = 750
+    origin_warmup_recent_max_entries: int = 512
     browser_error_retry_attempts: int = 1
     browser_error_retry_delay_ms: int = 1000
     browser_post_block_cooldown_ms: int = 500
@@ -290,16 +284,10 @@ class CrawlerRuntimeSettings(BaseSettings):
     browser_connection_type: str = "wifi"
     browser_connection_save_data: bool = False
     browser_mobile_max_touch_points: int = 5
-    browser_permission_notifications_state: Literal["granted", "denied", "prompt"] = (
-        "prompt"
-    )
+    browser_permission_notifications_state: Literal["granted", "denied", "prompt"] = "prompt"
     browser_permission_camera_state: Literal["granted", "denied", "prompt"] = "prompt"
-    browser_permission_microphone_state: Literal["granted", "denied", "prompt"] = (
-        "prompt"
-    )
-    browser_permission_geolocation_state: Literal["granted", "denied", "prompt"] = (
-        "prompt"
-    )
+    browser_permission_microphone_state: Literal["granted", "denied", "prompt"] = "prompt"
+    browser_permission_geolocation_state: Literal["granted", "denied", "prompt"] = "prompt"
     fingerprint_browser: str = "chrome"
     fingerprint_os: tuple[str, ...] = ("windows", "macos", "linux")
     fingerprint_device: str = "desktop"
@@ -406,31 +394,22 @@ class CrawlerRuntimeSettings(BaseSettings):
     @model_validator(mode="after")
     def _apply_profile_defaults(self) -> CrawlerRuntimeSettings:
         explicitly_set = set(self.model_fields_set)
-        profile = PERFORMANCE_PROFILES.get(
-            self.performance_profile, PERFORMANCE_PROFILES["BALANCED"]
-        )
+        profile = PERFORMANCE_PROFILES.get(self.performance_profile, PERFORMANCE_PROFILES["BALANCED"])
         for field_name in _PROFILE_CONTROLLED_FIELDS:
-            if (
-                self.performance_profile != "BALANCED"
-                and field_name not in explicitly_set
-            ) or getattr(self, field_name) is None:
+            if (self.performance_profile != "BALANCED" and field_name not in explicitly_set) or getattr(
+                self, field_name
+            ) is None:
                 setattr(self, field_name, profile[field_name])
 
-        self.worker_orphan_recovery_grace_seconds = max(
-            int(self.worker_orphan_recovery_grace_seconds), 60
-        )
+        self.worker_orphan_recovery_grace_seconds = max(int(self.worker_orphan_recovery_grace_seconds), 60)
         if self.max_url_process_timeout_seconds < self.url_process_timeout_seconds:
-            raise ValueError(
-                "max_url_process_timeout_seconds must be >= url_process_timeout_seconds"
-            )
+            raise ValueError("max_url_process_timeout_seconds must be >= url_process_timeout_seconds")
         _require_non_negative(
             "proxy_failure_cooldown_base_ms",
             self.proxy_failure_cooldown_base_ms,
         )
         if self.proxy_failure_cooldown_max_ms < self.proxy_failure_cooldown_base_ms:
-            raise ValueError(
-                "proxy_failure_cooldown_max_ms must be >= proxy_failure_cooldown_base_ms"
-            )
+            raise ValueError("proxy_failure_cooldown_max_ms must be >= proxy_failure_cooldown_base_ms")
         if self.min_max_pages < 1:
             raise ValueError("min_max_pages must be >= 1")
         if self.max_max_pages < self.min_max_pages:
@@ -453,6 +432,8 @@ class CrawlerRuntimeSettings(BaseSettings):
             "adapter_payload_identity_min_token_length",
             "browser_launch_timeout_seconds",
             "browser_context_slot_timeout_seconds",
+            "origin_warmup_min_budget_ms",
+            "origin_warmup_recent_max_entries",
         ):
             _require_positive(field_name, getattr(self, field_name))
         for field_name in (
@@ -476,9 +457,7 @@ class CrawlerRuntimeSettings(BaseSettings):
             self.browser_behavior_scroll_max_px,
         )
         if self.browser_behavior_scroll_max_px < self.browser_behavior_scroll_min_px:
-            raise ValueError(
-                "browser_behavior_scroll_max_px must be >= browser_behavior_scroll_min_px"
-            )
+            raise ValueError("browser_behavior_scroll_max_px must be >= browser_behavior_scroll_min_px")
         _require_non_negative(
             "browser_behavior_pause_min_ms",
             self.browser_behavior_pause_min_ms,
@@ -509,10 +488,7 @@ class CrawlerRuntimeSettings(BaseSettings):
             "browser_runtime_pool_idle_ttl_seconds",
             self.browser_runtime_pool_idle_ttl_seconds,
         )
-        if (
-            self.browser_capture_total_network_payload_bytes
-            < self.browser_capture_max_network_payload_bytes
-        ):
+        if self.browser_capture_total_network_payload_bytes < self.browser_capture_max_network_payload_bytes:
             raise ValueError(
                 "browser_capture_total_network_payload_bytes must be >= browser_capture_max_network_payload_bytes"
             )
@@ -521,33 +497,23 @@ class CrawlerRuntimeSettings(BaseSettings):
             "acquisition_artifact_cleanup_interval_seconds",
         ):
             _require_non_negative(field_name, getattr(self, field_name))
-        _require_positive(
-            "host_memory_ttl_min_seconds", self.host_memory_ttl_min_seconds
-        )
+        _require_positive("host_memory_ttl_min_seconds", self.host_memory_ttl_min_seconds)
         _require_positive(
             "host_memory_ttl_max_seconds",
             self.host_memory_ttl_max_seconds,
         )
         if self.host_memory_ttl_max_seconds < self.host_memory_ttl_min_seconds:
-            raise ValueError(
-                "host_memory_ttl_max_seconds must be >= host_memory_ttl_min_seconds"
-            )
-        _require_unit_interval(
-            "llm_confidence_threshold", self.llm_confidence_threshold
-        )
+            raise ValueError("host_memory_ttl_max_seconds must be >= host_memory_ttl_min_seconds")
+        _require_unit_interval("llm_confidence_threshold", self.llm_confidence_threshold)
         if self.run_quality_threshold_high < self.run_quality_threshold_medium:
-            raise ValueError(
-                "run_quality_threshold_high must be >= run_quality_threshold_medium"
-            )
+            raise ValueError("run_quality_threshold_high must be >= run_quality_threshold_medium")
         for field_name in (
             "run_health_degraded_error_rate",
             "run_health_failed_error_rate",
         ):
             _require_unit_interval(field_name, getattr(self, field_name))
         if self.run_health_failed_error_rate < self.run_health_degraded_error_rate:
-            raise ValueError(
-                "run_health_failed_error_rate must be >= run_health_degraded_error_rate"
-            )
+            raise ValueError("run_health_failed_error_rate must be >= run_health_degraded_error_rate")
         for field_name in ("selector_self_heal_min_confidence",):
             _require_unit_interval(field_name, getattr(self, field_name))
         for field_name in (
@@ -577,19 +543,13 @@ class CrawlerRuntimeSettings(BaseSettings):
             "listing_cohort_homogeneity_min_ratio",
             self.listing_cohort_homogeneity_min_ratio,
         )
-        _require_non_negative(
-            "listing_integrity_min_records", self.listing_integrity_min_records
-        )
+        _require_non_negative("listing_integrity_min_records", self.listing_integrity_min_records)
         _require_non_negative(
             "listing_integrity_escalation_retry_max_per_run",
             self.listing_integrity_escalation_retry_max_per_run,
         )
-        _require_positive(
-            "api_rate_limit_max_requests", self.api_rate_limit_max_requests
-        )
-        _require_positive(
-            "api_rate_limit_window_seconds", self.api_rate_limit_window_seconds
-        )
+        _require_positive("api_rate_limit_max_requests", self.api_rate_limit_max_requests)
+        _require_positive("api_rate_limit_window_seconds", self.api_rate_limit_window_seconds)
         _require_positive("api_rate_limit_max_clients", self.api_rate_limit_max_clients)
         return self
 
@@ -635,15 +595,9 @@ crawler_runtime_settings = CrawlerRuntimeSettings()
 
 # Compatibility exports: these are import-time snapshots. Use the functions below
 # when tests or runtime code need values patched through crawler_runtime_settings.
-BROWSER_CAPTURE_MAX_NETWORK_PAYLOADS = (
-    crawler_runtime_settings.browser_capture_max_network_payloads
-)
-BROWSER_CAPTURE_MAX_NETWORK_PAYLOAD_BYTES = (
-    crawler_runtime_settings.browser_capture_max_network_payload_bytes
-)
-BROWSER_CAPTURE_TOTAL_NETWORK_PAYLOAD_BYTES = (
-    crawler_runtime_settings.browser_capture_total_network_payload_bytes
-)
+BROWSER_CAPTURE_MAX_NETWORK_PAYLOADS = crawler_runtime_settings.browser_capture_max_network_payloads
+BROWSER_CAPTURE_MAX_NETWORK_PAYLOAD_BYTES = crawler_runtime_settings.browser_capture_max_network_payload_bytes
+BROWSER_CAPTURE_TOTAL_NETWORK_PAYLOAD_BYTES = crawler_runtime_settings.browser_capture_total_network_payload_bytes
 BROWSER_CAPTURE_QUEUE_SIZE = BROWSER_CAPTURE_MAX_NETWORK_PAYLOADS * 2
 BROWSER_CAPTURE_WORKERS = crawler_runtime_settings.browser_capture_workers
 

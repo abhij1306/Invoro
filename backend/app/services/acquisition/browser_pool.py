@@ -56,9 +56,6 @@ from app.services.acquisition.browser_storage_state import (
     DOMAIN_STORAGE_PERSIST_ATTR as _DOMAIN_STORAGE_PERSIST_ATTR,
     RUN_STORAGE_PERSIST_ATTR as _RUN_STORAGE_PERSIST_ATTR,
 )
-from app.services.config.browser_fingerprint_profiles import (
-    NATIVE_REAL_CHROME_CONTEXT_OPTIONS,
-)
 from app.services.config.runtime_settings import crawler_runtime_settings
 
 if TYPE_CHECKING:
@@ -332,11 +329,7 @@ class SharedBrowserRuntime:
         run_id: int | None = None,
         locality_profile: dict[str, object] | None = None,
     ) -> PlaywrightContextSpec:
-        if _use_native_real_chrome_context(self.browser_engine):
-            return PlaywrightContextSpec(
-                context_options=dict(NATIVE_REAL_CHROME_CONTEXT_OPTIONS),
-                init_script=None,
-            )
+        native_real_chrome = _use_native_real_chrome_context(self.browser_engine)
         browser_major_version = None
         if self._browser is not None:
             raw_version = str(getattr(self._browser, "version", "") or "")
@@ -349,6 +342,7 @@ class SharedBrowserRuntime:
             run_id=run_id,
             browser_major_version=browser_major_version,
             locality_profile=locality_profile,
+            apply_identity_defaults=not native_real_chrome,
         )
         return PlaywrightContextSpec(
             context_options=dict(spec.context_options),

@@ -21,6 +21,7 @@ from app.services.config.sitemap import (
     SITEMAP_FETCH_RETRY_DELAY_SECONDS,
     SITEMAP_FETCH_RETRY_STATUS_CODES,
     SITEMAP_FETCH_TIMEOUT_SECONDS,
+    SITEMAP_MAX_INDEX_DEPTH,
     SITEMAP_HOMEPAGE_FALLBACK_MAX_ANCHORS,
     SITEMAP_HOMEPAGE_FALLBACK_MAX_VALIDATIONS,
     SITEMAP_THIN_RESULT_THRESHOLD,
@@ -394,7 +395,13 @@ async def _resolve_sitemap_urls(
         ]
         if not child_urls:
             raise ValueError(f"No child sitemaps found in {root_url}.")
-        filtered = await _resolve_child_sitemap_urls(child_urls, keyword, limit, category_only=category_only)
+        filtered = await _resolve_child_sitemap_urls(
+            client,
+            child_urls,
+            keyword,
+            limit,
+            category_only=category_only,
+        )
         if not filtered:
             raise ValueError(f"No URLs matched filter '{keyword}' in {root_url}.")
         return SitemapResolutionResult(
@@ -420,20 +427,47 @@ async def _resolve_sitemap_urls(
 
 
 async def _resolve_child_sitemap_urls(
-    child_urls: list[str], keyword: str, max_urls: int, *, category_only: bool
+    client: httpx.AsyncClient,
+    child_urls: list[str],
+    keyword: str,
+    max_urls: int,
+    *,
+    category_only: bool,
+    depth: int = 1,
+    visited: set[str] | None = None,
 ) -> list[str]:
+    if max_urls <= 0 or depth > SITEMAP_MAX_INDEX_DEPTH:
+        return []
     all_urls: list[str] = []
-    async with httpx.AsyncClient(
-        follow_redirects=True,
-        max_redirects=SITEMAP_FETCH_MAX_REDIRECTS,
-        timeout=SITEMAP_FETCH_TIMEOUT_SECONDS,
-    ) as client:
-        for child_url in child_urls:
-            try:
-                child_xml = await _fetch_xml(client, child_url)
-            except ValueError as exc:
-                logger.warning("Skipping failed child sitemap %s: %s", child_url, exc)
-                continue
+    seen = visited if visited is not None else set()
+    for child_url in child_urls:
+        if child_url in seen:
+            continue
+        seen.add(child_url)
+        try:
+            child_xml = await _fetch_xml(client, child_url)
+        except ValueError as exc:
+            logger.warning("Skipping failed child sitemap %s: %s", child_url, exc)
+            continue
+        root_tag = _local_tag(child_xml.tag)
+        if root_tag == "sitemapindex":
+            nested_urls = [
+                loc.text.strip()
+                for sitemap in child_xml.findall(f"{{{SITEMAP_NS}}}sitemap")
+                if (loc := sitemap.find(f"{{{SITEMAP_NS}}}loc")) is not None and loc.text
+            ]
+            all_urls.extend(
+                await _resolve_child_sitemap_urls(
+                    client,
+                    nested_urls,
+                    keyword,
+                    max_urls - len(all_urls),
+                    category_only=category_only,
+                    depth=depth + 1,
+                    visited=seen,
+                )
+            )
+        elif root_tag == "urlset":
             all_urls.extend(
                 _filter_urls(
                     await _safe_locs(child_xml),

@@ -62,6 +62,20 @@ DETAIL_DIAGNOSTIC_FIELDS = (
 # Max losing candidates captured per field in full-tier traces. Bounds trace
 # size on pathological pages with many rejected candidates.
 MAX_CANDIDATE_LOSERS_PER_FIELD = 12
+TRACE_REDACTED_FIELD_TOKENS = frozenset(
+    {
+        "address",
+        "authorization",
+        "cookie",
+        "credential",
+        "email",
+        "password",
+        "phone",
+        "secret",
+        "token",
+    }
+)
+TRACE_REDACTED_VALUE = "[redacted]"
 
 # --- Acquire-timeline event kinds --------------------------------------------
 # Stable identifiers for ordered acquire-timeline events so the audit engine and
@@ -209,6 +223,8 @@ __all__ = [
     "HIGH_VALUE_FIELD_FLOOR",
     "DETAIL_DIAGNOSTIC_FIELDS",
     "MAX_CANDIDATE_LOSERS_PER_FIELD",
+    "TRACE_REDACTED_FIELD_TOKENS",
+    "TRACE_REDACTED_VALUE",
     "ACQUIRE_EVENT_NAVIGATION",
     "ACQUIRE_EVENT_HTTP_FETCH",
     "ACQUIRE_EVENT_READINESS_PROBE",

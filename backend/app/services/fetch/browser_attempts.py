@@ -198,11 +198,7 @@ class _AttemptRunner:
                 f"Patchright navigation failed for {self.context.url} with ERR_HTTP2_PROTOCOL_ERROR; retrying real Chrome",
             )
             return
-        if not (
-            isinstance(exc, (TimeoutError, asyncio.TimeoutError))
-            and is_vendor_block_reason(self.reason)
-            and engine_index <= len(engines)
-        ):
+        if not (isinstance(exc, (TimeoutError, asyncio.TimeoutError)) and is_vendor_block_reason(self.reason)):
             return
         await self.record_hard_block(
             self.context.url,

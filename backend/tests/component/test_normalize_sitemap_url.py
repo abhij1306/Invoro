@@ -85,6 +85,51 @@ async def test_resolve_sitemap_index_filters_final_urls_not_child_sitemaps(
 
 @pytest.mark.asyncio
 @pytest.mark.component
+async def test_resolve_nested_sitemap_indexes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root_url = "https://example.com/sitemap.xml"
+    nested_url = "https://example.com/nested-index.xml"
+    leaf_url = "https://example.com/collections.xml"
+    fake_client = _FakeClient(
+        {
+            root_url: _xml_response(
+                root_url,
+                f"""<sitemapindex xmlns="{SITEMAP_NS}">
+                  <sitemap><loc>{nested_url}</loc></sitemap>
+                </sitemapindex>""",
+            ),
+            nested_url: _xml_response(
+                nested_url,
+                f"""<sitemapindex xmlns="{SITEMAP_NS}">
+                  <sitemap><loc>{leaf_url}</loc></sitemap>
+                </sitemapindex>""",
+            ),
+            leaf_url: _xml_response(
+                leaf_url,
+                f"""<urlset xmlns="{SITEMAP_NS}">
+                  <url><loc>https://example.com/collections/widgets</loc></url>
+                </urlset>""",
+            ),
+        }
+    )
+    monkeypatch.setattr(
+        "app.services.crawl.sitemap_resolver.httpx.AsyncClient",
+        lambda **kwargs: fake_client,
+    )
+    monkeypatch.setattr(
+        "app.services.crawl.sitemap_resolver.validate_public_target",
+        _valid_target,
+    )
+
+    urls = await resolve_category_urls_from_sitemap("example.com", "collections", 10)
+
+    assert urls == ["https://example.com/collections/widgets"]
+    assert fake_client.requested_urls == [root_url, nested_url, leaf_url]
+
+
+@pytest.mark.asyncio
+@pytest.mark.component
 async def test_resolve_sitemap_retries_transient_root_fetch_failure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
