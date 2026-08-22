@@ -223,7 +223,7 @@ def _check_secret_defaults() -> None:
         raise RuntimeError(msg)
     logger.warning(
         "SECURITY WARNING: insecure default secrets detected",
-        extra={"issues": issues, "issue_count": len(issues)},
+        extra={"issue_count": len(issues)},
     )
 
 

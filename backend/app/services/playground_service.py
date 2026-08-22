@@ -29,8 +29,8 @@ from app.services.playground_progress import (
     auto_advance as _auto_advance,
     extract_record_ids as _extract_record_ids,
     extract_run_ids as _extract_run_ids,
-    get_results as get_results,
-    merge_seed_detail_products,
+    get_results as _get_results,
+    merge_seed_detail_products as _merge_seed_detail_products_impl,
 )
 from app.services.surface_resolver import resolve_auto_surface
 
@@ -43,7 +43,18 @@ _PI_TERMINAL_STATUSES = {
 _ENRICH_TERMINAL_STATUSES = set(DATA_ENRICHMENT_JOB_TERMINAL_STATUSES)
 
 MAX_PRODUCTS = 50
-_merge_seed_detail_products = merge_seed_detail_products
+
+
+async def get_results(
+    session: AsyncSession, *, playground: PlaygroundSession
+) -> dict[str, Any]:
+    return await _get_results(session, playground=playground)
+
+
+def _merge_seed_detail_products(
+    step_data: dict[str, Any], discovered_products: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    return _merge_seed_detail_products_impl(step_data, discovered_products)
 
 
 def _classify_input_url(url: str) -> str:
