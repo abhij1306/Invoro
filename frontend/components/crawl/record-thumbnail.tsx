@@ -2,17 +2,17 @@
 
 import Image from 'next/image';
 import { useState } from 'react';
-const BROKEN_THUMBNAIL_STORAGE_KEY = 'invoro-broken-thumb-urls-v1';
-const BROKEN_THUMBNAIL_HOSTS_KEY = 'invoro-broken-thumb-hosts-v1';
+const BROKEN_THUMBNAIL_URLS_STORAGE_NAME = 'invoro-broken-thumb-urls-v1';
+const BROKEN_THUMBNAIL_HOSTS_STORAGE_NAME = 'invoro-broken-thumb-hosts-v1';
 const BROKEN_THUMBNAIL_URLS = new Set<string>();
 const BROKEN_THUMBNAIL_HOSTS = new Set<string>();
 
 function loadBrokenThumbnailCache() {
   if (typeof window === 'undefined') return;
   try {
-    const urls = window.sessionStorage.getItem(BROKEN_THUMBNAIL_STORAGE_KEY);
+    const urls = window.sessionStorage.getItem(BROKEN_THUMBNAIL_URLS_STORAGE_NAME);
     if (urls) (JSON.parse(urls) as string[]).forEach((u) => BROKEN_THUMBNAIL_URLS.add(u));
-    const hosts = window.sessionStorage.getItem(BROKEN_THUMBNAIL_HOSTS_KEY);
+    const hosts = window.sessionStorage.getItem(BROKEN_THUMBNAIL_HOSTS_STORAGE_NAME);
     if (hosts) (JSON.parse(hosts) as string[]).forEach((h) => BROKEN_THUMBNAIL_HOSTS.add(h));
   } catch {
     /* ignore */
@@ -24,11 +24,11 @@ function persistBrokenThumbnailCache() {
   if (typeof window === 'undefined') return;
   try {
     window.sessionStorage.setItem(
-      BROKEN_THUMBNAIL_STORAGE_KEY,
+      BROKEN_THUMBNAIL_URLS_STORAGE_NAME,
       JSON.stringify(Array.from(BROKEN_THUMBNAIL_URLS).slice(-500)),
     );
     window.sessionStorage.setItem(
-      BROKEN_THUMBNAIL_HOSTS_KEY,
+      BROKEN_THUMBNAIL_HOSTS_STORAGE_NAME,
       JSON.stringify(Array.from(BROKEN_THUMBNAIL_HOSTS)),
     );
   } catch {
