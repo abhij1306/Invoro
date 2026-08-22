@@ -125,19 +125,24 @@
   --font-mono-family:
     var(--font-mono-source, 'Geist Mono'), ui-monospace, 'Cascadia Code', 'Fira Code', monospace;
 
-  /* Surfaces */
-  --bg-base: #fafafa;
-  --bg-alt: #f4f4f5;
+  /* Surfaces — wider steps between levels so panels/alt/well read as
+     distinct surfaces instead of near-identical washes. */
+  --bg-base: #f6f6f8;
+  --bg-alt: #ececf0;
   --bg-panel: #ffffff;
   --bg-elevated: #ffffff;
-  --bg-well: #ececef;
+  --bg-well: #e1e1e7;
   --bg-sidebar: #ffffff;
   --surface-overlay: rgba(255, 255, 255, 0.88);
 
-  /* Borders */
-  --border-subtle: #f0f0f1;
-  --border: #e7e7e9;
-  --border-strong: #d9d9dc;
+  /* Borders — --border-strong targets ~3:1 against white per WCAG 1.4.11
+     (non-text UI component boundaries), so buttons/inputs read as shapes
+     instead of relying on faint hairlines. --border stays a lighter
+     structural divider (table/card edges are decorative, not the sole
+     affordance for a control). */
+  --border-subtle: #eaeaec;
+  --border: #d5d5db;
+  --border-strong: #8f8f9c;
   --border-focus: var(--accent);
 
   /* Typography */
@@ -283,8 +288,8 @@
   --setting-icon-active-bg: var(--accent-subtle);
 
   /* Skeleton */
-  --skeleton-base: #ececef;
-  --skeleton-highlight: #fafafa;
+  --skeleton-base: var(--bg-well);
+  --skeleton-highlight: var(--bg-base);
 
   /* Logo */
   --logo-mark-bg: var(--accent);
@@ -317,19 +322,23 @@
 html[data-theme='dark'] {
   color-scheme: dark;
 
-  /* Surfaces — pure neutral gray, no blue/purple cast */
-  --bg-base: #0e0f12;
-  --bg-alt: #131418;
-  --bg-panel: #16171c;
-  --bg-elevated: #1b1d23;
-  --bg-well: #22242b;
-  --bg-sidebar: #131418;
-  --surface-overlay: rgba(14, 15, 18, 0.9);
+  /* Surfaces — VS Code / Perplexity style neutral charcoal, lifted off
+     near-black so panels read as grey rather than void, with wider steps
+     between levels for clear elevation. */
+  --bg-base: #1a1a1c;
+  --bg-alt: #202023;
+  --bg-panel: #242427;
+  --bg-elevated: #2a2a2e;
+  --bg-well: #323236;
+  --bg-sidebar: #1e1e20;
+  --surface-overlay: rgba(20, 20, 22, 0.9);
 
-  /* Borders — neutral gray */
-  --border-subtle: #1c1e24;
-  --border: #23262d;
-  --border-strong: #2f323b;
+  /* Borders — --border-strong targets ~3:1 against --bg-panel per WCAG
+     1.4.11 so button/input outlines are actually visible, not just a
+     tone shift. --border is a lighter structural divider. */
+  --border-subtle: #2a2a2e;
+  --border: #35353c;
+  --border-strong: #68686f;
 
   /* Typography — neutral, no cool/blue cast */
   --text-primary: #ececf1;
@@ -387,26 +396,26 @@ html[data-theme='dark'] {
   --syntax-null: #569cd6;
   --syntax-punct: #d4d4d4;
 
-  /* Shadows — deep blacks for dark surfaces */
-  --shadow-xs-value: 0 1px 1px rgba(0, 0, 0, 0.3);
-  --shadow-card-value: 0 1px 0 rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.25);
-  --shadow-elevated-value: 0 12px 28px rgba(0, 0, 0, 0.5);
-  --shadow-lg-value: 0 20px 40px rgba(0, 0, 0, 0.6);
-  --shadow-modal: 0 32px 64px rgba(0, 0, 0, 0.7);
+  /* Shadows — slightly deeper blacks since surfaces sit lighter now */
+  --shadow-xs-value: 0 1px 1px rgba(0, 0, 0, 0.35);
+  --shadow-card-value: 0 1px 0 rgba(0, 0, 0, 0.35), 0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-elevated-value: 0 12px 28px rgba(0, 0, 0, 0.55);
+  --shadow-lg-value: 0 20px 40px rgba(0, 0, 0, 0.65);
+  --shadow-modal: 0 32px 64px rgba(0, 0, 0, 0.75);
   --focus-ring: 0 0 0 3px rgba(124, 132, 232, 0.22);
-  --overlay-scrim: rgba(0, 0, 0, 0.55);
+  --overlay-scrim: rgba(0, 0, 0, 0.6);
 
   /* Form controls */
   --tab-active-fg: var(--text-primary);
   --toggle-thumb: #ececf1;
 
-  /* Terminal — pure neutral black, no blue tint */
-  --terminal-bg: #16171c;
-  --terminal-fg: #e0e0e0;
-  --terminal-secondary: #b7b9c2;
+  /* Terminal — tracks the same neutral grey ramp as the rest of the shell */
+  --terminal-bg: var(--bg-panel);
+  --terminal-fg: var(--text-primary);
+  --terminal-secondary: var(--text-secondary);
   --terminal-muted: var(--text-subtle);
-  --terminal-row-alt: #1b1d23;
-  --terminal-border: #1f2129;
+  --terminal-row-alt: var(--bg-alt);
+  --terminal-border: var(--border);
   --terminal-shadow: 0 6px 12px rgba(0, 0, 0, 0.5);
 
   /* Settings */

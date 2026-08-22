@@ -90,7 +90,6 @@ export const LogTerminal = memo(function LogTerminal({
   >('__auto__');
   const [triageCursor, setTriageCursor] = useState(0);
   const groups = useMemo(() => buildLogSiteGroups(logs, records), [logs, records]);
-  const isParallelCrawl = useMemo(() => groups.filter((g) => g.url).length > 1, [groups]);
   const siteOrdinalByKey = useMemo(() => {
     let ordinal = 0;
     const values = new Map<string, number>();
@@ -316,7 +315,6 @@ export const LogTerminal = memo(function LogTerminal({
                 live,
                 nowMs,
                 siteOrdinalByKey,
-                isParallelCrawl,
                 toggleGroup,
                 setPeekedGroupKey,
                 setPeekedRecordIndex,
@@ -354,7 +352,6 @@ type LogGroupSectionProps = {
   live: boolean;
   nowMs: number;
   siteOrdinalByKey: Map<string, number>;
-  isParallelCrawl: boolean;
   toggleGroup: (key: string) => void;
   setPeekedGroupKey: React.Dispatch<React.SetStateAction<string | null>>;
   setPeekedRecordIndex: React.Dispatch<React.SetStateAction<number>>;
@@ -369,7 +366,6 @@ function LogGroupSection({
   live,
   nowMs,
   siteOrdinalByKey,
-  isParallelCrawl,
   toggleGroup,
   setPeekedGroupKey,
   setPeekedRecordIndex,
@@ -401,7 +397,6 @@ function LogGroupSection({
           durationMs,
           summaryLog,
           siteOrdinalByKey,
-          isParallelCrawl,
           toggleGroup,
           setPeekedGroupKey,
           setPeekedRecordIndex,
@@ -427,7 +422,6 @@ type LogGroupSummaryProps = Pick<
   | 'group'
   | 'index'
   | 'siteOrdinalByKey'
-  | 'isParallelCrawl'
   | 'toggleGroup'
   | 'setPeekedGroupKey'
   | 'setPeekedRecordIndex'
@@ -457,11 +451,7 @@ function LogGroupSummaryRow(props: LogGroupSummaryProps) {
       <div className="text-muted text-xs font-medium opacity-60">
         {groupOrdinal(props).toString().padStart(2, '0')}
       </div>
-      <LogGroupIdentity
-        group={group}
-        isRunEventGroup={isRunEventGroup}
-        isParallelCrawl={props.isParallelCrawl}
-      />
+      <LogGroupIdentity group={group} isRunEventGroup={isRunEventGroup} />
       {isRunEventGroup ? null : <LogGroupMetrics {...{ coverage, confidence, durationMs }} />}
       <LogGroupStage group={group} isRunEventGroup={isRunEventGroup} />
       <div className="min-w-0">
@@ -482,11 +472,9 @@ function groupOrdinal({ group, index, siteOrdinalByKey }: LogGroupSummaryProps) 
 function LogGroupIdentity({
   group,
   isRunEventGroup,
-  isParallelCrawl,
 }: {
   group: LogSiteGroup;
   isRunEventGroup: boolean;
-  isParallelCrawl: boolean;
 }) {
   return (
     <div className="flex min-w-0 items-center gap-2">
@@ -507,14 +495,6 @@ function LogGroupIdentity({
           {formatShortUrlLabel(group.url)}
         </a>
       )}
-      {isParallelCrawl && group.url ? (
-        <span className="text-muted border-border shrink-0 rounded border px-1 py-px text-xs font-semibold tracking-widest uppercase">
-          Parallel
-        </span>
-      ) : null}
-      <span className="text-muted shrink-0 font-mono text-xs opacity-50">
-        {group.logs.length} logs
-      </span>
     </div>
   );
 }

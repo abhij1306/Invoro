@@ -10,17 +10,17 @@ fonts:
   mono: "Geist Mono"
 themes:
   light:
-    background-base: "#fafafa"
-    background-alt: "#f4f4f5"
+    background-base: "#f6f6f8"
+    background-alt: "#ececf0"
     background-panel: "#ffffff"
-    background-well: "#ececef"
+    background-well: "#e1e1e7"
     text-primary: "#18181b"
     accent: "#5e6ad2"
   dark:
-    background-base: "#0e0f12"
-    background-alt: "#131418"
-    background-panel: "#16171c"
-    background-well: "#22242b"
+    background-base: "#1a1a1c"
+    background-alt: "#202023"
+    background-panel: "#242427"
+    background-well: "#323236"
     text-primary: "#ececf1"
     accent: "#5e6ad2"
 geometry:
