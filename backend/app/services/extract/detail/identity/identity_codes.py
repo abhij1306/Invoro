@@ -40,11 +40,6 @@ DETAIL_IDENTITY_QUERY_PREFIXES = tuple(
 LOWER_NON_ALNUM_RE = re.compile(r"[^a-z0-9]+")
 MIXED_NON_ALNUM_RE = re.compile(r"[^A-Za-z0-9]+")
 HTML_SUFFIX_RE = re.compile(r"\.htm(?:l)?$", re.IGNORECASE)
-_DETAIL_IDENTITY_PATH_MARKERS = frozenset(
-    marker.strip("/").casefold()
-    for marker in detail_path_hints("ecommerce_detail")
-    if marker.strip("/")
-)
 
 
 def detail_url_path_segments(url: str) -> list[str]:
@@ -86,15 +81,18 @@ def detail_identity_codes_from_url(url: object) -> set[str]:
     parsed = urlparse(text)
     codes: set[str] = set()
     segments = detail_url_path_segments(text)
+    path_markers = frozenset(
+        marker.strip("/").casefold()
+        for marker in detail_path_hints("ecommerce_detail")
+        if marker.strip("/")
+    )
     for index, segment in enumerate(segments):
         candidate = HTML_SUFFIX_RE.sub("", segment)
         previous_is_marker = (
-            index > 0
-            and segments[index - 1].casefold() in _DETAIL_IDENTITY_PATH_MARKERS
+            index > 0 and segments[index - 1].casefold() in path_markers
         )
         next_is_marker = (
-            index + 1 < len(segments)
-            and segments[index + 1].casefold() in _DETAIL_IDENTITY_PATH_MARKERS
+            index + 1 < len(segments) and segments[index + 1].casefold() in path_markers
         )
         if (
             index == len(segments) - 1
