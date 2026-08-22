@@ -54,9 +54,7 @@ def location_interstitial_detected(
     soup = analysis.soup
     text = analysis.normalized_text.lower()
     tokens = _string_config_list(LOCATION_INTERSTITIAL_TEXT_TOKENS)
-    matched_tokens = [
-        token.lower() for token in tokens if token and token.lower() in text
-    ]
+    matched_tokens = [token.lower() for token in tokens if token and token.lower() in text]
     if not text or not matched_tokens:
         return False
     selectors = _string_config_list(LOCATION_INTERSTITIAL_CONTAINER_SELECTORS)
@@ -65,12 +63,8 @@ def location_interstitial_detected(
             if soup.select_one(selector) is not None:
                 return True
         except Exception:
-            logger.debug(
-                "Invalid location interstitial selector=%s", selector, exc_info=True
-            )
-    for node in soup.select(
-        "[aria-modal='true'], [role='dialog'], .modal, .popup, .overlay"
-    ):
+            logger.debug("Invalid location interstitial selector=%s", selector, exc_info=True)
+    for node in soup.select("[aria-modal='true'], [role='dialog'], .modal, .popup, .overlay"):
         node_text = " ".join(node.get_text(" ", strip=True).lower().split())
         if any(token in node_text for token in matched_tokens):
             return True
@@ -129,20 +123,17 @@ async def dismiss_safe_location_interstitial(page: Any) -> dict[str, object]:
     still_present_result: dict[str, object] | None = None
     visible_timeout_ms = int(
         crawler_runtime_settings.traversal_location_interstitial_visible_timeout_ms
-        if crawler_runtime_settings.traversal_location_interstitial_visible_timeout_ms
-        is not None
+        if crawler_runtime_settings.traversal_location_interstitial_visible_timeout_ms is not None
         else crawler_runtime_settings.traversal_cookie_consent_visible_timeout_ms
     )
     click_timeout_ms = int(
         crawler_runtime_settings.traversal_location_interstitial_click_timeout_ms
-        if crawler_runtime_settings.traversal_location_interstitial_click_timeout_ms
-        is not None
+        if crawler_runtime_settings.traversal_location_interstitial_click_timeout_ms is not None
         else crawler_runtime_settings.traversal_cookie_consent_click_timeout_ms
     )
     postclick_wait_ms = int(
         crawler_runtime_settings.traversal_location_interstitial_postclick_wait_ms
-        if crawler_runtime_settings.traversal_location_interstitial_postclick_wait_ms
-        is not None
+        if crawler_runtime_settings.traversal_location_interstitial_postclick_wait_ms is not None
         else crawler_runtime_settings.cookie_consent_postclick_wait_ms
     )
     for selector in selectors:
@@ -240,8 +231,7 @@ async def _dismiss_location_interstitial_by_text(page: Any) -> dict[str, object]
             # text-path and selector-path post-click waits stay consistent.
             postclick_wait_ms = int(
                 crawler_runtime_settings.traversal_location_interstitial_postclick_wait_ms
-                if crawler_runtime_settings.traversal_location_interstitial_postclick_wait_ms
-                is not None
+                if crawler_runtime_settings.traversal_location_interstitial_postclick_wait_ms is not None
                 else crawler_runtime_settings.cookie_consent_postclick_wait_ms
             )
             await page.wait_for_timeout(postclick_wait_ms)

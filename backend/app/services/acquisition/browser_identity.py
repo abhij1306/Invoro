@@ -81,6 +81,7 @@ def build_playwright_context_spec(
     run_id: int | None = None,
     browser_major_version: int | None = None,
     locality_profile: Mapping[str, object] | None = None,
+    apply_identity_defaults: bool = True,
 ) -> PlaywrightContextSpec:
     _ = run_id  # reserved for future fingerprint keying
     context_options: dict[str, Any] = dict(NATIVE_REAL_CHROME_CONTEXT_OPTIONS)
@@ -89,68 +90,87 @@ def build_playwright_context_spec(
     # otherwise leaks a "HeadlessChrome" token with no sec-ch-ua hints, which
     # PerimeterX/Akamai/DataDome block instantly. A locality browser_context_profile
     # may still override user_agent below (explicit locality wins).
-    context_options["user_agent"] = _deheadless_user_agent(browser_major_version)
-    context_options["extra_http_headers"] = _coherent_chrome_client_hint_headers(
-        browser_major_version
-    )
+    if apply_identity_defaults:
+        context_options["user_agent"] = _deheadless_user_agent(browser_major_version)
+        context_options["extra_http_headers"] = _coherent_chrome_client_hint_headers(browser_major_version)
 
     default_permissions = [
-        str(value).strip()
-        for value in crawler_runtime_settings.browser_context_permissions
-        if str(value).strip()
+        str(value).strip() for value in crawler_runtime_settings.browser_context_permissions if str(value).strip()
     ]
     if default_permissions and "permissions" not in context_options:
         context_options["permissions"] = default_permissions
 
     if locality_profile is not None:
-        locale = locality_profile.get("locale")
-        if isinstance(locale, str) and locale.strip():
-            context_options["locale"] = locale.strip()
-
-        timezone_id = locality_profile.get("timezone_id")
-        if isinstance(timezone_id, str) and timezone_id.strip():
-            context_options["timezone_id"] = timezone_id.strip()
-
-        geolocation = locality_profile.get("geolocation")
-        if isinstance(geolocation, dict):
-            lat = geolocation.get("latitude")
-            lon = geolocation.get("longitude")
-            if lat is not None and lon is not None:
-                geo: dict[str, Any] = {
-                    "latitude": float(lat),
-                    "longitude": float(lon),
-                }
-                accuracy = geolocation.get("accuracy")
-                if accuracy is not None:
-                    geo["accuracy"] = float(accuracy)
-                context_options["geolocation"] = geo
-                context_options.setdefault("permissions", [])
-                if "geolocation" not in context_options["permissions"]:
-                    context_options["permissions"].append("geolocation")
-
-        browser_context_profile = locality_profile.get("browser_context_profile")
-        if isinstance(browser_context_profile, dict):
-            for key, value in browser_context_profile.items():
-                normalized_key = str(key)
-                if value is None:
-                    continue
-                if normalized_key == "extra_http_headers" and isinstance(
-                    value, Mapping
-                ):
-                    context_options["extra_http_headers"] = {
-                        **dict(context_options.get("extra_http_headers") or {}),
-                        **{
-                            str(header): str(header_value)
-                            for header, header_value in value.items()
-                        },
-                    }
-                    continue
-                context_options[normalized_key] = value
+        _apply_locality_profile(context_options, locality_profile)
 
     return PlaywrightContextSpec(
         context_options=context_options,
         init_script=None,
     )
+
+
+def _apply_locality_profile(context_options: dict[str, Any], locality_profile: Mapping[str, object]) -> None:
+    for option_name in ("locale", "timezone_id"):
+        value = locality_profile.get(option_name)
+        if isinstance(value, str) and value.strip():
+            context_options[option_name] = value.strip()
+    profile = locality_profile.get("browser_context_profile")
+    if isinstance(profile, Mapping):
+        _apply_browser_context_profile(context_options, profile)
+    _apply_geolocation(context_options, locality_profile.get("geolocation"))
+    if "permissions" in context_options:
+        context_options["permissions"] = _normalized_permissions(context_options["permissions"])
+
+
+def _apply_geolocation(context_options: dict[str, Any], value: object) -> None:
+    if not isinstance(value, Mapping):
+        return
+    latitude = value.get("latitude")
+    longitude = value.get("longitude")
+    if latitude is None or longitude is None:
+        return
+    try:
+        geolocation: dict[str, Any] = {
+            "latitude": float(latitude),  # type: ignore[arg-type]
+            "longitude": float(longitude),  # type: ignore[arg-type]
+        }
+        if value.get("accuracy") is not None:
+            geolocation["accuracy"] = float(value["accuracy"])  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return
+    context_options["geolocation"] = geolocation
+    permissions = _normalized_permissions(context_options.get("permissions"))
+    if "geolocation" not in permissions:
+        permissions.append("geolocation")
+    context_options["permissions"] = permissions
+
+
+def _apply_browser_context_profile(context_options: dict[str, Any], profile: Mapping[str, object]) -> None:
+    if isinstance(profile.get("user_agent"), str):
+        headers = dict(context_options.get("extra_http_headers") or {})
+        context_options["extra_http_headers"] = {
+            key: value for key, value in headers.items() if not str(key).lower().startswith("sec-ch-ua")
+        }
+    for key, value in profile.items():
+        normalized_key = str(key)
+        if value is None:
+            continue
+        if normalized_key == "extra_http_headers" and isinstance(value, Mapping):
+            current_headers = dict(context_options.get("extra_http_headers") or {})
+            current_headers.update({str(header): str(header_value) for header, header_value in value.items()})
+            context_options[normalized_key] = current_headers
+        else:
+            context_options[normalized_key] = value
+
+
+def _normalized_permissions(value: object) -> list[str]:
+    if isinstance(value, str):
+        raw_values = [value]
+    elif isinstance(value, (list, tuple, set, frozenset)):
+        raw_values = list(value)
+    else:
+        raw_values = []
+    return list(dict.fromkeys(str(item).strip() for item in raw_values if str(item).strip()))
 
 
 def build_playwright_context_options(
@@ -165,6 +185,18 @@ def build_playwright_context_options(
             browser_major_version=browser_major_version,
             locality_profile=locality_profile,
         ).context_options
+    )
+
+
+def build_native_real_chrome_context_spec(
+    *, locality_profile: Mapping[str, object] | None = None
+) -> PlaywrightContextSpec:
+    context_options: dict[str, Any] = dict(NATIVE_REAL_CHROME_CONTEXT_OPTIONS)
+    if locality_profile is not None:
+        _apply_locality_profile(context_options, locality_profile)
+    return PlaywrightContextSpec(
+        context_options=context_options,
+        init_script=None,
     )
 
 

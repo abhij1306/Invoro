@@ -56,9 +56,7 @@ def _suppress_all():
     except MemoryError:
         raise
     except Exception:
-        logger.warning(
-            "Suppressed host protection memory cleanup failure", exc_info=True
-        )
+        logger.warning("Suppressed host protection memory cleanup failure", exc_info=True)
 
 
 def _now() -> datetime:
@@ -69,11 +67,7 @@ def _ttl_delta(ttl_seconds: int | None = None) -> timedelta:
     return timedelta(
         seconds=max(
             1,
-            int(
-                ttl_seconds
-                if ttl_seconds is not None
-                else crawler_runtime_settings.pacing_host_cache_ttl_seconds
-            ),
+            int(ttl_seconds if ttl_seconds is not None else crawler_runtime_settings.pacing_host_cache_ttl_seconds),
         )
     )
 
@@ -129,9 +123,7 @@ def _recent_success_overrides_block(
     if not _is_recent(last_success_at, now=now, ttl_seconds=ttl_seconds):
         return False
     last_blocked_at = row.last_blocked_at
-    return last_success_at is not None and (
-        last_blocked_at is None or last_success_at >= last_blocked_at
-    )
+    return last_success_at is not None and (last_blocked_at is None or last_success_at >= last_blocked_at)
 
 
 def _recent_block_method(
@@ -176,11 +168,7 @@ async def _policy_cache_get(host: str) -> HostProtectionPolicy | None:
 
 def _evict_policy_cache_entries(*, now: float) -> None:
     ttl_seconds = _policy_cache_ttl_seconds()
-    expired_hosts = [
-        host
-        for host, entry in _POLICY_CACHE.items()
-        if now - entry.cached_at >= ttl_seconds
-    ]
+    expired_hosts = [host for host, entry in _POLICY_CACHE.items() if now - entry.cached_at >= ttl_seconds]
     for host in expired_hosts:
         _POLICY_CACHE.pop(host, None)
     overflow = len(_POLICY_CACHE) - _policy_cache_max_entries()

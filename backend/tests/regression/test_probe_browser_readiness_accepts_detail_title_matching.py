@@ -4,6 +4,7 @@ from .test_browser_expansion_runtime import SimpleNamespace, _FakeExpansionPage,
 
 pytest_plugins = ["tests.regression.test_browser_expansion_runtime"]
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_probe_browser_readiness_accepts_detail_title_matching_url() -> None:
@@ -31,6 +32,7 @@ async def test_probe_browser_readiness_accepts_detail_title_matching_url() -> No
 
     assert probe["is_ready"] is True
     assert probe["detail_title_matches_url"] is True
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -104,6 +106,7 @@ async def test_browser_fetch_bounds_response_capture_workers_under_burst_load(
         >= 200 - browser_runtime.BROWSER_CAPTURE_QUEUE_SIZE
     )
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_browser_fetch_expands_detail_accordions_before_collecting_html() -> None:
@@ -135,6 +138,7 @@ async def test_browser_fetch_expands_detail_accordions_before_collecting_html() 
     assert result.browser_diagnostics["detail_expansion"]["expanded_elements"] == [
         "product specifications"
     ]
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -172,6 +176,7 @@ async def test_browser_fetch_expands_requested_field_sections_even_when_probe_is
 
     assert "Full-grain leather upper." in result.html
     assert result.browser_diagnostics["detail_expansion"]["clicked_count"] == 1
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -215,6 +220,7 @@ async def test_browser_fetch_skips_detail_expansion_when_requested_section_is_al
         == "requested_content_already_extractable"
     )
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_browser_fetch_expands_requested_dom_pattern_content_without_heading_sections() -> (
@@ -255,6 +261,7 @@ async def test_browser_fetch_expands_requested_dom_pattern_content_without_headi
         "matched_requested_fields"
     ] == ["materials"]
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_expand_detail_content_if_needed_skips_aom_when_page_is_already_ready(
@@ -282,6 +289,7 @@ async def test_expand_detail_content_if_needed_skips_aom_when_page_is_already_re
     assert diagnostics["aom"]["status"] == "skipped"
     assert diagnostics["aom"]["reason"] == "not_needed"
 
+
 @pytest.mark.regression
 def test_accessibility_expand_candidates_ignores_navigation_roles() -> None:
     candidates = browser_detail.accessibility_expand_candidates(
@@ -298,11 +306,12 @@ def test_accessibility_expand_candidates_ignores_navigation_roles() -> None:
 
     assert candidates == [("button", "product details")]
 
+
 @pytest.mark.regression
 def test_finish_expansion_diagnostics_marks_attempt_without_clicks_as_no_matches() -> (
     None
 ):
-    diagnostics = browser_detail._finish_expansion_diagnostics(
+    diagnostics = browser_detail.finish_expansion_diagnostics(
         {"status": "attempted"},
         clicked_count=0,
         expanded_elements=[],
@@ -313,11 +322,12 @@ def test_finish_expansion_diagnostics_marks_attempt_without_clicks_as_no_matches
 
     assert diagnostics["status"] == "no_matches"
 
+
 @pytest.mark.regression
 def test_finish_expansion_diagnostics_marks_attempt_failures_as_interaction_failed() -> (
     None
 ):
-    diagnostics = browser_detail._finish_expansion_diagnostics(
+    diagnostics = browser_detail.finish_expansion_diagnostics(
         {"status": "attempted"},
         clicked_count=0,
         expanded_elements=[],
@@ -328,6 +338,7 @@ def test_finish_expansion_diagnostics_marks_attempt_failures_as_interaction_fail
 
     assert diagnostics["status"] == "interaction_failed"
     assert diagnostics["interaction_failures"] == ["click_failed:size"]
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -351,6 +362,7 @@ async def test_expand_all_interactive_elements_skips_blocked_commerce_actions() 
 
     assert diagnostics["clicked_count"] == 1
     assert diagnostics["expanded_elements"] == ["materials"]
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -380,6 +392,7 @@ async def test_expand_all_interactive_elements_skips_blocked_label_tokens_withou
     assert diagnostics["clicked_count"] == 1
     assert diagnostics["expanded_elements"] == ["product details"]
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_expand_all_interactive_elements_scans_past_non_expandable_early_candidates() -> (
@@ -406,6 +419,7 @@ async def test_expand_all_interactive_elements_scans_past_non_expandable_early_c
     assert diagnostics["clicked_count"] == 1
     assert diagnostics["expanded_elements"] == ["materials"]
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_browser_fetch_flattens_shadow_dom_before_serializing_html() -> None:
@@ -431,6 +445,7 @@ async def test_browser_fetch_flattens_shadow_dom_before_serializing_html() -> No
 
     assert page.shadow_flattened is True
     assert "Shadow DOM specifications" in result.html
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -462,6 +477,7 @@ async def test_browser_fetch_keeps_markdown_removed() -> None:
     )
 
     assert hasattr(result, "page_markdown") is False
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -510,6 +526,7 @@ async def test_browser_fetch_captures_rendered_listing_fragments_artifact() -> N
             """.strip()
     ]
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_browser_fetch_ignores_non_string_rendered_listing_fragments(
@@ -543,6 +560,7 @@ async def test_browser_fetch_ignores_non_string_rendered_listing_fragments(
     )
 
     assert result.artifacts["rendered_listing_fragments"] == ["<article>good</article>"]
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -587,6 +605,7 @@ async def test_browser_fetch_keeps_empty_successful_listing_artifacts(
     assert result.artifacts["rendered_listing_fragments"] == []
     assert result.artifacts["listing_visual_elements"] == []
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_detail_expansion_keywords_include_ecommerce_fallbacks_without_requested_fields() -> (
@@ -601,6 +620,7 @@ async def test_detail_expansion_keywords_include_ecommerce_fallbacks_without_req
 
     assert "shipping" in default_keywords
     assert "shipping" in requested_keywords
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -621,6 +641,7 @@ async def test_interactive_candidate_snapshot_excludes_class_names_from_probe() 
     assert "utility-token" not in str(snapshot["probe"])
     assert "care-panel-toggle" in str(snapshot["probe"])
 
+
 @pytest.mark.regression
 def test_acquisition_package_exports_interactive_candidate_snapshot() -> None:
     from app.services import acquisition
@@ -629,6 +650,7 @@ def test_acquisition_package_exports_interactive_candidate_snapshot() -> None:
         acquisition.interactive_candidate_snapshot
         is browser_runtime.interactive_candidate_snapshot
     )
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -651,6 +673,7 @@ async def test_expand_all_interactive_elements_matches_keywords_from_class_names
     )
 
     assert diagnostics["clicked_count"] == 1
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression

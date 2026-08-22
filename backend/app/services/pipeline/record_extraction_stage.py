@@ -49,8 +49,7 @@ async def _extract_records_for_acquisition(
 ) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
     acquisition_result = fetched.acquisition_result
     if not _browser_result_is_extractable(acquisition_result) and not (
-        context.surface in CONTENT_DETAIL_SURFACES
-        and str(getattr(acquisition_result, "html", "") or "").strip()
+        context.surface in CONTENT_DETAIL_SURFACES and str(getattr(acquisition_result, "html", "") or "").strip()
     ):
         return [], []
     await _populate_adapter_records(context, acquisition_result)
@@ -66,11 +65,7 @@ async def _extract_records_for_acquisition(
         acquisition_result=acquisition_result,
         selector_rules=selector_rules,
     )
-    if (
-        not records
-        and "listing" in context.surface
-        and getattr(acquisition_result, "method", "") == "browser"
-    ):
+    if not records and "listing" in context.surface and getattr(acquisition_result, "method", "") == "browser":
         fallback_records = await _extract_records_from_preserved_browser_html(
             context,
             fetched,
@@ -89,16 +84,29 @@ async def _populate_adapter_records(
     acquisition_result.adapter_name = None
     acquisition_result.adapter_source_type = None
 
-    adapter_results = []
-    adapter_started_at = time.perf_counter()
-    adapter_proxy = next(
-        (
-            str(proxy).strip()
-            for proxy in context.config.proxy_list or []
-            if str(proxy).strip()
-        ),
-        None,
-    )
+    adapter_proxy = _first_adapter_proxy(context.config.proxy_list)
+    adapter_results = await _run_adapter_evidence(context, acquisition_result, adapter_proxy=adapter_proxy)
+    adapter_result = _best_adapter_result(adapter_results)
+    if not _adapter_result_has_records(adapter_result) and _effective_blocked(acquisition_result):
+        adapter_result = await _recover_blocked_adapter(context, acquisition_result)
+    if adapter_result is not None and _adapter_result_has_records(adapter_result):
+        acquisition_result.adapter_records = list(adapter_result.records or [])
+        acquisition_result.adapter_name = adapter_result.adapter_name or None
+        acquisition_result.adapter_source_type = adapter_result.source_type or None
+
+
+def _first_adapter_proxy(values: list[str] | None) -> str | None:
+    return next((str(proxy).strip() for proxy in values or [] if str(proxy).strip()), None)
+
+
+async def _run_adapter_evidence(
+    context: _URLProcessingContext,
+    acquisition_result: AcquisitionResult,
+    *,
+    adapter_proxy: str | None,
+) -> list[AdapterResult]:
+    adapter_results: list[AdapterResult] = []
+    started_at = time.perf_counter()
     with logfire_span(
         "extract.tier.adapter",
         run_id=context.run.id,
@@ -106,9 +114,7 @@ async def _populate_adapter_records(
         surface=context.surface,
         proxy_configured=bool(adapter_proxy),
     ) as span:
-        evidence_inputs, empty_skips, duplicate_skips = _ordered_adapter_evidence(
-            acquisition_result
-        )
+        evidence_inputs, empty_skips, duplicate_skips = _ordered_adapter_evidence(acquisition_result)
         from app.services.pipeline import extraction_loop
 
         adapter_runner = getattr(extraction_loop, "run_adapter", run_adapter)
@@ -143,39 +149,37 @@ async def _populate_adapter_records(
             adapter_call_count=adapter_calls,
             adapter_elapsed_ms=max(
                 0,
-                int(round((time.perf_counter() - adapter_started_at) * 1000)),
+                int(round((time.perf_counter() - started_at) * 1000)),
             ),
             adapter_names=[
-                str(result.adapter_name or "")
-                for result in adapter_results
-                if str(result.adapter_name or "").strip()
+                str(result.adapter_name or "") for result in adapter_results if str(result.adapter_name or "").strip()
             ],
-            record_count=sum(
-                len(list(result.records or [])) for result in adapter_results
-            ),
+            record_count=sum(len(list(result.records or [])) for result in adapter_results),
         )
-    adapter_result = _best_adapter_result(adapter_results)
-    if (
-        adapter_result is None or not list(adapter_result.records or [])
-    ) and _effective_blocked(acquisition_result):
-        adapter_result = await try_blocked_adapter_recovery(
-            acquisition_result.final_url,
-            AcquisitionPlan(
-                surface=context.surface,
-                proxy_list=tuple(context.config.proxy_list or []),
-                traversal_mode=context.config.traversal_mode,
-                max_pages=context.config.max_pages,
-                max_scrolls=context.config.max_scrolls,
-                max_records=context.config.max_records,
-                sleep_ms=context.config.sleep_ms,
-                adapter_recovery_enabled=True,
-            ),
-            proxy_list=list(context.config.proxy_list or []),
-        )
-    if adapter_result is not None and list(adapter_result.records or []):
-        acquisition_result.adapter_records = list(adapter_result.records or [])
-        acquisition_result.adapter_name = adapter_result.adapter_name or None
-        acquisition_result.adapter_source_type = adapter_result.source_type or None
+    return adapter_results
+
+
+def _adapter_result_has_records(result: AdapterResult | None) -> bool:
+    return result is not None and bool(list(result.records or []))
+
+
+async def _recover_blocked_adapter(
+    context: _URLProcessingContext, acquisition_result: AcquisitionResult
+) -> AdapterResult | None:
+    return await try_blocked_adapter_recovery(
+        acquisition_result.final_url,
+        AcquisitionPlan(
+            surface=context.surface,
+            proxy_list=tuple(context.config.proxy_list or []),
+            traversal_mode=context.config.traversal_mode,
+            max_pages=context.config.max_pages,
+            max_scrolls=context.config.max_scrolls,
+            max_records=context.config.max_records,
+            sleep_ms=context.config.sleep_ms,
+            adapter_recovery_enabled=True,
+        ),
+        proxy_list=list(context.config.proxy_list or []),
+    )
 
 
 def _best_adapter_result(adapter_results: list[AdapterResult]) -> AdapterResult | None:
@@ -183,9 +187,7 @@ def _best_adapter_result(adapter_results: list[AdapterResult]) -> AdapterResult 
         return None
     best = max(
         adapter_results,
-        key=lambda result: _adapter_result_score(
-            list(getattr(result, "records", []) or [])
-        ),
+        key=lambda result: _adapter_result_score(list(getattr(result, "records", []) or [])),
     )
     merged_records: dict[str, dict[str, object]] = {}
     unsourced_records: list[dict[str, object]] = []
@@ -221,9 +223,7 @@ def _adapter_result_score(records: list[object]) -> tuple[int, int]:
         if not isinstance(record, dict):
             continue
         populated += sum(
-            value not in (None, "", [], {})
-            for key, value in record.items()
-            if not str(key).startswith("_")
+            value not in (None, "", [], {}) for key, value in record.items() if not str(key).startswith("_")
         )
     return len(records), populated
 
@@ -241,9 +241,7 @@ def _adapter_result_satisfies_listing_context(
         return False
     min_items = max(1, int(crawler_runtime_settings.listing_min_items))
     target = max(min_items, int(context.config.max_records or min_items))
-    diagnostics = mapping_or_empty(
-        getattr(acquisition_result, "browser_diagnostics", {})
-    )
+    diagnostics = mapping_or_empty(getattr(acquisition_result, "browser_diagnostics", {}))
     rendered_count = _positive_int(diagnostics.get("rendered_listing_fragment_count"))
     if rendered_count <= 0:
         evidence = mapping_or_empty(diagnostics.get("extractable_listing_evidence"))
@@ -316,9 +314,7 @@ def _adapter_network_payload_inputs(
         except (TypeError, ValueError):
             continue
         serialized_key = serialized.casefold()
-        if identity_tokens and not any(
-            token in serialized_key for token in identity_tokens
-        ):
+        if identity_tokens and not any(token in serialized_key for token in identity_tokens):
             continue
         inputs.append(serialized)
     return inputs
@@ -327,9 +323,7 @@ def _adapter_network_payload_inputs(
 def _adapter_payload_identity_tokens(page_url: str) -> set[str]:
     from app.services.extract.detail.identity.core import detail_identity_codes_from_url
 
-    min_length = max(
-        0, int(crawler_runtime_settings.adapter_payload_identity_min_token_length)
-    )
+    min_length = max(0, int(crawler_runtime_settings.adapter_payload_identity_min_token_length))
     return {
         str(token).casefold()
         for token in detail_identity_codes_from_url(page_url)
@@ -340,9 +334,7 @@ def _adapter_payload_identity_tokens(page_url: str) -> set[str]:
 def _rendered_listing_fragments_html(value: object) -> str:
     if not isinstance(value, list):
         return ""
-    fragments = [
-        fragment for fragment in (str(item or "").strip() for item in value) if fragment
-    ]
+    fragments = [fragment for fragment in (str(item or "").strip() for item in value) if fragment]
     if not fragments:
         return ""
     joined = "\n".join(fragments)
@@ -399,9 +391,7 @@ async def _run_record_extraction(
                 selector_rules=selector_rules,
                 extraction_runtime_snapshot=context.run.settings_view.extraction_runtime_snapshot(),
                 content_type=acquisition_result.content_type,
-                browser_diagnostics=getattr(
-                    acquisition_result, "browser_diagnostics", None
-                ),
+                browser_diagnostics=getattr(acquisition_result, "browser_diagnostics", None),
                 record_dom_observed_selectors=True,
             )
         )
@@ -416,9 +406,7 @@ async def _extract_records_from_preserved_browser_html(
     selector_rules: list[dict[str, object]],
 ) -> list[dict[str, object]]:
     acquisition_result = fetched.acquisition_result
-    browser_diagnostics = mapping_or_empty(
-        getattr(acquisition_result, "browser_diagnostics", {})
-    )
+    browser_diagnostics = mapping_or_empty(getattr(acquisition_result, "browser_diagnostics", {}))
     if not bool(browser_diagnostics.get("traversal_activated")):
         return []
     artifacts = mapping_or_empty(getattr(acquisition_result, "artifacts", {}))
@@ -518,14 +506,10 @@ async def _update_acquisition_contract_memory(
     persisted_count: int,
     verdict: str,
 ) -> None:
-    domain = normalize_domain(
-        getattr(acquisition_result, "final_url", "") or context.url
-    )
+    domain = normalize_domain(getattr(acquisition_result, "final_url", "") or context.url)
     if not domain:
         return
-    diagnostics = mapping_or_empty(
-        getattr(acquisition_result, "browser_diagnostics", {})
-    )
+    diagnostics = mapping_or_empty(getattr(acquisition_result, "browser_diagnostics", {}))
     await record_acquisition_contract_outcome(
         context.session,
         domain=domain,
@@ -543,9 +527,7 @@ async def _update_acquisition_contract_memory(
         verdict=verdict,
         blocked=_effective_blocked(acquisition_result),
         page_url=getattr(acquisition_result, "final_url", "") or context.url,
-        network_payloads=list(
-            getattr(acquisition_result, "network_payloads", []) or []
-        ),
+        network_payloads=list(getattr(acquisition_result, "network_payloads", []) or []),
     )
 
 

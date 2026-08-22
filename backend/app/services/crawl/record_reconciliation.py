@@ -30,16 +30,12 @@ async def load_records_with_reconciliation(
         return rows, total
 
     retry_attempts = max(0, crawler_runtime_settings.records_read_retry_attempts)
-    retry_delay_seconds = max(
-        0.0, crawler_runtime_settings.records_read_retry_delay_ms / 1000
-    )
+    retry_delay_seconds = max(0.0, crawler_runtime_settings.records_read_retry_delay_ms / 1000)
     for _ in range(retry_attempts):
         if retry_delay_seconds > 0:
             await asyncio.sleep(retry_delay_seconds)
         async with SessionLocal() as retry_session:
-            retry_rows, retry_total = await get_run_records(
-                retry_session, run_id, page, limit
-            )
+            retry_rows, retry_total = await get_run_records(retry_session, run_id, page, limit)
         if retry_rows or retry_total:
             return retry_rows, retry_total
     return rows, total

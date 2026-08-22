@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from .test_browser_expansion_runtime import BeautifulSoup, SimpleNamespace, _FakeExpansionPage, _async_checkpoint, _network_capture_summary, asynccontextmanager, browser_page_flow, browser_page_helpers, browser_readiness, browser_result_builder, browser_runtime, crawler_runtime_settings, pytest  # fmt: skip
+from app.services.acquisition.runtime import BlockPageClassification
 
 pytest_plugins = ["tests.regression.test_browser_expansion_runtime"]
+
 
 @pytest.mark.regression
 def test_generic_card_selectors_use_ecommerce_group_for_unknown_listing_surface(
@@ -14,17 +16,14 @@ def test_generic_card_selectors_use_ecommerce_group_for_unknown_listing_surface(
         {"ecommerce": [".product-card"], "jobs": [".job-card", ".product-card"]},
     )
 
-    selectors = browser_page_flow._generic_card_selectors_for_surface(
-        "automobile_listing"
-    )
+    selectors = browser_page_flow._generic_card_selectors_for_surface("automobile_listing")
 
     # Non-job surfaces route to ecommerce group only, matching listing_selector_group.
     assert selectors == [".product-card"]
 
+
 @pytest.mark.regression
-def test_select_primary_browser_html_prefers_full_rendered_when_traversal_fragment_is_capped() -> (
-    None
-):
+def test_select_primary_browser_html_prefers_full_rendered_when_traversal_fragment_is_capped() -> None:
     traversal_result = SimpleNamespace(
         activated=True,
         progress_events=1,
@@ -36,16 +35,12 @@ def test_select_primary_browser_html_prefers_full_rendered_when_traversal_fragme
         surface="ecommerce_listing",
         traversal_result=traversal_result,
         traversal_html="<html><body><a href='/products/a'>A</a></body></html>",
-        rendered_html=(
-            "<html><body>"
-            "<a href='/products/a'>A</a>"
-            "<a href='/products/b'>B</a>"
-            "</body></html>"
-        ),
+        rendered_html=("<html><body><a href='/products/a'>A</a><a href='/products/b'>B</a></body></html>"),
         listing_min_items=2,
     )
 
     assert "products/b" in html
+
 
 @pytest.mark.regression
 def test_select_primary_browser_html_uses_surface_specific_detail_hints() -> None:
@@ -60,16 +55,14 @@ def test_select_primary_browser_html_uses_surface_specific_detail_hints() -> Non
         surface="job_listing",
         traversal_result=traversal_result,
         traversal_html=(
-            "<html><body>"
-            "<a href='/products/a'>Product A</a>"
-            "<a href='/products/b'>Product B</a>"
-            "</body></html>"
+            "<html><body><a href='/products/a'>Product A</a><a href='/products/b'>Product B</a></body></html>"
         ),
         rendered_html="<html><body><a href='/jobs/123'>Job</a></body></html>",
         listing_min_items=2,
     )
 
     assert "jobs/123" in html
+
 
 @pytest.mark.regression
 def test_location_interstitial_diagnostics_marks_location_required() -> None:
@@ -118,6 +111,7 @@ def test_location_interstitial_diagnostics_marks_location_required() -> None:
     assert diagnostics["failure_reason"] == "location_required"
     assert diagnostics["interstitial"]["location_required"] is True
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_finalize_browser_fetch_marks_location_interstitial_blocked(
@@ -149,6 +143,7 @@ async def test_finalize_browser_fetch_marks_location_interstitial_blocked(
     assert result["diagnostics"]["low_content_reason"] == "location_required"
     assert "location_interstitial" in result["diagnostics"]["challenge_evidence"]
     assert browser_finalize_support.visual_calls == []
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -193,6 +188,7 @@ async def test_finalize_browser_fetch_keeps_usable_detail_without_ready_probe(
     assert result["diagnostics"]["browser_outcome"] == "usable_content"
     assert result["diagnostics"].get("low_content_reason") in (None, "")
 
+
 @pytest.mark.regression
 def test_location_interstitial_detects_text_only_fallback() -> None:
     html = """
@@ -205,6 +201,7 @@ def test_location_interstitial_detects_text_only_fallback() -> None:
     """
 
     assert browser_page_helpers.location_interstitial_detected(html) is True
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -234,16 +231,14 @@ async def test_probe_browser_readiness_detects_spaced_jsonld_detail_type() -> No
         surface="ecommerce_detail",
         html=html.replace(
             "</body>",
-            (
-                "<h1>Widget</h1>"
-                "<p>Detailed rendered product content. " * 12 + "</p></body>"
-            ),
+            ("<h1>Widget</h1><p>Detailed rendered product content. " * 12 + "</p></body>"),
         ),
         detail_readiness_hint_count=lambda *_args, **_kwargs: 0,
     )
 
     assert ready_probe["structured_data_present"] is True
     assert ready_probe["is_ready"] is True
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -308,6 +303,7 @@ async def test_browser_fetch_closes_payload_capture_after_policy_resolution_erro
 
     assert closed == [page]
 
+
 @pytest.mark.regression
 def test_ready_probe_supports_fast_finalize_for_strong_detail_page() -> None:
     assert (
@@ -325,6 +321,7 @@ def test_ready_probe_supports_fast_finalize_for_strong_detail_page() -> None:
         )
         is True
     )
+
 
 @pytest.mark.regression
 def test_ready_probe_fast_finalize_rejects_for_forced_block_status() -> None:
@@ -344,6 +341,7 @@ def test_ready_probe_fast_finalize_rejects_for_forced_block_status() -> None:
         is False
     )
 
+
 @pytest.mark.regression
 def test_fast_finalize_accepts_verified_extractability_without_probe_payload() -> None:
     assert (
@@ -360,6 +358,7 @@ def test_fast_finalize_accepts_verified_extractability_without_probe_payload() -
         )
         is True
     )
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -398,6 +397,49 @@ async def test_fast_finalize_keeps_location_clear_when_precheck_found_no_signal(
     assert result["blocked"] is False
     assert result["diagnostics"]["browser_outcome"] == "usable_content"
     assert result["diagnostics"]["interstitial"]["location_required"] is False
+
+
+@pytest.mark.asyncio
+@pytest.mark.regression
+async def test_fast_finalize_still_runs_block_classification(
+    browser_finalize_support: SimpleNamespace,
+) -> None:
+    payload = browser_finalize_support.make_payload(
+        readiness_probes=[
+            {
+                "is_ready": True,
+                "visible_text_length": 5000,
+                "structured_data_present": True,
+                "detail_hint_count": 4,
+            }
+        ],
+        networkidle_skip_reason="fast_path_ready",
+    )
+
+    async def _classify(*args, **kwargs):
+        del args, kwargs
+        return BlockPageClassification(
+            blocked=True,
+            outcome="challenge_page",
+            evidence=["challenge"],
+        )
+
+    result = await browser_result_builder.finalize_browser_fetch(
+        payload,
+        blocked_html_checker=lambda *_args, **_kwargs: False,
+        classify_blocked_page_async=_classify,
+        classify_low_content_reason=lambda *_args, **_kwargs: None,
+        classify_browser_outcome=lambda **kwargs: "blocked" if kwargs["blocked"] else "usable_content",
+        capture_browser_screenshot=lambda _page: "",
+        emit_browser_event=browser_finalize_support.emit_browser_event,
+        elapsed_ms=lambda _started_at: 0,
+        capture_rendered_listing_fragments_impl=browser_finalize_support.capture_fragments,
+        capture_listing_visual_elements_impl=browser_finalize_support.capture_visuals,
+    )
+
+    assert result["blocked"] is True
+    assert result["diagnostics"]["browser_outcome"] == "blocked"
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -442,6 +484,7 @@ async def test_location_interstitial_dismisses_by_safe_text_token() -> None:
 
     assert result == {"status": "dismissed", "selector": "text:continue"}
     assert page.waited is True
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -495,6 +538,7 @@ async def test_location_interstitial_dismissal_counts_before_first_locator() -> 
 
     assert result["status"] == "dismissed"
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_location_interstitial_dismissal_requires_modal_to_clear() -> None:
@@ -537,6 +581,7 @@ async def test_location_interstitial_dismissal_requires_modal_to_clear() -> None
     assert isinstance(result["selector"], str)
     assert result["selector"].strip()
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_location_interstitial_dismissal_skips_when_no_signal_present() -> None:
@@ -544,23 +589,17 @@ async def test_location_interstitial_dismissal_skips_when_no_signal_present() ->
         url = "https://example.com/products/widget"
 
         def locator(self, _selector: str):
-            raise AssertionError(
-                "locator probe should be skipped when no signal exists"
-            )
+            raise AssertionError("locator probe should be skipped when no signal exists")
 
         async def evaluate(self, script: str, payload: dict[str, object]):
             await _async_checkpoint()
             if "selectors" in payload:
                 return False
-            raise AssertionError(
-                "dismiss-by-text should be skipped when no signal exists"
-            )
+            raise AssertionError("dismiss-by-text should be skipped when no signal exists")
 
         async def wait_for_timeout(self, *_args, **_kwargs) -> None:
             await _async_checkpoint()
-            raise AssertionError(
-                "wait_for_timeout should be skipped when no signal exists"
-            )
+            raise AssertionError("wait_for_timeout should be skipped when no signal exists")
 
         async def content(self) -> str:
             await _async_checkpoint()
@@ -569,6 +608,7 @@ async def test_location_interstitial_dismissal_skips_when_no_signal_present() ->
     result = await browser_page_helpers.dismiss_safe_location_interstitial(_Page())
 
     assert result == {"status": "not_found", "reason": "no_location_signal"}
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -614,11 +654,10 @@ async def test_serialize_browser_page_content_reuses_prefetched_html_without_pag
     assert traversal_result is None
     assert listing_recovery_diagnostics["status"] == "skipped"
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
-async def test_settle_browser_page_skips_platform_selector_when_probe_is_ready() -> (
-    None
-):
+async def test_settle_browser_page_skips_platform_selector_when_probe_is_ready() -> None:
     probe_analyses: list[object] = []
     current_html = "<html><body>Searching...</body></html>"
 
@@ -662,11 +701,11 @@ async def test_settle_browser_page_skips_platform_selector_when_probe_is_ready()
 
     _current_probe, readiness_probes, *_rest = result
 
-    assert [
-        (analysis.html, analysis.lowered_html, analysis.normalized_text)
-        for analysis in probe_analyses
-    ] == [(current_html, current_html.lower(), "Searching...")]
+    assert [(analysis.html, analysis.lowered_html, analysis.normalized_text) for analysis in probe_analyses] == [
+        (current_html, current_html.lower(), "Searching...")
+    ]
     assert [probe["stage"] for probe in readiness_probes] == ["after_navigation"]
+
 
 @pytest.mark.regression
 def test_detail_expansion_extractability_reuses_supplied_soup_without_reparse() -> None:

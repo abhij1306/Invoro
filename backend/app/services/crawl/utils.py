@@ -124,11 +124,7 @@ def text_has_token(text: str, token: str) -> bool:
         return False
     if " " in cleaned_token:
         return cleaned_token in cleaned_text
-    words = {
-        word
-        for word in cleaned_text.replace("-", " ").replace("_", " ").split()
-        if word
-    }
+    words = {word for word in cleaned_text.replace("-", " ").replace("_", " ").split() if word}
     return cleaned_token in words
 
 
@@ -163,11 +159,7 @@ def collect_target_urls(
             candidates.append(candidate)
 
     # URLs array from settings
-    setting_urls = (
-        settings_view.urls()
-        if hasattr(settings_view, "urls")
-        else (settings_view.get("urls") or [])
-    )
+    setting_urls = settings_view.urls() if hasattr(settings_view, "urls") else (settings_view.get("urls") or [])
     for value in setting_urls:
         candidate = normalize_target_url(value)
         if candidate:
@@ -208,20 +200,14 @@ def resolve_traversal_mode(settings: object) -> str | None:
     settings_view = _settings_view(settings)
     advanced_enabled_value = settings_view.get("advanced_enabled")
     advanced_enabled = (
-        settings_view.advanced_enabled()
-        if hasattr(settings_view, "advanced_enabled")
-        else bool(advanced_enabled_value)
+        settings_view.advanced_enabled() if hasattr(settings_view, "advanced_enabled") else bool(advanced_enabled_value)
     )
     advanced_flag_present = (
-        settings_view.has("advanced_enabled")
-        if hasattr(settings_view, "has")
-        else advanced_enabled_value is not None
+        settings_view.has("advanced_enabled") if hasattr(settings_view, "has") else advanced_enabled_value is not None
     )
     fetch_profile = settings_view.get("fetch_profile")
     if isinstance(fetch_profile, dict) and fetch_profile:
-        fetch_profile_mode = _normalize_traversal_mode_value(
-            fetch_profile.get("traversal_mode")
-        )
+        fetch_profile_mode = _normalize_traversal_mode_value(fetch_profile.get("traversal_mode"))
         if fetch_profile_mode is None:
             return None
         if fetch_profile_mode in _TRAVERSAL_MODES:
@@ -230,9 +216,7 @@ def resolve_traversal_mode(settings: object) -> str | None:
         raise CrawlerConfigurationError("Unsupported traversal_mode")
     if advanced_flag_present and not advanced_enabled:
         return None
-    mode = _normalize_traversal_mode_value(
-        settings_view.get("traversal_mode") or settings_view.get("advanced_mode")
-    )
+    mode = _normalize_traversal_mode_value(settings_view.get("traversal_mode") or settings_view.get("advanced_mode"))
     if mode is None:
         return None
     if mode in _TRAVERSAL_MODES:
@@ -261,17 +245,13 @@ def validate_extraction_contract(contract_rows: list[dict]) -> None:
         if xpath:
             valid_xpath, xpath_error = validate_xpath_syntax(xpath)
             if not valid_xpath:
-                errors.append(
-                    f"Row {index} ({field_name or 'unnamed'}): invalid XPath ({xpath_error})"
-                )
+                errors.append(f"Row {index} ({field_name or 'unnamed'}): invalid XPath ({xpath_error})")
 
         if regex:
             try:
                 regex_lib.compile(regex)
             except regex_lib.error as exc:
-                errors.append(
-                    f"Row {index} ({field_name or 'unnamed'}): invalid regex ({exc})"
-                )
+                errors.append(f"Row {index} ({field_name or 'unnamed'}): invalid regex ({exc})")
 
     if errors:
         raise ValueError("; ".join(errors))

@@ -109,10 +109,11 @@ Public API schemas live in `api_key.py` and `public_api.py`.
 | `data_enrichment/deterministic.py` | Deterministic enrichment normalization, taxonomy matching, and product attribute diagnostics |
 | `data_enrichment/llm_diagnostics.py` | Data enrichment LLM rejection and skip-reason diagnostics |
 | `data_enrichment/shopify_catalog.py` | Shopify taxonomy and attribute repository loading/matching |
-| `crawl/batch_runtime.py` | URL loop, progress, pause, kill checks |
-| `crawl/sitemap_resolver.py`, `crawl/site_link_discovery.py` | Static sitemap/homepage category discovery plus rendered same-origin site-link fallback |
+| `crawl/batch_runtime.py`, `crawl/batch_parallel.py` | Sequential/parallel URL orchestration, progress, pause, kill checks |
+| `crawl/sitemap_resolver.py`, `crawl/sitemap_navigation.py`, `crawl/site_link_discovery.py` | Static sitemap/homepage category discovery, URL classification, and rendered same-origin fallback |
 | `tasks.py` | Celery task entry |
 | `pipeline/extraction_loop.py` | Per-URL stage orchestration: acquire -> extract -> normalize -> persist |
+| `pipeline/acquisition_timeline.py`, `pipeline/extraction_trace.py` | Acquisition/extraction observability projection |
 | `pipeline/record_extraction_stage.py` | Adapter population, selector-rule loading, extraction invocation, acquisition-contract memory |
 | `pipeline/extraction_retry_stage.py` | Browser retry families, detail rejection guard, listing-integrity escalation |
 | `pipeline/url_processing_context.py` | Per-URL acquisition config and run-context resolution |
@@ -138,6 +139,7 @@ Flow:
 | `acquisition/http_client.py` | Thin shared-client wrapper |
 | `acquisition/browser_runtime.py` | Browser fetch orchestration and runtime-policy wiring |
 | `acquisition/browser_pool.py` | Shared Playwright pool, context lifecycle, browser binary/proxy launch |
+| `acquisition/browser_pool_spec.py` | Pool lifecycle implementation and aggregate runtime snapshots |
 | `acquisition/browser_fetch_support.py` | Browser fetch result, diagnostics, and page event assembly helpers |
 | `acquisition/browser_capture.py` | Screenshots and network payload capture |
 | `acquisition/browser_diagnostics.py` | Browser engine labels, profile diagnostics, and failed-fetch diagnostic contracts |
@@ -146,6 +148,9 @@ Flow:
 | `acquisition/browser_page_flow.py` | Page navigation, cached-analysis readiness orchestration, and serialization policy |
 | `acquisition/browser_result_builder.py` | Browser acquisition diagnostics, artifacts, screenshots, final result shaping |
 | `acquisition/browser_page_helpers.py` | Browser page HTML selection, detail extractability probes, listing visual capture |
+| `acquisition/browser_accessibility_expansion.py` | Bounded accessibility-assisted detail expansion |
+| `acquisition/browser_origin_warmup.py` | Eligibility and bounded origin-warmup navigation |
+| `acquisition/content_signals.py` | Shared deterministic detail/listing content signals |
 | `acquisition/browser_proxy_config.py` | Browser proxy URL parsing, redaction, and Playwright proxy config |
 | `acquisition/browser_readiness.py` | DOM readiness checks, listing/detail probes, outcome classification |
 | `acquisition/browser_stage_runner.py` | Bounded browser-stage execution, timeout cancellation, and page/context teardown |
@@ -157,7 +162,8 @@ Flow:
 | `acquisition/traversal_card_counting.py` | Card-count and progress-snapshot helpers used by traversal loops |
 | `acquisition/pacing.py` | Host-level rate limiting |
 | `acquisition/cookie_store.py` | Temp storage state plus domain cookie memory helpers |
-| `fetch/fetch_context.py` | `fetch_page()` owner: HTTP/browser attempt orchestration, host memory, escalation events, and result flow |
+| `fetch/fetch_context.py` | `fetch_page()` facade: HTTP attempt orchestration, escalation events, and result flow |
+| `fetch/browser_attempts.py`, `fetch/host_memory.py` | Browser attempt execution and short-lived host-result memory updates |
 | `fetch/browser_policy.py` | Pure proxy, engine-plan, escalation, handoff, and shared-deadline decisions |
 | `fetch/types.py` | Typed fetch request, runtime context, and browser-attempt plan containers |
 | `robots_policy.py` | robots.txt policy |

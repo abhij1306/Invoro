@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from .test_crawl_service import AsyncSession, CrawlerConfigurationError, ProgrammingError, ReviewPromotion, apply_acquisition_contract_to_profile, build_success_acquisition_contract, create_crawl_run, dependencies_module, load_domain_run_profile, normalize_acquisition_contract, normalize_crawl_settings, normalize_domain_run_profile, note_acquisition_contract_failure, pytest, record_acquisition_contract_outcome, resolve_url_acquisition_recipe, save_domain_run_profile, settings  # fmt: skip
+from app.services.crawl.profile.merge import merge_saved_run_profile
+
 
 @pytest.mark.component
 def test_get_run_dispatcher_reuses_dispatch_mode_singletons(
@@ -20,6 +22,50 @@ def test_get_run_dispatcher_reuses_dispatch_mode_singletons(
         assert celery_dispatcher is not local_dispatcher
     finally:
         dependencies_module._run_dispatchers.clear()
+
+
+@pytest.mark.component
+def test_handoff_auto_falls_back_to_preferred_browser_engine() -> None:
+    profile = apply_acquisition_contract_to_profile(
+        {},
+        {
+            "preferred_browser_engine": "real_chrome",
+            "handoff_cookie_engine": "auto",
+            "handoff_eligible": True,
+        },
+    )
+
+    assert profile["handoff_cookie_engine"] == "real_chrome"
+
+
+@pytest.mark.component
+def test_saved_endpoint_merge_caps_combined_explicit_first(patch_settings) -> None:
+    patch_settings(internal_api_replay_max_endpoints=3)
+    explicit = {
+        "internal_api_endpoints": [
+            {"method": "GET", "url": "https://example.com/api/explicit-a"},
+            {"method": "GET", "url": "https://example.com/api/explicit-b"},
+        ]
+    }
+    saved = {
+        "internal_api_endpoints": [
+            {"method": "GET", "url": "https://example.com/api/saved-a"},
+            {"method": "GET", "url": "https://example.com/api/saved-b"},
+        ]
+    }
+
+    merged = merge_saved_run_profile(
+        explicit,
+        saved,
+        ignore_default_equivalent_values=False,
+    )
+
+    assert [item["url"] for item in merged["internal_api_endpoints"]] == [
+        "https://example.com/api/explicit-a",
+        "https://example.com/api/explicit-b",
+        "https://example.com/api/saved-a",
+    ]
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -41,6 +87,7 @@ async def test_create_crawl_run_sets_pending_and_preserves_surface(
     assert run.status == "pending"
     assert run.surface == "ecommerce_detail"
     assert run.result_summary["url_count"] == 1
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -84,6 +131,7 @@ async def test_create_crawl_run_preserves_raw_additional_fields_and_keeps_domain
     assert "care" not in run.requested_fields
     assert run.settings["requested_fields"] == run.requested_fields
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_create_crawl_run_preserves_exact_custom_additional_field_labels(
@@ -103,6 +151,7 @@ async def test_create_crawl_run_preserves_exact_custom_additional_field_labels(
 
     assert run.requested_fields == ["Features & Benefits", "Product Story"]
     assert run.settings["requested_fields"] == ["Features & Benefits", "Product Story"]
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -181,6 +230,7 @@ async def test_create_crawl_run_merges_saved_domain_run_profile_for_single_url(
         "proxy_list": [],
     }
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_explicit_forced_engine_overrides_saved_contract(
@@ -226,6 +276,7 @@ async def test_explicit_forced_engine_overrides_saved_contract(
     assert contract["handoff_eligible"] is False
     assert contract["handoff_cookie_engine"] == "patchright"
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_browser_only_run_disables_saved_handoff_contract(
@@ -269,6 +320,7 @@ async def test_browser_only_run_disables_saved_handoff_contract(
     assert contract["handoff_eligible"] is False
     assert contract["handoff_cookie_engine"] == "auto"
 
+
 @pytest.mark.component
 def test_browser_only_profile_application_drops_handoff() -> None:
     profile = apply_acquisition_contract_to_profile(
@@ -286,11 +338,13 @@ def test_browser_only_profile_application_drops_handoff() -> None:
     assert "prefer_curl_handoff" not in profile
     assert "handoff_cookie_engine" not in profile
 
+
 @pytest.mark.component
 def test_normalize_acquisition_contract_accepts_legacy_handoff_flag() -> None:
     contract = normalize_acquisition_contract({"prefer_curl_handoff": True})
 
     assert contract["handoff_eligible"] is True
+
 
 @pytest.mark.component
 def test_build_success_acquisition_contract_tolerates_bad_payload_count() -> None:
@@ -306,6 +360,7 @@ def test_build_success_acquisition_contract_tolerates_bad_payload_count() -> Non
 
     assert contract["required_network_payloads"] is False
     assert contract["handoff_eligible"] is True
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -332,6 +387,7 @@ async def test_create_crawl_run_rejects_invalid_traversal_mode(
                 },
             },
         )
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -388,6 +444,7 @@ async def test_contract_marks_stale_after_repeated_quality_failures(
         "stale": True,
     }
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_contract_failure_tolerates_bad_source_run_id(
@@ -419,6 +476,7 @@ async def test_contract_failure_tolerates_bad_source_run_id(
         "failure_count": 1,
         "stale": True,
     }
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -479,6 +537,7 @@ async def test_contract_outcome_can_skip_non_acquisition_failures(
         "stale": False,
     }
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_resolve_url_acquisition_recipe_reuses_saved_profile_for_batch_defaults(
@@ -523,6 +582,7 @@ async def test_resolve_url_acquisition_recipe_reuses_saved_profile_for_batch_def
     assert resolved["diagnostics_profile"]["capture_network"] == "matched_only"
     assert resolved["acquisition_contract"]["preferred_browser_engine"] == "real_chrome"
     assert resolved["acquisition_contract"]["handoff_eligible"] is True
+
 
 @pytest.mark.asyncio
 @pytest.mark.component
@@ -589,6 +649,7 @@ async def test_record_acquisition_contract_outcome_saves_internal_api_endpoint(
         }
     ]
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_record_acquisition_contract_outcome_counts_empty_detail_failure(
@@ -648,10 +709,12 @@ async def test_record_acquisition_contract_outcome_counts_empty_detail_failure(
         "stale": False,
     }
 
+
 @pytest.mark.component
 def test_normalize_domain_run_profile_rejects_invalid_source_run_id() -> None:
     with pytest.raises(ValueError, match="source_run_id must be a positive integer"):
         normalize_domain_run_profile({}, source_run_id="invalid")  # type: ignore[arg-type]
+
 
 @pytest.mark.parametrize(
     ("legacy_value", "expected"),
@@ -675,6 +738,7 @@ def test_normalize_domain_run_profile_translates_legacy_traversal_mode(
     )
 
     assert normalized["fetch_profile"]["traversal_mode"] == expected
+
 
 @pytest.mark.asyncio
 @pytest.mark.component

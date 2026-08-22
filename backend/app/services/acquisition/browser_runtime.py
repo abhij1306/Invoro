@@ -6,8 +6,6 @@ import logging
 import time
 from contextlib import suppress
 from typing import Any
-from urllib.parse import urlparse
-from weakref import WeakKeyDictionary
 
 from app.services.acquisition.browser_capture import (
     BrowserNetworkCapture as _BrowserNetworkCapture,
@@ -27,8 +25,6 @@ from app.services.acquisition.browser_detail import (
 from app.services.acquisition.browser_diagnostics import (
     CHROMIUM_BROWSER_ENGINE as _CHROMIUM_BROWSER_ENGINE,
     REAL_CHROME_BROWSER_ENGINE as _REAL_CHROME_BROWSER_ENGINE,
-    browser_launch_mode as _browser_launch_mode,
-    browser_profile as _browser_profile,
     build_browser_diagnostics_contract,
     build_failed_browser_diagnostics,
     normalize_browser_engine as _normalize_browser_engine,
@@ -36,6 +32,7 @@ from app.services.acquisition.browser_diagnostics import (
 from app.services.acquisition.browser_storage_state import (
     mark_storage_state_persist_policy,
 )
+from app.services.acquisition import browser_origin_warmup as _origin_warmup
 from app.services.acquisition.browser_page_flow import (
     append_readiness_probe,
     navigate_browser_page_impl,
@@ -48,15 +45,13 @@ from app.services.acquisition.browser_result_builder import (
     BrowserFinalizeInput,
     finalize_browser_fetch,
 )
-from app.services.acquisition.browser_proxy_config import (
-    display_proxy as _display_proxy,
-)
 from app.services.acquisition.browser_fetch_support import (
     attach_browser_fetch_exception_context,
     build_browser_fetch_diagnostics,
     build_browser_fetch_result,
     dismiss_browser_interstitial,
     emit_page_loaded_event,
+    prepare_browser_fetch_launch_context as _prepare_browser_fetch_launch_context,
 )
 from app.services.acquisition import browser_readiness as _browser_readiness
 from app.services.acquisition.browser_readiness import (
@@ -68,7 +63,6 @@ from app.services.acquisition.browser_readiness import (
 )
 from app.services.acquisition.browser_recovery import (
     emit_browser_behavior_activity,
-    recover_browser_challenge,
 )
 from app.services.acquisition.browser_stage_runner import (
     run_browser_stage as _run_browser_stage,
@@ -87,8 +81,6 @@ from app.services.acquisition.browser_pool import (
     shutdown_browser_runtime_sync as _shutdown_browser_runtime_sync_impl,
     temporary_browser_page,
 )
-from app.services.acquisition import cookie_store
-from app.services.acquisition.dom_runtime import get_page_html
 from app.services.acquisition.runtime import (
     NetworkPayloadReadResult,
     classify_blocked_page_async,
@@ -102,7 +94,6 @@ from app.services.acquisition.traversal import (
 from app.services.acquisition.traversal_recovery import recover_listing_page_content
 from app.services.config.browser_fingerprint_profiles import (
     BEHAVIOR_REALISM_ELIGIBLE_BROWSER_REASONS,
-    WARMUP_ELIGIBLE_BROWSER_REASONS,
     WARMUP_VENDOR_BLOCK_PREFIX,
 )
 from app.services.config.runtime_settings import (
@@ -118,22 +109,7 @@ from app.services.domain_utils import normalize_domain
 
 logger = logging.getLogger(__name__)
 
-
-_ORIGIN_WARMUP_STATE_LOCKS: WeakKeyDictionary[
-    asyncio.AbstractEventLoop, asyncio.Lock
-] = WeakKeyDictionary()
-_ORIGIN_WARMUP_IN_FLIGHT: set[tuple[str, str, str, str]] = set()
-_ORIGIN_WARMUP_RECENT: dict[tuple[str, str, str, str], float] = {}
-_ORIGIN_WARMUP_RECENT_MAX_ENTRIES = 512
-
-
-def _origin_warmup_state_lock() -> asyncio.Lock:
-    loop = asyncio.get_running_loop()
-    lock = _ORIGIN_WARMUP_STATE_LOCKS.get(loop)
-    if lock is None:
-        lock = asyncio.Lock()
-        _ORIGIN_WARMUP_STATE_LOCKS[loop] = lock
-    return lock
+_maybe_warm_origin_before_navigation = _origin_warmup.maybe_warm_origin_before_navigation
 
 
 get_browser_runtime = _get_browser_runtime_impl
@@ -161,9 +137,7 @@ def _should_run_behavior_realism(engine: str, *, browser_reason: str | None) -> 
     reason = str(browser_reason or "").strip().lower()
     if not reason:
         return False
-    return reason in BEHAVIOR_REALISM_ELIGIBLE_BROWSER_REASONS or reason.startswith(
-        WARMUP_VENDOR_BLOCK_PREFIX
-    )
+    return reason in BEHAVIOR_REALISM_ELIGIBLE_BROWSER_REASONS or reason.startswith(WARMUP_VENDOR_BLOCK_PREFIX)
 
 
 async def _emit_browser_behavior_activity_bounded(page: Any) -> dict[str, object]:
@@ -243,10 +217,7 @@ def _browser_storage_state_is_persistable(
     readiness_probes = diagnostics.get("readiness_probes")
     if not isinstance(readiness_probes, list):
         return False
-    return any(
-        isinstance(probe, dict) and bool(probe.get("is_ready"))
-        for probe in readiness_probes
-    )
+    return any(isinstance(probe, dict) and bool(probe.get("is_ready")) for probe in readiness_probes)
 
 
 async def _resolve_runtime_provider(
@@ -268,8 +239,7 @@ def _callable_accepts_keyword(candidate: Any, keyword: str) -> bool:
     return any(
         parameter.kind is inspect.Parameter.VAR_KEYWORD
         or (
-            parameter.kind
-            in {inspect.Parameter.KEYWORD_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD}
+            parameter.kind in {inspect.Parameter.KEYWORD_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD}
             and parameter.name == keyword
         )
         for parameter in parameters
@@ -371,6 +341,7 @@ async def browser_fetch(
                 proxy=proxy,
                 resolved_proxy_rotation_mode=resolved_proxy_rotation_mode,
                 on_event=on_event,
+                emit_browser_event=_emit_browser_event,
             )
             runtime_bridge_used = runtime_bridge_used or launch_bridge_used
             _remaining = remaining_timeout_factory(deadline)
@@ -383,17 +354,13 @@ async def browser_fetch(
                     # acquisition gate. A route-install hiccup must not abort the fetch.
                     with suppress(Exception):
                         await page.route("**/*", _block_unneeded_route)
-                traversal_active, readiness_policy, readiness_override = (
-                    resolve_browser_fetch_policy_impl(
-                        url=url,
-                        surface=normalized_surface,
-                        traversal_mode=traversal_mode,
-                        should_run_traversal=should_run_traversal,
-                    )
+                traversal_active, readiness_policy, readiness_override = resolve_browser_fetch_policy_impl(
+                    url=url,
+                    surface=normalized_surface,
+                    traversal_mode=traversal_mode,
+                    should_run_traversal=should_run_traversal,
                 )
-                pre_nav_pause_ms = max(
-                    0, int(crawler_runtime_settings.browser_first_nav_pause_ms)
-                )
+                pre_nav_pause_ms = max(0, int(crawler_runtime_settings.browser_first_nav_pause_ms))
                 if pre_nav_pause_ms > 0 and normalized_surface.startswith("ecommerce_"):
                     await page.wait_for_timeout(pre_nav_pause_ms)
                 await _maybe_warm_origin_before_navigation(
@@ -409,9 +376,7 @@ async def browser_fetch(
                     timeout_seconds=_remaining(),
                     phase_timings_ms=phase_timings_ms,
                 )
-                popup_guard_registrations = _install_popup_guard(
-                    page, on_event=on_event
-                )
+                popup_guard_registrations = _install_popup_guard(page, on_event=on_event)
                 response, navigation_strategy = await _run_browser_stage(
                     stage="navigation",
                     page=page,
@@ -437,10 +402,7 @@ async def browser_fetch(
                     on_event=on_event,
                     emit_browser_event=_emit_browser_event,
                 )
-                navigation_strategy = str(
-                    getattr(response, "browser_navigation_strategy", None)
-                    or navigation_strategy
-                )
+                navigation_strategy = str(getattr(response, "browser_navigation_strategy", None) or navigation_strategy)
                 interstitial_diagnostics = await dismiss_browser_interstitial(
                     page,
                     phase_timings_ms=phase_timings_ms,
@@ -454,12 +416,8 @@ async def browser_fetch(
                     browser_reason=browser_reason,
                 ):
                     behavior_started_at = time.perf_counter()
-                    behavior_diagnostics = (
-                        await _emit_browser_behavior_activity_bounded(page)
-                    )
-                    phase_timings_ms["behavior_realism"] = _elapsed_ms(
-                        behavior_started_at
-                    )
+                    behavior_diagnostics = await _emit_browser_behavior_activity_bounded(page)
+                    phase_timings_ms["behavior_realism"] = _elapsed_ms(behavior_started_at)
                 (
                     current_probe,
                     readiness_probes,
@@ -495,9 +453,7 @@ async def browser_fetch(
                     page=page,
                     timeout_seconds=max(
                         _remaining(),
-                        float(
-                            crawler_runtime_settings.browser_capture_read_timeout_seconds
-                        ),
+                        float(crawler_runtime_settings.browser_capture_read_timeout_seconds),
                     ),
                     phase_timings_ms=phase_timings_ms,
                     operation=lambda: serialize_browser_page_content_impl(
@@ -524,9 +480,7 @@ async def browser_fetch(
                     page=page,
                     timeout_seconds=max(
                         _remaining(),
-                        float(
-                            crawler_runtime_settings.browser_capture_read_timeout_seconds
-                        ),
+                        float(crawler_runtime_settings.browser_capture_read_timeout_seconds),
                     ),
                     phase_timings_ms=phase_timings_ms,
                     operation=lambda: finalize_browser_fetch(
@@ -547,9 +501,7 @@ async def browser_fetch(
                             listing_recovery_diagnostics=listing_recovery_diagnostics,
                             payload_capture=payload_capture,
                             html=html,
-                            html_analysis=prefetched_analysis
-                            if html == prefetched_html
-                            else None,
+                            html_analysis=prefetched_analysis if html == prefetched_html else None,
                             traversal_result=traversal_result,
                             rendered_html=rendered_html,
                             interstitial_diagnostics=interstitial_diagnostics,
@@ -567,9 +519,7 @@ async def browser_fetch(
                     ),
                 )
                 finalized_status_code = finalized.get("status_code", 0)
-                finalized_platform_family = (
-                    str(finalized.get("platform_family") or "").strip() or None
-                )
+                finalized_platform_family = str(finalized.get("platform_family") or "").strip() or None
                 finalized_diagnostics = _mapping_value(finalized.get("diagnostics"))
                 diagnostics = build_browser_fetch_diagnostics(
                     finalized_diagnostics=finalized_diagnostics,
@@ -590,10 +540,8 @@ async def browser_fetch(
                 )
                 mark_storage_state_persist_policy(
                     page,
-                    persist_run_storage_state=allow_storage_state
-                    and persist_storage_state,
-                    persist_domain_storage_state=allow_storage_state
-                    and persist_storage_state,
+                    persist_run_storage_state=allow_storage_state and persist_storage_state,
+                    persist_domain_storage_state=allow_storage_state and persist_storage_state,
                 )
                 return build_browser_fetch_result(
                     url=url,
@@ -661,281 +609,6 @@ async def _resolve_browser_fetch_page_context(
         allow_storage_state=allow_storage_state,
         phase_timings_ms=phase_timings_ms,
     )
-
-
-async def _prepare_browser_fetch_launch_context(
-    *,
-    runtime: SharedBrowserRuntime | None,
-    normalized_engine: str,
-    normalized_domain: str | None,
-    allow_storage_state: bool,
-    proxy: str | None,
-    resolved_proxy_rotation_mode: str | None,
-    on_event,
-) -> tuple[str, str, bool, bool]:
-    runtime_engine = (
-        str(getattr(runtime, "browser_engine", "") or "").strip().lower()
-        if runtime is not None
-        else ""
-    ) or normalized_engine
-    runtime_binary = (
-        str(getattr(runtime, "browser_binary", "") or "").strip()
-        if runtime is not None
-        else ""
-    ) or runtime_engine
-    bridge_flag = getattr(runtime, "bridge_used", None) if runtime is not None else None
-    runtime_bridge_used = bool(bridge_flag()) if callable(bridge_flag) else False
-    skip_origin_warmup = False
-    if allow_storage_state and normalized_domain:
-        # Same-domain repeat hits already load saved domain storage state into the
-        # context, so re-running the multi-second origin warmup is redundant. This
-        # skip is engine-agnostic: patchright (the default detail engine) gets the
-        # same reuse benefit real_chrome already had, instead of paying ~7s warmup
-        # on every sequential acquisition in a batch.
-        skip_origin_warmup = bool(
-            await cookie_store.load_storage_state_for_domain(
-                normalized_domain,
-                browser_engine=runtime_engine,
-            )
-        )
-    await _emit_browser_event(
-        on_event,
-        "info",
-        (
-            f"Launched {_browser_launch_mode(runtime_engine)} browser "
-            f"({runtime_engine}, profile: {_browser_profile(runtime_engine)}, "
-            f"proxy: {_display_proxy(proxy)}, binary: {runtime_binary})"
-        ),
-    )
-    if resolved_proxy_rotation_mode == "rotating":
-        await _emit_browser_event(
-            on_event,
-            "info",
-            "Rotating proxy profile detected; skipping origin warmup",
-        )
-    return runtime_engine, runtime_binary, runtime_bridge_used, skip_origin_warmup
-
-
-async def _maybe_warm_origin_before_navigation(
-    page: Any,
-    *,
-    url: str,
-    surface: str,
-    browser_engine: str = _CHROMIUM_BROWSER_ENGINE,
-    browser_reason: str | None,
-    host_policy_snapshot: dict[str, object] | None,
-    proxy: str | None = None,
-    proxy_profile: dict[str, object] | None,
-    skip_for_reusable_domain_state: bool = False,
-    timeout_seconds: float,
-    phase_timings_ms: dict[str, int],
-) -> None:
-    normalized_surface = str(surface or "").strip().lower()
-    if not _surface_supports_origin_warmup(normalized_surface):
-        return
-    if _proxy_requires_fresh_browser_state(proxy_profile):
-        return
-    if skip_for_reusable_domain_state:
-        return
-    reason = str(browser_reason or "").strip().lower()
-    if reason in {
-        "detail-shell retry",
-        "challenge-shell retry",
-        "low-quality-extraction retry",
-    }:
-        return
-    if not (
-        reason in WARMUP_ELIGIBLE_BROWSER_REASONS
-        or reason.startswith(WARMUP_VENDOR_BLOCK_PREFIX)
-    ):
-        return
-    host_policy = dict(host_policy_snapshot or {})
-    if (
-        _normalize_browser_engine(browser_engine) != _REAL_CHROME_BROWSER_ENGINE
-        and bool(host_policy.get("prefer_browser"))
-        and str(host_policy.get("last_block_vendor") or "").strip()
-    ):
-        return
-    warm_pause_ms = max(0, int(crawler_runtime_settings.origin_warm_pause_ms or 0))
-    if warm_pause_ms <= 0:
-        return
-    parsed = urlparse(url)
-    if not parsed.scheme or not parsed.netloc:
-        return
-    warm_url = f"{parsed.scheme}://{parsed.netloc}/"
-    if warm_url.rstrip("/") == str(url or "").strip().rstrip("/"):
-        return
-    warmup_key = _origin_warmup_key(
-        url=url,
-        browser_engine=browser_engine,
-        proxy=proxy,
-        proxy_profile=proxy_profile,
-    )
-    should_run_warmup = await _begin_origin_warmup(warmup_key)
-    if not should_run_warmup:
-        phase_timings_ms["origin_warmup"] = 0
-        return
-    warm_budget_ratio = max(
-        0.0, float(crawler_runtime_settings.origin_warmup_max_budget_ratio)
-    )
-    warm_budget_ms = min(
-        max(750, int(max(0.1, float(timeout_seconds)) * 1000 * warm_budget_ratio)),
-        int(crawler_runtime_settings.browser_navigation_domcontentloaded_timeout_ms),
-    )
-    if warm_budget_ms < 750:
-        await asyncio.shield(_finish_origin_warmup(warmup_key))
-        return
-    started_at = time.perf_counter()
-    use_active_warmup_page = (
-        _normalize_browser_engine(browser_engine) == _REAL_CHROME_BROWSER_ENGINE
-    )
-    open_warmup_page = None
-    if not use_active_warmup_page:
-        context = getattr(page, "context", None)
-        if callable(context):
-            with suppress(Exception):
-                context = context()
-        new_page = getattr(context, "new_page", None)
-        if not callable(new_page):
-            logger.debug(
-                "Skipping origin warmup for %s because page context cannot spawn a sibling page",
-                url,
-            )
-            await asyncio.shield(_finish_origin_warmup(warmup_key))
-            return
-        open_warmup_page = new_page
-    warm_page = None
-    warmup_succeeded = False
-    try:
-        if use_active_warmup_page:
-            warm_page = page
-        else:
-            if not callable(open_warmup_page):
-                logger.debug(
-                    "Skipping origin warmup for %s because no opener is available", url
-                )
-                await asyncio.shield(_finish_origin_warmup(warmup_key))
-                return
-            warm_page = await open_warmup_page()
-        warm_response = await warm_page.goto(
-            warm_url,
-            wait_until="domcontentloaded",
-            timeout=warm_budget_ms,
-        )
-        elapsed_so_far_ms = _elapsed_ms(started_at)
-        remaining_budget_ms = max(750, warm_budget_ms - elapsed_so_far_ms)
-        warm_phase_timings_ms: dict[str, int] = {}
-        # Origin warmup is best-effort and non-fatal (INVARIANTS Rule 6). It runs
-        # the bounded challenge wait/retry loop to seed cookies, but a blocked or
-        # challenge-shell origin must NOT abort the fetch: the main navigation runs
-        # its own challenge loop and owns the blocked verdict for this URL.
-        await recover_browser_challenge(
-            warm_page,
-            url=warm_url,
-            response=warm_response,
-            browser_engine=browser_engine,
-            timeout_seconds=max(1.0, remaining_budget_ms / 1000),
-            phase_timings_ms=warm_phase_timings_ms,
-            challenge_wait_max_seconds=min(
-                max(
-                    0.0, float(crawler_runtime_settings.challenge_wait_max_seconds or 0)
-                ),
-                max(1.0, remaining_budget_ms / 1000),
-            ),
-            challenge_poll_interval_ms=int(
-                crawler_runtime_settings.challenge_poll_interval_ms
-            ),
-            navigation_timeout_ms=remaining_budget_ms,
-            elapsed_ms=_elapsed_ms,
-            classify_blocked_page=classify_blocked_page_async,
-            get_page_html=get_page_html,
-            looks_like_low_content_shell=looks_like_low_content_shell,
-        )
-        phase_timings_ms["origin_warmup_behavior"] = 0
-        remaining_budget_ms = max(0, warm_budget_ms - _elapsed_ms(started_at))
-        await warm_page.wait_for_timeout(min(warm_pause_ms, remaining_budget_ms))
-        warmup_succeeded = True
-        if warm_phase_timings_ms.get("challenge_wait"):
-            phase_timings_ms["origin_warmup_challenge_wait"] = int(
-                warm_phase_timings_ms["challenge_wait"]
-            )
-        if warm_phase_timings_ms.get("challenge_retry"):
-            phase_timings_ms["origin_warmup_challenge_retry"] = int(
-                warm_phase_timings_ms["challenge_retry"]
-            )
-    except Exception:
-        logger.debug("Origin warmup failed for %s", url, exc_info=True)
-    finally:
-        if warm_page is not None and not use_active_warmup_page:
-            close_page = getattr(warm_page, "close", None)
-            if callable(close_page):
-                with suppress(Exception):
-                    await close_page()
-        phase_timings_ms["origin_warmup"] = _elapsed_ms(started_at)
-        await asyncio.shield(
-            _finish_origin_warmup(warmup_key, succeeded=warmup_succeeded)
-        )
-
-
-def _origin_warmup_key(
-    *,
-    url: str,
-    browser_engine: str,
-    proxy: str | None,
-    proxy_profile: dict[str, object] | None,
-) -> tuple[str, str, str, str]:
-    parsed = urlparse(url)
-    return (
-        _normalize_browser_engine(browser_engine),
-        str(parsed.scheme or "").lower(),
-        str(parsed.netloc or "").lower(),
-        str(proxy or proxy_rotation_mode(proxy_profile) or "direct").lower(),
-    )
-
-
-async def _begin_origin_warmup(key: tuple[str, str, str, str]) -> bool:
-    now = time.monotonic()
-    ttl_seconds = max(
-        0.0, float(crawler_runtime_settings.origin_warmup_dedupe_ttl_seconds)
-    )
-    async with _origin_warmup_state_lock():
-        if ttl_seconds > 0:
-            stale_keys = [
-                recent_key
-                for recent_key, completed_at in _ORIGIN_WARMUP_RECENT.items()
-                if now - completed_at >= ttl_seconds
-            ]
-            for stale_key in stale_keys:
-                _ORIGIN_WARMUP_RECENT.pop(stale_key, None)
-            if len(_ORIGIN_WARMUP_RECENT) > _ORIGIN_WARMUP_RECENT_MAX_ENTRIES:
-                keep_count = _ORIGIN_WARMUP_RECENT_MAX_ENTRIES // 2
-                excess = len(_ORIGIN_WARMUP_RECENT) - keep_count
-                for evict_key in list(_ORIGIN_WARMUP_RECENT.keys())[:excess]:
-                    _ORIGIN_WARMUP_RECENT.pop(evict_key, None)
-        else:
-            _ORIGIN_WARMUP_RECENT.clear()
-        if key in _ORIGIN_WARMUP_IN_FLIGHT:
-            return False
-        completed_at = _ORIGIN_WARMUP_RECENT.get(key)
-        if ttl_seconds > 0 and completed_at is not None:
-            if now - completed_at < ttl_seconds:
-                return False
-        _ORIGIN_WARMUP_IN_FLIGHT.add(key)
-        return True
-
-
-async def _finish_origin_warmup(
-    key: tuple[str, str, str, str],
-    *,
-    succeeded: bool = False,
-) -> None:
-    async with _origin_warmup_state_lock():
-        _ORIGIN_WARMUP_IN_FLIGHT.discard(key)
-        ttl_seconds = max(
-            0.0, float(crawler_runtime_settings.origin_warmup_dedupe_ttl_seconds)
-        )
-        if succeeded and ttl_seconds > 0:
-            _ORIGIN_WARMUP_RECENT[key] = time.monotonic()
 
 
 async def _settle_browser_page(

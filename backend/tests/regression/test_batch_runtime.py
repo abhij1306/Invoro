@@ -10,11 +10,11 @@ from app.models.crawl_settings import CrawlRunSettings
 
 from app.services.crawl import batch_runtime as batch_runtime_module
 
-from app.services.crawl.batch_runtime import (
-    _parallel_url_concurrency,
-    _parallel_worker_record_limit,
-    process_run,
+from app.services.crawl.batch_parallel import (
+    parallel_url_concurrency as _parallel_url_concurrency,
+    parallel_worker_record_limit as _parallel_worker_record_limit,
 )
+from app.services.crawl.batch_runtime import process_run
 
 from app.services.config.sitemap import SITEMAP_DEFAULT_MAX_URLS
 

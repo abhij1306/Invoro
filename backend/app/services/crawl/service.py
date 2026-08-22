@@ -59,11 +59,7 @@ def _heartbeat_checkpoint(
     updated_at: datetime | None,
     created_at: datetime | None,
 ) -> datetime | None:
-    return (
-        _as_utc_datetime(last_heartbeat_at)
-        or _as_utc_datetime(updated_at)
-        or _as_utc_datetime(created_at)
-    )
+    return _as_utc_datetime(last_heartbeat_at) or _as_utc_datetime(updated_at) or _as_utc_datetime(created_at)
 
 
 def _summary_task_id(summary: object) -> str | None:
@@ -108,9 +104,7 @@ def _should_recover_stale_run(
     if reference_time is None:
         return True
     current_time = now or datetime.now(UTC)
-    return (
-        current_time - reference_time
-    ).total_seconds() >= crawler_runtime_settings.stalled_run_threshold_seconds
+    return (current_time - reference_time).total_seconds() >= crawler_runtime_settings.stalled_run_threshold_seconds
 
 
 async def _recover_stale_local_run(
@@ -146,9 +140,7 @@ async def _recover_stale_local_run(
     return True
 
 
-async def _load_run_with_normalized_status(
-    retry_session: AsyncSession, run_id: int
-) -> tuple[CrawlRun, CrawlStatus]:
+async def _load_run_with_normalized_status(retry_session: AsyncSession, run_id: int) -> tuple[CrawlRun, CrawlStatus]:
     retry_run = await retry_session.get(CrawlRun, run_id)
     if retry_run is None:
         raise ValueError("Run not found")
@@ -181,9 +173,7 @@ async def pause_run(session: AsyncSession, run: CrawlRun) -> CrawlRun:
     run_id = int(run.id)
     from app.services.dispatch.local_dispatcher import get_live_local_run_task
 
-    async def _operation(
-        retry_session: AsyncSession, retry_run: CrawlRun, current: CrawlStatus
-    ) -> None:
+    async def _operation(retry_session: AsyncSession, retry_run: CrawlRun, current: CrawlStatus) -> None:
         if current != CrawlStatus.RUNNING:
             raise ValueError(f"Cannot pause run in state: {retry_run.status}")
         task_id = _get_task_id(retry_run)
@@ -216,9 +206,7 @@ async def pause_run(session: AsyncSession, run: CrawlRun) -> CrawlRun:
 
 
 async def resume_run(session: AsyncSession, run: CrawlRun) -> CrawlRun:
-    async def _operation(
-        retry_session: AsyncSession, retry_run: CrawlRun, current: CrawlStatus
-    ) -> None:
+    async def _operation(retry_session: AsyncSession, retry_run: CrawlRun, current: CrawlStatus) -> None:
         if current != CrawlStatus.PAUSED:
             raise ValueError(f"Cannot resume run in state: {retry_run.status}")
         update_run_status(retry_run, CrawlStatus.RUNNING)
@@ -238,9 +226,7 @@ async def kill_run(session: AsyncSession, run: CrawlRun) -> CrawlRun:
         live_local_run_task_count,
     )
 
-    async def _operation(
-        retry_session: AsyncSession, retry_run: CrawlRun, current: CrawlStatus
-    ) -> None:
+    async def _operation(retry_session: AsyncSession, retry_run: CrawlRun, current: CrawlStatus) -> None:
         if current in TERMINAL_STATUSES:
             raise ValueError(f"Cannot kill run in terminal state: {retry_run.status}")
         task_id = _get_task_id(retry_run)

@@ -1,12 +1,17 @@
 from __future__ import annotations
 
-import asyncio
 import re
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
-from patchright.async_api import TimeoutError as PlaywrightTimeoutError
+
+from app.services.acquisition.browser_accessibility_expansion import (
+    accessibility_expand_candidates_impl,
+    expand_interactive_elements_via_accessibility_impl,
+    finish_expansion_diagnostics,
+    interactive_candidate_snapshot,
+)
 
 from app.services.config.extraction_rules import (
     BROWSER_DETAIL_CHROME_TOKENS,
@@ -19,10 +24,8 @@ from app.services.config.extraction_rules import (
     DETAIL_BLOCKED_TOKENS,
     DETAIL_EXPANSION_STATUS_ATTEMPTED,
     DETAIL_EXPANSION_STATUS_EXPANDED,
-    DETAIL_EXPANSION_STATUS_INTERACTION_FAILED,
     DETAIL_EXPANSION_STATUS_INTERACTION_LIMIT_REACHED,
     DETAIL_EXPANSION_STATUS_SELECTOR_LIMIT_REACHED,
-    DETAIL_EXPANSION_STATUS_NO_MATCHES,
     DETAIL_EXPANSION_STATUS_SKIPPED,
     DETAIL_EXPANSION_STATUS_TIME_BUDGET_REACHED,
     DETAIL_EXPAND_KEYWORD_EXTENSIONS,
@@ -41,20 +44,6 @@ _DETAIL_EXPAND_KEYWORDS: dict[str, tuple[str, ...]] = {
     str(key): tuple(str(item) for item in value or [])
     for key, value in dict(BROWSER_DETAIL_EXPAND_KEYWORDS or {}).items()
 }
-
-
-def _accessibility_snapshot_timeout_seconds() -> float:
-    try:
-        timeout = float(
-            crawler_runtime_settings.browser_accessibility_snapshot_timeout_seconds
-        )
-    except (TypeError, ValueError):
-        timeout = float(
-            crawler_runtime_settings.__class__.model_fields[
-                "browser_accessibility_snapshot_timeout_seconds"
-            ].default
-        )
-    return max(0.0, timeout)
 
 
 def detail_expansion_skip(reason: str) -> dict[str, object]:
@@ -101,12 +90,9 @@ def _requested_match_priority(
     aria_controls = str(snapshot.get("aria_controls") or "").strip().lower()
     data_qa_action = str(snapshot.get("data_qa_action") or "").strip().lower()
     href = str(snapshot.get("href") or "").strip().lower()
-    requested_keyword_probe = " ".join(
-        part for part in (label, aria_controls, data_qa_action, href) if part
-    ).strip()
+    requested_keyword_probe = " ".join(part for part in (label, aria_controls, data_qa_action, href) if part).strip()
     matches_requested_keywords = bool(
-        requested_keywords
-        and any(keyword in requested_keyword_probe for keyword in requested_keywords)
+        requested_keywords and any(keyword in requested_keyword_probe for keyword in requested_keywords)
     )
     return (0 if matches_requested_keywords else 1, label)
 
@@ -145,9 +131,7 @@ async def expand_detail_content_if_needed_impl(
         "expanded_elements": [],
         "interaction_failures": [],
         "limit": int(crawler_runtime_settings.detail_aom_expand_max_interactions),
-        "max_elapsed_ms": int(
-            crawler_runtime_settings.detail_aom_expand_max_elapsed_ms
-        ),
+        "max_elapsed_ms": int(crawler_runtime_settings.detail_aom_expand_max_elapsed_ms),
         "attempted": False,
     }
     if not current_probe.get("is_ready"):
@@ -155,9 +139,7 @@ async def expand_detail_content_if_needed_impl(
             page,
             surface=surface,
             requested_fields=requested_fields,
-            max_elapsed_ms=int(
-                crawler_runtime_settings.detail_aom_expand_max_elapsed_ms
-            ),
+            max_elapsed_ms=int(crawler_runtime_settings.detail_aom_expand_max_elapsed_ms),
         )
     return {
         "status": DETAIL_EXPANSION_STATUS_EXPANDED
@@ -179,29 +161,6 @@ async def expand_detail_content_if_needed_impl(
     }
 
 
-def _finish_expansion_diagnostics(
-    diagnostics: dict[str, object],
-    *,
-    clicked_count: int,
-    expanded_elements: list[str],
-    interaction_failures: list[str],
-    started_at: float,
-    elapsed_ms: Callable[[float], int],
-) -> dict[str, object]:
-    if diagnostics.get("status") == DETAIL_EXPANSION_STATUS_ATTEMPTED:
-        if clicked_count > 0:
-            diagnostics["status"] = DETAIL_EXPANSION_STATUS_EXPANDED
-        elif interaction_failures:
-            diagnostics["status"] = DETAIL_EXPANSION_STATUS_INTERACTION_FAILED
-        else:
-            diagnostics["status"] = DETAIL_EXPANSION_STATUS_NO_MATCHES
-    diagnostics["clicked_count"] = clicked_count
-    diagnostics["expanded_elements"] = expanded_elements
-    diagnostics["interaction_failures"] = interaction_failures
-    diagnostics["elapsed_ms"] = elapsed_ms(started_at)
-    return diagnostics
-
-
 @dataclass(slots=True)
 class _DomExpansionState:
     started_at: float
@@ -216,10 +175,7 @@ class _DomExpansionState:
     seen_candidates: set[tuple[str, str, str]] = field(default_factory=set)
 
     def time_budget_reached(self) -> bool:
-        return bool(
-            self.max_elapsed_ms is not None
-            and self.elapsed_ms(self.started_at) >= int(self.max_elapsed_ms)
-        )
+        return bool(self.max_elapsed_ms is not None and self.elapsed_ms(self.started_at) >= int(self.max_elapsed_ms))
 
     def stop_status(self, *, selector_clicks: int | None = None) -> str | None:
         if self.clicked_count >= self.max_interactions:
@@ -282,9 +238,7 @@ def _new_dom_expansion_state(
     return _DomExpansionState(
         started_at=started_at,
         max_interactions=max_interactions,
-        max_per_selector=max(
-            1, int(crawler_runtime_settings.detail_expand_max_per_selector)
-        ),
+        max_per_selector=max(1, int(crawler_runtime_settings.detail_expand_max_per_selector)),
         max_elapsed_ms=max_elapsed_ms,
         elapsed_ms=elapsed_ms,
         diagnostics={
@@ -312,9 +266,7 @@ async def _selector_candidate_rows(
     except Exception as exc:
         state.interaction_failures.append(f"locator_failed:{selector}:{exc}")
         return []
-    state.diagnostics["buttons_found"] = _coerce_int(
-        state.diagnostics["buttons_found"]
-    ) + len(candidates)
+    state.diagnostics["buttons_found"] = _coerce_int(state.diagnostics["buttons_found"]) + len(candidates)
     if not requested_keywords:
         return [(handle, None) for handle in candidates]
     prioritized_rows: list[tuple[tuple[int, str], Any, dict[str, object]]] = []
@@ -369,10 +321,7 @@ def _candidate_action_label(
     if _expansion_candidate_is_blocked(candidate, size_toggle=matches.size_toggle):
         return False, ""
     if requested_fields and not (
-        matches.requested
-        or matches.fallback_requested
-        or matches.generic_requested_toggle
-        or matches.size_toggle
+        matches.requested or matches.fallback_requested or matches.generic_requested_toggle or matches.size_toggle
     ):
         return False, ""
     if not _expansion_candidate_is_expandable(candidate, selector, matches):
@@ -436,14 +385,10 @@ def _expansion_candidate_matches(
         if part
     ).strip()
     size_toggle = any(
-        token in f"{candidate.data_qa_action} {candidate.class_name}"
-        for token in BROWSER_DETAIL_SIZE_TOGGLE_TOKENS
+        token in f"{candidate.data_qa_action} {candidate.class_name}" for token in BROWSER_DETAIL_SIZE_TOGGLE_TOKENS
     )
     return _ExpansionMatches(
-        requested=bool(
-            requested_keywords
-            and any(keyword in requested_probe for keyword in requested_keywords)
-        ),
+        requested=bool(requested_keywords and any(keyword in requested_probe for keyword in requested_keywords)),
         fallback_requested=any(keyword in requested_probe for keyword in keywords),
         generic=any(keyword in generic_probe for keyword in keywords),
         generic_requested_toggle=bool(
@@ -502,8 +447,7 @@ def _expansion_candidate_is_in_safe_context(
     matches: _ExpansionMatches,
 ) -> bool:
     outside_main_chrome = bool(
-        not candidate.inside_main
-        and (candidate.inside_header or candidate.inside_nav or candidate.inside_footer)
+        not candidate.inside_main and (candidate.inside_header or candidate.inside_nav or candidate.inside_footer)
     )
     if outside_main_chrome and not (matches.requested or matches.size_toggle):
         return False
@@ -562,9 +506,7 @@ async def _expand_selector_candidates(
             break
         try:
             snapshot = (
-                prefetched_snapshot
-                if prefetched_snapshot is not None
-                else await interactive_candidate_snapshot(handle)
+                prefetched_snapshot if prefetched_snapshot is not None else await interactive_candidate_snapshot(handle)
             )
             should_click, expanded_label = _candidate_action_label(
                 snapshot,
@@ -577,9 +519,7 @@ async def _expand_selector_candidates(
             if not should_click:
                 continue
             if state.time_budget_reached():
-                state.diagnostics["status"] = (
-                    DETAIL_EXPANSION_STATUS_TIME_BUDGET_REACHED
-                )
+                state.diagnostics["status"] = DETAIL_EXPANSION_STATUS_TIME_BUDGET_REACHED
                 break
             await _execute_expansion_action(
                 page,
@@ -591,9 +531,7 @@ async def _expand_selector_candidates(
             if expanded_label:
                 state.expanded_elements.append(expanded_label)
             if state.time_budget_reached():
-                state.diagnostics["status"] = (
-                    DETAIL_EXPANSION_STATUS_TIME_BUDGET_REACHED
-                )
+                state.diagnostics["status"] = DETAIL_EXPANSION_STATUS_TIME_BUDGET_REACHED
                 break
         except Exception as exc:
             state.interaction_failures.append(str(exc))
@@ -619,11 +557,7 @@ async def expand_all_interactive_elements_impl(
     )
     keywords = detail_expansion_keywords(surface, requested_fields=requested_fields)
     requested_keywords = requested_field_tokens(requested_fields)
-    selectors = [
-        str(selector).strip()
-        for selector in detail_expand_selectors or []
-        if str(selector).strip()
-    ]
+    selectors = [str(selector).strip() for selector in detail_expand_selectors or [] if str(selector).strip()]
     selectors = _ordered_detail_expand_selectors(
         selectors,
         requested_keywords=requested_keywords,
@@ -643,7 +577,7 @@ async def expand_all_interactive_elements_impl(
             click_timeout_ms=click_timeout_ms,
             state=state,
         )
-    return _finish_expansion_diagnostics(
+    return finish_expansion_diagnostics(
         state.diagnostics,
         clicked_count=state.clicked_count,
         expanded_elements=state.expanded_elements,
@@ -653,187 +587,28 @@ async def expand_all_interactive_elements_impl(
     )
 
 
-async def expand_interactive_elements_via_accessibility_impl(
-    page: Any,
-    *,
-    surface: str,
-    requested_fields: list[str] | None,
-    accessibility_expand_candidates,
-    detail_expansion_keywords,
-    elapsed_ms,
-    max_elapsed_ms: int | None = None,
-) -> dict[str, object]:
-    started_at = time.perf_counter()
-    click_timeout_ms = int(crawler_runtime_settings.detail_expand_click_timeout_ms)
-    visibility_timeout_ms = int(
-        crawler_runtime_settings.detail_expand_visibility_timeout_ms
-    )
-    diagnostics: dict[str, object] = {
-        "status": DETAIL_EXPANSION_STATUS_ATTEMPTED,
-        "attempted": False,
-        "limit": int(crawler_runtime_settings.detail_aom_expand_max_interactions),
-        "max_elapsed_ms": max_elapsed_ms,
-        "buttons_found": 0,
-        "clicked_count": 0,
-        "expanded_elements": [],
-        "interaction_failures": [],
-    }
-    clicked_count = 0
-    expanded_elements: list[str] = []
-    interaction_failures: list[str] = []
-    accessibility = getattr(page, "accessibility", None)
-    snapshot_fn = getattr(accessibility, "snapshot", None)
-    if snapshot_fn is None:
-        diagnostics["status"] = DETAIL_EXPANSION_STATUS_SKIPPED
-        diagnostics["reason"] = "accessibility_unavailable"
-        diagnostics["elapsed_ms"] = elapsed_ms(started_at)
-        return diagnostics
-    diagnostics["attempted"] = True
-    try:
-        async with asyncio.timeout(_accessibility_snapshot_timeout_seconds()):
-            snapshot = await snapshot_fn()
-    except (asyncio.TimeoutError, PlaywrightTimeoutError):
-        diagnostics["status"] = "snapshot_timeout"
-        diagnostics["elapsed_ms"] = elapsed_ms(started_at)
-        return diagnostics
-    except Exception as exc:
-        diagnostics["status"] = "snapshot_failed"
-        diagnostics["interaction_failures"] = [f"snapshot_failed:{exc}"]
-        diagnostics["elapsed_ms"] = elapsed_ms(started_at)
-        return diagnostics
-    candidates = accessibility_expand_candidates(
-        snapshot,
-        surface=surface,
-        requested_fields=requested_fields,
-    )
-    diagnostics["buttons_found"] = len(candidates)
-    max_interactions = max(
-        0, int(crawler_runtime_settings.detail_aom_expand_max_interactions)
-    )
-    if len(candidates) > max_interactions:
-        keywords = detail_expansion_keywords(surface, requested_fields=requested_fields)
-        if keywords:
-            prioritized = [
-                item
-                for item in candidates
-                if any(keyword in item[1] for keyword in keywords)
-            ]
-            prioritized_set = set(prioritized)
-            candidates = prioritized + [
-                item for item in candidates if item not in prioritized_set
-            ]
-        diagnostics["skipped_count"] = len(candidates) - max_interactions
-    for role, name in candidates[:max_interactions]:
-        if max_elapsed_ms is not None and elapsed_ms(started_at) >= int(max_elapsed_ms):
-            diagnostics["status"] = DETAIL_EXPANSION_STATUS_TIME_BUDGET_REACHED
-            break
-        try:
-            locator_factory = getattr(page, "get_by_role", None)
-            if locator_factory is None:
-                interaction_failures.append("get_by_role_unavailable")
-                diagnostics["status"] = "locator_unavailable"
-                break
-            locator = locator_factory(role, name=name, exact=True)
-            locator = getattr(locator, "first", locator)
-            if hasattr(locator, "count") and await locator.count() == 0:
-                continue
-            wait_for = getattr(locator, "wait_for", None)
-            if callable(wait_for):
-                try:
-                    await wait_for(state="visible", timeout=visibility_timeout_ms)
-                except Exception:
-                    visible = False
-                else:
-                    visible = True
-                if not visible:
-                    continue
-            elif hasattr(locator, "is_visible") and not await locator.is_visible():
-                continue
-            if hasattr(locator, "is_disabled") and await locator.is_disabled():
-                continue
-            await locator.click(timeout=click_timeout_ms)
-            if int(crawler_runtime_settings.accordion_expand_wait_ms) > 0:
-                await page.wait_for_timeout(
-                    int(crawler_runtime_settings.accordion_expand_wait_ms)
-                )
-            clicked_count += 1
-            expanded_elements.append(name)
-        except Exception as exc:
-            interaction_failures.append(str(exc))
-    return _finish_expansion_diagnostics(
-        diagnostics,
-        clicked_count=clicked_count,
-        expanded_elements=expanded_elements,
-        interaction_failures=interaction_failures,
-        started_at=started_at,
-        elapsed_ms=elapsed_ms,
-    )
-
-
-def accessibility_expand_candidates_impl(
-    snapshot: dict[str, object] | None,
-    *,
-    surface: str,
-    requested_fields: list[str] | None,
-    aom_expand_roles: set[str],
-    detail_expansion_keywords,
-) -> list[tuple[str, str]]:
-    requested_keywords = requested_field_tokens(requested_fields)
-    keywords = (
-        requested_keywords
-        if requested_keywords
-        else detail_expansion_keywords(surface, requested_fields=requested_fields)
-    )
-    if not snapshot:
-        return []
-    results: list[tuple[str, str]] = []
-    seen: set[tuple[str, str]] = set()
-
-    def _walk(node: dict[str, object]) -> None:
-        role = str(node.get("role") or "").strip().lower()
-        name = " ".join(str(node.get("name") or "").split()).strip().lower()
-        candidate = (role, name)
-        if (
-            role in aom_expand_roles
-            and name
-            and not any(token in name for token in DETAIL_BLOCKED_TOKENS)
-            and (not keywords or any(keyword in name for keyword in keywords))
-            and candidate not in seen
-        ):
-            seen.add(candidate)
-            results.append(candidate)
-        children = node.get("children")
-        for child in children if isinstance(children, list) else []:
-            if isinstance(child, dict):
-                _walk(child)
-
-    _walk(snapshot)
-    return results
-
-
 def requested_field_tokens(requested_fields: list[str] | None) -> tuple[str, ...]:
     tokens: list[str] = []
     seen: set[str] = set()
     for field_name in requested_fields or []:
-        exact_key = exact_requested_field_key(str(field_name or ""))
-        for token in re.split(r"[_\W]+", exact_key):
-            cleaned = str(token or "").strip().lower()
-            if len(cleaned) < 3 or cleaned in seen:
-                continue
-            seen.add(cleaned)
-            tokens.append(cleaned)
-        normalized = normalize_requested_field(str(field_name or ""))
+        raw_field_name = str(field_name or "")
+        _append_requested_tokens(exact_requested_field_key(raw_field_name), tokens=tokens, seen=seen)
+        normalized = normalize_requested_field(raw_field_name)
         if not normalized:
             continue
         aliases = NORMALIZED_REQUESTED_FIELD_ALIASES.get(normalized, [normalized])
         for alias in aliases:
-            for token in re.split(r"[_\W]+", str(alias or "")):
-                cleaned = str(token or "").strip().lower()
-                if len(cleaned) < 3 or cleaned in seen:
-                    continue
-                seen.add(cleaned)
-                tokens.append(cleaned)
+            _append_requested_tokens(alias, tokens=tokens, seen=seen)
     return tuple(tokens)
+
+
+def _append_requested_tokens(value: object, *, tokens: list[str], seen: set[str]) -> None:
+    for token in re.split(r"[_\W]+", str(value or "")):
+        cleaned = token.strip().lower()
+        if len(cleaned) < 3 or cleaned in seen:
+            continue
+        seen.add(cleaned)
+        tokens.append(cleaned)
 
 
 def detail_expansion_keywords(
@@ -872,168 +647,8 @@ def accessibility_expand_candidates(
         requested_fields=requested_fields,
         aom_expand_roles=set(DETAIL_AOM_EXPAND_ROLES),
         detail_expansion_keywords=detail_expansion_keywords,
+        requested_field_tokens=requested_field_tokens,
     )
-
-
-async def interactive_label(handle: Any) -> str:
-    value = await handle.evaluate(
-        """(node) => {
-            const pieces = [
-                node.innerText,
-                node.textContent,
-                node.getAttribute('aria-label'),
-                node.getAttribute('title'),
-                node.getAttribute('data-testid'),
-            ];
-            return pieces.find((item) => item && item.trim()) || '';
-        }"""
-    )
-    return " ".join(str(value or "").split()).strip().lower()
-
-
-async def is_actionable_interactive_handle(handle: Any) -> bool:
-    state = await handle.evaluate(
-        """(node) => {
-            if (!(node instanceof HTMLElement) || !node.isConnected) {
-                return { actionable: false };
-            }
-            const style = window.getComputedStyle(node);
-            const rect = node.getBoundingClientRect();
-            const disabled = Boolean(
-                node.hasAttribute('disabled') ||
-                node.getAttribute('aria-disabled') === 'true' ||
-                node.inert
-            );
-            const hidden = Boolean(
-                node.hidden ||
-                node.getAttribute('aria-hidden') === 'true' ||
-                style.display === 'none' ||
-                style.visibility === 'hidden' ||
-                style.pointerEvents === 'none'
-            );
-            const collapsed = rect.width <= 0 || rect.height <= 0;
-            return { actionable: !(disabled || hidden || collapsed) };
-        }"""
-    )
-    if not isinstance(state, dict):
-        return False
-    return bool(state.get("actionable"))
-
-
-async def _interactive_handle_attr(handle: Any, attr_name: str) -> str:
-    getter = getattr(handle, "get_attribute", None)
-    if getter is None:
-        return ""
-    try:
-        value = await getter(attr_name)
-    except Exception:
-        return ""
-    return " ".join(str(value or "").split()).strip().lower()
-
-
-async def _interactive_handle_tag_name(handle: Any) -> str:
-    try:
-        value = await handle.evaluate(
-            "(node) => node instanceof Element ? node.tagName.toLowerCase() : ''"
-        )
-    except Exception:
-        return ""
-    return " ".join(str(value or "").split()).strip().lower()
-
-
-async def _interactive_handle_is_visible(handle: Any) -> bool:
-    checker = getattr(handle, "is_visible", None)
-    if checker is None:
-        return True
-    try:
-        return bool(await checker())
-    except Exception:
-        return False
-
-
-async def _interactive_handle_context_flags(handle: Any) -> dict[str, object]:
-    try:
-        value = await handle.evaluate(
-            """(node) => {
-                const flags = {
-                    elementIdentity: '',
-                    insideMain: false,
-                    insideHeader: false,
-                    insideNav: false,
-                    insideFooter: false,
-                    insideAside: false,
-                };
-                const store = globalThis.__invoroDetailExpansionCandidates ??=
-                    {nodes: new WeakMap(), nextId: 1};
-                let identity = store.nodes.get(node);
-                if (!identity) { identity = `node-${store.nextId++}`; store.nodes.set(node, identity); }
-                flags.elementIdentity = identity;
-                let current = node instanceof Element ? node : null;
-                while (current) {
-                    const tag = (current.tagName || '').toLowerCase();
-                    const role = (current.getAttribute('role') || '').toLowerCase();
-                    if (tag === 'main' || role === 'main') flags.insideMain = true;
-                    if (tag === 'header' || role === 'banner') flags.insideHeader = true;
-                    if (tag === 'nav' || role === 'navigation') flags.insideNav = true;
-                    if (tag === 'footer' || role === 'contentinfo') flags.insideFooter = true;
-                    if (tag === 'aside' || role === 'complementary') flags.insideAside = true;
-                    current = current.parentElement;
-                }
-                return flags;
-            }"""
-        )
-    except Exception:
-        return {}
-    if not isinstance(value, dict):
-        return {}
-    return {
-        "element_identity": str(value.get("elementIdentity") or ""),
-        "inside_main": bool(value.get("insideMain")),
-        "inside_header": bool(value.get("insideHeader")),
-        "inside_nav": bool(value.get("insideNav")),
-        "inside_footer": bool(value.get("insideFooter")),
-        "inside_aside": bool(value.get("insideAside")),
-    }
-
-
-async def interactive_candidate_snapshot(handle: Any) -> dict[str, object]:
-    label = await interactive_label(handle)
-    visible = await _interactive_handle_is_visible(handle)
-    aria_label = await _interactive_handle_attr(handle, "aria-label")
-    title = await _interactive_handle_attr(handle, "title")
-    href = await _interactive_handle_attr(handle, "href")
-    aria_controls = await _interactive_handle_attr(handle, "aria-controls")
-    aria_expanded = await _interactive_handle_attr(handle, "aria-expanded")
-    data_qa_action = await _interactive_handle_attr(handle, "data-qa-action")
-    data_testid = await _interactive_handle_attr(handle, "data-testid")
-    class_name = await _interactive_handle_attr(handle, "class")
-    tag_name = await _interactive_handle_tag_name(handle)
-    context_flags = await _interactive_handle_context_flags(handle)
-    probe = (
-        " ".join(
-            part
-            for part in (label, aria_label, title, data_qa_action, data_testid)
-            if str(part or "").strip()
-        )
-        .strip()
-        .lower()
-    )
-    return {
-        "label": label,
-        "probe": probe,
-        "aria_label": aria_label,
-        "title": title,
-        "href": href,
-        "aria_controls": aria_controls,
-        "aria_expanded": aria_expanded,
-        "data_qa_action": data_qa_action,
-        "data_testid": data_testid,
-        "class_name": class_name,
-        "tag_name": tag_name,
-        **context_flags,
-        "visible": visible,
-        "actionable": await is_actionable_interactive_handle(handle),
-    }
 
 
 def _elapsed_ms(started_at: float) -> int:

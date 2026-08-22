@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .test_traversal_runtime import Any, TraversalResult, _OverlayCookieLocator, click_with_retry, count_listing_cards, locator_still_resolves, pytest, traversal_module  # fmt: skip
 
+
 @pytest.mark.asyncio
 @pytest.mark.component
 async def test_count_listing_cards_heuristic_rejects_detail_sections_with_support_links(
@@ -55,6 +56,7 @@ async def test_count_listing_cards_heuristic_rejects_detail_sections_with_suppor
     count = await count_listing_cards(_SelectorPage(), surface="ecommerce_listing")
 
     assert count == 0
+
 
 @pytest.mark.asyncio
 async def testclick_with_retry_uses_mutation_settle_after_js_fallback() -> None:
@@ -111,6 +113,7 @@ async def testclick_with_retry_uses_mutation_settle_after_js_fallback() -> None:
     assert page.mutation_settle_calls == 1
     assert page.wait_timeout_calls == []
 
+
 @pytest.mark.asyncio
 async def testclick_with_retry_stops_when_locator_no_longer_resolves() -> None:
     class _ClickPage:
@@ -165,6 +168,55 @@ async def testclick_with_retry_stops_when_locator_no_longer_resolves() -> None:
     assert locator.click_calls == 0
     assert result.click_retries == 0
 
+
+@pytest.mark.asyncio
+async def testclick_with_retry_restores_overlays_when_force_click_detaches_locator(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    restored = 0
+
+    class _Page:
+        url = "https://example.com/listing"
+
+    class _Locator:
+        def __init__(self) -> None:
+            self.force_attempted = False
+
+        async def scroll_into_view_if_needed(self, timeout: int | None = None) -> None:
+            del timeout
+
+        async def evaluate(self, script: str) -> None:
+            del script
+
+        async def count(self) -> int:
+            return 0 if self.force_attempted else 1
+
+        async def click(self, timeout: int | None = None, force: bool = False) -> None:
+            del timeout
+            self.force_attempted = force
+            raise traversal_module.PlaywrightError("intercepted")
+
+    async def _dismiss(*args, **kwargs) -> None:
+        del args, kwargs
+
+    async def _restore(*args, **kwargs) -> None:
+        nonlocal restored
+        del args, kwargs
+        restored += 1
+
+    monkeypatch.setattr(traversal_module, "dismiss_overlays_if_needed", _dismiss)
+    monkeypatch.setattr(traversal_module, "_restore_overlays", _restore)
+
+    clicked = await click_with_retry(
+        _Page(),
+        _Locator(),
+        result=TraversalResult(requested_mode="load_more"),
+    )
+
+    assert clicked is False
+    assert restored == 1
+
+
 @pytest.mark.asyncio
 async def testclick_with_retry_tolerates_transient_locator_resolution_loss() -> None:
     class _ClickPage:
@@ -218,6 +270,7 @@ async def testclick_with_retry_tolerates_transient_locator_resolution_loss() -> 
     assert clicked is True
     assert locator.click_calls == 1
 
+
 @pytest.mark.asyncio
 async def testlocator_still_resolves_returns_false_after_probe_errors() -> None:
     class _ProbeErrorLocator:
@@ -225,6 +278,7 @@ async def testlocator_still_resolves_returns_false_after_probe_errors() -> None:
             raise traversal_module.PlaywrightError("transient probe failure")
 
     assert await locator_still_resolves(_ProbeErrorLocator()) is False
+
 
 @pytest.mark.asyncio
 async def testclick_with_retry_tolerates_locator_probe_errors() -> None:

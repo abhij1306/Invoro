@@ -1,8 +1,90 @@
 from __future__ import annotations
 
 from .test_browser_expansion_runtime import Any, BrowserNetworkCapture, PlaywrightTimeoutError, SimpleNamespace, TraversalResult, _FakeExpansionPage, _FakeRuntime, _NoTimeoutRoleLocator, _WaitingRoleLocator, _async_checkpoint, asyncio, browser_detail, browser_readiness, browser_runtime, pytest  # fmt: skip
+from app.services.acquisition import browser_accessibility_expansion
 
 pytest_plugins = ["tests.regression.test_browser_expansion_runtime"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.regression
+async def test_accessibility_expansion_bounds_each_candidate_by_remaining_budget() -> None:
+    class _Locator:
+        first = None
+
+        async def count(self) -> int:
+            return 1
+
+        async def is_visible(self) -> bool:
+            return True
+
+        async def is_disabled(self) -> bool:
+            return False
+
+        async def click(self, *, timeout: int) -> None:
+            del timeout
+            await asyncio.sleep(0.05)
+
+    class _Page:
+        def get_by_role(self, *args, **kwargs):
+            del args, kwargs
+            locator = _Locator()
+            locator.first = locator
+            return locator
+
+    loop = asyncio.get_running_loop()
+    started_at = loop.time()
+    diagnostics: dict[str, object] = {}
+
+    clicked, _expanded, _failures = await browser_accessibility_expansion._expand_candidates(
+        _Page(),
+        candidates=[("button", "details")],
+        max_interactions=1,
+        max_elapsed_ms=2,
+        started_at=started_at,
+        elapsed_ms=lambda started: int((loop.time() - started) * 1000),
+        diagnostics=diagnostics,
+    )
+
+    assert clicked == 0
+    assert diagnostics["status"] == "time_budget_reached"
+
+
+@pytest.mark.regression
+def test_listing_override_requires_minimum_matching_cards(patch_settings) -> None:
+    patch_settings(listing_min_items=3)
+
+    assert (
+        browser_readiness._readiness_decision(
+            is_detail=False,
+            is_listing=True,
+            visible_text_length=1000,
+            structured_data_present=True,
+            detail_like=False,
+            h1_present=False,
+            detail_hints=0,
+            detail_title_matches_url=False,
+            listing_card_count=0,
+            matched_listing_selectors=1,
+        )
+        is False
+    )
+    assert (
+        browser_readiness._readiness_decision(
+            is_detail=False,
+            is_listing=True,
+            visible_text_length=1000,
+            structured_data_present=True,
+            detail_like=False,
+            h1_present=False,
+            detail_hints=0,
+            detail_title_matches_url=False,
+            listing_card_count=0,
+            matched_listing_selectors=3,
+        )
+        is True
+    )
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -46,11 +128,10 @@ async def test_browser_fetch_aom_expansion_respects_interaction_cap(
     assert result.browser_diagnostics["detail_expansion"]["aom"]["clicked_count"] == 1
     assert result.browser_diagnostics["detail_expansion"]["aom"]["attempted"] is True
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
-async def test_expand_interactive_elements_via_accessibility_supports_locators_without_visibility_timeout() -> (
-    None
-):
+async def test_expand_interactive_elements_via_accessibility_supports_locators_without_visibility_timeout() -> None:
     page = _FakeExpansionPage(
         base_html="<html><body><h1>Widget Prime</h1></body></html>",
         accessibility_snapshot={
@@ -60,9 +141,7 @@ async def test_expand_interactive_elements_via_accessibility_supports_locators_w
         role_targets={("tab", "product specifications")},
     )
 
-    def _get_by_role(
-        role: str, *, name: str, exact: bool = True
-    ) -> _NoTimeoutRoleLocator:
+    def _get_by_role(role: str, *, name: str, exact: bool = True) -> _NoTimeoutRoleLocator:
         del exact
         return _NoTimeoutRoleLocator(page, role, name)
 
@@ -80,6 +159,7 @@ async def test_expand_interactive_elements_via_accessibility_supports_locators_w
     assert diagnostics["clicked_count"] == 1
     assert diagnostics["expanded_elements"] == ["product specifications"]
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_expand_interactive_elements_via_accessibility_waits_for_visibility_with_configured_timeout(
@@ -96,9 +176,7 @@ async def test_expand_interactive_elements_via_accessibility_waits_for_visibilit
     locator = _WaitingRoleLocator(page, "tab", "product specifications")
     patch_settings(detail_expand_visibility_timeout_ms=375)
 
-    def _get_by_role(
-        role: str, *, name: str, exact: bool = True
-    ) -> _WaitingRoleLocator:
+    def _get_by_role(role: str, *, name: str, exact: bool = True) -> _WaitingRoleLocator:
         del role, name, exact
         return locator
 
@@ -114,6 +192,7 @@ async def test_expand_interactive_elements_via_accessibility_waits_for_visibilit
 
     assert locator.wait_for_calls == [("visible", 375)]
     assert diagnostics["clicked_count"] == 1
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -144,6 +223,7 @@ async def test_expand_interactive_elements_via_accessibility_times_out_slow_snap
     assert diagnostics["clicked_count"] == 0
     assert diagnostics["attempted"] is True
 
+
 @pytest.mark.regression
 def test_detail_title_url_match_scans_past_nonmatching_trailing_segments() -> None:
     assert browser_readiness._detail_title_matches_url(
@@ -151,6 +231,7 @@ def test_detail_title_url_match_scans_past_nonmatching_trailing_segments() -> No
         "Widget",
         min_matches=1,
     )
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -176,6 +257,7 @@ async def test_expand_detail_content_if_needed_skips_non_detail_like_pages(
     assert diagnostics["status"] == "skipped"
     assert diagnostics["reason"] == "not_detail_like"
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_listing_card_signal_count_uses_heuristic_card_fallback_after_selector_miss(
@@ -183,9 +265,7 @@ async def test_listing_card_signal_count_uses_heuristic_card_fallback_after_sele
 ) -> None:
     calls: list[bool] = []
 
-    async def _fake_count_listing_cards(
-        page, *, surface: str, allow_heuristic: bool = True
-    ) -> int:
+    async def _fake_count_listing_cards(page, *, surface: str, allow_heuristic: bool = True) -> int:
         await _async_checkpoint()
         del page, surface
         calls.append(bool(allow_heuristic))
@@ -205,6 +285,7 @@ async def test_listing_card_signal_count_uses_heuristic_card_fallback_after_sele
     assert count == 9
     assert calls == [True]
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_probe_browser_readiness_uses_heuristic_listing_card_fallback(
@@ -212,9 +293,7 @@ async def test_probe_browser_readiness_uses_heuristic_listing_card_fallback(
 ) -> None:
     calls: list[bool] = []
 
-    async def _fake_count_listing_cards(
-        page, *, surface: str, allow_heuristic: bool = True
-    ) -> int:
+    async def _fake_count_listing_cards(page, *, surface: str, allow_heuristic: bool = True) -> int:
         await _async_checkpoint()
         del page, surface
         calls.append(bool(allow_heuristic))
@@ -227,9 +306,7 @@ async def test_probe_browser_readiness_uses_heuristic_listing_card_fallback(
     )
 
     probe = await browser_runtime.probe_browser_readiness(
-        _FakeExpansionPage(
-            base_html="<html><body><h1>adidas Sneakers</h1><p>Grid loaded</p></body></html>"
-        ),
+        _FakeExpansionPage(base_html="<html><body><h1>adidas Sneakers</h1><p>Grid loaded</p></body></html>"),
         url="https://example.com/collections/adidas-shoes",
         surface="ecommerce_listing",
     )
@@ -237,6 +314,7 @@ async def test_probe_browser_readiness_uses_heuristic_listing_card_fallback(
     assert probe["is_ready"] is True
     assert probe["listing_card_count"] == 12
     assert calls == [True]
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -282,6 +360,7 @@ async def test_browser_capture_close_drains_inflight_response_callbacks() -> Non
     assert summary.network_payload_count == 1
     assert summary.payloads[0]["body"]["id"] == "captured"
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_browser_capture_decodes_react_server_component_payloads() -> None:
@@ -315,6 +394,7 @@ async def test_browser_capture_decodes_react_server_component_payloads() -> None
     assert summary.payloads[0]["body"][0][3]["title"] == "Trail Runner"
     assert summary.payloads[0]["body"][1]["product"]["sku"] == "TRAIL-1"
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_browser_capture_offloads_payload_decoding_to_thread() -> None:
@@ -342,6 +422,7 @@ async def test_browser_capture_offloads_payload_decoding_to_thread() -> None:
     assert summary.network_payload_count == 1
     assert summary.payloads[0]["body"]["id"] == "captured"
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_browser_capture_close_uses_bounded_queue_join_timeout(
@@ -352,11 +433,9 @@ async def test_browser_capture_close_uses_bounded_queue_join_timeout(
         surface="ecommerce_detail",
         should_capture_payload=lambda **_kwargs: True,
         classify_endpoint=lambda **_kwargs: {"type": "api", "family": "generic"},
-        read_payload_body=lambda *_args, **_kwargs: (
-            browser_runtime.NetworkPayloadReadResult(
-                body=b'{"id":"captured"}',
-                outcome="ok",
-            )
+        read_payload_body=lambda *_args, **_kwargs: browser_runtime.NetworkPayloadReadResult(
+            body=b'{"id":"captured"}',
+            outcome="ok",
         ),
     )
     page = _FakeExpansionPage(base_html="<html><body></body></html>")
@@ -374,11 +453,10 @@ async def test_browser_capture_close_uses_bounded_queue_join_timeout(
     assert summary.network_payload_count == 0
     assert elapsed < 0.5
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
-async def test_browser_capture_close_awaits_sentinel_enqueue_when_queue_put_blocks() -> (
-    None
-):
+async def test_browser_capture_close_awaits_sentinel_enqueue_when_queue_put_blocks() -> None:
     capture = BrowserNetworkCapture(surface="ecommerce_detail")
 
     class _Queue:
@@ -397,12 +475,11 @@ async def test_browser_capture_close_awaits_sentinel_enqueue_when_queue_put_bloc
     capture._queue = fake_queue  # type: ignore[assignment]
     capture._workers = {asyncio.create_task(asyncio.sleep(0))}
 
-    summary = await capture.close(
-        _FakeExpansionPage(base_html="<html><body></body></html>")
-    )
+    summary = await capture.close(_FakeExpansionPage(base_html="<html><body></body></html>"))
 
     assert summary.network_payload_count == 0
     assert fake_queue.put_calls == [None]
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -425,12 +502,11 @@ async def test_browser_capture_close_cancels_workers_when_sentinel_enqueue_times
     capture._queue = _Queue()  # type: ignore[assignment]
     capture._workers = {worker}
 
-    summary = await capture.close(
-        _FakeExpansionPage(base_html="<html><body></body></html>")
-    )
+    summary = await capture.close(_FakeExpansionPage(base_html="<html><body></body></html>"))
 
     assert summary.network_payload_count == 0
     assert worker.cancelled() or worker.done()
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -464,6 +540,7 @@ async def test_probe_browser_readiness_skips_listing_queries_for_detail_pages(
     assert probe["listing_card_count"] == 0
     assert probe["matched_listing_selectors"] == 0
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_count_matching_selectors_ignores_timeout_misses() -> None:
@@ -483,6 +560,7 @@ async def test_count_matching_selectors_ignores_timeout_misses() -> None:
     )
 
     assert matches == 0
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -506,11 +584,10 @@ async def test_expand_all_interactive_elements_respects_small_interaction_cap(
     assert diagnostics["clicked_count"] == 1
     assert diagnostics["expanded_elements"] == ["product details"]
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
-async def test_expand_all_interactive_elements_skips_non_actionable_candidates() -> (
-    None
-):
+async def test_expand_all_interactive_elements_skips_non_actionable_candidates() -> None:
     page = _FakeExpansionPage(
         base_html="<html><body></body></html>",
         labels=[
@@ -526,6 +603,7 @@ async def test_expand_all_interactive_elements_skips_non_actionable_candidates()
 
     assert diagnostics["clicked_count"] == 1
     assert diagnostics["expanded_elements"] == ["product specifications"]
+
 
 @pytest.mark.regression
 def test_classify_browser_outcome_marks_empty_category_as_low_content_shell() -> None:
@@ -546,10 +624,9 @@ def test_classify_browser_outcome_marks_empty_category_as_low_content_shell() ->
         == "empty_terminal_page"
     )
 
+
 @pytest.mark.regression
-def test_classify_browser_outcome_marks_site_maintenance_title_as_low_content_shell() -> (
-    None
-):
+def test_classify_browser_outcome_marks_site_maintenance_title_as_low_content_shell() -> None:
     html = """
     <html>
       <head><title>Site Maintenance</title></head>
@@ -580,6 +657,7 @@ def test_classify_browser_outcome_marks_site_maintenance_title_as_low_content_sh
         )
         == "empty_terminal_page"
     )
+
 
 @pytest.mark.regression
 def test_classify_browser_outcome_marks_error_page_title_as_low_content_shell() -> None:
@@ -613,6 +691,7 @@ def test_classify_browser_outcome_marks_error_page_title_as_low_content_shell() 
         == "empty_terminal_page"
     )
 
+
 @pytest.mark.regression
 def test_classify_low_content_reason_ignores_empty_phrase_on_contentful_page() -> None:
     html = """
@@ -634,10 +713,9 @@ def test_classify_low_content_reason_ignores_empty_phrase_on_contentful_page() -
         is None
     )
 
+
 @pytest.mark.regression
-def test_classify_browser_outcome_keeps_ready_listing_with_no_pagination_progress_usable() -> (
-    None
-):
+def test_classify_browser_outcome_keeps_ready_listing_with_no_pagination_progress_usable() -> None:
     html = """
     <html><body>
       <article class='product-card'><a href='/products/widget-1'>Widget One</a><span>$10</span></article>
@@ -662,10 +740,9 @@ def test_classify_browser_outcome_keeps_ready_listing_with_no_pagination_progres
 
     assert outcome == "usable_content"
 
+
 @pytest.mark.regression
-def test_classify_browser_outcome_keeps_extractable_listing_usable_below_threshold() -> (
-    None
-):
+def test_classify_browser_outcome_keeps_extractable_listing_usable_below_threshold() -> None:
     html = """
     <html><body>
       <article class='product-card'><a href='/products/widget-1'>Widget One</a><span>$10</span></article>
@@ -689,6 +766,7 @@ def test_classify_browser_outcome_keeps_extractable_listing_usable_below_thresho
     )
 
     assert outcome == "usable_content"
+
 
 @pytest.mark.regression
 def test_build_failed_browser_diagnostics_marks_page_closed_explicitly() -> None:

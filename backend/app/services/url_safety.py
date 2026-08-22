@@ -82,9 +82,7 @@ async def validate_proxy_endpoint(proxy_url: str) -> ValidatedTarget:
     parsed = urlparse(str(proxy_url or "").strip())
     scheme = str(parsed.scheme or "").lower()
     if scheme not in ALLOWED_PROXY_SCHEMES:
-        raise ValueError(
-            "Only http://, https://, socks5://, and socks5h:// proxy endpoints are allowed"
-        )
+        raise ValueError("Only http://, https://, socks5://, and socks5h:// proxy endpoints are allowed")
     hostname = str(parsed.hostname or "").strip().lower()
     if not hostname:
         raise ValueError("Proxy URL must include a hostname")
@@ -142,9 +140,7 @@ async def _validate_endpoint_host(
     )
 
 
-async def _resolve_host_ips(
-    hostname: str, port: int, *, label: str = "Target"
-) -> list[str]:
+async def _resolve_host_ips(hostname: str, port: int, *, label: str = "Target") -> list[str]:
     attempts = max(1, int(crawler_runtime_settings.dns_resolution_retries) + 1)
     families = dns_resolution_families()
     records: (
@@ -189,13 +185,9 @@ async def _resolve_host_ips(
         if records is not None:
             break
         if attempt < attempts:
-            await asyncio.sleep(
-                max(0, crawler_runtime_settings.dns_resolution_retry_delay_ms) / 1000
-            )
+            await asyncio.sleep(max(0, crawler_runtime_settings.dns_resolution_retry_delay_ms) / 1000)
             continue
-        raise ValueError(
-            f"{label} host could not be resolved: {hostname}"
-        ) from last_error
+        raise ValueError(f"{label} host could not be resolved: {hostname}") from last_error
 
     resolved: list[str] = []
     seen: set[str] = set()
@@ -219,9 +211,7 @@ def _parse_ip(value: str) -> ipaddress.IPv4Address | ipaddress.IPv6Address | Non
 
 
 def _raise_if_blocked_hostname(hostname: str, label: str) -> None:
-    if hostname in BLOCKED_HOSTNAMES or any(
-        hostname.endswith(suffix) for suffix in BLOCKED_HOST_SUFFIXES
-    ):
+    if hostname in BLOCKED_HOSTNAMES or any(hostname.endswith(suffix) for suffix in BLOCKED_HOST_SUFFIXES):
         raise SecurityError(f"{label} host is not allowed: {hostname}")
 
 
@@ -231,9 +221,7 @@ def _raise_if_non_public_ip(
     label: str,
 ) -> None:
     if ip_value in BLOCKED_IPS:
-        raise SecurityError(
-            f"{label} host resolves to a blocked platform IP address: {host_label} -> {ip_value}"
-        )
+        raise SecurityError(f"{label} host resolves to a blocked platform IP address: {host_label} -> {ip_value}")
     if (
         ip_value.is_private
         or ip_value.is_loopback
@@ -241,14 +229,10 @@ def _raise_if_non_public_ip(
         or ip_value.is_reserved
         or (isinstance(ip_value, ipaddress.IPv4Address) and ip_value in CGNAT_NETWORK)
     ):
-        raise SecurityError(
-            f"{label} host resolves to a non-public IP address: {host_label} -> {ip_value}"
-        )
+        raise SecurityError(f"{label} host resolves to a non-public IP address: {host_label} -> {ip_value}")
     if ip_value.is_global:
         return
-    raise SecurityError(
-        f"{label} host resolves to a non-public IP address: {host_label} -> {ip_value}"
-    )
+    raise SecurityError(f"{label} host resolves to a non-public IP address: {host_label} -> {ip_value}")
 
 
 def _rebuild_url(original: str, target: ValidatedTarget) -> str:

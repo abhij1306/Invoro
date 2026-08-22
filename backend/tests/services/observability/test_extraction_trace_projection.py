@@ -62,10 +62,7 @@ def test_projects_completed_tiers_and_skip_decision():
         "dom",
     ]
     assert payload["dom_skipped"] is False
-    assert (
-        payload["skip_decision"]["dom_completion_reason"]
-        == "confidence_below_threshold"
-    )
+    assert payload["skip_decision"]["dom_completion_reason"] == "confidence_below_threshold"
     assert payload["skip_decision"]["confidence"] == pytest.approx(0.55)
 
 
@@ -77,15 +74,42 @@ def test_projects_high_value_field_winning_sources_only():
         requested_fields=["price", "variants"],
     )
     _record_extraction_trace(_context(trace), [_detail_record()])
-    provenance = {
-        entry["field"]: entry
-        for entry in trace.to_dict(flagged=True)["extraction"]["field_provenance"]
-    }
+    provenance = {entry["field"]: entry for entry in trace.to_dict(flagged=True)["extraction"]["field_provenance"]}
     # high-value fields recorded with their winning source
     assert provenance["price"]["winning_source"] == "js_state"
     assert provenance["variants"]["winning_source"] == "dom_selector"
     # title is a default canonical high-value field for ecommerce detail
     assert "title" in provenance
+
+
+def test_sensitive_field_candidate_preview_is_redacted():
+    class _Trace:
+        previews: dict[str, str] = {}
+
+        def record_completed_tiers(self, _tiers) -> None:
+            return None
+
+        def record_skip_dom_decision(self, **_kwargs) -> None:
+            return None
+
+        def record_field_candidate(self, field_name: str, **kwargs) -> None:
+            self.previews[field_name] = kwargs["value_preview"]
+
+        def trace_field_names(self) -> list[str]:
+            return ["email", "title"]
+
+        def record_field_state(self, *_args, **_kwargs) -> None:
+            return None
+
+    record = _detail_record()
+    record["email"] = "person@example.com"
+    record["_field_sources"]["email"] = ["dom"]
+    trace = _Trace()
+
+    _record_extraction_trace(_context(trace), [record])
+
+    assert trace.previews["email"] == "[redacted]"
+    assert trace.previews["title"] == "Widget"
 
 
 def test_projects_missing_variant_candidate_state():
@@ -100,10 +124,7 @@ def test_projects_missing_variant_candidate_state():
 
     _record_extraction_trace(_context(trace), [record])
 
-    provenance = {
-        entry["field"]: entry
-        for entry in trace.to_dict()["extraction"]["field_provenance"]
-    }
+    provenance = {entry["field"]: entry for entry in trace.to_dict()["extraction"]["field_provenance"]}
     assert provenance["variants"]["winning_source"] == "dom_selector"
     assert provenance["variants"]["present"] is False
     assert provenance["variants"]["note"] == "candidate_source_without_public_value"

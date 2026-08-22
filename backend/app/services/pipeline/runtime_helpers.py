@@ -85,13 +85,8 @@ def browser_outcome(acquisition_result: AcquisitionResult) -> str:
 
 
 def browser_launch_log_message(acquisition_result: AcquisitionResult) -> str:
-    diagnostics = mapping_or_empty(
-        getattr(acquisition_result, "browser_diagnostics", {})
-    )
-    engine = (
-        str(diagnostics.get("browser_engine") or "chromium").strip().lower()
-        or "chromium"
-    )
+    diagnostics = mapping_or_empty(getattr(acquisition_result, "browser_diagnostics", {}))
+    engine = str(diagnostics.get("browser_engine") or "chromium").strip().lower() or "chromium"
     launch_mode = str(diagnostics.get("browser_launch_mode") or "").strip().lower()
     if not launch_mode:
         launch_mode = "headless"
@@ -145,58 +140,47 @@ def record_detail_expansion_extraction_outcome(
     *,
     requested_fields: list[str],
 ) -> None:
-    if (
-        str(getattr(acquisition_result, "method", "") or "").strip().lower()
-        != "browser"
-    ):
+    if str(getattr(acquisition_result, "method", "") or "").strip().lower() != "browser":
         return
-    browser_diagnostics = mapping_or_empty(
-        getattr(acquisition_result, "browser_diagnostics", {})
-    )
-    detail_expansion = dict(
-        mapping_or_empty(browser_diagnostics.get("detail_expansion"))
-    )
+    browser_diagnostics = mapping_or_empty(getattr(acquisition_result, "browser_diagnostics", {}))
+    detail_expansion = dict(mapping_or_empty(browser_diagnostics.get("detail_expansion")))
     try:
         clicked_count = int(str(detail_expansion.get("clicked_count", 0) or 0))
     except (TypeError, ValueError):
         clicked_count = 0
     if clicked_count <= 0:
         return
-    requested = {
-        normalized
-        for value in requested_fields
-        if (normalized := normalize_requested_field(value))
-    }
-    extracted_fields = sorted(
-        {
-            str(field_name).strip().lower()
-            for record in records
-            if isinstance(record, dict)
-            for field_name, value in record.items()
-            if (
-                not str(field_name).startswith("_")
-                and value not in (None, "", [], {})
-                and (
-                    not requested
-                    or str(field_name).strip().lower() in requested
-                    or str(field_name).strip().lower() in LONG_TEXT_FIELDS
-                )
-            )
-        }
-    )
+    requested = _normalized_requested_fields(requested_fields)
+    extracted_fields = _consumed_expansion_fields(records, requested=requested)
     detail_expansion["extraction_consumed"] = bool(extracted_fields or records)
     detail_expansion["extracted_fields"] = extracted_fields
     browser_diagnostics["detail_expansion"] = detail_expansion
     acquisition_result.browser_diagnostics = browser_diagnostics
 
 
+def _normalized_requested_fields(values: list[str]) -> set[str]:
+    return {normalized for value in values if (normalized := normalize_requested_field(value))}
+
+
+def _consumed_expansion_fields(records: list[dict[str, object]], *, requested: set[str]) -> list[str]:
+    extracted: set[str] = set()
+    for record in records:
+        if not isinstance(record, dict):
+            continue
+        for field_name, value in record.items():
+            normalized = str(field_name).strip().lower()
+            if str(field_name).startswith("_") or value in (None, "", [], {}):
+                continue
+            if not requested or normalized in requested or normalized in LONG_TEXT_FIELDS:
+                extracted.add(normalized)
+    return sorted(extracted)
+
+
 async def mark_run_failed(session: AsyncSession, run_id: int, error_msg: str) -> None:
     try:
         await session.rollback()
     except SQLAlchemyError:
-        logger.debug(
-            "Session rollback failed before failure persistence", exc_info=True
-        )
+        logger.debug("Session rollback failed before failure persistence", exc_info=True)
     try:
         await persist_failure_state(session, run_id, error_msg)
         return
@@ -210,8 +194,7 @@ async def mark_run_failed(session: AsyncSession, run_id: int, error_msg: str) ->
             await persist_failure_state(recovery, run_id, error_msg)
     except SQLAlchemyError:
         logger.critical(
-            "Failure recovery via SessionLocal failed; "
-            "run may be stuck in RUNNING state (zombie run).",
+            "Failure recovery via SessionLocal failed; run may be stuck in RUNNING state (zombie run).",
             exc_info=True,
             extra={"run_id": run_id},
         )

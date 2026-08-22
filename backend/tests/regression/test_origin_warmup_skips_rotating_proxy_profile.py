@@ -1,8 +1,38 @@
 from __future__ import annotations
 
 from .test_browser_expansion_runtime import CARD_SELECTORS, PlaywrightError, PlaywrightTimeoutError, TraversalResult, _FakeExpansionPage, _FakeRuntime, _async_checkpoint, asynccontextmanager, asyncio, browser_pool, browser_runtime, cookie_store, pytest  # fmt: skip
+from app.services.acquisition import browser_origin_warmup
 
 pytest_plugins = ["tests.regression.test_browser_expansion_runtime"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.regression
+async def test_origin_warmup_skips_recovery_after_budget_is_consumed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _Page:
+        async def goto(self, *args, **kwargs):
+            del args, kwargs
+            return object()
+
+    async def _unexpected_recovery(*args, **kwargs):
+        del args, kwargs
+        raise AssertionError("challenge recovery must not exceed warmup budget")
+
+    monkeypatch.setattr(browser_origin_warmup, "elapsed_ms", lambda _started: 1000)
+    monkeypatch.setattr(browser_origin_warmup, "recover_browser_challenge", _unexpected_recovery)
+
+    timings = await browser_origin_warmup._navigate_warmup_page(
+        _Page(),
+        warm_url="https://example.com/",
+        browser_engine="chromium",
+        warm_budget_ms=1000,
+        started_at=0,
+    )
+
+    assert timings == {}
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -23,6 +53,7 @@ async def test_origin_warmup_skips_for_rotating_proxy_profile() -> None:
     assert page.goto_calls == []
     assert not page.spawned_pages
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_origin_warmup_runs_for_real_chrome_without_saved_domain_state() -> None:
@@ -42,6 +73,7 @@ async def test_origin_warmup_runs_for_real_chrome_without_saved_domain_state() -
 
     assert page.goto_calls == ["domcontentloaded"]
     assert not page.spawned_pages
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -69,6 +101,7 @@ async def test_origin_warmup_caps_budget_to_preserve_navigation_time(
     assert page.goto_timeout_calls == [8000]
     assert not page.spawned_pages
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_origin_warmup_keeps_minimum_budget_for_short_url_timeout(
@@ -94,6 +127,7 @@ async def test_origin_warmup_keeps_minimum_budget_for_short_url_timeout(
 
     assert page.goto_timeout_calls == [750]
     assert not page.spawned_pages
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -121,6 +155,7 @@ async def test_origin_warmup_zero_ratio_preserves_minimum_budget(
     assert page.goto_timeout_calls == [750]
     assert not page.spawned_pages
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_origin_warmup_skips_for_real_chrome_with_saved_domain_state() -> None:
@@ -141,6 +176,7 @@ async def test_origin_warmup_skips_for_real_chrome_with_saved_domain_state() -> 
 
     assert not page.spawned_pages
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_origin_warmup_skips_for_known_vendor_block_memory() -> None:
@@ -159,6 +195,7 @@ async def test_origin_warmup_skips_for_known_vendor_block_memory() -> None:
 
     assert page.goto_calls == []
     assert not page.spawned_pages
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -180,13 +217,11 @@ async def test_origin_warmup_runs_for_real_chrome_despite_vendor_block_memory() 
     assert page.goto_calls == ["domcontentloaded"]
     assert not page.spawned_pages
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_origin_warmup_dedupes_parallel_same_host() -> None:
-    pages = [
-        _FakeExpansionPage(base_html="<html><body><h1>Widget</h1></body></html>")
-        for _index in range(6)
-    ]
+    pages = [_FakeExpansionPage(base_html="<html><body><h1>Widget</h1></body></html>") for _index in range(6)]
 
     await asyncio.gather(
         *(
@@ -206,13 +241,11 @@ async def test_origin_warmup_dedupes_parallel_same_host() -> None:
 
     assert sum(len(page.spawned_pages) for page in pages) == 1
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_origin_warmup_dedupes_recent_same_host_waves_by_default() -> None:
-    pages = [
-        _FakeExpansionPage(base_html="<html><body><h1>Widget</h1></body></html>")
-        for _index in range(3)
-    ]
+    pages = [_FakeExpansionPage(base_html="<html><body><h1>Widget</h1></body></html>") for _index in range(3)]
 
     for page in pages:
         await browser_runtime._maybe_warm_origin_before_navigation(
@@ -227,6 +260,7 @@ async def test_origin_warmup_dedupes_recent_same_host_waves_by_default() -> None
         )
 
     assert sum(len(page.spawned_pages) for page in pages) == 1
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -280,6 +314,7 @@ async def test_browser_fetch_skips_real_chrome_warmup_when_domain_cookies_exist(
 
     assert captured_skip_flags == [True]
 
+
 @pytest.mark.regression
 def test_browser_runtime_snapshot_uses_capacity_fallback_for_pooled_runtimes(
     monkeypatch: pytest.MonkeyPatch,
@@ -298,17 +333,14 @@ def test_browser_runtime_snapshot_uses_capacity_fallback_for_pooled_runtimes(
             await _async_checkpoint()
             return None
 
-    monkeypatch.setattr(
-        browser_pool._BROWSER_POOL, "direct", {"direct": _FakeRuntime()}
-    )
-    monkeypatch.setattr(
-        browser_pool._BROWSER_POOL, "proxied", {"proxy": _FakeRuntime()}
-    )
+    monkeypatch.setattr(browser_pool._BROWSER_POOL, "direct", {"direct": _FakeRuntime()})
+    monkeypatch.setattr(browser_pool._BROWSER_POOL, "proxied", {"proxy": _FakeRuntime()})
 
     snapshot = browser_runtime.browser_runtime_snapshot()
 
     assert snapshot["capacity"] == 6
     assert snapshot["max_size"] == 6
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -350,11 +382,10 @@ async def test_browser_fetch_disables_storage_reuse_for_rotating_proxy_profile(
 
     assert captured_allow_storage_state == [False]
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
-async def test_browser_fetch_recovers_when_commit_navigation_is_interrupted_by_same_url_reload() -> (
-    None
-):
+async def test_browser_fetch_recovers_when_commit_navigation_is_interrupted_by_same_url_reload() -> None:
     page = _FakeExpansionPage(
         base_html="<html><body><h1>Widget</h1></body></html>",
         goto_failures={
@@ -381,6 +412,7 @@ async def test_browser_fetch_recovers_when_commit_navigation_is_interrupted_by_s
     assert "domcontentloaded" in page.load_state_calls
     assert result.final_url == "https://example.com/products/widget"
     assert result.status_code == 0
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -415,6 +447,7 @@ async def test_browser_fetch_force_closes_context_when_cancelled_mid_stage() -> 
             await asyncio.wait_for(task, timeout=0.5)
 
     assert page.page_close_calls + page.context_close_calls >= 1
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -464,6 +497,7 @@ async def test_browser_fetch_force_closes_context_when_stage_times_out(
     assert page.page_close_calls + page.context_close_calls >= 1
     assert diagnostics["failure_stage"] == "settle"
     assert diagnostics["browser_outcome"] == "render_timeout"
+
 
 @pytest.mark.asyncio
 @pytest.mark.regression
@@ -532,6 +566,7 @@ async def test_browser_fetch_surfaces_traversal_fragment_metrics(
     assert 'data-traversal-fragment="1"' in result.html
     assert 'data-traversal-fragment="2"' in result.html
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_browser_fetch_keeps_full_rendered_html_when_traversal_makes_no_progress(
@@ -593,6 +628,7 @@ async def test_browser_fetch_keeps_full_rendered_html_when_traversal_makes_no_pr
     assert "Privacy notice" in result.artifacts["traversal_composed_html"]
     assert result.browser_diagnostics["browser_outcome"] == "usable_content"
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_browser_fetch_prefers_rendered_html_when_progress_traversal_fragment_is_thin(
@@ -652,6 +688,7 @@ async def test_browser_fetch_prefers_rendered_html_when_progress_traversal_fragm
     assert "traversal_composed_html" in result.artifacts
     assert "Widget Two" in result.artifacts["full_rendered_html"]
 
+
 @pytest.mark.asyncio
 @pytest.mark.regression
 async def test_browser_fetch_runs_listing_recovery_when_thin_listing_retry_requested(
@@ -699,7 +736,4 @@ async def test_browser_fetch_runs_listing_recovery_when_thin_listing_retry_reque
 
     assert calls["count"] == 1
     assert result.browser_diagnostics["listing_recovery"]["status"] == "recovered"
-    assert (
-        result.browser_diagnostics["listing_recovery"]["requested_mode"]
-        == "thin_listing"
-    )
+    assert result.browser_diagnostics["listing_recovery"]["requested_mode"] == "thin_listing"

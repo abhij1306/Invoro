@@ -31,11 +31,7 @@ def apply_acquisition_contract_to_profile(
     acquisition_profile: object,
     contract: object,
 ) -> dict[str, object]:
-    profile = (
-        dict(acquisition_profile or {})
-        if isinstance(acquisition_profile, Mapping)
-        else {}
-    )
+    profile = dict(acquisition_profile or {}) if isinstance(acquisition_profile, Mapping) else {}
     normalized = normalize_acquisition_contract(contract)
     fetch_mode = str(profile.get("fetch_mode") or "").strip().lower()
     browser_only = fetch_mode == "browser_only"
@@ -45,28 +41,33 @@ def apply_acquisition_contract_to_profile(
         profile["acquisition_contract_stale"] = True
         return profile
     engine = str(normalized.get("preferred_browser_engine") or "auto").strip().lower()
-    cookie_engine = (
-        str(normalized.get("handoff_cookie_engine") or "auto").strip().lower()
-    )
+    cookie_engine = str(normalized.get("handoff_cookie_engine") or "auto").strip().lower()
     if bool(normalized.get("prefer_browser")) or browser_only:
         profile["prefer_browser"] = True
         profile.setdefault("browser_reason", "acquisition-contract")
-    if engine in {"patchright", "real_chrome"} and not profile.get(
-        "forced_browser_engine"
-    ):
+    if engine in {"patchright", "real_chrome"} and not profile.get("forced_browser_engine"):
         profile["forced_browser_engine"] = engine
     if bool(normalized.get("handoff_eligible")) and not browser_only:
         profile["prefer_curl_handoff"] = True
         profile["handoff_eligible"] = True
-    if browser_only:
-        profile.pop("prefer_curl_handoff", None)
-        profile.pop("handoff_eligible", None)
-        profile.pop("handoff_cookie_engine", None)
-    elif cookie_engine in {"patchright", "real_chrome"}:
-        profile["handoff_cookie_engine"] = cookie_engine
-    elif engine in {"patchright", "real_chrome"}:
-        profile["handoff_cookie_engine"] = engine
+    _apply_handoff_engine(profile, browser_only=browser_only, cookie_engine=cookie_engine, engine=engine)
     return profile
+
+
+def _apply_handoff_engine(
+    profile: dict[str, object],
+    *,
+    browser_only: bool,
+    cookie_engine: str,
+    engine: str,
+) -> None:
+    if browser_only:
+        for key in ("prefer_curl_handoff", "handoff_eligible", "handoff_cookie_engine"):
+            profile.pop(key, None)
+        return
+    selected = cookie_engine if cookie_engine in {"patchright", "real_chrome"} else engine
+    if selected in {"patchright", "real_chrome"}:
+        profile["handoff_cookie_engine"] = selected
 
 
 def build_success_acquisition_contract(
@@ -83,38 +84,21 @@ def build_success_acquisition_contract(
     diagnostics = dict(browser_diagnostics or {})
     normalized_method = str(method or "").strip().lower()
     normalized_engine = _coerce_optional_choice(browser_engine, _BROWSER_ENGINE_VALUES)
-    preferred_engine = (
-        normalized_engine
-        if normalized_engine in {"patchright", "real_chrome"}
-        else "auto"
-    )
+    preferred_engine = normalized_engine if normalized_engine in {"patchright", "real_chrome"} else "auto"
     extraction_source = str(diagnostics.get("extraction_source") or "").strip().lower()
     required_rendering = extraction_source in {"rendered_dom", "rendered_dom_visual"}
     required_traversal = bool(diagnostics.get("traversal_activated"))
-    raw_network_payload_count = diagnostics.get("network_payload_count")
-    try:
-        network_payload_count = (
-            float(raw_network_payload_count)
-            if isinstance(raw_network_payload_count, (int, float, str))
-            else 0.0
-        )
-    except (TypeError, ValueError):
-        network_payload_count = 0.0
+    network_payload_count = _numeric_value(diagnostics.get("network_payload_count"))
     required_network_payloads = network_payload_count > 0
-    handoff_eligible = (
-        normalized_method == "browser"
-        and preferred_engine != "auto"
-        and not required_rendering
-        and not required_traversal
-        and not required_network_payloads
+    handoff_eligible = _handoff_is_eligible(
+        method=normalized_method,
+        engine=preferred_engine,
+        required_rendering=required_rendering,
+        required_traversal=required_traversal,
+        required_network_payloads=required_network_payloads,
     )
     handoff_engine = preferred_engine if handoff_eligible else "auto"
-    requested = list(requested_fields or [])
-    requested_set = set(requested)
-    covered_fields = [
-        field for field in list(found_fields or []) if field in requested_set
-    ]
-    covered_set = set(covered_fields)
+    coverage = _field_coverage(requested_fields, found_fields)
     return normalize_acquisition_contract(
         {
             "preferred_browser_engine": preferred_engine,
@@ -128,19 +112,49 @@ def build_success_acquisition_contract(
                 "method": normalized_method or None,
                 "browser_engine": normalized_engine,
                 "record_count": int(record_count or 0),
-                "field_coverage": {
-                    "requested": requested,
-                    "found": covered_fields,
-                    "missing": [
-                        field for field in requested if field not in covered_set
-                    ],
-                },
+                "field_coverage": coverage,
                 "source_run_id": int(source_run_id or 0),
                 "timestamp": timestamp or datetime.now(UTC).isoformat(),
             },
             "stale_after_failures": {"failure_count": 0, "stale": False},
         }
     )
+
+
+def _handoff_is_eligible(
+    *,
+    method: str,
+    engine: str,
+    required_rendering: bool,
+    required_traversal: bool,
+    required_network_payloads: bool,
+) -> bool:
+    return (
+        method == "browser"
+        and engine != "auto"
+        and not any((required_rendering, required_traversal, required_network_payloads))
+    )
+
+
+def _field_coverage(requested_fields: list[str], found_fields: list[str]) -> dict[str, list[str]]:
+    requested = list(requested_fields or [])
+    requested_set = set(requested)
+    found = [field for field in list(found_fields or []) if field in requested_set]
+    found_set = set(found)
+    return {
+        "requested": requested,
+        "found": found,
+        "missing": [field for field in requested if field not in found_set],
+    }
+
+
+def _numeric_value(value: object) -> float:
+    if not isinstance(value, (int, float, str)):
+        return 0.0
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
 
 
 async def save_learned_acquisition_contract(
@@ -228,70 +242,29 @@ async def record_acquisition_contract_outcome(
     page_url: str | None = None,
     network_payloads: list[dict[str, object]] | None = None,
 ) -> None:
-    stale_threshold = int(
-        crawler_runtime_settings.acquisition_contract_stale_failure_threshold
-    )
+    stale_threshold = int(crawler_runtime_settings.acquisition_contract_stale_failure_threshold)
     quality_success = (
-        persisted_count > 0
-        and not blocked
-        and verdict not in {VERDICT_BLOCKED, VERDICT_EMPTY, VERDICT_LISTING_FAILED}
+        persisted_count > 0 and not blocked and verdict not in {VERDICT_BLOCKED, VERDICT_EMPTY, VERDICT_LISTING_FAILED}
     )
     count_failure = not blocked and (
         verdict == VERDICT_LISTING_FAILED
-        or (
-            verdict == VERDICT_EMPTY
-            and "detail" in str(surface or "")
-            and persisted_count == 0
-        )
+        or (verdict == VERDICT_EMPTY and "detail" in str(surface or "") and persisted_count == 0)
     )
     if quality_success:
-        found_fields = sorted(
-            {
-                str(field_name)
-                for record in records
-                if isinstance(record, dict)
-                for field_name, value in record.items()
-                if not str(field_name).startswith("_")
-                and value not in (None, "", [], {})
-            }
-        )
-        saved_profile = await save_learned_acquisition_contract(
+        await _record_successful_acquisition_contract(
             session,
             domain=domain,
             surface=surface,
             source_run_id=source_run_id,
-            contract=build_success_acquisition_contract(
-                method=method,
-                browser_engine=browser_engine,
-                browser_diagnostics=browser_diagnostics,
-                record_count=persisted_count,
-                requested_fields=requested_fields,
-                found_fields=found_fields,
-                source_run_id=source_run_id,
-            ),
-        )
-        endpoints = learned_internal_api_endpoints(
-            network_payloads=network_payloads,
-            surface=surface,
-            page_url=page_url or "",
+            method=method,
+            browser_engine=browser_engine,
+            browser_diagnostics=browser_diagnostics,
             requested_fields=requested_fields,
-            source_run_id=source_run_id,
+            records=records,
+            persisted_count=persisted_count,
+            network_payloads=network_payloads,
+            page_url=page_url,
         )
-        if endpoints:
-            saved_profile[INTERNAL_API_ENDPOINTS_PROFILE_KEY] = endpoints
-            existing_profile = await load_domain_run_profile(
-                session,
-                domain=domain,
-                surface=surface,
-            )
-            await save_domain_run_profile(
-                session,
-                domain=domain,
-                surface=surface,
-                profile=saved_profile,
-                source_run_id=source_run_id,
-                existing_record=existing_profile,
-            )
         return
     if not count_failure:
         return
@@ -300,6 +273,66 @@ async def record_acquisition_contract_outcome(
         domain=domain,
         surface=surface,
         threshold=stale_threshold,
+    )
+
+
+async def _record_successful_acquisition_contract(
+    session: AsyncSession,
+    *,
+    domain: str,
+    surface: str,
+    source_run_id: int,
+    method: object,
+    browser_engine: object,
+    browser_diagnostics: dict[str, object] | None,
+    requested_fields: list[str],
+    records: list[dict[str, object]],
+    persisted_count: int,
+    network_payloads: list[dict[str, object]] | None,
+    page_url: str | None,
+) -> None:
+    found_fields = sorted(
+        {
+            str(field_name)
+            for record in records
+            if isinstance(record, dict)
+            for field_name, value in record.items()
+            if not str(field_name).startswith("_") and value not in (None, "", [], {})
+        }
+    )
+    saved_profile = await save_learned_acquisition_contract(
+        session,
+        domain=domain,
+        surface=surface,
+        source_run_id=source_run_id,
+        contract=build_success_acquisition_contract(
+            method=method,
+            browser_engine=browser_engine,
+            browser_diagnostics=browser_diagnostics,
+            record_count=persisted_count,
+            requested_fields=requested_fields,
+            found_fields=found_fields,
+            source_run_id=source_run_id,
+        ),
+    )
+    endpoints = learned_internal_api_endpoints(
+        network_payloads=network_payloads,
+        surface=surface,
+        page_url=page_url or "",
+        requested_fields=requested_fields,
+        source_run_id=source_run_id,
+    )
+    if not endpoints:
+        return
+    saved_profile[INTERNAL_API_ENDPOINTS_PROFILE_KEY] = endpoints
+    existing = await load_domain_run_profile(session, domain=domain, surface=surface)
+    await save_domain_run_profile(
+        session,
+        domain=domain,
+        surface=surface,
+        profile=saved_profile,
+        source_run_id=source_run_id,
+        existing_record=existing,
     )
 
 

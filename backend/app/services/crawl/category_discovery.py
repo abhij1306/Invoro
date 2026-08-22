@@ -123,9 +123,5 @@ async def _resolve_one(
 
 
 def _normalize_inputs(urls: list[str]) -> list[str]:
-    normalized = [
-        normalized
-        for item in urls
-        if item and (normalized := normalize_target_url(str(item).strip()))
-    ]
+    normalized = [normalized for item in urls if item and (normalized := normalize_target_url(str(item).strip()))]
     return list(dict.fromkeys(normalized))

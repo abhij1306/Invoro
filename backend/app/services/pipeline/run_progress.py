@@ -49,9 +49,7 @@ class BatchRunProgressState:
         persisted_record_count: int,
     ) -> "BatchRunProgressState":
         summary = mapping_or_empty(current_summary)
-        raw_verdicts = string_list(
-            summary.get("url_verdicts"), strip=True, none_as_empty=True
-        )[:total_urls]
+        raw_verdicts = string_list(summary.get("url_verdicts"), strip=True, none_as_empty=True)[:total_urls]
         completed_count = min(as_int(summary.get("completed_urls", 0)), total_urls)
         if raw_verdicts:
             completed_count = 0
@@ -64,10 +62,7 @@ class BatchRunProgressState:
             url_domain=str(url_domain or ""),
             url_verdicts=raw_verdicts,
             verdict_counts={
-                str(key): as_int(value)
-                for key, value in mapping_or_empty(
-                    summary.get("verdict_counts")
-                ).items()
+                str(key): as_int(value) for key, value in mapping_or_empty(summary.get("verdict_counts")).items()
             },
             acquisition_summary=mapping_or_empty(summary.get("acquisition_summary")),
             quality_summary=mapping_or_empty(summary.get("quality_summary")),
@@ -158,31 +153,22 @@ def _merge_run_acquisition_metrics(
     url_metrics: dict[str, object],
 ) -> dict[str, object]:
     current = mapping_or_empty(existing)
-    methods = {
-        str(key): as_int(value)
-        for key, value in mapping_or_empty(current.get("methods")).items()
-    }
+    methods = {str(key): as_int(value) for key, value in mapping_or_empty(current.get("methods")).items()}
     method = str(url_metrics.get("method") or "").strip()
     if method:
         methods[method] = as_int(methods.get(method, 0)) + 1
     platform_families = {
-        str(key): as_int(value)
-        for key, value in mapping_or_empty(current.get("platform_families")).items()
+        str(key): as_int(value) for key, value in mapping_or_empty(current.get("platform_families")).items()
     }
     platform_family = str(url_metrics.get("platform_family") or "").strip()
     if platform_family:
-        platform_families[platform_family] = (
-            as_int(platform_families.get(platform_family, 0)) + 1
-        )
+        platform_families[platform_family] = as_int(platform_families.get(platform_family, 0)) + 1
     failure_reasons = {
-        str(key): as_int(value)
-        for key, value in mapping_or_empty(current.get("failure_reasons")).items()
+        str(key): as_int(value) for key, value in mapping_or_empty(current.get("failure_reasons")).items()
     }
     failure_reason = str(url_metrics.get("failure_reason") or "").strip()
     if failure_reason:
-        failure_reasons[failure_reason] = (
-            as_int(failure_reasons.get(failure_reason, 0)) + 1
-        )
+        failure_reasons[failure_reason] = as_int(failure_reasons.get(failure_reason, 0)) + 1
 
     summary = {
         "methods": methods,
@@ -190,12 +176,10 @@ def _merge_run_acquisition_metrics(
         "failure_reasons": failure_reasons,
         "browser_attempted_urls": as_int(current.get("browser_attempted_urls", 0))
         + int(bool(url_metrics.get("browser_attempted"))),
-        "browser_used_urls": as_int(current.get("browser_used_urls", 0))
-        + int(bool(url_metrics.get("browser_used"))),
+        "browser_used_urls": as_int(current.get("browser_used_urls", 0)) + int(bool(url_metrics.get("browser_used"))),
         "memory_browser_first_urls": as_int(current.get("memory_browser_first_urls", 0))
         + int(bool(url_metrics.get("memory_browser_first"))),
-        "proxy_used_urls": as_int(current.get("proxy_used_urls", 0))
-        + int(bool(url_metrics.get("proxy_used"))),
+        "proxy_used_urls": as_int(current.get("proxy_used_urls", 0)) + int(bool(url_metrics.get("proxy_used"))),
         "network_payloads_total": as_int(current.get("network_payloads_total", 0))
         + as_int(url_metrics.get("network_payloads", 0)),
         "promoted_sources_total": as_int(current.get("promoted_sources_total", 0))
@@ -207,8 +191,7 @@ def _merge_run_acquisition_metrics(
             + _as_float(url_metrics.get("host_wait_seconds", 0.0)),
             3,
         ),
-        "records_total": as_int(current.get("records_total", 0))
-        + as_int(url_metrics.get("record_count", 0)),
+        "records_total": as_int(current.get("records_total", 0)) + as_int(url_metrics.get("record_count", 0)),
         "acquisition_ms_total": as_int(current.get("acquisition_ms_total", 0))
         + as_int(url_metrics.get("acquisition_ms", 0)),
         "extraction_ms_total": as_int(current.get("extraction_ms_total", 0))
@@ -219,17 +202,11 @@ def _merge_run_acquisition_metrics(
         + as_int(url_metrics.get("browser_decision_ms", 0)),
         "browser_launch_ms_total": as_int(current.get("browser_launch_ms_total", 0))
         + as_int(url_metrics.get("browser_launch_ms", 0)),
-        "browser_origin_warm_ms_total": as_int(
-            current.get("browser_origin_warm_ms_total", 0)
-        )
+        "browser_origin_warm_ms_total": as_int(current.get("browser_origin_warm_ms_total", 0))
         + as_int(url_metrics.get("browser_origin_warm_ms", 0)),
-        "browser_navigation_ms_total": as_int(
-            current.get("browser_navigation_ms_total", 0)
-        )
+        "browser_navigation_ms_total": as_int(current.get("browser_navigation_ms_total", 0))
         + as_int(url_metrics.get("browser_navigation_ms", 0)),
-        "browser_challenge_wait_ms_total": as_int(
-            current.get("browser_challenge_wait_ms_total", 0)
-        )
+        "browser_challenge_wait_ms_total": as_int(current.get("browser_challenge_wait_ms_total", 0))
         + as_int(url_metrics.get("browser_challenge_wait_ms", 0)),
         "browser_total_ms_total": as_int(current.get("browser_total_ms_total", 0))
         + as_int(url_metrics.get("browser_total_ms", 0)),
@@ -237,9 +214,7 @@ def _merge_run_acquisition_metrics(
         + as_int(url_metrics.get("request_wait_ms", 0)),
         "host_fetch_ms_total": as_int(current.get("host_fetch_ms_total", 0))
         + as_int(url_metrics.get("host_fetch_ms", 0)),
-        "host_browser_first_ms_total": as_int(
-            current.get("host_browser_first_ms_total", 0)
-        )
+        "host_browser_first_ms_total": as_int(current.get("host_browser_first_ms_total", 0))
         + as_int(url_metrics.get("host_browser_first_ms", 0)),
         "host_total_ms_total": as_int(current.get("host_total_ms_total", 0))
         + as_int(url_metrics.get("host_total_ms", 0)),
@@ -259,19 +234,14 @@ def _merge_run_acquisition_metrics(
     traversal_mode = str(url_metrics.get("traversal_mode_used") or "").strip()
     if traversal_mode:
         traversal_modes_used = {
-            str(key): as_int(value)
-            for key, value in mapping_or_empty(
-                current.get("traversal_modes_used")
-            ).items()
+            str(key): as_int(value) for key, value in mapping_or_empty(current.get("traversal_modes_used")).items()
         }
         summary["traversal_modes_used"] = {
             **traversal_modes_used,
             traversal_mode: as_int(traversal_modes_used.get(traversal_mode, 0)) + 1,
         }
     elif current.get("traversal_modes_used"):
-        summary["traversal_modes_used"] = mapping_or_empty(
-            current.get("traversal_modes_used")
-        )
+        summary["traversal_modes_used"] = mapping_or_empty(current.get("traversal_modes_used"))
 
     return summary
 
@@ -297,10 +267,7 @@ def _merge_run_quality_summary(
     if not url_quality:
         return current
 
-    level_counts = {
-        str(key): as_int(value)
-        for key, value in mapping_or_empty(current.get("level_counts")).items()
-    }
+    level_counts = {str(key): as_int(value) for key, value in mapping_or_empty(current.get("level_counts")).items()}
     url_level = str(url_quality.get("level") or "").strip().lower()
     if url_level in {"high", "medium", "low", "unknown"}:
         level_counts[url_level] = int(level_counts.get(url_level, 0) or 0) + 1
@@ -314,25 +281,17 @@ def _merge_run_quality_summary(
     listing_incomplete = as_int(current.get("listing_incomplete_urls", 0))
     listing_completeness_value = url_quality.get("listing_completeness")
     listing_completeness: dict[str, object] = (
-        listing_completeness_value
-        if isinstance(listing_completeness_value, dict)
-        else {}
+        listing_completeness_value if isinstance(listing_completeness_value, dict) else {}
     )
-    if listing_completeness.get("applicable") and not listing_completeness.get(
-        "complete", True
-    ):
+    if listing_completeness.get("applicable") and not listing_completeness.get("complete", True):
         listing_incomplete += 1
 
     variant_incomplete = as_int(current.get("variant_incomplete_urls", 0))
     variant_completeness_value = url_quality.get("variant_completeness")
     variant_completeness: dict[str, object] = (
-        variant_completeness_value
-        if isinstance(variant_completeness_value, dict)
-        else {}
+        variant_completeness_value if isinstance(variant_completeness_value, dict) else {}
     )
-    if variant_completeness.get("applicable") and not variant_completeness.get(
-        "complete", True
-    ):
+    if variant_completeness.get("applicable") and not variant_completeness.get("complete", True):
         variant_incomplete += 1
 
     requested_total = max(

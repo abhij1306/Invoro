@@ -125,18 +125,14 @@ class Socks5AuthBridge:
         try:
             request = await asyncio.wait_for(
                 _read_client_request(reader, writer),
-                timeout=float(
-                    crawler_runtime_settings.browser_proxy_bridge_first_byte_timeout_seconds
-                ),
+                timeout=float(crawler_runtime_settings.browser_proxy_bridge_first_byte_timeout_seconds),
             )
             opened_reader, opened_writer = await asyncio.wait_for(
                 asyncio.open_connection(
                     self.upstream.host,
                     self.upstream.port,
                 ),
-                timeout=float(
-                    crawler_runtime_settings.browser_proxy_bridge_connect_timeout_seconds
-                ),
+                timeout=float(crawler_runtime_settings.browser_proxy_bridge_connect_timeout_seconds),
             )
             upstream_writer = opened_writer
             await asyncio.wait_for(
@@ -145,17 +141,13 @@ class Socks5AuthBridge:
                     opened_writer,
                     upstream=self.upstream,
                 ),
-                timeout=float(
-                    crawler_runtime_settings.browser_proxy_bridge_auth_timeout_seconds
-                ),
+                timeout=float(crawler_runtime_settings.browser_proxy_bridge_auth_timeout_seconds),
             )
             opened_writer.write(request.to_upstream_bytes())
             await opened_writer.drain()
             response = await asyncio.wait_for(
                 _read_socks5_response(opened_reader),
-                timeout=float(
-                    crawler_runtime_settings.browser_proxy_bridge_first_byte_timeout_seconds
-                ),
+                timeout=float(crawler_runtime_settings.browser_proxy_bridge_first_byte_timeout_seconds),
             )
             writer.write(response)
             await writer.drain()
@@ -208,9 +200,7 @@ async def _read_client_request(
     if _SOCKS_AUTH_NONE not in methods:
         writer.write(bytes([_SOCKS_VERSION, _SOCKS_AUTH_NO_ACCEPTABLE]))
         await writer.drain()
-        raise _ClientNotifiedSocksError(
-            "Browser SOCKS client did not offer no-auth method"
-        )
+        raise _ClientNotifiedSocksError("Browser SOCKS client did not offer no-auth method")
     writer.write(bytes([_SOCKS_VERSION, _SOCKS_AUTH_NONE]))
     await writer.drain()
     request_header = await reader.readexactly(4)
@@ -255,9 +245,7 @@ async def _authenticate_upstream(
     password = upstream.password.encode("utf-8")
     if len(username) > 255 or len(password) > 255:
         raise ValueError("SOCKS5 proxy username/password too long")
-    writer.write(
-        bytes([1, len(username)]) + username + bytes([len(password)]) + password
-    )
+    writer.write(bytes([1, len(username)]) + username + bytes([len(password)]) + password)
     await writer.drain()
     auth_response = await reader.readexactly(2)
     if auth_response[1] != 0:

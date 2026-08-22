@@ -310,7 +310,6 @@ async def test_browser_fetch_does_not_repeat_challenge_recovery_after_navigation
         )
 
     monkeypatch.setattr(browser_page_flow, "recover_browser_challenge", _recover_once)
-    monkeypatch.setattr(browser_runtime, "recover_browser_challenge", _recover_once)
     monkeypatch.setattr(
         browser_runtime,
         "classify_blocked_page_async",

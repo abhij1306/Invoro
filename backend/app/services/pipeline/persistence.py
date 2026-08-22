@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+from dataclasses import dataclass
 
 from app.models.crawl_run import CrawlRecord, CrawlRun
 from app.services.db_utils import mapping_or_empty
@@ -20,6 +21,7 @@ from app.services.artifact_store import (
 )
 from app.services.publish.metadata import refresh_record_commit_metadata
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -52,9 +54,7 @@ def _record_content_fingerprint(
     }
     if not values:
         values = {"url": _fingerprint_value(identity_source_url)}
-    payload = json.dumps(
-        values, ensure_ascii=True, sort_keys=True, separators=(",", ":")
-    )
+    payload = json.dumps(values, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
@@ -62,11 +62,7 @@ def _fingerprint_value(value: object) -> object:
     if isinstance(value, str):
         return " ".join(value.casefold().split())
     if isinstance(value, list):
-        return [
-            item
-            for item in (_fingerprint_value(item) for item in value)
-            if item not in (None, "", [], {})
-        ]
+        return [item for item in (_fingerprint_value(item) for item in value) if item not in (None, "", [], {})]
     if isinstance(value, dict):
         return {
             str(key): item
@@ -177,13 +173,9 @@ async def _persist_browser_artifacts(
     surface: str | None = None,
     blocked: bool = False,
 ) -> None:
-    diagnostics = mapping_or_empty(
-        getattr(acquisition_result, "browser_diagnostics", {})
-    )
+    diagnostics = mapping_or_empty(getattr(acquisition_result, "browser_diagnostics", {}))
     artifacts = dict(mapping_or_empty(getattr(acquisition_result, "artifacts", {})))
-    screenshot_path_source = str(
-        artifacts.pop("browser_screenshot_path", "") or ""
-    ).strip()
+    screenshot_path_source = str(artifacts.pop("browser_screenshot_path", "") or "").strip()
     screenshot_bytes = artifacts.pop("browser_screenshot_png", b"")
     screenshot_path = ""
     if screenshot_required:
@@ -243,139 +235,206 @@ async def persist_extracted_records(
     raw_html_path: str | None = None,
 ) -> int:
     persisted = 0
-    candidate_identity_keys = {
-        identity_key
+    prepared_records = [
+        (record, prepared)
         for record in records
-        for identity_key in (
-            _record_identity_key(
-                str(
-                    dict(record).get("url")
-                    or dict(record).get("source_url")
-                    or acquisition_result.final_url
-                )
-            ),
-        )
-        if identity_key
+        if (prepared := _prepare_record(record, run=run, acquisition_result=acquisition_result)) is not None
+    ]
+    identity_keys = {
+        prepared.identity_key for _record, prepared in prepared_records if prepared.identity_key is not None
     }
-    existing_records_by_identity: dict[str, CrawlRecord] = {}
-    if candidate_identity_keys:
-        existing_records_by_identity = {
-            str(row.url_identity_key): row
-            for row in (
-                await session.scalars(
-                    select(CrawlRecord).where(
-                        CrawlRecord.run_id == run.id,
-                        CrawlRecord.url_identity_key.in_(candidate_identity_keys),
-                    )
-                )
-            )
-            if row.url_identity_key
-        }
-    seen_identities: set[str] = set(existing_records_by_identity)
-    for record in records:
-        raw_record = dict(record)
-        preliminary_source_url = str(
-            raw_record.get("source_url") or acquisition_result.final_url
-        )
-        data, rejected_public_fields = public_record_data_for_surface(
-            raw_record,
-            surface=run.surface,
-            page_url=preliminary_source_url,
-            requested_fields=list(run.requested_fields or []),
-        )
-        if not data:
-            continue
-        is_content_table_row = (
-            str(run.surface or "") == "content_listing"
-            and raw_record.get("_extraction_mode") == "table_rows"
-        )
-        if (
-            "listing" in str(run.surface or "")
-            and not data.get("url")
-            and not is_content_table_row
-        ):
-            continue
-        record_source_url = str(data.get("source_url") or acquisition_result.final_url)
-        identity_source_url = str(data.get("url") or record_source_url)
-        identity_key = _record_identity_key(identity_source_url)
-        if rejected_public_fields:
-            raw_record["_rejected_public_fields"] = rejected_public_fields
-        content_fingerprint = _record_content_fingerprint(
-            data,
-            identity_source_url=identity_source_url,
-        )
-        discovered_data = {
-            key: value
-            for key, value in {
-                "confidence": mapping_or_empty(record.get("_confidence")),
-                "field_repair": mapping_or_empty(record.get("_field_repair")),
-                "manifest_trace": mapping_or_empty(record.get("_manifest_trace")),
-                "semantic": mapping_or_empty(record.get("_semantic")),
-                "review_bucket": _object_list(record.get("_review_bucket")),
-            }.items()
-            if value not in (None, "", [], {})
-        }
-        source_trace = build_source_trace(
-            acquisition_result,
-            raw_record,
-            data=data,
-        )
-        existing_record = existing_records_by_identity.get(identity_key or "")
-        if identity_key and identity_key in seen_identities:
-            if existing_record and not _stored_record_matches(
-                existing_record,
-                source_url=record_source_url,
-                data=data,
-                raw_data=raw_record,
-                source_trace=source_trace,
+    existing_records_by_identity = await _existing_records_by_identity(session, run=run, identity_keys=identity_keys)
+    for record, prepared in prepared_records:
+        existing_record = existing_records_by_identity.get(prepared.identity_key or "")
+        if existing_record is not None:
+            persisted += await _update_existing_record_if_changed(
+                session,
+                run=run,
+                record=record,
+                prepared=prepared,
+                existing_record=existing_record,
                 raw_html_path=raw_html_path,
-                content_fingerprint=content_fingerprint,
-            ):
-                _update_stored_record(
-                    existing_record,
-                    source_url=record_source_url,
-                    data=data,
-                    raw_data=raw_record,
-                    discovered_data=dict(discovered_data),
-                    source_trace=source_trace,
-                    raw_html_path=raw_html_path,
-                    content_fingerprint=content_fingerprint,
-                )
-                for field_name, value in data.items():
-                    refresh_record_commit_metadata(
-                        existing_record,
-                        run=run,
-                        field_name=field_name,
-                        value=value,
-                        source_label=str(record.get("_source") or "extraction"),
-                        preserve_existing_sources=True,
-                    )
-                await session.flush()
-                persisted += 1
+            )
             continue
-        if identity_key is not None:
-            seen_identities.add(identity_key)
-        crawl_record = CrawlRecord(
-            run_id=run.id,
-            source_url=record_source_url,
-            url_identity_key=identity_key,
-            content_fingerprint=content_fingerprint,
-            data=data,
-            raw_data=raw_record,
-            discovered_data=discovered_data,
-            source_trace=source_trace,
+        crawl_record, inserted = await _insert_prepared_record(
+            session,
+            run=run,
+            record=record,
+            prepared=prepared,
             raw_html_path=raw_html_path,
         )
+        if prepared.identity_key is not None:
+            existing_records_by_identity[prepared.identity_key] = crawl_record
+        if inserted:
+            persisted += 1
+        else:
+            persisted += await _update_existing_record_if_changed(
+                session,
+                run=run,
+                record=record,
+                prepared=prepared,
+                existing_record=crawl_record,
+                raw_html_path=raw_html_path,
+            )
+    return persisted
+
+
+@dataclass(frozen=True, slots=True)
+class _PreparedRecord:
+    source_url: str
+    identity_key: str | None
+    content_fingerprint: str | None
+    data: dict[str, object]
+    raw_data: dict[str, object]
+    discovered_data: dict[str, object]
+    source_trace: dict[str, object]
+
+
+async def _existing_records_by_identity(
+    session: AsyncSession, *, run: CrawlRun, identity_keys: set[str]
+) -> dict[str, CrawlRecord]:
+    if not identity_keys:
+        return {}
+    rows = await session.scalars(
+        select(CrawlRecord).where(
+            CrawlRecord.run_id == run.id,
+            CrawlRecord.url_identity_key.in_(identity_keys),
+        )
+    )
+    return {str(row.url_identity_key): row for row in rows if row.url_identity_key}
+
+
+async def _insert_prepared_record(
+    session: AsyncSession,
+    *,
+    run: CrawlRun,
+    record: dict[str, object],
+    prepared: _PreparedRecord,
+    raw_html_path: str | None,
+) -> tuple[CrawlRecord, bool]:
+    crawl_record = CrawlRecord(
+        run_id=run.id,
+        source_url=prepared.source_url,
+        url_identity_key=prepared.identity_key,
+        content_fingerprint=prepared.content_fingerprint,
+        data=prepared.data,
+        raw_data=prepared.raw_data,
+        discovered_data=prepared.discovered_data,
+        source_trace=prepared.source_trace,
+        raw_html_path=raw_html_path,
+    )
+    _refresh_record_metadata(crawl_record, run=run, record=record, data=prepared.data)
+    if prepared.identity_key is None:
         session.add(crawl_record)
         await session.flush()
-        for field_name, value in data.items():
-            refresh_record_commit_metadata(
-                crawl_record,
-                run=run,
-                field_name=field_name,
-                value=value,
-                source_label=str(record.get("_source") or "extraction"),
-                preserve_existing_sources=True,
+        return crawl_record, True
+    try:
+        async with session.begin_nested():
+            session.add(crawl_record)
+            await session.flush()
+    except IntegrityError:
+        existing_record = await session.scalar(
+            select(CrawlRecord).where(
+                CrawlRecord.run_id == run.id,
+                CrawlRecord.url_identity_key == prepared.identity_key,
             )
-        persisted += 1
-    return persisted
+        )
+        if existing_record is None:
+            raise
+        return existing_record, False
+    return crawl_record, True
+
+
+def _prepare_record(record: dict[str, object], *, run: CrawlRun, acquisition_result) -> _PreparedRecord | None:
+    raw_record = dict(record)
+    preliminary_url = str(raw_record.get("source_url") or acquisition_result.final_url)
+    data, rejected_fields = public_record_data_for_surface(
+        raw_record,
+        surface=run.surface,
+        page_url=preliminary_url,
+        requested_fields=list(run.requested_fields or []),
+    )
+    if not data or _listing_record_requires_url(run, raw_record=raw_record, data=data):
+        return None
+    source_url = str(data.get("source_url") or acquisition_result.final_url)
+    identity_source_url = str(data.get("url") or source_url)
+    if rejected_fields:
+        raw_record["_rejected_public_fields"] = rejected_fields
+    discovered_data = _record_discovered_data(record)
+    return _PreparedRecord(
+        source_url=source_url,
+        identity_key=_record_identity_key(identity_source_url),
+        content_fingerprint=_record_content_fingerprint(data, identity_source_url=identity_source_url),
+        data=data,
+        raw_data=raw_record,
+        discovered_data=discovered_data,
+        source_trace=build_source_trace(acquisition_result, raw_record, data=data),
+    )
+
+
+def _listing_record_requires_url(run: CrawlRun, *, raw_record: dict[str, object], data: dict[str, object]) -> bool:
+    table_row = str(run.surface or "") == "content_listing" and raw_record.get("_extraction_mode") == "table_rows"
+    return "listing" in str(run.surface or "") and not data.get("url") and not table_row
+
+
+def _record_discovered_data(record: dict[str, object]) -> dict[str, object]:
+    values = {
+        "confidence": mapping_or_empty(record.get("_confidence")),
+        "field_repair": mapping_or_empty(record.get("_field_repair")),
+        "manifest_trace": mapping_or_empty(record.get("_manifest_trace")),
+        "semantic": mapping_or_empty(record.get("_semantic")),
+        "review_bucket": _object_list(record.get("_review_bucket")),
+    }
+    return {key: value for key, value in values.items() if value not in (None, "", [], {})}
+
+
+async def _update_existing_record_if_changed(
+    session: AsyncSession,
+    *,
+    run: CrawlRun,
+    record: dict[str, object],
+    prepared: _PreparedRecord,
+    existing_record: CrawlRecord | None,
+    raw_html_path: str | None,
+) -> int:
+    if existing_record is None or _stored_record_matches(
+        existing_record,
+        source_url=prepared.source_url,
+        data=prepared.data,
+        raw_data=prepared.raw_data,
+        source_trace=prepared.source_trace,
+        raw_html_path=raw_html_path,
+        content_fingerprint=prepared.content_fingerprint,
+    ):
+        return 0
+    _update_stored_record(
+        existing_record,
+        source_url=prepared.source_url,
+        data=prepared.data,
+        raw_data=prepared.raw_data,
+        discovered_data=dict(prepared.discovered_data),
+        source_trace=prepared.source_trace,
+        raw_html_path=raw_html_path,
+        content_fingerprint=prepared.content_fingerprint,
+    )
+    _refresh_record_metadata(existing_record, run=run, record=record, data=prepared.data)
+    await session.flush()
+    return 1
+
+
+def _refresh_record_metadata(
+    crawl_record: CrawlRecord,
+    *,
+    run: CrawlRun,
+    record: dict[str, object],
+    data: dict[str, object],
+) -> None:
+    for field_name, value in data.items():
+        refresh_record_commit_metadata(
+            crawl_record,
+            run=run,
+            field_name=field_name,
+            value=value,
+            source_label=str(record.get("_source") or "extraction"),
+            preserve_existing_sources=True,
+        )

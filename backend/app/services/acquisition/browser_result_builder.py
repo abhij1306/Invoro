@@ -85,35 +85,18 @@ class BrowserAcquisitionResultBuilder:
         self.elapsed_ms = elapsed_ms
         self.build_browser_diagnostics = build_browser_diagnostics_impl
         self.build_browser_artifacts = build_browser_artifacts_impl
-        self.capture_rendered_listing_fragments = (
-            capture_rendered_listing_fragments_impl
-        )
+        self.capture_rendered_listing_fragments = capture_rendered_listing_fragments_impl
         self.capture_listing_visual_elements = capture_listing_visual_elements_impl
-        self.ready_probe_supports_fast_finalize = (
-            ready_probe_supports_fast_finalize_impl
-        )
+        self.ready_probe_supports_fast_finalize = ready_probe_supports_fast_finalize_impl
         self.logger = logger_impl
 
     async def build(self) -> dict[str, object]:
         payload = self.payload
         response_missing = payload.response is None
-        status_code = (
-            int(
-                getattr(
-                    payload.response,
-                    "browser_recovered_status",
-                    getattr(payload.response, "status", 0),
-                )
-                or 0
-            )
-            if payload.response is not None
-            else 0
-        )
+        status_code = _response_status_code(payload.response)
         payload_capture_started_at = time.perf_counter()
         capture_summary = await payload.payload_capture.close(payload.page)
-        payload.phase_timings_ms["payload_capture"] = self.elapsed_ms(
-            payload_capture_started_at
-        )
+        payload.phase_timings_ms["payload_capture"] = self.elapsed_ms(payload_capture_started_at)
         html_bytes = len(payload.html.encode("utf-8"))
         fast_finalize = self.ready_probe_supports_fast_finalize(
             payload.readiness_probes,
@@ -121,37 +104,17 @@ class BrowserAcquisitionResultBuilder:
             status_code=status_code,
             expansion_diagnostics=payload.expansion_diagnostics,
         )
-        if fast_finalize:
-            blocked_classification = BlockPageClassification(
-                blocked=False,
-                outcome="ok",
-            )
-            blocked = False
-            challenge_evidence: list[str] = []
-            low_content_reason = None
-            location_interstitial_present = False
-        else:
-            blocked_classification = await self.classify_blocked_page_async(
-                payload.html, status_code
-            )
-            blocked_result = self.blocked_html_checker(payload.html, status_code)
-            if inspect.isawaitable(blocked_result):
-                blocked_result = await blocked_result
-            blocked = bool(blocked_classification.blocked) or bool(blocked_result)
-            if blocked and not blocked_classification.blocked:
-                blocked_classification = BlockPageClassification(
-                    blocked=True,
-                    outcome="challenge_page",
-                    evidence=["blocked_html_checker"],
-                )
-            challenge_evidence = list(blocked_classification.evidence or [])
-            low_content_reason = self.classify_low_content_reason(
-                payload.html,
-                html_bytes=html_bytes,
-            )
-            location_interstitial_present = location_interstitial_detected(
-                payload.html, analysis=payload.html_analysis
-            )
+        (
+            blocked_classification,
+            blocked,
+            challenge_evidence,
+            low_content_reason,
+            location_interstitial_present,
+        ) = await self._classify_page(
+            status_code=status_code,
+            html_bytes=html_bytes,
+            fast_finalize=fast_finalize,
+        )
         browser_outcome = self.classify_browser_outcome(
             html=payload.html,
             html_bytes=html_bytes,
@@ -167,15 +130,11 @@ class BrowserAcquisitionResultBuilder:
                 blocked_classification,
                 blocked=True,
                 outcome="location_required",
-                evidence=list(
-                    dict.fromkeys([*challenge_evidence, "location_interstitial"])
-                ),
+                evidence=list(dict.fromkeys([*challenge_evidence, "location_interstitial"])),
             )
             challenge_evidence = list(blocked_classification.evidence)
         await self._emit_events(browser_outcome=browser_outcome, blocked=blocked)
-        screenshot_path = await self._capture_screenshot(
-            browser_outcome=browser_outcome
-        )
+        screenshot_path = await self._capture_screenshot(browser_outcome=browser_outcome)
         (
             rendered_listing_fragments,
             listing_visual_elements,
@@ -212,12 +171,8 @@ class BrowserAcquisitionResultBuilder:
             },
             traversal_result=payload.traversal_result,
         )
-        diagnostics["rendered_listing_fragment_count"] = listing_evidence_counts[
-            "rendered_listing_fragments"
-        ]
-        diagnostics["listing_visual_element_count"] = listing_evidence_counts[
-            "listing_visual_elements"
-        ]
+        diagnostics["rendered_listing_fragment_count"] = listing_evidence_counts["rendered_listing_fragments"]
+        diagnostics["listing_visual_element_count"] = listing_evidence_counts["listing_visual_elements"]
         diagnostics["extractable_listing_evidence"] = listing_evidence_counts
         artifacts = self.build_browser_artifacts(
             screenshot_path=screenshot_path,
@@ -251,9 +206,7 @@ class BrowserAcquisitionResultBuilder:
             "artifacts": artifacts,
             "network_payloads": capture_summary.payloads,
             "page_headers": (
-                copy_headers(payload.response.headers)
-                if payload.response is not None
-                else httpx.Headers()
+                copy_headers(payload.response.headers) if payload.response is not None else httpx.Headers()
             ),
             "content_type": (
                 payload.response.headers.get("content-type", "text/html")
@@ -266,6 +219,30 @@ class BrowserAcquisitionResultBuilder:
                 surface=payload.surface,
             ).get("family"),
         }
+
+    async def _classify_page(
+        self, *, status_code: int, html_bytes: int, fast_finalize: bool
+    ) -> tuple[BlockPageClassification, bool, list[str], str | None, bool]:
+        payload = self.payload
+        _ = fast_finalize
+        classification = await self.classify_blocked_page_async(payload.html, status_code)
+        blocked_result = self.blocked_html_checker(payload.html, status_code)
+        if inspect.isawaitable(blocked_result):
+            blocked_result = await blocked_result
+        blocked = bool(classification.blocked) or bool(blocked_result)
+        if blocked and not classification.blocked:
+            classification = BlockPageClassification(
+                blocked=True,
+                outcome="challenge_page",
+                evidence=["blocked_html_checker"],
+            )
+        return (
+            classification,
+            blocked,
+            list(classification.evidence or []),
+            self.classify_low_content_reason(payload.html, html_bytes=html_bytes),
+            location_interstitial_detected(payload.html, analysis=payload.html_analysis),
+        )
 
     async def _emit_events(self, *, browser_outcome: str, blocked: bool) -> None:
         payload = self.payload
@@ -324,9 +301,7 @@ class BrowserAcquisitionResultBuilder:
         try:
             return await self.capture_browser_screenshot(payload.page)
         finally:
-            payload.phase_timings_ms["screenshot_capture"] = self.elapsed_ms(
-                screenshot_started_at
-            )
+            payload.phase_timings_ms["screenshot_capture"] = self.elapsed_ms(screenshot_started_at)
 
     async def _capture_listing_artifacts(
         self,
@@ -345,9 +320,7 @@ class BrowserAcquisitionResultBuilder:
                 self.capture_rendered_listing_fragments(
                     payload.page,
                     surface=payload.surface,
-                    limit=int(
-                        crawler_runtime_settings.rendered_listing_card_capture_limit
-                    ),
+                    limit=int(crawler_runtime_settings.rendered_listing_card_capture_limit),
                 ),
                 stage="rendered_listing_fragment_capture",
                 item_kind="text",
@@ -526,9 +499,7 @@ def build_browser_diagnostics(
         "phase_timings_ms": phase_timings_ms,
         "challenge_evidence": challenge_evidence,
         "challenge_provider_hits": list(blocked_classification.provider_hits or []),
-        "challenge_element_hits": list(
-            blocked_classification.challenge_element_hits or []
-        ),
+        "challenge_element_hits": list(blocked_classification.challenge_element_hits or []),
         "low_content_reason": low_content_reason,
         "readiness_probes": readiness_probes,
         "network_payload_count": capture_summary.network_payload_count,
@@ -542,9 +513,7 @@ def build_browser_diagnostics(
         "listing_recovery": listing_recovery_diagnostics,
         "listing_artifact_capture": listing_artifact_diagnostics,
         "interstitial": interstitial_diagnostics,
-        "failure_reason": "location_required"
-        if browser_outcome == "location_required"
-        else None,
+        "failure_reason": "location_required" if browser_outcome == "location_required" else None,
         "detail_expansion": expansion_diagnostics,
     }
     if traversal_result is not None:
@@ -587,38 +556,61 @@ def ready_probe_supports_fast_finalize(
     min_visible_text = int(crawler_runtime_settings.browser_readiness_visible_text_min)
     min_detail_hints = int(crawler_runtime_settings.detail_field_signal_min_count)
     min_listing_items = int(crawler_runtime_settings.listing_min_items)
-    extractability = (
-        cast(dict[str, object], expansion_diagnostics.get("extractability"))
-        if isinstance(expansion_diagnostics, dict)
-        and isinstance(expansion_diagnostics.get("extractability"), dict)
-        else {}
-    )
-    matched_requested_fields = extractability.get("matched_requested_fields")
-    extractable_fields = extractability.get("extractable_fields")
-    if bool(extractability.get("verified")) and (
-        bool(matched_requested_fields) or bool(extractable_fields)
-    ):
+    if _expansion_extractability_verified(expansion_diagnostics):
         return True
     for probe in readiness_probes:
-        if not isinstance(probe, dict) or not bool(probe.get("is_ready")):
-            continue
-        visible_text_length = _object_int(probe.get("visible_text_length"))
-        if visible_text_length < min_visible_text:
-            continue
-        if "detail" in normalized_surface:
-            if bool(probe.get("structured_data_present")):
-                return True
-            if _object_int(probe.get("detail_hint_count")) >= min_detail_hints:
-                return True
-            continue
-        if "listing" in normalized_surface:
-            if _object_int(probe.get("listing_card_count")) >= min_listing_items:
-                return True
-            if _object_int(probe.get("matched_listing_selectors")) > 0:
-                return True
-            continue
-        return True
+        if _readiness_probe_supports_fast_finalize(
+            probe,
+            surface=normalized_surface,
+            min_visible_text=min_visible_text,
+            min_detail_hints=min_detail_hints,
+            min_listing_items=min_listing_items,
+        ):
+            return True
     return False
+
+
+def _expansion_extractability_verified(
+    expansion_diagnostics: dict[str, object] | None,
+) -> bool:
+    extractability = (
+        cast(dict[str, object], expansion_diagnostics.get("extractability"))
+        if isinstance(expansion_diagnostics, dict) and isinstance(expansion_diagnostics.get("extractability"), dict)
+        else {}
+    )
+    return bool(extractability.get("verified")) and bool(
+        extractability.get("matched_requested_fields") or extractability.get("extractable_fields")
+    )
+
+
+def _readiness_probe_supports_fast_finalize(
+    probe: object,
+    *,
+    surface: str,
+    min_visible_text: int,
+    min_detail_hints: int,
+    min_listing_items: int,
+) -> bool:
+    if not isinstance(probe, dict) or not bool(probe.get("is_ready")):
+        return False
+    if _object_int(probe.get("visible_text_length")) < min_visible_text:
+        return False
+    if "detail" in surface:
+        return bool(probe.get("structured_data_present")) or (
+            _object_int(probe.get("detail_hint_count")) >= min_detail_hints
+        )
+    if "listing" in surface:
+        return (
+            _object_int(probe.get("listing_card_count")) >= min_listing_items
+            or _object_int(probe.get("matched_listing_selectors")) > 0
+        )
+    return True
+
+
+def _response_status_code(response: object | None) -> int:
+    if response is None:
+        return 0
+    return int(getattr(response, "browser_recovered_status", getattr(response, "status", 0)) or 0)
 
 
 async def finalize_browser_fetch(
@@ -650,12 +642,10 @@ async def finalize_browser_fetch(
         build_browser_diagnostics_impl=build_browser_diagnostics_impl,
         build_browser_artifacts_impl=build_browser_artifacts_impl,
         capture_rendered_listing_fragments_impl=(
-            capture_rendered_listing_fragments_impl
-            or browser_recovery.capture_rendered_listing_fragments
+            capture_rendered_listing_fragments_impl or browser_recovery.capture_rendered_listing_fragments
         ),
         capture_listing_visual_elements_impl=(
-            capture_listing_visual_elements_impl
-            or browser_page_helpers.capture_listing_visual_elements
+            capture_listing_visual_elements_impl or browser_page_helpers.capture_listing_visual_elements
         ),
         ready_probe_supports_fast_finalize_impl=ready_probe_supports_fast_finalize_impl,
         logger_impl=logger_impl,

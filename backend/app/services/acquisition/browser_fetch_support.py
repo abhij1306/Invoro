@@ -8,7 +8,11 @@ from typing import Any, Awaitable, Callable
 from app.services.acquisition.browser_diagnostics import (
     build_browser_diagnostics_contract,
     build_failed_browser_diagnostics,
+    browser_launch_mode,
+    browser_profile,
 )
+from app.services.acquisition.browser_proxy_config import display_proxy
+from app.services.acquisition import cookie_store
 from app.services.acquisition.browser_page_helpers import (
     dismiss_safe_location_interstitial,
 )
@@ -180,3 +184,43 @@ def _network_payload_rows(value: object) -> list[dict[str, object]]:
     if not isinstance(value, list):
         return []
     return [dict(item) for item in value if isinstance(item, dict)]
+
+
+async def prepare_browser_fetch_launch_context(
+    *,
+    runtime: Any,
+    normalized_engine: str,
+    normalized_domain: str | None,
+    allow_storage_state: bool,
+    proxy: str | None,
+    resolved_proxy_rotation_mode: str | None,
+    on_event,
+    emit_browser_event,
+) -> tuple[str, str, bool, bool]:
+    runtime_engine = str(getattr(runtime, "browser_engine", "") or "").strip().lower()
+    runtime_engine = runtime_engine or normalized_engine
+    runtime_binary = str(getattr(runtime, "browser_binary", "") or "").strip()
+    runtime_binary = runtime_binary or runtime_engine
+    bridge_flag = getattr(runtime, "bridge_used", None)
+    bridge_used = bool(bridge_flag()) if callable(bridge_flag) else False
+    skip_origin_warmup = bool(
+        allow_storage_state
+        and normalized_domain
+        and await cookie_store.load_storage_state_for_domain(normalized_domain, browser_engine=runtime_engine)
+    )
+    await emit_browser_event(
+        on_event,
+        "info",
+        (
+            f"Launched {browser_launch_mode(runtime_engine)} browser "
+            f"({runtime_engine}, profile: {browser_profile(runtime_engine)}, "
+            f"proxy: {display_proxy(proxy)}, binary: {runtime_binary})"
+        ),
+    )
+    if resolved_proxy_rotation_mode == "rotating":
+        await emit_browser_event(
+            on_event,
+            "info",
+            "Rotating proxy profile detected; skipping origin warmup",
+        )
+    return runtime_engine, runtime_binary, bridge_used, skip_origin_warmup

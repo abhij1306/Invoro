@@ -25,9 +25,7 @@ class AcquisitionRequest:
     url: str
     plan: AcquisitionPlan
     requested_fields: list[str] = field(default_factory=list)
-    requested_field_selectors: dict[str, list[dict[str, object]]] = field(
-        default_factory=dict
-    )
+    requested_field_selectors: dict[str, list[dict[str, object]]] = field(default_factory=dict)
     acquisition_profile: dict[str, object] = field(default_factory=dict)
     policy: AcquisitionPolicy | None = None
     checkpoint: Any = None
@@ -40,9 +38,9 @@ class AcquisitionRequest:
             self.acquisition_profile = policy.to_profile()
 
     def with_profile_updates(self, **updates: object) -> "AcquisitionRequest":
-        policy = (
-            self.policy or AcquisitionPolicy.from_profile(self.acquisition_profile)
-        ).with_updates(**cast(Any, updates))
+        policy = (self.policy or AcquisitionPolicy.from_profile(self.acquisition_profile)).with_updates(
+            **cast(Any, updates)
+        )
         profile = policy.to_profile()
         return replace(self, acquisition_profile=profile, policy=policy)
 
@@ -98,30 +96,22 @@ class PageEvidence:
     diagnostics: dict[str, object]
 
     @classmethod
-    def from_acquisition_result(
-        cls, acquisition_result: AcquisitionResult
-    ) -> "PageEvidence":
+    def from_acquisition_result(cls, acquisition_result: AcquisitionResult) -> "PageEvidence":
         diagnostics = getattr(acquisition_result, "browser_diagnostics", {})
         return cls(
             blocked=bool(getattr(acquisition_result, "blocked", False)),
             method=str(getattr(acquisition_result, "method", "") or ""),
-            diagnostics=dict(diagnostics or {})
-            if isinstance(diagnostics, dict)
-            else {},
+            diagnostics=dict(diagnostics or {}) if isinstance(diagnostics, dict) else {},
         )
 
     @classmethod
-    def from_browser_diagnostics(
-        cls, diagnostics: dict[str, object] | object
-    ) -> "PageEvidence":
+    def from_browser_diagnostics(cls, diagnostics: dict[str, object] | object) -> "PageEvidence":
         payload = dict(diagnostics or {}) if isinstance(diagnostics, dict) else {}
         return cls(blocked=False, method="", diagnostics=payload)
 
     @property
     def browser_attempted(self) -> bool:
-        return (
-            bool(self.diagnostics.get("browser_attempted")) or self.method == "browser"
-        )
+        return bool(self.diagnostics.get("browser_attempted")) or self.method == "browser"
 
     @property
     def browser_outcome(self) -> str:
@@ -150,21 +140,15 @@ class PageEvidence:
     def indicates_block(self) -> bool:
         if self.blocked or self.browser_outcome == "challenge_page":
             return True
-        if any(
-            item.startswith(("title:", "strong:")) for item in self.challenge_evidence
-        ):
+        if any(item.startswith(("title:", "strong:")) for item in self.challenge_evidence):
             return True
         if self.browser_outcome == "usable_content" and self.has_ready_readiness_probe:
             return False
         # INVARIANTS.md Rule 6: usable content beats provider noise.
         if self.browser_outcome == "usable_content":
             return False
-        provider_evidence = _list_or_empty(
-            self.diagnostics.get("challenge_provider_hits")
-        ) or [
-            item
-            for item in self.challenge_evidence
-            if item.startswith(("provider:", "active_provider:"))
+        provider_evidence = _list_or_empty(self.diagnostics.get("challenge_provider_hits")) or [
+            item for item in self.challenge_evidence if item.startswith(("provider:", "active_provider:"))
         ]
         return bool(provider_evidence and self.browser_outcome != "usable_content")
 
@@ -175,10 +159,7 @@ class PageEvidence:
         challenge_shell = (
             self.browser_outcome in {"challenge_page", "low_content_shell"}
             or self.indicates_block
-            or (
-                self.browser_reason.startswith("vendor-block:")
-                and not self.has_ready_readiness_probe
-            )
+            or (self.browser_reason.startswith("vendor-block:") and not self.has_ready_readiness_probe)
         )
         return "challenge_shell" if challenge_shell else None
 
@@ -202,9 +183,7 @@ async def _emit_event(on_event: Any, level: str, message: str) -> None:
 
 async def acquire(request: AcquisitionRequest) -> AcquisitionResult:
     requested_url = normalize_target_url(request.url)
-    effective_url = (
-        await normalize_adapter_acquisition_url(requested_url) or requested_url
-    )
+    effective_url = await normalize_adapter_acquisition_url(requested_url) or requested_url
     runtime_policy = resolve_platform_runtime_policy(
         effective_url,
         surface=request.surface,
@@ -222,9 +201,7 @@ async def acquire(request: AcquisitionRequest) -> AcquisitionResult:
     await policy_middleware.before_fetch(request)
     request = request.with_profile_updates(**acquisition_policy.to_profile())
     await _emit_event(request.on_event, "info", f"Acquiring {effective_url}")
-    profile_endpoints = request.acquisition_profile.get(
-        INTERNAL_API_ENDPOINTS_PROFILE_KEY
-    )
+    profile_endpoints = request.acquisition_profile.get(INTERNAL_API_ENDPOINTS_PROFILE_KEY)
     replay_payload = await replay_internal_api_endpoints(
         page_url=effective_url,
         surface=request.surface,
@@ -260,12 +237,8 @@ async def acquire(request: AcquisitionRequest) -> AcquisitionResult:
         effective_url,
         run_id=request.run_id,
         proxy_list=request.proxy_list,
-        proxy_profile=dict(acquisition_policy.proxy_profile)
-        if acquisition_policy.proxy_profile
-        else None,
-        locality_profile=dict(acquisition_policy.locality_profile)
-        if acquisition_policy.locality_profile
-        else None,
+        proxy_profile=dict(acquisition_policy.proxy_profile) if acquisition_policy.proxy_profile else None,
+        locality_profile=dict(acquisition_policy.locality_profile) if acquisition_policy.locality_profile else None,
         fetch_mode=acquisition_policy.fetch_mode,
         prefer_browser=acquisition_policy.prefer_browser,
         surface=request.surface,
@@ -345,14 +318,11 @@ def _apply_runtime_policy_defaults(
     raw_runtime_locality = active_policy.get("locality_profile")
     raw_runtime_context_profile = active_policy.get("browser_context_profile")
     runtime_locality: Mapping[str, object] | None = (
-        raw_runtime_locality
-        if isinstance(raw_runtime_locality, Mapping) and raw_runtime_locality
-        else None
+        raw_runtime_locality if isinstance(raw_runtime_locality, Mapping) and raw_runtime_locality else None
     )
     runtime_context_profile: Mapping[str, object] | None = (
         raw_runtime_context_profile
-        if isinstance(raw_runtime_context_profile, Mapping)
-        and raw_runtime_context_profile
+        if isinstance(raw_runtime_context_profile, Mapping) and raw_runtime_context_profile
         else None
     )
     if runtime_locality is None and runtime_context_profile is None:
@@ -387,6 +357,4 @@ def _headers_to_dict(headers: Mapping[str, object] | Any) -> dict[str, str]:
         return {str(key): str(value) for key, value in headers.items()}
     if isinstance(headers, Mapping):
         return {str(key): str(value) for key, value in headers.items()}
-    return {
-        str(key): str(value) for key, value in getattr(headers, "items", lambda: [])()
-    }
+    return {str(key): str(value) for key, value in getattr(headers, "items", lambda: [])()}

@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.crawl_settings import normalize_crawl_settings
 from app.services.config.domain_profiles import INTERNAL_API_ENDPOINTS_PROFILE_KEY
+from app.services.config.runtime_settings import crawler_runtime_settings
 from app.services.domain_utils import normalize_domain
 
 from .normalization import (
@@ -14,6 +15,22 @@ from .normalization import (
 from .repository import load_domain_run_profile
 
 _CACHED_DEFAULT_RUN_SETTINGS = normalize_crawl_settings({})
+_FETCH_ROOT_KEYS = {
+    "fetch_mode",
+    "extraction_source",
+    "js_mode",
+    "include_iframes",
+    "traversal_mode",
+    "advanced_mode",
+    "request_delay_ms",
+    "sleep_ms",
+    "max_pages",
+    "max_scrolls",
+}
+_FETCH_ROOT_ALIASES = {
+    "advanced_mode": "traversal_mode",
+    "sleep_ms": "request_delay_ms",
+}
 
 
 def _default_run_settings() -> dict[str, object]:
@@ -42,13 +59,9 @@ def _merge_profile_section(
     ignore_default_equivalent_values: bool,
 ) -> dict[str, object]:
     explicit_section_raw = explicit_settings.get(key)
-    explicit_section = (
-        dict(explicit_section_raw) if isinstance(explicit_section_raw, dict) else {}
-    )
+    explicit_section = dict(explicit_section_raw) if isinstance(explicit_section_raw, dict) else {}
     default_section_raw = default_settings.get(key)
-    default_section = (
-        dict(default_section_raw) if isinstance(default_section_raw, dict) else {}
-    )
+    default_section = dict(default_section_raw) if isinstance(default_section_raw, dict) else {}
     merged = dict(saved_section)
     if not saved_section and explicit_section:
         return explicit_section
@@ -119,40 +132,22 @@ def merge_saved_run_profile(
     *,
     ignore_default_equivalent_values: bool,
 ) -> dict[str, object]:
-    merged = (
-        dict(explicit_settings or {}) if isinstance(explicit_settings, dict) else {}
-    )
+    merged = dict(explicit_settings or {}) if isinstance(explicit_settings, dict) else {}
     saved = dict(saved_profile or {}) if isinstance(saved_profile, dict) else {}
     if not saved:
         return merged
     default_settings = _default_run_settings()
-    fetch_root_keys = {
-        "fetch_mode",
-        "extraction_source",
-        "js_mode",
-        "include_iframes",
-        "traversal_mode",
-        "advanced_mode",
-        "request_delay_ms",
-        "sleep_ms",
-        "max_pages",
-        "max_scrolls",
-    }
-    fetch_root_aliases = {
-        "advanced_mode": "traversal_mode",
-        "sleep_ms": "request_delay_ms",
-    }
     merged["fetch_profile"] = _merge_profile_section(
         merged,
         "fetch_profile",
         _section_with_saved_root_aliases(
             saved,
             "fetch_profile",
-            root_keys=fetch_root_keys,
-            root_aliases=fetch_root_aliases,
+            root_keys=_FETCH_ROOT_KEYS,
+            root_aliases=_FETCH_ROOT_ALIASES,
         ),
-        root_override_keys=fetch_root_keys,
-        root_override_aliases=fetch_root_aliases,
+        root_override_keys=_FETCH_ROOT_KEYS,
+        root_override_aliases=_FETCH_ROOT_ALIASES,
         default_settings=default_settings,
         ignore_default_equivalent_values=ignore_default_equivalent_values,
     )
@@ -180,39 +175,38 @@ def merge_saved_run_profile(
         default_settings=default_settings,
         ignore_default_equivalent_values=ignore_default_equivalent_values,
     )
-    saved_contract = dict(saved.get("acquisition_contract") or {})
-    explicit_contract = dict(merged.get("acquisition_contract") or {})
+    _merge_saved_contract(merged, saved, ignore_default_equivalent_values=ignore_default_equivalent_values)
+    _merge_saved_endpoints(merged, saved)
+    return merged
+
+
+def _merge_saved_contract(
+    merged: dict[str, object],
+    saved: dict[str, object],
+    *,
+    ignore_default_equivalent_values: bool,
+) -> None:
+    saved_contract = dict(saved.get("acquisition_contract") or {})  # type: ignore[call-overload]
+    explicit_contract = dict(merged.get("acquisition_contract") or {})  # type: ignore[call-overload]
     if saved_contract or explicit_contract:
         merged["acquisition_contract"] = _merge_acquisition_contract(
             explicit_contract,
             saved_contract,
             ignore_default_equivalent_values=ignore_default_equivalent_values,
         )
-    saved_endpoints = normalize_internal_api_endpoints(
-        saved.get(INTERNAL_API_ENDPOINTS_PROFILE_KEY)
-    )
-    explicit_endpoints = normalize_internal_api_endpoints(
-        merged.get(INTERNAL_API_ENDPOINTS_PROFILE_KEY)
-    )
-    if saved_endpoints or explicit_endpoints:
-        endpoints_by_key = {
-            (
-                str(endpoint.get("method") or ""),
-                str(endpoint.get("url") or ""),
-            ): endpoint
-            for endpoint in saved_endpoints
-        }
-        endpoints_by_key.update(
-            {
-                (
-                    str(endpoint.get("method") or ""),
-                    str(endpoint.get("url") or ""),
-                ): endpoint
-                for endpoint in explicit_endpoints
-            }
-        )
-        merged[INTERNAL_API_ENDPOINTS_PROFILE_KEY] = list(endpoints_by_key.values())
-    return merged
+
+
+def _merge_saved_endpoints(merged: dict[str, object], saved: dict[str, object]) -> None:
+    saved_endpoints = normalize_internal_api_endpoints(saved.get(INTERNAL_API_ENDPOINTS_PROFILE_KEY))
+    explicit_endpoints = normalize_internal_api_endpoints(merged.get(INTERNAL_API_ENDPOINTS_PROFILE_KEY))
+    if not saved_endpoints and not explicit_endpoints:
+        return
+    endpoints_by_key: dict[tuple[str, str], dict[str, object]] = {}
+    for endpoint in [*explicit_endpoints, *saved_endpoints]:
+        key = (str(endpoint.get("method") or ""), str(endpoint.get("url") or ""))
+        endpoints_by_key.setdefault(key, endpoint)
+    limit = max(1, int(crawler_runtime_settings.internal_api_replay_max_endpoints))
+    merged[INTERNAL_API_ENDPOINTS_PROFILE_KEY] = list(endpoints_by_key.values())[:limit]
 
 
 async def resolve_url_acquisition_recipe(

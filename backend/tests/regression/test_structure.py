@@ -105,8 +105,6 @@ ALLOWED_PRIVATE_TEST_IMPORTS: set[str] = {
     "tests/unit/test_materials_sanitizer.py -> app.services.extract.detail.text.sanitizer:_clean_materials_pollution",
     "tests/component/test_public_api.py -> app.main:_crawler_app_state",
     "tests/services/observability/test_extraction_trace_projection.py -> app.services.pipeline.extraction_loop:_record_extraction_trace",
-    "tests/regression/test_batch_runtime.py -> app.services.crawl.batch_runtime:_parallel_url_concurrency",
-    "tests/regression/test_batch_runtime.py -> app.services.crawl.batch_runtime:_parallel_worker_record_limit",
     "tests/regression/test_detail_extractor_structured_sources.py -> app.services.extract.field_candidates.variant_rows:_structured_variants_from_product_payload",
     "tests/regression/test_selectolax_css_migration.py -> app.services.extract.field_candidates.variant_rows:_structured_variants_from_product_payload",
     "tests/unit/test_normalizers.py -> app.services.extract.detail.assembly.final_cleanup:_reconcile_variant_derived_parent_fields",
