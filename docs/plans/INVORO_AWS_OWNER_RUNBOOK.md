@@ -15,7 +15,7 @@ certificate, and the initial GitHub variables. Continue here.
 In GitHub → Settings → Environments → `aws-demo` → Environment variables, add:
 
 ```text
-DEMO_EXPIRY_DATE=2026-08-30
+DEMO_EXPIRY_DATE=2026-08-29
 ```
 
 Use the actual mandatory cleanup date. It must be today or within the next six days
