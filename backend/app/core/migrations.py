@@ -14,10 +14,15 @@ _ALEMBIC_INI_PATH = BASE_DIR / "alembic.ini"
 _ALEMBIC_SCRIPT_PATH = BASE_DIR / "alembic"
 
 
+def set_database_url(config: Config) -> None:
+    """Set the runtime URL without triggering ConfigParser interpolation."""
+    config.set_main_option("sqlalchemy.url", settings.database_url.replace("%", "%%"))
+
+
 def build_alembic_config() -> Config:
     config = Config(str(_ALEMBIC_INI_PATH))
     config.set_main_option("script_location", str(_ALEMBIC_SCRIPT_PATH))
-    config.set_main_option("sqlalchemy.url", settings.database_url.replace("%", "%%"))
+    set_database_url(config)
     return config
 
 
