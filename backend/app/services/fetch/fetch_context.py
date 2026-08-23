@@ -344,7 +344,11 @@ async def _run_browser_first_if_selected(
 
 
 async def _handle_browser_failure_with_http_fallback(
-    context: FetchRuntimeContext, *, reason: str, exc: Exception
+    context: FetchRuntimeContext,
+    *,
+    reason: str,
+    exc: Exception,
+    retain_http_result: bool = False,
 ) -> None:
     context.last_error = exc
     context.browser_first_failed = True
@@ -355,10 +359,15 @@ async def _handle_browser_failure_with_http_fallback(
     _attach_exception_browser_diagnostics(exc, context.last_browser_attempt_diagnostics)
     if context.fetch_mode == "browser_only" or context.traversal_required:
         raise exc
+    fallback_text = (
+        "keeping prior HTTP observation"
+        if retain_http_result
+        else "falling back to HTTP"
+    )
     await _emit_fetch_event(
         context.on_event,
         "warning",
-        f"Browser acquisition failed; falling back to HTTP ({type(exc).__name__})",
+        f"Browser acquisition failed; {fallback_text} ({type(exc).__name__})",
     )
 
 
@@ -753,7 +762,10 @@ async def _escalate_http_result_to_browser(
         )
     except Exception as exc:
         await _handle_browser_failure_with_http_fallback(
-            context, reason=reason, exc=exc
+            context,
+            reason=reason,
+            exc=exc,
+            retain_http_result=True,
         )
         _attach_browser_attempt_diagnostics(
             result,

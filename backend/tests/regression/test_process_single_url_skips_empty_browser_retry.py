@@ -390,6 +390,7 @@ async def test_post_extraction_detail_retry_timeout_keeps_patchright_observation
 
     assert attempted_engines == ["patchright", "real_chrome"]
     assert result.verdict == "empty"
+    assert result.url_metrics["method"] == "browser"
     assert result.url_metrics["failure_reason"] == "timeout"
     assert any("Browser retry failed" in log.message for log in logs)
 

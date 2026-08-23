@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import time
 
 from app.services.acquisition.acquirer import (
@@ -41,13 +42,15 @@ from app.services.pipeline.runtime_helpers import (
     log_pipeline_event as _log_pipeline_event,
     merge_browser_diagnostics as _merge_browser_diagnostics,
 )
-from app.services.publish import build_acquisition_profile, build_url_metrics
-
 from app.services.pipeline.url_processing_context import (
     ExtractedURLStage as _ExtractedURLStage,
     FetchedURLStage as _FetchedURLStage,
     URLProcessingContext as _URLProcessingContext,
 )
+from app.services.publish import build_acquisition_profile, build_url_metrics
+
+
+logger = logging.getLogger(__name__)
 
 acquire = _acquire
 
@@ -723,6 +726,11 @@ async def _acquire_browser_retry_result(
         acquire_impl = getattr(extraction_loop, "acquire", acquire)
         return await acquire_impl(retry_request)
     except Exception as exc:
+        logger.warning(
+            "Browser retry acquisition failed for %s",
+            context.url,
+            exc_info=True,
+        )
         _merge_browser_diagnostics(
             acquisition_result,
             build_failed_browser_diagnostics(

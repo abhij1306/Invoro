@@ -24,9 +24,9 @@ This supersedes `docs/audits/security-audit.md` (2026-05-21). Several May findin
 | | |
 |---|---|
 | **Component** | `backend/app/schemas/alert.py` (`validate_webhook_url`), `backend/app/services/monitor_webhook_service.py` |
-| **Evidence** | Webhook URLs are accepted if they start with `http://` or `https://` only. Delivery uses `httpx.AsyncClient(...).post(str(monitor.webhook_url), ...)` with **no** `validate_public_target` / `ensure_public_crawl_targets`. Crawl/selector fetches **do** use `url_safety.py`. httpx **follows redirects by default**. |
-| **Failure mode** | Authenticated user (or admin) sets `webhook_url` to `http://169.254.169.254/`, `http://127.0.0.1:6379/`, or a DNS name that later resolves private. On alert fire, the **server** POSTs there. Redirects can bounce to IMDS. Error strings may land in `monitor_webhook_deliveries.error_message`. |
-| **Fix** | Reuse `validate_public_target` (or equivalent) at save **and** immediately before each delivery; disable redirects or re-validate redirect targets; block link-local / metadata / private ranges; prefer HTTPS-only webhooks in production. |
+| **Evidence** | Webhook URLs are accepted if they start with `http://` or `https://` only. Delivery uses `httpx.AsyncClient(...).post(str(monitor.webhook_url), ...)` with **no** `validate_public_target` / `ensure_public_crawl_targets`. Crawl/selector fetches **do** use `url_safety.py`. The current HTTPX client does not enable redirects. |
+| **Failure mode** | Authenticated user (or admin) sets `webhook_url` to `http://169.254.169.254/`, `http://127.0.0.1:6379/`, or a DNS name that resolves to a private address at connection time. On alert fire, the **server** POSTs there. Error strings may land in `monitor_webhook_deliveries.error_message`. |
+| **Fix** | Reuse `validate_public_target` (or equivalent) at save and immediately before delivery, then enforce public non-link-local destination IPs at connection time through a pinned transport or egress proxy. Keep redirects disabled; if later enabled, apply the same policy to every hop. Prefer HTTPS-only webhooks in production. |
 | **Status** | Open. Not fixed (audit-only). |
 
 ### P1 — Authenticated HTML preview is an XSS proxy on the API origin
@@ -129,7 +129,7 @@ No **P0** (unauthenticated RCE, trivial account takeover without user action, or
 | Mass assignment on register | PASS | `UserCreate` email+password only |
 | Privileged DB to client | N/A | No Supabase anon key; SQLAlchemy server-side |
 | SQL parameterization | PASS | ORM; `text()` in metrics health checks is static |
-| SSRF on crawl targets | PASS | `url_safety.py` + tests (40 focused tests passed) |
+| SSRF on crawl targets | PASS with residual risk | `url_safety.py` + tests (40 focused tests passed); see [redirect/DNS-rebinding limits](#unverified-external-controls) |
 | SSRF on webhooks | FAIL | P1 |
 | Condition language RCE | PASS | Tokenized field/operator/literal parser, not `eval` |
 | Uploads | FAIL (limits) | CSV only; auth yes; no size/MIME; not stored as executable origin content |
