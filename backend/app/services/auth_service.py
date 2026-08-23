@@ -55,40 +55,26 @@ async def create_user(
     return user
 
 
-async def ensure_default_admin(session: AsyncSession) -> User:
-    email, password = _load_default_admin_credentials()
-    result = await session.execute(select(User).where(User.email == email))
-    user = result.scalar_one_or_none()
-    if user is None:
-        return await create_user(session, email, password, role="admin")
-    return await _ensure_admin_user_state(session, user)
-
-
-async def _ensure_admin_user_state(session: AsyncSession, user: User) -> User:
-    changed = False
-    if user.role != "admin":
-        user.role = "admin"
-        changed = True
-    if not user.is_active:
-        user.is_active = True
-        changed = True
-    if changed:
-        await session.commit()
-        await session.refresh(user)
-    return user
-
-
 async def bootstrap_admin_user(session: AsyncSession) -> User | None:
     admin_settings = load_admin_bootstrap_settings()
     if not admin_settings.bootstrap_admin_once:
         return None
 
     email, password = _load_default_admin_credentials()
-    result = await session.execute(select(User).where(User.email == email))
-    user = result.scalar_one_or_none()
-    if user is None:
+    users = list((await session.execute(select(User))).scalars().all())
+    if not users:
         return await create_user(session, email, password, role="admin")
-    return await _ensure_admin_user_state(session, user)
+    if (
+        len(users) != 1
+        or users[0].email != email
+        or users[0].role != "admin"
+        or not users[0].is_active
+    ):
+        raise RuntimeError(
+            "Admin bootstrap requires an empty database or exactly one active "
+            "admin matching DEFAULT_ADMIN_EMAIL."
+        )
+    return users[0]
 
 
 async def authenticate_user(

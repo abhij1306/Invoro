@@ -43,6 +43,7 @@ async def request_result(
     data: Any | None = None,
     proxy: str | None = None,
     timeout_seconds: float | None = None,
+    follow_redirects: bool | None = None,
 ) -> HttpFetchResult:
     # Browser acquisition is orchestrated by the acquisition pipeline, not
     # by this low-level HTTP helper. Keep the flag for call compatibility,
@@ -59,6 +60,7 @@ async def request_result(
             data=data,
             proxy=proxy,
             timeout=timeout,
+            follow_redirects=follow_redirects,
         )
     except Exception as exc:
         if not should_retry_with_forced_ipv4(exc):
@@ -72,6 +74,7 @@ async def request_result(
             proxy=proxy,
             timeout=timeout,
             force_ipv4=True,
+            follow_redirects=follow_redirects,
         )
     text = response.text or ""
     return HttpFetchResult(
@@ -98,7 +101,16 @@ async def _request_with_httpx(
     proxy: str | None,
     timeout: float,
     force_ipv4: bool = False,
+    follow_redirects: bool | None = None,
 ) -> httpx.Response:
+    request_kwargs: dict[str, Any] = {
+        "headers": headers,
+        "json": json_body,
+        "data": data,
+        "timeout": timeout,
+    }
+    if follow_redirects is not None:
+        request_kwargs["follow_redirects"] = follow_redirects
     if force_ipv4:
         async with build_async_http_client(
             follow_redirects=True,
@@ -110,23 +122,9 @@ async def _request_with_httpx(
             proxy=proxy,
             force_ipv4=True,
         ) as client:
-            return await client.request(
-                method.upper(),
-                url,
-                headers=headers,
-                json=json_body,
-                data=data,
-                timeout=timeout,
-            )
+            return await client.request(method.upper(), url, **request_kwargs)
     client = await get_shared_http_client(proxy=proxy)
-    return await client.request(
-        method.upper(),
-        url,
-        headers=headers,
-        json=json_body,
-        data=data,
-        timeout=timeout,
-    )
+    return await client.request(method.upper(), url, **request_kwargs)
 
 
 async def close_shared_http_client() -> None:

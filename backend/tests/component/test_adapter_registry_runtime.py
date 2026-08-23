@@ -74,6 +74,43 @@ async def test_request_result_applies_per_request_timeout_with_shared_client(
     assert observed_timeouts == [1.5, 3.0]
 
 
+@pytest.mark.asyncio
+@pytest.mark.component
+async def test_request_result_can_disable_redirect_following(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    observed_redirect_values: list[bool | None] = []
+
+    class _FakeResponse:
+        status_code = 302
+        url = "https://example.com/page"
+        headers = httpx.Headers({"location": "https://example.com/next"})
+        text = ""
+
+    class _FakeClient:
+        async def request(self, method, url, **kwargs):
+            del method, url
+            observed_redirect_values.append(kwargs.get("follow_redirects"))
+            return _FakeResponse()
+
+    async def _fake_get_shared(*, proxy=None):
+        del proxy
+        return _FakeClient()
+
+    monkeypatch.setattr(
+        "app.services.acquisition.http_client.get_shared_http_client",
+        _fake_get_shared,
+    )
+
+    result = await request_result(
+        "https://example.com/page",
+        follow_redirects=False,
+    )
+
+    assert result.status_code == 302
+    assert observed_redirect_values == [False]
+
+
 @pytest.mark.component
 def test_registered_adapters_include_workday_and_ultipro() -> None:
     names = {adapter.name for adapter in registered_adapters()}

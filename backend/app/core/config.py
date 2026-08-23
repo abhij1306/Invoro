@@ -115,7 +115,7 @@ class Settings(BaseSettings):
         default=False,
         validation_alias=AliasChoices("BOOTSTRAP_ADMIN_ONCE", "bootstrap_admin_once"),
     )
-    # Demo/release surface controls. Local behavior stays fully enabled by default.
+    # Demo/release surface controls. Registration is opt-in; other local surfaces stay enabled.
     registration_enabled: bool = False
     monitoring_enabled: bool = True
     public_docs_enabled: bool = True

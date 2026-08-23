@@ -50,6 +50,29 @@ jobs:
           CONFIRMATION: ${{ inputs.confirmation }}
         run: test "$CONFIRMATION" = 'APPLY'
 
+      - name: Validate demo expiry window
+        env:
+          DEMO_EXPIRY_DATE: ${{ vars.DEMO_EXPIRY_DATE }}
+        run: |
+          if [[ ! "$DEMO_EXPIRY_DATE" =~ ^20[0-9]{2}-[0-9]{2}-[0-9]{2}$ ]]; then
+            echo "DEMO_EXPIRY_DATE must use YYYY-MM-DD." >&2
+            exit 1
+          fi
+          if ! expiry_epoch=$(date -u -d "$DEMO_EXPIRY_DATE" +%s); then
+            echo "DEMO_EXPIRY_DATE must be a valid calendar date." >&2
+            exit 1
+          fi
+          if [[ "$(date -u -d "@$expiry_epoch" +%F)" != "$DEMO_EXPIRY_DATE" ]]; then
+            echo "DEMO_EXPIRY_DATE must be a valid calendar date." >&2
+            exit 1
+          fi
+          today_epoch=$(date -u -d "$(date -u +%F)" +%s)
+          latest_epoch=$((today_epoch + 6 * 86400))
+          if (( expiry_epoch < today_epoch || expiry_epoch > latest_epoch )); then
+            echo "DEMO_EXPIRY_DATE must be today or within the next six days." >&2
+            exit 1
+          fi
+
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 

@@ -46,12 +46,12 @@ Routers registered in `backend/app/main.py`:
 - `/api/selectors`
 - `/api/llm`
 - `/api/data-enrichment`
-- `/api/monitors`
-- `/api/alerts`
-- `/api/v1/alerts`
+- `/api/monitors` (only when `MONITORING_ENABLED=true`)
+- `/api/alerts` (only when `MONITORING_ENABLED=true`)
+- `/api/v1/alerts` (only when `MONITORING_ENABLED=true`)
 - `/api/playground`
 - `/api/health`
-- `/api/metrics`
+- `/api/metrics` (only when `PUBLIC_METRICS_ENABLED=true`)
 
 Important route groups:
 

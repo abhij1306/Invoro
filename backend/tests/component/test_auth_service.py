@@ -29,6 +29,63 @@ async def test_bootstrap_admin_user_creates_admin(db_session, monkeypatch) -> No
     assert user.role == "admin"
     assert user.is_active is True
 
+    rerun_user = await auth_service.bootstrap_admin_user(db_session)
+
+    assert rerun_user is not None
+    assert rerun_user.id == user.id
+
+
+@pytest.mark.asyncio
+@pytest.mark.component
+async def test_bootstrap_admin_user_rejects_preexisting_non_admin(
+    db_session, monkeypatch
+) -> None:
+    monkeypatch.setattr(
+        auth_service,
+        "load_admin_bootstrap_settings",
+        lambda: SimpleNamespace(
+            bootstrap_admin_once=True,
+            default_admin_email="admin@example.com",
+            default_admin_password="VeryStrongPassword123!",
+        ),
+    )
+    existing = await auth_service.create_user(
+        db_session,
+        "admin@example.com",
+        "ExistingPassword123!",
+    )
+
+    with pytest.raises(RuntimeError, match="exactly one active admin"):
+        await auth_service.bootstrap_admin_user(db_session)
+
+    await db_session.refresh(existing)
+    assert existing.role == "user"
+    assert existing.is_active is True
+
+
+@pytest.mark.asyncio
+@pytest.mark.component
+async def test_bootstrap_admin_user_rejects_any_other_existing_user(
+    db_session, monkeypatch
+) -> None:
+    monkeypatch.setattr(
+        auth_service,
+        "load_admin_bootstrap_settings",
+        lambda: SimpleNamespace(
+            bootstrap_admin_once=True,
+            default_admin_email="admin@example.com",
+            default_admin_password="VeryStrongPassword123!",
+        ),
+    )
+    await auth_service.create_user(
+        db_session,
+        "other@example.com",
+        "ExistingPassword123!",
+    )
+
+    with pytest.raises(RuntimeError, match="exactly one active admin"):
+        await auth_service.bootstrap_admin_user(db_session)
+
 
 @pytest.mark.asyncio
 @pytest.mark.component

@@ -6,7 +6,7 @@ from urllib.parse import urlparse
 
 import httpx
 
-from app.core.config import settings
+from app.core.config import get_frontend_origins
 from app.core.dependencies import get_current_user, get_db
 from app.models.user import User
 from app.schemas.selectors import (
@@ -221,5 +221,5 @@ async def selectors_preview_html(
             source_url=str(document["url"]),
             html=str(document["html"]),
         ),
-        frame_ancestor=settings.frontend_url,
+        frame_ancestors=get_frontend_origins(),
     )

@@ -151,7 +151,7 @@ frontend_desired=$(service_desired_count "$frontend_service")
 api_desired=$(service_desired_count "$api_service")
 worker_desired=$(service_desired_count "$worker_service")
 restore_database=false
-if [[ "$previous_db_state" == "stopped" ]] && (( frontend_desired + api_desired + worker_desired == 0 )); then
+if [[ "$previous_db_state" == "stopped" || "$previous_db_state" == "stopping" ]] && (( frontend_desired + api_desired + worker_desired == 0 )); then
   restore_database=true
 fi
 

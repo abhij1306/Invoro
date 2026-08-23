@@ -45,7 +45,7 @@ variable "github_environment" {
 }
 
 variable "demo_expiry_date" {
-  description = "Mandatory YYYY-MM-DD cleanup date, at most one week after launch."
+  description = "Mandatory YYYY-MM-DD cleanup date, validated by the workflow as no later than six days after provisioning."
   type        = string
 
   validation {

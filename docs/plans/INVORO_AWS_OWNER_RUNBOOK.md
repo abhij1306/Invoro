@@ -18,7 +18,9 @@ In GitHub → Settings → Environments → `aws-demo` → Environment variables
 DEMO_EXPIRY_DATE=2026-08-30
 ```
 
-Use the actual mandatory cleanup date. Keep it within one week of launch.
+Use the actual mandatory cleanup date. It must be today or within the next six days
+when provisioning runs. Destroy by that date, before RDS can auto-start after seven
+consecutive stopped days.
 
 Expected variables before provisioning:
 
@@ -97,7 +99,8 @@ The password must contain upper/lowercase letters, a digit, and a special charac
 Save it in the password manager. Do not add `POSTGRES_PASSWORD`; RDS owns that secret.
 
 The API and worker never receive `DEFAULT_ADMIN_PASSWORD`. Only the migration task
-receives it while creating/repairing the single admin.
+receives it while creating or verifying the single admin. Bootstrap fails without
+changing users if the database contains any conflicting account state.
 
 ## 18. Add Cloudflare DNS-only records
 
@@ -161,6 +164,10 @@ never downgraded. Then redeploy the intended SHA.
 ## 22. Normal operating state
 
 After rehearsal, run **Control Invoro AWS Demo** with `action=stop`.
+
+Do not leave the stopped database in place for seven consecutive days. Destroy the
+stack by `DEMO_EXPIRY_DATE`; if cleanup is delayed, check status daily and stop RDS
+again if AWS auto-starts it.
 
 Expected idle state:
 

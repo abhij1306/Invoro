@@ -93,7 +93,13 @@ async def read_csv_upload(file: UploadFile) -> str:
                 detail=f"CSV upload exceeds the {max_bytes}-byte limit",
             )
         chunks.append(chunk)
-    return b"".join(chunks).decode("utf-8", errors="ignore")
+    try:
+        return b"".join(chunks).decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="CSV upload must be valid UTF-8",
+        ) from exc
 
 
 def _log_stream_sleep_seconds() -> float:

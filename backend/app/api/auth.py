@@ -97,14 +97,14 @@ async def register(
     request: Request,
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> UserResponse | Response:
-    limited = await _enforce_auth_rate_limit(request, "register")
-    if limited is not None:
-        return limited
     if not settings.registration_enabled:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Not Found",
         )
+    limited = await _enforce_auth_rate_limit(request, "register")
+    if limited is not None:
+        return limited
     existing = await session.execute(
         select(User).where(User.email == payload.email.lower())
     )

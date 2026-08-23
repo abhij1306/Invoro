@@ -3,10 +3,13 @@ from __future__ import annotations
 from io import BytesIO
 
 import pytest
+from fastapi import HTTPException
 from starlette.datastructures import Headers, UploadFile
 
+from app.api import auth
 from app.api.crawls import read_csv_upload
 from app.main import application_routers
+from app.schemas.user import UserCreate
 from app.services.config.runtime_settings import crawler_runtime_settings
 from app.services.crawl.ingestion_service import build_csv_crawl_payload
 from app.services.untrusted_html import trusted_origin, untrusted_html_response
@@ -26,6 +29,18 @@ async def test_csv_upload_accepts_exact_limit_and_rejects_extra_byte(
         await read_csv_upload(rejected)
 
     assert getattr(exc_info.value, "status_code", None) == 413
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_csv_upload_rejects_invalid_utf8() -> None:
+    upload = UploadFile(BytesIO(b"url\nhttps://example.com/\xff"), headers=Headers())
+
+    with pytest.raises(HTTPException) as exc_info:
+        await read_csv_upload(upload)
+
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail == "CSV upload must be valid UTF-8"
 
 
 @pytest.mark.unit
@@ -53,9 +68,47 @@ def test_untrusted_html_response_blocks_active_content_and_framing() -> None:
 
 
 @pytest.mark.unit
+def test_untrusted_html_response_allows_each_configured_frontend_origin() -> None:
+    response = untrusted_html_response(
+        "<p>preview</p>",
+        frame_ancestors=[
+            "http://localhost:3000/path",
+            "http://127.0.0.1:3000/other",
+        ],
+    )
+
+    assert (
+        "frame-ancestors http://localhost:3000 http://127.0.0.1:3000"
+        in response.headers["content-security-policy"]
+    )
+
+
+@pytest.mark.unit
 def test_trusted_origin_preserves_ipv6_brackets_and_regular_hosts() -> None:
     assert trusted_origin("http://[::1]:4000/path") == "http://[::1]:4000"
     assert trusted_origin("https://invoro.example/path") == "https://invoro.example"
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_disabled_registration_returns_404_before_rate_limiting(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(auth.settings, "registration_enabled", False)
+
+    async def _unexpected_rate_limit(*args, **kwargs):
+        raise AssertionError("disabled registration must not consume rate-limit state")
+
+    monkeypatch.setattr(auth, "_enforce_auth_rate_limit", _unexpected_rate_limit)
+
+    with pytest.raises(HTTPException) as exc_info:
+        await auth.register(
+            UserCreate(email="second@example.com", password="VeryStrongPassword123!"),
+            object(),  # type: ignore[arg-type]
+            object(),  # type: ignore[arg-type]
+        )
+
+    assert exc_info.value.status_code == 404
 
 
 @pytest.mark.unit

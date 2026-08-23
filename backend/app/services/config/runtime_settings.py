@@ -376,6 +376,7 @@ class CrawlerRuntimeSettings(BaseSettings):
     browser_max_contexts_before_recycle: int = 200
     browser_max_lifetime_seconds: int = 1800
     iframe_promotion_max_candidates: int = 2
+    selector_preview_max_redirects: int = 5
     browser_preference_min_successes: int = 2
     acquisition_artifact_ttl_seconds: int = 86400
     acquisition_artifact_cleanup_interval_seconds: int = 300
@@ -464,6 +465,7 @@ class CrawlerRuntimeSettings(BaseSettings):
             "adapter_payload_identity_min_token_length",
             "browser_launch_timeout_seconds",
             "browser_context_slot_timeout_seconds",
+            "selector_preview_max_redirects",
         ):
             _require_positive(field_name, getattr(self, field_name))
         for field_name in (

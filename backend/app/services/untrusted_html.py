@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from urllib.parse import urlsplit
 
 from fastapi.responses import HTMLResponse
@@ -25,14 +26,19 @@ def trusted_origin(value: str) -> str:
 def untrusted_html_response(
     content: str,
     *,
-    frame_ancestor: str | None = None,
+    frame_ancestors: Iterable[str] | None = None,
 ) -> HTMLResponse:
-    ancestor = trusted_origin(frame_ancestor) if frame_ancestor else "'none'"
+    ancestors = list(
+        dict.fromkeys(trusted_origin(value) for value in frame_ancestors or [])
+    )
+    ancestor_policy = " ".join(ancestors) if ancestors else "'none'"
     return HTMLResponse(
         content=content,
         headers={
             "Cache-Control": "no-store",
-            "Content-Security-Policy": f"{_SANDBOX_POLICY}; frame-ancestors {ancestor}",
+            "Content-Security-Policy": (
+                f"{_SANDBOX_POLICY}; frame-ancestors {ancestor_policy}"
+            ),
             "Referrer-Policy": "no-referrer",
             "X-Content-Type-Options": "nosniff",
         },

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import httpx
 import pytest
 
 from app.services.domain_memory_service import load_domain_memory, save_domain_memory
@@ -102,9 +103,11 @@ async def test_fetch_selector_document_revalidates_promoted_iframe(
 ) -> None:
     class _Result:
         final_url = "https://example.com/page"
-        html = '<html><iframe src="http://127.0.0.1/internal"></iframe></html>'
+        text = '<html><iframe src="http://127.0.0.1/internal"></iframe></html>'
+        status_code = 200
+        headers = httpx.Headers()
 
-    async def _fake_fetch_page(url: str, **kwargs):
+    async def _fake_request_result(url: str, **kwargs):
         del kwargs
         assert url == "https://example.com/page"
         return _Result()
@@ -115,13 +118,52 @@ async def test_fetch_selector_document_revalidates_promoted_iframe(
             return values
         raise ValueError("Target host resolves to a non-public IP address")
 
-    monkeypatch.setattr("app.services.selectors_runtime.fetch_page", _fake_fetch_page)
+    monkeypatch.setattr(
+        "app.services.selectors_runtime.request_result", _fake_request_result
+    )
     monkeypatch.setattr(
         "app.services.selectors_runtime.ensure_public_crawl_targets", _fake_ensure
     )
 
     with pytest.raises(ValueError, match="non-public IP"):
         await fetch_selector_document("https://example.com/page")
+
+
+@pytest.mark.asyncio
+@pytest.mark.component
+async def test_fetch_selector_document_rejects_private_redirect_before_request(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    requested: list[str] = []
+
+    class _Redirect:
+        final_url = "https://example.com/page"
+        text = ""
+        status_code = 302
+        headers = httpx.Headers({"location": "http://127.0.0.1/internal"})
+
+    async def _fake_request_result(url: str, **kwargs):
+        assert kwargs["follow_redirects"] is False
+        requested.append(url)
+        return _Redirect()
+
+    async def _fake_ensure(urls):
+        values = list(urls)
+        if values == ["https://example.com/page"]:
+            return values
+        raise ValueError("Target host resolves to a non-public IP address")
+
+    monkeypatch.setattr(
+        "app.services.selectors_runtime.request_result", _fake_request_result
+    )
+    monkeypatch.setattr(
+        "app.services.selectors_runtime.ensure_public_crawl_targets", _fake_ensure
+    )
+
+    with pytest.raises(ValueError, match="non-public IP"):
+        await fetch_selector_document("https://example.com/page")
+
+    assert requested == ["https://example.com/page"]
 
 
 @pytest.mark.asyncio
