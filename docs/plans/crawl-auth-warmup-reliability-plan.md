@@ -2,7 +2,7 @@
 
 **Created:** 2026-08-22
 **Agent:** Codex
-**Status:** IN PROGRESS
+**Status:** DONE
 **Touches buckets:** crawl orchestration, authentication, frontend shell, browser acquisition, runtime configuration, architecture docs
 
 ## Goal
@@ -46,7 +46,7 @@ Prevent batch crawls from sharing SQLAlchemy sessions across concurrent work, ad
 **Verify:** Browser tests prove target-first navigation, storage-state reuse, recovery, and absence of warmup behavior.
 
 ### Slice 4: Broad verification and closeout
-**Status:** IN PROGRESS
+**Status:** DONE
 **Files:** plan tracking and any required documentation corrections
 **What:** Run backend, frontend, acquisition, extraction, and acceptance checks; perform the real 80-URL acceptance run when the local services permit it.
 **Verify:** Required quality gates pass, or environment-only blockers are recorded precisely.
@@ -67,3 +67,4 @@ Prevent batch crawls from sharing SQLAlchemy sessions across concurrent work, ad
 - Slice 1 found the concrete race: URL tasks read an expired `run.id` attribute from the coordinator ORM instance, causing concurrent lazy SQL on the coordinator session. Workers now capture a primitive id before scheduling, own sessions per URL in both modes, and run through a fixed worker pool. Targeted regressions: 13 passed.
 - Slice 2 added idempotent current-user token-version revocation, cookie deletion, sidebar identity/logout, and unconditional query-cache clearing. Backend auth checks: 30 passed. Frontend checks: typecheck passed; full Vitest suite 181 passed.
 - Slice 3 deleted the warmup owner, runtime calls, configuration, stale telemetry, and warmup-only tests. Direct-navigation/challenge/config checks: 108 passed. Focused direct-navigation and real-Chrome state checks: 24 passed.
+- Owner confirmed on 2026-08-23 that this historical plan is closed. It is not active launch work.

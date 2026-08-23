@@ -153,11 +153,13 @@ Primary files:
 Responsibilities:
 
 - app startup/shutdown
-- migrations on startup
+- migrations and optional admin bootstrap through the one-shot `init_db.py` task; long-running API/worker processes never receive the bootstrap password
 - route registration
 - auth/dependencies
 - correlation IDs
 - health and metrics
+- deployment surface controls: `MONITORING_ENABLED=false` omits monitor/alert/notification routers and scheduler registration; public docs and metrics have separate production switches
+- untrusted selector/review HTML is served through `services/untrusted_html.py` with sandbox CSP and no-store headers
 
 ### 6.2 Crawl ingestion and orchestration
 

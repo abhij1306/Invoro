@@ -97,6 +97,35 @@ async def test_fetch_selector_document_rejects_private_targets() -> None:
 
 @pytest.mark.asyncio
 @pytest.mark.component
+async def test_fetch_selector_document_revalidates_promoted_iframe(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _Result:
+        final_url = "https://example.com/page"
+        html = '<html><iframe src="http://127.0.0.1/internal"></iframe></html>'
+
+    async def _fake_fetch_page(url: str, **kwargs):
+        del kwargs
+        assert url == "https://example.com/page"
+        return _Result()
+
+    async def _fake_ensure(urls):
+        values = list(urls)
+        if values == ["https://example.com/page"]:
+            return values
+        raise ValueError("Target host resolves to a non-public IP address")
+
+    monkeypatch.setattr("app.services.selectors_runtime.fetch_page", _fake_fetch_page)
+    monkeypatch.setattr(
+        "app.services.selectors_runtime.ensure_public_crawl_targets", _fake_ensure
+    )
+
+    with pytest.raises(ValueError, match="non-public IP"):
+        await fetch_selector_document("https://example.com/page")
+
+
+@pytest.mark.asyncio
+@pytest.mark.component
 async def test_update_selector_record_returns_committed_memory_timestamps(
     db_session,
 ) -> None:

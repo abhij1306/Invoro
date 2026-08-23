@@ -8,6 +8,7 @@ import { Trash2 } from 'lucide-react';
 
 import { api } from '../../lib/api';
 import { httpErrorStatus } from '../../lib/api/client';
+import { awsDemoMode } from '../../lib/config/demo-mode';
 import { trapFocus } from '../../lib/focus-trap';
 import { getAuthSessionQueryOptions, isAuthRoute } from './auth-session-query';
 import { Button } from '../ui/button';
@@ -173,11 +174,12 @@ function ShellContent({
     queryKey: ['notifications-unread-count'],
     queryFn: api.notificationUnreadCount,
     staleTime: 30_000,
+    enabled: !awsDemoMode,
   });
   const notificationsQuery = useQuery({
     queryKey: ['notifications-unread'],
     queryFn: () => api.listNotifications({ limit: 10 }),
-    enabled: notificationsOpen,
+    enabled: notificationsOpen && !awsDemoMode,
   });
   const markReadMutation = useMutation({
     mutationFn: api.markNotificationRead,
@@ -287,15 +289,17 @@ function ShellContent({
             </div>
           ) : null}
           <ThemeToggle compact />
-          <NotificationMenu
-            open={notificationsOpen}
-            count={notificationCountQuery.data?.count ?? 0}
-            pending={notificationsQuery.isPending}
-            items={notificationsQuery.data ?? []}
-            onToggle={() => setNotificationsOpen((value) => !value)}
-            onClose={() => setNotificationsOpen(false)}
-            onRead={(id) => markReadMutation.mutate(id)}
-          />
+          {!awsDemoMode ? (
+            <NotificationMenu
+              open={notificationsOpen}
+              count={notificationCountQuery.data?.count ?? 0}
+              pending={notificationsQuery.isPending}
+              items={notificationsQuery.data ?? []}
+              onToggle={() => setNotificationsOpen((value) => !value)}
+              onClose={() => setNotificationsOpen(false)}
+              onRead={(id) => markReadMutation.mutate(id)}
+            />
+          ) : null}
         </div>
       </header>
 

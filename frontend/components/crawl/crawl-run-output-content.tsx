@@ -10,6 +10,7 @@ import {
 } from '../ui/patterns';
 import { Badge, Button, Card } from '../ui/primitives';
 import { CRAWL_DEFAULTS } from '../../lib/constants/crawl-defaults';
+import { awsDemoMode } from '../../lib/config/demo-mode';
 import { LogTerminal, RecordsTable } from './shared-components';
 import { copyJson, selectorWinnerLabel } from './shared';
 import { MarkdownOutputPanel } from './markdown-output';
@@ -121,7 +122,7 @@ function JsonRunOutput({ model }: { model: CrawlRunScreenModel }) {
   return (
     <div className="relative min-h-[55vh]">
       <div className="absolute top-2 right-2 z-10 flex items-center gap-2">
-        {ecommerceDetailRun && records.length ? (
+        {!awsDemoMode && ecommerceDetailRun && records.length ? (
           <Button variant="action" type="button" onClick={() => setAlertBuilderOpen(true)}>
             <Bell className="size-3.5" />
             Alert

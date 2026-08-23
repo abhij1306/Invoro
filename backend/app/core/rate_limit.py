@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 from collections import OrderedDict, deque
 from time import monotonic
 
@@ -13,14 +14,9 @@ def client_identifier_from_request(
     trusted_proxies: tuple[str, ...] = (),
 ) -> str:
     peer_host = request.client.host if request.client and request.client.host else ""
-    trusted_proxy_set = frozenset(
-        normalized
-        for normalized in (str(value).strip() for value in trusted_proxies)
-        if normalized
-    )
     forwarded_for = (
         request.headers.get("x-forwarded-for")
-        if peer_host in trusted_proxy_set
+        if is_trusted_proxy(peer_host, trusted_proxies=trusted_proxies)
         else None
     )
     if forwarded_for:
@@ -30,6 +26,29 @@ def client_identifier_from_request(
     if peer_host:
         return peer_host
     return "unknown"
+
+
+def is_trusted_proxy(proxy_ip: str, *, trusted_proxies: tuple[str, ...]) -> bool:
+    candidate = str(proxy_ip or "").strip()
+    if not candidate:
+        return False
+    try:
+        address = ipaddress.ip_address(candidate)
+    except ValueError:
+        return candidate in {
+            str(value).strip() for value in trusted_proxies if str(value).strip()
+        }
+    for raw_value in trusted_proxies:
+        value = str(raw_value or "").strip()
+        if not value:
+            continue
+        try:
+            if address in ipaddress.ip_network(value, strict=False):
+                return True
+        except ValueError:
+            if candidate == value:
+                return True
+    return False
 
 
 async def consume_sliding_window_limit(

@@ -6,6 +6,7 @@ from urllib.parse import urlparse
 
 import httpx
 
+from app.core.config import settings
 from app.core.dependencies import get_current_user, get_db
 from app.models.user import User
 from app.schemas.selectors import (
@@ -31,6 +32,7 @@ from app.services.selectors_runtime import (
     update_selector_record,
 )
 from app.services.url_safety import SecurityError, validate_public_target
+from app.services.untrusted_html import untrusted_html_response
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from fastapi.responses import HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -214,9 +216,10 @@ async def selectors_preview_html(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Unable to fetch preview HTML from the upstream page.",
         ) from exc
-    return HTMLResponse(
-        content=build_preview_html(
+    return untrusted_html_response(
+        build_preview_html(
             source_url=str(document["url"]),
             html=str(document["html"]),
-        )
+        ),
+        frame_ancestor=settings.frontend_url,
     )

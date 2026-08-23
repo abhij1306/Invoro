@@ -115,8 +115,11 @@ class Settings(BaseSettings):
         default=False,
         validation_alias=AliasChoices("BOOTSTRAP_ADMIN_ONCE", "bootstrap_admin_once"),
     )
-    # When false, POST /api/auth/register returns 403 (POC single-admin dev). Enable for production multi-tenant.
+    # Demo/release surface controls. Local behavior stays fully enabled by default.
     registration_enabled: bool = False
+    monitoring_enabled: bool = True
+    public_docs_enabled: bool = True
+    public_metrics_enabled: bool = True
 
     # Database pool tuning (ignored for SQLite).
     db_pool_size: int = 5

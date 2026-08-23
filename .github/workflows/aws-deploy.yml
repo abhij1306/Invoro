@@ -1,0 +1,191 @@
+name: Deploy Invoro to AWS
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Deploy or roll back a complete release
+        required: true
+        default: deploy
+        type: choice
+        options: [deploy, rollback]
+      release_sha:
+        description: Main-branch commit to deploy; blank uses workflow commit
+        required: false
+        type: string
+      rollback_to_sha:
+        description: Existing immutable release SHA when mode is rollback
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: invoro-aws-demo
+  cancel-in-progress: false
+
+jobs:
+  resolve:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    outputs:
+      release_sha: ${{ steps.release.outputs.release_sha }}
+    steps:
+      - name: Checkout main history
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve authorized release
+        id: release
+        env:
+          MODE: ${{ inputs.mode }}
+          REQUESTED_DEPLOY: ${{ inputs.release_sha }}
+          REQUESTED_ROLLBACK: ${{ inputs.rollback_to_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$MODE" == "rollback" ]]; then
+            requested="$REQUESTED_ROLLBACK"
+            test -n "$requested"
+          else
+            requested="${REQUESTED_DEPLOY:-$GITHUB_SHA}"
+          fi
+          release_sha=$(git rev-parse --verify "${requested}^{commit}")
+          git fetch origin main
+          git merge-base --is-ancestor "$release_sha" origin/main
+          echo "release_sha=$release_sha" >> "$GITHUB_OUTPUT"
+
+  backend-quality:
+    if: inputs.mode == 'deploy'
+    needs: resolve
+    runs-on: ubuntu-latest
+    environment: aws-demo
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: test_db
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d test_db"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      APP_ENV: test
+      JWT_SECRET_KEY: release-jwt-secret-not-default
+      ENCRYPTION_KEY: release-encryption-secret-not-default
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/test_db
+      TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/test_db
+      REDIS_STATE_ENABLED: "false"
+      CELERY_DISPATCH_ENABLED: "false"
+      BOOTSTRAP_ADMIN_ONCE: "false"
+      PYTHONPATH: .
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout release
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.resolve.outputs.release_sha }}
+
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@d0d8abe699bfb85fec6de9f7adb5ae17292296ff # v6
+        with:
+          version: "0.11.28"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Install and verify backend
+        run: |
+          uv sync --frozen --extra dev
+          uv run --frozen --extra dev pip-audit --local --vulnerability-service osv
+          uv run --frozen --extra dev ruff check app tests
+          uv run --frozen --extra dev ruff format --check app tests
+          uv run --frozen --extra dev mypy app
+          uv run --frozen --extra dev pytest tests/regression/test_structure.py -q -m regression
+          uv run --frozen --extra dev pytest tests -q -m "unit or component or regression"
+
+  frontend-quality:
+    if: inputs.mode == 'deploy'
+    needs: resolve
+    runs-on: ubuntu-latest
+    environment: aws-demo
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout release
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.resolve.outputs.release_sha }}
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+
+      - name: Verify frontend
+        run: |
+          corepack enable
+          pnpm install --frozen-lockfile
+          pnpm audit --audit-level=high
+          pnpm run format:check
+          pnpm run lint
+          pnpm run typecheck
+          pnpm test
+          NEXT_PUBLIC_API_BASE_URL=https://${{ vars.INVORO_API_HOST }} NEXT_PUBLIC_AWS_DEMO_MODE=true pnpm run build
+
+  release:
+    if: >-
+      always() &&
+      needs.resolve.result == 'success' &&
+      (inputs.mode == 'rollback' ||
+       (needs.backend-quality.result == 'success' && needs.frontend-quality.result == 'success'))
+    needs: [resolve, backend-quality, frontend-quality]
+    runs-on: ubuntu-latest
+    environment: aws-demo
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
+      AWS_DEPLOY_ROLE_ARN: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+      RELEASE_MODE: ${{ inputs.mode }}
+      RELEASE_SHA: ${{ needs.resolve.outputs.release_sha }}
+      FRONTEND_HOST: ${{ vars.INVORO_FRONTEND_HOST }}
+      API_HOST: ${{ vars.INVORO_API_HOST }}
+    steps:
+      - name: Checkout release automation
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Checkout release source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.resolve.outputs.release_sha }}
+          path: release-source
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@cabfdba3510de1431bac9dba27511d97497fc100 # v5
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Deploy or roll back complete release
+        shell: bash
+        env:
+          SOURCE_DIR: ${{ github.workspace }}/release-source
+        run: bash infra/aws/scripts/release.sh

@@ -7,6 +7,7 @@ from app.models.crawl_run import CrawlRun
 from app.services.crawl.crud import create_crawl_run
 from app.services.crawl.service import dispatch_run
 from app.services.crawl.utils import parse_csv_urls
+from app.services.config.runtime_settings import crawler_runtime_settings
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
@@ -57,6 +58,9 @@ def build_csv_crawl_payload(
     urls = parse_csv_urls(csv_content)
     if not urls:
         raise ValueError("No valid URLs found in CSV")
+    max_urls = int(crawler_runtime_settings.csv_url_max_count)
+    if len(urls) > max_urls:
+        raise ValueError(f"CSV contains more than the {max_urls}-URL limit")
 
     crawl_settings = _parse_settings_json(settings_json)
     crawl_settings["csv_content"] = csv_content

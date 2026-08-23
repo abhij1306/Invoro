@@ -239,6 +239,16 @@ def test_runtime_settings_reject_invalid_page_bounds() -> None:
         CrawlerRuntimeSettings(min_max_pages=5, max_max_pages=4)
 
 
+@pytest.mark.parametrize("field_name", ["csv_upload_max_bytes", "csv_url_max_count"])
+@pytest.mark.parametrize("value", [0, -1])
+@pytest.mark.regression
+def test_runtime_settings_require_positive_csv_limits(
+    field_name: str, value: int
+) -> None:
+    with pytest.raises(ValueError, match=rf"{field_name} must be > 0"):
+        CrawlerRuntimeSettings(**{field_name: value})
+
+
 @pytest.mark.regression
 def test_runtime_settings_reject_invalid_scroll_bounds() -> None:
     with pytest.raises(

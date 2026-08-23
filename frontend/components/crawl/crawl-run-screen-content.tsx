@@ -19,6 +19,7 @@ import {
 } from '../ui/patterns';
 import { Badge, Button, Card } from '../ui/primitives';
 import type { ResultSummaryQualityLevel } from '../../lib/api/types';
+import { awsDemoMode } from '../../lib/config/demo-mode';
 import { ACTIVE_STATUSES } from '../../lib/constants/crawl-statuses';
 import { getDomain } from '../../lib/format/domain';
 import { ActionButton, LogTerminal } from './shared-components';
@@ -152,13 +153,15 @@ export function CrawlRunScreenContent({
       <LiveRunPanel model={model} />
 
       <TerminalRunPanel model={model} />
-      <AlertBuilderDrawer
-        open={alertBuilderOpen}
-        onOpenChange={setAlertBuilderOpen}
-        records={records}
-        run={run}
-        onCreated={(alertId) => router.push(`/alerts/${alertId}`)}
-      />
+      {!awsDemoMode ? (
+        <AlertBuilderDrawer
+          open={alertBuilderOpen}
+          onOpenChange={setAlertBuilderOpen}
+          records={records}
+          run={run}
+          onCreated={(alertId) => router.push(`/alerts/${alertId}`)}
+        />
+      ) : null}
       <HistoryDrawer
         open={historyOpen}
         onClose={() => setHistoryOpen(false)}

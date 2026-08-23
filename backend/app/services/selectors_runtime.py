@@ -80,7 +80,10 @@ async def fetch_selector_document(url: str) -> dict[str, object]:
         candidate_url = _primary_iframe_candidate(final_url, html)
         if not candidate_url or candidate_url in visited:
             break
-        iframe_result = await fetch_page(candidate_url, prefer_browser=False)
+        validated_candidates = await ensure_public_crawl_targets([candidate_url])
+        if not validated_candidates:
+            break
+        iframe_result = await fetch_page(validated_candidates[0], prefer_browser=False)
         iframe_text = html_to_text(iframe_result.html)
         page_text = html_to_text(html)
         if len(iframe_text) <= len(page_text):

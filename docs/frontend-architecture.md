@@ -53,6 +53,7 @@ Important route behavior:
 - `/crawl` switches between config mode and run workspace based on `run_id`
 - `/crawl/category`, `/crawl/pdp`, and `/crawl/bulk` are route shims into `/crawl?...`
 - `/runs/[run_id]` routes back into the crawl workspace
+- AWS demo builds set `NEXT_PUBLIC_AWS_DEMO_MODE=true`; the proxy returns 404 for `/monitors*` and `/alerts*`, while the shell hides monitoring navigation and notification requests
 
 ## 3. Main Frontend Subsystems
 
@@ -74,6 +75,7 @@ Responsibilities:
 - signed-in identity display and per-user logout; logout clears the complete query cache before routing to `/login` so a later account cannot inherit cached workspace data
 - shell layout and nav
 - notification menu presentation in `components/layout/notification-menu.tsx`
+- demo-mode visibility and route policy from `lib/config/demo-mode.ts`
 - auth-route vs app-route split
 - header state
 - theme toggle and common shell framing

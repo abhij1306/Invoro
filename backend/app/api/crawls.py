@@ -78,6 +78,24 @@ RUN_CONFLICT_RESPONSE: ResponseSpec = {
 _WEBSOCKET_PROTOCOL_TRANSFER_TASK_ATTR = "transfer_data_task"
 
 
+async def read_csv_upload(file: UploadFile) -> str:
+    max_bytes = int(crawler_runtime_settings.csv_upload_max_bytes)
+    chunks: list[bytes] = []
+    total = 0
+    while True:
+        chunk = await file.read(min(64 * 1024, max_bytes + 1 - total))
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > max_bytes:
+            raise HTTPException(
+                status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+                detail=f"CSV upload exceeds the {max_bytes}-byte limit",
+            )
+        chunks.append(chunk)
+    return b"".join(chunks).decode("utf-8", errors="ignore")
+
+
 def _log_stream_sleep_seconds() -> float:
     try:
         return max(
@@ -193,7 +211,7 @@ async def crawls_create_csv(
     settings_json: Annotated[str, Form()] = "{}",
 ) -> dict:
     """Create a crawl run from an uploaded CSV file."""
-    content = (await file.read()).decode("utf-8", errors="ignore")
+    content = await read_csv_upload(file)
     try:
         run, url_count = await create_crawl_run_from_csv(
             session,

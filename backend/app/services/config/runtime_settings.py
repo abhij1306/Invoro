@@ -135,6 +135,8 @@ class CrawlerRuntimeSettings(BaseSettings):
     api_rate_limit_window_seconds: int = 60
     api_rate_limit_max_clients: int = 4096
     api_rate_limit_trusted_proxies: tuple[str, ...] = ()
+    csv_upload_max_bytes: int = 1_048_576
+    csv_url_max_count: int = 1_000
     max_candidates_per_field: int = 5
     dynamic_field_name_max_tokens: int = 7
     accordion_expand_max: int = 20
@@ -249,6 +251,7 @@ class CrawlerRuntimeSettings(BaseSettings):
         "--disable-background-networking",
         "--disable-client-side-phishing-detection",
         "--disable-domain-reliability",
+        "--disable-dev-shm-usage",
         "--disable-sync",
         "--no-first-run",
     )
@@ -600,6 +603,8 @@ class CrawlerRuntimeSettings(BaseSettings):
             "api_rate_limit_window_seconds", self.api_rate_limit_window_seconds
         )
         _require_positive("api_rate_limit_max_clients", self.api_rate_limit_max_clients)
+        _require_positive("csv_upload_max_bytes", self.csv_upload_max_bytes)
+        _require_positive("csv_url_max_count", self.csv_url_max_count)
 
     def coerce_url_timeout_seconds(self, value: object) -> float:
         try:

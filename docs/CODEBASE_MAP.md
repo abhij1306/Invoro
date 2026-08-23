@@ -328,6 +328,7 @@ Verdict set:
 |---|---|
 | `review/__init__.py` | Review payloads and approved field mapping persistence |
 | `selectors_runtime.py` | Selector CRUD and runtime lookup |
+| `untrusted_html.py` | Shared sandbox CSP response boundary for crawled/preview HTML |
 | `selector_auto_learn.py` | Strict DOM-observed selector auto-save into domain memory |
 | `selector_suggestions.py` | Selector suggestion assembly from domain memory, deterministic DOM patterns, listing cards, and LLM candidates |
 | `selector_self_heal.py` | Selector synthesis and validation |
@@ -389,7 +390,20 @@ All selector memory is scoped by normalized `(domain, surface)`.
 | `lib/api/client.ts` | auth-aware fetch wrapper |
 | `lib/api/index.ts` | only frontend backend-access layer |
 | `lib/api/types.ts`, `lib/api/monitor-types.ts` | shared frontend API types and monitor/alert DTO ownership |
+| `lib/config/demo-mode.ts` | AWS demo route and feature visibility contract |
 | `scripts/check-token-escapes.mjs` | frontend guard against new raw CSS-var Tailwind token escapes |
+
+---
+
+## AWS Demo Deployment
+
+| Path | Purpose |
+|---|---|
+| `infra/aws/` | Disposable AWS VPC, ALB, Fargate, RDS, Redis, EFS, ECR, logs, secrets, and least-privilege IAM |
+| `infra/aws/scripts/release.sh` | Immutable deploy/rollback orchestration and migration gate |
+| `.github/workflows/aws-*.yml` | Manual provision, deploy, control, and destroy entry points using GitHub OIDC |
+
+The AWS demo owns exactly frontend, API, and worker ECS services. Monitoring is disabled and no Beat service is provisioned.
 
 ---
 

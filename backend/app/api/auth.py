@@ -102,8 +102,8 @@ async def register(
         return limited
     if not settings.registration_enabled:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Registration is disabled. Enable REGISTRATION_ENABLED for multi-tenant deployments.",
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Not Found",
         )
     existing = await session.execute(
         select(User).where(User.email == payload.email.lower())

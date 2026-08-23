@@ -1,9 +1,9 @@
 # Active Plan
 
-**Current:** Crawl Reliability, Logout, and Warmup Removal → `docs/plans/crawl-auth-warmup-reliability-plan.md`
+**Current:** Invoro AWS Feedonomics Demo Launch → `docs/plans/INVORO_AWS_CODEX_IMPLEMENTATION.md`
 **Status:** IN PROGRESS
-**Started:** 2026-08-22
-**Last slice completed:** Slice 3 — Remove origin warmup
+**Started:** 2026-08-23
+**Last slice completed:** Slice 4 — documentation and repository verification
 
 ## Queue
 
