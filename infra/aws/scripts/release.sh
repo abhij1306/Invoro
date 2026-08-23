@@ -99,9 +99,35 @@ if ! image_exists "$frontend_repository"; then
   docker push "$registry/$frontend_repository:$RELEASE_SHA"
 fi
 
+wait_for_image_scan() {
+  local repository=$1
+  local attempt wait_output
+  for attempt in $(seq 1 12); do
+    if wait_output=$(aws ecr wait image-scan-complete \
+      --repository-name "$repository" \
+      --image-id "imageTag=$RELEASE_SHA" 2>&1); then
+      return 0
+    fi
+    case "$wait_output" in
+      *ScanNotFoundException*|*ImageNotFoundException*) ;;
+      *)
+        echo "$wait_output" >&2
+        return 1
+        ;;
+    esac
+    if (( attempt == 12 )); then
+      echo "$wait_output" >&2
+      echo "$repository:$RELEASE_SHA scan was not created within 60 seconds." >&2
+      return 1
+    fi
+    echo "$repository:$RELEASE_SHA scan is not visible yet; retrying in 5 seconds ($attempt/12)." >&2
+    sleep 5
+  done
+}
+
 scan_image() {
   local repository=$1
-  aws ecr wait image-scan-complete --repository-name "$repository" --image-id "imageTag=$RELEASE_SHA"
+  wait_for_image_scan "$repository"
   local findings_file enhanced_count blocking no_fix
   findings_file=$(mktemp)
   aws ecr describe-image-scan-findings \
