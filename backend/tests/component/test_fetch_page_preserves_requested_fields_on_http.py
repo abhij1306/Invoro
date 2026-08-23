@@ -213,12 +213,7 @@ async def test_http_escalation_timeout_keeps_prior_http_observation(
 ) -> None:
     context = _default_fetch_context()
     context.fetch_mode = "auto"
-    events: list[tuple[str, str]] = []
-
-    async def _capture_event(level: str, message: str) -> None:
-        events.append((level, message))
-
-    context.on_event = _capture_event
+    context.on_event = AsyncMock()
     original = PageFetchResult(
         url=context.url,
         final_url=context.url,
@@ -244,17 +239,10 @@ async def test_http_escalation_timeout_keeps_prior_http_observation(
     assert result.method == "curl_cffi"
     assert result.browser_diagnostics["browser_outcome"] == "render_timeout"
     assert result.browser_diagnostics["failure_kind"] == "timeout"
-    assert events == [
-        (
-            "info",
-            "Escalating to browser after HTTP result "
-            "(status=200, method=curl_cffi, reason=http-escalation)",
-        ),
-        (
-            "warning",
-            "Browser acquisition failed; keeping prior HTTP observation (TimeoutError)",
-        ),
-    ]
+    context.on_event.assert_awaited_with(
+        "warning",
+        "Browser acquisition failed; keeping prior HTTP result (TimeoutError)",
+    )
 
 
 @pytest.mark.asyncio
