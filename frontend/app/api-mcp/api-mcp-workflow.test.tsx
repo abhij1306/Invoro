@@ -85,7 +85,9 @@ describe('API and MCP workflow', () => {
 
     await screen.findByText('Production client');
     expect(
-      screen.getByText(/https:\/\/api\.example\.com\/api\/v1\/capabilities/),
+      screen.getByText(
+        'curl -H "Authorization: Bearer <YOUR_API_KEY>" "https://api.example.com/api/v1/capabilities"',
+      ),
     ).toBeInTheDocument();
     expect(screen.getByText(/app\.mcp_server\.server/)).toBeInTheDocument();
     expect(screen.getAllByText(/INVORO_API_KEY/)).toHaveLength(1);
