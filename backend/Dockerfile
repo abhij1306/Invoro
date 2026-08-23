@@ -1,4 +1,6 @@
-FROM python:3.12-slim@sha256:2c941e860699f878900b0edc2403613c234d4b32eda3cc9fa7036991a2a63c4a
+FROM ghcr.io/astral-sh/uv:0.11.28@sha256:0f36cb9361a3346885ca3677e3767016687b5a170c1a6b88465ec14aefec90aa AS uv
+
+FROM ubuntu:24.04@sha256:33ceb71981b602c1a7443a53469e4dba065f7503eab3078a2d7a57a2ab987517
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -14,17 +16,22 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app/backend
 
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends ca-certificates python3 && \
+    ln -s /usr/bin/python3 /usr/local/bin/python && \
+    rm -rf /var/lib/apt/lists/*
+
 COPY backend/ ./
 
-# Install exactly the frozen application lock. uv itself is pinned as build tooling.
-# hadolint ignore=DL3013
-RUN python -m pip install --no-cache-dir uv==0.11.28 && \
+# Install exactly the frozen application lock. uv is a pinned build-only mount.
+RUN --mount=from=uv,source=/uv,target=/usr/local/bin/uv \
     uv sync --frozen --no-dev && \
     python -m patchright install --with-deps chromium && \
     apt-get purge -y xvfb xserver-common && \
     apt-get update && \
     apt-get upgrade -y && \
     apt-get clean && \
+    rm -rf /root/.cache/uv && \
     rm -rf /var/lib/apt/lists/*
 
 RUN groupadd --gid 10001 appuser && \
