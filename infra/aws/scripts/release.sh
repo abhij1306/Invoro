@@ -46,6 +46,34 @@ update_service() {
   aws ecs update-service --cluster "$cluster" --service "$service" --task-definition "$task_definition" >/dev/null
 }
 
+print_migration_failure_logs() {
+  local task_arn=$1
+  local task_id=${task_arn##*/}
+  local log_group="/ecs/${cluster}/migration"
+  local log_stream="migration/migration/${task_id}"
+  local attempt log_json messages
+
+  for attempt in $(seq 1 6); do
+    if log_json=$(aws logs get-log-events \
+      --log-group-name "$log_group" \
+      --log-stream-name "$log_stream" \
+      --limit 100 \
+      --output json 2>/dev/null); then
+      messages=$(jq -r '.events[].message' <<< "$log_json")
+      if [[ -n "$messages" ]]; then
+        echo "Migration logs (credentials redacted):" >&2
+        printf '%s\n' "$messages" | sed -E \
+          -e 's#(postgres(ql)?(\+asyncpg)?://[^:[:space:]]+:)[^@[:space:]]+@#\1***@#gI' \
+          -e 's#((password|secret|token)[=:][[:space:]]*)[^[:space:]]+#\1***#gI' >&2
+        return
+      fi
+    fi
+    sleep 2
+  done
+
+  echo "Migration log stream was not available: $log_stream" >&2
+}
+
 find_release_task_definition() {
   local family=$1
   local container=$2
@@ -265,6 +293,7 @@ if [[ "$migration_exit" != "0" ]]; then
     --tasks "$migration_run" \
     --query 'tasks[0].{StopCode:stopCode,StoppedReason:stoppedReason,Containers:containers[].{Name:name,ExitCode:exitCode,LastStatus:lastStatus,Reason:reason}}' \
     --output json >&2
+  print_migration_failure_logs "$migration_run"
   exit 1
 fi
 
