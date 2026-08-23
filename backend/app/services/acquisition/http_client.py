@@ -44,6 +44,7 @@ async def request_result(
     proxy: str | None = None,
     timeout_seconds: float | None = None,
     follow_redirects: bool | None = None,
+    extensions: dict[str, Any] | None = None,
 ) -> HttpFetchResult:
     # Browser acquisition is orchestrated by the acquisition pipeline, not
     # by this low-level HTTP helper. Keep the flag for call compatibility,
@@ -61,6 +62,7 @@ async def request_result(
             proxy=proxy,
             timeout=timeout,
             follow_redirects=follow_redirects,
+            extensions=extensions,
         )
     except Exception as exc:
         if not should_retry_with_forced_ipv4(exc):
@@ -75,6 +77,7 @@ async def request_result(
             timeout=timeout,
             force_ipv4=True,
             follow_redirects=follow_redirects,
+            extensions=extensions,
         )
     text = response.text or ""
     return HttpFetchResult(
@@ -102,6 +105,7 @@ async def _request_with_httpx(
     timeout: float,
     force_ipv4: bool = False,
     follow_redirects: bool | None = None,
+    extensions: dict[str, Any] | None = None,
 ) -> httpx.Response:
     request_kwargs: dict[str, Any] = {
         "headers": headers,
@@ -111,6 +115,8 @@ async def _request_with_httpx(
     }
     if follow_redirects is not None:
         request_kwargs["follow_redirects"] = follow_redirects
+    if extensions is not None:
+        request_kwargs["extensions"] = extensions
     if force_ipv4:
         async with build_async_http_client(
             follow_redirects=True,

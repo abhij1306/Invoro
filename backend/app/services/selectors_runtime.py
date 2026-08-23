@@ -42,7 +42,7 @@ from app.services.dom.xpath_service import (
     extract_selector_value,
     validate_or_convert_xpath,
 )
-from app.services.url_safety import ensure_public_crawl_targets
+from app.services.url_safety import prepare_public_request_target
 
 coerce_int = _coerce_int
 _HTML_PARSER = "html.parser"
@@ -97,22 +97,27 @@ async def _fetch_public_selector_html(url: str) -> tuple[str, str]:
     current_url = str(url)
     max_redirects = int(crawler_runtime_settings.selector_preview_max_redirects)
     for redirect_count in range(max_redirects + 1):
-        validated = await ensure_public_crawl_targets([current_url])
-        if not validated:
-            raise ValueError("Selector preview target is not public")
+        target = await prepare_public_request_target(current_url)
+        extensions = (
+            {"sni_hostname": target.sni_hostname}
+            if target.sni_hostname is not None
+            else None
+        )
         result = await request_result(
-            validated[0],
+            target.pinned_url,
             prefer_browser=False,
             follow_redirects=False,
+            headers={"Host": target.host_header},
+            extensions=extensions,
         )
         if result.status_code not in {301, 302, 303, 307, 308}:
-            return result.final_url, result.text
+            return target.logical_url, result.text
         location = result.headers.get("location")
         if not location:
             raise ValueError("Selector preview redirect is missing a Location header")
         if redirect_count >= max_redirects:
             raise ValueError("Selector preview exceeded the redirect limit")
-        current_url = urljoin(result.final_url, location)
+        current_url = urljoin(target.logical_url, location)
     raise ValueError("Selector preview exceeded the redirect limit")
 
 
