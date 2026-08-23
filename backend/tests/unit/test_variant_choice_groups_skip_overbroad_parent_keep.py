@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from .test_shared_variant_logic import BeautifulSoup, axis_values_are_mislabeled_duplicate, backfill_variants_from_dom_if_missing, extract_variants_from_dom, infer_variant_group_name_from_values, iter_variant_choice_groups, normalized_variant_axis_key, pytest, resolve_variant_group_name, resolve_variants, variant_choice_container_for_input, variant_choice_container_is_overbroad  # fmt: skip
+from app.services.extract import variant_choice_collection
 
 
 @pytest.mark.unit
@@ -124,6 +125,138 @@ def test_variant_choice_groups_collect_button_container_not_buttons() -> None:
     assert len(groups) == 1
     assert groups[0].name == "section"
     assert len(groups[0].select("button")) == 2
+
+
+@pytest.mark.unit
+def test_narrow_button_pass_does_not_scan_parent_subtrees() -> None:
+    class FakeNode:
+        name = "button"
+
+        def __init__(self, parent=None) -> None:
+            self.parent = parent
+            self.attrs = {"class": ["size-option"], "data-variant": "size"}
+
+        def get(self, key: str):  # type: ignore[no-untyped-def]
+            return self.attrs.get(key)
+
+    class FakeParent(FakeNode):
+        name = "section"
+
+        def __init__(self) -> None:
+            super().__init__()
+            self.attrs = {"class": ["size-options"], "aria-label": "Size"}
+
+        def select(self, *_args, **_kwargs):  # type: ignore[no-untyped-def]
+            raise AssertionError("narrow button pass must not scan parent subtrees")
+
+    parent = FakeParent()
+    nodes = [FakeNode(parent), FakeNode(parent)]
+
+    groups: list[object] = []
+    reached_limit = variant_choice_collection._add_button_choice_groups(
+        type("FakeSoup", (), {"select": lambda self, selector: nodes})(),
+        groups,
+        set(),
+    )
+
+    assert reached_limit is False
+    assert groups == [parent]
+
+
+@pytest.mark.unit
+def test_input_choice_scan_respects_global_candidate_cap(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    nodes = [object() for _ in range(10)]
+    visited: list[object] = []
+    monkeypatch.setattr(variant_choice_collection, "VARIANT_CHOICE_INPUT_SCAN_LIMIT", 3)
+    monkeypatch.setattr(
+        variant_choice_collection,
+        "variant_node_in_noise_context",
+        lambda node: False,
+    )
+
+    def _candidate(node):  # type: ignore[no-untyped-def]
+        visited.append(node)
+        return None
+
+    monkeypatch.setattr(
+        variant_choice_collection,
+        "variant_choice_container_for_input",
+        _candidate,
+    )
+
+    groups: list[object] = []
+    variant_choice_collection._add_input_choice_groups(
+        type("FakeSoup", (), {"select": lambda self, selector: nodes})(),
+        groups,
+        set(),
+    )
+
+    assert visited == nodes[:3]
+
+
+@pytest.mark.unit
+def test_input_choice_parent_walk_respects_depth_cap(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FakeNode:
+        name = "div"
+
+        def __init__(self, parent=None) -> None:
+            self.parent = parent
+
+        def get(self, key: str):  # type: ignore[no-untyped-def]
+            return "radio" if key == "type" else None
+
+    parent = None
+    for _ in range(20):
+        parent = FakeNode(parent)
+    node = FakeNode(parent)
+    visited: list[object] = []
+
+    def _ineligible(candidate):  # type: ignore[no-untyped-def]
+        visited.append(candidate)
+        return False
+
+    monkeypatch.setattr(
+        variant_choice_collection,
+        "_input_parent_is_eligible",
+        _ineligible,
+    )
+
+    assert variant_choice_container_for_input(node) is None
+    assert len(visited) == variant_choice_collection.VARIANT_SWATCH_PARENT_DEPTH
+
+
+@pytest.mark.unit
+def test_variant_choice_groups_reuse_cached_discovery(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = 0
+
+    def _stage(soup, groups, seen):  # type: ignore[no-untyped-def]
+        nonlocal calls
+        del soup, groups, seen
+        calls += 1
+        return False
+
+    soup = type("FakeSoup", (), {})()
+    monkeypatch.setattr(variant_choice_collection, "_add_labeled_role_groups", _stage)
+    monkeypatch.setattr(
+        variant_choice_collection, "_add_configured_choice_groups", _stage
+    )
+    monkeypatch.setattr(variant_choice_collection, "_add_input_choice_groups", _stage)
+    monkeypatch.setattr(variant_choice_collection, "_add_button_choice_groups", _stage)
+    monkeypatch.setattr(
+        variant_choice_collection,
+        "_add_swatch_choice_groups",
+        lambda soup, groups, seen: None,
+    )
+
+    assert variant_choice_collection.iter_variant_choice_groups(soup) == []
+    assert variant_choice_collection.iter_variant_choice_groups(soup) == []
+    assert calls == 4
 
 
 @pytest.mark.unit

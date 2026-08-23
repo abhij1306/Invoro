@@ -117,6 +117,10 @@ class CrawlerRuntimeSettings(BaseSettings):
     url_process_timeout_seconds: float = 90.0
     url_process_timeout_buffer_seconds: float = 15.0
     max_url_process_timeout_seconds: float = 600.0
+    extraction_process_start_timeout_seconds: float = 30.0
+    extraction_process_timeout_seconds: float = 45.0
+    extraction_process_terminate_grace_seconds: float = 1.0
+    extraction_process_max_payload_bytes: int = 256_000_000
     job_max_wall_seconds: int = 3600
     worker_max_concurrent_jobs: int = 8
     worker_orphan_recovery_grace_seconds: int = 900
@@ -437,6 +441,9 @@ class CrawlerRuntimeSettings(BaseSettings):
         for field_name in (
             "url_process_timeout_seconds",
             "max_url_process_timeout_seconds",
+            "extraction_process_start_timeout_seconds",
+            "extraction_process_timeout_seconds",
+            "extraction_process_max_payload_bytes",
             "job_max_wall_seconds",
             "browser_render_timeout_seconds",
             "browser_vendor_block_probe_timeout_seconds",
@@ -456,6 +463,7 @@ class CrawlerRuntimeSettings(BaseSettings):
             _require_positive(field_name, getattr(self, field_name))
         for field_name in (
             "url_process_timeout_buffer_seconds",
+            "extraction_process_terminate_grace_seconds",
             "browser_post_block_cooldown_ms",
             "browser_first_nav_pause_ms",
             "browser_accessibility_snapshot_timeout_seconds",

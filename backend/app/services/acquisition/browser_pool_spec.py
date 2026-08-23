@@ -22,8 +22,35 @@ class BrowserRuntimePool:
         self.direct: dict[str, Any] = {}
         self.proxied: dict[tuple[str, str], Any] = {}
         self.lock = asyncio.Lock()
+        self.shutdown_lock = asyncio.Lock()
+        self.shutdown_complete = asyncio.Event()
+        self.shutdown_complete.set()
+        self.shutting_down = False
         self.popup_guard_tasks: set[asyncio.Task[Any]] = set()
         self.eviction_cleanup_tasks: set[asyncio.Task[Any]] = set()
+
+    def register_cleanup_task(self, task: asyncio.Task[Any]) -> None:
+        self.eviction_cleanup_tasks.add(task)
+        task.add_done_callback(self._consume_cleanup_task)
+        if self.shutting_down:
+            task.cancel()
+
+    def begin_shutdown(self) -> None:
+        self.shutting_down = True
+        self.shutdown_complete.clear()
+
+    def finish_shutdown(self) -> None:
+        self.shutting_down = False
+        self.shutdown_complete.set()
+
+    def _consume_cleanup_task(self, task: asyncio.Task[Any]) -> None:
+        self.eviction_cleanup_tasks.discard(task)
+        if task.cancelled():
+            return
+        try:
+            task.result()
+        except Exception:
+            logger.debug("Browser background cleanup task failed", exc_info=True)
 
     def evict_idle_runtimes_locked(self) -> list[Any]:
         idle_ttl = max(

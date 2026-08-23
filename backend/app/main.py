@@ -67,6 +67,7 @@ from app.services.acquisition import (
     validate_cookie_policy_config,
 )
 from app.services.auth_service import bootstrap_admin_user
+from app.services.pipeline.extraction_process import shutdown_extraction_processes
 from app.services.config.auth_security import (
     API_ALLOWED_CORS_METHODS,
     SECURITY_HEADER_CONTENT_TYPE_OPTIONS,
@@ -157,6 +158,7 @@ async def lifespan(fastapi_app: FastAPI):
             crawler_state.monitor_scheduler_loop = None
         await shutdown_run_dispatchers()
         await shutdown_browser_runtime()
+        await shutdown_extraction_processes()
         await close_shared_http_client()
         await close_llm_provider_clients()
         await close_redis()

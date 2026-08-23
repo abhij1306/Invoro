@@ -586,7 +586,7 @@ async def test_process_single_url_upserts_duplicate_run_identity_records(
 
 @pytest.mark.asyncio
 @pytest.mark.regression
-async def test_process_single_url_offloads_extract_records_to_thread(
+async def test_process_single_url_uses_killable_extraction_process(
     db_session: AsyncSession,
     test_user,
     monkeypatch: pytest.MonkeyPatch,
@@ -601,7 +601,7 @@ async def test_process_single_url_offloads_extract_records_to_thread(
             "settings": {"respect_robots_txt": False},
         },
     )
-    to_thread_calls: list[str] = []
+    process_calls: list[str] = []
 
     @_as_async
     def _fake_acquire(request):
@@ -618,10 +618,21 @@ async def test_process_single_url_offloads_extract_records_to_thread(
         del args, kwargs
         return []
 
-    @_as_async
-    def _fake_to_thread(func, *args, **kwargs):
-        to_thread_calls.append(getattr(func, "__name__", type(func).__name__))
-        return func(*args, **kwargs)
+    async def _fake_extraction_process(request):
+        from app.services.pipeline.extraction_process import ExtractionProcessResult
+
+        process_calls.append(request.page_url)
+        return ExtractionProcessResult(
+            records=[
+                {
+                    "title": "Widget Prime",
+                    "price": "19.99",
+                    "url": request.page_url,
+                }
+            ],
+            elapsed_ms=12,
+            queue_wait_ms=0,
+        )
 
     monkeypatch.setattr("app.services.pipeline.extraction_loop.acquire", _fake_acquire)
     monkeypatch.setattr(
@@ -632,11 +643,11 @@ async def test_process_single_url_offloads_extract_records_to_thread(
         _no_selector_rules,
     )
     monkeypatch.setattr(
-        "app.services.pipeline.record_extraction_stage.asyncio.to_thread",
-        _fake_to_thread,
+        "app.services.pipeline.record_extraction_stage.run_extraction_process",
+        _fake_extraction_process,
     )
 
     result = await process_single_url(db_session, run, run.url)
 
     assert result.verdict in {"success", "empty"}
-    assert "extract_records" in to_thread_calls
+    assert process_calls == [run.url]

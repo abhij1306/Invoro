@@ -144,7 +144,13 @@ class BrowserNetworkCapture:
     async def _stop_workers(self) -> None:
         workers = set(self._workers)
         await asyncio.sleep(0)
-        timeout_seconds = _queue_join_timeout_seconds()
+        queue_empty = getattr(self._queue, "empty", None)
+        active_payload_reads = self._pending_payloads > 0 or (
+            callable(queue_empty) and not queue_empty()
+        )
+        timeout_seconds = _queue_join_timeout_seconds(
+            active_payload_reads=active_payload_reads
+        )
         try:
             for _worker in workers:
                 await asyncio.wait_for(self._queue.put(None), timeout=timeout_seconds)
@@ -489,12 +495,21 @@ async def read_network_payload_body(
         endpoint_info=endpoint_info,
     )
     try:
-        body_bytes = await asyncio.wait_for(
-            response.body(),
-            timeout=_payload_read_timeout_seconds(),
+        body_task = asyncio.create_task(response.body())
+        done, _pending = await asyncio.wait(
+            {body_task}, timeout=_payload_read_timeout_seconds()
         )
-    except asyncio.TimeoutError:
-        return NetworkPayloadReadResult(body=None, outcome="timeout")
+        if body_task not in done:
+            # Patchright response-body reads do not unwind cleanly when cancelled.
+            # Keep the task owned until it completes so its driver exception is
+            # consumed instead of leaking as an unhandled Future.
+            from app.services.acquisition.browser_pool import (
+                register_browser_cleanup_task,
+            )
+
+            register_browser_cleanup_task(body_task)
+            return NetworkPayloadReadResult(body=None, outcome="timeout")
+        body_bytes = body_task.result()
     except Exception as exc:
         if is_response_closed_error(exc):
             return NetworkPayloadReadResult(
@@ -557,11 +572,14 @@ def has_chunked_transfer_encoding(headers: dict[str, object] | Any) -> bool:
     return any(token.strip() == "chunked" for token in normalized.split(","))
 
 
-def _queue_join_timeout_seconds() -> float:
-    return max(
+def _queue_join_timeout_seconds(*, active_payload_reads: bool = False) -> float:
+    configured = max(
         0.1,
         float(crawler_runtime_settings.browser_capture_queue_join_timeout_ms) / 1000,
     )
+    if not active_payload_reads:
+        return configured
+    return max(configured, _payload_read_timeout_seconds() + 0.5)
 
 
 def _payload_read_timeout_seconds() -> float:

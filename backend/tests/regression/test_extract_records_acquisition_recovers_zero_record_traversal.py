@@ -60,8 +60,14 @@ async def test_extract_records_for_acquisition_recovers_from_zero_record_travers
         del request
         return acquisition
 
+    extraction_diagnostics: list[object] = []
+
     def _extract_records(html, *args, **kwargs):
-        del args, kwargs
+        del args
+        diagnostics = kwargs.get("browser_diagnostics")
+        extraction_diagnostics.append(
+            dict(diagnostics) if isinstance(diagnostics, dict) else diagnostics
+        )
         if "full rendered listing" in html:
             return [
                 {
@@ -105,3 +111,5 @@ async def test_extract_records_for_acquisition_recovers_from_zero_record_travers
     assert result.url_metrics["traversal_fallback_used"] is True
     assert result.url_metrics["traversal_fallback_recovered"] is True
     assert result.url_metrics["traversal_fallback_record_count"] == 1
+    assert extraction_diagnostics[0] == extraction_diagnostics[1]
+    assert extraction_diagnostics[0]["traversal_activated"] is True

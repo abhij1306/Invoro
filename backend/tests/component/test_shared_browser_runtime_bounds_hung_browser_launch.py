@@ -7,6 +7,80 @@ pytest_plugins = ["tests.component._cookie_store_test_support"]
 
 @pytest.mark.asyncio
 @pytest.mark.component
+async def test_browser_shutdown_bounds_cancel_resistant_cleanup(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    release_cleanup = asyncio.Event()
+
+    async def _cancel_resistant_cleanup() -> None:
+        while not release_cleanup.is_set():
+            try:
+                await release_cleanup.wait()
+            except asyncio.CancelledError:
+                continue
+
+    monkeypatch.setattr(
+        acquisition_browser_pool.crawler_runtime_settings,
+        "browser_close_timeout_ms",
+        10,
+    )
+    cleanup_task = asyncio.create_task(_cancel_resistant_cleanup())
+    acquisition_browser_pool.register_browser_cleanup_task(cleanup_task)
+    await asyncio.sleep(0)
+
+    await asyncio.wait_for(
+        acquisition_browser_runtime.shutdown_browser_runtime(), timeout=1
+    )
+
+    assert cleanup_task in acquisition_browser_pool._BROWSER_POOL.eviction_cleanup_tasks
+    assert not cleanup_task.done()
+    release_cleanup.set()
+    await cleanup_task
+    await asyncio.sleep(0)
+    assert (
+        cleanup_task
+        not in acquisition_browser_pool._BROWSER_POOL.eviction_cleanup_tasks
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.component
+async def test_browser_runtime_creation_waits_for_shutdown(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    close_started = asyncio.Event()
+    release_close = asyncio.Event()
+
+    class FakeRuntime:
+        browser_engine = "chromium"
+
+        async def close(self) -> None:
+            close_started.set()
+            await release_close.wait()
+
+    await acquisition_browser_runtime.shutdown_browser_runtime()
+    acquisition_browser_pool._BROWSER_POOL.direct["chromium"] = FakeRuntime()
+    shutdown_task = asyncio.create_task(
+        acquisition_browser_runtime.shutdown_browser_runtime()
+    )
+    await close_started.wait()
+
+    get_task = asyncio.create_task(
+        acquisition_browser_runtime.get_browser_runtime(browser_engine="chromium")
+    )
+    await asyncio.sleep(0)
+    assert not get_task.done()
+
+    release_close.set()
+    await shutdown_task
+    runtime = await get_task
+
+    assert runtime is acquisition_browser_pool._BROWSER_POOL.direct["chromium"]
+    await acquisition_browser_runtime.shutdown_browser_runtime()
+
+
+@pytest.mark.asyncio
+@pytest.mark.component
 async def test_shared_browser_runtime_bounds_hung_browser_launch(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

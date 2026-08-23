@@ -319,12 +319,15 @@ The playground flow creates normal `CrawlRun` rows for discover/extract, launche
 
 **Rule:** Generic crawler paths stay generic. Pipeline boundaries use typed objects. CPU-bound parsing does not block async hot paths. New architecture must improve reusable coverage across multiple domains or surfaces, not just rescue one site, unless the user explicitly asks for a site-specific path.
 
+The default synchronous deterministic record extractor runs behind the bounded extraction-process boundary. URL timeout, pause, kill, and task cancellation must terminate the active extraction subprocess. Do not move that default path back to `asyncio.to_thread()`: cancelling a task awaiting a thread does not stop its CPU work, so timed-out URLs accumulate orphaned extraction work and starve later URLs. `_execute_record_extraction` may still use `asyncio.to_thread()` for a test-injected extractor that replaces the default callable.
+
 **VIOLATION signatures:**
 - `if "shopify" in url` or `if "greenhouse" in host` appears in `crawl_fetch_runtime.py`, `crawl_engine.py`, `_batch_runtime.py`, or any non-adapter file
 - A new shared layer, pipeline branch, or runtime abstraction is added for a bug proven on only one domain, with no evidence it improves broader extractor coverage
 - A generic service module starts owning logic that belongs in an adapter or existing platform-specific mapper just to fix one site's markup
 - A function returns a tuple of 4+ items instead of a typed object
 - A sync `requests.get()` or sync parsing call inside an `async def` function without `run_in_executor`
+- The default extractor path in `record_extraction_stage.py` uses `asyncio.to_thread()` or another cancellation boundary that leaves timed-out CPU work alive; test-injected extractors are excluded
 
 ---
 

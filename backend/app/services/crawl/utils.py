@@ -19,7 +19,6 @@ from app.services.config.crawl_inputs import (
     WRAPPED_URL_DELIMITER_PAIRS,
 )
 from app.services.exceptions import CrawlerConfigurationError
-from app.services.dom.xpath_service import validate_xpath_syntax
 
 logger = logging.getLogger(__name__)
 
@@ -259,6 +258,8 @@ def validate_extraction_contract(contract_rows: list[dict]) -> None:
             errors.append(f"Row {index}: field_name is required")
 
         if xpath:
+            from app.services.dom.xpath_service import validate_xpath_syntax
+
             valid_xpath, xpath_error = validate_xpath_syntax(xpath)
             if not valid_xpath:
                 errors.append(
