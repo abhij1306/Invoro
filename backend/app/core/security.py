@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import hmac
 from datetime import UTC, datetime, timedelta
 
 from argon2 import PasswordHasher
@@ -13,10 +14,11 @@ from joserfc import jwt
 from joserfc.errors import JoseError
 from joserfc.jwk import OctKey
 from joserfc.jwt import JWTClaimsRegistry
-from passlib.hash import pbkdf2_sha256
 
 _PASSWORD_HASHER = PasswordHasher()
 _ARGON2_PREFIXES = ("$argon2id$", "$argon2i$", "$argon2d$")
+_LEGACY_PBKDF2_SHA256_SCHEME = "pbkdf2-sha256"
+_LEGACY_PBKDF2_MAX_ROUNDS = 1_000_000
 
 
 class TokenDecodeError(ValueError):
@@ -35,11 +37,41 @@ def _is_argon2_hash(hashed_password: str) -> bool:
     return str(hashed_password or "").startswith(_ARGON2_PREFIXES)
 
 
+def _decode_passlib_base64(value: str) -> bytes:
+    encoded = value.replace(".", "+")
+    return base64.b64decode(encoded + ("=" * (-len(encoded) % 4)), validate=True)
+
+
+def _verify_legacy_pbkdf2_sha256(password: str, hashed_password: str) -> bool:
+    parts = hashed_password.split("$")
+    if len(parts) != 5 or parts[0] or parts[1] != _LEGACY_PBKDF2_SHA256_SCHEME:
+        return False
+    rounds_text, salt_text, checksum_text = parts[2:]
+    if not rounds_text.isascii() or not rounds_text.isdecimal():
+        return False
+    rounds = int(rounds_text)
+    if not 1 <= rounds <= _LEGACY_PBKDF2_MAX_ROUNDS:
+        return False
+    if not salt_text or len(salt_text) > 128 or len(checksum_text) > 128:
+        return False
+    salt = _decode_passlib_base64(salt_text)
+    expected = _decode_passlib_base64(checksum_text)
+    if len(expected) != hashlib.sha256().digest_size:
+        return False
+    actual = hashlib.pbkdf2_hmac(
+        "sha256",
+        password.encode("utf-8"),
+        salt,
+        rounds,
+    )
+    return hmac.compare_digest(actual, expected)
+
+
 def verify_password(password: str, hashed_password: str) -> bool:
     try:
         if _is_argon2_hash(hashed_password):
             return _PASSWORD_HASHER.verify(hashed_password, password)
-        return pbkdf2_sha256.verify(password, hashed_password)
+        return _verify_legacy_pbkdf2_sha256(password, hashed_password)
     except (TypeError, ValueError, argon2_exceptions.Argon2Error):
         return False
 

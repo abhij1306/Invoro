@@ -17,6 +17,7 @@ import {
   FileChartColumn,
   FolderKanban,
   Grid2x2,
+  KeyRound,
   LogOut,
   Radar,
   SearchCheck,
@@ -42,6 +43,7 @@ const navGroups = [
       { href: '/crawl', label: 'Crawl Studio', icon: WandSparkles },
       { href: '/runs', label: 'History', icon: Clock3 },
       { href: '/jobs', label: 'Jobs', icon: BriefcaseBusiness },
+      { href: '/api-mcp', label: 'API & MCP', icon: KeyRound },
     ],
   },
   {

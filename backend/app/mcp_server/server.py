@@ -35,7 +35,7 @@ def build_server():
 
     @mcp.tool
     async def list_capabilities() -> dict[str, Any]:
-        return await _list_capabilities()
+        return await _list_capabilities(client)
 
     return mcp
 

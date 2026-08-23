@@ -231,25 +231,44 @@ class _ExtractionWorker:
 
     async def close(self) -> None:
         process, self.process = self.process, None
-        if process is not None and process.returncode is None:
-            process.terminate()
-            try:
-                await asyncio.wait_for(
-                    process.wait(),
-                    timeout=max(
-                        0.001,
-                        float(
-                            crawler_runtime_settings.extraction_process_terminate_grace_seconds
-                        ),
-                    ),
-                )
-            except asyncio.TimeoutError:
-                process.kill()
-                await process.wait()
         stderr_task, self.stderr_task = self.stderr_task, None
-        if stderr_task is not None:
-            stderr_task.cancel()
-            await asyncio.gather(stderr_task, return_exceptions=True)
+        try:
+            if process is not None and process.returncode is None:
+                process.terminate()
+                try:
+                    await asyncio.wait_for(
+                        process.wait(),
+                        timeout=max(
+                            0.001,
+                            float(
+                                crawler_runtime_settings.extraction_process_terminate_grace_seconds
+                            ),
+                        ),
+                    )
+                except asyncio.TimeoutError:
+                    process.kill()
+                    await process.wait()
+        finally:
+            if stderr_task is not None:
+                stderr_task.cancel()
+                await asyncio.gather(stderr_task, return_exceptions=True)
+            if process is not None:
+                if process.stdin is not None:
+                    with contextlib.suppress(Exception):
+                        process.stdin.close()
+                    wait_closed = getattr(process.stdin, "wait_closed", None)
+                    if wait_closed is not None:
+                        with contextlib.suppress(Exception):
+                            await wait_closed()
+                for stream in (process.stdout, process.stderr):
+                    pipe_transport = getattr(stream, "_transport", None)
+                    if pipe_transport is not None:
+                        with contextlib.suppress(Exception):
+                            pipe_transport.close()
+                transport = getattr(process, "_transport", None)
+                if transport is not None:
+                    with contextlib.suppress(Exception):
+                        transport.close()
 
     def close_sync(self) -> None:
         process, self.process = self.process, None

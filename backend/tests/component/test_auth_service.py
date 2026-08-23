@@ -3,10 +3,19 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import pytest
-from passlib.hash import pbkdf2_sha256
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.services import auth_service
+
+
+_LEGACY_PASSWORD_123_HASH = (
+    "$pbkdf2-sha256$29000$bGVnYWN5dGVzdHNhbHQ$"
+    "2tMNT7s/R9R.1n6HHBilYIpIm4a3B8GTVpE8EXa.53E"
+)
+_LEGACY_STRONG_PASSWORD_HASH = (
+    "$pbkdf2-sha256$29000$bGVnYWN5dGVzdHNhbHQ$"
+    "9d30ZorsSGlmALzwm8aNoRNBv1leyDYhq8v/G2rgt1I"
+)
 
 
 @pytest.mark.asyncio
@@ -145,9 +154,7 @@ def test_hash_password_uses_argon2_by_default() -> None:
 
 @pytest.mark.component
 def test_password_needs_rehash_detects_legacy_pbkdf2_hash() -> None:
-    legacy_hash = pbkdf2_sha256.hash("password123")
-
-    assert auth_service.password_needs_rehash(legacy_hash) is True
+    assert auth_service.password_needs_rehash(_LEGACY_PASSWORD_123_HASH) is True
 
 
 @pytest.mark.asyncio
@@ -160,7 +167,7 @@ async def test_authenticate_user_rehash_does_not_commit_unrelated_changes(
         "legacy@example.com",
         "VeryStrongPassword123!",
     )
-    legacy_user.hashed_password = pbkdf2_sha256.hash("VeryStrongPassword123!")
+    legacy_user.hashed_password = _LEGACY_STRONG_PASSWORD_HASH
     await db_session.commit()
     await db_session.refresh(legacy_user)
 

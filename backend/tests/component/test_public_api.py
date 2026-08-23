@@ -12,8 +12,6 @@ from fastapi import FastAPI, HTTPException
 
 from httpx import ASGITransport, AsyncClient
 
-from passlib.hash import pbkdf2_sha256
-
 from sqlalchemy import select
 
 from sqlalchemy.exc import SQLAlchemyError
@@ -80,4 +78,10 @@ def _password_field_name(*, hashed: bool = False) -> str:
     return ("hashed_" if hashed else "") + "pass" + "word"
 
 
-__all__ = ['ASGITransport', 'ApiKey', 'AsyncClient', 'CrawlRecord', 'CrawlerAppState', 'DomainMemory', 'DomainRunProfile', 'FastAPI', 'HTTPException', 'OrderedDict', 'PUBLIC_API_ERROR_API_KEY_REQUIRED', 'PUBLIC_API_ERROR_AUTH_UNAVAILABLE', 'PUBLIC_API_INTERNAL_ECOMMERCE_SURFACE', 'RATE_LIMIT_BUCKETS', 'Request', 'SQLAlchemyError', 'UTC', 'User', '_crawler_app_state', '_password_field_name', '_public_auth_session', '_retry_after', '_trim', 'annotations', 'app', 'auth_rate_limit_buckets_snapshot', 'auth_security', 'authenticate_public_api_key', 'clear_auth_rate_limit_buckets_for_testing', 'clear_public_rate_limit_buckets_for_testing', 'clear_rate_limit_buckets_for_testing', 'client_rate_limit_key', 'config', 'crawler_runtime_settings', 'create_user', 'datetime', 'deque', 'get_current_user', 'get_db', 'hash_api_key', 'logging', 'metrics_module', 'pbkdf2_sha256', 'public_api_client', 'public_rate_limit_buckets_snapshot', 'pytest', 'rate_limit_buckets_snapshot', 'reset_runtime_app_env', 'restore_auth_rate_limit_buckets_for_testing', 'restore_public_rate_limit_buckets_for_testing', 'restore_rate_limit_buckets_for_testing', 'select', 'settings']  # fmt: skip
+_LEGACY_PASSWORD_HASH = (
+    "$pbkdf2-sha256$29000$bGVnYWN5dGVzdHNhbHQ$"
+    "2tMNT7s/R9R.1n6HHBilYIpIm4a3B8GTVpE8EXa.53E"
+)
+
+
+__all__ = ['ASGITransport', 'ApiKey', 'AsyncClient', 'CrawlRecord', 'CrawlerAppState', 'DomainMemory', 'DomainRunProfile', 'FastAPI', 'HTTPException', 'OrderedDict', 'PUBLIC_API_ERROR_API_KEY_REQUIRED', 'PUBLIC_API_ERROR_AUTH_UNAVAILABLE', 'PUBLIC_API_INTERNAL_ECOMMERCE_SURFACE', 'RATE_LIMIT_BUCKETS', 'Request', 'SQLAlchemyError', 'UTC', 'User', '_LEGACY_PASSWORD_HASH', '_crawler_app_state', '_password_field_name', '_public_auth_session', '_retry_after', '_trim', 'annotations', 'app', 'auth_rate_limit_buckets_snapshot', 'auth_security', 'authenticate_public_api_key', 'clear_auth_rate_limit_buckets_for_testing', 'clear_public_rate_limit_buckets_for_testing', 'clear_rate_limit_buckets_for_testing', 'client_rate_limit_key', 'config', 'crawler_runtime_settings', 'create_user', 'datetime', 'deque', 'get_current_user', 'get_db', 'hash_api_key', 'logging', 'metrics_module', 'public_api_client', 'public_rate_limit_buckets_snapshot', 'pytest', 'rate_limit_buckets_snapshot', 'reset_runtime_app_env', 'restore_auth_rate_limit_buckets_for_testing', 'restore_public_rate_limit_buckets_for_testing', 'restore_rate_limit_buckets_for_testing', 'select', 'settings']  # fmt: skip

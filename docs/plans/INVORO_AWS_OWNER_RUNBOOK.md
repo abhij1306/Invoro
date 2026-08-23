@@ -120,11 +120,19 @@ GitHub → Actions → **Deploy Invoro to AWS**:
 ```text
 mode=deploy
 release_sha=<blank for current main>
+allow_unfixed_image_findings=false
 ```
 
-The workflow runs full backend/frontend gates, builds SHA images, blocks High/Critical
-ECR findings, starts RDS if needed, runs migrations/admin bootstrap, registers all
-task revisions, preserves service counts, and restores a previously stopped RDS.
+The workflow runs full backend/frontend gates, builds SHA images, prints each
+High/Critical ECR finding with its package and fix status, starts RDS if needed, runs
+migrations/admin bootstrap, registers all task revisions, preserves service counts,
+and restores a previously stopped RDS. Fixable or unclassified High/Critical findings
+always block deployment.
+
+Keep `allow_unfixed_image_findings=false` unless every remaining High/Critical finding
+shows `fix=NO` and you have reviewed the release risk. If accepted for this temporary
+demo, rerun with it enabled. This input cannot bypass a finding with an available or
+unknown fix.
 
 If migration fails, do not start services. Inspect `/ecs/invoro-demo/migration`.
 

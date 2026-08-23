@@ -25,6 +25,7 @@ from app.services.config.runtime_settings import crawler_runtime_settings
 from app.services.crawl.crud import create_crawl_run
 from app.services.fetch.fetch_context import reset_fetch_runtime_state
 from app.services.acquisition.pacing import reset_pacing_state
+from app.services.pipeline.extraction_process import shutdown_extraction_processes
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
@@ -194,6 +195,7 @@ def fake_redis(monkeypatch: pytest.MonkeyPatch) -> FakeRedis:
 @pytest_asyncio.fixture(autouse=True)
 async def _reset_async_acquisition_state():
     yield
+    await shutdown_extraction_processes()
     await reset_fetch_runtime_state()
     await reset_pacing_state()
 

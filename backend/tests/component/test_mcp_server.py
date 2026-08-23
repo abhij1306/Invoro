@@ -40,14 +40,12 @@ async def test_mcp_tools_call_public_api(monkeypatch: pytest.MonkeyPatch) -> Non
     product = await extract_product(
         client, url="https://example.com/p/1", fields=["price"], use_cache=True
     )
-    domain = await check_domain(client, domain="example.com")
-    caps = await list_capabilities()
+    domain = await check_domain(client, domain="example.com/path")
+    caps = await list_capabilities(client)
 
     assert product["status"] == "ok"
     assert domain["status"] == "ok"
-    assert "extract_product" in caps["data"]["tools"]
-    assert "alert_product" in caps["data"]["tools"]
-    assert "watches" not in caps["data"]["deferred"]
+    assert caps["data"]["ok"] is True
     assert calls[0] == {
         "method": "POST",
         "url": "https://api.test/api/v1/extract",
@@ -60,7 +58,8 @@ async def test_mcp_tools_call_public_api(monkeypatch: pytest.MonkeyPatch) -> Non
         },
         "params": None,
     }
-    assert calls[1]["url"] == "https://api.test/api/v1/domains/example.com"
+    assert calls[1]["url"] == "https://api.test/api/v1/domains/example.com%2Fpath"
+    assert calls[2]["url"] == "https://api.test/api/v1/capabilities"
 
 
 @pytest.mark.asyncio

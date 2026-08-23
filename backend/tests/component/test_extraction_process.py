@@ -6,7 +6,7 @@ import sys
 import time
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 import psutil
 import pytest
@@ -136,6 +136,44 @@ async def test_extraction_startup_uses_the_exchange_timeout_budget(
 
     assert response["ok"] is True
     assert observed_timeout == [pytest.approx(0.25)]
+
+
+@pytest.mark.component
+@pytest.mark.asyncio
+async def test_close_reaps_and_closes_async_process_transports() -> None:
+    worker = extraction_process._ExtractionWorker()
+    process_transport = Mock()
+    stdin = Mock()
+    stdin.wait_closed = AsyncMock()
+    stdout_transport = Mock()
+    stderr_transport = Mock()
+    process = SimpleNamespace(
+        returncode=None,
+        terminate=Mock(),
+        kill=Mock(),
+        wait=AsyncMock(),
+        stdin=stdin,
+        stdout=SimpleNamespace(_transport=stdout_transport),
+        stderr=SimpleNamespace(_transport=stderr_transport),
+        _transport=process_transport,
+    )
+    stderr_task = asyncio.create_task(asyncio.sleep(60))
+    worker.process = process
+    worker.stderr_task = stderr_task
+
+    await worker.close()
+
+    process.terminate.assert_called_once_with()
+    process.wait.assert_awaited_once_with()
+    process.kill.assert_not_called()
+    stdin.close.assert_called_once_with()
+    stdin.wait_closed.assert_awaited_once_with()
+    stdout_transport.close.assert_called_once_with()
+    stderr_transport.close.assert_called_once_with()
+    process_transport.close.assert_called_once_with()
+    assert stderr_task.cancelled()
+    assert worker.process is None
+    assert worker.stderr_task is None
 
 
 @pytest.mark.component

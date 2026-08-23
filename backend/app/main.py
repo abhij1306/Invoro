@@ -13,6 +13,7 @@ from time import perf_counter
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
@@ -564,14 +565,15 @@ async def public_validation_exception_handler(
     request: Request,
     exc: RequestValidationError,
 ) -> JSONResponse:
+    errors = jsonable_encoder(exc.errors())
     if not request.url.path.startswith(_PUBLIC_API_PREFIX):
-        return JSONResponse({"detail": exc.errors()}, status_code=422)
+        return JSONResponse({"detail": errors}, status_code=422)
     return public_error_response(
         request,
         code="VALIDATION_ERROR",
         message="Request validation failed.",
         status_code=422,
-        details={"errors": exc.errors()},
+        details={"errors": errors},
     )
 
 
