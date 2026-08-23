@@ -18,6 +18,10 @@ from app.services.acquisition import (
 )
 from app.services.crawl.batch_runtime import process_run
 from app.services.config.runtime_settings import crawler_runtime_settings
+from app.services.pipeline.extraction_process import (
+    shutdown_extraction_processes,
+    shutdown_extraction_processes_sync,
+)
 
 logger = logging.getLogger(__name__)
 _SignalHandler = Callable[[int, FrameType | None], object]
@@ -63,9 +67,16 @@ def _worker_process_shutdown(**_kwargs) -> None:
     loop = _WORKER_TASK_STATE.worker_loop
     if loop is None or loop.is_closed():
         _run_worker_shutdown_step("browser runtime", shutdown_browser_runtime_sync)
+        _run_worker_shutdown_step(
+            "extraction processes", shutdown_extraction_processes_sync
+        )
         return
     _run_worker_shutdown_step(
         "browser runtime", lambda: loop.run_until_complete(shutdown_browser_runtime())
+    )
+    _run_worker_shutdown_step(
+        "extraction processes",
+        lambda: loop.run_until_complete(shutdown_extraction_processes()),
     )
     _run_worker_shutdown_step(
         "database engine", lambda: loop.run_until_complete(dispose_engine())
@@ -104,6 +115,10 @@ def _shutdown_browser_runtime_before_task_exit(
 ) -> None:
     _run_worker_shutdown_step(
         "browser runtime", lambda: loop.run_until_complete(shutdown_browser_runtime())
+    )
+    _run_worker_shutdown_step(
+        "extraction processes",
+        lambda: loop.run_until_complete(shutdown_extraction_processes()),
     )
 
 

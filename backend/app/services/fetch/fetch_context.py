@@ -351,9 +351,7 @@ async def _handle_browser_first_failure(
             browser_reason=reason, exc=exc
         )
     _attach_exception_browser_diagnostics(exc, context.last_browser_attempt_diagnostics)
-    if context.fetch_mode == "browser_only" or _hard_browser_requirement(
-        context=context
-    ):
+    if context.fetch_mode == "browser_only" or context.traversal_required:
         raise exc
     await _emit_fetch_event(
         context.on_event,

@@ -461,21 +461,43 @@ async def test_read_network_payload_body_marks_generic_read_failures_explicitly(
 async def test_read_network_payload_body_maps_read_timeouts_to_timeout(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    response = FakeBodyResponse(b"x")
+    release_body = asyncio.Event()
+    body_cancelled = False
 
-    @_as_async
-    def _fake_wait_for(awaitable, timeout: float):
-        awaitable.close()
-        del timeout
-        raise asyncio.TimeoutError
+    class _SlowBodyResponse(FakeBodyResponse):
+        async def body(self) -> bytes:
+            nonlocal body_cancelled
+            self.body_calls += 1
+            try:
+                await release_body.wait()
+            except asyncio.CancelledError:
+                body_cancelled = True
+                raise
+            return b"x"
 
-    monkeypatch.setattr(browser_capture.asyncio, "wait_for", _fake_wait_for)
+    response = _SlowBodyResponse()
+    monkeypatch.setattr(browser_capture, "_payload_read_timeout_seconds", lambda: 0.01)
 
     result = await read_network_payload_body(response)
 
     assert result.outcome == "timeout"
     assert result.body is None
-    assert response.body_calls == 0
+    assert response.body_calls == 1
+    assert body_cancelled is False
+
+    release_body.set()
+    await asyncio.sleep(0)
+
+
+@pytest.mark.component
+def test_capture_queue_join_allows_active_body_read_to_finish(patch_settings) -> None:
+    patch_settings(
+        browser_capture_queue_join_timeout_ms=2000,
+        browser_capture_read_timeout_seconds=5,
+    )
+
+    assert browser_capture._queue_join_timeout_seconds() == 2
+    assert browser_capture._queue_join_timeout_seconds(active_payload_reads=True) == 5.5
 
 
 @pytest.mark.asyncio

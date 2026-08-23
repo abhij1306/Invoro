@@ -9,12 +9,6 @@ from collections.abc import Callable
 from typing import cast
 
 from app.services.dom.html_parser import BeautifulSoup, NavigableString, Tag
-from lxml import (
-    etree,
-)  # skipcq: BAN-B410 - lxml is used in HTML parsing mode for sanitized DOM recovery, not arbitrary XML.
-from lxml import (
-    html as lxml_html,
-)  # skipcq: BAN-B410 - lxml.html.fromstring parses sanitized HTML snippets, not arbitrary XML.
 
 from app.services.config.extraction_rules import (
     DETAIL_IMAGE_URL_ATTRS,
@@ -72,7 +66,6 @@ from app.services.shared.field_coerce import (
 )
 from app.services.shared.coerce_primitives import safe_int as _safe_int
 from app.services.shared.regex_patterns import compile_regex_patterns
-from app.services.dom.xpath_service import validate_xpath_syntax
 
 logger = logging.getLogger(__name__)
 
@@ -276,6 +269,9 @@ def extract_xpath_values(
     field_name: str,
     page_url: str,
 ) -> list[object]:
+    from app.services.dom.xpath_service import validate_xpath_syntax
+    from lxml import etree, html as lxml_html
+
     valid_xpath, _ = validate_xpath_syntax(xpath)
     if not valid_xpath:
         logger.warning("Skipping invalid xpath selector for %s: %s", field_name, xpath)

@@ -22,6 +22,12 @@ from app.services.extract.content_surface_extractor import CONTENT_DETAIL_SURFAC
 from app.services.extract.record_overlay import overlay_record
 from app.services.field_policy import repair_target_fields_for_surface
 from app.services.pipeline.extract_records import extract_records
+from app.services.pipeline.extraction_process import (
+    ExtractionProcessDeadlineExceeded,
+    ExtractionProcessRequest,
+    ExtractionProcessResult,
+    run_extraction_process,
+)
 from app.services.pipeline.runtime_helpers import (
     browser_result_is_extractable as _browser_result_is_extractable,
     effective_blocked as _effective_blocked,
@@ -397,7 +403,7 @@ async def _run_record_extraction(
 
     extract_records_impl = getattr(extraction_loop, "extract_records", extract_records)
     with logfire_span(
-        "extract.record_thread",
+        "extract.record_process",
         run_id=context.run.id,
         domain=normalize_domain(acquisition_result.final_url),
         surface=context.surface,
@@ -405,29 +411,89 @@ async def _run_record_extraction(
         network_payload_count=len(acquisition_result.network_payloads or []),
         selector_rule_count=len(selector_rules or []),
     ) as span:
-        records = _record_list(
-            await asyncio.to_thread(
-                extract_records_impl,
-                acquisition_result.html,
-                acquisition_result.final_url,
-                context.surface,
-                max_records=context.config.max_records,
-                requested_page_url=context.url,
-                requested_fields=list(context.requested_fields),
-                adapter_records=acquisition_result.adapter_records,
-                network_payloads=acquisition_result.network_payloads,
-                artifacts=acquisition_result.artifacts,
-                selector_rules=selector_rules,
-                extraction_runtime_snapshot=context.run.settings_view.extraction_runtime_snapshot(),
-                content_type=acquisition_result.content_type,
-                browser_diagnostics=getattr(
-                    acquisition_result, "browser_diagnostics", None
-                ),
-                record_dom_observed_selectors=True,
-            )
+        request = ExtractionProcessRequest(
+            html=acquisition_result.html,
+            page_url=acquisition_result.final_url,
+            surface=context.surface,
+            max_records=context.config.max_records,
+            requested_page_url=context.url,
+            requested_fields=list(context.requested_fields),
+            adapter_records=acquisition_result.adapter_records,
+            network_payloads=acquisition_result.network_payloads,
+            artifacts=acquisition_result.artifacts,
+            selector_rules=selector_rules,
+            extraction_runtime_snapshot=context.run.settings_view.extraction_runtime_snapshot(),
+            content_type=acquisition_result.content_type,
+            browser_diagnostics=getattr(
+                acquisition_result, "browser_diagnostics", None
+            ),
+            record_dom_observed_selectors=True,
         )
-        set_logfire_attributes(span, record_count=len(records))
+        isolated = extract_records_impl is extract_records
+        if isolated:
+            await _log_pipeline_event(
+                context,
+                "info",
+                "Starting deterministic extraction "
+                f"(process_timeout_seconds={crawler_runtime_settings.extraction_process_timeout_seconds:g})",
+            )
+        try:
+            result = await _execute_record_extraction(extract_records_impl, request)
+        except ExtractionProcessDeadlineExceeded:
+            await _log_pipeline_event(
+                context,
+                "warning",
+                "Deterministic extraction process timed out and was terminated "
+                f"for {acquisition_result.final_url}",
+            )
+            raise
+        records = _record_list(result.records)
+        if isolated:
+            await _log_pipeline_event(
+                context,
+                "info",
+                "Completed deterministic extraction "
+                f"in {result.elapsed_ms}ms after {result.queue_wait_ms}ms queue wait "
+                f"with {len(records)} record(s)",
+            )
+        set_logfire_attributes(
+            span,
+            record_count=len(records),
+            extraction_elapsed_ms=result.elapsed_ms,
+            extraction_queue_wait_ms=result.queue_wait_ms,
+        )
         return records
+
+
+async def _execute_record_extraction(
+    extract_impl,
+    request: ExtractionProcessRequest,
+) -> ExtractionProcessResult:
+    if extract_impl is extract_records:
+        return await run_extraction_process(request)
+    started_at = time.perf_counter()
+    records = await asyncio.to_thread(
+        extract_impl,
+        request.html,
+        request.page_url,
+        request.surface,
+        max_records=request.max_records,
+        requested_page_url=request.requested_page_url,
+        requested_fields=request.requested_fields,
+        adapter_records=request.adapter_records,
+        network_payloads=request.network_payloads,
+        artifacts=request.artifacts,
+        selector_rules=request.selector_rules,
+        extraction_runtime_snapshot=request.extraction_runtime_snapshot,
+        content_type=request.content_type,
+        browser_diagnostics=request.browser_diagnostics,
+        record_dom_observed_selectors=request.record_dom_observed_selectors,
+    )
+    return ExtractionProcessResult(
+        records=_record_list(records),
+        elapsed_ms=max(0, int(round((time.perf_counter() - started_at) * 1000))),
+        queue_wait_ms=0,
+    )
 
 
 async def _extract_records_from_preserved_browser_html(
@@ -449,23 +515,24 @@ async def _extract_records_from_preserved_browser_html(
     from app.services.pipeline import extraction_loop as _extraction_loop
 
     extract_impl = getattr(_extraction_loop, "extract_records", extract_records)
+    request = ExtractionProcessRequest(
+        html=rendered_html,
+        page_url=acquisition_result.final_url,
+        surface=context.surface,
+        max_records=context.config.max_records,
+        requested_page_url=context.url,
+        requested_fields=list(context.requested_fields),
+        adapter_records=acquisition_result.adapter_records,
+        network_payloads=acquisition_result.network_payloads,
+        artifacts=acquisition_result.artifacts,
+        selector_rules=selector_rules,
+        extraction_runtime_snapshot=context.run.settings_view.extraction_runtime_snapshot(),
+        content_type=acquisition_result.content_type,
+        browser_diagnostics=getattr(acquisition_result, "browser_diagnostics", None),
+        record_dom_observed_selectors=True,
+    )
     fallback_records = _record_list(
-        await asyncio.to_thread(
-            extract_impl,
-            rendered_html,
-            acquisition_result.final_url,
-            context.surface,
-            max_records=context.config.max_records,
-            requested_page_url=context.url,
-            requested_fields=list(context.requested_fields),
-            adapter_records=acquisition_result.adapter_records,
-            network_payloads=acquisition_result.network_payloads,
-            artifacts=acquisition_result.artifacts,
-            selector_rules=selector_rules,
-            extraction_runtime_snapshot=context.run.settings_view.extraction_runtime_snapshot(),
-            content_type=acquisition_result.content_type,
-            record_dom_observed_selectors=True,
-        )
+        (await _execute_record_extraction(extract_impl, request)).records
     )
     if not fallback_records:
         await _log_pipeline_event(

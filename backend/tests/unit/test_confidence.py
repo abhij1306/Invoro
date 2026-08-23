@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from app.services.confidence import score_record_confidence
+from app.services.extract.detail.assembly import record_assembly
 from app.services.extract.detail.assembly.record_assembly import build_detail_record
 
 
@@ -65,6 +66,29 @@ def test_score_record_confidence_penalizes_broken_detail_page() -> None:
         penalty["kind"] == "generic_title"
         for penalty in record["_confidence"]["penalties"]
     )
+
+
+@pytest.mark.unit
+def test_detail_tiers_materialize_only_records_used_for_decisions(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    materialized_tiers: list[str] = []
+    original = record_assembly._materialize_record
+
+    def capture_materialization(**kwargs):
+        materialized_tiers.append(str(kwargs["tier_name"]))
+        return original(**kwargs)
+
+    monkeypatch.setattr(record_assembly, "_materialize_record", capture_materialization)
+
+    build_detail_record(
+        "<html><body><h1>Product</h1></body></html>",
+        "https://example.com/products/widget",
+        "ecommerce_detail",
+        requested_fields=["description"],
+    )
+
+    assert materialized_tiers == ["js_state", "dom"]
 
 
 @pytest.mark.unit

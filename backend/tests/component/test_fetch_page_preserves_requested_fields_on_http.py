@@ -208,6 +208,44 @@ async def test_fetch_page_kitchenaid_prefer_browser_timeout_falls_back_to_http(
 
 @pytest.mark.asyncio
 @pytest.mark.component
+async def test_platform_required_browser_timeout_still_tries_http_in_auto_mode(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[str] = []
+    url = "https://www.ulta.com/p/shape-tape-concealer-xlsImpprod14251035"
+
+    @_as_async
+    def _failing_browser(*_args, **_kwargs):
+        calls.append("browser")
+        raise TimeoutError("Browser navigation stage exceeded timeout_seconds=30.00")
+
+    @_as_async
+    def _fake_curl(url: str, timeout_seconds: float, *, proxy: str | None = None):
+        del timeout_seconds, proxy
+        calls.append("curl")
+        return PageFetchResult(
+            url=url,
+            final_url=url,
+            html="<html><body><h1>Shape Tape Concealer</h1></body></html>",
+            status_code=200,
+            method="curl_cffi",
+        )
+
+    monkeypatch.setattr(crawl_fetch_runtime, "run_browser_attempts", _failing_browser)
+    monkeypatch.setattr(crawl_fetch_runtime, "_curl_fetch", _fake_curl)
+
+    result = await crawl_fetch_runtime.fetch_page(
+        url,
+        surface="ecommerce_detail",
+        fetch_mode="auto",
+    )
+
+    assert calls == ["browser", "curl"]
+    assert result.method == "curl_cffi"
+
+
+@pytest.mark.asyncio
+@pytest.mark.component
 async def test_handle_http_result_retries_browser_after_browser_first_failure_and_block(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

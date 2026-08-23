@@ -177,13 +177,13 @@ class DetailTierExecutor:
             adapter_records=inputs.adapter_records,
             network_payloads=inputs.network_payloads,
         )
-        self._materialize(prepared.state, "authoritative")
+        prepared.state.completed_tiers.append("authoritative")
         self._collect_structured_data_tier(
             prepared.state,
             context=prepared.context,
             alias_lookup=inputs.alias_lookup,
         )
-        self._materialize(prepared.state, "structured_data")
+        prepared.state.completed_tiers.append("structured_data")
         self._collect_js_state_tier(
             prepared.state,
             js_state_record=prepared.js_state_record,

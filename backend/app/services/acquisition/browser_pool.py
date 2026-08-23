@@ -66,6 +66,7 @@ logger = logging.getLogger(__name__)
 
 
 _BROWSER_POOL = BrowserRuntimePool()
+register_browser_cleanup_task = _BROWSER_POOL.register_cleanup_task
 
 
 def register_popup_guard_task(task: asyncio.Task[Any]) -> None:
@@ -650,6 +651,14 @@ def _evict_idle_browser_runtimes_locked() -> list[SharedBrowserRuntime]:
     return cast(list[SharedBrowserRuntime], _BROWSER_POOL.evict_idle_runtimes_locked())
 
 
+def _browser_runtimes() -> list[SharedBrowserRuntime]:
+    return [
+        runtime
+        for runtime in (*_BROWSER_POOL.direct.values(), *_BROWSER_POOL.proxied.values())
+        if runtime is not None
+    ]
+
+
 async def get_browser_runtime(
     *,
     proxy: str | None = None,
@@ -657,44 +666,41 @@ async def get_browser_runtime(
 ) -> SharedBrowserRuntime:
     normalized_proxy = _normalized_proxy_value(proxy)
     normalized_engine = _normalize_browser_engine(browser_engine)
-    if normalized_proxy is None:
-        runtime = _BROWSER_POOL.direct.get(normalized_engine)
-        if runtime is not None:
-            runtime.touch()
-            return runtime
-    else:
-        runtime = _BROWSER_POOL.proxied.get((normalized_engine, normalized_proxy))
-        if runtime is not None:
-            runtime.touch()
-            return runtime
-    runtimes_to_close: list[SharedBrowserRuntime] = []
-    async with _BROWSER_POOL.lock:
-        if normalized_proxy is None:
-            runtime = _BROWSER_POOL.direct.get(normalized_engine)
-            if runtime is None:
+    while True:
+        await _BROWSER_POOL.shutdown_complete.wait()
+        async with _BROWSER_POOL.lock:
+            if _BROWSER_POOL.shutting_down:
+                continue
+            runtimes_to_close: list[SharedBrowserRuntime] = []
+            if normalized_proxy is None:
+                runtime = _BROWSER_POOL.direct.get(normalized_engine)
+                if runtime is None:
+                    runtimes_to_close = _evict_idle_browser_runtimes_locked()
+                    runtime = _build_browser_runtime_entry(
+                        max_contexts=_browser_runtime_context_capacity(),
+                        browser_engine=normalized_engine,
+                    )
+                    _BROWSER_POOL.direct[normalized_engine] = runtime
+            else:
                 runtimes_to_close = _evict_idle_browser_runtimes_locked()
-                runtime = _build_browser_runtime_entry(
-                    max_contexts=_browser_runtime_context_capacity(),
-                    browser_engine=normalized_engine,
+                runtime = _BROWSER_POOL.proxied.get(
+                    (normalized_engine, normalized_proxy)
                 )
-                _BROWSER_POOL.direct[normalized_engine] = runtime
+                if runtime is None:
+                    runtime = _build_browser_runtime_entry(
+                        max_contexts=_browser_runtime_context_capacity(),
+                        launch_proxy=normalized_proxy,
+                        browser_engine=normalized_engine,
+                    )
+                    _BROWSER_POOL.proxied[(normalized_engine, normalized_proxy)] = (
+                        runtime
+                    )
             runtime.touch()
-        else:
-            runtimes_to_close = _evict_idle_browser_runtimes_locked()
-            runtime = _BROWSER_POOL.proxied.get((normalized_engine, normalized_proxy))
-            if runtime is None:
-                runtime = _build_browser_runtime_entry(
-                    max_contexts=_browser_runtime_context_capacity(),
-                    launch_proxy=normalized_proxy,
-                    browser_engine=normalized_engine,
+            for stale_runtime in runtimes_to_close:
+                register_browser_cleanup_task(
+                    asyncio.create_task(_close_evicted_runtime(stale_runtime))
                 )
-                _BROWSER_POOL.proxied[(normalized_engine, normalized_proxy)] = runtime
-            runtime.touch()
-    for stale_runtime in runtimes_to_close:
-        task = asyncio.create_task(_close_evicted_runtime(stale_runtime))
-        _BROWSER_POOL.eviction_cleanup_tasks.add(task)
-        task.add_done_callback(_BROWSER_POOL.eviction_cleanup_tasks.discard)
-    return runtime
+            return runtime
 
 
 async def _close_evicted_runtime(runtime: SharedBrowserRuntime) -> None:
@@ -724,32 +730,40 @@ def _build_browser_runtime_entry(
 
 
 async def shutdown_browser_runtime() -> None:
-    pending_eviction_tasks = list(_BROWSER_POOL.eviction_cleanup_tasks)
-    _BROWSER_POOL.eviction_cleanup_tasks.clear()
-    if pending_eviction_tasks:
-        await asyncio.gather(*pending_eviction_tasks, return_exceptions=True)
-    async with _BROWSER_POOL.lock:
-        runtimes = [
-            runtime
-            for runtime in (
-                *_BROWSER_POOL.direct.values(),
-                *_BROWSER_POOL.proxied.values(),
+    async with _BROWSER_POOL.shutdown_lock:
+        async with _BROWSER_POOL.lock:
+            _BROWSER_POOL.begin_shutdown()
+            runtimes = _browser_runtimes()
+            _BROWSER_POOL.direct.clear()
+            _BROWSER_POOL.proxied.clear()
+        try:
+            await _drain_browser_cleanup_tasks()
+            results = await asyncio.gather(
+                *(runtime.close() for runtime in runtimes),
+                return_exceptions=True,
             )
-            if runtime is not None
-        ]
-        _BROWSER_POOL.direct.clear()
-        _BROWSER_POOL.proxied.clear()
-    results = await asyncio.gather(
-        *(runtime.close() for runtime in runtimes),
-        return_exceptions=True,
-    )
-    for result in results:
-        if isinstance(result, Exception):
-            logger.warning(
-                "Browser runtime close failed during shutdown: %s",
-                result,
-            )
-    clear_browser_identity_cache()
+            for result in results:
+                if isinstance(result, Exception):
+                    logger.warning(
+                        "Browser runtime close failed during shutdown: %s",
+                        result,
+                    )
+            await _drain_browser_cleanup_tasks()
+            clear_browser_identity_cache()
+        finally:
+            _BROWSER_POOL.finish_shutdown()
+
+
+async def _drain_browser_cleanup_tasks() -> None:
+    handled: set[asyncio.Task[Any]] = set()
+    timeout_seconds = _browser_close_timeout_seconds()
+    while tasks := _BROWSER_POOL.eviction_cleanup_tasks - handled:
+        _done, pending = await asyncio.wait(tasks, timeout=timeout_seconds)
+        for task in pending:
+            task.cancel()
+        if pending:
+            await asyncio.wait(pending, timeout=timeout_seconds)
+        handled.update(tasks)
 
 
 def shutdown_browser_runtime_sync() -> None:
@@ -763,14 +777,7 @@ def shutdown_browser_runtime_sync() -> None:
 
 
 def browser_runtime_snapshot() -> dict[str, int | bool]:
-    runtimes = [
-        runtime
-        for runtime in (
-            *_BROWSER_POOL.direct.values(),
-            *_BROWSER_POOL.proxied.values(),
-        )
-        if runtime is not None
-    ]
+    runtimes = _browser_runtimes()
     return _aggregate_runtime_snapshots(
         runtimes, default_capacity=_browser_runtime_context_capacity()
     )
