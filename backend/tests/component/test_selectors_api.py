@@ -110,6 +110,14 @@ async def test_selectors_api_preview_test_and_suggest(
     )
     assert preview_response.status_code == 200
     assert '<base href="https://example.com/products/widget"' in preview_response.text
+    assert "x-frame-options" not in preview_response.headers
+    assert preview_response.headers["cache-control"] == "no-store"
+    preview_csp = preview_response.headers["content-security-policy"]
+    assert "sandbox" in preview_csp
+    assert "script-src 'none'" in preview_csp
+    assert "connect-src 'none'" in preview_csp
+    assert "form-action 'none'" in preview_csp
+    assert "frame-ancestors http://127.0.0.1:4000" in preview_csp
 
     test_response = await selector_api_client.post(
         "/api/selectors/test",

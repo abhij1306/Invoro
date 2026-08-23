@@ -17,6 +17,7 @@ from app.services.crawl.access_service import (
     RUN_NOT_FOUND_DETAIL,
 )
 from app.services.review import build_review_payload, load_review_html, save_review
+from app.services.untrusted_html import untrusted_html_response
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -69,7 +70,7 @@ async def review_artifact_html(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="No HTML artifact found"
         )
-    return HTMLResponse(content=html_text)
+    return untrusted_html_response(html_text)
 
 
 @router.post("/{run_id}/save")

@@ -369,7 +369,7 @@ export default function SelectorsPage() {
                 className="bg-panel h-[760px] w-full"
                 loading="lazy"
                 referrerPolicy="no-referrer"
-                sandbox="allow-same-origin"
+                sandbox=""
               />
             ) : (
               <div className="text-muted grid h-[760px] place-items-center text-sm leading-relaxed">

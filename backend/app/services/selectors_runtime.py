@@ -8,7 +8,7 @@ from urllib.parse import urljoin
 from app.services.dom.html_parser import BeautifulSoup
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.services.fetch.fetch_context import fetch_page
+from app.services.acquisition.http_client import request_result
 from app.services.config.extraction_rules import (
     COMMERCE_FIELD_HINTS,
     JOB_FIELD_HINTS,
@@ -42,7 +42,7 @@ from app.services.dom.xpath_service import (
     extract_selector_value,
     validate_or_convert_xpath,
 )
-from app.services.url_safety import ensure_public_crawl_targets
+from app.services.url_safety import prepare_public_request_target
 
 coerce_int = _coerce_int
 _HTML_PARSER = "html.parser"
@@ -68,10 +68,7 @@ def infer_surface(*, url: str, expected_fields: Iterable[str] | None = None) -> 
 
 
 async def fetch_selector_document(url: str) -> dict[str, object]:
-    await ensure_public_crawl_targets([url])
-    result = await fetch_page(str(url), prefer_browser=False)
-    final_url = result.final_url
-    html = result.html
+    final_url, html = await _fetch_public_selector_html(str(url))
     promoted = False
     visited = {final_url}
     for _ in range(
@@ -80,13 +77,13 @@ async def fetch_selector_document(url: str) -> dict[str, object]:
         candidate_url = _primary_iframe_candidate(final_url, html)
         if not candidate_url or candidate_url in visited:
             break
-        iframe_result = await fetch_page(candidate_url, prefer_browser=False)
-        iframe_text = html_to_text(iframe_result.html)
+        iframe_url, iframe_html = await _fetch_public_selector_html(candidate_url)
+        iframe_text = html_to_text(iframe_html)
         page_text = html_to_text(html)
         if len(iframe_text) <= len(page_text):
             break
-        final_url = iframe_result.final_url
-        html = iframe_result.html
+        final_url = iframe_url
+        html = iframe_html
         promoted = True
         visited.add(final_url)
     return {
@@ -94,6 +91,34 @@ async def fetch_selector_document(url: str) -> dict[str, object]:
         "html": html,
         "iframe_promoted": promoted,
     }
+
+
+async def _fetch_public_selector_html(url: str) -> tuple[str, str]:
+    current_url = str(url)
+    max_redirects = int(crawler_runtime_settings.selector_preview_max_redirects)
+    for redirect_count in range(max_redirects + 1):
+        target = await prepare_public_request_target(current_url)
+        extensions = (
+            {"sni_hostname": target.sni_hostname}
+            if target.sni_hostname is not None
+            else None
+        )
+        result = await request_result(
+            target.pinned_url,
+            prefer_browser=False,
+            follow_redirects=False,
+            headers={"Host": target.host_header},
+            extensions=extensions,
+        )
+        if result.status_code not in {301, 302, 303, 307, 308}:
+            return target.logical_url, result.text
+        location = result.headers.get("location")
+        if not location:
+            raise ValueError("Selector preview redirect is missing a Location header")
+        if redirect_count >= max_redirects:
+            raise ValueError("Selector preview exceeded the redirect limit")
+        current_url = urljoin(target.logical_url, location)
+    raise ValueError("Selector preview exceeded the redirect limit")
 
 
 def build_preview_html(*, source_url: str, html: str) -> str:

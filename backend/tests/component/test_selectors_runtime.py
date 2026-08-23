@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import httpx
 import pytest
 
 from app.services.domain_memory_service import load_domain_memory, save_domain_memory
+from app.services.url_safety import PublicRequestTarget
 from app.services.selectors_runtime import (
     coerce_int,
     create_selector_record,
@@ -93,6 +95,85 @@ async def test_create_selector_record_normalizes_duplicate_ids_before_append(
 async def test_fetch_selector_document_rejects_private_targets() -> None:
     with pytest.raises(ValueError):
         await fetch_selector_document("http://localhost/internal")
+
+
+@pytest.mark.asyncio
+@pytest.mark.component
+async def test_fetch_selector_document_revalidates_promoted_iframe(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _Result:
+        final_url = "https://example.com/page"
+        text = '<html><iframe src="http://127.0.0.1/internal"></iframe></html>'
+        status_code = 200
+        headers = httpx.Headers()
+
+    async def _fake_request_result(url: str, **kwargs):
+        assert url == "https://93.184.216.34:443/page"
+        assert kwargs["headers"] == {"Host": "example.com"}
+        assert kwargs["extensions"] == {"sni_hostname": "example.com"}
+        return _Result()
+
+    async def _fake_prepare(url: str):
+        if url == "https://example.com/page":
+            return PublicRequestTarget(
+                logical_url=url,
+                pinned_url="https://93.184.216.34:443/page",
+                host_header="example.com",
+                sni_hostname="example.com",
+            )
+        raise ValueError("Target host resolves to a non-public IP address")
+
+    monkeypatch.setattr(
+        "app.services.selectors_runtime.request_result", _fake_request_result
+    )
+    monkeypatch.setattr(
+        "app.services.selectors_runtime.prepare_public_request_target", _fake_prepare
+    )
+
+    with pytest.raises(ValueError, match="non-public IP"):
+        await fetch_selector_document("https://example.com/page")
+
+
+@pytest.mark.asyncio
+@pytest.mark.component
+async def test_fetch_selector_document_rejects_private_redirect_before_request(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    requested: list[str] = []
+
+    class _Redirect:
+        final_url = "https://example.com/page"
+        text = ""
+        status_code = 302
+        headers = httpx.Headers({"location": "http://127.0.0.1/internal"})
+
+    async def _fake_request_result(url: str, **kwargs):
+        assert kwargs["follow_redirects"] is False
+        requested.append(url)
+        return _Redirect()
+
+    async def _fake_prepare(url: str):
+        if url == "https://example.com/page":
+            return PublicRequestTarget(
+                logical_url=url,
+                pinned_url="https://93.184.216.34:443/page",
+                host_header="example.com",
+                sni_hostname="example.com",
+            )
+        raise ValueError("Target host resolves to a non-public IP address")
+
+    monkeypatch.setattr(
+        "app.services.selectors_runtime.request_result", _fake_request_result
+    )
+    monkeypatch.setattr(
+        "app.services.selectors_runtime.prepare_public_request_target", _fake_prepare
+    )
+
+    with pytest.raises(ValueError, match="non-public IP"):
+        await fetch_selector_document("https://example.com/page")
+
+    assert requested == ["https://93.184.216.34:443/page"]
 
 
 @pytest.mark.asyncio

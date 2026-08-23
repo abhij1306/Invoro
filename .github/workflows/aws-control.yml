@@ -1,0 +1,102 @@
+name: Control Invoro AWS Demo
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Environment action
+        required: true
+        type: choice
+        options: [status, start, stop]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: invoro-aws-demo
+  cancel-in-progress: false
+
+jobs:
+  control:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: aws-demo
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
+      CLUSTER: invoro-demo
+      RDS_ID: invoro-demo-db
+      FRONTEND_SERVICE: invoro-demo-frontend
+      API_SERVICE: invoro-demo-api
+      WORKER_SERVICE: invoro-demo-worker
+      FRONTEND_HOST: ${{ vars.INVORO_FRONTEND_HOST }}
+      API_HOST: ${{ vars.INVORO_API_HOST }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@cabfdba3510de1431bac9dba27511d97497fc100 # v5
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Verify AWS account
+        run: test "$(aws sts get-caller-identity --query Account --output text)" = "$AWS_ACCOUNT_ID"
+
+      - name: Start environment
+        if: inputs.action == 'start'
+        shell: bash
+        run: |
+          set -euo pipefail
+          state=$(aws rds describe-db-instances --db-instance-identifier "$RDS_ID" --query 'DBInstances[0].DBInstanceStatus' --output text)
+          if [[ "$state" == "stopped" ]]; then
+            aws rds start-db-instance --db-instance-identifier "$RDS_ID" >/dev/null
+          elif [[ "$state" == "stopping" ]]; then
+            aws rds wait db-instance-stopped --db-instance-identifier "$RDS_ID"
+            aws rds start-db-instance --db-instance-identifier "$RDS_ID" >/dev/null
+          fi
+          aws rds wait db-instance-available --db-instance-identifier "$RDS_ID"
+          for service in "$FRONTEND_SERVICE" "$API_SERVICE" "$WORKER_SERVICE"; do
+            aws ecs update-service --cluster "$CLUSTER" --service "$service" --desired-count 1 >/dev/null
+          done
+          aws ecs wait services-stable --cluster "$CLUSTER" --services "$FRONTEND_SERVICE" "$API_SERVICE" "$WORKER_SERVICE"
+          for _ in {1..30}; do
+            if curl --fail --silent --show-error "https://$API_HOST/health/ready" >/dev/null && curl --fail --silent --show-error "https://$FRONTEND_HOST/" >/dev/null; then
+              exit 0
+            fi
+            sleep 10
+          done
+          echo 'External readiness did not pass.' >&2
+          exit 1
+
+      - name: Stop environment
+        if: inputs.action == 'stop'
+        shell: bash
+        run: |
+          set -euo pipefail
+          for service in "$FRONTEND_SERVICE" "$API_SERVICE" "$WORKER_SERVICE"; do
+            aws ecs update-service --cluster "$CLUSTER" --service "$service" --desired-count 0 >/dev/null
+          done
+          aws ecs wait services-stable --cluster "$CLUSTER" --services "$FRONTEND_SERVICE" "$API_SERVICE" "$WORKER_SERVICE"
+          state=$(aws rds describe-db-instances --db-instance-identifier "$RDS_ID" --query 'DBInstances[0].DBInstanceStatus' --output text)
+          if [[ "$state" == "available" ]]; then
+            aws rds stop-db-instance --db-instance-identifier "$RDS_ID" >/dev/null
+            aws rds wait db-instance-stopped --db-instance-identifier "$RDS_ID"
+          elif [[ "$state" == "starting" ]]; then
+            aws rds wait db-instance-available --db-instance-identifier "$RDS_ID"
+            aws rds stop-db-instance --db-instance-identifier "$RDS_ID" >/dev/null
+            aws rds wait db-instance-stopped --db-instance-identifier "$RDS_ID"
+          fi
+
+      - name: Report status
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '## Invoro AWS demo status' >> "$GITHUB_STEP_SUMMARY"
+          aws rds describe-db-instances --db-instance-identifier "$RDS_ID" --query 'DBInstances[0].{Identifier:DBInstanceIdentifier,Status:DBInstanceStatus}' --output table | tee -a "$GITHUB_STEP_SUMMARY"
+          aws ecs describe-services --cluster "$CLUSTER" --services "$FRONTEND_SERVICE" "$API_SERVICE" "$WORKER_SERVICE" --query 'services[].{Service:serviceName,Desired:desiredCount,Running:runningCount,Pending:pendingCount,TaskDefinition:taskDefinition}' --output table | tee -a "$GITHUB_STEP_SUMMARY"

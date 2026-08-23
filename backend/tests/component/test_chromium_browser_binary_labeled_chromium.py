@@ -728,6 +728,7 @@ async def test_shared_browser_runtime_uses_socks5_auth_bridge_and_keeps_context_
                 "--disable-background-networking",
                 "--disable-client-side-phishing-detection",
                 "--disable-domain-reliability",
+                "--disable-dev-shm-usage",
                 "--disable-sync",
                 "--no-first-run",
                 "--headless=new",

@@ -50,6 +50,7 @@ from app.core.metrics import (
 from app.core.rate_limit import (
     client_identifier_from_request,
     consume_sliding_window_limit,
+    is_trusted_proxy,
 )
 from app.core.redis import close_redis
 from app.core.database import SessionLocal, dispose_engine
@@ -66,7 +67,6 @@ from app.services.acquisition import (
     shutdown_browser_runtime,
     validate_cookie_policy_config,
 )
-from app.services.auth_service import bootstrap_admin_user
 from app.services.pipeline.extraction_process import shutdown_extraction_processes
 from app.services.config.auth_security import (
     API_ALLOWED_CORS_METHODS,
@@ -130,16 +130,19 @@ async def lifespan(fastapi_app: FastAPI):
         logger.debug("Asyncio exception filter not installed; no running loop")
     validate_cookie_policy_config()
     async with SessionLocal() as session:
-        await bootstrap_admin_user(session)
         recovered = await recover_stale_local_runs(session)
         if recovered:
             logger.warning(
                 "Recovered %s stale local crawl run(s) after backend restart",
                 recovered,
             )
-    ensure_monitor_change_detection_registered()
+    if settings.monitoring_enabled:
+        ensure_monitor_change_detection_registered()
     crawler_state = _crawler_app_state(fastapi_app)
-    if settings.scheduler_driver == SCHEDULER_DRIVER_DEV:
+    if (
+        settings.monitoring_enabled
+        and settings.scheduler_driver == SCHEDULER_DRIVER_DEV
+    ):
         scheduler_loop = AsyncSchedulerLoop(
             MonitorSchedulerService(),
             SCHEDULER_POLL_INTERVAL_SECONDS,
@@ -165,7 +168,13 @@ async def lifespan(fastapi_app: FastAPI):
         await dispose_engine()
 
 
-app = FastAPI(title=settings.app_name, lifespan=lifespan)
+app = FastAPI(
+    title=settings.app_name,
+    lifespan=lifespan,
+    docs_url="/docs" if settings.public_docs_enabled else None,
+    redoc_url="/redoc" if settings.public_docs_enabled else None,
+    openapi_url="/openapi.json" if settings.public_docs_enabled else None,
+)
 app.state.crawler = CrawlerAppState()
 instrument_fastapi(app)
 app.add_middleware(
@@ -179,6 +188,10 @@ app.add_middleware(
 
 @app.middleware("http")
 async def public_api_middleware(request: Request, call_next) -> Response:
+    if not settings.monitoring_enabled and request.url.path.startswith(
+        "/api/v1/alerts"
+    ):
+        return JSONResponse({"detail": "Not Found"}, status_code=404)
     if not request.url.path.startswith(_PUBLIC_API_PREFIX):
         return await call_next(request)
     request.state.public_api_started_at = perf_counter()
@@ -291,7 +304,11 @@ def _sanitize_header_name(value: str) -> str:
 async def security_headers_middleware(request: Request, call_next) -> Response:
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = SECURITY_HEADER_CONTENT_TYPE_OPTIONS
-    response.headers["X-Frame-Options"] = SECURITY_HEADER_FRAME_OPTIONS
+    if request.url.path == "/api/selectors/preview-html":
+        if "X-Frame-Options" in response.headers:
+            del response.headers["X-Frame-Options"]
+    else:
+        response.headers["X-Frame-Options"] = SECURITY_HEADER_FRAME_OPTIONS
     response.headers["Referrer-Policy"] = SECURITY_HEADER_REFERRER_POLICY
     response.headers["Permissions-Policy"] = SECURITY_HEADER_PERMISSIONS_POLICY
     if path_requires_no_store(request.url.path):
@@ -419,7 +436,10 @@ def _trusted_proxy_set() -> frozenset[str]:
 
 
 def _is_trusted_proxy(proxy_ip: str) -> bool:
-    return proxy_ip in _trusted_proxy_set()
+    return is_trusted_proxy(
+        proxy_ip,
+        trusted_proxies=tuple(_trusted_proxy_set()),
+    )
 
 
 async def _consume_rate_limit(
@@ -588,33 +608,40 @@ async def health() -> dict[str, object]:
 
 @app.get("/api/metrics")
 async def metrics() -> Response:
+    if not settings.public_metrics_enabled:
+        raise HTTPException(status_code=404, detail="Not Found")
     payload, content_type = await render_prometheus_metrics()
     return Response(content=payload, media_type=content_type)
 
 
 # crawl_domain_router and crawls_router share "/api/crawls". Dynamic run routes
 # use the int path converter, so non-run domain-memory routes are not shadowed.
-for router in [
-    auth_router,
-    api_keys_router,
-    users_router,
-    dashboard_router,
-    crawl_domain_router,
-    crawls_router,
-    data_enrichment_router,
-    records_router,
-    jobs_router,
-    review_router,
-    selectors_router,
-    llm_router,
-    product_intelligence_router,
-    playground_router,
-    monitors_router,
-    alerts_router,
-    public_extract_router,
-    public_domains_router,
-    public_capabilities_router,
-    public_alerts_router,
-    notifications_router,
-]:
+def application_routers(*, monitoring_enabled: bool):
+    routers = [
+        auth_router,
+        api_keys_router,
+        users_router,
+        dashboard_router,
+        crawl_domain_router,
+        crawls_router,
+        data_enrichment_router,
+        records_router,
+        jobs_router,
+        review_router,
+        selectors_router,
+        llm_router,
+        product_intelligence_router,
+        playground_router,
+        public_extract_router,
+        public_domains_router,
+        public_capabilities_router,
+    ]
+    if monitoring_enabled:
+        routers.extend(
+            [monitors_router, alerts_router, public_alerts_router, notifications_router]
+        )
+    return routers
+
+
+for router in application_routers(monitoring_enabled=settings.monitoring_enabled):
     app.include_router(router)

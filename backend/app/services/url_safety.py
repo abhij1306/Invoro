@@ -37,6 +37,16 @@ class ValidatedTarget:
     dns_resolved: bool = True
 
 
+@dataclass(frozen=True)
+class PublicRequestTarget:
+    """A public URL rewritten to its validated IP for a single HTTP request."""
+
+    logical_url: str
+    pinned_url: str
+    host_header: str
+    sni_hostname: str | None
+
+
 async def ensure_public_crawl_targets(urls: Iterable[str]) -> list[str]:
     seen: set[str] = set()
     normalized: list[str] = []
@@ -75,6 +85,34 @@ async def validate_public_target(url: str) -> ValidatedTarget:
         label="Target",
         unresolved_detail="Target host could not be resolved to a valid IP address",
         wrap_resolution_error=True,
+    )
+
+
+async def prepare_public_request_target(url: str) -> PublicRequestTarget:
+    """Validate a target and pin the request URL to the checked public IP."""
+    logical_url = str(url or "").strip()
+    target = await validate_public_target(logical_url)
+    if not urlparse(logical_url).scheme:
+        logical_url = _rebuild_url(logical_url, target)
+    parsed = urlparse(logical_url)
+    if parsed.username is not None or parsed.password is not None:
+        raise SecurityError("Target URLs must not include credentials")
+
+    pinned_hostname = target.resolved_ips[0]
+    pinned_netloc = (
+        f"[{pinned_hostname}]:{target.port}"
+        if ":" in pinned_hostname
+        else f"{pinned_hostname}:{target.port}"
+    )
+    host = f"[{target.hostname}]" if ":" in target.hostname else target.hostname
+    host_header = (
+        host if target.port == _default_port(target.scheme) else f"{host}:{target.port}"
+    )
+    return PublicRequestTarget(
+        logical_url=logical_url,
+        pinned_url=parsed._replace(netloc=pinned_netloc, fragment="").geturl(),
+        host_header=host_header,
+        sni_hostname=target.hostname if target.dns_resolved else None,
     )
 
 

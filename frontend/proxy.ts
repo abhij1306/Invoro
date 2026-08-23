@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
+import { awsDemoMode, isDemoDisabledPath } from './lib/config/demo-mode';
+
 export const CSP_NONCE_HEADER = 'x-nonce';
 
 function configuredApiCspSources() {
@@ -44,6 +46,9 @@ export function buildContentSecurityPolicy(nonce: string) {
 }
 
 export function proxy(request: NextRequest) {
+  if (awsDemoMode && isDemoDisabledPath(request.nextUrl.pathname)) {
+    return new NextResponse('Not Found', { status: 404 });
+  }
   if (process.env.NODE_ENV !== 'production') {
     return NextResponse.next();
   }

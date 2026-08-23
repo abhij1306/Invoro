@@ -1,9 +1,12 @@
-FROM python:3.12-slim
+FROM python:3.12-slim@sha256:2c941e860699f878900b0edc2403613c234d4b32eda3cc9fa7036991a2a63c4a
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+    PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
+    UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    PATH=/app/backend/.venv/bin:$PATH
 
 WORKDIR /app/backend
 
@@ -15,15 +18,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY backend/ ./
 
-# skipcq: DOK-DL3013 - project dependencies are pinned by package metadata/lock inputs, not CLI flags.
+# Install exactly the frozen application lock. uv itself is pinned as build tooling.
 # hadolint ignore=DL3013
-RUN pip install --upgrade pip && \
-    pip install "." && \
+RUN python -m pip install --no-cache-dir uv==0.11.28 && \
+    uv sync --frozen --no-dev && \
     python -m patchright install --with-deps chromium
 
-RUN useradd --create-home --shell /bin/bash appuser && \
+RUN groupadd --gid 10001 appuser && \
+    useradd --uid 10001 --gid 10001 --create-home --shell /bin/bash appuser && \
     mkdir -p /app/backend/artifacts /app/backend/cookie_store /ms-playwright && \
-    chown -R appuser:appuser /app /ms-playwright
+    chown -R appuser:appuser \
+      /app/backend/artifacts \
+      /app/backend/cookie_store \
+      /home/appuser
 
 USER appuser
 

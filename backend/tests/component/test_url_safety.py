@@ -142,3 +142,29 @@ async def test_validate_public_target_rejects_private_and_metadata_ranges(
 ) -> None:
     with pytest.raises(url_safety.SecurityError):
         await url_safety.validate_public_target(url)
+
+
+@pytest.mark.asyncio
+@pytest.mark.component
+async def test_prepare_public_request_target_pins_validated_ip_and_preserves_host(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def _fake_validate(url: str) -> url_safety.ValidatedTarget:
+        assert url == "https://example.com/products?id=1#details"
+        return url_safety.ValidatedTarget(
+            hostname="example.com",
+            scheme="https",
+            port=443,
+            resolved_ips=("93.184.216.34",),
+        )
+
+    monkeypatch.setattr(url_safety, "validate_public_target", _fake_validate)
+
+    target = await url_safety.prepare_public_request_target(
+        "https://example.com/products?id=1#details"
+    )
+
+    assert target.logical_url == "https://example.com/products?id=1#details"
+    assert target.pinned_url == "https://93.184.216.34:443/products?id=1"
+    assert target.host_header == "example.com"
+    assert target.sni_hostname == "example.com"

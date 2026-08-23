@@ -28,6 +28,7 @@ import {
 import { api, monitorsApi } from '../../lib/api';
 import type { User } from '../../lib/api/types';
 import { STORAGE_KEYS } from '../../lib/constants/storage-keys';
+import { awsDemoMode } from '../../lib/config/demo-mode';
 import { cn } from '../../lib/utils';
 import { InlineAlert } from '../ui/alert';
 import { LogoMark } from './logo-mark';
@@ -81,7 +82,13 @@ const navGroups = [
   }>;
 }>;
 
-const navSkeletonKeys = navGroups.flatMap((group) => group.items.map((item) => `nav-${item.href}`));
+const visibleNavGroups = awsDemoMode
+  ? navGroups.filter((group) => group.label !== 'Monitoring')
+  : navGroups;
+
+const navSkeletonKeys = visibleNavGroups.flatMap((group) =>
+  group.items.map((item) => `nav-${item.href}`),
+);
 
 export function SidebarSkeletonNavigation() {
   return navSkeletonKeys.map((key) => <div key={key} className="skeleton h-8 w-full rounded-md" />);
@@ -124,6 +131,7 @@ export function Sidebar({ pathname, user }: Readonly<{ pathname: string; user: U
     queryKey: ['sidebar-monitors'],
     queryFn: () => monitorsApi.list({ status: 'active' }),
     staleTime: 60_000,
+    enabled: !awsDemoMode,
   });
   const monitorPulse = Boolean(
     monitorsQuery.data?.some((monitor) => {
@@ -161,7 +169,7 @@ export function Sidebar({ pathname, user }: Readonly<{ pathname: string; user: U
       </div>
 
       <nav id="app-sidebar-navigation" className="app-sidebar-nav" aria-label="Main navigation">
-        {navGroups.map((group) => (
+        {visibleNavGroups.map((group) => (
           <div key={group.label} className="app-sidebar-group">
             <div className="space-y-1">
               {group.items.map((item) => {

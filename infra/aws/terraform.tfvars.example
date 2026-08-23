@@ -1,0 +1,7 @@
+aws_account_id       = "123456789012"
+aws_region           = "us-east-1"
+acm_certificate_arn  = "arn:aws:acm:us-east-1:123456789012:certificate/example"
+frontend_host        = "invoro.cube27.com"
+api_host             = "api.invoro.cube27.com"
+default_admin_email  = "owner@example.com"
+demo_expiry_date     = "2026-08-30"
