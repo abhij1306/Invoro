@@ -121,6 +121,7 @@ class CrawlerRuntimeSettings(BaseSettings):
     extraction_process_timeout_seconds: float = 45.0
     extraction_process_terminate_grace_seconds: float = 1.0
     extraction_process_max_payload_bytes: int = 256_000_000
+    extraction_process_concurrency: int = 2
     job_max_wall_seconds: int = 3600
     worker_max_concurrent_jobs: int = 8
     worker_orphan_recovery_grace_seconds: int = 900
@@ -444,6 +445,7 @@ class CrawlerRuntimeSettings(BaseSettings):
             "extraction_process_start_timeout_seconds",
             "extraction_process_timeout_seconds",
             "extraction_process_max_payload_bytes",
+            "extraction_process_concurrency",
             "job_max_wall_seconds",
             "browser_render_timeout_seconds",
             "browser_vendor_block_probe_timeout_seconds",

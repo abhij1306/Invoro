@@ -231,6 +231,11 @@ async def test_extraction_cancellation_terminates_worker(
 async def test_extraction_concurrency_is_bounded_separately(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setattr(
+        extraction_process.crawler_runtime_settings,
+        "extraction_process_concurrency",
+        2,
+    )
     active = 0
     peak = 0
 
@@ -253,4 +258,4 @@ async def test_extraction_concurrency_is_bounded_separately(
 
     await asyncio.gather(*(run_extraction_process(request) for _ in range(5)))
 
-    assert peak == 1
+    assert peak == 2

@@ -1,4 +1,6 @@
 import asyncio
+from dataclasses import dataclass, field
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -107,6 +109,146 @@ async def cancel_pending_tasks(tasks: list[asyncio.Task]) -> None:
     await asyncio.gather(*tasks, return_exceptions=True)
 
 
+async def _parallel_url_worker(
+    *,
+    work_queue,
+    result_queue,
+    record_budget: ParallelRecordBudget,
+    process_url,
+    session_factory,
+    run_id: int,
+    total_urls: int,
+    url_timeout_seconds: float,
+    url_metric,
+) -> None:
+    while True:
+        try:
+            idx, url = work_queue.get_nowait()
+        except asyncio.QueueEmpty:
+            return
+        claimed = await record_budget.claim()
+        try:
+            result_idx, result_url, result = await process_url(
+                session_factory=session_factory,
+                run_id=run_id,
+                idx=idx,
+                total_urls=total_urls,
+                url=url,
+                max_records=claimed,
+                url_timeout_seconds=url_timeout_seconds,
+            )
+            count = as_int(url_metric(result, "record_count", len(result.records)))
+            await record_budget.release(max(0, claimed - count))
+            await result_queue.put((result_idx, result_url, result, count))
+        except asyncio.CancelledError:
+            await record_budget.release(claimed)
+            raise
+        except Exception as exc:
+            await record_budget.release(claimed)
+            await result_queue.put(exc)
+            return
+        finally:
+            work_queue.task_done()
+
+
+@dataclass
+class _ParallelResultCoordinator:
+    session: AsyncSession
+    run: CrawlRun
+    progress_state: BatchRunProgressState
+    max_records: int
+    record_count: int
+    url_metric: Any
+    touch_heartbeat: Any
+    current_duration_ms: Any
+    verdicts: list[str] = field(default_factory=list, init=False)
+
+    async def record(self, item: tuple[int, str, URLProcessingResult, int]) -> bool:
+        idx, url, result, count = item
+        verdict = str(result.verdict or VERDICT_ERROR)
+        self.verdicts.append(verdict)
+        self.record_count += count
+        self.progress_state.record_url_result(
+            idx=idx - 1,
+            records_count=count,
+            verdict=verdict,
+            url_metrics=result.url_metrics,
+        )
+        self.touch_heartbeat(self.run)
+        self.run.update_summary(
+            **self.progress_state.build_progress_patch(
+                current_url=url, current_url_index=idx
+            ),
+            duration_ms=self.current_duration_ms(self.run),
+        )
+        await self.session.commit()
+        return self.record_count >= self.max_records
+
+    async def drain_ready_results(self, result_queue) -> Exception | None:
+        first_error: Exception | None = None
+        while True:
+            try:
+                item = result_queue.get_nowait()
+            except asyncio.QueueEmpty:
+                return first_error
+            if isinstance(item, Exception):
+                first_error = first_error or item
+            else:
+                await self.record(item)
+            result_queue.task_done()
+
+    async def consume(
+        self,
+        *,
+        result_queue,
+        tasks: list[asyncio.Task],
+        total_urls: int,
+    ) -> bool:
+        completed_urls = 0
+        while completed_urls < total_urls:
+            completed_item = await result_queue.get()
+            result_queue.task_done()
+            completed_urls += 1
+            if isinstance(completed_item, Exception):
+                await cancel_pending_tasks(tasks)
+                await self.drain_ready_results(result_queue)
+                raise completed_item
+            record_limit_reached = await self.record(completed_item)
+            await self.session.refresh(self.run)
+            control_request = get_control_request(self.run)
+            if control_request in (CONTROL_REQUEST_PAUSE, CONTROL_REQUEST_KILL):
+                await self._stop_for_control(result_queue, tasks, control_request)
+                return True
+            if record_limit_reached:
+                await self._stop_at_record_limit(result_queue, tasks)
+                return True
+        return False
+
+    async def _stop_for_control(
+        self, result_queue, tasks: list[asyncio.Task], control_request: str
+    ) -> None:
+        queued_error = await self.drain_ready_results(result_queue)
+        await cancel_pending_tasks(tasks)
+        if queued_error is not None:
+            raise queued_error
+        await _persist_parallel_control(self.session, self.run, control_request)
+
+    async def _stop_at_record_limit(
+        self, result_queue, tasks: list[asyncio.Task]
+    ) -> None:
+        queued_error = await self.drain_ready_results(result_queue)
+        await cancel_pending_tasks(tasks)
+        if queued_error is not None:
+            raise queued_error
+        await log_event(
+            self.session,
+            self.run.id,
+            "info",
+            f"Stopped after reaching max_records={self.max_records}",
+        )
+        await self.session.commit()
+
+
 async def process_urls_in_parallel(
     session: AsyncSession,
     *,
@@ -147,122 +289,48 @@ async def process_urls_in_parallel(
         tuple[int, str, URLProcessingResult, int] | Exception
     ] = asyncio.Queue(maxsize=concurrency)
 
-    async def worker(worker_number: int) -> None:
-        while True:
-            try:
-                idx, url = work_queue.get_nowait()
-            except asyncio.QueueEmpty:
-                return
-            claimed = await record_budget.claim()
-            try:
-                result_idx, result_url, result = await process_url(
-                    session_factory=session_factory,
-                    run_id=run_id,
-                    idx=idx,
-                    total_urls=total_urls,
-                    url=url,
-                    max_records=claimed,
-                    url_timeout_seconds=url_timeout_seconds,
-                )
-                count = as_int(url_metric(result, "record_count", len(result.records)))
-                await record_budget.release(max(0, claimed - count))
-                await result_queue.put((result_idx, result_url, result, count))
-            except asyncio.CancelledError:
-                await record_budget.release(claimed)
-                raise
-            except Exception as exc:
-                await record_budget.release(claimed)
-                await result_queue.put(exc)
-                return
-            finally:
-                work_queue.task_done()
-
     tasks = [
         asyncio.create_task(
-            worker(worker_number), name=f"crawl-run-{run_id}-worker-{worker_number}"
+            _parallel_url_worker(
+                work_queue=work_queue,
+                result_queue=result_queue,
+                record_budget=record_budget,
+                process_url=process_url,
+                session_factory=session_factory,
+                run_id=run_id,
+                total_urls=total_urls,
+                url_timeout_seconds=url_timeout_seconds,
+                url_metric=url_metric,
+            ),
+            name=f"crawl-run-{run_id}-worker-{worker_number}",
         )
         for worker_number in range(1, concurrency + 1)
     ]
-    verdicts: list[str] = []
-
-    async def record_result(
-        item: tuple[int, str, URLProcessingResult, int],
-    ) -> bool:
-        nonlocal record_count
-        idx, url, result, count = item
-        verdict = str(result.verdict or VERDICT_ERROR)
-        verdicts.append(verdict)
-        record_count += count
-        progress_state.record_url_result(
-            idx=idx - 1,
-            records_count=count,
-            verdict=verdict,
-            url_metrics=result.url_metrics,
-        )
-        touch_heartbeat(run)
-        run.update_summary(
-            **progress_state.build_progress_patch(
-                current_url=url, current_url_index=idx
-            ),
-            duration_ms=current_duration_ms(run),
-        )
-        await session.commit()
-        return record_count >= max_records
-
-    async def drain_ready_results() -> Exception | None:
-        first_error: Exception | None = None
-        while True:
-            try:
-                item = result_queue.get_nowait()
-            except asyncio.QueueEmpty:
-                return first_error
-            if isinstance(item, Exception):
-                first_error = first_error or item
-            else:
-                await record_result(item)
-            result_queue.task_done()
-
+    coordinator = _ParallelResultCoordinator(
+        session=session,
+        run=run,
+        progress_state=progress_state,
+        max_records=max_records,
+        record_count=record_count,
+        url_metric=url_metric,
+        touch_heartbeat=touch_heartbeat,
+        current_duration_ms=current_duration_ms,
+    )
     try:
-        completed_urls = 0
-        while completed_urls < total_urls:
-            completed_item = await result_queue.get()
-            result_queue.task_done()
-            completed_urls += 1
-            if isinstance(completed_item, Exception):
-                await cancel_pending_tasks(tasks)
-                await drain_ready_results()
-                raise completed_item
-            record_limit_reached = await record_result(completed_item)
-            await session.refresh(run)
-            control_request = get_control_request(run)
-            if control_request in (CONTROL_REQUEST_PAUSE, CONTROL_REQUEST_KILL):
-                queued_error = await drain_ready_results()
-                await cancel_pending_tasks(tasks)
-                if queued_error is not None:
-                    raise queued_error
-                await _persist_parallel_control(session, run, control_request)
-                return verdicts, record_count
-            if record_limit_reached:
-                queued_error = await drain_ready_results()
-                await cancel_pending_tasks(tasks)
-                if queued_error is not None:
-                    raise queued_error
-                await log_event(
-                    session,
-                    run.id,
-                    "info",
-                    f"Stopped after reaching max_records={max_records}",
-                )
-                await session.commit()
-                break
+        skip_final_gather = await coordinator.consume(
+            result_queue=result_queue,
+            tasks=tasks,
+            total_urls=total_urls,
+        )
     except asyncio.CancelledError:
         await cancel_pending_tasks(tasks)
         raise
     except Exception:
         await cancel_pending_tasks(tasks)
         raise
-    await asyncio.gather(*tasks)
-    return verdicts, record_count
+    if not skip_final_gather:
+        await asyncio.gather(*tasks)
+    return coordinator.verdicts, coordinator.record_count
 
 
 async def _persist_parallel_control(

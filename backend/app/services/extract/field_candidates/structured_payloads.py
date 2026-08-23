@@ -90,50 +90,61 @@ def _clean_structured_markup_text(value: object) -> str | None:
     return cleaned or None
 
 
+def _breadcrumb_position(item: object) -> float:
+    if not isinstance(item, dict):
+        return 0.0
+    try:
+        return float(item.get("position", 0))
+    except (ValueError, TypeError):
+        return 0.0
+
+
+def _breadcrumb_page_root_labels(page_url: str) -> set[str]:
+    if not page_url:
+        return set()
+    host = urlparse(page_url).netloc.lower()
+    if host.startswith("www."):
+        host = host[4:]
+    host_parts = [part for part in host.split(".") if part]
+    second_level_domain = host_parts[-2] if len(host_parts) >= 2 else host
+    return {host, second_level_domain} if host else set()
+
+
+def _is_breadcrumb_root_label(text: str, page_root_labels: set[str]) -> bool:
+    lowered = text.strip().lower()
+    return lowered in DETAIL_BREADCRUMB_ROOT_LABELS or lowered in page_root_labels
+
+
+def _clean_breadcrumb_names(items: list[object]) -> list[str]:
+    strip_chars = " \t\n\r" + "".join(DETAIL_BREADCRUMB_SEPARATOR_LABELS)
+    names: list[str] = []
+    for item in items:
+        name = _breadcrumb_item_name(item)
+        if not name:
+            continue
+        clean_name = name.strip(strip_chars)
+        if clean_name and clean_name not in DETAIL_BREADCRUMB_SEPARATOR_LABELS:
+            names.append(clean_name)
+    return names
+
+
 def _breadcrumb_names(payload: dict[str, object], page_url: str = "") -> list[str]:
     raw_items = payload.get("itemListElement")
     if not isinstance(raw_items, list):
         return []
-
-    def _get_position(item: Any) -> float:
-        if not isinstance(item, dict):
-            return 0.0
-        try:
-            return float(item.get("position", 0))
-        except (ValueError, TypeError):
-            return 0.0
-
-    raw_items = _sort_breadcrumb_items(raw_items, _get_position)
-
-    names: list[str] = []
-    strip_chars = " \t\n\r" + "".join(DETAIL_BREADCRUMB_SEPARATOR_LABELS)
-    for item in raw_items:
-        name = _breadcrumb_item_name(item)
-        if name:
-            clean_name = name.strip(strip_chars)
-            if clean_name and clean_name not in DETAIL_BREADCRUMB_SEPARATOR_LABELS:
-                names.append(clean_name)
+    names = _clean_breadcrumb_names(
+        _sort_breadcrumb_items(raw_items, _breadcrumb_position)
+    )
     if not names:
         return []
+    page_root_labels = _breadcrumb_page_root_labels(page_url)
 
-    def _is_root_label(text: str) -> bool:
-        lowered = text.strip().lower()
-        if lowered in DETAIL_BREADCRUMB_ROOT_LABELS:
-            return True
-        if page_url:
-            host = urlparse(page_url).netloc.lower()
-            if host.startswith("www."):
-                host = host[4:]
-            host_parts = [part for part in host.split(".") if part]
-            second_level_domain = host_parts[-2] if len(host_parts) >= 2 else host
-            if host and (lowered == host or lowered == second_level_domain):
-                return True
-        return False
+    def is_root(name: str) -> bool:
+        return _is_breadcrumb_root_label(name, page_root_labels)
 
-    if len(names) > 1 and _is_root_label(names[-1]) and not _is_root_label(names[0]):
+    if len(names) > 1 and is_root(names[-1]) and not is_root(names[0]):
         names.reverse()
-
-    if _is_root_label(names[0]):
+    if is_root(names[0]):
         names = names[1:]
     return [name for name in names if name]
 

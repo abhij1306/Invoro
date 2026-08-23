@@ -1,7 +1,32 @@
 from __future__ import annotations
 
-from ._run_json_issue_audit_shared import APPAREL_VARIANT_HINT_RES, BLOCKED_PAGE_TITLE_RES, NON_PRODUCT_IMAGE_PATH_RES, URL_RE, Any, Counter, parse_qsl, re, urlencode, urlparse, urlunparse  # fmt: skip
-from .json_issue_audit_field_checks import Issue, _find_incorrect_fields, _find_missing_fields, _find_pollution, _host_from_url, _host_matches_domain, _is_noise_text, _is_variant_size_value, _looks_price, _safe_list, _safe_str, _variant_signature  # fmt: skip
+from ._run_json_issue_audit_shared import (  # fmt: skip
+    APPAREL_VARIANT_HINT_RES,
+    BLOCKED_PAGE_TITLE_RES,
+    NON_PRODUCT_IMAGE_PATH_RES,
+    URL_RE,
+    Any,
+    Counter,
+    parse_qsl,
+    re,
+    urlencode,
+    urlparse,
+    urlunparse,
+)
+from .json_issue_audit_field_checks import (  # fmt: skip
+    Issue,
+    _find_incorrect_fields,
+    _find_missing_fields,
+    _find_pollution,
+    _host_from_url,
+    _host_matches_domain,
+    _is_noise_text,
+    _is_variant_size_value,
+    _looks_price,
+    _safe_list,
+    _safe_str,
+    _variant_signature,
+)
 
 
 def _normalized_image_key(url: str) -> str:
@@ -112,15 +137,12 @@ def _looks_like_variant_expected(record: dict[str, Any]) -> bool:
         return True
     if re.search(r"((?:\b\d{1,2}(?:\.\d)?\b\s*){8,})$", desc):
         return True
-    if _is_variant_size_value(_safe_str(record.get("size"))):
-        return True
-    return False
+    return _is_variant_size_value(_safe_str(record.get("size")))
 
 
-def _find_variant_issues(record: dict[str, Any], issues: list[Issue]) -> None:
-    variants = _safe_list(record.get("variants"))
-    variant_count = record.get("variant_count")
-
+def _check_declared_variant_count(
+    variant_count: object, variants: list[Any], issues: list[Issue]
+) -> None:
     if variant_count not in (None, ""):
         try:
             declared = int(str(variant_count))
@@ -145,22 +167,52 @@ def _find_variant_issues(record: dict[str, Any], issues: list[Issue]) -> None:
                 )
             )
 
-    if not variants:
-        if _looks_like_variant_expected(record):
-            issues.append(
-                Issue(
-                    "incorrect_variants",
-                    "high",
-                    "variants",
-                    "variants missing but product looks multi-variant",
-                )
-            )
-        return
 
+def _check_variant_fields(variant: dict[str, Any], issues: list[Issue]) -> None:
+    variant_url = _safe_str(variant.get("url"))
+    if variant_url and not URL_RE.match(variant_url):
+        issues.append(
+            Issue(
+                "incorrect_variants",
+                "medium",
+                "variants.url",
+                "variant url not http/https",
+                variant_url,
+            )
+        )
+    variant_price = variant.get("price")
+    if variant_price not in (None, "") and not _looks_price(variant_price):
+        issues.append(
+            Issue(
+                "incorrect_variants",
+                "medium",
+                "variants.price",
+                "variant price not numeric",
+                variant_price,
+            )
+        )
+
+
+def _variant_has_noise(variant: dict[str, Any]) -> bool:
+    for key, value in variant.items():
+        if key in {"url", "image_url"}:
+            continue
+        text = _safe_str(value)
+        if not text or (
+            key in {"flavor", "scent"} and re.search(r"\bcookie\b", text, re.I)
+        ):
+            continue
+        if _is_noise_text(text):
+            return True
+    return False
+
+
+def _variant_quality_counts(
+    variants: list[Any], issues: list[Issue]
+) -> tuple[int, int]:
     noisy_variant_rows = 0
     duplicate_signatures = 0
     seen_signatures: set[tuple[tuple[str, str], ...]] = set()
-
     for idx, variant in enumerate(variants):
         if not isinstance(variant, dict):
             issues.append(
@@ -173,47 +225,22 @@ def _find_variant_issues(record: dict[str, Any], issues: list[Issue]) -> None:
                 )
             )
             continue
-
-        variant_url = _safe_str(variant.get("url"))
-        if variant_url and not URL_RE.match(variant_url):
-            issues.append(
-                Issue(
-                    "incorrect_variants",
-                    "medium",
-                    "variants.url",
-                    "variant url not http/https",
-                    variant_url,
-                )
-            )
-
-        v_price = variant.get("price")
-        if v_price not in (None, "") and not _looks_price(v_price):
-            issues.append(
-                Issue(
-                    "incorrect_variants",
-                    "medium",
-                    "variants.price",
-                    "variant price not numeric",
-                    v_price,
-                )
-            )
-
-        for key, value in variant.items():
-            if key in {"url", "image_url"}:
-                continue
-            text = _safe_str(value)
-            if not text:
-                continue
-            if key in {"flavor", "scent"} and re.search(r"\bcookie\b", text, re.I):
-                continue
-            if _is_noise_text(text):
-                noisy_variant_rows += 1
-                break
-
+        _check_variant_fields(variant, issues)
+        noisy_variant_rows += int(_variant_has_noise(variant))
         signature = _variant_signature(variant)
         if signature in seen_signatures and signature:
             duplicate_signatures += 1
         seen_signatures.add(signature)
+    return noisy_variant_rows, duplicate_signatures
+
+
+def _append_aggregate_variant_issues(
+    variants: list[Any],
+    issues: list[Issue],
+    *,
+    noisy_variant_rows: int,
+    duplicate_signatures: int,
+) -> None:
 
     if noisy_variant_rows:
         sev = "high" if noisy_variant_rows >= max(3, len(variants) // 3) else "medium"
@@ -252,11 +279,34 @@ def _find_variant_issues(record: dict[str, Any], issues: list[Issue]) -> None:
         )
 
 
+def _find_variant_issues(record: dict[str, Any], issues: list[Issue]) -> None:
+    variants = _safe_list(record.get("variants"))
+    _check_declared_variant_count(record.get("variant_count"), variants, issues)
+    if not variants:
+        if _looks_like_variant_expected(record):
+            issues.append(
+                Issue(
+                    "incorrect_variants",
+                    "high",
+                    "variants",
+                    "variants missing but product looks multi-variant",
+                )
+            )
+        return
+    noisy_variant_rows, duplicate_signatures = _variant_quality_counts(variants, issues)
+    _append_aggregate_variant_issues(
+        variants,
+        issues,
+        noisy_variant_rows=noisy_variant_rows,
+        duplicate_signatures=duplicate_signatures,
+    )
+
+
 def _url_path_tokens(url: str) -> set[str]:
     """Extract meaningful tokens from URL path for coherence checking."""
     try:
         path = urlparse(url).path.lower()
-    except Exception:
+    except ValueError:
         return set()
     # strip common ecommerce path prefixes
     path = re.sub(r"^/(products?|shop|p|collections?|dp|ip|store|detail)/", "/", path)
@@ -477,31 +527,36 @@ def _find_logical_errors(record: dict[str, Any], issues: list[Issue]) -> None:
     sale_price = record.get("sale_price")
     original_price = record.get("original_price")
 
-    if _looks_price(price) and _looks_price(original_price):
-        if float(str(price).replace(",", "")) > float(
-            str(original_price).replace(",", "")
-        ):
-            issues.append(
-                Issue(
-                    "logical_errors",
-                    "medium",
-                    "price/original_price",
-                    "price greater than original_price",
-                    {"price": price, "original_price": original_price},
-                )
+    if (
+        _looks_price(price)
+        and _looks_price(original_price)
+        and float(str(price).replace(",", ""))
+        > float(str(original_price).replace(",", ""))
+    ):
+        issues.append(
+            Issue(
+                "logical_errors",
+                "medium",
+                "price/original_price",
+                "price greater than original_price",
+                {"price": price, "original_price": original_price},
             )
+        )
 
-    if _looks_price(price) and _looks_price(sale_price):
-        if float(str(sale_price).replace(",", "")) > float(str(price).replace(",", "")):
-            issues.append(
-                Issue(
-                    "logical_errors",
-                    "low",
-                    "sale_price/price",
-                    "sale_price greater than price",
-                    {"price": price, "sale_price": sale_price},
-                )
+    if (
+        _looks_price(price)
+        and _looks_price(sale_price)
+        and float(str(sale_price).replace(",", "")) > float(str(price).replace(",", ""))
+    ):
+        issues.append(
+            Issue(
+                "logical_errors",
+                "low",
+                "sale_price/price",
+                "sale_price greater than price",
+                {"price": price, "sale_price": sale_price},
             )
+        )
 
     title = _safe_str(record.get("title"))
     description = _safe_str(record.get("description"))

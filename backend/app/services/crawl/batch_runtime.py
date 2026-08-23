@@ -218,74 +218,36 @@ async def _recover_url_failure(
     session: AsyncSession,
     *,
     session_factory,
-    run: CrawlRun | None = None,
     run_id: int,
     url: str,
     exc: BaseException,
     log_message: str,
-) -> tuple[CrawlRun, URLProcessingResult]:
+) -> URLProcessingResult:
     await _rollback_url_session(session, context="URL failure recovery")
-    if run is not None:
-        with suppress(Exception):
-            session.expire(run)
-        with suppress(Exception):
-            await session.refresh(run)
     recovery_error: Exception | None = None
     try:
-        run = await _persist_url_failure_log(
-            session,
-            run_id=run_id,
-            url=url,
-            exc=exc,
-            log_message=log_message,
-        )
-    except Exception as original_session_error:
-        recovery_error = original_session_error
-        logger.debug(
-            "Original session unusable for URL failure recovery; using fresh owned session",
-            exc_info=True,
-        )
-        await _rollback_url_session(session, context="before URL recovery fallback")
-        try:
-            async with session_factory() as recovery:
-                await _persist_url_failure_log(
-                    recovery,
-                    run_id=run_id,
-                    url=url,
-                    exc=exc,
-                    log_message=log_message,
-                )
-        except Exception as fallback_error:
-            recovery_error = fallback_error
-            logger.exception(
-                "Failed to persist URL failure log for run=%s url=%s",
-                run_id,
-                url,
+        async with session_factory() as recovery:
+            await _persist_url_failure_log(
+                recovery,
+                run_id=run_id,
+                url=url,
+                exc=exc,
+                log_message=log_message,
             )
-        await _rollback_url_session(session, context="after URL recovery fallback")
-        try:
-            reloaded_run = await session.get(CrawlRun, run_id, populate_existing=True)
-        except Exception as reload_error:
-            logger.debug(
-                "Failed to reload run after URL failure recovery; keeping current instance",
-                exc_info=True,
-            )
-            if run is None:
-                raise RuntimeError(
-                    f"Original session unusable after URL failure recovery for run {run_id}"
-                ) from reload_error
-        else:
-            if reloaded_run is not None:
-                run = reloaded_run
-    if run is None:
-        raise RuntimeError(f"Run {run_id} disappeared after URL failure") from exc
+    except Exception as fresh_session_error:
+        recovery_error = fresh_session_error
+        logger.exception(
+            "Failed to persist URL failure log for run=%s url=%s",
+            run_id,
+            url,
+        )
     metrics = _url_failure_metrics(exc)
     if recovery_error is not None:
         metrics["failure_log_persistence_error"] = (
             f"{type(recovery_error).__name__}: {recovery_error}"
         )
         metrics["failure_log_persisted"] = False
-    return run, URLProcessingResult(
+    return URLProcessingResult(
         records=[],
         verdict=VERDICT_ERROR,
         url_metrics=metrics,
@@ -335,10 +297,11 @@ async def _process_url_in_owned_session(
         run = await url_session.get(CrawlRun, run_id, populate_existing=True)
         if run is None:
             raise RuntimeError(f"Run {run_id} disappeared before URL processing")
+        owned_run_id = int(run.id)
         if log_start:
             await log_event(
                 url_session,
-                run.id,
+                owned_run_id,
                 "info",
                 _url_start_message(url=url, idx=idx, total_urls=total_urls),
             )
@@ -354,7 +317,7 @@ async def _process_url_in_owned_session(
         try:
             with logfire_span(
                 "pipeline.url",
-                run_id=run.id,
+                run_id=owned_run_id,
                 url_index=idx,
                 url_count=total_urls,
                 domain=normalize_domain(url),
@@ -386,12 +349,13 @@ async def _process_url_in_owned_session(
                 )
             await url_session.commit()
         except _URLProcessingDeadlineExceeded as exc:
-            logger.warning("URL processing timed out for run=%s url=%s", run.id, url)
-            run, url_result = await _recover_url_failure(
+            logger.warning(
+                "URL processing timed out for run=%s url=%s", owned_run_id, url
+            )
+            url_result = await _recover_url_failure(
                 url_session,
                 session_factory=session_factory,
-                run=run,
-                run_id=run.id,
+                run_id=owned_run_id,
                 url=url,
                 exc=exc,
                 log_message=(
@@ -402,11 +366,10 @@ async def _process_url_in_owned_session(
                 f"TimeoutError: url exceeded timeout_seconds={url_timeout_seconds}"
             )
         except Exception as exc:
-            run, url_result = await _recover_url_failure(
+            url_result = await _recover_url_failure(
                 url_session,
                 session_factory=session_factory,
-                run=run,
-                run_id=run.id,
+                run_id=owned_run_id,
                 url=url,
                 exc=exc,
                 log_message=f"URL processing failed for {url}: {type(exc).__name__}: {exc}",

@@ -208,6 +208,40 @@ async def test_fetch_page_kitchenaid_prefer_browser_timeout_falls_back_to_http(
 
 @pytest.mark.asyncio
 @pytest.mark.component
+async def test_http_escalation_timeout_keeps_prior_http_observation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    context = _default_fetch_context()
+    context.fetch_mode = "auto"
+    original = PageFetchResult(
+        url=context.url,
+        final_url=context.url,
+        html="<html><body><h1>Widget</h1></body></html>",
+        status_code=200,
+        method="curl_cffi",
+    )
+
+    async def _failing_browser(*_args, **_kwargs):
+        raise TimeoutError("Browser navigation stage exceeded timeout_seconds=30.00")
+
+    monkeypatch.setattr(crawl_fetch_runtime, "run_browser_attempts", _failing_browser)
+    monkeypatch.setattr(crawl_fetch_runtime, "_update_host_result_memory", AsyncMock())
+
+    result = await crawl_fetch_runtime._escalate_http_result_to_browser(
+        context,
+        result=original,
+        proxy=None,
+        vendor=None,
+    )
+
+    assert result is original
+    assert result.method == "curl_cffi"
+    assert result.browser_diagnostics["browser_outcome"] == "render_timeout"
+    assert result.browser_diagnostics["failure_kind"] == "timeout"
+
+
+@pytest.mark.asyncio
+@pytest.mark.component
 async def test_platform_required_browser_timeout_still_tries_http_in_auto_mode(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

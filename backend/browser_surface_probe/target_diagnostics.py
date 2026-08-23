@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from ._core_shared import _NON_ALNUM_RE, _WHITESPACE_RE, _object_dict, _object_list  # fmt: skip
 import json
+import inspect
 import re
 from app.services.acquisition.browser_runtime import SharedBrowserRuntime  # fmt: skip
 from app.services.acquisition.runtime import classify_block_from_headers, classify_blocked_page, copy_headers, curl_fetch, http_fetch  # fmt: skip
@@ -55,12 +56,7 @@ def _validated_target_url(value: object) -> str:
     host = str(parsed.hostname).strip().lower().rstrip(".")
     if host == "localhost" or host.endswith(".localhost"):
         raise ValueError("target URL host must not be local")
-    address = None
-    try:
-        address = ip_address(host)
-    except ValueError:
-        # Host is a domain name, not an IP literal; SSRF IP checks below are skipped.
-        pass
+    address = _ip_literal(host)
     if address is not None and (
         address.is_loopback
         or address.is_private
@@ -70,6 +66,13 @@ def _validated_target_url(value: object) -> str:
     ):
         raise ValueError("target URL host must not be local or private")
     return url
+
+
+def _ip_literal(host: str):
+    try:
+        return ip_address(host)
+    except ValueError:
+        return None
 
 
 def _truncate_text(value: object, *, limit: int) -> str:
@@ -294,18 +297,18 @@ async def _response_headers_dict(response: object | None) -> dict[str, str]:
         candidate = getattr(response, attr, None)
         if candidate is None:
             continue
-        try:
-            resolved = await candidate() if callable(candidate) else candidate
-        except TypeError:
-            try:
-                resolved = candidate()
-            except Exception:
-                continue
-        except Exception:
-            continue
+        resolved = await _resolved_response_headers(candidate)
         if isinstance(resolved, dict):
             return {str(key): str(value) for key, value in resolved.items()}
     return {}
+
+
+async def _resolved_response_headers(candidate: object) -> object | None:
+    try:
+        resolved = candidate() if callable(candidate) else candidate
+        return await resolved if inspect.isawaitable(resolved) else resolved
+    except Exception:
+        return None
 
 
 async def _browser_cookie_names(page: Any, final_url: str) -> list[str]:
@@ -360,10 +363,7 @@ async def _target_browser_payload(
             timeout=int(BROWSER_SURFACE_PROBE_TARGET_NAVIGATION_TIMEOUT_MS),
         )
         for state, timeout_ms in (("load", 10000), ("networkidle", 8000)):
-            try:
-                await page.wait_for_load_state(state, timeout=timeout_ms)
-            except Exception:
-                continue
+            await _wait_for_probe_load_state(page, state, timeout_ms)
         await page.wait_for_timeout(int(BROWSER_SURFACE_PROBE_POST_NAVIGATION_WAIT_MS))
         html = await page.content()
         snapshot = await _collect_page_snapshot(page)
@@ -479,11 +479,15 @@ async def _navigate_probe_target(page, url: str) -> None:
         timeout=int(BROWSER_SURFACE_PROBE_TARGET_NAVIGATION_TIMEOUT_MS),
     )
     for state, timeout_ms in (("load", 10000), ("networkidle", 8000)):
-        try:
-            await page.wait_for_load_state(state, timeout=timeout_ms)
-        except Exception:
-            continue
+        await _wait_for_probe_load_state(page, state, timeout_ms)
     await page.wait_for_timeout(int(BROWSER_SURFACE_PROBE_POST_NAVIGATION_WAIT_MS))
+
+
+async def _wait_for_probe_load_state(page: Any, state: str, timeout_ms: int) -> None:
+    try:
+        await page.wait_for_load_state(state, timeout=timeout_ms)
+    except Exception:
+        return
 
 
 async def _capture_probe_artifacts(
@@ -494,34 +498,51 @@ async def _capture_probe_artifacts(
 ) -> dict[str, str]:
     created: dict[str, str] = {}
     screenshot_path = artifacts.get("screenshot")
-    if screenshot_path is not None:
-        try:
-            await page.screenshot(path=str(screenshot_path), full_page=True)
-            created["screenshot"] = screenshot_path.name
-        except Exception:
-            # Probe artifacts are best effort; the diagnostic result must survive.
-            pass
+    if screenshot_path is not None and await _capture_screenshot(page, screenshot_path):
+        created["screenshot"] = screenshot_path.name
     try:
         page_html = html if html is not None else await page.content()
     except Exception:
         page_html = None
     html_path = artifacts.get("html")
-    if html_path is not None and page_html is not None:
-        try:
-            html_path.write_text(page_html, encoding="utf-8")
-            created["html"] = html_path.name
-        except Exception:
-            # A filesystem failure must not discard the in-memory probe result.
-            pass
+    if (
+        html_path is not None
+        and page_html is not None
+        and _write_text_artifact(html_path, page_html)
+    ):
+        created["html"] = html_path.name
     body_path = artifacts.get("body")
-    if body_path is not None and page_html is not None:
-        try:
-            _write_target_body_artifact(body_path, page_html)
-            created["body"] = body_path.name
-        except Exception:
-            # Keep other artifacts when the bounded body artifact cannot be written.
-            pass
+    if (
+        body_path is not None
+        and page_html is not None
+        and _write_body_artifact(body_path, page_html)
+    ):
+        created["body"] = body_path.name
     return created
+
+
+async def _capture_screenshot(page: Any, path: Path) -> bool:
+    try:
+        await page.screenshot(path=str(path), full_page=True)
+        return True
+    except Exception:
+        return False
+
+
+def _write_text_artifact(path: Path, content: str) -> bool:
+    try:
+        path.write_text(content, encoding="utf-8")
+        return True
+    except Exception:
+        return False
+
+
+def _write_body_artifact(path: Path, content: str) -> bool:
+    try:
+        _write_target_body_artifact(path, content)
+        return True
+    except Exception:
+        return False
 
 
 def _site_validation_warnings(site_id: str, snapshot: dict[str, object]) -> list[str]:

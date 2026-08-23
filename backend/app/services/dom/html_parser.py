@@ -552,6 +552,9 @@ class HtmlDocument(HtmlNode):
     ) -> HtmlNode:
         normalized_name = str(name or "").strip().lower()
         wrappers = {
+            "caption": "table",
+            "colgroup": "table",
+            "col": "table><colgroup",
             "tbody": "table",
             "thead": "table",
             "tfoot": "table",

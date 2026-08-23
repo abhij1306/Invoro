@@ -335,13 +335,15 @@ async def _run_browser_first_if_selected(
             proxies=context.proxies,
         )
     except Exception as exc:
-        await _handle_browser_first_failure(context, reason=reason, exc=exc)
+        await _handle_browser_failure_with_http_fallback(
+            context, reason=reason, exc=exc
+        )
         return None
     await _update_host_result_memory(context, result=result)
     return result
 
 
-async def _handle_browser_first_failure(
+async def _handle_browser_failure_with_http_fallback(
     context: FetchRuntimeContext, *, reason: str, exc: Exception
 ) -> None:
     context.last_error = exc
@@ -356,7 +358,7 @@ async def _handle_browser_first_failure(
     await _emit_fetch_event(
         context.on_event,
         "warning",
-        f"Browser-first acquisition failed; falling back to HTTP ({type(exc).__name__})",
+        f"Browser acquisition failed; falling back to HTTP ({type(exc).__name__})",
     )
 
 
@@ -736,18 +738,31 @@ async def _escalate_http_result_to_browser(
         "Escalating to browser after HTTP result "
         f"(status={result.status_code}, method={result.method}, reason={reason})",
     )
-    browser_result = await run_browser_attempts(
-        context,
-        reason=reason,
-        requested_fields=context.requested_fields,
-        listing_recovery_mode=context.listing_recovery_mode,
-        capture_screenshot=context.capture_screenshot,
-        proxies=_browser_escalation_proxies(
-            context=context,
-            current_proxy=proxy,
-            vendor_blocked=bool(vendor),
-        ),
-    )
+    try:
+        browser_result = await run_browser_attempts(
+            context,
+            reason=reason,
+            requested_fields=context.requested_fields,
+            listing_recovery_mode=context.listing_recovery_mode,
+            capture_screenshot=context.capture_screenshot,
+            proxies=_browser_escalation_proxies(
+                context=context,
+                current_proxy=proxy,
+                vendor_blocked=bool(vendor),
+            ),
+        )
+    except Exception as exc:
+        await _handle_browser_failure_with_http_fallback(
+            context, reason=reason, exc=exc
+        )
+        _attach_browser_attempt_diagnostics(
+            result,
+            diagnostics=context.last_browser_attempt_diagnostics,
+        )
+        if vendor or bool(result.blocked):
+            raise
+        await _update_host_result_memory(context, result=result)
+        return result
     await _update_host_result_memory(context, result=browser_result)
     return browser_result
 
