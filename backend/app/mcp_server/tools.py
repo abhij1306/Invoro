@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from typing import Any
+from urllib.parse import quote
 
 from app.mcp_server.client import PublicApiClient
-from app.mcp_server.config import capabilities
 
 
 async def extract_product(
@@ -26,8 +26,8 @@ async def extract_product(
 
 
 async def check_domain(client: PublicApiClient, *, domain: str) -> dict[str, Any]:
-    return await client.request("GET", f"/domains/{domain}")
+    return await client.request("GET", f"/domains/{quote(domain, safe='')}")
 
 
-async def list_capabilities() -> dict[str, Any]:
-    return {"status": "ok", "data": capabilities()}
+async def list_capabilities(client: PublicApiClient) -> dict[str, Any]:
+    return await client.request("GET", "/capabilities")

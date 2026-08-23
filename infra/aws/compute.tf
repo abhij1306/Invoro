@@ -312,7 +312,7 @@ resource "aws_ecs_task_definition" "api" {
       protocol      = "tcp"
     }]
     healthCheck = {
-      command     = ["CMD-SHELL", "curl -fsS http://127.0.0.1:9000/health/live || exit 1"]
+      command     = ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:9000/health/live', timeout=4).read()\""]
       interval    = 30
       timeout     = 5
       retries     = 3

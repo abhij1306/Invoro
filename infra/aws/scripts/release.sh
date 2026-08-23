@@ -82,8 +82,6 @@ if [[ "$RELEASE_MODE" == "rollback" ]]; then
   exit 0
 fi
 
-aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$registry"
-
 image_exists() {
   aws ecr describe-images --repository-name "$1" --image-ids "imageTag=$RELEASE_SHA" >/dev/null 2>&1
 }
@@ -104,11 +102,55 @@ fi
 scan_image() {
   local repository=$1
   aws ecr wait image-scan-complete --repository-name "$repository" --image-id "imageTag=$RELEASE_SHA"
-  local blocking
-  blocking=$(aws ecr describe-image-scan-findings --repository-name "$repository" --image-id "imageTag=$RELEASE_SHA" --output json | jq '[.imageScanFindings.findingSeverityCounts.CRITICAL // 0, .imageScanFindings.findingSeverityCounts.HIGH // 0] | add')
-  if (( blocking > 0 )); then
-    echo "$repository:$RELEASE_SHA has $blocking unresolved High/Critical finding(s)." >&2
+  local findings_file enhanced_count blocking no_fix
+  findings_file=$(mktemp)
+  aws ecr describe-image-scan-findings \
+    --repository-name "$repository" \
+    --image-id "imageTag=$RELEASE_SHA" \
+    --output json > "$findings_file"
+  enhanced_count=$(jq '[.imageScanFindings.enhancedFindings[]?] | length' "$findings_file")
+  if (( enhanced_count > 0 )); then
+    jq -r '
+      [.imageScanFindings.enhancedFindings[]?
+        | select(.severity == "CRITICAL" or .severity == "HIGH")]
+      | sort_by(.severity, .packageVulnerabilityDetails.vulnerabilityId)
+      | .[]
+      | (.fixAvailable // "UNKNOWN") as $fix
+      | [
+          .severity,
+          .packageVulnerabilityDetails.vulnerabilityId,
+          ([.packageVulnerabilityDetails.vulnerablePackages[]?
+            | (.fixedInVersion // "no packaged fix") as $fixed
+            | "\(.name)@\(.version) -> \($fixed)"]
+            | join(", ")),
+          "fix=\($fix)"
+        ]
+      | @tsv
+    ' "$findings_file" >&2
+    blocking=$(jq '[.imageScanFindings.enhancedFindings[]?
+      | select((.severity == "CRITICAL" or .severity == "HIGH") and .fixAvailable != "NO")]
+      | length' "$findings_file")
+    no_fix=$(jq '[.imageScanFindings.enhancedFindings[]?
+      | select((.severity == "CRITICAL" or .severity == "HIGH") and .fixAvailable == "NO")]
+      | length' "$findings_file")
+  else
+    blocking=$(jq '[.imageScanFindings.findings[]?
+      | select(.severity == "CRITICAL" or .severity == "HIGH")]
+      | length' "$findings_file")
+    no_fix=0
+  fi
+  rm -f "$findings_file"
+  if (( no_fix > 0 )) && [[ "${ALLOW_UNFIXED_IMAGE_FINDINGS:-false}" != "true" ]]; then
+    echo "$repository:$RELEASE_SHA has $no_fix High/Critical finding(s) with no packaged fix." >&2
+    echo "Review them, then rerun with allow_unfixed_image_findings enabled to accept this release risk." >&2
     exit 1
+  fi
+  if (( blocking > 0 )); then
+    echo "$repository:$RELEASE_SHA has $blocking fixable or unclassified High/Critical finding(s)." >&2
+    exit 1
+  fi
+  if (( no_fix > 0 )); then
+    echo "$repository:$RELEASE_SHA: explicitly accepted $no_fix High/Critical finding(s) with no packaged fix." >&2
   fi
 }
 

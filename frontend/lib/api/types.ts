@@ -7,6 +7,19 @@ export type User = {
   updated_at: string;
 };
 
+export type ApiKeyRecord = {
+  id: number;
+  name: string;
+  key_prefix: string;
+  is_active: boolean;
+  last_used_at: string | null;
+  created_at: string;
+};
+
+export type ApiKeyCreated = ApiKeyRecord & {
+  api_key: string;
+};
+
 export type RunStatus =
   'pending' | 'running' | 'paused' | 'completed' | 'killed' | 'failed' | 'proxy_exhausted';
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .test_public_api import ASGITransport, ApiKey, AsyncClient, CrawlerAppState, FastAPI, HTTPException, OrderedDict, PUBLIC_API_ERROR_API_KEY_REQUIRED, PUBLIC_API_ERROR_AUTH_UNAVAILABLE, RATE_LIMIT_BUCKETS, Request, SQLAlchemyError, User, _crawler_app_state, _password_field_name, _public_auth_session, _retry_after, _trim, app, auth_rate_limit_buckets_snapshot, auth_security, authenticate_public_api_key, clear_auth_rate_limit_buckets_for_testing, clear_public_rate_limit_buckets_for_testing, clear_rate_limit_buckets_for_testing, client_rate_limit_key, crawler_runtime_settings, create_user, deque, get_current_user, get_db, hash_api_key, logging, metrics_module, pbkdf2_sha256, public_rate_limit_buckets_snapshot, pytest, rate_limit_buckets_snapshot, restore_auth_rate_limit_buckets_for_testing, restore_public_rate_limit_buckets_for_testing, restore_rate_limit_buckets_for_testing, select, settings  # fmt: skip
+from .test_public_api import ASGITransport, ApiKey, AsyncClient, CrawlerAppState, FastAPI, HTTPException, OrderedDict, PUBLIC_API_ERROR_API_KEY_REQUIRED, PUBLIC_API_ERROR_AUTH_UNAVAILABLE, RATE_LIMIT_BUCKETS, Request, SQLAlchemyError, User, _LEGACY_PASSWORD_HASH, _crawler_app_state, _password_field_name, _public_auth_session, _retry_after, _trim, app, auth_rate_limit_buckets_snapshot, auth_security, authenticate_public_api_key, clear_auth_rate_limit_buckets_for_testing, clear_public_rate_limit_buckets_for_testing, clear_rate_limit_buckets_for_testing, client_rate_limit_key, crawler_runtime_settings, create_user, deque, get_current_user, get_db, hash_api_key, logging, metrics_module, public_rate_limit_buckets_snapshot, pytest, rate_limit_buckets_snapshot, restore_auth_rate_limit_buckets_for_testing, restore_public_rate_limit_buckets_for_testing, restore_rate_limit_buckets_for_testing, select, settings  # fmt: skip
 
 pytest_plugins = ["tests.component.test_public_api"]
 
@@ -86,7 +86,7 @@ async def test_login_rehashes_legacy_pbkdf2_hash_on_success(
 ) -> None:
     user = User(
         email="legacy@example.com",
-        hashed_password=pbkdf2_sha256.hash("password123"),
+        hashed_password=_LEGACY_PASSWORD_HASH,
         role="user",
     )
     db_session.add(user)
@@ -525,6 +525,30 @@ async def test_api_key_crud_returns_plaintext_once(db_session, test_user) -> Non
     stored = await db_session.scalar(select(ApiKey).where(ApiKey.id == payload["id"]))
     assert stored is not None
     assert stored.key_hash == hash_api_key(payload["api_key"])
+
+
+@pytest.mark.asyncio
+@pytest.mark.component
+async def test_api_key_create_rejects_whitespace_only_name(
+    db_session, test_user
+) -> None:
+    async def _override_db():
+        yield db_session
+
+    async def _override_user():
+        return test_user
+
+    app.dependency_overrides[get_db] = _override_db
+    app.dependency_overrides[get_current_user] = _override_user
+    try:
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://testserver"
+        ) as client:
+            response = await client.post("/api/api-keys", json={"name": "   "})
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 422
 
 
 @pytest.mark.asyncio

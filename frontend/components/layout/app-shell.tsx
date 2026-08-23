@@ -327,6 +327,14 @@ function ShellContent({
   );
 }
 
+const simpleFallbackHeaders: Record<string, TopBarState> = {
+  '/jobs': { title: 'Jobs', description: 'Review worker activity and queued work.' },
+  '/api-mcp': {
+    title: 'API & MCP',
+    description: 'Manage API keys and connect developer tools.',
+  },
+};
+
 function getFallbackHeader(pathname: string): TopBarState {
   if (pathname.startsWith('/dashboard'))
     return {
@@ -382,7 +390,5 @@ function getFallbackHeader(pathname: string): TopBarState {
     return { title: 'Users', description: 'Manage workspace access and roles.' };
   if (pathname.startsWith('/admin/llm'))
     return { title: 'LLM Config', description: 'Control provider settings and prompts.' };
-  if (pathname.startsWith('/jobs'))
-    return { title: 'Jobs', description: 'Review worker activity and queued work.' };
-  return { title: 'Invoro' };
+  return simpleFallbackHeaders[pathname] ?? { title: 'Invoro' };
 }

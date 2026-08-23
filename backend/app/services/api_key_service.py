@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import secrets
-from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -61,7 +60,6 @@ async def revoke_api_key(
     if row is None or row.user_id != user_id:
         raise LookupError("API key not found")
     row.is_active = False
-    row.last_used_at = row.last_used_at or datetime.now(UTC)
     await session.commit()
     await session.refresh(row)
     return row

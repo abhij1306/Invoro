@@ -156,7 +156,7 @@ services:
       - backend_cookie_store:/app/backend/cookie_store
     healthcheck:
       test:
-        ["CMD-SHELL", "curl -fsS http://localhost:9000/health/live || exit 1"]
+        ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9000/health/live', timeout=4).read()"]
       interval: 15s
       timeout: 5s
       retries: 5

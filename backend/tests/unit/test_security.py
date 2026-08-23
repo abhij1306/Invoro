@@ -6,9 +6,14 @@ import base64
 import hashlib
 
 from cryptography.fernet import Fernet
-from passlib.hash import pbkdf2_sha256
 
 from app.core import security
+
+
+_LEGACY_PASSWORD_HASH = (
+    "$pbkdf2-sha256$29000$bGVnYWN5dGVzdHNhbHQ$"
+    "/8mfE7fwvQ32eNti3iAH1KSLJQ6GCyE3KgjUl3VbFc4"
+)
 
 
 @pytest.mark.unit
@@ -22,9 +27,21 @@ def test_password_hash_verify_roundtrip() -> None:
 
 @pytest.mark.unit
 def test_password_needs_rehash_returns_true_for_legacy_pbkdf2_hash() -> None:
-    legacy_hash = pbkdf2_sha256.hash("correct horse battery staple")
+    assert security.verify_password(
+        "correct horse battery staple", _LEGACY_PASSWORD_HASH
+    )
+    assert not security.verify_password("wrong password", _LEGACY_PASSWORD_HASH)
+    assert security.password_needs_rehash(_LEGACY_PASSWORD_HASH) is True
 
-    assert security.password_needs_rehash(legacy_hash) is True
+
+@pytest.mark.unit
+def test_legacy_pbkdf2_rejects_excessive_rounds() -> None:
+    expensive_hash = _LEGACY_PASSWORD_HASH.replace("$29000$", "$1000001$")
+
+    assert (
+        security.verify_password("correct horse battery staple", expensive_hash)
+        is False
+    )
 
 
 @pytest.mark.unit

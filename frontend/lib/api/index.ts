@@ -2,6 +2,8 @@ import { apiClient, getApiBaseUrl } from './client';
 export { alertsApi, monitorsApi } from './monitors';
 import type {
   ActiveJob,
+  ApiKeyCreated,
+  ApiKeyRecord,
   CrawlCreatePayload,
   CrawlLog,
   CrawlRecord,
@@ -109,6 +111,9 @@ export const api = {
     apiClient.post<Record<string, number | boolean>>('/api/dashboard/reset-data', {}),
   resetDomainMemory: () =>
     apiClient.post<Record<string, number | boolean>>('/api/dashboard/reset-domain-memory', {}),
+  createApiKey: (name: string) => apiClient.post<ApiKeyCreated>('/api/api-keys', { name }),
+  listApiKeys: () => apiClient.get<ApiKeyRecord[]>('/api/api-keys'),
+  revokeApiKey: (keyId: number) => apiClient.delete<void>(`/api/api-keys/${keyId}`),
   createCrawl: (payload: CrawlCreatePayload) =>
     apiClient.post<{ run_id: number }>('/api/crawls', payload),
   discoverCategoryUrls: (payload: CategoryDiscoveryPayload) =>
@@ -398,6 +403,10 @@ export const api = {
   playgroundResults: (sessionId: number) =>
     apiClient.get<Record<string, unknown>>(`/api/playground/sessions/${sessionId}/results`),
 };
+
+export function getPublicApiBaseUrl() {
+  return `${getApiBaseUrl()}/api/v1`;
+}
 
 // Named exports for easier consumption in components
 export const fetchCrawlRun = api.getCrawl;
