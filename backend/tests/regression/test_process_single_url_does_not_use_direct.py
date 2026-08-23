@@ -541,7 +541,7 @@ async def test_challenge_shell_budget_skip_logs_once(
 
 @pytest.mark.asyncio
 @pytest.mark.regression
-async def test_process_single_url_raises_when_browser_retry_fails(
+async def test_process_single_url_keeps_prior_observation_when_browser_retry_fails(
     db_session: AsyncSession,
     test_user,
     monkeypatch: pytest.MonkeyPatch,
@@ -594,20 +594,24 @@ async def test_process_single_url_raises_when_browser_retry_fails(
         lambda *args, **kwargs: [],
     )
 
-    with pytest.raises(TimeoutError, match="browser retry timed out"):
-        await process_single_url(db_session, run, run.url)
+    result = await process_single_url(db_session, run, run.url)
 
     logs = await get_run_logs(db_session, run.id)
     artifact_dir = artifacts_dir / "runs" / str(run.id) / "pages"
     diagnostics_files = list(artifact_dir.glob("*.browser.json"))
 
+    assert result.verdict == "listing_detection_failed"
+    assert result.url_metrics["failure_reason"] == "timeout"
     assert len(acquire_calls) == 2
     assert [log.message for log in logs] == [
         "Acquired payload via curl_cffi (status=200)",
         "No records via curl_cffi; retrying browser render for https://example.com/category/widgets",
         "Browser retry failed for https://example.com/category/widgets: TimeoutError: browser retry timed out",
+        "Extraction yielded 0 records (generic extraction path)",
+        "Normalized 0 record(s) for persistence",
+        "Persisted 0 record(s) for https://example.com/category/widgets",
     ]
-    assert len(diagnostics_files) == 0
+    assert len(diagnostics_files) == 1
 
 
 @pytest.mark.asyncio

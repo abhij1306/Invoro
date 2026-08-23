@@ -32,7 +32,7 @@ python -c "import secrets; print(secrets.token_urlsafe(64))"
 
 ```powershell
 .\backend\.venv\Scripts\python.exe -m pytest backend\tests --ignore=backend/tests/e2e -q
-.\backend\.venv\Scripts\python.exe -m mypy backend\app backend\harness_support.py backend\run_acquire_smoke.py backend\run_browser_surface_probe.py backend\run_extraction_smoke.py backend\run_test_sites_acceptance.py
+.\backend\.venv\Scripts\python.exe -m mypy --config-file backend\pyproject.toml backend\app backend\harness_support.py backend\run_acquire_smoke.py backend\run_browser_surface_probe.py backend\run_extraction_smoke.py backend\run_test_sites_acceptance.py
 ```
 
 ## Admin bootstrap

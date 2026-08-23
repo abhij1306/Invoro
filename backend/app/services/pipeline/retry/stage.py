@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import time
 
 from app.services.acquisition.acquirer import (
@@ -41,13 +42,15 @@ from app.services.pipeline.runtime_helpers import (
     log_pipeline_event as _log_pipeline_event,
     merge_browser_diagnostics as _merge_browser_diagnostics,
 )
-from app.services.publish import build_acquisition_profile, build_url_metrics
-
 from app.services.pipeline.url_processing_context import (
     ExtractedURLStage as _ExtractedURLStage,
     FetchedURLStage as _FetchedURLStage,
     URLProcessingContext as _URLProcessingContext,
 )
+from app.services.publish import build_acquisition_profile, build_url_metrics
+
+
+logger = logging.getLogger(__name__)
 
 acquire = _acquire
 
@@ -207,6 +210,8 @@ async def _retry_patchright_detail_rejection_with_real_chrome(
         retry_reason=resolved_retry_reason,
         forced_browser_engine="real_chrome",
     )
+    if retry_result is None:
+        return None
     _merge_browser_diagnostics(
         retry_result,
         {"retry_reason": resolved_retry_reason},
@@ -371,6 +376,8 @@ async def _retry_empty_extraction_with_browser(
     browser_result = await _acquire_browser_retry_result(
         context, fetched, retry_reason="empty_extraction"
     )
+    if browser_result is None:
+        return records, selector_rules
     fetched.acquisition_result = browser_result
     retry_records, retry_selector_rules = await _extract_records_for_acquisition(
         context, fetched
@@ -428,13 +435,12 @@ async def _retry_low_quality_extraction_with_browser(
         "Detail record missing high-value fields "
         f"{', '.join(missing_fields)} via {acquisition_result.method}; retrying browser render for {context.url}",
     )
-    try:
-        browser_result = await _acquire_browser_retry_result(
-            context,
-            fetched,
-            retry_reason="low_quality_extraction",
-        )
-    except (RuntimeError, ValueError, TypeError, OSError):
+    browser_result = await _acquire_browser_retry_result(
+        context,
+        fetched,
+        retry_reason="low_quality_extraction",
+    )
+    if browser_result is None:
         return records, selector_rules
     fetched.acquisition_result = browser_result
     return await _extract_records_for_acquisition(context, fetched)
@@ -580,6 +586,8 @@ async def _retry_listing_integrity_with_stronger_tier(
         retry_reason="listing_integrity_promo_cluster",
         forced_browser_engine=forced_engine,
     )
+    if retry_result is None:
+        return records, selector_rules
     fetched.acquisition_result = retry_result
     context.listing_integrity_retry_count += 1
 
@@ -701,7 +709,7 @@ async def _acquire_browser_retry_result(
     *,
     retry_reason: str,
     forced_browser_engine: str | None = None,
-):
+) -> AcquisitionResult | None:
     acquisition_result = fetched.acquisition_result
     profile_updates: dict[str, object] = {
         "prefer_browser": True,
@@ -717,7 +725,12 @@ async def _acquire_browser_retry_result(
 
         acquire_impl = getattr(extraction_loop, "acquire", acquire)
         return await acquire_impl(retry_request)
-    except (RuntimeError, ValueError, TypeError, OSError) as exc:
+    except Exception as exc:
+        logger.warning(
+            "Browser retry acquisition failed for %s",
+            context.url,
+            exc_info=True,
+        )
         _merge_browser_diagnostics(
             acquisition_result,
             build_failed_browser_diagnostics(
@@ -732,4 +745,4 @@ async def _acquire_browser_retry_result(
             "warning",
             f"Browser retry failed for {context.url}: {type(exc).__name__}: {exc}",
         )
-        raise
+        return None

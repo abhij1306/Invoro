@@ -53,7 +53,7 @@ def _safe_str(value: Any) -> str:
 def _host_from_url(url: str) -> str:
     try:
         return (urlparse(url).hostname or "").lower()
-    except Exception:
+    except ValueError:
         return ""
 
 
@@ -117,9 +117,7 @@ def _is_variant_size_value(text: str) -> bool:
         return True
     if re.search(r"\b(oz|fl\.?\s*oz|ml|l|inch|in\.|cm|mm|pack)\b", value, re.I):
         return False
-    if re.search(r"\b(queen|king|twin|full)\b", value, re.I):
-        return True
-    return False
+    return bool(re.search(r"\b(queen|king|twin|full)\b", value, re.I))
 
 
 def _find_missing_fields(record: dict[str, Any], issues: list[Issue]) -> None:
@@ -142,17 +140,20 @@ def _find_missing_fields(record: dict[str, Any], issues: list[Issue]) -> None:
         )
 
 
-def _find_incorrect_fields(record: dict[str, Any], issues: list[Issue]) -> None:
+def _find_incorrect_url_and_price(record: dict[str, Any], issues: list[Issue]) -> None:
     url = _safe_str(record.get("url"))
     if url and not URL_RE.match(url):
         issues.append(Issue("incorrect_data", "high", "url", "url not http/https", url))
-
     price = record.get("price")
     if price not in (None, "") and not _looks_price(price):
         issues.append(
             Issue("incorrect_data", "high", "price", "price not numeric string", price)
         )
 
+
+def _find_incorrect_currency_and_availability(
+    record: dict[str, Any], issues: list[Issue]
+) -> None:
     currency = record.get("currency")
     if currency not in (None, "") and not _looks_currency(currency):
         issues.append(
@@ -177,6 +178,8 @@ def _find_incorrect_fields(record: dict[str, Any], issues: list[Issue]) -> None:
             )
         )
 
+
+def _find_negative_prices(record: dict[str, Any], issues: list[Issue]) -> None:
     for key in ("price", "original_price", "sale_price"):
         value = record.get(key)
         if value in (None, ""):
@@ -190,6 +193,10 @@ def _find_incorrect_fields(record: dict[str, Any], issues: list[Issue]) -> None:
             except ValueError:
                 continue
 
+
+def _find_incorrect_brand_color_size(
+    record: dict[str, Any], issues: list[Issue]
+) -> None:
     brand = _safe_str(record.get("brand"))
     if (
         brand
@@ -236,140 +243,147 @@ def _find_incorrect_fields(record: dict[str, Any], issues: list[Issue]) -> None:
         )
 
 
+def _find_incorrect_fields(record: dict[str, Any], issues: list[Issue]) -> None:
+    _find_incorrect_url_and_price(record, issues)
+    _find_incorrect_currency_and_availability(record, issues)
+    _find_negative_prices(record, issues)
+    _find_incorrect_brand_color_size(record, issues)
+
+
+def _find_string_pollution(field: str, text: str, issues: list[Issue]) -> None:
+    if _is_noise_text(text):
+        issues.append(
+            Issue(
+                "polluted_data",
+                "medium",
+                field,
+                "UI/control noise pattern in text",
+                text[:200],
+            )
+        )
+    if field != "description":
+        return
+    trailing = re.search(r"((?:\b\d{1,2}(?:\.5)?\b\s*){8,})$", text)
+    if trailing:
+        issues.append(
+            Issue(
+                "polluted_data",
+                "medium",
+                field,
+                "description has trailing size-like numeric list",
+                trailing.group(1).strip()[:200],
+            )
+        )
+    if re.search(r"read reviews and buy .* at target\. choose from", text, re.I):
+        issues.append(
+            Issue(
+                "polluted_data",
+                "medium",
+                field,
+                "description looks like generic SEO/storefront copy, not product detail",
+                text[:200],
+            )
+        )
+
+
+def _list_pollution_counts(field: str, values: list[Any]) -> tuple[list[str], int]:
+    noisy_samples: list[str] = []
+    tiny_token_ratio_hits = 0
+    for item in values:
+        if field == "variants" and isinstance(item, dict):
+            continue
+        item_text = _safe_str(item)
+        if not item_text:
+            continue
+        if _is_noise_text(item_text):
+            noisy_samples.append(item_text[:160])
+        if field in {"features", "description"} and _text_token_count(item_text) <= 2:
+            tiny_token_ratio_hits += 1
+    return noisy_samples, tiny_token_ratio_hits
+
+
+def _find_tag_pollution(values: list[Any], issues: list[Issue]) -> None:
+    noisy_tag_prefixes = (
+        "clearance_",
+        "dropship_",
+        "dtlrexclusive_",
+        "employeepromoexclude_",
+        "instoreonly_",
+        "lastsyncdatetime_",
+        "onlineonly_",
+        "promoexclude_",
+        "stylelimit_",
+        "unisexsizingeligible_",
+        "size_",
+        "stock_",
+        "sale_",
+    )
+    noisy_tags = [
+        _safe_str(item)
+        for item in values
+        if _safe_str(item).lower().startswith(noisy_tag_prefixes)
+    ]
+    if len(noisy_tags) >= 6:
+        issues.append(
+            Issue(
+                "polluted_data",
+                "high",
+                "tags",
+                "tags polluted by internal metadata tokens",
+                noisy_tags[:12],
+            )
+        )
+    url_like_tags = [
+        _safe_str(item)
+        for item in values
+        if re.search(r"(?:^/shop/product/|https?://)", _safe_str(item), re.I)
+    ]
+    if len(url_like_tags) >= 3:
+        issues.append(
+            Issue(
+                "polluted_data",
+                "medium",
+                "tags",
+                "tags contain related-product URLs or links",
+                url_like_tags[:8],
+            )
+        )
+
+
+def _find_list_pollution(field: str, values: list[Any], issues: list[Issue]) -> None:
+    noisy_samples, tiny_token_ratio_hits = _list_pollution_counts(field, values)
+    if noisy_samples:
+        issues.append(
+            Issue(
+                "polluted_data",
+                "medium",
+                field,
+                "list contains UI/control noise tokens",
+                noisy_samples[:5],
+            )
+        )
+    if (
+        field == "features"
+        and len(values) >= 8
+        and tiny_token_ratio_hits >= max(4, len(values) // 2)
+    ):
+        issues.append(
+            Issue(
+                "polluted_data",
+                "high",
+                field,
+                "features list dominated by tiny/noisy tokens",
+                {"total_items": len(values), "tiny_items": tiny_token_ratio_hits},
+            )
+        )
+    if field == "tags":
+        _find_tag_pollution(values, issues)
+
+
 def _find_pollution(record: dict[str, Any], issues: list[Issue]) -> None:
     for field in OPTIONAL_SUSPECT_FIELDS:
         value = record.get(field)
-        if isinstance(value, str):
-            text = value.strip()
-            if not text:
-                continue
-            if _is_noise_text(text):
-                issues.append(
-                    Issue(
-                        "polluted_data",
-                        "medium",
-                        field,
-                        "UI/control noise pattern in text",
-                        text[:200],
-                    )
-                )
-            if field == "description":
-                trailing = re.search(r"((?:\b\d{1,2}(?:\.5)?\b\s*){8,})$", text)
-                if trailing:
-                    issues.append(
-                        Issue(
-                            "polluted_data",
-                            "medium",
-                            field,
-                            "description has trailing size-like numeric list",
-                            trailing.group(1).strip()[:200],
-                        )
-                    )
-                if re.search(
-                    r"read reviews and buy .* at target\. choose from", text, re.I
-                ):
-                    issues.append(
-                        Issue(
-                            "polluted_data",
-                            "medium",
-                            field,
-                            "description looks like generic SEO/storefront copy, not product detail",
-                            text[:200],
-                        )
-                    )
-            continue
-
-        if isinstance(value, list):
-            if not value:
-                continue
-            noisy_samples: list[str] = []
-            tiny_token_ratio_hits = 0
-            for item in value:
-                if field == "variants" and isinstance(item, dict):
-                    continue
-                else:
-                    item_text = _safe_str(item)
-                if not item_text:
-                    continue
-                if _is_noise_text(item_text):
-                    noisy_samples.append(item_text[:160])
-                if (
-                    field in {"features", "description"}
-                    and _text_token_count(item_text) <= 2
-                ):
-                    tiny_token_ratio_hits += 1
-            if noisy_samples:
-                issues.append(
-                    Issue(
-                        "polluted_data",
-                        "medium",
-                        field,
-                        "list contains UI/control noise tokens",
-                        noisy_samples[:5],
-                    )
-                )
-            if (
-                field == "features"
-                and len(value) >= 8
-                and tiny_token_ratio_hits >= max(4, len(value) // 2)
-            ):
-                issues.append(
-                    Issue(
-                        "polluted_data",
-                        "high",
-                        field,
-                        "features list dominated by tiny/noisy tokens",
-                        {
-                            "total_items": len(value),
-                            "tiny_items": tiny_token_ratio_hits,
-                        },
-                    )
-                )
-            if field == "tags":
-                noisy_tag_prefixes = (
-                    "clearance_",
-                    "dropship_",
-                    "dtlrexclusive_",
-                    "employeepromoexclude_",
-                    "instoreonly_",
-                    "lastsyncdatetime_",
-                    "onlineonly_",
-                    "promoexclude_",
-                    "stylelimit_",
-                    "unisexsizingeligible_",
-                    "size_",
-                    "stock_",
-                    "sale_",
-                )
-                noisy_tags = [
-                    _safe_str(item)
-                    for item in value
-                    if _safe_str(item).lower().startswith(noisy_tag_prefixes)
-                ]
-                if len(noisy_tags) >= 6:
-                    issues.append(
-                        Issue(
-                            "polluted_data",
-                            "high",
-                            "tags",
-                            "tags polluted by internal metadata tokens",
-                            noisy_tags[:12],
-                        )
-                    )
-                url_like_tags = [
-                    _safe_str(item)
-                    for item in value
-                    if re.search(
-                        r"(?:^/shop/product/|https?://)", _safe_str(item), re.I
-                    )
-                ]
-                if len(url_like_tags) >= 3:
-                    issues.append(
-                        Issue(
-                            "polluted_data",
-                            "medium",
-                            "tags",
-                            "tags contain related-product URLs or links",
-                            url_like_tags[:8],
-                        )
-                    )
+        if isinstance(value, str) and (text := value.strip()):
+            _find_string_pollution(field, text, issues)
+        elif isinstance(value, list) and value:
+            _find_list_pollution(field, value, issues)

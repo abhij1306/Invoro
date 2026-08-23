@@ -89,6 +89,25 @@ def test_navigation_anchor_is_not_extracted_as_section() -> None:
     assert "Specifications" not in extract_heading_sections(soup)
 
 
+@pytest.mark.parametrize("table_child", ["caption", "colgroup", "col"])
+def test_heading_section_pruning_clones_valid_table_children(table_child: str) -> None:
+    table_markup = {
+        "caption": "<caption>Size guide</caption>",
+        "colgroup": "<colgroup><col /></colgroup>",
+        "col": "<col />",
+    }[table_child]
+    soup = BeautifulSoup(
+        "<main><h2>Specifications</h2><table>"
+        f"{table_markup}<tbody><tr><td>Width</td><td>20 cm</td></tr></tbody>"
+        "</table></main>",
+        "html.parser",
+    )
+
+    sections = extract_heading_sections(soup)
+
+    assert isinstance(sections, dict)
+
+
 def test_variant_option_text_keeps_direct_text_without_dropped_child_text() -> None:
     soup = BeautifulSoup(
         "<button>Blue <span>Sold out</span><span>Limited edition</span></button>",

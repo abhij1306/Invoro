@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 from .test_crawl_service import AsyncSession, CONTROL_REQUEST_KILL, CONTROL_REQUEST_PAUSE, CrawlRecord, UTC, _create_running_run, asyncio, celery_dispatch_module, commit_selected_fields, crawl_service, create_crawl_run, database_module, datetime, delete_run, get_control_request, load_domain_run_profile, local_dispatch_module, logging, pytest, save_domain_run_profile, settings, timedelta, update_run_status  # fmt: skip
+from app.models.domain_memory import DomainRunProfile
+from app.services.crawl.profile import repository as profile_repository
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import async_sessionmaker
 
 
 @pytest.mark.asyncio
@@ -52,6 +56,66 @@ async def test_save_domain_run_profile_commit_persists_changes(
     )
     assert loaded is not None
     assert dict(loaded.profile or {})["fetch_profile"]["fetch_mode"] == "browser_only"
+
+
+@pytest.mark.asyncio
+@pytest.mark.component
+async def test_save_domain_run_profile_upserts_concurrent_first_writes(
+    db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session_factory = async_sessionmaker(
+        bind=db_session.bind,
+        expire_on_commit=False,
+        class_=AsyncSession,
+        autoflush=False,
+    )
+    load_gate = asyncio.Barrier(2)
+    original_load = profile_repository.load_domain_run_profile
+
+    async def _load_then_wait(*args, **kwargs):
+        existing = await original_load(*args, **kwargs)
+        assert existing is None
+        await load_gate.wait()
+        return existing
+
+    monkeypatch.setattr(
+        profile_repository,
+        "load_domain_run_profile",
+        _load_then_wait,
+    )
+
+    async def _save(source_run_id: int, fetch_mode: str) -> None:
+        async with session_factory() as session:
+            await save_domain_run_profile(
+                session,
+                domain="parallel.example.com",
+                surface="ecommerce_detail",
+                profile={"fetch_profile": {"fetch_mode": fetch_mode}},
+                source_run_id=source_run_id,
+                commit=True,
+            )
+
+    await asyncio.gather(
+        _save(101, "http_only"),
+        _save(102, "browser_only"),
+    )
+    await db_session.rollback()
+    profiles = list(
+        await db_session.scalars(
+            select(DomainRunProfile).where(
+                DomainRunProfile.domain == "parallel.example.com",
+                DomainRunProfile.surface == "ecommerce_detail",
+            )
+        )
+    )
+
+    assert len(profiles) == 1
+    loaded = profiles[0]
+    assert dict(loaded.profile or {})["fetch_profile"]["fetch_mode"] in {
+        "http_only",
+        "browser_only",
+    }
 
 
 @pytest.mark.asyncio

@@ -335,14 +335,18 @@ async def _run_browser_first_if_selected(
             proxies=context.proxies,
         )
     except Exception as exc:
-        await _handle_browser_first_failure(context, reason=reason, exc=exc)
+        await _handle_browser_failure(context, reason=reason, exc=exc)
         return None
     await _update_host_result_memory(context, result=result)
     return result
 
 
-async def _handle_browser_first_failure(
-    context: FetchRuntimeContext, *, reason: str, exc: Exception
+async def _handle_browser_failure(
+    context: FetchRuntimeContext,
+    *,
+    reason: str,
+    exc: Exception,
+    retain_http: bool = False,
 ) -> None:
     context.last_error = exc
     context.browser_first_failed = True
@@ -353,10 +357,11 @@ async def _handle_browser_first_failure(
     _attach_exception_browser_diagnostics(exc, context.last_browser_attempt_diagnostics)
     if context.fetch_mode == "browser_only" or context.traversal_required:
         raise exc
+    action = "keeping prior HTTP result" if retain_http else "using HTTP fallback"
     await _emit_fetch_event(
         context.on_event,
         "warning",
-        f"Browser-first acquisition failed; falling back to HTTP ({type(exc).__name__})",
+        f"Browser acquisition failed; {action} ({type(exc).__name__})",
     )
 
 
@@ -736,18 +741,29 @@ async def _escalate_http_result_to_browser(
         "Escalating to browser after HTTP result "
         f"(status={result.status_code}, method={result.method}, reason={reason})",
     )
-    browser_result = await run_browser_attempts(
-        context,
-        reason=reason,
-        requested_fields=context.requested_fields,
-        listing_recovery_mode=context.listing_recovery_mode,
-        capture_screenshot=context.capture_screenshot,
-        proxies=_browser_escalation_proxies(
-            context=context,
-            current_proxy=proxy,
-            vendor_blocked=bool(vendor),
-        ),
-    )
+    try:
+        browser_result = await run_browser_attempts(
+            context,
+            reason=reason,
+            requested_fields=context.requested_fields,
+            listing_recovery_mode=context.listing_recovery_mode,
+            capture_screenshot=context.capture_screenshot,
+            proxies=_browser_escalation_proxies(
+                context=context,
+                current_proxy=proxy,
+                vendor_blocked=bool(vendor),
+            ),
+        )
+    except Exception as exc:
+        await _handle_browser_failure(context, reason=reason, exc=exc, retain_http=True)
+        _attach_browser_attempt_diagnostics(
+            result,
+            diagnostics=context.last_browser_attempt_diagnostics,
+        )
+        if vendor or bool(result.blocked):
+            raise
+        await _update_host_result_memory(context, result=result)
+        return result
     await _update_host_result_memory(context, result=browser_result)
     return browser_result
 

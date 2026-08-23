@@ -262,15 +262,16 @@ def _narrow_button_container(
 
 
 def _ordered_swatch_buttons(soup: Any) -> list[Any]:
-    priority = soup.select(
-        "[data-testid='swatch' i], [data-testid*='swatch-option' i], [role='button'][aria-label]"
+    priority = select_variant_nodes(
+        soup,
+        "[data-testid='swatch' i], [data-testid*='swatch-option' i], [role='button'][aria-label]",
     )
     priority_nodes = {_node_identity(node) for node in priority}
     buttons = [
         *priority,
         *(
             node
-            for node in soup.select(VARIANT_SWATCH_BUTTON_SELECTOR)
+            for node in select_variant_nodes(soup, VARIANT_SWATCH_BUTTON_SELECTOR)
             if _node_identity(node) not in priority_nodes
         ),
     ]

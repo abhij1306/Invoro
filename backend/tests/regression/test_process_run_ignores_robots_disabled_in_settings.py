@@ -595,7 +595,20 @@ async def test_process_run_continues_after_sqlalchemy_url_error(
         del args
         url = str(kwargs.get("url") or "")
         if "bad-widget" in url:
-            raise PendingRollbackError("flush failed earlier")
+            session = kwargs["session"]
+            for title in ("Duplicate one", "Duplicate two"):
+                session.add(
+                    CrawlRecord(
+                        run_id=run.id,
+                        source_url=url,
+                        url_identity_key="duplicate-identity",
+                        data={"title": title, "url": url},
+                        raw_data={},
+                        discovered_data={},
+                        source_trace={},
+                    )
+                )
+            await session.flush()
         session = kwargs["session"]
         session.add(
             CrawlRecord(

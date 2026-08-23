@@ -25,9 +25,9 @@ _WORKER_BOOTSTRAP = (
     "from app.services.pipeline.extraction_process import worker_main; "
     "raise SystemExit(worker_main())"
 )
-_WORKERS: weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, _ExtractionWorker] = (
-    weakref.WeakKeyDictionary()
-)
+_WORKERS: weakref.WeakKeyDictionary[
+    asyncio.AbstractEventLoop, list[_ExtractionWorker]
+] = weakref.WeakKeyDictionary()
 
 
 class ExtractionProcessError(RuntimeError):
@@ -81,6 +81,7 @@ def _decode_response(payload: bytes) -> dict[str, object]:
 class _ExtractionWorker:
     def __init__(self) -> None:
         self.lock = asyncio.Lock()
+        self.pending_count = 0
         self.process: asyncio.subprocess.Process | None = None
         self.stderr_task: asyncio.Task[None] | None = None
         self.stderr_tail = bytearray()
@@ -92,9 +93,15 @@ class _ExtractionWorker:
         timeout_seconds: float,
     ) -> ExtractionProcessResult:
         queued_at = time.perf_counter()
-        async with self.lock:
-            queue_wait_ms = max(0, int(round((time.perf_counter() - queued_at) * 1000)))
-            response = await self._run(request, timeout_seconds=timeout_seconds)
+        self.pending_count += 1
+        try:
+            async with self.lock:
+                queue_wait_ms = max(
+                    0, int(round((time.perf_counter() - queued_at) * 1000))
+                )
+                response = await self._run(request, timeout_seconds=timeout_seconds)
+        finally:
+            self.pending_count -= 1
         if not bool(response.get("ok")):
             error_type = str(response.get("error_type") or "ExtractionError")
             error_message = str(response.get("error_message") or "unknown error")
@@ -283,10 +290,16 @@ class _ExtractionWorker:
 
 def _extraction_worker() -> _ExtractionWorker:
     loop = asyncio.get_running_loop()
-    worker = _WORKERS.get(loop)
-    if worker is None:
+    workers = _WORKERS.setdefault(loop, [])
+    concurrency = max(1, int(crawler_runtime_settings.extraction_process_concurrency))
+    if not workers:
         worker = _ExtractionWorker()
-        _WORKERS[loop] = worker
+        workers.append(worker)
+        return worker
+    worker = min(workers, key=lambda item: item.pending_count)
+    if worker.pending_count > 0 and len(workers) < concurrency:
+        worker = _ExtractionWorker()
+        workers.append(worker)
     return worker
 
 
@@ -304,7 +317,7 @@ async def run_extraction_process(
 
 
 async def shutdown_extraction_processes() -> None:
-    workers = list(_WORKERS.values())
+    workers = [worker for pool in _WORKERS.values() for worker in pool]
     _WORKERS.clear()
     await asyncio.gather(
         *(worker.close() for worker in workers), return_exceptions=True
@@ -312,8 +325,9 @@ async def shutdown_extraction_processes() -> None:
 
 
 def shutdown_extraction_processes_sync() -> None:
-    for worker in list(_WORKERS.values()):
-        worker.close_sync()
+    for pool in list(_WORKERS.values()):
+        for worker in pool:
+            worker.close_sync()
     _WORKERS.clear()
 
 

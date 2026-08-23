@@ -329,6 +329,74 @@ async def test_post_extraction_detail_shell_escalates_real_chrome(
 
 @pytest.mark.asyncio
 @pytest.mark.regression
+async def test_post_extraction_detail_retry_timeout_keeps_patchright_observation(
+    db_session: AsyncSession,
+    test_user,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run = await create_crawl_run(
+        db_session,
+        test_user.id,
+        {
+            "run_type": "crawl",
+            "url": "https://www.wayfair.com/pdp/widget",
+            "surface": "ecommerce_detail",
+            "settings": {"respect_robots_txt": False},
+        },
+    )
+    attempted_engines: list[str] = []
+
+    @_as_async
+    def _fake_acquire(request: AcquisitionRequest) -> AcquisitionResult:
+        forced_engine = str(
+            request.acquisition_profile.get("forced_browser_engine") or "patchright"
+        )
+        attempted_engines.append(forced_engine)
+        if forced_engine == "real_chrome":
+            raise TimeoutError(
+                "Browser navigation stage exceeded timeout_seconds=30.00"
+            )
+        return _fake_acquire_result(
+            request,
+            html="<html><body>patchright</body></html>",
+            method="browser",
+            blocked=False,
+            browser_diagnostics={
+                "browser_attempted": True,
+                "browser_engine": "patchright",
+                "browser_outcome": "usable_content",
+            },
+        )
+
+    monkeypatch.setattr("app.services.pipeline.extraction_loop.acquire", _fake_acquire)
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.extract_records",
+        lambda *_args, **_kwargs: [],
+    )
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.real_chrome_browser_available",
+        lambda: True,
+    )
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.run_adapter", _no_adapter
+    )
+    monkeypatch.setattr(
+        "app.services.pipeline.extraction_loop.infer_detail_failure_reason",
+        lambda *_args, **_kwargs: "detail_shell",
+    )
+
+    result = await process_single_url(db_session, run, run.url)
+    logs = await get_run_logs(db_session, run.id)
+
+    assert attempted_engines == ["patchright", "real_chrome"]
+    assert result.verdict == "empty"
+    assert result.url_metrics["method"] == "browser"
+    assert result.url_metrics["failure_reason"] == "timeout"
+    assert any("Browser retry failed" in log.message for log in logs)
+
+
+@pytest.mark.asyncio
+@pytest.mark.regression
 async def test_post_extraction_identity_mismatch_escalates_real_chrome(
     db_session: AsyncSession,
     test_user,
