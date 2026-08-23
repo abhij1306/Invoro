@@ -260,7 +260,11 @@ fi
 aws ecs wait tasks-stopped --cluster "$cluster" --tasks "$migration_run"
 migration_exit=$(aws ecs describe-tasks --cluster "$cluster" --tasks "$migration_run" --query "tasks[0].containers[?name=='migration'].exitCode | [0]" --output text)
 if [[ "$migration_exit" != "0" ]]; then
-  aws ecs describe-tasks --cluster "$cluster" --tasks "$migration_run" --query 'tasks[0].{StopCode:stopCode,StoppedReason:stoppedReason,Containers:containers[].reason}' --output json >&2
+  aws ecs describe-tasks \
+    --cluster "$cluster" \
+    --tasks "$migration_run" \
+    --query 'tasks[0].{StopCode:stopCode,StoppedReason:stoppedReason,Containers:containers[].{Name:name,ExitCode:exitCode,LastStatus:lastStatus,Reason:reason}}' \
+    --output json >&2
   exit 1
 fi
 

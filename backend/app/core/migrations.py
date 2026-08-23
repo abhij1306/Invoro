@@ -17,7 +17,7 @@ _ALEMBIC_SCRIPT_PATH = BASE_DIR / "alembic"
 def build_alembic_config() -> Config:
     config = Config(str(_ALEMBIC_INI_PATH))
     config.set_main_option("script_location", str(_ALEMBIC_SCRIPT_PATH))
-    config.set_main_option("sqlalchemy.url", settings.database_url)
+    config.set_main_option("sqlalchemy.url", settings.database_url.replace("%", "%%"))
     return config
 
 
