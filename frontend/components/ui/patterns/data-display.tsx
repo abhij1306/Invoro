@@ -142,7 +142,9 @@ export function KVTile({
 }
 
 export function MetricPulse({ children }: Readonly<{ children: ReactNode }>) {
-  return <div className="grid grid-cols-4 gap-3 max-sm:grid-cols-2">{children}</div>;
+  return (
+    <div className="grid grid-cols-1 gap-3 min-[380px]:grid-cols-2 lg:grid-cols-4">{children}</div>
+  );
 }
 
 export function MetricPulseItem({

@@ -2,9 +2,9 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
-import { Trash2 } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { ReactNode, RefObject } from 'react';
+import { Menu, Trash2 } from 'lucide-react';
 
 import { api } from '../../lib/api';
 import { httpErrorStatus } from '../../lib/api/client';
@@ -38,6 +38,10 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
   const pathname = usePathname();
   const router = useRouter();
   const authRoute = isAuthRoute(pathname);
+  const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
+  const mobileMenuTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const closeMobileNavigation = useCallback(() => setMobileNavigationOpen(false), []);
+  const openMobileNavigation = useCallback(() => setMobileNavigationOpen(true), []);
 
   const authQuery = useQuery(getAuthSessionQueryOptions(pathname));
 
@@ -126,8 +130,20 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
           Skip to main content
         </a>
         <div className="app-shell-grid">
-          <Sidebar pathname={pathname} user={authQuery.data} />
-          <ShellContent pathname={pathname} canResetWorkspace={authQuery.data?.role === 'admin'}>
+          <Sidebar
+            pathname={pathname}
+            user={authQuery.data}
+            mobileOpen={mobileNavigationOpen}
+            mobileMenuTriggerRef={mobileMenuTriggerRef}
+            onMobileClose={closeMobileNavigation}
+          />
+          <ShellContent
+            pathname={pathname}
+            canResetWorkspace={authQuery.data?.role === 'admin'}
+            mobileNavigationOpen={mobileNavigationOpen}
+            mobileMenuTriggerRef={mobileMenuTriggerRef}
+            onMobileNavigationOpen={openMobileNavigation}
+          >
             {children}
           </ShellContent>
         </div>
@@ -156,7 +172,17 @@ function ShellContent({
   children,
   pathname,
   canResetWorkspace,
-}: Readonly<{ children: ReactNode; pathname: string; canResetWorkspace: boolean }>) {
+  mobileNavigationOpen,
+  mobileMenuTriggerRef,
+  onMobileNavigationOpen,
+}: Readonly<{
+  children: ReactNode;
+  pathname: string;
+  canResetWorkspace: boolean;
+  mobileNavigationOpen: boolean;
+  mobileMenuTriggerRef: RefObject<HTMLButtonElement | null>;
+  onMobileNavigationOpen: () => void;
+}>) {
   const header = useTopBarHeader();
   const topBar = header?.pathKey === pathname ? header : getFallbackHeader(pathname);
   const router = useRouter();
@@ -267,6 +293,17 @@ function ShellContent({
     <div className="app-main-col">
       <header className="app-topbar">
         <div className="app-topbar-main">
+          <button
+            ref={mobileMenuTriggerRef}
+            type="button"
+            className="app-icon-button app-mobile-menu-button"
+            aria-label="Open navigation"
+            aria-controls="app-sidebar-navigation"
+            aria-expanded={mobileNavigationOpen}
+            onClick={onMobileNavigationOpen}
+          >
+            <Menu className="size-4" />
+          </button>
           <h1 className="app-topbar-title">{topBar.title}</h1>
         </div>
         <div className="app-topbar-actions">
@@ -284,7 +321,7 @@ function ShellContent({
                 size="sm"
               >
                 <Trash2 className="size-3" />
-                {resetLabel}
+                <span className="app-reset-label">{resetLabel}</span>
               </Button>
             </div>
           ) : null}

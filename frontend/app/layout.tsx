@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { headers } from 'next/headers';
 import localFont from 'next/font/local';
 import Script from 'next/script';
@@ -37,6 +37,12 @@ const monoFont = Geist_Mono({
 export const metadata: Metadata = {
   title: 'Invoro',
   description: 'AI commerce intelligence and structured extraction platform.',
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
 };
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

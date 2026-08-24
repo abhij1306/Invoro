@@ -178,6 +178,52 @@ describe('AppShell sidebar toggle', () => {
       'false',
     );
   });
+
+  it('manages mobile drawer state and restores focus to its opener', async () => {
+    vi.mocked(globalThis.matchMedia).mockImplementation((query) => ({
+      matches: query.includes('max-width: 760px'),
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }));
+    apiMock.me.mockResolvedValue({
+      id: 2,
+      email: 'user@example.com',
+      role: 'user',
+      is_active: true,
+      created_at: new Date('2026-05-19T00:00:00Z').toISOString(),
+      updated_at: new Date('2026-05-19T00:00:00Z').toISOString(),
+    });
+
+    renderShell();
+
+    const opener = await screen.findByRole('button', { name: /open navigation/i });
+    const drawer = document.querySelector<HTMLElement>('.app-sidebar');
+    expect(opener).toHaveAttribute('aria-expanded', 'false');
+    await waitFor(() => expect(drawer).toHaveAttribute('inert'));
+
+    fireEvent.click(opener);
+
+    await waitFor(() => {
+      expect(opener).toHaveAttribute('aria-expanded', 'true');
+      expect(drawer).not.toHaveAttribute('inert');
+      expect(screen.getByRole('button', { name: /close navigation/i })).toHaveFocus();
+    });
+    expect(document.body.style.overflow).toBe('hidden');
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    await waitFor(() => {
+      expect(opener).toHaveAttribute('aria-expanded', 'false');
+      expect(drawer).toHaveAttribute('inert');
+      expect(opener).toHaveFocus();
+    });
+    expect(document.body.style.overflow).toBe('');
+  });
 });
 
 describe('AppShell logout', () => {

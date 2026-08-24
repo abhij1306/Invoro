@@ -1265,6 +1265,46 @@ html:not([data-theme='dark']) .compact-data-table {
 @media (max-width: 480px) {
   :root {
     --content-gutter: var(--space-4);
+    --card-padding: var(--space-4);
+  }
+
+  .page-stack {
+    gap: var(--space-4);
+  }
+
+  .page-stack-lg {
+    gap: var(--space-5);
+  }
+
+  .section-card {
+    gap: var(--space-3);
+  }
+
+  .compact-data-table {
+    min-width: 680px;
+  }
+
+  .compact-data-table tbody tr:hover {
+    background: inherit;
+  }
+}
+
+@media (pointer: coarse) {
+  button,
+  a,
+  input,
+  select,
+  textarea,
+  [role='button'],
+  [role='tab'] {
+    touch-action: manipulation;
+  }
+
+  button,
+  a[role='button'],
+  [role='button'],
+  [role='tab'] {
+    min-height: 44px;
   }
 }
 
