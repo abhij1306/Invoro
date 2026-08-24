@@ -129,6 +129,14 @@ migrations/admin bootstrap, registers all task revisions, preserves service coun
 and restores a previously stopped RDS. Fixable or unclassified High/Critical findings
 always block deployment.
 
+Release rollout is component-aware. When `backend/` is unchanged from the backend
+release currently selected by ECS, the workflow reuses that deployed immutable image,
+rechecks its current scan findings, skips migration, and does not restart API or worker
+services. It still registers release-marked task revisions so rollback to the
+frontend-only release remains complete. Changed services update and stabilize
+sequentially. A stabilization failure prints the failing service, deployment events,
+stopped-task reasons, and recent redacted logs before exiting.
+
 Keep `allow_unfixed_image_findings=false` unless every remaining High/Critical finding
 shows `fix=NO` and you have reviewed the release risk. If accepted for this temporary
 demo, rerun with it enabled. This input cannot bypass a finding with an available or
