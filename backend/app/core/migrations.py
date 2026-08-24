@@ -10,7 +10,6 @@ from alembic.config import Config
 from app.core.config import BASE_DIR, settings
 
 logger = logging.getLogger("app.core.migrations")
-_ALEMBIC_INI_PATH = BASE_DIR / "alembic.ini"
 _ALEMBIC_SCRIPT_PATH = BASE_DIR / "alembic"
 
 
@@ -20,7 +19,7 @@ def set_database_url(config: Config) -> None:
 
 
 def build_alembic_config() -> Config:
-    config = Config(str(_ALEMBIC_INI_PATH))
+    config = Config()
     config.set_main_option("script_location", str(_ALEMBIC_SCRIPT_PATH))
     set_database_url(config)
     return config
