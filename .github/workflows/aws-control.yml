@@ -52,11 +52,25 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          wait_for_rds_stopped() {
+            local state
+            for _ in {1..60}; do
+              state=$(aws rds describe-db-instances --db-instance-identifier "$RDS_ID" --query 'DBInstances[0].DBInstanceStatus' --output text)
+              echo "RDS state: $state"
+              if [[ "$state" == "stopped" ]]; then
+                return 0
+              fi
+              sleep 15
+            done
+            echo 'Timed out waiting for RDS to stop.' >&2
+            return 1
+          }
+
           state=$(aws rds describe-db-instances --db-instance-identifier "$RDS_ID" --query 'DBInstances[0].DBInstanceStatus' --output text)
           if [[ "$state" == "stopped" ]]; then
             aws rds start-db-instance --db-instance-identifier "$RDS_ID" >/dev/null
           elif [[ "$state" == "stopping" ]]; then
-            aws rds wait db-instance-stopped --db-instance-identifier "$RDS_ID"
+            wait_for_rds_stopped
             aws rds start-db-instance --db-instance-identifier "$RDS_ID" >/dev/null
           fi
           aws rds wait db-instance-available --db-instance-identifier "$RDS_ID"
@@ -78,6 +92,20 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          wait_for_rds_stopped() {
+            local state
+            for _ in {1..60}; do
+              state=$(aws rds describe-db-instances --db-instance-identifier "$RDS_ID" --query 'DBInstances[0].DBInstanceStatus' --output text)
+              echo "RDS state: $state"
+              if [[ "$state" == "stopped" ]]; then
+                return 0
+              fi
+              sleep 15
+            done
+            echo 'Timed out waiting for RDS to stop.' >&2
+            return 1
+          }
+
           for service in "$FRONTEND_SERVICE" "$API_SERVICE" "$WORKER_SERVICE"; do
             aws ecs update-service --cluster "$CLUSTER" --service "$service" --desired-count 0 >/dev/null
           done
@@ -85,11 +113,11 @@ jobs:
           state=$(aws rds describe-db-instances --db-instance-identifier "$RDS_ID" --query 'DBInstances[0].DBInstanceStatus' --output text)
           if [[ "$state" == "available" ]]; then
             aws rds stop-db-instance --db-instance-identifier "$RDS_ID" >/dev/null
-            aws rds wait db-instance-stopped --db-instance-identifier "$RDS_ID"
+            wait_for_rds_stopped
           elif [[ "$state" == "starting" ]]; then
             aws rds wait db-instance-available --db-instance-identifier "$RDS_ID"
             aws rds stop-db-instance --db-instance-identifier "$RDS_ID" >/dev/null
-            aws rds wait db-instance-stopped --db-instance-identifier "$RDS_ID"
+            wait_for_rds_stopped
           fi
 
       - name: Report status

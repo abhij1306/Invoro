@@ -33,6 +33,20 @@ service_desired_count() {
   aws ecs describe-services --cluster "$cluster" --services "$1" --query 'services[0].desiredCount' --output text
 }
 
+wait_for_rds_stopped() {
+  local state
+  for _ in {1..60}; do
+    state=$(aws rds describe-db-instances --db-instance-identifier "$rds_id" --query 'DBInstances[0].DBInstanceStatus' --output text)
+    echo "RDS state: $state"
+    if [[ "$state" == "stopped" ]]; then
+      return 0
+    fi
+    sleep 15
+  done
+  echo "Timed out waiting for RDS to stop." >&2
+  return 1
+}
+
 print_service_failure() {
   local service=$1
   local suffix=${service#"$cluster-"}
@@ -359,7 +373,7 @@ restore_database_if_needed() {
   state=$(aws rds describe-db-instances --db-instance-identifier "$rds_id" --query 'DBInstances[0].DBInstanceStatus' --output text 2>/dev/null || true)
   if [[ "$state" == "available" ]]; then
     aws rds stop-db-instance --db-instance-identifier "$rds_id" >/dev/null || true
-    aws rds wait db-instance-stopped --db-instance-identifier "$rds_id" || true
+    wait_for_rds_stopped || true
   fi
 }
 trap restore_database_if_needed EXIT
@@ -372,7 +386,7 @@ if [[ "$backend_changed" == "true" ]]; then
   if [[ "$previous_db_state" == "stopped" ]]; then
     aws rds start-db-instance --db-instance-identifier "$rds_id" >/dev/null
   elif [[ "$previous_db_state" == "stopping" ]]; then
-    aws rds wait db-instance-stopped --db-instance-identifier "$rds_id"
+    wait_for_rds_stopped
     aws rds start-db-instance --db-instance-identifier "$rds_id" >/dev/null
   fi
   aws rds wait db-instance-available --db-instance-identifier "$rds_id"
